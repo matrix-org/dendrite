@@ -20,7 +20,7 @@ entries to the logs and readers that read those entries.
 
 The event logs then serve to decouple the two components, the writers and
 readers need only agree on the format of the entries in the event log.
-This format could be largely dervived from the wire format of the events used
+This format could be largely derived from the wire format of the events used
 in the client and federation protocols:
 
 
