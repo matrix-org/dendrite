@@ -1,0 +1,9 @@
+#! /bin/bash
+
+set -eu
+
+golint src/...
+go fmt ./src/...
+go tool vet --shadow ./src
+gocyclo -over 12 src/
+gb test
