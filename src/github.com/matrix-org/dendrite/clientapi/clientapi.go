@@ -16,8 +16,8 @@ import (
 // to clients which need to make outbound HTTP requests.
 func setup(mux *http.ServeMux, httpClient *http.Client) {
 	mux.Handle("/metrics", prometheus.Handler())
-	mux.Handle("/send", prometheus.InstrumentHandler("send_message", util.MakeJSONAPI(&writers.SendMessage{})))
-	mux.Handle("/sync", prometheus.InstrumentHandler("sync", util.MakeJSONAPI(&readers.Sync{})))
+	mux.Handle("/api/send", prometheus.InstrumentHandler("send_message", util.MakeJSONAPI(&writers.SendMessage{})))
+	mux.Handle("/api/sync", prometheus.InstrumentHandler("sync", util.MakeJSONAPI(&readers.Sync{})))
 }
 
 func main() {
