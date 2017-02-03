@@ -10,7 +10,7 @@ import (
 // A Database is used to store room events and stream offsets.
 type Database struct {
 	statements statements
-	db    *sql.DB
+	db         *sql.DB
 }
 
 // Open a postgres database.
