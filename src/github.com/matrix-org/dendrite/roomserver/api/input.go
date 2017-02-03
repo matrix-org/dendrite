@@ -30,7 +30,7 @@ type InputRoomEvent struct {
 	Kind int
 	// The event JSON for the event to add.
 	Event []byte
-	// Optional list of state events forming the state before this event.
+	// Optional list of state event IDs forming the state before this event.
 	// These state events must have already been persisted.
 	State []string
 }
