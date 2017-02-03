@@ -7,8 +7,10 @@ import (
 	"github.com/matrix-org/util"
 )
 
+// Sync handles HTTP requests to /sync
 type Sync struct{}
 
+// OnIncomingRequest implements util.JSONRequestHandler
 func (s *Sync) OnIncomingRequest(req *http.Request) (interface{}, *util.HTTPError) {
 	logger := req.Context().Value(util.CtxValueLogger).(*log.Entry)
 	logger.Info("Doing stuff...")
