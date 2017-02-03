@@ -7,11 +7,10 @@ const (
 	// These events are state events used to authenticate other events.
 	// They can become part of the contiguous event graph via backfill.
 	KindOutlier = 1
-	// KindJoin event start a new contiguous event graph. The first event
-	// in the list must be a m.room.memeber event joining this server to
-	// the room. This must come with the state at the event.
-	// If the event is contiguous with the existing graph for the room then
-	// it is treated as a normal new event.
+	// KindJoin event start a new contiguous event graph. The event must be a
+	// m.room.member event joining this server to the room. This must come with
+	// the state at the event. If the event is contiguous with the existing
+	// graph for the room then it is treated as a normal new event.
 	KindJoin = 2
 	// KindNew event extend the contiguous graph going forwards.
 	// They usually don't need state, but may include state if the
