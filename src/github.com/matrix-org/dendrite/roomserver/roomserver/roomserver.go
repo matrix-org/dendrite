@@ -38,5 +38,7 @@ func main() {
 
 	fmt.Println("Started roomserver")
 
+	// Wait forever.
+	// TODO: Implement clean shutdown.
 	select {}
 }

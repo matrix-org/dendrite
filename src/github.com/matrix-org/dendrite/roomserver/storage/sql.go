@@ -5,12 +5,12 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
-type stmts struct {
+type statements struct {
 	selectPartitionOffsetsStmt *sql.Stmt
 	upsertPartitionOffsetStmt  *sql.Stmt
 }
 
-func (s *stmts) prepare(db *sql.DB) error {
+func (s *statements) prepare(db *sql.DB) error {
 	var err error
 
 	_, err = db.Exec(partitionOffsetsSchema)
@@ -48,7 +48,7 @@ const upsertPartitionOffsetsSQL = "" +
 	" ON CONFLICT ON CONSTRAINT topic_partition_unique" +
 	" DO UPDATE SET partition_offset = $3"
 
-func (s *stmts) selectPartitionOffsets(topic string) ([]types.PartitionOffset, error) {
+func (s *statements) selectPartitionOffsets(topic string) ([]types.PartitionOffset, error) {
 	rows, err := s.selectPartitionOffsetsStmt.Query(topic)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func (s *stmts) selectPartitionOffsets(topic string) ([]types.PartitionOffset, e
 	return results, nil
 }
 
-func (s *stmts) upsertPartitionOffset(topic string, partition int32, offset int64) error {
+func (s *statements) upsertPartitionOffset(topic string, partition int32, offset int64) error {
 	_, err := s.upsertPartitionOffsetStmt.Exec(topic, partition, offset)
 	return err
 }

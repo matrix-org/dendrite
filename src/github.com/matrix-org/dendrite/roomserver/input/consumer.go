@@ -14,25 +14,36 @@ type ConsumerDatabase interface {
 	SetPartitionOffset(topic string, partition int32, offset int64) error
 }
 
-// An ErrorHandler handles the errors encountered by the consumer.
-type ErrorHandler interface {
-	OnError(err error)
+// An ErrorLogger handles the errors encountered by the consumer.
+type ErrorLogger interface {
+	OnError(message *sarama.ConsumerMessage, err error)
 }
 
 // A Consumer consumes a kafkaesque stream of room events.
+// The room events are supplied as api.InputRoomEvent structs serialised as JSON.
+// The events should be valid matrix events.
+// The events needed to authenticate the event should already be stored on the roomserver.
+// The events needed to construct the state at the event should already be stored on the roomserver.
+// If the event is not valid then it will be discarded and an error will be logged.
 type Consumer struct {
-	// A kafkaesque stream consumer.
+	// A kafkaesque stream consumer providing the APIs for talking to the event source.
+	// The interface is taken from a client library for Apache Kafka.
+	// But any equivalent event streaming protocol could be made to implement the same interface.
 	Consumer sarama.Consumer
 	// The database used to store the room events.
 	DB ConsumerDatabase
 	// The kafkaesque topic to consume room events from.
+	// This is the name used in kafka to identify the stream to consume events from.
 	RoomEventTopic string
-	// The ErrorHandler for this consumer.
-	// If left as nil then the consumer will panic with that error.
-	ErrorHandler ErrorHandler
+	// The ErrorLogger for this consumer.
+	// If left as nil then the consumer will panic when it encounters an error
+	ErrorLogger ErrorLogger
 }
 
 // Start starts the consumer consuming.
+// Starts up a goroutine for each partition in the kafka stream.
+// Returns nil once all the goroutines are started.
+// Returns an error if it can't start consuming for any of the partitions.
 func (c *Consumer) Start() error {
 	offsets := map[int32]int64{}
 
@@ -58,8 +69,8 @@ func (c *Consumer) Start() error {
 	for partition, offset := range offsets {
 		pc, err := c.Consumer.ConsumePartition(c.RoomEventTopic, partition, offset)
 		if err != nil {
-			for _, pc := range partitionConsumers {
-				pc.Close()
+			for _, p := range partitionConsumers {
+				p.Close()
 			}
 			return err
 		}
@@ -74,18 +85,19 @@ func (c *Consumer) Start() error {
 
 // consumePartition consumes the room events for a single partition of the kafkaesque stream.
 func (c *Consumer) consumePartition(pc sarama.PartitionConsumer) {
+	defer pc.Close()
 	for message := range pc.Messages() {
-		// Do stuff with message.
+		// TODO: Do stuff with message.
 		if err := c.DB.SetPartitionOffset(c.RoomEventTopic, message.Partition, message.Offset); err != nil {
-			c.handleError(message, err)
+			c.logError(message, err)
 		}
 	}
 }
 
-// handleError is a convenience method for handling errors.
-func (c *Consumer) handleError(message *sarama.ConsumerMessage, err error) {
-	if c.ErrorHandler == nil {
+// logError is a convenience method for logging errors.
+func (c *Consumer) logError(message *sarama.ConsumerMessage, err error) {
+	if c.ErrorLogger == nil {
 		panic(err)
 	}
-	c.ErrorHandler.OnError(err)
+	c.ErrorLogger.OnError(message, err)
 }

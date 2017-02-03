@@ -9,7 +9,7 @@ import (
 
 // A Database is used to store room events and stream offsets.
 type Database struct {
-	stmts stmts
+	statements statements
 	db    *sql.DB
 }
 
@@ -20,7 +20,7 @@ func Open(dataSourceName string) (*Database, error) {
 	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
-	if err = d.stmts.prepare(d.db); err != nil {
+	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}
 	return &d, nil
@@ -28,10 +28,10 @@ func Open(dataSourceName string) (*Database, error) {
 
 // PartitionOffsets implements input.ConsumerDatabase
 func (d *Database) PartitionOffsets(topic string) ([]types.PartitionOffset, error) {
-	return d.stmts.selectPartitionOffsets(topic)
+	return d.statements.selectPartitionOffsets(topic)
 }
 
 // SetPartitionOffset implements input.ConsumerDatabase
 func (d *Database) SetPartitionOffset(topic string, partition int32, offset int64) error {
-	return d.stmts.upsertPartitionOffset(topic, partition, offset)
+	return d.statements.upsertPartitionOffset(topic, partition, offset)
 }
