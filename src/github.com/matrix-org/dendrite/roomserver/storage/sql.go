@@ -190,14 +190,14 @@ const eventStateKeysSchema = `
 -- Well known state keys are pre-assigned numeric IDs:
 --   1 -> "" (the empty string)
 CREATE SEQUENCE IF NOT EXISTS event_state_key_nid_seq START 65536;
-CREATE TABLE event_state_keys (
+CREATE TABLE IF NOT EXISTS event_state_keys (
     -- Local numeric ID for the state key.
     event_state_key_nid BIGINT PRIMARY KEY DEFAULT nextval('event_state_key_nid_seq'),
     event_state_key TEXT NOT NULL CONSTRAINT event_state_key_unique UNIQUE
 );
 INSERT INTO event_state_keys (event_state_key_nid, event_state_key) VALUES (
     (1, '')
-);
+) ON CONFLICT DO NOTHING;
 `
 
 const insertEventStateKeyNIDSQL = "" +
