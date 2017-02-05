@@ -8,36 +8,36 @@ import (
 type statements struct {
 	selectPartitionOffsetsStmt *sql.Stmt
 	upsertPartitionOffsetStmt  *sql.Stmt
-        insertEventTypeNIDStmt *sql.Stmt
-        selectEventTypeNIDStmt *sql.Stmt
+	insertEventTypeNIDStmt     *sql.Stmt
+	selectEventTypeNIDStmt     *sql.Stmt
 }
 
 func (s *statements) prepare(db *sql.DB) error {
 	var err error
 
-        if err = s.preparePartitionOffsets(db); err != nil {
-            return err
-        }
+	if err = s.preparePartitionOffsets(db); err != nil {
+		return err
+	}
 
-        if err = s.prepareEventTypes(db); err != nil {
-            return err
-        }
+	if err = s.prepareEventTypes(db); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (s *statements) preparePartitionOffsets(db *sql.DB) (err error) {
-    _, err = db.Exec(partitionOffsetsSchema)
-    if err != nil {
-	    return
-    }
-    if s.selectPartitionOffsetsStmt, err = db.Prepare(selectPartitionOffsetsSQL); err != nil {
-	    return
-    }
-    if s.upsertPartitionOffsetStmt, err = db.Prepare(upsertPartitionOffsetsSQL); err != nil {
-        return
-    }
-    return
+	_, err = db.Exec(partitionOffsetsSchema)
+	if err != nil {
+		return
+	}
+	if s.selectPartitionOffsetsStmt, err = db.Prepare(selectPartitionOffsetsSQL); err != nil {
+		return
+	}
+	if s.upsertPartitionOffsetStmt, err = db.Prepare(upsertPartitionOffsetsSQL); err != nil {
+		return
+	}
+	return
 }
 
 const partitionOffsetsSchema = `
@@ -83,18 +83,18 @@ func (s *statements) upsertPartitionOffset(topic string, partition int32, offset
 }
 
 func (s *statements) prepareEventTypes(db *sql.DB) (err error) {
-        _, err = db.Exec(eventTypesSchema)
-        if err != nil {
-            return
-        }
-        if s.insertEventTypeNIDStmt, err = db.Prepare(insertEventTypeNIDSQL); err != nil {
-            return
-        }
-        if s.selectEventTypeNIDStmt, err = db.Prepare(selectEventTypeNIDSQL); err != nil {
-            return
-        }
-        return
-    }
+	_, err = db.Exec(eventTypesSchema)
+	if err != nil {
+		return
+	}
+	if s.insertEventTypeNIDStmt, err = db.Prepare(insertEventTypeNIDSQL); err != nil {
+		return
+	}
+	if s.selectEventTypeNIDStmt, err = db.Prepare(selectEventTypeNIDSQL); err != nil {
+		return
+	}
+	return
+}
 
 const eventTypesSchema = `
 -- Numeric versions of the event "type"s. Event types tend to be taken from a
@@ -135,28 +135,28 @@ INSERT INTO event_types (event_type_nid, event_type) VALUES (
 `
 
 const insertEventTypeNIDSQL = "" +
-    "INSERT INTO event_types (event_type) VALUES ($1)" +
-    " ON CONFLICT ON CONSTRAINT event_type_unique" +
-    " DO UPDATE SET event_type = $1" +
-    " RETURNING (event_type_nid)"
+	"INSERT INTO event_types (event_type) VALUES ($1)" +
+	" ON CONFLICT ON CONSTRAINT event_type_unique" +
+	" DO UPDATE SET event_type = $1" +
+	" RETURNING (event_type_nid)"
 
 const selectEventTypeNIDSQL = "" +
-    "SELECT event_type_nid FROM event_types WHERE event_type = $1"
+	"SELECT event_type_nid FROM event_types WHERE event_type = $1"
 
 func (s *statements) insertEventTypeNID(eventType string) (eventTypeNID int64, err error) {
-    err = s.insertEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
-    if err == sql.ErrNoRows {
-        eventTypeNID = 0
-        err = nil
-    }
-    return
+	err = s.insertEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
+	if err == sql.ErrNoRows {
+		eventTypeNID = 0
+		err = nil
+	}
+	return
 }
 
 func (s *statements) selectEventTypeNID(eventType string) (eventTypeNID int64, err error) {
-    err = s.selectEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
-    if err == sql.ErrNoRows {
-        eventTypeNID = 0
-        err = nil
-    }
-    return
+	err = s.selectEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
+	if err == sql.ErrNoRows {
+		eventTypeNID = 0
+		err = nil
+	}
+	return
 }
