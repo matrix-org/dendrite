@@ -14,6 +14,8 @@ type statements struct {
 	selectEventStateKeyNIDStmt *sql.Stmt
 	insertRoomNIDStmt          *sql.Stmt
 	selectRoomNIDStmt          *sql.Stmt
+	insertEventStmt            *sql.Stmt
+	insertEventJSONStmt        *sql.Stmt
 }
 
 func (s *statements) prepare(db *sql.DB) error {
@@ -157,10 +159,6 @@ const selectEventTypeNIDSQL = "" +
 
 func (s *statements) insertEventTypeNID(eventType string) (eventTypeNID int64, err error) {
 	err = s.insertEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
-	if err == sql.ErrNoRows {
-		eventTypeNID = 0
-		err = nil
-	}
 	return
 }
 
@@ -217,10 +215,6 @@ const selectEventStateKeyNIDSQL = "" +
 
 func (s *statements) insertEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
 	err = s.insertEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
-	if err == sql.ErrNoRows {
-		eventStateKeyNID = 0
-		err = nil
-	}
 	return
 }
 
@@ -268,10 +262,6 @@ const selectRoomNIDSQL = "" +
 
 func (s *statements) insertRoomNID(roomID string) (roomNID int64, err error) {
 	err = s.insertRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
-	if err == sql.ErrNoRows {
-		roomNID = 0
-		err = nil
-	}
 	return
 }
 
@@ -282,4 +272,92 @@ func (s *statements) selectRoomNID(roomID string) (roomNID int64, err error) {
 		err = nil
 	}
 	return
+}
+
+const eventsSchema = `
+-- The events table holds metadata for each event, the actual JSON is stored
+-- separately to keep the size of the rows small.
+CREATE SEQUENCE IF NOT EXISTS event_nid_seq;
+CREATE TABLE IF NOT EXISTS events (
+    -- Local numeric ID for the event.
+    event_nid bigint PRIMARY KEY DEFAULT nextval('event_nid_seq'),
+    -- Local numeric ID for the room the event is in.
+    room_nid bigint NOT NULL,
+	-- Local numeric ID for the type of the event.
+    event_type_nid bigint NOT NULL,
+    -- Local numeric ID for the state_key of the event
+	-- This is 0 if the event is not a state event.
+    event_state_key_nid bigint NOT NULL,
+    -- The textual event id.
+    -- Used to lookup the numeric ID when processing requests.
+    -- Needed for state resolution.
+    -- An event may only appear in this table once.
+    event_id text NOT NULL CONSTRAINT event_id_unique UNIQUE,
+    -- The sha256 reference hash for the event.
+    -- Needed for setting reference hashes when sending new events.
+    reference_sha256 bytea NOT NULL
+);
+`
+
+const insertEventSQL = "" +
+	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256)" +
+	" VALUES ($1, $2, $3, $4, $5)" +
+	" ON CONFLICT ON CONSTRAINT event_id_unique" +
+	" DO UPDATE SET event_id = $1" +
+	" RETURNING event_nid"
+
+func (s *statements) prepareEvents(db *sql.DB) (err error) {
+	_, err = db.Exec(eventsSchema)
+	if err != nil {
+		return
+	}
+	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
+		return
+	}
+	return
+}
+
+func (s *statements) insertEvent(
+	roomNID, eventTypeNID, eventStateKeyNID int64,
+	eventID string,
+	referenceSHA256 []byte,
+) (eventNID int64, err error) {
+	err = s.insertEventStmt.QueryRow(
+		roomNID, eventTypeNID, eventStateKeyNID, eventID, referenceSHA256,
+	).Scan(&eventNID)
+	return
+}
+
+func (s *statements) prepareEventJSON(db *sql.DB) (err error) {
+	_, err = db.Exec(eventJSONSchema)
+	if err != nil {
+		return
+	}
+	if s.insertEventJSONStmt, err = db.Prepare(insertEventJSONSQL); err != nil {
+		return
+	}
+	return
+}
+
+const eventJSONSchema = `
+-- Stores the JSON for each event. This kept separate from the main events
+-- table to keep the rows in the main events table small.
+CREATE TABLE IF NOT EXISTS event_json (
+    -- Local numeric ID for the event.
+    event_nid bigint NOT NULL PRIMARY KEY,
+    -- The JSON for the event.
+    -- Stored as TEXT because this should be valid UTF-8.
+    -- Not stored as a JSONB because we always just pull the entire event.
+    -- TODO: Should we be compressing the events with Snappy or DEFLATE?
+    event_json text NOT NULL
+);
+`
+
+const insertEventJSONSQL = "" +
+	"INSERT INTO event_json (event_nid, event_json) VALUES ($1, $2)" +
+	" ON CONFLICT DO NOTHING"
+
+func (s *statements) insertEventJSON(eventNID int64, eventJSON []byte) error {
+	_, err := s.insertEventJSONStmt.Exec(eventNID, eventJSON)
+	return err
 }
