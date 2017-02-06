@@ -72,6 +72,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/matrix-org/gomatrixserverlib",
+			"repository": "https://github.com/matrix-org/gomatrixserverlib",
+			"revision": "48ee56a33d195dc412dd919a0e81af70c9aaf4a3",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/matrix-org/util",
 			"repository": "https://github.com/matrix-org/util",
 			"revision": "0f4d9cce82badc0741ff1141dcf079312cb4d2f0",
@@ -148,6 +154,13 @@
 			"repository": "https://github.com/sirupsen/logrus",
 			"revision": "61e43dc76f7ee59a82bdf3d71033dc12bea4c77d",
 			"branch": "master"
+		},
+		{
+			"importpath": "golang.org/x/crypto/ed25519",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "77014cf7f9bde4925afeed52b7bf676d5f5b4285",
+			"branch": "master",
+			"path": "/ed25519"
 		},
 		{
 			"importpath": "golang.org/x/net/context",
