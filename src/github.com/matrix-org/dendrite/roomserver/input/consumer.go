@@ -2,12 +2,15 @@
 package input
 
 import (
+	"encoding/json"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // A ConsumerDatabase has the storage APIs needed by the consumer.
 type ConsumerDatabase interface {
+	RoomEventDatabase
 	// PartitionOffsets returns the offsets the consumer has reached for each partition.
 	PartitionOffsets(topic string) ([]types.PartitionOffset, error)
 	// SetPartitionOffset records where the consumer has reached for a partition.
@@ -87,7 +90,14 @@ func (c *Consumer) Start() error {
 func (c *Consumer) consumePartition(pc sarama.PartitionConsumer) {
 	defer pc.Close()
 	for message := range pc.Messages() {
-		// TODO: Do stuff with message.
+		var input api.InputRoomEvent
+		if err := json.Unmarshal(message.Value, &message.Value); err != nil {
+			c.logError(message, err)
+		} else {
+			if err := processRoomEvent(c.DB, input); err != nil {
+				c.logError(message, err)
+			}
+		}
 		if err := c.DB.SetPartitionOffset(c.RoomEventTopic, message.Partition, message.Offset); err != nil {
 			c.logError(message, err)
 		}

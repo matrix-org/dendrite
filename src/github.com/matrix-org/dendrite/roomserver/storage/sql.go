@@ -37,6 +37,14 @@ func (s *statements) prepare(db *sql.DB) error {
 		return err
 	}
 
+	if err = s.prepareEvents(db); err != nil {
+		return err
+	}
+
+	if err = s.prepareEventJSON(db); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -137,15 +145,14 @@ CREATE TABLE IF NOT EXISTS event_types (
     -- The string event_type.
     event_type TEXT NOT NULL CONSTRAINT event_type_unique UNIQUE
 );
-INSERT INTO event_types (event_type_nid, event_type) VALUES (
+INSERT INTO event_types (event_type_nid, event_type) VALUES
     (1, 'm.room.create'),
     (2, 'm.room.power_levels'),
     (3, 'm.room.join_rules'),
     (4, 'm.room.third_party_invite'),
     (5, 'm.room.member'),
     (6, 'm.room.redaction'),
-    (7, 'm.room.history_visibility'),
-) ON CONFLICT DO NOTHING;
+    (7, 'm.room.history_visibility') ON CONFLICT DO NOTHING;
 `
 
 const insertEventTypeNIDSQL = "" +
@@ -199,9 +206,8 @@ CREATE TABLE IF NOT EXISTS event_state_keys (
     event_state_key_nid BIGINT PRIMARY KEY DEFAULT nextval('event_state_key_nid_seq'),
     event_state_key TEXT NOT NULL CONSTRAINT event_state_key_unique UNIQUE
 );
-INSERT INTO event_state_keys (event_state_key_nid, event_state_key) VALUES (
-    (1, '')
-) ON CONFLICT DO NOTHING;
+INSERT INTO event_state_keys (event_state_key_nid, event_state_key) VALUES
+    (1, '') ON CONFLICT DO NOTHING;
 `
 
 const insertEventStateKeyNIDSQL = "" +
@@ -243,9 +249,9 @@ func (s *statements) prepareRooms(db *sql.DB) (err error) {
 
 const roomsSchema = `
 CREATE SEQUENCE IF NOT EXISTS room_nid_seq;
-CREATE TABLE rooms (
+CREATE TABLE IF NOT EXISTS rooms (
     -- Local numeric ID for the room.
-    room_nid BIGINT PRIMARY KEY DEFAULT nextvalue('room_nid_seq'),
+    room_nid BIGINT PRIMARY KEY DEFAULT nextval('room_nid_seq'),
     -- Textual ID for the room.
     room_id TEXT NOT NULL CONSTRAINT room_id_unique UNIQUE
 );
