@@ -91,7 +91,7 @@ func (c *Consumer) consumePartition(pc sarama.PartitionConsumer) {
 	defer pc.Close()
 	for message := range pc.Messages() {
 		var input api.InputRoomEvent
-		if err := json.Unmarshal(message.Value, &message.Value); err != nil {
+		if err := json.Unmarshal(message.Value, &input); err != nil {
 			c.logError(message, err)
 		} else {
 			if err := processRoomEvent(c.DB, input); err != nil {

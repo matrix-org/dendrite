@@ -23,6 +23,7 @@ const (
 )
 
 // InputRoomEvent is a matrix room event to add to the room server database.
+// TODO: Implement UnmarshalJSON/MarshalJSON in a way that does something sensible with the event JSON.
 type InputRoomEvent struct {
 	// Whether this event is new, backfilled or an outlier.
 	// This controls how the event is processed.
