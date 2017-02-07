@@ -97,7 +97,7 @@ func (d *Database) assignStateKeyNID(eventStateKey string) (eventStateKeyNID int
 		return
 	}
 	if eventStateKeyNID == 0 {
-		return d.statements.insertEventTypeNID(eventStateKey)
+		return d.statements.insertEventStateKeyNID(eventStateKey)
 	}
 	return
 }
