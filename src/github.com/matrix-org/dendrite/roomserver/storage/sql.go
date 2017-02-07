@@ -65,13 +65,13 @@ func (s *statements) preparePartitionOffsets(db *sql.DB) (err error) {
 const partitionOffsetsSchema = `
 -- The offsets that the server has processed up to.
 CREATE TABLE IF NOT EXISTS partition_offsets (
-	-- The name of the topic.
-	topic TEXT NOT NULL,
-	-- The 32-bit partition ID
-	partition INTEGER NOT NULL,
-	-- The 64-bit offset.
-	partition_offset BIGINT NOT NULL,
-	CONSTRAINT topic_partition_unique UNIQUE (topic, partition)
+    -- The name of the topic.
+    topic TEXT NOT NULL,
+    -- The 32-bit partition ID
+    partition INTEGER NOT NULL,
+    -- The 64-bit offset.
+    partition_offset BIGINT NOT NULL,
+    CONSTRAINT topic_partition_unique UNIQUE (topic, partition)
 );
 `
 
@@ -292,11 +292,13 @@ CREATE TABLE IF NOT EXISTS events (
     -- Local numeric ID for the event.
     event_nid BIGINT PRIMARY KEY DEFAULT nextval('event_nid_seq'),
     -- Local numeric ID for the room the event is in.
+    -- This is never 0.
     room_nid BIGINT NOT NULL,
-	-- Local numeric ID for the type of the event.
+    -- Local numeric ID for the type of the event.
+    -- This is never 0.
     event_type_nid BIGINT NOT NULL,
     -- Local numeric ID for the state_key of the event
-	-- This is 0 if the event is not a state event.
+    -- This is 0 if the event is not a state event.
     event_state_key_nid BIGINT NOT NULL,
     -- The textual event id.
     -- Used to lookup the numeric ID when processing requests.

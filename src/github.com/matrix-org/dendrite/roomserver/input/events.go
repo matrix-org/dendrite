@@ -27,7 +27,7 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 	if input.Kind == api.KindOutlier {
 		// For outliers we can stop after we've stored the event itself as it
 		// doesn't have any associated state to store and we don't need to
-		// notify anyone it.
+		// notify anyone about it.
 		return nil
 	}
 
