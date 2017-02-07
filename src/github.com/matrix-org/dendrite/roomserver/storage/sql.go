@@ -290,22 +290,22 @@ const eventsSchema = `
 CREATE SEQUENCE IF NOT EXISTS event_nid_seq;
 CREATE TABLE IF NOT EXISTS events (
     -- Local numeric ID for the event.
-    event_nid bigint PRIMARY KEY DEFAULT nextval('event_nid_seq'),
+    event_nid BIGINT PRIMARY KEY DEFAULT nextval('event_nid_seq'),
     -- Local numeric ID for the room the event is in.
-    room_nid bigint NOT NULL,
+    room_nid BIGINT NOT NULL,
 	-- Local numeric ID for the type of the event.
-    event_type_nid bigint NOT NULL,
+    event_type_nid BIGINT NOT NULL,
     -- Local numeric ID for the state_key of the event
 	-- This is 0 if the event is not a state event.
-    event_state_key_nid bigint NOT NULL,
+    event_state_key_nid BIGINT NOT NULL,
     -- The textual event id.
     -- Used to lookup the numeric ID when processing requests.
     -- Needed for state resolution.
     -- An event may only appear in this table once.
-    event_id text NOT NULL CONSTRAINT event_id_unique UNIQUE,
+    event_id TEXT NOT NULL CONSTRAINT event_id_unique UNIQUE,
     -- The sha256 reference hash for the event.
     -- Needed for setting reference hashes when sending new events.
-    reference_sha256 bytea NOT NULL
+    reference_sha256 BYTEA NOT NULL
 );
 `
 
@@ -354,7 +354,7 @@ const eventJSONSchema = `
 -- table to keep the rows in the main events table small.
 CREATE TABLE IF NOT EXISTS event_json (
     -- Local numeric ID for the event.
-    event_nid bigint NOT NULL PRIMARY KEY,
+    event_nid BIGINT NOT NULL PRIMARY KEY,
     -- The JSON for the event.
     -- Stored as TEXT because this should be valid UTF-8.
     -- Not stored as a JSONB because we always just pull the entire event
@@ -362,7 +362,7 @@ CREATE TABLE IF NOT EXISTS event_json (
     -- Not stored as JSON because we already validate the JSON in the server
     -- so there is no point in postgres validating it.
     -- TODO: Should we be compressing the events with Snappy or DEFLATE?
-    event_json text NOT NULL
+    event_json TEXT NOT NULL
 );
 `
 
