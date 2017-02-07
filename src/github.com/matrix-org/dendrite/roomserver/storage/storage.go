@@ -56,6 +56,8 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event) error {
 	}
 
 	eventStateKey := event.StateKey()
+	// Assigned a numeric ID for the state_key if there is one present.
+	// Otherwise set the numeric ID for the state_key to 0.
 	if eventStateKey != nil {
 		if eventStateKeyNID, err = d.assignStateKeyNID(*eventStateKey); err != nil {
 			return err
