@@ -72,32 +72,35 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event) error {
 	return d.statements.insertEventJSON(eventNID, event.JSON())
 }
 
-func (d *Database) assignRoomNID(roomID string) (roomNID int64, err error) {
-	if roomNID, err = d.statements.selectRoomNID(roomID); err != nil {
-		return
+func (d *Database) assignRoomNID(roomID string) (int64, error) {
+	roomNID, err := d.statements.selectRoomNID(roomID)
+	if err != nil {
+		return 0, err
 	}
 	if roomNID == 0 {
 		return d.statements.insertRoomNID(roomID)
 	}
-	return
+	return roomNID, nil
 }
 
-func (d *Database) assignEventTypeNID(eventType string) (eventTypeNID int64, err error) {
-	if eventTypeNID, err = d.statements.selectEventTypeNID(eventType); err != nil {
-		return
+func (d *Database) assignEventTypeNID(eventType string) (int64, error) {
+	eventTypeNID, err := d.statements.selectEventTypeNID(eventType)
+	if err != nil {
+		return 0, err
 	}
 	if eventTypeNID == 0 {
 		return d.statements.insertEventTypeNID(eventType)
 	}
-	return
+	return eventTypeNID, nil
 }
 
-func (d *Database) assignStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
-	if eventStateKeyNID, err = d.statements.selectEventStateKeyNID(eventStateKey); err != nil {
-		return
+func (d *Database) assignStateKeyNID(eventStateKey string) (int64, error) {
+	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(eventStateKey)
+	if err != nil {
+		return 0, err
 	}
 	if eventStateKeyNID == 0 {
 		return d.statements.insertEventStateKeyNID(eventStateKey)
 	}
-	return
+	return eventStateKeyNID, nil
 }

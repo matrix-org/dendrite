@@ -138,6 +138,9 @@ const eventTypesSchema = `
 -- It also means that the numeric IDs for common event types should be
 -- consistent between different instances which might make ad-hoc debugging
 -- easier.
+-- Other event types are automatically assigned numeric IDs starting from 2**16.
+-- This leaves room to add more pre-assigned numeric IDs and clearly separates
+-- the automatically assigned IDs from the pre-assigned IDs.
 CREATE SEQUENCE IF NOT EXISTS event_type_nid_seq START 65536;
 CREATE TABLE IF NOT EXISTS event_types (
     -- Local numeric ID for the event type.
@@ -155,6 +158,14 @@ INSERT INTO event_types (event_type_nid, event_type) VALUES
     (7, 'm.room.history_visibility') ON CONFLICT DO NOTHING;
 `
 
+// Assign a new numeric event type ID.
+// The usual case is that the event type is not in the database.
+// In that case the ID will be assigned using the next value from the sequence.
+// We use `RETURNING` to tell postgres to return the assigned ID.
+// But it's possible that the type was added in a query that raced with us.
+// This will result in a conflict on the event_type_unique constraint.
+// We peform a update that does nothing rather that doing nothing at all because
+// postgres won't return anything unless we touch a row in the table.
 const insertEventTypeNIDSQL = "" +
 	"INSERT INTO event_types (event_type) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT event_type_unique" +
@@ -200,6 +211,9 @@ const eventStateKeysSchema = `
 -- string arrays which may help reduce GC pressure.
 -- Well known state keys are pre-assigned numeric IDs:
 --   1 -> "" (the empty string)
+-- Other state keys are automatically assigned numeric IDs starting from 2**16.
+-- This leaves room to add more pre-assigned numeric IDs and clearly separates
+-- the automatically assigned IDs from the pre-assigned IDs.
 CREATE SEQUENCE IF NOT EXISTS event_state_key_nid_seq START 65536;
 CREATE TABLE IF NOT EXISTS event_state_keys (
     -- Local numeric ID for the state key.
@@ -210,6 +224,7 @@ INSERT INTO event_state_keys (event_state_key_nid, event_state_key) VALUES
     (1, '') ON CONFLICT DO NOTHING;
 `
 
+// Same as insertEventTypeNIDSQL
 const insertEventStateKeyNIDSQL = "" +
 	"INSERT INTO event_state_keys (event_state_key) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT event_state_key_unique" +
@@ -257,6 +272,7 @@ CREATE TABLE IF NOT EXISTS rooms (
 );
 `
 
+// Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = "" +
 	"INSERT INTO rooms (room_id) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT room_id_unique" +
