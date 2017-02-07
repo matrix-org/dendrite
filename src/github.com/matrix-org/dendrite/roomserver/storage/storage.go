@@ -62,10 +62,13 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event) error {
 		}
 	}
 
-	eventID := event.EventID()
-	referenceSHA256 := event.EventReference().EventSHA256
-
-	if eventNID, err = d.statements.insertEvent(roomNID, eventTypeNID, eventStateKeyNID, eventID, referenceSHA256); err != nil {
+	if eventNID, err = d.statements.insertEvent(
+		roomNID,
+		eventTypeNID,
+		eventStateKeyNID,
+		event.EventID(),
+		event.EventReference().EventSHA256,
+	); err != nil {
 		return err
 	}
 

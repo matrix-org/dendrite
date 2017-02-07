@@ -11,6 +11,7 @@ type RoomEventDatabase interface {
 }
 
 func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
+	// Parse and validate the event JSON
 	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(input.Event)
 	if err != nil {
 		return err
@@ -20,11 +21,26 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 		return err
 	}
 
+	// TODO:
+	//  * Check that the event passes authentication checks.
+
 	if input.Kind == api.KindOutlier {
-		// For outlier events we only need to store the event JSON.
+		// For outliers we can stop after we've stored the event itself as it
+		// doesn't have any associated state to store and we don't need to
+		// notify anyone it.
 		return nil
 	}
 
-	// TODO: Handle the other kinds of input.
+	// TODO:
+	//  * Calcuate the state at the event if necessary.
+	//  * Store the state at the event.
+	//  * Update the extremities of the event graph for the room
+	//  * Caculate the new current state for the room if the forward extremities have changed.
+	//  * Work out the delta between the new current state and the previous current state.
+	//  * Work out the visibility of the event.
+	//  * Write a message to the output logs containing:
+	//      - The event itself
+	//      - The visiblity of the event, i.e. who is allowed to see the event.
+	//      - The changes to the current state of the room.
 	panic("Not implemented")
 }
