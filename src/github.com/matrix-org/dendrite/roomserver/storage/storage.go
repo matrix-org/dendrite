@@ -78,34 +78,40 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event) error {
 }
 
 func (d *Database) assignRoomNID(roomID string) (int64, error) {
+	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.statements.selectRoomNID(roomID)
+	if err == sql.ErrNoRows {
+		// We don't have a numeric ID so insert one into the database.
+		return d.statements.insertRoomNID(roomID)
+	}
 	if err != nil {
 		return 0, err
-	}
-	if roomNID == 0 {
-		return d.statements.insertRoomNID(roomID)
 	}
 	return roomNID, nil
 }
 
 func (d *Database) assignEventTypeNID(eventType string) (int64, error) {
+	// Check if we already have a numeric ID in the database.
 	eventTypeNID, err := d.statements.selectEventTypeNID(eventType)
+	if err == sql.ErrNoRows {
+		// We don't have a numeric ID so insert one into the database.
+		return d.statements.insertEventTypeNID(eventType)
+	}
 	if err != nil {
 		return 0, err
-	}
-	if eventTypeNID == 0 {
-		return d.statements.insertEventTypeNID(eventType)
 	}
 	return eventTypeNID, nil
 }
 
 func (d *Database) assignStateKeyNID(eventStateKey string) (int64, error) {
+	// Check if we already have a numeric ID in the database.
 	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(eventStateKey)
+	if err == sql.ErrNoRows {
+		// We don't have a numeric ID so insert one into the database.
+		return d.statements.insertEventStateKeyNID(eventStateKey)
+	}
 	if err != nil {
 		return 0, err
-	}
-	if eventStateKeyNID == 0 {
-		return d.statements.insertEventStateKeyNID(eventStateKey)
 	}
 	return eventStateKeyNID, nil
 }

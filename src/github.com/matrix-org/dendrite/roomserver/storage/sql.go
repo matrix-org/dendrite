@@ -182,10 +182,6 @@ func (s *statements) insertEventTypeNID(eventType string) (eventTypeNID int64, e
 
 func (s *statements) selectEventTypeNID(eventType string) (eventTypeNID int64, err error) {
 	err = s.selectEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
-	if err == sql.ErrNoRows {
-		eventTypeNID = 0
-		err = nil
-	}
 	return
 }
 
@@ -241,10 +237,6 @@ func (s *statements) insertEventStateKeyNID(eventStateKey string) (eventStateKey
 
 func (s *statements) selectEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
 	err = s.selectEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
-	if err == sql.ErrNoRows {
-		eventStateKeyNID = 0
-		err = nil
-	}
 	return
 }
 
@@ -289,10 +281,6 @@ func (s *statements) insertRoomNID(roomID string) (roomNID int64, err error) {
 
 func (s *statements) selectRoomNID(roomID string) (roomNID int64, err error) {
 	err = s.selectRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
-	if err == sql.ErrNoRows {
-		roomNID = 0
-		err = nil
-	}
 	return
 }
 
