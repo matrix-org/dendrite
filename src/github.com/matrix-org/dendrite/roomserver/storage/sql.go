@@ -369,7 +369,10 @@ CREATE TABLE IF NOT EXISTS event_json (
     event_nid bigint NOT NULL PRIMARY KEY,
     -- The JSON for the event.
     -- Stored as TEXT because this should be valid UTF-8.
-    -- Not stored as a JSONB because we always just pull the entire event.
+    -- Not stored as a JSONB because we always just pull the entire event
+    -- so there is no point in postgres parsing it.
+    -- Not stored as JSON because we already validate the JSON in the server
+    -- so there is no point in postgres validating it.
     -- TODO: Should we be compressing the events with Snappy or DEFLATE?
     event_json text NOT NULL
 );
