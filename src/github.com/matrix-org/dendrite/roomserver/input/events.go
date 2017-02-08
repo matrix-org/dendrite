@@ -13,10 +13,13 @@ type RoomEventDatabase interface {
 	// Stores a matrix room event in the database
 	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int64) error
 	// Lookup the state entries for a list of string event IDs
+	// Returns a sorted list of state entries.
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
 	// Lookup the numeric IDs for a list of string event state keys.
+	// Returns a sorted list of state entries.
 	EventStateKeyNIDs(eventStateKeys []string) ([]types.IDPair, error)
 	// Lookup the Events for a list of numeric event IDs.
+	// Returns a sorted list of state entries.
 	Events(eventNIDs []int64) ([]types.Event, error)
 }
 
@@ -70,6 +73,8 @@ func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEv
 	if len(authStateEntries) < len(authEventIDs) {
 		return nil, fmt.Errorf("input: Some of the auth event IDs were missing from the database")
 	}
+
+	// TODO: check for duplicate state keys here.
 
 	// Work out which of the state events we actaully need.
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event})
