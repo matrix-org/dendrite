@@ -120,7 +120,7 @@ func (ae *authEvents) ThirdPartyInvite(stateKey string) (*gomatrixserverlib.Even
 }
 
 func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID int64) *gomatrixserverlib.Event {
-	eventNID, ok := ae.state.lookup(types.StateKey{typeNID, types.EmptyStateKeyNID})
+	eventNID, ok := ae.state.lookup(types.StateKeyTuple{typeNID, types.EmptyStateKeyNID})
 	if !ok {
 		return nil
 	}
@@ -136,7 +136,7 @@ func (ae *authEvents) lookupEvent(typeNID int64, stateKey string) *gomatrixserve
 	if !ok {
 		return nil
 	}
-	eventNID, ok := ae.state.lookup(types.StateKey{typeNID, stateKeyNID})
+	eventNID, ok := ae.state.lookup(types.StateKeyTuple{typeNID, stateKeyNID})
 	if !ok {
 		return nil
 	}
@@ -182,27 +182,27 @@ func loadAuthEvents(
 }
 
 // stateKeysNeeded works out which numeric state keys we need to authenticate some events.
-func stateKeysNeeded(stateNIDMap idMap, stateNeeded gomatrixserverlib.StateNeeded) []types.StateKey {
-	var keys []types.StateKey
+func stateKeysNeeded(stateNIDMap idMap, stateNeeded gomatrixserverlib.StateNeeded) []types.StateKeyTuple {
+	var keys []types.StateKeyTuple
 	if stateNeeded.Create {
-		keys = append(keys, types.StateKey{types.MRoomCreateNID, types.EmptyStateKeyNID})
+		keys = append(keys, types.StateKeyTuple{types.MRoomCreateNID, types.EmptyStateKeyNID})
 	}
 	if stateNeeded.PowerLevels {
-		keys = append(keys, types.StateKey{types.MRoomPowerLevelsNID, types.EmptyStateKeyNID})
+		keys = append(keys, types.StateKeyTuple{types.MRoomPowerLevelsNID, types.EmptyStateKeyNID})
 	}
 	if stateNeeded.JoinRules {
-		keys = append(keys, types.StateKey{types.MRoomJoinRulesNID, types.EmptyStateKeyNID})
+		keys = append(keys, types.StateKeyTuple{types.MRoomJoinRulesNID, types.EmptyStateKeyNID})
 	}
 	for _, member := range stateNeeded.Member {
 		stateKeyNID, ok := stateNIDMap.lookup(member)
 		if ok {
-			keys = append(keys, types.StateKey{types.MRoomMemberNID, stateKeyNID})
+			keys = append(keys, types.StateKeyTuple{types.MRoomMemberNID, stateKeyNID})
 		}
 	}
 	for _, token := range stateNeeded.ThirdPartyInvite {
 		stateKeyNID, ok := stateNIDMap.lookup(token)
 		if ok {
-			keys = append(keys, types.StateKey{types.MRoomThirdPartyInviteNID, stateKeyNID})
+			keys = append(keys, types.StateKeyTuple{types.MRoomThirdPartyInviteNID, stateKeyNID})
 		}
 	}
 	return keys
@@ -238,16 +238,16 @@ func newStateEntryMap(stateEntries []types.StateEntry) stateEntryMap {
 }
 
 // lookup an entry in the event map.
-func (m stateEntryMap) lookup(stateKey types.StateKey) (eventNID int64, ok bool) {
+func (m stateEntryMap) lookup(stateKey types.StateKeyTuple) (eventNID int64, ok bool) {
 	// Since the list is sorted we can implement this using binary search.
 	// This is faster than using a hash map.
 	// We don't have to worry about pathological cases because the keys are fixed
 	// size and are controlled by us.
 	list := []types.StateEntry(m)
 	i := sort.Search(len(list), func(i int) bool {
-		return !list[i].StateKey.LessThan(stateKey)
+		return !list[i].StateKeyTuple.LessThan(stateKey)
 	})
-	if i < len(list) && list[i].StateKey == stateKey {
+	if i < len(list) && list[i].StateKeyTuple == stateKey {
 		ok = true
 		eventNID = list[i].EventNID
 	}

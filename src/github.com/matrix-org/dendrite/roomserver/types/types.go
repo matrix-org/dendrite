@@ -13,17 +13,17 @@ type PartitionOffset struct {
 	Offset int64
 }
 
-// A StateKey is a pair of a numeric event type and a numeric state key.
+// A StateKeyTuple is a pair of a numeric event type and a numeric state key.
 // It is used to lookup state entries.
-type StateKey struct {
+type StateKeyTuple struct {
 	// The numeric ID for the event type.
 	EventTypeNID int64
-	// The numeric ID for the state key or 0 if the event is not a state event.
+	// The numeric ID for the state key.
 	EventStateKeyNID int64
 }
 
 // LessThan returns true if this state key is less than the other state key.
-func (a StateKey) LessThan(b StateKey) bool {
+func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
 	if a.EventTypeNID != b.EventTypeNID {
 		return a.EventTypeNID < b.EventTypeNID
 	}
@@ -32,15 +32,15 @@ func (a StateKey) LessThan(b StateKey) bool {
 
 // A StateEntry is an entry in the room state of a matrix room.
 type StateEntry struct {
-	StateKey
+	StateKeyTuple
 	// The numeric ID for the event.
 	EventNID int64
 }
 
 // LessThan returns true if this state entry is less than the other state entry.
 func (a StateEntry) LessThan(b StateEntry) bool {
-	if a.StateKey != b.StateKey {
-		return a.StateKey.LessThan(b.StateKey)
+	if a.StateKeyTuple != b.StateKeyTuple {
+		return a.StateKeyTuple.LessThan(b.StateKeyTuple)
 	}
 	return a.EventNID < b.EventNID
 }
