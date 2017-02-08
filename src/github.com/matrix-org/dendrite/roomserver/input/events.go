@@ -1,13 +1,23 @@
 package input
 
 import (
+	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"sort"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
 type RoomEventDatabase interface {
-	StoreEvent(event gomatrixserverlib.Event) error
+	// Stores a matrix room event in the database
+	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int64) error
+	// Lookup the state entries for a list of string event IDs
+	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
+	// Lookup the numeric IDs for a list of string event state keys.
+	EventStateKeyNIDs(eventStateKeys []string) ([]types.IDPair, error)
+	// Lookup the Events for a list of numeric event IDs.
+	Events(eventNIDs []int64) ([]types.Event, error)
 }
 
 func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
@@ -17,12 +27,16 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 		return err
 	}
 
-	if err := db.StoreEvent(event); err != nil {
+	// Check that the event passes authentication checks.
+	authEventNIDs, err := checkAuthEvents(db, event, input.AuthEventIDs)
+	if err != nil {
 		return err
 	}
 
-	// TODO:
-	//  * Check that the event passes authentication checks.
+	// Store the event
+	if err := db.StoreEvent(event, authEventNIDs); err != nil {
+		return err
+	}
 
 	if input.Kind == api.KindOutlier {
 		// For outliers we can stop after we've stored the event itself as it
@@ -43,4 +57,192 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 	//      - The visiblity of the event, i.e. who is allowed to see the event.
 	//      - The changes to the current state of the room.
 	panic("Not implemented")
+}
+
+// checkAuthEvents checks that the event passes authentication checks
+// Returns the numeric IDs for the auth events.
+func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEventIDs []string) ([]int64, error) {
+	authStateEntries, err := db.StateEntriesForEventIDs(authEventIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(authStateEntries) < len(authEventIDs) {
+		return nil, fmt.Errorf("input: Some of the auth event IDs were missing from the database")
+	}
+
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event})
+
+	authEvents, err := loadAuthEvents(db, stateNeeded, authStateEntries)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
+		return nil, err
+	}
+
+	result := make([]int64, len(authStateEntries))
+	for i := range authStateEntries {
+		result[i] = authStateEntries[i].EventNID
+	}
+	return result, nil
+}
+
+type authEvents struct {
+	stateNIDMap idMap
+	state       stateEntryMap
+	events      eventMap
+}
+
+func (ae *authEvents) Create() (*gomatrixserverlib.Event, error) {
+	return ae.lookupEventWithEmptyStateKey(types.MRoomCreateNID), nil
+}
+
+func (ae *authEvents) PowerLevels() (*gomatrixserverlib.Event, error) {
+	return ae.lookupEventWithEmptyStateKey(types.MRoomPowerLevelsNID), nil
+}
+
+func (ae *authEvents) JoinRules() (*gomatrixserverlib.Event, error) {
+	return ae.lookupEventWithEmptyStateKey(types.MRoomJoinRulesNID), nil
+}
+
+func (ae *authEvents) Member(stateKey string) (*gomatrixserverlib.Event, error) {
+	return ae.lookupEvent(types.MRoomMemberNID, stateKey), nil
+}
+
+func (ae *authEvents) ThirdPartyInvite(stateKey string) (*gomatrixserverlib.Event, error) {
+	return ae.lookupEvent(types.MRoomThirdPartyInviteNID, stateKey), nil
+}
+
+func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID int64) *gomatrixserverlib.Event {
+	eventNID, ok := ae.state.lookup(types.StateKey{typeNID, types.EmptyStateKeyNID})
+	if !ok {
+		return nil
+	}
+	event, ok := ae.events.lookup(eventNID)
+	if !ok {
+		return nil
+	}
+	return &event.Event
+}
+
+func (ae *authEvents) lookupEvent(typeNID int64, stateKey string) *gomatrixserverlib.Event {
+	stateKeyNID, ok := ae.stateNIDMap.lookup(stateKey)
+	if !ok {
+		return nil
+	}
+	eventNID, ok := ae.state.lookup(types.StateKey{typeNID, stateKeyNID})
+	if !ok {
+		return nil
+	}
+	event, ok := ae.events.lookup(eventNID)
+	if !ok {
+		return nil
+	}
+	return &event.Event
+}
+
+func loadAuthEvents(
+	db RoomEventDatabase,
+	needed gomatrixserverlib.StateNeeded,
+	state []types.StateEntry,
+) (result authEvents, err error) {
+	// Lookup the numeric IDs for the state keys
+	var eventStateKeys []string
+	eventStateKeys = append(eventStateKeys, needed.Member...)
+	eventStateKeys = append(eventStateKeys, needed.ThirdPartyInvite...)
+	stateKeyNIDs, err := db.EventStateKeyNIDs(eventStateKeys)
+	if err != nil {
+		return
+	}
+	result.stateNIDMap = newIDMap(stateKeyNIDs)
+
+	// Load the events we need.
+	keysNeeded := stateKeysNeeded(result.stateNIDMap, needed)
+	var eventNIDs []int64
+	result.state = newStateEntryMap(state)
+	for _, keyNeeded := range keysNeeded {
+		eventNID, ok := result.state.lookup(keyNeeded)
+		if ok {
+			eventNIDs = append(eventNIDs, eventNID)
+		}
+	}
+	result.events, err = db.Events(eventNIDs)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func stateKeysNeeded(stateNIDMap idMap, stateNeeded gomatrixserverlib.StateNeeded) []types.StateKey {
+	var keys []types.StateKey
+	if stateNeeded.Create {
+		keys = append(keys, types.StateKey{types.MRoomCreateNID, types.EmptyStateKeyNID})
+	}
+	if stateNeeded.PowerLevels {
+		keys = append(keys, types.StateKey{types.MRoomPowerLevelsNID, types.EmptyStateKeyNID})
+	}
+	if stateNeeded.JoinRules {
+		keys = append(keys, types.StateKey{types.MRoomJoinRulesNID, types.EmptyStateKeyNID})
+	}
+	for _, member := range stateNeeded.Member {
+		stateKeyNID, ok := stateNIDMap.lookup(member)
+		if ok {
+			keys = append(keys, types.StateKey{types.MRoomMemberNID, stateKeyNID})
+		}
+	}
+	for _, token := range stateNeeded.ThirdPartyInvite {
+		stateKeyNID, ok := stateNIDMap.lookup(token)
+		if ok {
+			keys = append(keys, types.StateKey{types.MRoomThirdPartyInviteNID, stateKeyNID})
+		}
+	}
+	return keys
+}
+
+type idMap map[string]int64
+
+func newIDMap(ids []types.IDPair) idMap {
+	result := make(map[string]int64)
+	for _, pair := range ids {
+		result[pair.ID] = pair.NID
+	}
+	return idMap(result)
+}
+
+func (m idMap) lookup(id string) (nid int64, ok bool) {
+	nid, ok = map[string]int64(m)[id]
+	return
+}
+
+type stateEntryMap []types.StateEntry
+
+func newStateEntryMap(stateEntries []types.StateEntry) stateEntryMap {
+	return stateEntryMap(stateEntries)
+}
+
+func (m stateEntryMap) lookup(stateKey types.StateKey) (eventNID int64, ok bool) {
+	list := []types.StateEntry(m)
+	i := sort.Search(len(list), func(i int) bool {
+		return !list[i].StateKey.LessThan(stateKey)
+	})
+	if i < len(list) && list[i].StateKey == stateKey {
+		ok = true
+		eventNID = list[i].EventNID
+	}
+	return
+}
+
+type eventMap []types.Event
+
+func (m eventMap) lookup(eventNID int64) (event *types.Event, ok bool) {
+	list := []types.Event(m)
+	i := sort.Search(len(list), func(i int) bool {
+		return list[i].EventNID >= eventNID
+	})
+	if i < len(list) && list[i].EventNID == eventNID {
+		ok = true
+		event = &list[i]
+	}
+	return
 }

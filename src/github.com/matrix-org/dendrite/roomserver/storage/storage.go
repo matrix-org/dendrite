@@ -38,7 +38,7 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 }
 
 // StoreEvent implements input.EventDatabase
-func (d *Database) StoreEvent(event gomatrixserverlib.Event) error {
+func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDS []int64) error {
 	var (
 		roomNID          int64
 		eventTypeNID     int64
@@ -70,6 +70,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event) error {
 		eventStateKeyNID,
 		event.EventID(),
 		event.EventReference().EventSHA256,
+		authEventNIDS,
 	); err != nil {
 		return err
 	}
@@ -114,4 +115,33 @@ func (d *Database) assignStateKeyNID(eventStateKey string) (int64, error) {
 		return 0, err
 	}
 	return eventStateKeyNID, nil
+}
+
+// StateEntriesForEventIDs implements input.EventDatabase
+func (d *Database) StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error) {
+	return d.statements.selectStateEventsByID(eventIDs)
+}
+
+// EventStateKeyNIDs implements input.EventDatabase
+func (d *Database) EventStateKeyNIDs(eventStateKeys []string) ([]types.IDPair, error) {
+	return d.statements.selectEventStateKeyNIDs(eventStateKeys)
+}
+
+// Events implements input.EventDatabase
+func (d *Database) Events(eventNIDs []int64) ([]types.Event, error) {
+	eventJSONs, err := d.statements.selectEventJSONs(eventNIDs)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]types.Event, len(eventJSONs))
+	for i, eventJSON := range eventJSONs {
+		result := &results[i]
+		result.EventNID = eventJSON.EventNID
+		// TODO: Use NewEventFromTrustedJSON for efficiency
+		result.Event, err = gomatrixserverlib.NewEventFromUntrustedJSON(eventJSON.EventJSON)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return results, nil
 }

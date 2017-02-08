@@ -2,20 +2,24 @@ package storage
 
 import (
 	"database/sql"
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 type statements struct {
-	selectPartitionOffsetsStmt *sql.Stmt
-	upsertPartitionOffsetStmt  *sql.Stmt
-	insertEventTypeNIDStmt     *sql.Stmt
-	selectEventTypeNIDStmt     *sql.Stmt
-	insertEventStateKeyNIDStmt *sql.Stmt
-	selectEventStateKeyNIDStmt *sql.Stmt
-	insertRoomNIDStmt          *sql.Stmt
-	selectRoomNIDStmt          *sql.Stmt
-	insertEventStmt            *sql.Stmt
-	insertEventJSONStmt        *sql.Stmt
+	selectPartitionOffsetsStmt  *sql.Stmt
+	upsertPartitionOffsetStmt   *sql.Stmt
+	insertEventTypeNIDStmt      *sql.Stmt
+	selectEventTypeNIDStmt      *sql.Stmt
+	insertEventStateKeyNIDStmt  *sql.Stmt
+	selectEventStateKeyNIDStmt  *sql.Stmt
+	selectEventStateKeyNIDsStmt *sql.Stmt
+	insertRoomNIDStmt           *sql.Stmt
+	selectRoomNIDStmt           *sql.Stmt
+	insertEventStmt             *sql.Stmt
+	selectStateEventsByIDStmt   *sql.Stmt
+	insertEventJSONStmt         *sql.Stmt
+	selectEventJSONsStmt        *sql.Stmt
 }
 
 func (s *statements) prepare(db *sql.DB) error {
@@ -196,6 +200,9 @@ func (s *statements) prepareEventStateKeys(db *sql.DB) (err error) {
 	if s.selectEventStateKeyNIDStmt, err = db.Prepare(selectEventStateKeyNIDSQL); err != nil {
 		return
 	}
+	if s.selectEventStateKeyNIDsStmt, err = db.Prepare(selectEventStateKeyNIDsSQL); err != nil {
+		return
+	}
 	return
 }
 
@@ -230,6 +237,11 @@ const insertEventStateKeyNIDSQL = "" +
 const selectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key_nid FROM event_state_keys WHERE event_state_key = $1"
 
+const selectEventStateKeyNIDsSQL = "" +
+	"SELECT event_state_key, event_state_key_nid FROM event_state_keys" +
+	" WHERE event_state_key = ANY($1)" +
+	" ORDER BY event_state_key ASC"
+
 func (s *statements) insertEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
 	err = s.insertEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
 	return
@@ -238,6 +250,24 @@ func (s *statements) insertEventStateKeyNID(eventStateKey string) (eventStateKey
 func (s *statements) selectEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
 	err = s.selectEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
 	return
+}
+
+func (s *statements) selectEventStateKeyNIDs(eventStateKeys []string) ([]types.IDPair, error) {
+	rows, err := s.selectEventStateKeyNIDsStmt.Query(pq.StringArray(eventStateKeys))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]types.IDPair, len(eventStateKeys))
+	i := 0
+	for rows.Next() {
+		if err := rows.Scan(&results[i].ID, &results[i].NID); err != nil {
+			return nil, err
+		}
+		i++
+	}
+	return results[:i], nil
 }
 
 func (s *statements) prepareRooms(db *sql.DB) (err error) {
@@ -307,16 +337,23 @@ CREATE TABLE IF NOT EXISTS events (
     event_id TEXT NOT NULL CONSTRAINT event_id_unique UNIQUE,
     -- The sha256 reference hash for the event.
     -- Needed for setting reference hashes when sending new events.
-    reference_sha256 BYTEA NOT NULL
+    reference_sha256 BYTEA NOT NULL,
+    -- A list of numeric IDs for events that can authenticate this event.
+    auth_events BIGINT[] NOT NULL,
 );
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256)" +
-	" VALUES ($1, $2, $3, $4, $5)" +
+	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_events)" +
+	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT ON CONSTRAINT event_id_unique" +
 	" DO UPDATE SET event_id = $1" +
 	" RETURNING event_nid"
+
+const selectStateEventsByIDSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid FROM events" +
+	" WHERE event_id = ANY($1)" +
+	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	_, err = db.Exec(eventsSchema)
@@ -326,6 +363,9 @@ func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
 		return
 	}
+	if s.selectStateEventsByIDStmt, err = db.Prepare(selectStateEventsByIDSQL); err != nil {
+		return
+	}
 	return
 }
 
@@ -333,11 +373,34 @@ func (s *statements) insertEvent(
 	roomNID, eventTypeNID, eventStateKeyNID int64,
 	eventID string,
 	referenceSHA256 []byte,
+	authEventNIDs []int64,
 ) (eventNID int64, err error) {
 	err = s.insertEventStmt.QueryRow(
 		roomNID, eventTypeNID, eventStateKeyNID, eventID, referenceSHA256,
+		pq.Int64Array(authEventNIDs),
 	).Scan(&eventNID)
 	return
+}
+
+func (s *statements) selectStateEventsByID(eventIDs []string) ([]types.StateEntry, error) {
+	results := make([]types.StateEntry, len(eventIDs))
+	rows, err := s.selectStateEventsByIDStmt.Query(pq.StringArray(eventIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		if err = rows.Scan(
+			&result.EventNID,
+			&result.EventTypeNID,
+			&result.EventStateKeyNID,
+		); err != nil {
+			return nil, err
+		}
+	}
+	return results[:i], err
 }
 
 func (s *statements) prepareEventJSON(db *sql.DB) (err error) {
@@ -346,6 +409,9 @@ func (s *statements) prepareEventJSON(db *sql.DB) (err error) {
 		return
 	}
 	if s.insertEventJSONStmt, err = db.Prepare(insertEventJSONSQL); err != nil {
+		return
+	}
+	if s.selectEventJSONsStmt, err = db.Prepare(selectEventJSONsSQL); err != nil {
 		return
 	}
 	return
@@ -372,7 +438,35 @@ const insertEventJSONSQL = "" +
 	"INSERT INTO event_json (event_nid, event_json) VALUES ($1, $2)" +
 	" ON CONFLICT DO NOTHING"
 
+const selectEventJSONsSQL = "" +
+	"SELECT event_nid, event_json FROM event_json" +
+	" WHERE event_nid = ANY($1)" +
+	" ORDER BY event_nid ASC"
+
 func (s *statements) insertEventJSON(eventNID int64, eventJSON []byte) error {
 	_, err := s.insertEventJSONStmt.Exec(eventNID, eventJSON)
 	return err
+}
+
+type eventJSONPair struct {
+	EventNID  int64
+	EventJSON []byte
+}
+
+func (s *statements) selectEventJSONs(eventNIDs []int64) ([]eventJSONPair, error) {
+	rows, err := s.selectEventJSONsStmt.Query(pq.Int64Array(eventNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]eventJSONPair, len(eventNIDs))
+	i := 0
+	for rows.Next() {
+		if err := rows.Scan(&results[i].EventNID, &results[i].EventJSON); err != nil {
+			return nil, err
+		}
+		i++
+	}
+	return results[:i], nil
 }
