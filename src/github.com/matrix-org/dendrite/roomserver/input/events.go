@@ -173,10 +173,11 @@ func loadAuthEvents(
 			eventNIDs = append(eventNIDs, eventNID)
 		}
 	}
-	result.events, err = db.Events(eventNIDs)
+	events, err := db.Events(eventNIDs)
 	if err != nil {
 		return
 	}
+	result.events = newEventMap(events)
 	return
 }
 
