@@ -48,10 +48,12 @@ func TestStateEntryMap(t *testing.T) {
 		wantOK        bool
 		wantEventNID  int64
 	}{
-		{0, 0, false, 0},
+		// Check that tuples that in the array are in the map.
 		{1, 1, true, 1},
 		{1, 3, true, 2},
 		{2, 1, true, 3},
+		// Check that tuples that aren't in the array aren't in the map.
+		{0, 0, false, 0},
 		{1, 2, false, 0},
 		{3, 1, false, 0},
 	}
@@ -82,15 +84,17 @@ func TestEventMap(t *testing.T) {
 		wantOK        bool
 		wantEvent     *types.Event
 	}{
-		{0, false, nil},
+		// Check that the IDs that are in the array are in the map.
 		{1, true, &events[0]},
 		{2, true, &events[1]},
 		{3, true, &events[2]},
-		{4, false, nil},
 		{5, true, &events[3]},
+		{8, true, &events[4]},
+		// Check that tuples that aren't in the array aren't in the map.
+		{0, false, nil},
+		{4, false, nil},
 		{6, false, nil},
 		{7, false, nil},
-		{8, true, &events[4]},
 		{9, false, nil},
 	}
 
