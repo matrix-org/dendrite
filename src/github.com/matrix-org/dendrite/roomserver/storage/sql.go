@@ -18,7 +18,7 @@ type statements struct {
 	insertRoomNIDStmt              *sql.Stmt
 	selectRoomNIDStmt              *sql.Stmt
 	insertEventStmt                *sql.Stmt
-	bulkSelectStateEventByIDIDStmt *sql.Stmt
+	bulkSelectStateEventByIDStmt   *sql.Stmt
 	insertEventJSONStmt            *sql.Stmt
 	bulkSelectEventJSONStmt        *sql.Stmt
 }
@@ -356,7 +356,7 @@ const insertEventSQL = "" +
 // Bulk lookup of events by string ID.
 // Sort by the numeric IDs for event type and state key.
 // This means we can use binary search to lookup entries by type and state key.
-const bulkSelectStateEventByIDIDSQL = "" +
+const bulkSelectStateEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM events" +
 	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
@@ -369,7 +369,7 @@ func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
 		return
 	}
-	if s.bulkSelectStateEventByIDIDStmt, err = db.Prepare(bulkSelectStateEventByIDIDSQL); err != nil {
+	if s.bulkSelectStateEventByIDStmt, err = db.Prepare(bulkSelectStateEventByIDSQL); err != nil {
 		return
 	}
 	return
@@ -388,8 +388,8 @@ func (s *statements) insertEvent(
 	return
 }
 
-func (s *statements) bulkSelectStateEventByIDID(eventIDs []string) ([]types.StateEntry, error) {
-	rows, err := s.bulkSelectStateEventByIDIDStmt.Query(pq.StringArray(eventIDs))
+func (s *statements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateEntry, error) {
+	rows, err := s.bulkSelectStateEventByIDStmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
