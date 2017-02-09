@@ -4,9 +4,6 @@ Dendrite will be a matrix homeserver written in go.
 
 # Design
 
- * 
-
-
 ## Log Based Architecture
 
 ### Decomposition and Decoupling
