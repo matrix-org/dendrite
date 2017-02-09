@@ -410,13 +410,13 @@ func (s *statements) bulkSelectStateEventByIDID(eventIDs []string) ([]types.Stat
 			return nil, err
 		}
 	}
-	if i < len(eventIDs) {
+	if i != len(eventIDs) {
 		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
 		// We don't know which ones were missing because we don't return the string IDs in the query.
 		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
 		// If this turns out to be impossible and we do need the debug information here, it would be better
 		// to do it as a separate query rather than slowing down/complicating the common case.
-		return nil, fmt.Errorf("storage: state event IDs missing from the database")
+		return nil, fmt.Errorf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs))
 	}
 	return results, err
 }
