@@ -13,13 +13,13 @@ type statements struct {
 	selectEventTypeNIDStmt      *sql.Stmt
 	insertEventStateKeyNIDStmt  *sql.Stmt
 	selectEventStateKeyNIDStmt  *sql.Stmt
-	selectEventStateKeyNIDsStmt *sql.Stmt
+	bulkSelectEventStateKeyNIDStmt *sql.Stmt
 	insertRoomNIDStmt           *sql.Stmt
 	selectRoomNIDStmt           *sql.Stmt
 	insertEventStmt             *sql.Stmt
-	selectStateEventsByIDStmt   *sql.Stmt
+	bulkSelectStateEventByIDIDStmt   *sql.Stmt
 	insertEventJSONStmt         *sql.Stmt
-	selectEventJSONsStmt        *sql.Stmt
+	bulkSelectEventJSONStmt        *sql.Stmt
 }
 
 func (s *statements) prepare(db *sql.DB) error {
@@ -200,7 +200,7 @@ func (s *statements) prepareEventStateKeys(db *sql.DB) (err error) {
 	if s.selectEventStateKeyNIDStmt, err = db.Prepare(selectEventStateKeyNIDSQL); err != nil {
 		return
 	}
-	if s.selectEventStateKeyNIDsStmt, err = db.Prepare(selectEventStateKeyNIDsSQL); err != nil {
+	if s.bulkSelectEventStateKeyNIDStmt, err = db.Prepare(bulkSelectEventStateKeyNIDSQL); err != nil {
 		return
 	}
 	return
@@ -239,7 +239,7 @@ const selectEventStateKeyNIDSQL = "" +
 
 // Bulk lookup from string state key to numeric ID for that state key.
 // Takes an array of strings as the query parameter.
-const selectEventStateKeyNIDsSQL = "" +
+const bulkSelectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key, event_state_key_nid FROM event_state_keys" +
 	" WHERE event_state_key = ANY($1)"
 
@@ -253,8 +253,8 @@ func (s *statements) selectEventStateKeyNID(eventStateKey string) (eventStateKey
 	return
 }
 
-func (s *statements) selectEventStateKeyNIDs(eventStateKeys []string) (map[string]int64, error) {
-	rows, err := s.selectEventStateKeyNIDsStmt.Query(pq.StringArray(eventStateKeys))
+func (s *statements) bulkSelectEventStateKeyNID(eventStateKeys []string) (map[string]int64, error) {
+	rows, err := s.bulkSelectEventStateKeyNIDStmt.Query(pq.StringArray(eventStateKeys))
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ const insertEventSQL = "" +
 // Bulk lookup of events by string ID.
 // Sort by the numeric IDs for event type and state key.
 // This means we can use binary search to lookup entries by type and state key.
-const selectStateEventsByIDSQL = "" +
+const bulkSelectStateEventByIDIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM events" +
 	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
@@ -368,7 +368,7 @@ func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
 		return
 	}
-	if s.selectStateEventsByIDStmt, err = db.Prepare(selectStateEventsByIDSQL); err != nil {
+	if s.bulkSelectStateEventByIDIDStmt, err = db.Prepare(bulkSelectStateEventByIDIDSQL); err != nil {
 		return
 	}
 	return
@@ -387,8 +387,8 @@ func (s *statements) insertEvent(
 	return
 }
 
-func (s *statements) selectStateEventsByID(eventIDs []string) ([]types.StateEntry, error) {
-	rows, err := s.selectStateEventsByIDStmt.Query(pq.StringArray(eventIDs))
+func (s *statements) bulkSelectStateEventByIDID(eventIDs []string) ([]types.StateEntry, error) {
+	rows, err := s.bulkSelectStateEventByIDIDStmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +420,7 @@ func (s *statements) prepareEventJSON(db *sql.DB) (err error) {
 	if s.insertEventJSONStmt, err = db.Prepare(insertEventJSONSQL); err != nil {
 		return
 	}
-	if s.selectEventJSONsStmt, err = db.Prepare(selectEventJSONsSQL); err != nil {
+	if s.bulkSelectEventJSONStmt, err = db.Prepare(bulkSelectEventJSONSQL); err != nil {
 		return
 	}
 	return
@@ -450,7 +450,7 @@ const insertEventJSONSQL = "" +
 // Bulk event JSON lookup by numeric event ID.
 // Sort by the numeric event ID.
 // This means that we can use binary search to lookup by numeric event ID.
-const selectEventJSONsSQL = "" +
+const bulkSelectEventJSONSQL = "" +
 	"SELECT event_nid, event_json FROM event_json" +
 	" WHERE event_nid = ANY($1)" +
 	" ORDER BY event_nid ASC"
@@ -465,8 +465,8 @@ type eventJSONPair struct {
 	EventJSON []byte
 }
 
-func (s *statements) selectEventJSONs(eventNIDs []int64) ([]eventJSONPair, error) {
-	rows, err := s.selectEventJSONsStmt.Query(pq.Int64Array(eventNIDs))
+func (s *statements) bulkSelectEventJSON(eventNIDs []int64) ([]eventJSONPair, error) {
+	rows, err := s.bulkSelectEventJSONStmt.Query(pq.Int64Array(eventNIDs))
 	if err != nil {
 		return nil, err
 	}

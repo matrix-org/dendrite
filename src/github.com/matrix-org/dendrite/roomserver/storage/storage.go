@@ -119,17 +119,17 @@ func (d *Database) assignStateKeyNID(eventStateKey string) (int64, error) {
 
 // StateEntriesForEventIDs implements input.EventDatabase
 func (d *Database) StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error) {
-	return d.statements.selectStateEventsByID(eventIDs)
+	return d.statements.bulkSelectStateEventByIDID(eventIDs)
 }
 
 // EventStateKeyNIDs implements input.EventDatabase
 func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]int64, error) {
-	return d.statements.selectEventStateKeyNIDs(eventStateKeys)
+	return d.statements.bulkSelectEventStateKeyNID(eventStateKeys)
 }
 
 // Events implements input.EventDatabase
 func (d *Database) Events(eventNIDs []int64) ([]types.Event, error) {
-	eventJSONs, err := d.statements.selectEventJSONs(eventNIDs)
+	eventJSONs, err := d.statements.bulkSelectEventJSON(eventNIDs)
 	if err != nil {
 		return nil, err
 	}
