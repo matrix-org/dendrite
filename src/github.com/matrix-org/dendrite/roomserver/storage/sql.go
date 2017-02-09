@@ -2,20 +2,25 @@ package storage
 
 import (
 	"database/sql"
+	"fmt"
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 type statements struct {
-	selectPartitionOffsetsStmt *sql.Stmt
-	upsertPartitionOffsetStmt  *sql.Stmt
-	insertEventTypeNIDStmt     *sql.Stmt
-	selectEventTypeNIDStmt     *sql.Stmt
-	insertEventStateKeyNIDStmt *sql.Stmt
-	selectEventStateKeyNIDStmt *sql.Stmt
-	insertRoomNIDStmt          *sql.Stmt
-	selectRoomNIDStmt          *sql.Stmt
-	insertEventStmt            *sql.Stmt
-	insertEventJSONStmt        *sql.Stmt
+	selectPartitionOffsetsStmt     *sql.Stmt
+	upsertPartitionOffsetStmt      *sql.Stmt
+	insertEventTypeNIDStmt         *sql.Stmt
+	selectEventTypeNIDStmt         *sql.Stmt
+	insertEventStateKeyNIDStmt     *sql.Stmt
+	selectEventStateKeyNIDStmt     *sql.Stmt
+	bulkSelectEventStateKeyNIDStmt *sql.Stmt
+	insertRoomNIDStmt              *sql.Stmt
+	selectRoomNIDStmt              *sql.Stmt
+	insertEventStmt                *sql.Stmt
+	bulkSelectStateEventByIDStmt   *sql.Stmt
+	insertEventJSONStmt            *sql.Stmt
+	bulkSelectEventJSONStmt        *sql.Stmt
 }
 
 func (s *statements) prepare(db *sql.DB) error {
@@ -196,6 +201,9 @@ func (s *statements) prepareEventStateKeys(db *sql.DB) (err error) {
 	if s.selectEventStateKeyNIDStmt, err = db.Prepare(selectEventStateKeyNIDSQL); err != nil {
 		return
 	}
+	if s.bulkSelectEventStateKeyNIDStmt, err = db.Prepare(bulkSelectEventStateKeyNIDSQL); err != nil {
+		return
+	}
 	return
 }
 
@@ -230,6 +238,12 @@ const insertEventStateKeyNIDSQL = "" +
 const selectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key_nid FROM event_state_keys WHERE event_state_key = $1"
 
+// Bulk lookup from string state key to numeric ID for that state key.
+// Takes an array of strings as the query parameter.
+const bulkSelectEventStateKeyNIDSQL = "" +
+	"SELECT event_state_key, event_state_key_nid FROM event_state_keys" +
+	" WHERE event_state_key = ANY($1)"
+
 func (s *statements) insertEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
 	err = s.insertEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
 	return
@@ -238,6 +252,25 @@ func (s *statements) insertEventStateKeyNID(eventStateKey string) (eventStateKey
 func (s *statements) selectEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
 	err = s.selectEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
 	return
+}
+
+func (s *statements) bulkSelectEventStateKeyNID(eventStateKeys []string) (map[string]int64, error) {
+	rows, err := s.bulkSelectEventStateKeyNIDStmt.Query(pq.StringArray(eventStateKeys))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]int64, len(eventStateKeys))
+	for rows.Next() {
+		var stateKey string
+		var stateKeyNID int64
+		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
+			return nil, err
+		}
+		result[stateKey] = stateKeyNID
+	}
+	return result, nil
 }
 
 func (s *statements) prepareRooms(db *sql.DB) (err error) {
@@ -307,16 +340,26 @@ CREATE TABLE IF NOT EXISTS events (
     event_id TEXT NOT NULL CONSTRAINT event_id_unique UNIQUE,
     -- The sha256 reference hash for the event.
     -- Needed for setting reference hashes when sending new events.
-    reference_sha256 BYTEA NOT NULL
+    reference_sha256 BYTEA NOT NULL,
+    -- A list of numeric IDs for events that can authenticate this event.
+    auth_event_nids BIGINT[] NOT NULL,
 );
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256)" +
-	" VALUES ($1, $2, $3, $4, $5)" +
+	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids)" +
+	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT ON CONSTRAINT event_id_unique" +
 	" DO UPDATE SET event_id = $1" +
 	" RETURNING event_nid"
+
+// Bulk lookup of events by string ID.
+// Sort by the numeric IDs for event type and state key.
+// This means we can use binary search to lookup entries by type and state key.
+const bulkSelectStateEventByIDSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid FROM events" +
+	" WHERE event_id = ANY($1)" +
+	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	_, err = db.Exec(eventsSchema)
@@ -326,6 +369,9 @@ func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
 		return
 	}
+	if s.bulkSelectStateEventByIDStmt, err = db.Prepare(bulkSelectStateEventByIDSQL); err != nil {
+		return
+	}
 	return
 }
 
@@ -333,11 +379,46 @@ func (s *statements) insertEvent(
 	roomNID, eventTypeNID, eventStateKeyNID int64,
 	eventID string,
 	referenceSHA256 []byte,
+	authEventNIDs []int64,
 ) (eventNID int64, err error) {
 	err = s.insertEventStmt.QueryRow(
 		roomNID, eventTypeNID, eventStateKeyNID, eventID, referenceSHA256,
+		pq.Int64Array(authEventNIDs),
 	).Scan(&eventNID)
 	return
+}
+
+func (s *statements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateEntry, error) {
+	rows, err := s.bulkSelectStateEventByIDStmt.Query(pq.StringArray(eventIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	// We know that we will only get as many results as event IDs
+	// because of the unique constraint on event IDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
+	results := make([]types.StateEntry, len(eventIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		if err = rows.Scan(
+			&result.EventNID,
+			&result.EventTypeNID,
+			&result.EventStateKeyNID,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if i != len(eventIDs) {
+		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
+		// We don't know which ones were missing because we don't return the string IDs in the query.
+		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
+		// If this turns out to be impossible and we do need the debug information here, it would be better
+		// to do it as a separate query rather than slowing down/complicating the common case.
+		return nil, fmt.Errorf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs))
+	}
+	return results, err
 }
 
 func (s *statements) prepareEventJSON(db *sql.DB) (err error) {
@@ -346,6 +427,9 @@ func (s *statements) prepareEventJSON(db *sql.DB) (err error) {
 		return
 	}
 	if s.insertEventJSONStmt, err = db.Prepare(insertEventJSONSQL); err != nil {
+		return
+	}
+	if s.bulkSelectEventJSONStmt, err = db.Prepare(bulkSelectEventJSONSQL); err != nil {
 		return
 	}
 	return
@@ -372,7 +456,41 @@ const insertEventJSONSQL = "" +
 	"INSERT INTO event_json (event_nid, event_json) VALUES ($1, $2)" +
 	" ON CONFLICT DO NOTHING"
 
+// Bulk event JSON lookup by numeric event ID.
+// Sort by the numeric event ID.
+// This means that we can use binary search to lookup by numeric event ID.
+const bulkSelectEventJSONSQL = "" +
+	"SELECT event_nid, event_json FROM event_json" +
+	" WHERE event_nid = ANY($1)" +
+	" ORDER BY event_nid ASC"
+
 func (s *statements) insertEventJSON(eventNID int64, eventJSON []byte) error {
 	_, err := s.insertEventJSONStmt.Exec(eventNID, eventJSON)
 	return err
+}
+
+type eventJSONPair struct {
+	EventNID  int64
+	EventJSON []byte
+}
+
+func (s *statements) bulkSelectEventJSON(eventNIDs []int64) ([]eventJSONPair, error) {
+	rows, err := s.bulkSelectEventJSONStmt.Query(pq.Int64Array(eventNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// We know that we will only get as many results as event NIDs
+	// because of the unique constraint on event NIDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than NIDs so we adjust the length of the slice before returning it.
+	results := make([]eventJSONPair, len(eventNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		if err := rows.Scan(&results[i].EventNID, &results[i].EventJSON); err != nil {
+			return nil, err
+		}
+	}
+	return results[:i], nil
 }

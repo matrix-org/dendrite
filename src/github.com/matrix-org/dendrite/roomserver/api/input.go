@@ -30,7 +30,13 @@ type InputRoomEvent struct {
 	Kind int
 	// The event JSON for the event to add.
 	Event []byte
+	// List of state event IDs that authenticate this event.
+	// These are likely derived from the "auth_events" JSON key of the event.
+	// But can be different because the "auth_events" key can be incomplete or wrong.
+	// For example many matrix events forget to reference the m.room.create event even though it is needed for auth.
+	// (since synapse allows this to happen we have to allow it as well.)
+	AuthEventIDs []string
 	// Optional list of state event IDs forming the state before this event.
 	// These state events must have already been persisted.
-	State []string
+	StateEventIDs []string
 }
