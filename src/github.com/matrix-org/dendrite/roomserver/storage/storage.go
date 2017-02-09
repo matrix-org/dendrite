@@ -123,7 +123,7 @@ func (d *Database) StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntr
 }
 
 // EventStateKeyNIDs implements input.EventDatabase
-func (d *Database) EventStateKeyNIDs(eventStateKeys []string) ([]types.IDPair, error) {
+func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]int64, error) {
 	return d.statements.selectEventStateKeyNIDs(eventStateKeys)
 }
 

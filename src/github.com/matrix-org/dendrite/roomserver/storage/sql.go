@@ -237,10 +237,11 @@ const insertEventStateKeyNIDSQL = "" +
 const selectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key_nid FROM event_state_keys WHERE event_state_key = $1"
 
+// Bulk lookup from string state key to numeric ID for that state key.
+// Takes an array of strings as the query parameter.
 const selectEventStateKeyNIDsSQL = "" +
 	"SELECT event_state_key, event_state_key_nid FROM event_state_keys" +
-	" WHERE event_state_key = ANY($1)" +
-	" ORDER BY event_state_key ASC"
+	" WHERE event_state_key = ANY($1)"
 
 func (s *statements) insertEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
 	err = s.insertEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
@@ -252,22 +253,23 @@ func (s *statements) selectEventStateKeyNID(eventStateKey string) (eventStateKey
 	return
 }
 
-func (s *statements) selectEventStateKeyNIDs(eventStateKeys []string) ([]types.IDPair, error) {
+func (s *statements) selectEventStateKeyNIDs(eventStateKeys []string) (map[string]int64, error) {
 	rows, err := s.selectEventStateKeyNIDsStmt.Query(pq.StringArray(eventStateKeys))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	results := make([]types.IDPair, len(eventStateKeys))
-	i := 0
+	result := make(map[string]int64, len(eventStateKeys))
 	for rows.Next() {
-		if err := rows.Scan(&results[i].ID, &results[i].NID); err != nil {
+		var stateKey string
+		var stateKeyNID int64
+		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
 			return nil, err
 		}
-		i++
+		result[stateKey] = stateKeyNID
 	}
-	return results[:i], nil
+	return result, nil
 }
 
 func (s *statements) prepareRooms(db *sql.DB) (err error) {
@@ -339,17 +341,20 @@ CREATE TABLE IF NOT EXISTS events (
     -- Needed for setting reference hashes when sending new events.
     reference_sha256 BYTEA NOT NULL,
     -- A list of numeric IDs for events that can authenticate this event.
-    auth_events BIGINT[] NOT NULL,
+    auth_event_nids BIGINT[] NOT NULL,
 );
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_events)" +
+	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT ON CONSTRAINT event_id_unique" +
 	" DO UPDATE SET event_id = $1" +
 	" RETURNING event_nid"
 
+// Bulk lookup of events by string ID.
+// Sort by the numeric IDs for event type and state key.
+// This means we can use binary search to lookup entries by type and state key.
 const selectStateEventsByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM events" +
 	" WHERE event_id = ANY($1)" +
@@ -383,12 +388,16 @@ func (s *statements) insertEvent(
 }
 
 func (s *statements) selectStateEventsByID(eventIDs []string) ([]types.StateEntry, error) {
-	results := make([]types.StateEntry, len(eventIDs))
 	rows, err := s.selectStateEventsByIDStmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+	// We know that we will only get as many results as event IDs
+	// because of the unique constraint on event IDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
+	results := make([]types.StateEntry, len(eventIDs))
 	i := 0
 	for ; rows.Next(); i++ {
 		result := &results[i]
@@ -438,6 +447,9 @@ const insertEventJSONSQL = "" +
 	"INSERT INTO event_json (event_nid, event_json) VALUES ($1, $2)" +
 	" ON CONFLICT DO NOTHING"
 
+// Bulk event JSON lookup by numeric event ID.
+// Sort by the numeric event ID.
+// This means that we can use binary search to lookup by numeric event ID.
 const selectEventJSONsSQL = "" +
 	"SELECT event_nid, event_json FROM event_json" +
 	" WHERE event_nid = ANY($1)" +
@@ -460,6 +472,10 @@ func (s *statements) selectEventJSONs(eventNIDs []int64) ([]eventJSONPair, error
 	}
 	defer rows.Close()
 
+	// We know that we will only get as many results as event NIDs
+	// because of the unique constraint on event NIDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than NIDs so we adjust the length of the slice before returning it.
 	results := make([]eventJSONPair, len(eventNIDs))
 	i := 0
 	for rows.Next() {
