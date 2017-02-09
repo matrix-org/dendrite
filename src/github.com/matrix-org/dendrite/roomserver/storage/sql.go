@@ -478,11 +478,10 @@ func (s *statements) selectEventJSONs(eventNIDs []int64) ([]eventJSONPair, error
 	// We might get fewer results than NIDs so we adjust the length of the slice before returning it.
 	results := make([]eventJSONPair, len(eventNIDs))
 	i := 0
-	for rows.Next() {
+	for ; rows.Next(); i++ {
 		if err := rows.Scan(&results[i].EventNID, &results[i].EventJSON); err != nil {
 			return nil, err
 		}
-		i++
 	}
 	return results[:i], nil
 }
