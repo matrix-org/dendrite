@@ -31,7 +31,7 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 		return err
 	}
 
-	// Check that the event passes authentication checks.
+	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(db, event, input.AuthEventIDs)
 	if err != nil {
 		return err
