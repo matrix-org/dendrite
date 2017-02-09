@@ -7,18 +7,18 @@ import (
 )
 
 type statements struct {
-	selectPartitionOffsetsStmt  *sql.Stmt
-	upsertPartitionOffsetStmt   *sql.Stmt
-	insertEventTypeNIDStmt      *sql.Stmt
-	selectEventTypeNIDStmt      *sql.Stmt
-	insertEventStateKeyNIDStmt  *sql.Stmt
-	selectEventStateKeyNIDStmt  *sql.Stmt
+	selectPartitionOffsetsStmt     *sql.Stmt
+	upsertPartitionOffsetStmt      *sql.Stmt
+	insertEventTypeNIDStmt         *sql.Stmt
+	selectEventTypeNIDStmt         *sql.Stmt
+	insertEventStateKeyNIDStmt     *sql.Stmt
+	selectEventStateKeyNIDStmt     *sql.Stmt
 	bulkSelectEventStateKeyNIDStmt *sql.Stmt
-	insertRoomNIDStmt           *sql.Stmt
-	selectRoomNIDStmt           *sql.Stmt
-	insertEventStmt             *sql.Stmt
-	bulkSelectStateEventByIDIDStmt   *sql.Stmt
-	insertEventJSONStmt         *sql.Stmt
+	insertRoomNIDStmt              *sql.Stmt
+	selectRoomNIDStmt              *sql.Stmt
+	insertEventStmt                *sql.Stmt
+	bulkSelectStateEventByIDIDStmt *sql.Stmt
+	insertEventJSONStmt            *sql.Stmt
 	bulkSelectEventJSONStmt        *sql.Stmt
 }
 

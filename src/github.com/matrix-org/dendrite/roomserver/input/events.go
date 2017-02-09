@@ -76,7 +76,7 @@ func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEv
 
 	// TODO: check for duplicate state keys here.
 
-	// Work out which of the state events we actaully need.
+	// Work out which of the state events we actually need.
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event})
 
 	// Load the actual auth events from the database.
