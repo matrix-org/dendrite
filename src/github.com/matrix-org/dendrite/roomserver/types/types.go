@@ -23,6 +23,7 @@ type StateKeyTuple struct {
 }
 
 // LessThan returns true if this state key is less than the other state key.
+// The ordering is arbitrary and is used to implement binary search and to efficiently deduplicate entries.
 func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
 	if a.EventTypeNID != b.EventTypeNID {
 		return a.EventTypeNID < b.EventTypeNID
@@ -38,6 +39,7 @@ type StateEntry struct {
 }
 
 // LessThan returns true if this state entry is less than the other state entry.
+// The ordering is arbitrary and is used to implement binary search and to efficiently deduplicate entries.
 func (a StateEntry) LessThan(b StateEntry) bool {
 	if a.StateKeyTuple != b.StateKeyTuple {
 		return a.StateKeyTuple.LessThan(b.StateKeyTuple)
