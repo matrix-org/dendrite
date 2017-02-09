@@ -1,7 +1,6 @@
 package input
 
 import (
-	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -70,10 +69,6 @@ func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEv
 	if err != nil {
 		return nil, err
 	}
-	if len(authStateEntries) < len(authEventIDs) {
-		return nil, fmt.Errorf("input: Some of the auth event IDs were missing from the database")
-	}
-
 	// TODO: check for duplicate state keys here.
 
 	// Work out which of the state events we actually need.
