@@ -45,13 +45,6 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 	return a.EventNID < b.EventNID
 }
 
-// An IDPair is a pair of a string ID and the corresponding numeric ID.
-// It is used when performing bulk numeric ID lookup in the database.
-type IDPair struct {
-	ID  string
-	NID int64
-}
-
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
 // It is when performing bulk event lookup in the database.
 type Event struct {
