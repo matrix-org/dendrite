@@ -38,7 +38,7 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 }
 
 // StoreEvent implements input.EventDatabase
-func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDS []int64) error {
+func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int64) error {
 	var (
 		roomNID          int64
 		eventTypeNID     int64
@@ -70,7 +70,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDS []int
 		eventStateKeyNID,
 		event.EventID(),
 		event.EventReference().EventSHA256,
-		authEventNIDS,
+		authEventNIDs,
 	); err != nil {
 		return err
 	}
