@@ -48,10 +48,12 @@ func TestStateEntryMap(t *testing.T) {
 		wantOK        bool
 		wantEventNID  int64
 	}{
+		{0, 0, false, 0},
 		{1, 1, true, 1},
 		{1, 3, true, 2},
 		{2, 1, true, 3},
 		{1, 2, false, 0},
+		{3, 1, false, 0},
 	}
 
 	for _, testCase := range testCases {
@@ -64,4 +66,43 @@ func TestStateEntryMap(t *testing.T) {
 			t.Fatalf("stateEntryMap lookup(%v): want eventNID to be %v, got %v", keyTuple, testCase.wantEventNID, gotEventNID)
 		}
 	}
+}
+
+func TestEventMap(t *testing.T) {
+	events := eventMap([]types.Event{
+		{EventNID: 1},
+		{EventNID: 2},
+		{EventNID: 3},
+		{EventNID: 5},
+		{EventNID: 8},
+	})
+
+	testCases := []struct {
+		inputEventNID int64
+		wantOK        bool
+		wantEvent     *types.Event
+	}{
+		{0, false, nil},
+		{1, true, &events[0]},
+		{2, true, &events[1]},
+		{3, true, &events[2]},
+		{4, false, nil},
+		{5, true, &events[3]},
+		{6, false, nil},
+		{7, false, nil},
+		{8, true, &events[4]},
+		{9, false, nil},
+	}
+
+	for _, testCase := range testCases {
+		gotEvent, gotOK := events.lookup(testCase.inputEventNID)
+		if testCase.wantOK != gotOK {
+			t.Fatalf("eventMap lookup(%v): want ok to be %v, got %v", testCase.inputEventNID, testCase.wantOK, gotOK)
+		}
+
+		if testCase.wantEvent != gotEvent {
+			t.Fatalf("eventMap lookup(%v): want event to be %v, got %v", testCase.inputEventNID, testCase.wantEvent, gotEvent)
+		}
+	}
+
 }
