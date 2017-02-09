@@ -15,10 +15,10 @@ type RoomEventDatabase interface {
 	// Returns a sorted list of state entries.
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
 	// Lookup the numeric IDs for a list of string event state keys.
-	// Returns a sorted list of state entries.
+	// Returns a map from string state key to numeric ID for the state key.
 	EventStateKeyNIDs(eventStateKeys []string) (map[string]int64, error)
 	// Lookup the Events for a list of numeric event IDs.
-	// Returns a sorted list of state entries.
+	// Returns a sorted list of events.
 	Events(eventNIDs []int64) ([]types.Event, error)
 }
 
