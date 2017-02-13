@@ -352,7 +352,7 @@ CREATE TABLE IF NOT EXISTS events (
     -- part of the event graph
     -- Since many different events can have the same state we store the
     -- state into a separate state table and refer to it by numeric ID.
-    state_nid bigint NOT NULL DEFAULT 0
+    state_snapshot_nid bigint NOT NULL DEFAULT 0
     -- The textual event id.
     -- Used to lookup the numeric ID when processing requests.
     -- Needed for state resolution.
@@ -371,7 +371,7 @@ const insertEventSQL = "" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT ON CONSTRAINT event_id_unique" +
 	" DO UPDATE SET event_id = $1" +
-	" RETURNING event_nid, state_nid"
+	" RETURNING event_nid, state_snapshot_nid"
 
 // Bulk lookup of events by string ID.
 // Sort by the numeric IDs for event type and state key.
@@ -382,12 +382,12 @@ const bulkSelectStateEventByIDSQL = "" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 const bulkSelectStateAtEventByIDSQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid, state_nid FROM events" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid FROM events" +
 	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 const updateEventStateSQL = "" +
-	"UPDATE events SET state_nid = $2 WHERE event_nid = $1"
+	"UPDATE events SET state_snapshot_nid = $2 WHERE event_nid = $1"
 
 func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	_, err = db.Exec(eventsSchema)
@@ -414,7 +414,7 @@ func (s *statements) insertEvent(
 	eventID string,
 	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
-) (types.EventNID, types.StateNID, error) {
+) (types.EventNID, types.StateSnapshotNID, error) {
 	nids := make([]int64, len(authEventNIDs))
 	for i := range authEventNIDs {
 		nids[i] = int64(authEventNIDs[i])
@@ -425,7 +425,7 @@ func (s *statements) insertEvent(
 		int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, referenceSHA256,
 		pq.Int64Array(nids),
 	).Scan(&eventNID, &stateNID)
-	return types.EventNID(eventNID), types.StateNID(stateNID), err
+	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
 func (s *statements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateEntry, error) {
@@ -475,11 +475,11 @@ func (s *statements) bulkSelectStateAtEventByID(eventIDs []string) ([]types.Stat
 			&result.EventNID,
 			&result.EventTypeNID,
 			&result.EventStateKeyNID,
-			&result.BeforeStateNID,
+			&result.BeforeStateSnapshotNID,
 		); err != nil {
 			return nil, err
 		}
-		if result.BeforeStateNID == 0 {
+		if result.BeforeStateSnapshotNID == 0 {
 			return nil, fmt.Errorf("storage: missing state for event NID %d", result.EventNID)
 		}
 	}
@@ -489,7 +489,7 @@ func (s *statements) bulkSelectStateAtEventByID(eventIDs []string) ([]types.Stat
 	return results, err
 }
 
-func (s *statements) updateEventState(eventNID types.EventNID, stateNID types.StateNID) error {
+func (s *statements) updateEventState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error {
 	_, err := s.updateEventStateStmt.Exec(int64(eventNID), int64(stateNID))
 	return err
 }
@@ -586,10 +586,10 @@ const stateSchema = `
 -- because room state tends to accumulate small changes over time. Although if
 -- the list of deltas becomes too long it becomes more efficient to encode
 -- the full state under single state_data_nid.
-CREATE SEQUENCE IF NOT EXISTS state_nid_seq;
-CREATE TABLE IF NOT EXISTS state (
+CREATE SEQUENCE IF NOT EXISTS state_snapshot_nid_seq;
+CREATE TABLE IF NOT EXISTS state_snapshots (
     -- Local numeric ID for the state.
-    state_nid bigint PRIMARY KEY DEFAULT nextval('state_nid_seq'),
+    state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('state_snapshot_nid_seq'),
     -- Local numeric ID of the room this state is for.
     -- Unused in normal operation, but useful for background work or ad-hoc debugging.
     room_nid bigint NOT NULL,
@@ -599,13 +599,13 @@ CREATE TABLE IF NOT EXISTS state (
 `
 
 const insertStateSQL = "" +
-	"INSERT INTO state (room_nid, state_data_nids)" +
+	"INSERT INTO state_snapshots (room_nid, state_data_nids)" +
 	" VALUES ($1, $2)" +
-	" RETURNING state_nid"
+	" RETURNING state_snapshot_nid"
 
 const bulkSelectStateDataNIDsSQL = "" +
-	"SELECT state_nid, state_data_nids FROM state" +
-	" WHERE state_nid = ANY($1) ORDER BY state_nid"
+	"SELECT state_snapshot_nid, state_data_nids FROM state_snapshots" +
+	" WHERE state_snapshot_nid = ANY($1) ORDER BY state_snapshot_nid"
 
 func (s *statements) prepareState(db *sql.DB) (err error) {
 	_, err = db.Exec(stateSchema)
@@ -621,7 +621,7 @@ func (s *statements) prepareState(db *sql.DB) (err error) {
 	return
 }
 
-func (s *statements) insertState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID) (stateNID types.StateNID, err error) {
+func (s *statements) insertState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID) (stateNID types.StateSnapshotNID, err error) {
 	nids := make([]int64, len(stateDataNIDs))
 	for i := range stateDataNIDs {
 		nids[i] = int64(stateDataNIDs[i])
@@ -630,7 +630,7 @@ func (s *statements) insertState(roomNID types.RoomNID, stateDataNIDs []types.St
 	return
 }
 
-func (s *statements) bulkSelectStateDataNIDs(stateNIDs []types.StateNID) ([]types.StateDataNIDList, error) {
+func (s *statements) bulkSelectStateDataNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateDataNIDList, error) {
 	nids := make([]int64, len(stateNIDs))
 	for i := range stateNIDs {
 		nids[i] = int64(stateNIDs[i])
@@ -645,7 +645,7 @@ func (s *statements) bulkSelectStateDataNIDs(stateNIDs []types.StateNID) ([]type
 	for ; rows.Next(); i++ {
 		result := &results[i]
 		var stateDataNIDs pq.Int64Array
-		if err := rows.Scan(&result.StateNID, &stateDataNIDs); err != nil {
+		if err := rows.Scan(&result.StateSnapshotNID, &stateDataNIDs); err != nil {
 			return nil, err
 		}
 		result.StateDataNIDs = make([]types.StateDataNID, len(stateDataNIDs))

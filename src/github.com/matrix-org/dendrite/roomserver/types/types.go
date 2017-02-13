@@ -25,8 +25,8 @@ type EventNID int64
 // RoomNID is a numeric ID for a room.
 type RoomNID int64
 
-// StateNID is a numeric ID for the state at an event.
-type StateNID int64
+// StateSnapshotNID is a numeric ID for the state at an event.
+type StateSnapshotNID int64
 
 // StateDataNID is a numeric ID for a block of state data.
 // These blocks of state data are combined to form the actual state.
@@ -69,7 +69,7 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 // StateAtEvent is the state before and after a matrix event.
 type StateAtEvent struct {
 	// The state before the event.
-	BeforeStateNID StateNID
+	BeforeStateSnapshotNID StateSnapshotNID
 	// The state entry for the event itself, allows us to calculate the state after the event.
 	StateEntry
 }
@@ -105,8 +105,8 @@ const (
 
 // StateDataNIDList is used to return the result of bulk StateDataNID lookups from the database.
 type StateDataNIDList struct {
-	StateNID      StateNID
-	StateDataNIDs []StateDataNID
+	StateSnapshotNID StateSnapshotNID
+	StateDataNIDs    []StateDataNID
 }
 
 // StateEntryList is used to return the result of bulk state entry lookups from the database.

@@ -9,7 +9,7 @@ import (
 
 func calculateAndStoreState(
 	db RoomEventDatabase, event gomatrixserverlib.Event, roomNID types.RoomNID, stateEventIDs []string,
-) (types.StateNID, error) {
+) (types.StateSnapshotNID, error) {
 	if stateEventIDs != nil {
 		// 1) We've been told what the state at the event is.
 		// Check that those state events are in the database and store the state.
@@ -46,11 +46,11 @@ func calculateAndStoreState(
 			// have the same state, so this event has exactly the same state
 			// as the previous events.
 			// This should be the common case.
-			return prevState.BeforeStateNID, nil
+			return prevState.BeforeStateSnapshotNID, nil
 		}
 		// The previous event was a state event so we need to store a copy
 		// of the previous state updated with that event.
-		stateDataNIDLists, err := db.StateDataNIDs([]types.StateNID{prevState.BeforeStateNID})
+		stateDataNIDLists, err := db.StateDataNIDs([]types.StateSnapshotNID{prevState.BeforeStateSnapshotNID})
 		if err != nil {
 			return 0, err
 		}
@@ -70,14 +70,14 @@ func calculateAndStoreState(
 
 const maxStateDataNIDs = 64
 
-func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateNID, error) {
+func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
 	// Conflict resolution.
 	// First stage: load the state datablocks for the prev events.
-	stateNIDs := make([]types.StateNID, len(prevStates))
+	stateNIDs := make([]types.StateSnapshotNID, len(prevStates))
 	for i, state := range prevStates {
-		stateNIDs[i] = state.BeforeStateNID
+		stateNIDs[i] = state.BeforeStateSnapshotNID
 	}
-	stateDataNIDLists, err := db.StateDataNIDs(uniqueStateNIDs(stateNIDs))
+	stateDataNIDLists, err := db.StateDataNIDs(uniqueStateSnapshotNIDs(stateNIDs))
 	if err != nil {
 		return 0, err
 	}
@@ -95,11 +95,11 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 
 	var combined []types.StateEntry
 	for _, prevState := range prevStates {
-		list, ok := stateDataNIDsMap.lookup(prevState.BeforeStateNID)
+		list, ok := stateDataNIDsMap.lookup(prevState.BeforeStateSnapshotNID)
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateNID))
+			panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateSnapshotNID))
 		}
 
 		var fullState []types.StateEntry
@@ -108,7 +108,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateNID))
+				panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateSnapshotNID))
 			}
 			fullState = append(fullState, entries...)
 		}
@@ -121,7 +121,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 		sort.Stable(stateEntryByStateKeySorter(fullState))
 		// Unique returns the last entry for each state key.
 		fullState = fullState[:unique(stateEntryByStateKeySorter(fullState))]
-		// Add the full state for this StateNID.
+		// Add the full state for this StateSnapshotNID.
 		combined = append(combined, fullState...)
 	}
 
@@ -174,12 +174,12 @@ func duplicateStateKeys(a []types.StateEntry) []types.StateEntry {
 
 type stateDataNIDListMap []types.StateDataNIDList
 
-func (m stateDataNIDListMap) lookup(stateNID types.StateNID) (stateDataNIDs []types.StateDataNID, ok bool) {
+func (m stateDataNIDListMap) lookup(stateNID types.StateSnapshotNID) (stateDataNIDs []types.StateDataNID, ok bool) {
 	list := []types.StateDataNIDList(m)
 	i := sort.Search(len(list), func(i int) bool {
-		return list[i].StateNID >= stateNID
+		return list[i].StateSnapshotNID >= stateNID
 	})
-	if i < len(list) && list[i].StateNID == stateNID {
+	if i < len(list) && list[i].StateSnapshotNID == stateNID {
 		ok = true
 		stateDataNIDs = list[i].StateDataNIDs
 	}
@@ -214,13 +214,13 @@ func (s stateEntrySorter) Len() int           { return len(s) }
 func (s stateEntrySorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
 func (s stateEntrySorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-type stateNIDSorter []types.StateNID
+type stateNIDSorter []types.StateSnapshotNID
 
 func (s stateNIDSorter) Len() int           { return len(s) }
 func (s stateNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
 func (s stateNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-func uniqueStateNIDs(nids []types.StateNID) []types.StateNID {
+func uniqueStateSnapshotNIDs(nids []types.StateSnapshotNID) []types.StateSnapshotNID {
 	sort.Sort(stateNIDSorter(nids))
 	return nids[:unique(stateNIDSorter(nids))]
 }

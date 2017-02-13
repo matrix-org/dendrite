@@ -44,7 +44,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []typ
 		eventTypeNID     types.EventTypeNID
 		eventStateKeyNID types.EventStateKeyNID
 		eventNID         types.EventNID
-		stateNID         types.StateNID
+		stateNID         types.StateSnapshotNID
 		err              error
 	)
 
@@ -81,7 +81,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []typ
 	}
 
 	return roomNID, types.StateAtEvent{
-		BeforeStateNID: stateNID,
+		BeforeStateSnapshotNID: stateNID,
 		StateEntry: types.StateEntry{
 			StateKeyTuple: types.StateKeyTuple{
 				EventTypeNID:     eventTypeNID,
@@ -161,7 +161,7 @@ func (d *Database) Events(eventNIDs []types.EventNID) ([]types.Event, error) {
 }
 
 // AddState implements input.EventDatabase
-func (d *Database) AddState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID, state []types.StateEntry) (types.StateNID, error) {
+func (d *Database) AddState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID, state []types.StateEntry) (types.StateSnapshotNID, error) {
 	if len(state) > 0 {
 		stateDataNID, err := d.statements.selectNextStateDataNID()
 		if err != nil {
@@ -177,7 +177,7 @@ func (d *Database) AddState(roomNID types.RoomNID, stateDataNIDs []types.StateDa
 }
 
 // SetState implements input.EventDatabase
-func (d *Database) SetState(eventNID types.EventNID, stateNID types.StateNID) error {
+func (d *Database) SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error {
 	return d.statements.updateEventState(eventNID, stateNID)
 }
 
@@ -187,7 +187,7 @@ func (d *Database) StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, err
 }
 
 // StateDataNIDs implements input.EventDatabase
-func (d *Database) StateDataNIDs(stateNIDs []types.StateNID) ([]types.StateDataNIDList, error) {
+func (d *Database) StateDataNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateDataNIDList, error) {
 	return d.statements.bulkSelectStateDataNIDs(stateNIDs)
 }
 
