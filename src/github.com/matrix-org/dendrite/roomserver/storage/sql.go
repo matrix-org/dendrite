@@ -348,7 +348,7 @@ CREATE TABLE IF NOT EXISTS events (
     event_state_key_nid BIGINT NOT NULL,
     -- Local numeric ID for the state at the event.
     -- This is 0 if we don't know the state at the event.
-    -- If the state is not 0 this this event is part of the contiguous
+    -- If the state is not 0 then this event is part of the contiguous
     -- part of the event graph
     -- Since many different events can have the same state we store the
     -- state into a separate state table and refer to it by numeric ID.
