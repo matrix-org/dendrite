@@ -352,7 +352,7 @@ CREATE TABLE IF NOT EXISTS events (
     -- part of the event graph
     -- Since many different events can have the same state we store the
     -- state into a separate state table and refer to it by numeric ID.
-    state_snapshot_nid bigint NOT NULL DEFAULT 0
+    state_snapshot_nid bigint NOT NULL DEFAULT 0,
     -- The textual event id.
     -- Used to lookup the numeric ID when processing requests.
     -- Needed for state resolution.
@@ -362,7 +362,7 @@ CREATE TABLE IF NOT EXISTS events (
     -- Needed for setting reference hashes when sending new events.
     reference_sha256 BYTEA NOT NULL,
     -- A list of numeric IDs for events that can authenticate this event.
-    auth_event_nids BIGINT[] NOT NULL,
+    auth_event_nids BIGINT[] NOT NULL
 );
 `
 
