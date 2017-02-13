@@ -8,8 +8,8 @@ import (
 )
 
 func calculateAndStoreState(
-	db RoomEventDatabase, event gomatrixserverlib.Event, roomNID int64, stateEventIDs []string,
-) (int64, error) {
+	db RoomEventDatabase, event gomatrixserverlib.Event, roomNID types.RoomNID, stateEventIDs []string,
+) (types.StateNID, error) {
 	if stateEventIDs != nil {
 		// 1) We've been told what the state at the event is.
 		// Check that those state events are in the database and store the state.
@@ -50,7 +50,7 @@ func calculateAndStoreState(
 		}
 		// The previous event was a state event so we need to store a copy
 		// of the previous state updated with that event.
-		stateDataNIDLists, err := db.StateDataNIDs([]int64{prevState.BeforeStateNID})
+		stateDataNIDLists, err := db.StateDataNIDs([]types.StateNID{prevState.BeforeStateNID})
 		if err != nil {
 			return 0, err
 		}
@@ -70,23 +70,23 @@ func calculateAndStoreState(
 
 const maxStateDataNIDs = 64
 
-func calculateAndStoreStateMany(db RoomEventDatabase, roomNID int64, prevStates []types.StateAtEvent) (int64, error) {
+func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateNID, error) {
 	// Conflict resolution.
 	// First stage: load the state datablocks for the prev events.
-	stateNIDs := make([]int64, len(prevStates))
+	stateNIDs := make([]types.StateNID, len(prevStates))
 	for i, state := range prevStates {
 		stateNIDs[i] = state.BeforeStateNID
 	}
-	stateDataNIDLists, err := db.StateDataNIDs(uniqueNIDs(stateNIDs))
+	stateDataNIDLists, err := db.StateDataNIDs(uniqueStateNIDs(stateNIDs))
 	if err != nil {
 		return 0, err
 	}
 
-	var stateDataNIDs []int64
+	var stateDataNIDs []types.StateDataNID
 	for _, list := range stateDataNIDLists {
 		stateDataNIDs = append(stateDataNIDs, list.StateDataNIDs...)
 	}
-	stateEntryLists, err := db.StateEntries(uniqueNIDs(stateDataNIDs))
+	stateEntryLists, err := db.StateEntries(uniqueStateDataNIDs(stateDataNIDs))
 	if err != nil {
 		return 0, err
 	}
@@ -172,14 +172,9 @@ func duplicateStateKeys(a []types.StateEntry) []types.StateEntry {
 	return result
 }
 
-func uniqueNIDs(nids []int64) []int64 {
-	sort.Sort(int64Sorter(nids))
-	return nids[:unique(int64Sorter(nids))]
-}
-
 type stateDataNIDListMap []types.StateDataNIDList
 
-func (m stateDataNIDListMap) lookup(stateNID int64) (stateDataNIDs []int64, ok bool) {
+func (m stateDataNIDListMap) lookup(stateNID types.StateNID) (stateDataNIDs []types.StateDataNID, ok bool) {
 	list := []types.StateDataNIDList(m)
 	i := sort.Search(len(list), func(i int) bool {
 		return list[i].StateNID >= stateNID
@@ -193,7 +188,7 @@ func (m stateDataNIDListMap) lookup(stateNID int64) (stateDataNIDs []int64, ok b
 
 type stateEntryListMap []types.StateEntryList
 
-func (m stateEntryListMap) lookup(stateDataNID int64) (stateEntries []types.StateEntry, ok bool) {
+func (m stateEntryListMap) lookup(stateDataNID types.StateDataNID) (stateEntries []types.StateEntry, ok bool) {
 	list := []types.StateEntryList(m)
 	i := sort.Search(len(list), func(i int) bool {
 		return list[i].StateDataNID >= stateDataNID
@@ -219,11 +214,27 @@ func (s stateEntrySorter) Len() int           { return len(s) }
 func (s stateEntrySorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
 func (s stateEntrySorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-type int64Sorter []int64
+type stateNIDSorter []types.StateNID
 
-func (s int64Sorter) Len() int           { return len(s) }
-func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
-func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s stateNIDSorter) Len() int           { return len(s) }
+func (s stateNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
+func (s stateNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func uniqueStateNIDs(nids []types.StateNID) []types.StateNID {
+	sort.Sort(stateNIDSorter(nids))
+	return nids[:unique(stateNIDSorter(nids))]
+}
+
+type stateDataNIDSorter []types.StateDataNID
+
+func (s stateDataNIDSorter) Len() int           { return len(s) }
+func (s stateDataNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
+func (s stateDataNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func uniqueStateDataNIDs(nids []types.StateDataNID) []types.StateDataNID {
+	sort.Sort(stateDataNIDSorter(nids))
+	return nids[:unique(stateDataNIDSorter(nids))]
+}
 
 // Remove duplicate items from a sorted list.
 // Takes the same interface as sort.Sort

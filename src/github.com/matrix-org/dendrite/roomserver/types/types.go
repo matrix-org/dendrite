@@ -13,13 +13,32 @@ type PartitionOffset struct {
 	Offset int64
 }
 
+// EventTypeNID is a numeric ID for an event type.
+type EventTypeNID int64
+
+// EventStateKeyNID is a numeric ID for an event state_key.
+type EventStateKeyNID int64
+
+// EventNID is a numeric ID for an event.
+type EventNID int64
+
+// RoomNID is a numeric ID for a room.
+type RoomNID int64
+
+// StateNID is a numeric ID for the state at an event.
+type StateNID int64
+
+// StateDataNID is a numeric ID for a block of state data.
+// These blocks of state data are combined to form the actual state.
+type StateDataNID int64
+
 // A StateKeyTuple is a pair of a numeric event type and a numeric state key.
 // It is used to lookup state entries.
 type StateKeyTuple struct {
 	// The numeric ID for the event type.
-	EventTypeNID int64
+	EventTypeNID EventTypeNID
 	// The numeric ID for the state key.
-	EventStateKeyNID int64
+	EventStateKeyNID EventStateKeyNID
 }
 
 // LessThan returns true if this state key is less than the other state key.
@@ -35,7 +54,7 @@ func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
 type StateEntry struct {
 	StateKeyTuple
 	// The numeric ID for the event.
-	EventNID int64
+	EventNID EventNID
 }
 
 // LessThan returns true if this state entry is less than the other state entry.
@@ -50,7 +69,7 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 // StateAtEvent is the state before and after a matrix event.
 type StateAtEvent struct {
 	// The state before the event.
-	BeforeStateNID int64
+	BeforeStateNID StateNID
 	// The state entry for the event itself, allows us to calculate the state after the event.
 	StateEntry
 }
@@ -58,7 +77,7 @@ type StateAtEvent struct {
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
 // It is when performing bulk event lookup in the database.
 type Event struct {
-	EventNID int64
+	EventNID EventNID
 	gomatrixserverlib.Event
 }
 
@@ -86,12 +105,12 @@ const (
 
 // StateDataNIDList is used to return the result of bulk StateDataNID lookups from the database.
 type StateDataNIDList struct {
-	StateNID      int64
-	StateDataNIDs []int64
+	StateNID      StateNID
+	StateDataNIDs []StateDataNID
 }
 
 // StateEntryList is used to return the result of bulk state entry lookups from the database.
 type StateEntryList struct {
-	StateDataNID int64
+	StateDataNID StateDataNID
 	StateEntries []StateEntry
 }

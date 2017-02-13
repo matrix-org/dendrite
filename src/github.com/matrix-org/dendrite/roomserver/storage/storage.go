@@ -38,13 +38,13 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 }
 
 // StoreEvent implements input.EventDatabase
-func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int64) (int64, types.StateAtEvent, error) {
+func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error) {
 	var (
-		roomNID          int64
-		eventTypeNID     int64
-		eventStateKeyNID int64
-		eventNID         int64
-		stateNID         int64
+		roomNID          types.RoomNID
+		eventTypeNID     types.EventTypeNID
+		eventStateKeyNID types.EventStateKeyNID
+		eventNID         types.EventNID
+		stateNID         types.StateNID
 		err              error
 	)
 
@@ -92,7 +92,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int
 	}, nil
 }
 
-func (d *Database) assignRoomNID(roomID string) (int64, error) {
+func (d *Database) assignRoomNID(roomID string) (types.RoomNID, error) {
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.statements.selectRoomNID(roomID)
 	if err == sql.ErrNoRows {
@@ -105,7 +105,7 @@ func (d *Database) assignRoomNID(roomID string) (int64, error) {
 	return roomNID, nil
 }
 
-func (d *Database) assignEventTypeNID(eventType string) (int64, error) {
+func (d *Database) assignEventTypeNID(eventType string) (types.EventTypeNID, error) {
 	// Check if we already have a numeric ID in the database.
 	eventTypeNID, err := d.statements.selectEventTypeNID(eventType)
 	if err == sql.ErrNoRows {
@@ -118,7 +118,7 @@ func (d *Database) assignEventTypeNID(eventType string) (int64, error) {
 	return eventTypeNID, nil
 }
 
-func (d *Database) assignStateKeyNID(eventStateKey string) (int64, error) {
+func (d *Database) assignStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
 	// Check if we already have a numeric ID in the database.
 	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(eventStateKey)
 	if err == sql.ErrNoRows {
@@ -137,12 +137,12 @@ func (d *Database) StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntr
 }
 
 // EventStateKeyNIDs implements input.EventDatabase
-func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]int64, error) {
+func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error) {
 	return d.statements.bulkSelectEventStateKeyNID(eventStateKeys)
 }
 
 // Events implements input.EventDatabase
-func (d *Database) Events(eventNIDs []int64) ([]types.Event, error) {
+func (d *Database) Events(eventNIDs []types.EventNID) ([]types.Event, error) {
 	eventJSONs, err := d.statements.bulkSelectEventJSON(eventNIDs)
 	if err != nil {
 		return nil, err
@@ -161,14 +161,14 @@ func (d *Database) Events(eventNIDs []int64) ([]types.Event, error) {
 }
 
 // AddState implements input.EventDatabase
-func (d *Database) AddState(roomNID int64, stateDataNIDs []int64, state []types.StateEntry) (stateNID int64, err error) {
+func (d *Database) AddState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID, state []types.StateEntry) (types.StateNID, error) {
 	if len(state) > 0 {
-		var stateDataNID int64
-		if stateDataNID, err = d.statements.selectNextStateDataNID(); err != nil {
-			return
+		stateDataNID, err := d.statements.selectNextStateDataNID()
+		if err != nil {
+			return 0, err
 		}
 		if err = d.statements.bulkInsertStateData(stateDataNID, state); err != nil {
-			return
+			return 0, err
 		}
 		stateDataNIDs = append(stateDataNIDs[:len(stateDataNIDs):len(stateDataNIDs)], stateDataNID)
 	}
@@ -177,7 +177,7 @@ func (d *Database) AddState(roomNID int64, stateDataNIDs []int64, state []types.
 }
 
 // SetState implements input.EventDatabase
-func (d *Database) SetState(eventNID, stateNID int64) error {
+func (d *Database) SetState(eventNID types.EventNID, stateNID types.StateNID) error {
 	return d.statements.updateEventState(eventNID, stateNID)
 }
 
@@ -187,11 +187,11 @@ func (d *Database) StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, err
 }
 
 // StateDataNIDs implements input.EventDatabase
-func (d *Database) StateDataNIDs(stateNIDs []int64) ([]types.StateDataNIDList, error) {
+func (d *Database) StateDataNIDs(stateNIDs []types.StateNID) ([]types.StateDataNIDList, error) {
 	return d.statements.bulkSelectStateDataNIDs(stateNIDs)
 }
 
 // StateEntries implements input.EventDatabase
-func (d *Database) StateEntries(stateDataNIDs []int64) ([]types.StateEntryList, error) {
+func (d *Database) StateEntries(stateDataNIDs []types.StateDataNID) ([]types.StateEntryList, error) {
 	return d.statements.bulkSelectStateDataEntries(stateDataNIDs)
 }

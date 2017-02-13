@@ -9,7 +9,7 @@ import (
 // A RoomEventDatabase has the storage APIs needed to store a room event.
 type RoomEventDatabase interface {
 	// Stores a matrix room event in the database
-	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int64) (roomNID int64, stateAtEvent types.StateAtEvent, err error)
+	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
 	// Lookup the state entries for a list of string event IDs
 	// Returns a sorted list of state entries.
 	// Returns an error if the there is an error talking to the database
@@ -17,10 +17,10 @@ type RoomEventDatabase interface {
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
 	// Lookup the numeric IDs for a list of string event state keys.
 	// Returns a map from string state key to numeric ID for the state key.
-	EventStateKeyNIDs(eventStateKeys []string) (map[string]int64, error)
+	EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error)
 	// Lookup the Events for a list of numeric event IDs.
 	// Returns a sorted list of events.
-	Events(eventNIDs []int64) ([]types.Event, error)
+	Events(eventNIDs []types.EventNID) ([]types.Event, error)
 	// Lookup the state of a room at each event for a list of string event IDs.
 	// Returns a sorted list of state at each event.
 	// Returns an error if there is an error talking to the database
@@ -28,14 +28,14 @@ type RoomEventDatabase interface {
 	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
 	// Lookup the numeric state data IDs for the each numeric state ID
 	// The returned slice is sorted by numeric state ID.
-	StateDataNIDs(stateNIDs []int64) ([]types.StateDataNIDList, error)
+	StateDataNIDs(stateNIDs []types.StateNID) ([]types.StateDataNIDList, error)
 	// Lookup the state data for each numeric state data ID
 	// The returned slice is sorted by numeric state data ID.
-	StateEntries(stateDataNIDs []int64) ([]types.StateEntryList, error)
+	StateEntries(stateDataNIDs []types.StateDataNID) ([]types.StateEntryList, error)
 	// Store the room state at an event in the database
-	AddState(roomNID int64, stateDataNIDs []int64, state []types.StateEntry) (stateNID int64, err error)
+	AddState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID, state []types.StateEntry) (types.StateNID, error)
 	// Set the state at an event.
-	SetState(eventNID, stateNID int64) error
+	SetState(eventNID types.EventNID, stateNID types.StateNID) error
 }
 
 func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {

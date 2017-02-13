@@ -187,14 +187,16 @@ const insertEventTypeNIDSQL = "" +
 const selectEventTypeNIDSQL = "" +
 	"SELECT event_type_nid FROM event_types WHERE event_type = $1"
 
-func (s *statements) insertEventTypeNID(eventType string) (eventTypeNID int64, err error) {
-	err = s.insertEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
-	return
+func (s *statements) insertEventTypeNID(eventType string) (types.EventTypeNID, error) {
+	var eventTypeNID int64
+	err := s.insertEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
+	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *statements) selectEventTypeNID(eventType string) (eventTypeNID int64, err error) {
-	err = s.selectEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
-	return
+func (s *statements) selectEventTypeNID(eventType string) (types.EventTypeNID, error) {
+	var eventTypeNID int64
+	err := s.selectEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
+	return types.EventTypeNID(eventTypeNID), err
 }
 
 func (s *statements) prepareEventStateKeys(db *sql.DB) (err error) {
@@ -251,31 +253,33 @@ const bulkSelectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key, event_state_key_nid FROM event_state_keys" +
 	" WHERE event_state_key = ANY($1)"
 
-func (s *statements) insertEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
-	err = s.insertEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
-	return
+func (s *statements) insertEventStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
+	var eventStateKeyNID int64
+	err := s.insertEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
+	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *statements) selectEventStateKeyNID(eventStateKey string) (eventStateKeyNID int64, err error) {
-	err = s.selectEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
-	return
+func (s *statements) selectEventStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
+	var eventStateKeyNID int64
+	err := s.selectEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
+	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *statements) bulkSelectEventStateKeyNID(eventStateKeys []string) (map[string]int64, error) {
+func (s *statements) bulkSelectEventStateKeyNID(eventStateKeys []string) (map[string]types.EventStateKeyNID, error) {
 	rows, err := s.bulkSelectEventStateKeyNIDStmt.Query(pq.StringArray(eventStateKeys))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	result := make(map[string]int64, len(eventStateKeys))
+	result := make(map[string]types.EventStateKeyNID, len(eventStateKeys))
 	for rows.Next() {
 		var stateKey string
 		var stateKeyNID int64
 		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
 			return nil, err
 		}
-		result[stateKey] = stateKeyNID
+		result[stateKey] = types.EventStateKeyNID(stateKeyNID)
 	}
 	return result, nil
 }
@@ -314,14 +318,16 @@ const insertRoomNIDSQL = "" +
 const selectRoomNIDSQL = "" +
 	"SELECT room_nid FROM rooms WHERE room_id = $1"
 
-func (s *statements) insertRoomNID(roomID string) (roomNID int64, err error) {
-	err = s.insertRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
-	return
+func (s *statements) insertRoomNID(roomID string) (types.RoomNID, error) {
+	var roomNID int64
+	err := s.insertRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
+	return types.RoomNID(roomNID), err
 }
 
-func (s *statements) selectRoomNID(roomID string) (roomNID int64, err error) {
-	err = s.selectRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
-	return
+func (s *statements) selectRoomNID(roomID string) (types.RoomNID, error) {
+	var roomNID int64
+	err := s.selectRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
+	return types.RoomNID(roomNID), err
 }
 
 const eventsSchema = `
@@ -404,16 +410,22 @@ func (s *statements) prepareEvents(db *sql.DB) (err error) {
 }
 
 func (s *statements) insertEvent(
-	roomNID, eventTypeNID, eventStateKeyNID int64,
+	roomNID types.RoomNID, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID,
 	eventID string,
 	referenceSHA256 []byte,
-	authEventNIDs []int64,
-) (eventNID, stateNID int64, err error) {
-	err = s.insertEventStmt.QueryRow(
-		roomNID, eventTypeNID, eventStateKeyNID, eventID, referenceSHA256,
-		pq.Int64Array(authEventNIDs),
+	authEventNIDs []types.EventNID,
+) (types.EventNID, types.StateNID, error) {
+	nids := make([]int64, len(authEventNIDs))
+	for i := range authEventNIDs {
+		nids[i] = int64(authEventNIDs[i])
+	}
+	var eventNID int64
+	var stateNID int64
+	err := s.insertEventStmt.QueryRow(
+		int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, referenceSHA256,
+		pq.Int64Array(nids),
 	).Scan(&eventNID, &stateNID)
-	return
+	return types.EventNID(eventNID), types.StateNID(stateNID), err
 }
 
 func (s *statements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateEntry, error) {
@@ -477,8 +489,8 @@ func (s *statements) bulkSelectStateAtEventByID(eventIDs []string) ([]types.Stat
 	return results, err
 }
 
-func (s *statements) updateEventState(eventNID, stateNID int64) error {
-	_, err := s.updateEventStateStmt.Exec(eventNID, stateNID)
+func (s *statements) updateEventState(eventNID types.EventNID, stateNID types.StateNID) error {
+	_, err := s.updateEventStateStmt.Exec(int64(eventNID), int64(stateNID))
 	return err
 }
 
@@ -525,18 +537,22 @@ const bulkSelectEventJSONSQL = "" +
 	" WHERE event_nid = ANY($1)" +
 	" ORDER BY event_nid ASC"
 
-func (s *statements) insertEventJSON(eventNID int64, eventJSON []byte) error {
-	_, err := s.insertEventJSONStmt.Exec(eventNID, eventJSON)
+func (s *statements) insertEventJSON(eventNID types.EventNID, eventJSON []byte) error {
+	_, err := s.insertEventJSONStmt.Exec(int64(eventNID), eventJSON)
 	return err
 }
 
 type eventJSONPair struct {
-	EventNID  int64
+	EventNID  types.EventNID
 	EventJSON []byte
 }
 
-func (s *statements) bulkSelectEventJSON(eventNIDs []int64) ([]eventJSONPair, error) {
-	rows, err := s.bulkSelectEventJSONStmt.Query(pq.Int64Array(eventNIDs))
+func (s *statements) bulkSelectEventJSON(eventNIDs []types.EventNID) ([]eventJSONPair, error) {
+	nids := make([]int64, len(eventNIDs))
+	for i := range eventNIDs {
+		nids[i] = int64(eventNIDs[i])
+	}
+	rows, err := s.bulkSelectEventJSONStmt.Query(pq.Int64Array(nids))
 	if err != nil {
 		return nil, err
 	}
@@ -549,9 +565,12 @@ func (s *statements) bulkSelectEventJSON(eventNIDs []int64) ([]eventJSONPair, er
 	results := make([]eventJSONPair, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
-		if err := rows.Scan(&results[i].EventNID, &results[i].EventJSON); err != nil {
+		result := &results[i]
+		var eventNID int64
+		if err := rows.Scan(&eventNID, &result.EventJSON); err != nil {
 			return nil, err
 		}
+		result.EventNID = types.EventNID(eventNID)
 	}
 	return results[:i], nil
 }
@@ -602,13 +621,21 @@ func (s *statements) prepareState(db *sql.DB) (err error) {
 	return
 }
 
-func (s *statements) insertState(roomNID int64, stateDataNIDs []int64) (stateNID int64, err error) {
-	err = s.insertStateStmt.QueryRow(roomNID, pq.Int64Array(stateDataNIDs)).Scan(&stateNID)
+func (s *statements) insertState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID) (stateNID types.StateNID, err error) {
+	nids := make([]int64, len(stateDataNIDs))
+	for i := range stateDataNIDs {
+		nids[i] = int64(stateDataNIDs[i])
+	}
+	err = s.insertStateStmt.QueryRow(int64(roomNID), pq.Int64Array(nids)).Scan(&stateNID)
 	return
 }
 
-func (s *statements) bulkSelectStateDataNIDs(stateNIDs []int64) ([]types.StateDataNIDList, error) {
-	rows, err := s.bulkSelectStateDataNIDsStmt.Query(pq.Int64Array(stateNIDs))
+func (s *statements) bulkSelectStateDataNIDs(stateNIDs []types.StateNID) ([]types.StateDataNIDList, error) {
+	nids := make([]int64, len(stateNIDs))
+	for i := range stateNIDs {
+		nids[i] = int64(stateNIDs[i])
+	}
+	rows, err := s.bulkSelectStateDataNIDsStmt.Query(pq.Int64Array(nids))
 	if err != nil {
 		return nil, err
 	}
@@ -617,11 +644,14 @@ func (s *statements) bulkSelectStateDataNIDs(stateNIDs []int64) ([]types.StateDa
 	i := 0
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		var stateDataNids pq.Int64Array
-		if err := rows.Scan(&result.StateNID, &stateDataNids); err != nil {
+		var stateDataNIDs pq.Int64Array
+		if err := rows.Scan(&result.StateNID, &stateDataNIDs); err != nil {
 			return nil, err
 		}
-		result.StateDataNIDs = stateDataNids
+		result.StateDataNIDs = make([]types.StateDataNID, len(stateDataNIDs))
+		for k := range stateDataNIDs {
+			result.StateDataNIDs[k] = types.StateDataNID(stateDataNIDs[k])
+		}
 	}
 	if i != len(stateNIDs) {
 		return nil, fmt.Errorf("storage: state NIDs missing from the database (%d != %d)", i, len(stateNIDs))
@@ -680,13 +710,13 @@ func (s *statements) prepareStateData(db *sql.DB) (err error) {
 	return
 }
 
-func (s *statements) bulkInsertStateData(stateDataNID int64, entries []types.StateEntry) error {
+func (s *statements) bulkInsertStateData(stateDataNID types.StateDataNID, entries []types.StateEntry) error {
 	for _, entry := range entries {
 		_, err := s.insertStateDataStmt.Exec(
-			stateDataNID,
-			entry.EventTypeNID,
-			entry.EventStateKeyNID,
-			entry.EventNID,
+			int64(stateDataNID),
+			int64(entry.EventTypeNID),
+			int64(entry.EventStateKeyNID),
+			int64(entry.EventNID),
 		)
 		if err != nil {
 			return err
@@ -695,13 +725,18 @@ func (s *statements) bulkInsertStateData(stateDataNID int64, entries []types.Sta
 	return nil
 }
 
-func (s *statements) selectNextStateDataNID() (stateDataNID int64, err error) {
-	err = s.selectNextStateDataNIDStmt.QueryRow().Scan(&stateDataNID)
-	return
+func (s *statements) selectNextStateDataNID() (types.StateDataNID, error) {
+	var stateDataNID int64
+	err := s.selectNextStateDataNIDStmt.QueryRow().Scan(&stateDataNID)
+	return types.StateDataNID(stateDataNID), err
 }
 
-func (s *statements) bulkSelectStateDataEntries(stateDataNIDs []int64) ([]types.StateEntryList, error) {
-	rows, err := s.bulkSelectStateDataEntriesStmt.Query(pq.Int64Array(stateDataNIDs))
+func (s *statements) bulkSelectStateDataEntries(stateDataNIDs []types.StateDataNID) ([]types.StateEntryList, error) {
+	nids := make([]int64, len(stateDataNIDs))
+	for i := range stateDataNIDs {
+		nids[i] = int64(stateDataNIDs[i])
+	}
+	rows, err := s.bulkSelectStateDataEntriesStmt.Query(pq.Int64Array(nids))
 	if err != nil {
 		return nil, err
 	}
@@ -712,19 +747,26 @@ func (s *statements) bulkSelectStateDataEntries(stateDataNIDs []int64) ([]types.
 	var current *types.StateEntryList
 	i := 0
 	for rows.Next() {
-		var stateDataNID int64
-		var entry types.StateEntry
+		var (
+			stateDataNID     int64
+			eventTypeNID     int64
+			eventStateKeyNID int64
+			eventNID         int64
+			entry            types.StateEntry
+		)
 		if err := rows.Scan(
-			&stateDataNID,
-			&entry.EventTypeNID, &entry.EventStateKeyNID, &entry.EventNID,
+			&stateDataNID, &eventTypeNID, &eventStateKeyNID, &eventNID,
 		); err != nil {
 			return nil, err
 		}
-		if current == nil || stateDataNID != current.StateDataNID {
+		entry.EventTypeNID = types.EventTypeNID(eventTypeNID)
+		entry.EventStateKeyNID = types.EventStateKeyNID(eventStateKeyNID)
+		entry.EventNID = types.EventNID(eventNID)
+		if current == nil || types.StateDataNID(stateDataNID) != current.StateDataNID {
 			// The state entry row is for a different state data block to the current one.
 			// So we start appending to the next entry in the list.
 			current = &results[i]
-			current.StateDataNID = stateDataNID
+			current.StateDataNID = types.StateDataNID(stateDataNID)
 			i++
 		}
 		current.StateEntries = append(current.StateEntries, entry)
