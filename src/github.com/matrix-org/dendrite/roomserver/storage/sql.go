@@ -383,8 +383,7 @@ const bulkSelectStateEventByIDSQL = "" +
 
 const bulkSelectStateAtEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid FROM events" +
-	" WHERE event_id = ANY($1)" +
-	" ORDER BY event_type_nid, event_state_key_nid ASC"
+	" WHERE event_id = ANY($1)"
 
 const updateEventStateSQL = "" +
 	"UPDATE events SET state_snapshot_nid = $2 WHERE event_nid = $1"
@@ -603,9 +602,12 @@ const insertStateSQL = "" +
 	" VALUES ($1, $2)" +
 	" RETURNING state_snapshot_nid"
 
+// Bulk state data NID lookup.
+// Sorting by state_snapshot_nid means we can use binary search over the result
+// to lookup the state data NIDs for a state snapshot NID.
 const bulkSelectStateDataNIDsSQL = "" +
 	"SELECT state_snapshot_nid, state_data_nids FROM state_snapshots" +
-	" WHERE state_snapshot_nid = ANY($1) ORDER BY state_snapshot_nid"
+	" WHERE state_snapshot_nid = ANY($1) ORDER BY state_snapshot_nid ASC"
 
 func (s *statements) prepareState(db *sql.DB) (err error) {
 	_, err = db.Exec(stateSchema)
@@ -687,6 +689,12 @@ const insertStateDataSQL = "" +
 const selectNextStateDataNIDSQL = "" +
 	"SELECT nextval('state_data_nid_seq')"
 
+// Bulk state lookup by numeric event ID.
+// Sort by the state_data_nid, event_type_nid, event_state_key_nid
+// This means that all the entries for a given state_data_nid will appear
+// together in the list and those entries will sorted by event_type_nid
+// and event_state_key_nid. This property makes it easier to merge two
+// state data blocks together.
 const bulkSelectStateDataEntriesSQL = "" +
 	"SELECT state_data_nid, event_type_nid, event_state_key_nid, event_nid" +
 	" FROM state_data WHERE state_data_nid = ANY($1)" +
