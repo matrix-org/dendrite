@@ -19,8 +19,15 @@ type statements struct {
 	selectRoomNIDStmt              *sql.Stmt
 	insertEventStmt                *sql.Stmt
 	bulkSelectStateEventByIDStmt   *sql.Stmt
+	bulkSelectStateAtEventByIDStmt *sql.Stmt
+	updateEventStateStmt           *sql.Stmt
 	insertEventJSONStmt            *sql.Stmt
 	bulkSelectEventJSONStmt        *sql.Stmt
+	insertStateStmt                *sql.Stmt
+	bulkSelectStateDataNIDsStmt    *sql.Stmt
+	insertStateDataStmt            *sql.Stmt
+	selectNextStateDataNIDStmt     *sql.Stmt
+	bulkSelectStateDataEntriesStmt *sql.Stmt
 }
 
 func (s *statements) prepare(db *sql.DB) error {
@@ -333,6 +340,13 @@ CREATE TABLE IF NOT EXISTS events (
     -- Local numeric ID for the state_key of the event
     -- This is 0 if the event is not a state event.
     event_state_key_nid BIGINT NOT NULL,
+	-- Local numeric ID for the state at the event.
+    -- This is 0 if we don't know the state at the event.
+    -- If the state is not 0 this this event is part of the contiguous
+    -- part of the event graph
+    -- Since many different events can have the same state we store the
+    -- state into a separate state table and refer to it by numeric ID.
+    state_nid bigint NOT NULL DEFAULT 0
     -- The textual event id.
     -- Used to lookup the numeric ID when processing requests.
     -- Needed for state resolution.
@@ -351,7 +365,7 @@ const insertEventSQL = "" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT ON CONSTRAINT event_id_unique" +
 	" DO UPDATE SET event_id = $1" +
-	" RETURNING event_nid"
+	" RETURNING event_nid, state_nid"
 
 // Bulk lookup of events by string ID.
 // Sort by the numeric IDs for event type and state key.
@@ -360,6 +374,14 @@ const bulkSelectStateEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM events" +
 	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
+
+const bulkSelectStateAtEventByIDSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_nid FROM events" +
+	" WHERE event_id = ANY($1)" +
+	" ORDER BY event_type_nid, event_state_key_nid ASC"
+
+const updateEventStateSQL = "" +
+	"UPDATE events SET state_nid = $2 WHERE event_nid = $1"
 
 func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	_, err = db.Exec(eventsSchema)
@@ -372,6 +394,12 @@ func (s *statements) prepareEvents(db *sql.DB) (err error) {
 	if s.bulkSelectStateEventByIDStmt, err = db.Prepare(bulkSelectStateEventByIDSQL); err != nil {
 		return
 	}
+	if s.bulkSelectStateAtEventByIDStmt, err = db.Prepare(bulkSelectStateAtEventByIDSQL); err != nil {
+		return
+	}
+	if s.updateEventStateStmt, err = db.Prepare(updateEventStateSQL); err != nil {
+		return
+	}
 	return
 }
 
@@ -380,11 +408,11 @@ func (s *statements) insertEvent(
 	eventID string,
 	referenceSHA256 []byte,
 	authEventNIDs []int64,
-) (eventNID int64, err error) {
+) (eventNID, stateNID int64, err error) {
 	err = s.insertEventStmt.QueryRow(
 		roomNID, eventTypeNID, eventStateKeyNID, eventID, referenceSHA256,
 		pq.Int64Array(authEventNIDs),
-	).Scan(&eventNID)
+	).Scan(&eventNID, &stateNID)
 	return
 }
 
@@ -419,6 +447,39 @@ func (s *statements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateE
 		return nil, fmt.Errorf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs))
 	}
 	return results, err
+}
+
+func (s *statements) bulkSelectStateAtEventByID(eventIDs []string) ([]types.StateAtEvent, error) {
+	rows, err := s.bulkSelectStateAtEventByIDStmt.Query(pq.StringArray(eventIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([]types.StateAtEvent, len(eventIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		if err = rows.Scan(
+			&result.EventNID,
+			&result.EventTypeNID,
+			&result.EventStateKeyNID,
+			&result.BeforeStateNID,
+		); err != nil {
+			return nil, err
+		}
+		if result.BeforeStateNID == 0 {
+			return nil, fmt.Errorf("storage: missing state for event NID %d", result.EventNID)
+		}
+	}
+	if i != len(eventIDs) {
+		return nil, fmt.Errorf("storage: event IDs missing from the database (%d != %d)", i, len(eventIDs))
+	}
+	return results, err
+}
+
+func (s *statements) updateEventState(eventNID, stateNID int64) error {
+	_, err := s.updateEventStateStmt.Exec(eventNID, stateNID)
+	return err
 }
 
 func (s *statements) prepareEventJSON(db *sql.DB) (err error) {
@@ -493,4 +554,183 @@ func (s *statements) bulkSelectEventJSON(eventNIDs []int64) ([]eventJSONPair, er
 		}
 	}
 	return results[:i], nil
+}
+
+const stateSchema = `
+-- The state of a room before an event.
+-- Stored as a list of state_data entries stored in a separate table.
+-- The actual state is constructed by combining all the state_data entries
+-- referenced by state_data_nids together. If the same state key tuple appears
+-- multiple times then the entry from the later state_data clobbers the earlier
+-- entries.
+-- This encoding format allows us to implement a delta encoding which is useful
+-- because room state tends to accumulate small changes over time. Although if
+-- the list of deltas becomes too long it becomes more efficient to encode
+-- the full state under single state_data_nid.
+CREATE SEQUENCE IF NOT EXISTS state_nid_seq;
+CREATE TABLE IF NOT EXISTS state (
+    -- Local numeric ID for the state.
+    state_nid bigint PRIMARY KEY DEFAULT nextval('state_nid_seq'),
+    -- Local numeric ID of the room this state is for.
+    -- Unused in normal operation, but useful for background work or ad-hoc debugging.
+    room_nid bigint NOT NULL,
+    -- List of state_data_nids, stored sorted by state_data_nid.
+    state_data_nids bigint[] NOT NULL
+);
+`
+
+const insertStateSQL = "" +
+	"INSERT INTO state (room_nid, state_data_nids)" +
+	" VALUES ($1, $2)" +
+	" RETURNING state_nid"
+
+const bulkSelectStateDataNIDsSQL = "" +
+	"SELECT state_nid, state_data_nids FROM state" +
+	" WHERE state_nid = ANY($1) ORDER BY state_nid"
+
+func (s *statements) prepareState(db *sql.DB) (err error) {
+	_, err = db.Exec(stateSchema)
+	if err != nil {
+		return
+	}
+	if s.insertStateStmt, err = db.Prepare(insertStateSQL); err != nil {
+		return
+	}
+	if s.bulkSelectStateDataNIDsStmt, err = db.Prepare(bulkSelectStateDataNIDsSQL); err != nil {
+		return
+	}
+	return
+}
+
+func (s *statements) insertState(roomNID int64, stateDataNIDs []int64) (stateNID int64, err error) {
+	err = s.insertStateStmt.QueryRow(roomNID, pq.Int64Array(stateDataNIDs)).Scan(&stateNID)
+	return
+}
+
+func (s *statements) bulkSelectStateDataNIDs(stateNIDs []int64) ([]types.StateDataNIDList, error) {
+	rows, err := s.bulkSelectStateDataNIDsStmt.Query(pq.Int64Array(stateNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([]types.StateDataNIDList, len(stateNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		var stateDataNids pq.Int64Array
+		if err := rows.Scan(&result.StateNID, &stateDataNids); err != nil {
+			return nil, err
+		}
+		result.StateDataNIDs = stateDataNids
+	}
+	if i != len(stateNIDs) {
+		return nil, fmt.Errorf("storage: state NIDs missing from the database (%d != %d)", i, len(stateNIDs))
+	}
+	return results, nil
+}
+
+const stateDataSchema = `
+-- The state data map.
+-- Designed to give enough information to run the state resolution algorithm
+-- without hitting the database in the common case.
+-- TODO: Is it worth replacing the unique btree index with a covering index so
+-- that postgres could lookup the state using an index-only scan?
+-- The type and state_key are included in the index to make it easier to
+-- lookup a specific (type, state_key) pair for an event. It also makes it easy
+-- to read the state for a given state_data_nid ordered by (type, state_key)
+-- which in turn makes it easier to merge state data blocks.
+CREATE SEQUENCE IF NOT EXISTS state_data_nid_seq;
+CREATE TABLE IF NOT EXISTS state_data (
+    -- Local numeric ID for this state data.
+    state_data_nid bigint NOT NULL,
+    event_type_nid bigint NOT NULL,
+    event_state_key_nid bigint NOT NULL,
+    event_nid bigint NOT NULL,
+    UNIQUE (state_data_nid, event_type_nid, event_state_key_nid)
+);
+`
+
+const insertStateDataSQL = "" +
+	"INSERT INTO state_data (state_data_nid, event_type_nid, event_state_key_nid, event_nid)" +
+	" VALUES ($1, $2, $3, $4)"
+
+const selectNextStateDataNIDSQL = "" +
+	"SELECT nextval('state_data_nid_seq')"
+
+const bulkSelectStateDataEntriesSQL = "" +
+	"SELECT state_data_nid, event_type_nid, event_state_key_nid, event_nid" +
+	" FROM state_data WHERE state_data_nid = ANY($1)" +
+	" ORDER BY state_data_nid, event_type_nid, event_state_key_nid"
+
+func (s *statements) prepareStateData(db *sql.DB) (err error) {
+	_, err = db.Exec(stateDataSchema)
+	if err != nil {
+		return
+	}
+	if s.insertStateDataStmt, err = db.Prepare(insertStateDataSQL); err != nil {
+		return
+	}
+	if s.selectNextStateDataNIDStmt, err = db.Prepare(selectNextStateDataNIDSQL); err != nil {
+		return
+	}
+
+	if s.bulkSelectStateDataEntriesStmt, err = db.Prepare(bulkSelectStateDataEntriesSQL); err != nil {
+		return
+	}
+	return
+}
+
+func (s *statements) bulkInsertStateData(stateDataNID int64, entries []types.StateEntry) error {
+	for _, entry := range entries {
+		_, err := s.insertStateDataStmt.Exec(
+			stateDataNID,
+			entry.EventTypeNID,
+			entry.EventStateKeyNID,
+			entry.EventNID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *statements) selectNextStateDataNID() (stateDataNID int64, err error) {
+	err = s.selectNextStateDataNIDStmt.QueryRow().Scan(&stateDataNID)
+	return
+}
+
+func (s *statements) bulkSelectStateDataEntries(stateDataNIDs []int64) ([]types.StateEntryList, error) {
+	rows, err := s.bulkSelectStateDataEntriesStmt.Query(pq.Int64Array(stateDataNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]types.StateEntryList, len(stateDataNIDs))
+	// current is a pointer to the StateEntryList to append the state entries to.
+	var current *types.StateEntryList
+	i := 0
+	for rows.Next() {
+		var stateDataNID int64
+		var entry types.StateEntry
+		if err := rows.Scan(
+			&stateDataNID,
+			&entry.EventTypeNID, &entry.EventStateKeyNID, &entry.EventNID,
+		); err != nil {
+			return nil, err
+		}
+		if current == nil || stateDataNID != current.StateDataNID {
+			// The state entry row is for a different state data block to the current one.
+			// So we start appending to the next entry in the list.
+			current = &results[i]
+			current.StateDataNID = stateDataNID
+			i++
+		}
+		current.StateEntries = append(current.StateEntries, entry)
+	}
+	if i != len(stateDataNIDs) {
+		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(stateDataNIDs))
+	}
+	return results, nil
 }

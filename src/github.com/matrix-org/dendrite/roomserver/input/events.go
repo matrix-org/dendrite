@@ -9,10 +9,10 @@ import (
 // A RoomEventDatabase has the storage APIs needed to store a room event.
 type RoomEventDatabase interface {
 	// Stores a matrix room event in the database
-	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int64) error
+	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int64) (roomNID int64, stateAtEvent types.StateAtEvent, err error)
 	// Lookup the state entries for a list of string event IDs
 	// Returns a sorted list of state entries.
-	// Returns a error if the there is an error talking to the database
+	// Returns an error if the there is an error talking to the database
 	// or if the event IDs aren't in the database.
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
 	// Lookup the numeric IDs for a list of string event state keys.
@@ -21,6 +21,21 @@ type RoomEventDatabase interface {
 	// Lookup the Events for a list of numeric event IDs.
 	// Returns a sorted list of events.
 	Events(eventNIDs []int64) ([]types.Event, error)
+	// Lookup the state of a room at each event for a list of string event IDs.
+	// Returns a sorted list of state at each event.
+	// Returns an error if there is an error talking to the database
+	// or if the room state for the event IDs aren't in the database
+	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
+	// Lookup the numeric state data IDs for the each numeric state ID
+	// The returned slice is sorted by numeric state ID.
+	StateDataNIDs(stateNIDs []int64) ([]types.StateDataNIDList, error)
+	// Lookup the state data for each numeric state data ID
+	// The returned slice is sorted by numeric state data ID.
+	StateEntries(stateDataNIDs []int64) ([]types.StateEntryList, error)
+	// Store the room state at an event in the database
+	AddState(roomNID int64, stateDataNIDs []int64, state []types.StateEntry) (stateNID int64, err error)
+	// Set the state at an event.
+	SetState(eventNID, stateNID int64) error
 }
 
 func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
@@ -37,7 +52,8 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 	}
 
 	// Store the event
-	if err := db.StoreEvent(event, authEventNIDs); err != nil {
+	roomNID, stateAtEvent, err := db.StoreEvent(event, authEventNIDs)
+	if err != nil {
 		return err
 	}
 
@@ -46,6 +62,15 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 		// doesn't have any associated state to store and we don't need to
 		// notify anyone about it.
 		return nil
+	}
+
+	if stateAtEvent.BeforeStateNID == 0 {
+		// We haven't calculated a state for this event yet.
+		// Lets calculate one.
+		if stateAtEvent.BeforeStateNID, err = calculateAndStoreState(db, event, roomNID, input.StateEventIDs); err != nil {
+			return err
+		}
+		db.SetState(stateAtEvent.EventNID, stateAtEvent.BeforeStateNID)
 	}
 
 	// TODO:

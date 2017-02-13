@@ -47,6 +47,14 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 	return a.EventNID < b.EventNID
 }
 
+// StateAtEvent is the state before and after a matrix event.
+type StateAtEvent struct {
+	// The state before the event.
+	BeforeStateNID int64
+	// The state entry for the event itself, allows us to calculate the state after the event.
+	StateEntry
+}
+
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
 // It is when performing bulk event lookup in the database.
 type Event struct {
@@ -75,3 +83,15 @@ const (
 	// EmptyStateKeyNID is the numeric ID for the empty state key.
 	EmptyStateKeyNID = 1
 )
+
+// StateDataNIDList is used to return the result of bulk StateDataNID lookups from the database.
+type StateDataNIDList struct {
+	StateNID      int64
+	StateDataNIDs []int64
+}
+
+// StateEntryList is used to return the result of bulk state entry lookups from the database.
+type StateEntryList struct {
+	StateDataNID int64
+	StateEntries []StateEntry
+}

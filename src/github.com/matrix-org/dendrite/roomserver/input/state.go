@@ -1,0 +1,247 @@
+package input
+
+import (
+	"fmt"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
+	"sort"
+)
+
+func calculateAndStoreState(
+	db RoomEventDatabase, event gomatrixserverlib.Event, roomNID int64, stateEventIDs []string,
+) (int64, error) {
+	if stateEventIDs != nil {
+		// 1) We've been told what the state at the event is.
+		// Check that those state events are in the database and store the state.
+		entries, err := db.StateEntriesForEventIDs(stateEventIDs)
+		if err != nil {
+			return 0, err
+		}
+
+		return db.AddState(roomNID, nil, entries)
+	}
+
+	// Load the state at the prev events.
+	prevEventRefs := event.PrevEvents()
+	prevEventIDs := make([]string, len(prevEventRefs))
+	for i := range prevEventRefs {
+		prevEventIDs[i] = prevEventRefs[i].EventID
+	}
+
+	prevStates, err := db.StateAtEventIDs(prevEventIDs)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(prevStates) == 0 {
+		// 2) There weren't any prev_events for this event so the state is
+		// empty.
+		return db.AddState(roomNID, nil, nil)
+	}
+
+	if len(prevStates) == 1 {
+		prevState := prevStates[0]
+		if prevState.EventStateKeyNID == 0 {
+			// 3) None of the previous events were state events and they all
+			// have the same state, so this event has exactly the same state
+			// as the previous events.
+			// This should be the common case.
+			return prevState.BeforeStateNID, nil
+		}
+		// The previous event was a state event so we need to store a copy
+		// of the previous state updated with that event.
+		stateDataNIDLists, err := db.StateDataNIDs([]int64{prevState.BeforeStateNID})
+		if err != nil {
+			return 0, err
+		}
+		stateDataNIDs := stateDataNIDLists[0].StateDataNIDs
+		if len(stateDataNIDs) < maxStateDataNIDs {
+			// 4) The number of state data blocks is small enough that we can just
+			// add the state event as a block of size one to the end of the blocks.
+			return db.AddState(
+				roomNID, stateDataNIDs, []types.StateEntry{prevState.StateEntry},
+			)
+		}
+		// If there are too many deltas then we need to calculate the full state
+		// So fall through to calculateAndStoreStateMany
+	}
+	return calculateAndStoreStateMany(db, roomNID, prevStates)
+}
+
+const maxStateDataNIDs = 64
+
+func calculateAndStoreStateMany(db RoomEventDatabase, roomNID int64, prevStates []types.StateAtEvent) (int64, error) {
+	// Conflict resolution.
+	// First stage: load the state datablocks for the prev events.
+	stateNIDs := make([]int64, len(prevStates))
+	for i, state := range prevStates {
+		stateNIDs[i] = state.BeforeStateNID
+	}
+	stateDataNIDLists, err := db.StateDataNIDs(uniqueNIDs(stateNIDs))
+	if err != nil {
+		return 0, err
+	}
+
+	var stateDataNIDs []int64
+	for _, list := range stateDataNIDLists {
+		stateDataNIDs = append(stateDataNIDs, list.StateDataNIDs...)
+	}
+	stateEntryLists, err := db.StateEntries(uniqueNIDs(stateDataNIDs))
+	if err != nil {
+		return 0, err
+	}
+	stateDataNIDsMap := stateDataNIDListMap(stateDataNIDLists)
+	stateEntriesMap := stateEntryListMap(stateEntryLists)
+
+	var combined []types.StateEntry
+	for _, prevState := range prevStates {
+		list, ok := stateDataNIDsMap.lookup(prevState.BeforeStateNID)
+		if !ok {
+			// This should only get hit if the database is corrupt.
+			// It should be impossible for an event to reference a NID that doesn't exist
+			panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateNID))
+		}
+
+		var fullState []types.StateEntry
+		for _, stateDataNID := range list {
+			entries, ok := stateEntriesMap.lookup(stateDataNID)
+			if !ok {
+				// This should only get hit if the database is corrupt.
+				// It should be impossible for an event to reference a NID that doesn't exist
+				panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateNID))
+			}
+			fullState = append(fullState, entries...)
+		}
+		if prevState.EventStateKeyNID != 0 {
+			fullState = append(fullState, prevState.StateEntry)
+		}
+
+		// Stable sort so that the most recent entry for each state key stays
+		// remains later in the list than the older entries for the same state key.
+		sort.Stable(stateEntryByStateKeySorter(fullState))
+		// Unique returns the last entry for each state key.
+		fullState = fullState[:unique(stateEntryByStateKeySorter(fullState))]
+		// Add the full state for this StateNID.
+		combined = append(combined, fullState...)
+	}
+
+	// Collect all the entries with the same type and key together.
+	// We don't care about the order here.
+	sort.Sort(stateEntrySorter(combined))
+	// Remove duplicate entires.
+	combined = combined[:unique(stateEntrySorter(combined))]
+
+	// Find the conflicts
+	conflicts := duplicateStateKeys(combined)
+
+	var state []types.StateEntry
+	if len(conflicts) > 0 {
+		// 5) There are conflicting state events, for each conflict workout
+		// what the appropriate state event is.
+		resolved, err := resolveConflicts(db, combined, conflicts)
+		if err != nil {
+			return 0, err
+		}
+		state = resolved
+	} else {
+		// 6) There weren't any conflicts
+		state = combined
+	}
+
+	// TODO: Check if we can encode the new state as a delta against the
+	// previous state.
+	return db.AddState(roomNID, nil, state)
+}
+
+func resolveConflicts(db RoomEventDatabase, combinded, conflicted []types.StateEntry) ([]types.StateEntry, error) {
+	panic(fmt.Errorf("Not implemented"))
+}
+
+func duplicateStateKeys(a []types.StateEntry) []types.StateEntry {
+	var result []types.StateEntry
+	j := 0
+	for i := 1; i < len(a); i++ {
+		if a[j].StateKeyTuple != a[i].StateKeyTuple {
+			result = append(result, a[j:i]...)
+			j = i
+		}
+	}
+	if j != len(a)-1 {
+		result = append(result, a[j:]...)
+	}
+	return result
+}
+
+func uniqueNIDs(nids []int64) []int64 {
+	sort.Sort(int64Sorter(nids))
+	return nids[:unique(int64Sorter(nids))]
+}
+
+type stateDataNIDListMap []types.StateDataNIDList
+
+func (m stateDataNIDListMap) lookup(stateNID int64) (stateDataNIDs []int64, ok bool) {
+	list := []types.StateDataNIDList(m)
+	i := sort.Search(len(list), func(i int) bool {
+		return list[i].StateNID >= stateNID
+	})
+	if i < len(list) && list[i].StateNID == stateNID {
+		ok = true
+		stateDataNIDs = list[i].StateDataNIDs
+	}
+	return
+}
+
+type stateEntryListMap []types.StateEntryList
+
+func (m stateEntryListMap) lookup(stateDataNID int64) (stateEntries []types.StateEntry, ok bool) {
+	list := []types.StateEntryList(m)
+	i := sort.Search(len(list), func(i int) bool {
+		return list[i].StateDataNID >= stateDataNID
+	})
+	if i < len(list) && list[i].StateDataNID == stateDataNID {
+		ok = true
+		stateEntries = list[i].StateEntries
+	}
+	return
+}
+
+type stateEntryByStateKeySorter []types.StateEntry
+
+func (s stateEntryByStateKeySorter) Len() int { return len(s) }
+func (s stateEntryByStateKeySorter) Less(i, j int) bool {
+	return s[i].StateKeyTuple.LessThan(s[j].StateKeyTuple)
+}
+func (s stateEntryByStateKeySorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+type stateEntrySorter []types.StateEntry
+
+func (s stateEntrySorter) Len() int           { return len(s) }
+func (s stateEntrySorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
+func (s stateEntrySorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+type int64Sorter []int64
+
+func (s int64Sorter) Len() int           { return len(s) }
+func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
+func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+// Remove duplicate items from a sorted list.
+// Takes the same interface as sort.Sort
+// Returns the length of the date without duplicates
+// Uses the last occurance of a duplicate.
+// O(n).
+func unique(data sort.Interface) int {
+	if data.Len() == 0 {
+		return 0
+	}
+	length := data.Len()
+	j := 0
+	for i := 1; i < length; i++ {
+		if data.Less(i-1, i) {
+			data.Swap(i-1, j)
+			j++
+		}
+	}
+	data.Swap(length-1, j)
+	return j + 1
+}
