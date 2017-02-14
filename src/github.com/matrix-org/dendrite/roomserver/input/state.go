@@ -7,20 +7,12 @@ import (
 	"sort"
 )
 
+// calculateAndStoreState calculates a snapshot of the state of a room before an event.
+// Stores the snapshot of the state in the database.
+// Returns a numeric ID for that snapshot.
 func calculateAndStoreState(
-	db RoomEventDatabase, event gomatrixserverlib.Event, roomNID types.RoomNID, stateEventIDs []string,
+	db RoomEventDatabase, event gomatrixserverlib.Event, roomNID types.RoomNID,
 ) (types.StateSnapshotNID, error) {
-	if stateEventIDs != nil {
-		// 1) We've been told what the state at the event is.
-		// Check that those state events are in the database and store the state.
-		entries, err := db.StateEntriesForEventIDs(stateEventIDs)
-		if err != nil {
-			return 0, err
-		}
-
-		return db.AddState(roomNID, nil, entries)
-	}
-
 	// Load the state at the prev events.
 	prevEventRefs := event.PrevEvents()
 	prevEventIDs := make([]string, len(prevEventRefs))
@@ -50,16 +42,16 @@ func calculateAndStoreState(
 		}
 		// The previous event was a state event so we need to store a copy
 		// of the previous state updated with that event.
-		stateDataNIDLists, err := db.StateDataNIDs([]types.StateSnapshotNID{prevState.BeforeStateSnapshotNID})
+		stateBlockNIDLists, err := db.StateBlockNIDs([]types.StateSnapshotNID{prevState.BeforeStateSnapshotNID})
 		if err != nil {
 			return 0, err
 		}
-		stateDataNIDs := stateDataNIDLists[0].StateDataNIDs
-		if len(stateDataNIDs) < maxStateDataNIDs {
+		stateBlockNIDs := stateBlockNIDLists[0].StateBlockNIDs
+		if len(stateBlockNIDs) < maxStateBlockNIDs {
 			// 4) The number of state data blocks is small enough that we can just
 			// add the state event as a block of size one to the end of the blocks.
 			return db.AddState(
-				roomNID, stateDataNIDs, []types.StateEntry{prevState.StateEntry},
+				roomNID, stateBlockNIDs, []types.StateEntry{prevState.StateEntry},
 			)
 		}
 		// If there are too many deltas then we need to calculate the full state
@@ -68,13 +60,16 @@ func calculateAndStoreState(
 	return calculateAndStoreStateMany(db, roomNID, prevStates)
 }
 
-// maxStateDataNIDs is the maximum number of state data blocks to use to encode a snapshot of room state.
+// maxStateBlockNIDs is the maximum number of state data blocks to use to encode a snapshot of room state.
 // Increasing this number means that we can encode more of the state changes as simple deltas which means that
 // we need fewer entries in the state data table. However making this number bigger will increase the size of
 // the rows in the state table itself and will require more index lookups when retrieving a snapshot.
 // TODO: Tune this to get the right balance between size and lookup performance.
-const maxStateDataNIDs = 64
+const maxStateBlockNIDs = 64
 
+// calculateAndStoreStateMany calculates the state of the room before an event
+// using the states at each of the event's prev events.
+// Stores the resulting state and returns a numeric ID for the snapshot.
 func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
 	// Conflict resolution.
 	// First stage: load the state datablocks for the prev events.
@@ -86,31 +81,31 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	// Deduplicate the IDs before passing them to the database.
 	// There could be duplicates because the events could be state events where
 	// the snapshot of the room state before them was the same.
-	stateDataNIDLists, err := db.StateDataNIDs(uniqueStateSnapshotNIDs(stateNIDs))
+	stateBlockNIDLists, err := db.StateBlockNIDs(uniqueStateSnapshotNIDs(stateNIDs))
 	if err != nil {
 		return 0, err
 	}
 
-	var stateDataNIDs []types.StateDataNID
-	for _, list := range stateDataNIDLists {
-		stateDataNIDs = append(stateDataNIDs, list.StateDataNIDs...)
+	var stateBlockNIDs []types.StateBlockNID
+	for _, list := range stateBlockNIDLists {
+		stateBlockNIDs = append(stateBlockNIDs, list.StateBlockNIDs...)
 	}
 	// Fetch the state entries that will be combined to create the snapshots.
 	// Deduplicate the IDs before passing them to the database.
 	// There could be duplicates because a block of state entries could be reused by
 	// multiple snapshots.
-	stateEntryLists, err := db.StateEntries(uniqueStateDataNIDs(stateDataNIDs))
+	stateEntryLists, err := db.StateEntries(uniqueStateBlockNIDs(stateBlockNIDs))
 	if err != nil {
 		return 0, err
 	}
-	stateDataNIDsMap := stateDataNIDListMap(stateDataNIDLists)
+	stateBlockNIDsMap := stateBlockNIDListMap(stateBlockNIDLists)
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
 
 	// Combine the entries from all the snapshots of state after each prev event into a single list.
 	var combined []types.StateEntry
 	for _, prevState := range prevStates {
 		// Grab the list of state data NIDs for this snapshot.
-		list, ok := stateDataNIDsMap.lookup(prevState.BeforeStateSnapshotNID)
+		list, ok := stateBlockNIDsMap.lookup(prevState.BeforeStateSnapshotNID)
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
@@ -120,8 +115,8 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 		// Combined all the state entries for this snapshot.
 		// The order of state data NIDs in the list tells us the order to combine them in.
 		var fullState []types.StateEntry
-		for _, stateDataNID := range list {
-			entries, ok := stateEntriesMap.lookup(stateDataNID)
+		for _, stateBlockNID := range list {
+			entries, ok := stateEntriesMap.lookup(stateBlockNID)
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
@@ -138,7 +133,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 		// Stable sort so that the most recent entry for each state key stays
 		// remains later in the list than the older entries for the same state key.
 		sort.Stable(stateEntryByStateKeySorter(fullState))
-		// Unique returns the last entry for each state key.
+		// Unique returns the last entry and hence the most recent entry for each state key.
 		fullState = fullState[:unique(stateEntryByStateKeySorter(fullState))]
 		// Add the full state for this StateSnapshotNID.
 		combined = append(combined, fullState...)
@@ -201,28 +196,28 @@ func findDuplicateStateKeys(a []types.StateEntry) []types.StateEntry {
 	return result
 }
 
-type stateDataNIDListMap []types.StateDataNIDList
+type stateBlockNIDListMap []types.StateBlockNIDList
 
-func (m stateDataNIDListMap) lookup(stateNID types.StateSnapshotNID) (stateDataNIDs []types.StateDataNID, ok bool) {
-	list := []types.StateDataNIDList(m)
+func (m stateBlockNIDListMap) lookup(stateNID types.StateSnapshotNID) (stateBlockNIDs []types.StateBlockNID, ok bool) {
+	list := []types.StateBlockNIDList(m)
 	i := sort.Search(len(list), func(i int) bool {
 		return list[i].StateSnapshotNID >= stateNID
 	})
 	if i < len(list) && list[i].StateSnapshotNID == stateNID {
 		ok = true
-		stateDataNIDs = list[i].StateDataNIDs
+		stateBlockNIDs = list[i].StateBlockNIDs
 	}
 	return
 }
 
 type stateEntryListMap []types.StateEntryList
 
-func (m stateEntryListMap) lookup(stateDataNID types.StateDataNID) (stateEntries []types.StateEntry, ok bool) {
+func (m stateEntryListMap) lookup(stateBlockNID types.StateBlockNID) (stateEntries []types.StateEntry, ok bool) {
 	list := []types.StateEntryList(m)
 	i := sort.Search(len(list), func(i int) bool {
-		return list[i].StateDataNID >= stateDataNID
+		return list[i].StateBlockNID >= stateBlockNID
 	})
-	if i < len(list) && list[i].StateDataNID == stateDataNID {
+	if i < len(list) && list[i].StateBlockNID == stateBlockNID {
 		ok = true
 		stateEntries = list[i].StateEntries
 	}
@@ -254,15 +249,15 @@ func uniqueStateSnapshotNIDs(nids []types.StateSnapshotNID) []types.StateSnapsho
 	return nids[:unique(stateNIDSorter(nids))]
 }
 
-type stateDataNIDSorter []types.StateDataNID
+type stateBlockNIDSorter []types.StateBlockNID
 
-func (s stateDataNIDSorter) Len() int           { return len(s) }
-func (s stateDataNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
-func (s stateDataNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s stateBlockNIDSorter) Len() int           { return len(s) }
+func (s stateBlockNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
+func (s stateBlockNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-func uniqueStateDataNIDs(nids []types.StateDataNID) []types.StateDataNID {
-	sort.Sort(stateDataNIDSorter(nids))
-	return nids[:unique(stateDataNIDSorter(nids))]
+func uniqueStateBlockNIDs(nids []types.StateBlockNID) []types.StateBlockNID {
+	sort.Sort(stateBlockNIDSorter(nids))
+	return nids[:unique(stateBlockNIDSorter(nids))]
 }
 
 // Remove duplicate items from a sorted list.

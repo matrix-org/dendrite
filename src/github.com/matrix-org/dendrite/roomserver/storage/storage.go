@@ -161,19 +161,19 @@ func (d *Database) Events(eventNIDs []types.EventNID) ([]types.Event, error) {
 }
 
 // AddState implements input.EventDatabase
-func (d *Database) AddState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID, state []types.StateEntry) (types.StateSnapshotNID, error) {
+func (d *Database) AddState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error) {
 	if len(state) > 0 {
-		stateDataNID, err := d.statements.selectNextStateDataNID()
+		stateBlockNID, err := d.statements.selectNextStateBlockNID()
 		if err != nil {
 			return 0, err
 		}
-		if err = d.statements.bulkInsertStateData(stateDataNID, state); err != nil {
+		if err = d.statements.bulkInsertStateData(stateBlockNID, state); err != nil {
 			return 0, err
 		}
-		stateDataNIDs = append(stateDataNIDs[:len(stateDataNIDs):len(stateDataNIDs)], stateDataNID)
+		stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
 	}
 
-	return d.statements.insertState(roomNID, stateDataNIDs)
+	return d.statements.insertState(roomNID, stateBlockNIDs)
 }
 
 // SetState implements input.EventDatabase
@@ -186,12 +186,12 @@ func (d *Database) StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, err
 	return d.statements.bulkSelectStateAtEventByID(eventIDs)
 }
 
-// StateDataNIDs implements input.EventDatabase
-func (d *Database) StateDataNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateDataNIDList, error) {
-	return d.statements.bulkSelectStateDataNIDs(stateNIDs)
+// StateBlockNIDs implements input.EventDatabase
+func (d *Database) StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error) {
+	return d.statements.bulkSelectStateBlockNIDs(stateNIDs)
 }
 
 // StateEntries implements input.EventDatabase
-func (d *Database) StateEntries(stateDataNIDs []types.StateDataNID) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectStateDataEntries(stateDataNIDs)
+func (d *Database) StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error) {
+	return d.statements.bulkSelectStateDataEntries(stateBlockNIDs)
 }

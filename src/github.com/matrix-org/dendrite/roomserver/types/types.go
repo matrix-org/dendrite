@@ -28,9 +28,9 @@ type RoomNID int64
 // StateSnapshotNID is a numeric ID for the state at an event.
 type StateSnapshotNID int64
 
-// StateDataNID is a numeric ID for a block of state data.
+// StateBlockNID is a numeric ID for a block of state data.
 // These blocks of state data are combined to form the actual state.
-type StateDataNID int64
+type StateBlockNID int64
 
 // A StateKeyTuple is a pair of a numeric event type and a numeric state key.
 // It is used to lookup state entries.
@@ -103,14 +103,14 @@ const (
 	EmptyStateKeyNID = 1
 )
 
-// StateDataNIDList is used to return the result of bulk StateDataNID lookups from the database.
-type StateDataNIDList struct {
+// StateBlockNIDList is used to return the result of bulk StateBlockNID lookups from the database.
+type StateBlockNIDList struct {
 	StateSnapshotNID StateSnapshotNID
-	StateDataNIDs    []StateDataNID
+	StateBlockNIDs   []StateBlockNID
 }
 
 // StateEntryList is used to return the result of bulk state entry lookups from the database.
 type StateEntryList struct {
-	StateDataNID StateDataNID
-	StateEntries []StateEntry
+	StateBlockNID StateBlockNID
+	StateEntries  []StateEntry
 }

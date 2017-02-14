@@ -26,12 +26,12 @@ type RoomEventDatabase interface {
 	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
 	// Lookup the numeric state data IDs for each numeric state snapshot ID
 	// The returned slice is sorted by numeric state snapshot ID.
-	StateDataNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateDataNIDList, error)
+	StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
 	// Lookup the state data for each numeric state data ID
 	// The returned slice is sorted by numeric state data ID.
-	StateEntries(stateDataNIDs []types.StateDataNID) ([]types.StateEntryList, error)
+	StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
 	// Store the room state at an event in the database
-	AddState(roomNID types.RoomNID, stateDataNIDs []types.StateDataNID, state []types.StateEntry) (types.StateSnapshotNID, error)
+	AddState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
 	// Set the state at an event.
 	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error
 }
@@ -78,9 +78,7 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 			}
 		} else {
 			// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-			if stateAtEvent.BeforeStateSnapshotNID, err = calculateAndStoreState(
-				db, event, roomNID, input.StateEventIDs,
-			); err != nil {
+			if stateAtEvent.BeforeStateSnapshotNID, err = calculateAndStoreState(db, event, roomNID); err != nil {
 				return err
 			}
 		}
