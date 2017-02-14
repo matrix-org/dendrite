@@ -74,6 +74,11 @@ type StateAtEvent struct {
 	StateEntry
 }
 
+// IsStateEvent returns whether the event the state is at is a state event.
+func (s StateAtEvent) IsStateEvent() bool {
+	return s.EventStateKeyNID != 0
+}
+
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
 // It is when performing bulk event lookup in the database.
 type Event struct {

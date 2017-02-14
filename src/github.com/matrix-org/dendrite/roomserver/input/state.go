@@ -124,7 +124,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 			}
 			fullState = append(fullState, entries...)
 		}
-		if prevState.EventStateKeyNID != 0 {
+		if prevState.IsStateEvent() {
 			// If the prev event was a state event then add an entry for the event itself
 			// so that we get the state after the event rather than the state before.
 			fullState = append(fullState, prevState.StateEntry)
