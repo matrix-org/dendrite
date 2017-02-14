@@ -82,6 +82,10 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	for i, state := range prevStates {
 		stateNIDs[i] = state.BeforeStateSnapshotNID
 	}
+	// Fetch the state snapshots for the state before the each prev event from the database.
+	// Deduplicate the IDs before passing them to the database.
+	// There could be duplicates because the events could be state events where
+	// the snapshot of the room state before them was the same.
 	stateDataNIDLists, err := db.StateDataNIDs(uniqueStateSnapshotNIDs(stateNIDs))
 	if err != nil {
 		return 0, err
@@ -91,6 +95,10 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	for _, list := range stateDataNIDLists {
 		stateDataNIDs = append(stateDataNIDs, list.StateDataNIDs...)
 	}
+	// Fetch the state entries that will be combined to create the snapshots.
+	// Deduplicate the IDs before passing them to the database.
+	// There could be duplicates because a block of state entries could be reused by
+	// multiple snapshots.
 	stateEntryLists, err := db.StateEntries(uniqueStateDataNIDs(stateDataNIDs))
 	if err != nil {
 		return 0, err
@@ -98,8 +106,10 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	stateDataNIDsMap := stateDataNIDListMap(stateDataNIDLists)
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
 
+	// Combine the entries from all the snapshots of state after each prev event into a single list.
 	var combined []types.StateEntry
 	for _, prevState := range prevStates {
+		// Grab the list of state data NIDs for this snapshot.
 		list, ok := stateDataNIDsMap.lookup(prevState.BeforeStateSnapshotNID)
 		if !ok {
 			// This should only get hit if the database is corrupt.
@@ -107,6 +117,8 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 			panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateSnapshotNID))
 		}
 
+		// Combined all the state entries for this snapshot.
+		// The order of state data NIDs in the list tells us the order to combine them in.
 		var fullState []types.StateEntry
 		for _, stateDataNID := range list {
 			entries, ok := stateEntriesMap.lookup(stateDataNID)
@@ -118,6 +130,8 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 			fullState = append(fullState, entries...)
 		}
 		if prevState.EventStateKeyNID != 0 {
+			// If the prev event was a state event then add an entry for the event itself
+			// so that we get the state after the event rather than the state before.
 			fullState = append(fullState, prevState.StateEntry)
 		}
 
