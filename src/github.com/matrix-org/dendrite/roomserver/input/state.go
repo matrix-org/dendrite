@@ -140,7 +140,8 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	}
 
 	// Collect all the entries with the same type and key together.
-	// We don't care about the order here.
+	// We don't care about the order here because the conflict resolution
+	// algorithm doesn't depend on the order of the prev events.
 	sort.Sort(stateEntrySorter(combined))
 	// Remove duplicate entires.
 	combined = combined[:unique(stateEntrySorter(combined))]
