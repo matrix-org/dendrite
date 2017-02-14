@@ -72,7 +72,44 @@ const maxStateBlockNIDs = 64
 // Stores the resulting state and returns a numeric ID for the snapshot.
 func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
 	// Conflict resolution.
-	// First stage: load the state datablocks for the prev events.
+	// First stage: load the state after each of the prev events.
+	combined, err := loadCombinedStateAfterEvents(db, prevStates)
+	if err != nil {
+		return 0, err
+	}
+
+	// Collect all the entries with the same type and key together.
+	// We don't care about the order here because the conflict resolution
+	// algorithm doesn't depend on the order of the prev events.
+	sort.Sort(stateEntrySorter(combined))
+	// Remove duplicate entires.
+	combined = combined[:unique(stateEntrySorter(combined))]
+
+	// Find the conflicts
+	conflicts := findDuplicateStateKeys(combined)
+
+	var state []types.StateEntry
+	if len(conflicts) > 0 {
+		// 5) There are conflicting state events, for each conflict workout
+		// what the appropriate state event is.
+		resolved, err := resolveConflicts(db, combined, conflicts)
+		if err != nil {
+			return 0, err
+		}
+		state = resolved
+	} else {
+		// 6) There weren't any conflicts
+		state = combined
+	}
+
+	// TODO: Check if we can encode the new state as a delta against the
+	// previous state.
+	return db.AddState(roomNID, nil, state)
+}
+
+// loadCombinedStateAfterEvents loads a snapshot of the state after each of the events
+// and combines those snapshots together into a single list.
+func loadCombinedStateAfterEvents(db RoomEventDatabase, prevStates []types.StateAtEvent) ([]types.StateEntry, error) {
 	stateNIDs := make([]types.StateSnapshotNID, len(prevStates))
 	for i, state := range prevStates {
 		stateNIDs[i] = state.BeforeStateSnapshotNID
@@ -83,7 +120,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	// the snapshot of the room state before them was the same.
 	stateBlockNIDLists, err := db.StateBlockNIDs(uniqueStateSnapshotNIDs(stateNIDs))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	var stateBlockNIDs []types.StateBlockNID
@@ -96,7 +133,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	// multiple snapshots.
 	stateEntryLists, err := db.StateEntries(uniqueStateBlockNIDs(stateBlockNIDs))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	stateBlockNIDsMap := stateBlockNIDListMap(stateBlockNIDLists)
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
@@ -138,34 +175,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 		// Add the full state for this StateSnapshotNID.
 		combined = append(combined, fullState...)
 	}
-
-	// Collect all the entries with the same type and key together.
-	// We don't care about the order here because the conflict resolution
-	// algorithm doesn't depend on the order of the prev events.
-	sort.Sort(stateEntrySorter(combined))
-	// Remove duplicate entires.
-	combined = combined[:unique(stateEntrySorter(combined))]
-
-	// Find the conflicts
-	conflicts := findDuplicateStateKeys(combined)
-
-	var state []types.StateEntry
-	if len(conflicts) > 0 {
-		// 5) There are conflicting state events, for each conflict workout
-		// what the appropriate state event is.
-		resolved, err := resolveConflicts(db, combined, conflicts)
-		if err != nil {
-			return 0, err
-		}
-		state = resolved
-	} else {
-		// 6) There weren't any conflicts
-		state = combined
-	}
-
-	// TODO: Check if we can encode the new state as a delta against the
-	// previous state.
-	return db.AddState(roomNID, nil, state)
+	return combined, nil
 }
 
 func resolveConflicts(db RoomEventDatabase, combined, conflicted []types.StateEntry) ([]types.StateEntry, error) {
