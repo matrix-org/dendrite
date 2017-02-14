@@ -68,6 +68,11 @@ func calculateAndStoreState(
 	return calculateAndStoreStateMany(db, roomNID, prevStates)
 }
 
+// maxStateDataNIDs is the maximum number of state data blocks to use to encode a snapshot of room state.
+// Increasing this number means that we can encode more of the state changes as simple deltas which means that
+// we need fewer entries in the state data table. However making this number bigger will increase the size of
+// the rows in the state table itself and will require more index lookups when retrieving a snapshot.
+// TODO: Tune this to get the right balance between size and lookup performance.
 const maxStateDataNIDs = 64
 
 func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
