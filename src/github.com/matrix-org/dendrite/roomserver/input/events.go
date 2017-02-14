@@ -24,8 +24,8 @@ type RoomEventDatabase interface {
 	// Returns an error if there is an error talking to the database
 	// or if the room state for the event IDs aren't in the database
 	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
-	// Lookup the numeric state data IDs for the each numeric state ID
-	// The returned slice is sorted by numeric state ID.
+	// Lookup the numeric state data IDs for each numeric state snapshot ID
+	// The returned slice is sorted by numeric state snapshot ID.
 	StateDataNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateDataNIDList, error)
 	// Lookup the state data for each numeric state data ID
 	// The returned slice is sorted by numeric state data ID.
