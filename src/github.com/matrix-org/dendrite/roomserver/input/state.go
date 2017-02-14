@@ -105,7 +105,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	var combined []types.StateEntry
 	for _, prevState := range prevStates {
 		// Grab the list of state data NIDs for this snapshot.
-		list, ok := stateBlockNIDsMap.lookup(prevState.BeforeStateSnapshotNID)
+		stateBlockNIDs, ok := stateBlockNIDsMap.lookup(prevState.BeforeStateSnapshotNID)
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
@@ -115,7 +115,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 		// Combined all the state entries for this snapshot.
 		// The order of state data NIDs in the list tells us the order to combine them in.
 		var fullState []types.StateEntry
-		for _, stateBlockNID := range list {
+		for _, stateBlockNID := range stateBlockNIDs {
 			entries, ok := stateEntriesMap.lookup(stateBlockNID)
 			if !ok {
 				// This should only get hit if the database is corrupt.
