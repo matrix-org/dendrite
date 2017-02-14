@@ -162,16 +162,26 @@ func resolveConflicts(db RoomEventDatabase, combined, conflicted []types.StateEn
 	panic(fmt.Errorf("Not implemented"))
 }
 
+// findDuplicateStateKeys finds the state entries where the state key tuple appears more than once in a sorted list.
+// Returns a sorted list of those state entries.
 func findDuplicateStateKeys(a []types.StateEntry) []types.StateEntry {
 	var result []types.StateEntry
+	// j is the starting index of a block of entries with the same state key tuple.
 	j := 0
 	for i := 1; i < len(a); i++ {
+		// Check if the state key tuple matches the start of the block
 		if a[j].StateKeyTuple != a[i].StateKeyTuple {
-			result = append(result, a[j:i]...)
+			// Check if the size of the block is bigger than one.
+			if j+1 != i {
+				// Add the block to the result.
+				result = append(result, a[j:i]...)
+			}
+			// Start a new block.
 			j = i
 		}
 	}
-	if j != len(a)-1 {
+	// Check if the last block had more than one event in it.
+	if j+1 != len(a) {
 		result = append(result, a[j:]...)
 	}
 	return result
@@ -243,7 +253,7 @@ func uniqueStateDataNIDs(nids []types.StateDataNID) []types.StateDataNID {
 
 // Remove duplicate items from a sorted list.
 // Takes the same interface as sort.Sort
-// Returns the length of the date without duplicates
+// Returns the length of the data without duplicates
 // Uses the last occurance of a duplicate.
 // O(n).
 func unique(data sort.Interface) int {
@@ -251,13 +261,23 @@ func unique(data sort.Interface) int {
 		return 0
 	}
 	length := data.Len()
+	// j is the next index to output an element to.
 	j := 0
 	for i := 1; i < length; i++ {
+		// If the previous element is less than this element then they are
+		// not equal. Otherwise they must be equal because the list is sorted.
+		// If they are equal then we move onto the next element.
 		if data.Less(i-1, i) {
+			// "Write" the previous element to the output position by swaping
+			// the elements.
+			// Note that if the list has no duplicates then i-1 == j so the
+			// swap does nothing. (This assumes that data.Swap(a,b) nops if a==b)
 			data.Swap(i-1, j)
+			// Advance to the next output position in the list.
 			j++
 		}
 	}
+	// Output the last element.
 	data.Swap(length-1, j)
 	return j + 1
 }
