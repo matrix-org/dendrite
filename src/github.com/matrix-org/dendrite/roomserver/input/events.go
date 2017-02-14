@@ -65,8 +65,24 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		if stateAtEvent.BeforeStateSnapshotNID, err = calculateAndStoreState(db, event, roomNID, input.StateEventIDs); err != nil {
-			return err
+		if input.StateEventIDs != nil {
+			// We've been told what the state at the event is so we don't need to calculate it.
+			// Check that those state events are in the database and store the state.
+			entries, err := db.StateEntriesForEventIDs(input.StateEventIDs)
+			if err != nil {
+				return err
+			}
+
+			if stateAtEvent.BeforeStateSnapshotNID, err = db.AddState(roomNID, nil, entries); err != nil {
+				return nil
+			}
+		} else {
+			// We haven't been told what the state at the event is so we need to calculate it from the prev_events
+			if stateAtEvent.BeforeStateSnapshotNID, err = calculateAndStoreState(
+				db, event, roomNID, input.StateEventIDs,
+			); err != nil {
+				return err
+			}
 		}
 		db.SetState(stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 	}
