@@ -158,7 +158,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	return db.AddState(roomNID, nil, state)
 }
 
-func resolveConflicts(db RoomEventDatabase, combinded, conflicted []types.StateEntry) ([]types.StateEntry, error) {
+func resolveConflicts(db RoomEventDatabase, combined, conflicted []types.StateEntry) ([]types.StateEntry, error) {
 	panic(fmt.Errorf("Not implemented"))
 }
 
