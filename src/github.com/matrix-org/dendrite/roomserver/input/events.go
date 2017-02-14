@@ -11,7 +11,6 @@ type RoomEventDatabase interface {
 	// Stores a matrix room event in the database
 	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
 	// Lookup the state entries for a list of string event IDs
-	// Returns a sorted list of state entries.
 	// Returns an error if the there is an error talking to the database
 	// or if the event IDs aren't in the database.
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
@@ -22,7 +21,6 @@ type RoomEventDatabase interface {
 	// Returns a sorted list of events.
 	Events(eventNIDs []types.EventNID) ([]types.Event, error)
 	// Lookup the state of a room at each event for a list of string event IDs.
-	// Returns a sorted list of state at each event.
 	// Returns an error if there is an error talking to the database
 	// or if the room state for the event IDs aren't in the database
 	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
