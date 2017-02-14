@@ -576,15 +576,15 @@ func (s *statements) bulkSelectEventJSON(eventNIDs []types.EventNID) ([]eventJSO
 
 const stateSchema = `
 -- The state of a room before an event.
--- Stored as a list of state_data entries stored in a separate table.
--- The actual state is constructed by combining all the state_data entries
--- referenced by state_data_nids together. If the same state key tuple appears
--- multiple times then the entry from the later state_data clobbers the earlier
+-- Stored as a list of state_block entries stored in a separate table.
+-- The actual state is constructed by combining all the state_block entries
+-- referenced by state_block_nids together. If the same state key tuple appears
+-- multiple times then the entry from the later state_block clobbers the earlier
 -- entries.
 -- This encoding format allows us to implement a delta encoding which is useful
 -- because room state tends to accumulate small changes over time. Although if
 -- the list of deltas becomes too long it becomes more efficient to encode
--- the full state under single state_data_nid.
+-- the full state under single state_block_nid.
 CREATE SEQUENCE IF NOT EXISTS state_snapshot_nid_seq;
 CREATE TABLE IF NOT EXISTS state_snapshots (
     -- Local numeric ID for the state.
@@ -592,13 +592,13 @@ CREATE TABLE IF NOT EXISTS state_snapshots (
     -- Local numeric ID of the room this state is for.
     -- Unused in normal operation, but useful for background work or ad-hoc debugging.
     room_nid bigint NOT NULL,
-    -- List of state_data_nids, stored sorted by state_data_nid.
-    state_data_nids bigint[] NOT NULL
+    -- List of state_block_nids, stored sorted by state_block_nid.
+    state_block_nids bigint[] NOT NULL
 );
 `
 
 const insertStateSQL = "" +
-	"INSERT INTO state_snapshots (room_nid, state_data_nids)" +
+	"INSERT INTO state_snapshots (room_nid, state_block_nids)" +
 	" VALUES ($1, $2)" +
 	" RETURNING state_snapshot_nid"
 
@@ -606,7 +606,7 @@ const insertStateSQL = "" +
 // Sorting by state_snapshot_nid means we can use binary search over the result
 // to lookup the state data NIDs for a state snapshot NID.
 const bulkSelectStateBlockNIDsSQL = "" +
-	"SELECT state_snapshot_nid, state_data_nids FROM state_snapshots" +
+	"SELECT state_snapshot_nid, state_block_nids FROM state_snapshots" +
 	" WHERE state_snapshot_nid = ANY($1) ORDER BY state_snapshot_nid ASC"
 
 func (s *statements) prepareState(db *sql.DB) (err error) {
@@ -669,36 +669,36 @@ const stateDataSchema = `
 -- that postgres could lookup the state using an index-only scan?
 -- The type and state_key are included in the index to make it easier to
 -- lookup a specific (type, state_key) pair for an event. It also makes it easy
--- to read the state for a given state_data_nid ordered by (type, state_key)
+-- to read the state for a given state_block_nid ordered by (type, state_key)
 -- which in turn makes it easier to merge state data blocks.
-CREATE SEQUENCE IF NOT EXISTS state_data_nid_seq;
-CREATE TABLE IF NOT EXISTS state_data (
+CREATE SEQUENCE IF NOT EXISTS state_block_nid_seq;
+CREATE TABLE IF NOT EXISTS state_block (
     -- Local numeric ID for this state data.
-    state_data_nid bigint NOT NULL,
+    state_block_nid bigint NOT NULL,
     event_type_nid bigint NOT NULL,
     event_state_key_nid bigint NOT NULL,
     event_nid bigint NOT NULL,
-    UNIQUE (state_data_nid, event_type_nid, event_state_key_nid)
+    UNIQUE (state_block_nid, event_type_nid, event_state_key_nid)
 );
 `
 
 const insertStateDataSQL = "" +
-	"INSERT INTO state_data (state_data_nid, event_type_nid, event_state_key_nid, event_nid)" +
+	"INSERT INTO state_block (state_block_nid, event_type_nid, event_state_key_nid, event_nid)" +
 	" VALUES ($1, $2, $3, $4)"
 
 const selectNextStateBlockNIDSQL = "" +
-	"SELECT nextval('state_data_nid_seq')"
+	"SELECT nextval('state_block_nid_seq')"
 
 // Bulk state lookup by numeric event ID.
-// Sort by the state_data_nid, event_type_nid, event_state_key_nid
-// This means that all the entries for a given state_data_nid will appear
+// Sort by the state_block_nid, event_type_nid, event_state_key_nid
+// This means that all the entries for a given state_block_nid will appear
 // together in the list and those entries will sorted by event_type_nid
 // and event_state_key_nid. This property makes it easier to merge two
 // state data blocks together.
 const bulkSelectStateDataEntriesSQL = "" +
-	"SELECT state_data_nid, event_type_nid, event_state_key_nid, event_nid" +
-	" FROM state_data WHERE state_data_nid = ANY($1)" +
-	" ORDER BY state_data_nid, event_type_nid, event_state_key_nid"
+	"SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
+	" FROM state_block WHERE state_block_nid = ANY($1)" +
+	" ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
 
 func (s *statements) prepareStateData(db *sql.DB) (err error) {
 	_, err = db.Exec(stateDataSchema)
