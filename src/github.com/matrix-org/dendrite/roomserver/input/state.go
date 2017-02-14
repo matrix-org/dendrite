@@ -137,7 +137,7 @@ func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, pre
 	combined = combined[:unique(stateEntrySorter(combined))]
 
 	// Find the conflicts
-	conflicts := duplicateStateKeys(combined)
+	conflicts := findDuplicateStateKeys(combined)
 
 	var state []types.StateEntry
 	if len(conflicts) > 0 {
@@ -162,7 +162,7 @@ func resolveConflicts(db RoomEventDatabase, combined, conflicted []types.StateEn
 	panic(fmt.Errorf("Not implemented"))
 }
 
-func duplicateStateKeys(a []types.StateEntry) []types.StateEntry {
+func findDuplicateStateKeys(a []types.StateEntry) []types.StateEntry {
 	var result []types.StateEntry
 	j := 0
 	for i := 1; i < len(a); i++ {
