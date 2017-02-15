@@ -8,7 +8,7 @@ import (
 
 // checkAuthEvents checks that the event passes authentication checks
 // Returns the numeric IDs for the auth events.
-func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEventIDs []string) ([]int64, error) {
+func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEventIDs []string) ([]types.EventNID, error) {
 	// Grab the numeric IDs for the supplied auth state events from the database.
 	authStateEntries, err := db.StateEntriesForEventIDs(authEventIDs)
 	if err != nil {
@@ -31,7 +31,7 @@ func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEv
 	}
 
 	// Return the numeric IDs for the auth events.
-	result := make([]int64, len(authStateEntries))
+	result := make([]types.EventNID, len(authStateEntries))
 	for i := range authStateEntries {
 		result[i] = authStateEntries[i].EventNID
 	}
@@ -39,7 +39,7 @@ func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEv
 }
 
 type authEvents struct {
-	stateKeyNIDMap map[string]int64
+	stateKeyNIDMap map[string]types.EventStateKeyNID
 	state          stateEntryMap
 	events         eventMap
 }
@@ -69,7 +69,7 @@ func (ae *authEvents) ThirdPartyInvite(stateKey string) (*gomatrixserverlib.Even
 	return ae.lookupEvent(types.MRoomThirdPartyInviteNID, stateKey), nil
 }
 
-func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID int64) *gomatrixserverlib.Event {
+func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) *gomatrixserverlib.Event {
 	eventNID, ok := ae.state.lookup(types.StateKeyTuple{typeNID, types.EmptyStateKeyNID})
 	if !ok {
 		return nil
@@ -81,7 +81,7 @@ func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID int64) *gomatrixserve
 	return &event.Event
 }
 
-func (ae *authEvents) lookupEvent(typeNID int64, stateKey string) *gomatrixserverlib.Event {
+func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *gomatrixserverlib.Event {
 	stateKeyNID, ok := ae.stateKeyNIDMap[stateKey]
 	if !ok {
 		return nil
@@ -113,7 +113,7 @@ func loadAuthEvents(
 
 	// Load the events we need.
 	result.state = state
-	var eventNIDs []int64
+	var eventNIDs []types.EventNID
 	keyTuplesNeeded := stateKeyTuplesNeeded(result.stateKeyNIDMap, needed)
 	for _, keyTuple := range keyTuplesNeeded {
 		eventNID, ok := result.state.lookup(keyTuple)
@@ -128,7 +128,7 @@ func loadAuthEvents(
 }
 
 // stateKeyTuplesNeeded works out which numeric state key tuples we need to authenticate some events.
-func stateKeyTuplesNeeded(stateKeyNIDMap map[string]int64, stateNeeded gomatrixserverlib.StateNeeded) []types.StateKeyTuple {
+func stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.EventStateKeyNID, stateNeeded gomatrixserverlib.StateNeeded) []types.StateKeyTuple {
 	var keyTuples []types.StateKeyTuple
 	if stateNeeded.Create {
 		keyTuples = append(keyTuples, types.StateKeyTuple{types.MRoomCreateNID, types.EmptyStateKeyNID})
@@ -159,7 +159,7 @@ func stateKeyTuplesNeeded(stateKeyNIDMap map[string]int64, stateNeeded gomatrixs
 type stateEntryMap []types.StateEntry
 
 // lookup an entry in the event map.
-func (m stateEntryMap) lookup(stateKey types.StateKeyTuple) (eventNID int64, ok bool) {
+func (m stateEntryMap) lookup(stateKey types.StateKeyTuple) (eventNID types.EventNID, ok bool) {
 	// Since the list is sorted we can implement this using binary search.
 	// This is faster than using a hash map.
 	// We don't have to worry about pathological cases because the keys are fixed
@@ -180,7 +180,7 @@ func (m stateEntryMap) lookup(stateKey types.StateKeyTuple) (eventNID int64, ok 
 type eventMap []types.Event
 
 // lookup an entry in the event map.
-func (m eventMap) lookup(eventNID int64) (event *types.Event, ok bool) {
+func (m eventMap) lookup(eventNID types.EventNID) (event *types.Event, ok bool) {
 	// Since the list is sorted we can implement this using binary search.
 	// This is faster than using a hash map.
 	// We don't have to worry about pathological cases because the keys are fixed

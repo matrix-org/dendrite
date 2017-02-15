@@ -38,21 +38,22 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 }
 
 // StoreEvent implements input.EventDatabase
-func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int64) error {
+func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error) {
 	var (
-		roomNID          int64
-		eventTypeNID     int64
-		eventStateKeyNID int64
-		eventNID         int64
+		roomNID          types.RoomNID
+		eventTypeNID     types.EventTypeNID
+		eventStateKeyNID types.EventStateKeyNID
+		eventNID         types.EventNID
+		stateNID         types.StateSnapshotNID
 		err              error
 	)
 
 	if roomNID, err = d.assignRoomNID(event.RoomID()); err != nil {
-		return err
+		return 0, types.StateAtEvent{}, err
 	}
 
 	if eventTypeNID, err = d.assignEventTypeNID(event.Type()); err != nil {
-		return err
+		return 0, types.StateAtEvent{}, err
 	}
 
 	eventStateKey := event.StateKey()
@@ -60,11 +61,11 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int
 	// Otherwise set the numeric ID for the state_key to 0.
 	if eventStateKey != nil {
 		if eventStateKeyNID, err = d.assignStateKeyNID(*eventStateKey); err != nil {
-			return err
+			return 0, types.StateAtEvent{}, err
 		}
 	}
 
-	if eventNID, err = d.statements.insertEvent(
+	if eventNID, stateNID, err = d.statements.insertEvent(
 		roomNID,
 		eventTypeNID,
 		eventStateKeyNID,
@@ -72,13 +73,26 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []int
 		event.EventReference().EventSHA256,
 		authEventNIDs,
 	); err != nil {
-		return err
+		return 0, types.StateAtEvent{}, err
 	}
 
-	return d.statements.insertEventJSON(eventNID, event.JSON())
+	if err = d.statements.insertEventJSON(eventNID, event.JSON()); err != nil {
+		return 0, types.StateAtEvent{}, err
+	}
+
+	return roomNID, types.StateAtEvent{
+		BeforeStateSnapshotNID: stateNID,
+		StateEntry: types.StateEntry{
+			StateKeyTuple: types.StateKeyTuple{
+				EventTypeNID:     eventTypeNID,
+				EventStateKeyNID: eventStateKeyNID,
+			},
+			EventNID: eventNID,
+		},
+	}, nil
 }
 
-func (d *Database) assignRoomNID(roomID string) (int64, error) {
+func (d *Database) assignRoomNID(roomID string) (types.RoomNID, error) {
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.statements.selectRoomNID(roomID)
 	if err == sql.ErrNoRows {
@@ -91,7 +105,7 @@ func (d *Database) assignRoomNID(roomID string) (int64, error) {
 	return roomNID, nil
 }
 
-func (d *Database) assignEventTypeNID(eventType string) (int64, error) {
+func (d *Database) assignEventTypeNID(eventType string) (types.EventTypeNID, error) {
 	// Check if we already have a numeric ID in the database.
 	eventTypeNID, err := d.statements.selectEventTypeNID(eventType)
 	if err == sql.ErrNoRows {
@@ -104,7 +118,7 @@ func (d *Database) assignEventTypeNID(eventType string) (int64, error) {
 	return eventTypeNID, nil
 }
 
-func (d *Database) assignStateKeyNID(eventStateKey string) (int64, error) {
+func (d *Database) assignStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
 	// Check if we already have a numeric ID in the database.
 	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(eventStateKey)
 	if err == sql.ErrNoRows {
@@ -123,12 +137,12 @@ func (d *Database) StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntr
 }
 
 // EventStateKeyNIDs implements input.EventDatabase
-func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]int64, error) {
+func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error) {
 	return d.statements.bulkSelectEventStateKeyNID(eventStateKeys)
 }
 
 // Events implements input.EventDatabase
-func (d *Database) Events(eventNIDs []int64) ([]types.Event, error) {
+func (d *Database) Events(eventNIDs []types.EventNID) ([]types.Event, error) {
 	eventJSONs, err := d.statements.bulkSelectEventJSON(eventNIDs)
 	if err != nil {
 		return nil, err
@@ -144,4 +158,40 @@ func (d *Database) Events(eventNIDs []int64) ([]types.Event, error) {
 		}
 	}
 	return results, nil
+}
+
+// AddState implements input.EventDatabase
+func (d *Database) AddState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error) {
+	if len(state) > 0 {
+		stateBlockNID, err := d.statements.selectNextStateBlockNID()
+		if err != nil {
+			return 0, err
+		}
+		if err = d.statements.bulkInsertStateData(stateBlockNID, state); err != nil {
+			return 0, err
+		}
+		stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
+	}
+
+	return d.statements.insertState(roomNID, stateBlockNIDs)
+}
+
+// SetState implements input.EventDatabase
+func (d *Database) SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error {
+	return d.statements.updateEventState(eventNID, stateNID)
+}
+
+// StateAtEventIDs implements input.EventDatabase
+func (d *Database) StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error) {
+	return d.statements.bulkSelectStateAtEventByID(eventIDs)
+}
+
+// StateBlockNIDs implements input.EventDatabase
+func (d *Database) StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error) {
+	return d.statements.bulkSelectStateBlockNIDs(stateNIDs)
+}
+
+// StateEntries implements input.EventDatabase
+func (d *Database) StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error) {
+	return d.statements.bulkSelectStateDataEntries(stateBlockNIDs)
 }

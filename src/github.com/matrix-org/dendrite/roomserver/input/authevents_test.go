@@ -8,13 +8,18 @@ import (
 func benchmarkStateEntryMapLookup(entries, lookups int64, b *testing.B) {
 	var list []types.StateEntry
 	for i := int64(0); i < entries; i++ {
-		list = append(list, types.StateEntry{types.StateKeyTuple{i, i}, i})
+		list = append(list, types.StateEntry{types.StateKeyTuple{
+			types.EventTypeNID(i),
+			types.EventStateKeyNID(i),
+		}, types.EventNID(i)})
 	}
 
 	for i := 0; i < b.N; i++ {
 		entryMap := stateEntryMap(list)
 		for j := int64(0); j < lookups; j++ {
-			entryMap.lookup(types.StateKeyTuple{j, j})
+			entryMap.lookup(types.StateKeyTuple{
+				types.EventTypeNID(j), types.EventStateKeyNID(j),
+			})
 		}
 	}
 }
@@ -43,10 +48,10 @@ func TestStateEntryMap(t *testing.T) {
 	})
 
 	testCases := []struct {
-		inputTypeNID  int64
-		inputStateKey int64
+		inputTypeNID  types.EventTypeNID
+		inputStateKey types.EventStateKeyNID
 		wantOK        bool
-		wantEventNID  int64
+		wantEventNID  types.EventNID
 	}{
 		// Check that tuples that in the array are in the map.
 		{1, 1, true, 1},
@@ -80,7 +85,7 @@ func TestEventMap(t *testing.T) {
 	})
 
 	testCases := []struct {
-		inputEventNID int64
+		inputEventNID types.EventNID
 		wantOK        bool
 		wantEvent     *types.Event
 	}{

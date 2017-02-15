@@ -13,13 +13,32 @@ type PartitionOffset struct {
 	Offset int64
 }
 
+// EventTypeNID is a numeric ID for an event type.
+type EventTypeNID int64
+
+// EventStateKeyNID is a numeric ID for an event state_key.
+type EventStateKeyNID int64
+
+// EventNID is a numeric ID for an event.
+type EventNID int64
+
+// RoomNID is a numeric ID for a room.
+type RoomNID int64
+
+// StateSnapshotNID is a numeric ID for the state at an event.
+type StateSnapshotNID int64
+
+// StateBlockNID is a numeric ID for a block of state data.
+// These blocks of state data are combined to form the actual state.
+type StateBlockNID int64
+
 // A StateKeyTuple is a pair of a numeric event type and a numeric state key.
 // It is used to lookup state entries.
 type StateKeyTuple struct {
 	// The numeric ID for the event type.
-	EventTypeNID int64
+	EventTypeNID EventTypeNID
 	// The numeric ID for the state key.
-	EventStateKeyNID int64
+	EventStateKeyNID EventStateKeyNID
 }
 
 // LessThan returns true if this state key is less than the other state key.
@@ -35,7 +54,7 @@ func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
 type StateEntry struct {
 	StateKeyTuple
 	// The numeric ID for the event.
-	EventNID int64
+	EventNID EventNID
 }
 
 // LessThan returns true if this state entry is less than the other state entry.
@@ -47,10 +66,23 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 	return a.EventNID < b.EventNID
 }
 
+// StateAtEvent is the state before and after a matrix event.
+type StateAtEvent struct {
+	// The state before the event.
+	BeforeStateSnapshotNID StateSnapshotNID
+	// The state entry for the event itself, allows us to calculate the state after the event.
+	StateEntry
+}
+
+// IsStateEvent returns whether the event the state is at is a state event.
+func (s StateAtEvent) IsStateEvent() bool {
+	return s.EventStateKeyNID != 0
+}
+
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
 // It is when performing bulk event lookup in the database.
 type Event struct {
-	EventNID int64
+	EventNID EventNID
 	gomatrixserverlib.Event
 }
 
@@ -75,3 +107,15 @@ const (
 	// EmptyStateKeyNID is the numeric ID for the empty state key.
 	EmptyStateKeyNID = 1
 )
+
+// StateBlockNIDList is used to return the result of bulk StateBlockNID lookups from the database.
+type StateBlockNIDList struct {
+	StateSnapshotNID StateSnapshotNID
+	StateBlockNIDs   []StateBlockNID
+}
+
+// StateEntryList is used to return the result of bulk state entry lookups from the database.
+type StateEntryList struct {
+	StateBlockNID StateBlockNID
+	StateEntries  []StateEntry
+}
