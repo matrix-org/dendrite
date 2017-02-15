@@ -191,16 +191,18 @@ func findDuplicateStateKeys(a []types.StateEntry) []types.StateEntry {
 	for i := 1; i < len(a); i++ {
 		// Check if the state key tuple matches the start of the block
 		if a[j].StateKeyTuple != a[i].StateKeyTuple {
+			// If the state key tuple is different then we've reached the end of a block of duplicates.
 			// Check if the size of the block is bigger than one.
+			// If the size is one then there was only a single entry with that state key tuple so we don't add it to the result
 			if j+1 != i {
 				// Add the block to the result.
 				result = append(result, a[j:i]...)
 			}
-			// Start a new block.
+			// Start a new block for the next state key tuple.
 			j = i
 		}
 	}
-	// Check if the last block had more than one event in it.
+	// Check if the last block with the same state key tuple had more than one event in it.
 	if j+1 != len(a) {
 		result = append(result, a[j:]...)
 	}
