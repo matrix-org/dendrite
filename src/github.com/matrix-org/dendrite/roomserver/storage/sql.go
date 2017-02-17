@@ -13,6 +13,7 @@ type statements struct {
 	eventJSONStatements
 	stateSnapshotStatements
 	stateBlockStatements
+	previousEventStatements
 }
 
 func (s *statements) prepare(db *sql.DB) error {
@@ -47,6 +48,10 @@ func (s *statements) prepare(db *sql.DB) error {
 	}
 
 	if err = s.stateBlockStatements.prepare(db); err != nil {
+		return err
+	}
+
+	if err = s.previousEventStatements.prepare(db); err != nil {
 		return err
 	}
 

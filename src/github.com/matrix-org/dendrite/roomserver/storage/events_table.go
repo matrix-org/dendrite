@@ -65,11 +65,16 @@ const bulkSelectStateAtEventByIDSQL = "" +
 const updateEventStateSQL = "" +
 	"UPDATE events SET state_snapshot_nid = $2 WHERE event_nid = $1"
 
+const bulkSelectStateAtEventAndReferenceSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
+	" FROM events WHERE event_nid = ANY($1)"
+
 type eventStatements struct {
-	insertEventStmt                *sql.Stmt
-	bulkSelectStateEventByIDStmt   *sql.Stmt
-	bulkSelectStateAtEventByIDStmt *sql.Stmt
-	updateEventStateStmt           *sql.Stmt
+	insertEventStmt                        *sql.Stmt
+	bulkSelectStateEventByIDStmt           *sql.Stmt
+	bulkSelectStateAtEventByIDStmt         *sql.Stmt
+	updateEventStateStmt                   *sql.Stmt
+	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -87,6 +92,9 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.updateEventStateStmt, err = db.Prepare(updateEventStateSQL); err != nil {
+		return
+	}
+	if s.bulkSelectStateAtEventAndReferenceStmt, err = db.Prepare(bulkSelectStateAtEventAndReferenceSQL); err != nil {
 		return
 	}
 	return
@@ -175,4 +183,44 @@ func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types
 func (s *eventStatements) updateEventState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error {
 	_, err := s.updateEventStateStmt.Exec(int64(eventNID), int64(stateNID))
 	return err
+}
+
+func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventNIDs []types.EventNID) ([]types.StateAtEventAndReference, error) {
+	nids := make([]int64, len(eventNIDs))
+	for i := range eventNIDs {
+		nids[i] = int64(eventNIDs[i])
+	}
+	rows, err := txn.Stmt(s.bulkSelectStateAtEventAndReferenceStmt).Query(pq.Int64Array(nids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([]types.StateAtEventAndReference, len(eventNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		var (
+			eventTypeNID     int64
+			eventStateKeyNID int64
+			eventNID         int64
+			stateSnapshotNID int64
+			eventID          string
+			eventSHA256      []byte
+		)
+		if err = rows.Scan(
+			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventNID, &eventSHA256,
+		); err != nil {
+			return nil, err
+		}
+		result := &results[i]
+		result.EventTypeNID = types.EventTypeNID(eventTypeNID)
+		result.EventStateKeyNID = types.EventStateKeyNID(eventStateKeyNID)
+		result.EventNID = types.EventNID(eventNID)
+		result.BeforeStateSnapshotNID = types.StateSnapshotNID(stateSnapshotNID)
+		result.EventID = eventID
+		result.EventSHA256 = eventSHA256
+	}
+	if i != len(eventNIDs) {
+		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
+	}
+	return results, nil
 }

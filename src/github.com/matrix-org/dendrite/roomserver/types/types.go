@@ -79,6 +79,12 @@ func (s StateAtEvent) IsStateEvent() bool {
 	return s.EventStateKeyNID != 0
 }
 
+// StateAtEventAndReference ...
+type StateAtEventAndReference struct {
+	StateAtEvent
+	gomatrixserverlib.EventReference
+}
+
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
 // It is when performing bulk event lookup in the database.
 type Event struct {
@@ -118,4 +124,16 @@ type StateBlockNIDList struct {
 type StateEntryList struct {
 	StateBlockNID StateBlockNID
 	StateEntries  []StateEntry
+}
+
+// A RoomRecentEventsUpdater is used to update the recent events in a room.
+type RoomRecentEventsUpdater interface {
+	// Store the previous events referenced by an event.
+	StorePreviousEvents(eventNID EventNID, previousEventReferences []gomatrixserverlib.EventReference) error
+	// Check whether the eventReference is already referenced by another matrix event.
+	IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error)
+	// Set the list of latest events for the room.
+	SetLatestEvents(roomNID RoomNID, latest []StateAtEventAndReference) error
+	// Commit or Rollback the transaction.
+	Close(commit bool) error
 }
