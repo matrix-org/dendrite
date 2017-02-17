@@ -1,56 +1,29 @@
 package routing
 
 import (
+	"net/http"
+
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/readers"
-	_ "github.com/matrix-org/dendrite/clientapi/writers"
+	"github.com/matrix-org/dendrite/clientapi/writers"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"net/http"
-	"strings"
 )
 
 const pathPrefixR0 = "/_matrix/client/r0"
 
-// Return true if this path should be handled by this handler
-type matcher func(path string) bool
-
-type lookup struct {
-	Matches matcher
-	Handler http.Handler
-}
-
-func newLookup(name string, m matcher, h util.JSONRequestHandler) lookup {
-	return lookup{
-		Matches: m,
-		Handler: prometheus.InstrumentHandler(name, util.MakeJSONAPI(h)),
-	}
-}
-
-func matchesString(str string) func(path string) bool {
-	return func(path string) bool {
-		return path == str
-	}
+func make(metricsName string, h util.JSONRequestHandler) http.Handler {
+	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
 }
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(mux *http.ServeMux, httpClient *http.Client) {
-	var r0lookups []lookup
-	r0lookups = append(r0lookups, newLookup("sync", matchesString("/sync"), &readers.Sync{}))
+func Setup(servMux *http.ServeMux, httpClient *http.Client) {
+	apiMux := mux.NewRouter()
+	r0mux := apiMux.PathPrefix("/_matrix/client/r0").Subrouter()
+	r0mux.Handle("/sync", make("sync", &readers.Sync{}))
+	r0mux.Handle("/rooms/{roomID}/send/{eventType}", make("send_message", &writers.SendMessage{}))
 
-	mux.Handle("/metrics", prometheus.Handler())
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, req *http.Request) {
-		clientServerPath := strings.TrimPrefix(req.URL.Path, "/api")
-		if strings.HasPrefix(clientServerPath, pathPrefixR0) {
-			apiPath := strings.TrimPrefix(clientServerPath, pathPrefixR0)
-			for _, lookup := range r0lookups {
-				if lookup.Matches(apiPath) {
-					lookup.Handler.ServeHTTP(w, req)
-					return
-				}
-			}
-		}
-		w.WriteHeader(404)
-		w.Write([]byte(`{"error":"Not found","errcode":"M_NOT_FOUND"}`))
-	})
+	servMux.Handle("/metrics", prometheus.Handler())
+	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
