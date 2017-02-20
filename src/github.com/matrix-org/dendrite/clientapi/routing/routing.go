@@ -23,9 +23,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client) {
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
 		make("send_message", wrap(func(req *http.Request) (interface{}, *util.HTTPError) {
 			vars := mux.Vars(req)
-			roomID := vars["roomID"]
-			eventType := vars["eventType"]
-			return writers.SendMessage(req, roomID, eventType)
+			return writers.SendMessage(req, vars["roomID"], vars["eventType"])
 		})),
 	)
 
