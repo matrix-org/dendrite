@@ -1,17 +1,39 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/clientapi/routing"
 	"net/http"
 	"os"
+	"path/filepath"
+
+	"github.com/matrix-org/dendrite/clientapi/routing"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dugong"
 )
+
+func setupLogging(logDir string) {
+	_ = os.Mkdir(logDir, os.ModePerm)
+	log.AddHook(dugong.NewFSHook(
+		filepath.Join(logDir, "info.log"),
+		filepath.Join(logDir, "warn.log"),
+		filepath.Join(logDir, "error.log"),
+		&log.TextFormatter{
+			TimestampFormat:  "2006-01-02 15:04:05.000000",
+			DisableColors:    true,
+			DisableTimestamp: false,
+			DisableSorting:   false,
+		}, &dugong.DailyRotationSchedule{GZip: true},
+	))
+}
 
 func main() {
 	bindAddr := os.Getenv("BIND_ADDRESS")
 	if bindAddr == "" {
 		log.Panic("No BIND_ADDRESS environment variable found.")
+	}
+	logDir := os.Getenv("LOG_DIR")
+	if logDir != "" {
+		setupLogging(logDir)
 	}
 	log.Info("Starting clientapi")
 	routing.Setup(http.DefaultServeMux, http.DefaultClient)
