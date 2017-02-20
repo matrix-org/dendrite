@@ -78,6 +78,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/matrix-org/dugong",
+			"repository": "https://github.com/matrix-org/dugong",
+			"revision": "193b8f88e381d12f2d53023fba25e43fc81dc5ac",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
 			"revision": "48ee56a33d195dc412dd919a0e81af70c9aaf4a3",
