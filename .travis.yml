@@ -5,8 +5,11 @@ install:
  - go get github.com/constabulary/gb/...
  - go get github.com/golang/lint/golint
  - go get github.com/fzipp/gocyclo
+ - go get github.com/mattn/goveralls
 
-script: gb build github.com/matrix-org/dendrite/roomserver/roomserver && ./hooks/pre-commit
+script:
+ - gb build github.com/matrix-org/dendrite/roomserver/roomserver && ./hooks/pre-commit
+ - $HOME/gopath/bin/goveralls -service=travis-ci
 
 notifications:
     webhooks:
