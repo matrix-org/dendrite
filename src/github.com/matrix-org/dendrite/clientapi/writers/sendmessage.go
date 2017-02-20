@@ -17,7 +17,8 @@ func (s *SendMessage) OnIncomingRequest(req *http.Request) (interface{}, *util.H
 	logger := req.Context().Value(util.CtxValueLogger).(*log.Entry)
 	vars := mux.Vars(req)
 	roomID := vars["roomID"]
-	logger.WithField("roomID", roomID).Info("Doing stuff...")
+	eventType := vars["eventType"]
+	logger.WithField("roomID", roomID).WithField("eventType", eventType).Info("Doing stuff...")
 	return nil, &util.HTTPError{
 		Code:    404,
 		Message: "Not implemented yet",
