@@ -12,11 +12,33 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-// ContextKeys is a type alias for string to namespace Context keys per-package.
-type ContextKeys string
+// contextKeys is a type alias for string to namespace Context keys per-package.
+type contextKeys string
 
-// CtxValueLogger is the key to extract the logrus Logger.
-const CtxValueLogger = ContextKeys("logger")
+// ctxValueRequestID is the key to extract the request ID for an HTTP request
+const ctxValueRequestID = contextKeys("requestid")
+
+// GetRequestID returns the request ID associated with this context, or the empty string
+// if one is not associated with this context.
+func GetRequestID(ctx context.Context) string {
+	id := ctx.Value(ctxValueRequestID)
+	if id == nil {
+		return ""
+	}
+	return id.(string)
+}
+
+// ctxValueLogger is the key to extract the logrus Logger.
+const ctxValueLogger = contextKeys("logger")
+
+// GetLogger retrieves the logrus logger from the supplied context. Returns nil if there is no logger.
+func GetLogger(ctx context.Context) *log.Entry {
+	l := ctx.Value(ctxValueLogger)
+	if l == nil {
+		return nil
+	}
+	return l.(*log.Entry)
+}
 
 // JSONRequestHandler represents an interface that must be satisfied in order to respond to incoming
 // HTTP requests with JSON. The interface returned will be marshalled into JSON to be sent to the client,
@@ -34,12 +56,12 @@ type JSONError struct {
 
 // Protect panicking HTTP requests from taking down the entire process, and log them using
 // the correct logger, returning a 500 with a JSON response rather than abruptly closing the
-// connection. The http.Request MUST have a CtxValueLogger.
+// connection. The http.Request MUST have a ctxValueLogger.
 func Protect(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger := req.Context().Value(CtxValueLogger).(*log.Entry)
+				logger := req.Context().Value(ctxValueLogger).(*log.Entry)
 				logger.WithFields(log.Fields{
 					"panic": r,
 				}).Errorf(
@@ -56,18 +78,20 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 
 // MakeJSONAPI creates an HTTP handler which always responds to incoming requests with JSON responses.
 // Incoming http.Requests will have a logger (with a request ID/method/path logged) attached to the Context.
-// This can be accessed via the const CtxValueLogger. The type of the logger is *log.Entry from github.com/Sirupsen/logrus
+// This can be accessed via GetLogger(Context). The type of the logger is *log.Entry from github.com/Sirupsen/logrus
 func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 	return Protect(func(w http.ResponseWriter, req *http.Request) {
+		reqID := RandomString(12)
 		// Set a Logger on the context
-		ctx := context.WithValue(req.Context(), CtxValueLogger, log.WithFields(log.Fields{
+		ctx := context.WithValue(req.Context(), ctxValueLogger, log.WithFields(log.Fields{
 			"req.method": req.Method,
 			"req.path":   req.URL.Path,
-			"req.id":     RandomString(12),
+			"req.id":     reqID,
 		}))
+		ctx = context.WithValue(ctx, ctxValueRequestID, reqID)
 		req = req.WithContext(ctx)
 
-		logger := req.Context().Value(CtxValueLogger).(*log.Entry)
+		logger := req.Context().Value(ctxValueLogger).(*log.Entry)
 		logger.Print("Incoming request")
 
 		res, httpErr := handler.OnIncomingRequest(req)
@@ -99,7 +123,7 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 }
 
 func jsonErrorResponse(w http.ResponseWriter, req *http.Request, httpErr *HTTPError) {
-	logger := req.Context().Value(CtxValueLogger).(*log.Entry)
+	logger := req.Context().Value(ctxValueLogger).(*log.Entry)
 	if httpErr.Code == 302 {
 		logger.WithField("err", httpErr.Error()).Print("Redirecting")
 		http.Redirect(w, req, httpErr.Message, 302)

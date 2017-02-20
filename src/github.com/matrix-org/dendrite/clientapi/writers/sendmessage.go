@@ -3,8 +3,6 @@ package writers
 import (
 	"net/http"
 
-	log "github.com/Sirupsen/logrus"
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/util"
 )
 
@@ -12,12 +10,9 @@ import (
 type SendMessage struct {
 }
 
-// OnIncomingRequest implements util.JSONRequestHandler
-func (s *SendMessage) OnIncomingRequest(req *http.Request) (interface{}, *util.HTTPError) {
-	logger := req.Context().Value(util.CtxValueLogger).(*log.Entry)
-	vars := mux.Vars(req)
-	roomID := vars["roomID"]
-	eventType := vars["eventType"]
+// OnIncomingRequest implements /rooms/{roomID}/send/{eventType}
+func (s *SendMessage) OnIncomingRequest(req *http.Request, roomID, eventType string) (interface{}, *util.HTTPError) {
+	logger := util.GetLogger(req.Context())
 	logger.WithField("roomID", roomID).WithField("eventType", eventType).Info("Doing stuff...")
 	return nil, &util.HTTPError{
 		Code:    404,
