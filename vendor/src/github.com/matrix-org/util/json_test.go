@@ -73,12 +73,30 @@ func TestMakeJSONAPIRedirect(t *testing.T) {
 	}
 }
 
+func TestGetLogger(t *testing.T) {
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
+	entry := log.WithField("test", "yep")
+	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+	ctx := context.WithValue(mockReq.Context(), ctxValueLogger, entry)
+	mockReq = mockReq.WithContext(ctx)
+	ctxLogger := GetLogger(mockReq.Context())
+	if ctxLogger != entry {
+		t.Errorf("TestGetLogger wanted logger '%v', got '%v'", entry, ctxLogger)
+	}
+
+	noLoggerInReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+	ctxLogger = GetLogger(noLoggerInReq.Context())
+	if ctxLogger != nil {
+		t.Errorf("TestGetLogger wanted nil logger, got '%v'", ctxLogger)
+	}
+}
+
 func TestProtect(t *testing.T) {
 	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	mockWriter := httptest.NewRecorder()
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	mockReq = mockReq.WithContext(
-		context.WithValue(mockReq.Context(), CtxValueLogger, log.WithField("test", "yep")),
+		context.WithValue(mockReq.Context(), ctxValueLogger, log.WithField("test", "yep")),
 	)
 	h := Protect(func(w http.ResponseWriter, req *http.Request) {
 		panic("oh noes!")
@@ -95,5 +113,23 @@ func TestProtect(t *testing.T) {
 	actualBody := mockWriter.Body.String()
 	if actualBody != expectBody {
 		t.Errorf("TestProtect wanted body %s, got %s", expectBody, actualBody)
+	}
+}
+
+func TestGetRequestID(t *testing.T) {
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
+	reqID := "alphabetsoup"
+	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+	ctx := context.WithValue(mockReq.Context(), ctxValueRequestID, reqID)
+	mockReq = mockReq.WithContext(ctx)
+	ctxReqID := GetRequestID(mockReq.Context())
+	if reqID != ctxReqID {
+		t.Errorf("TestGetRequestID wanted request ID '%s', got '%s'", reqID, ctxReqID)
+	}
+
+	noReqIDInReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+	ctxReqID = GetRequestID(noReqIDInReq.Context())
+	if ctxReqID != "" {
+		t.Errorf("TestGetRequestID wanted empty request ID, got '%s'", ctxReqID)
 	}
 }
