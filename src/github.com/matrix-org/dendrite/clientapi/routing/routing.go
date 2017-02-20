@@ -17,14 +17,15 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(servMux *http.ServeMux, httpClient *http.Client) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-	r0mux.Handle("/sync", make("sync", &readers.Sync{}))
+	r0mux.Handle("/sync", make("sync", wrap(func(req *http.Request) (interface{}, *util.HTTPError) {
+		return readers.Sync(req)
+	})))
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
 		make("send_message", wrap(func(req *http.Request) (interface{}, *util.HTTPError) {
 			vars := mux.Vars(req)
 			roomID := vars["roomID"]
 			eventType := vars["eventType"]
-			h := &writers.SendMessage{}
-			return h.OnIncomingRequest(req, roomID, eventType)
+			return writers.SendMessage(req, roomID, eventType)
 		})),
 	)
 
