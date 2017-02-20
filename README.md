@@ -1,4 +1,4 @@
-# Dendrite
+# Dendrite [![Build Status](https://travis-ci.org/matrix-org/dendrite.svg?branch=master)](https://travis-ci.org/matrix-org/dendrite)
 
 Dendrite will be a matrix homeserver written in go.
 
