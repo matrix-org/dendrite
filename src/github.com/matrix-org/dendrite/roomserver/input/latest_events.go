@@ -9,7 +9,7 @@ import (
 // updateLatestEvents updates the list of latest events for this room.
 func updateLatestEvents(
 	db RoomEventDatabase, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
-) error {
+) (err error) {
 	oldLatest, updater, err := db.GetLatestEventsForUpdate(roomNID)
 	if err != nil {
 		return err
@@ -68,5 +68,5 @@ func updateLatestEvents(
 
 	// The err should be nil at this point.
 	// But when we call Close in the defer above it might set an error here.
-	return err
+	return
 }
