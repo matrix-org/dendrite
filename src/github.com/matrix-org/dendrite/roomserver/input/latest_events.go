@@ -26,7 +26,7 @@ func updateLatestEvents(
 ) (err error) {
 	oldLatest, updater, err := db.GetLatestEventsForUpdate(roomNID)
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
 		if err == nil {
@@ -42,6 +42,14 @@ func updateLatestEvents(
 		}
 	}()
 
+	err = doUpdateLatestEvents(updater, oldLatest, roomNID, stateAtEvent, event)
+	return
+}
+
+func doUpdateLatestEvents(
+	updater types.RoomRecentEventsUpdater, oldLatest []types.StateAtEventAndReference, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+) error {
+	var err error
 	var prevEvents []gomatrixserverlib.EventReference
 	prevEvents = event.PrevEvents()
 
@@ -84,7 +92,5 @@ func updateLatestEvents(
 		return err
 	}
 
-	// The err should be nil at this point.
-	// But when we call Close in the defer above it might set an error here.
-	return
+	return nil
 }
