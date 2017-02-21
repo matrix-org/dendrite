@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS previous_events (
 `
 
 // Insert an entry into the previous_events table.
-// The there is already an entry indicating that an event references that previous event then
+// If there is already an entry indicating that an event references that previous event then
 // add the event NID to the list to indicate that this event references that previous event as well.
 // This should only be modified while holding a "FOR UPDATE" lock on the row in the rooms table for this room.
 // The lock is necessary to avoid data races when checking whether an event is already referenced by another event.
