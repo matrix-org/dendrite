@@ -41,6 +41,8 @@ func updateLatestEvents(
 		for _, prevEvent := range prevEvents {
 			if l.EventID == prevEvent.EventID && bytes.Compare(l.EventSHA256, prevEvent.EventSHA256) == 0 {
 				// This event can be removed from the latest events cause we've found an event that references it.
+				// (If an event is referenced by another event then it can't be one of the latest events in the room
+				//  because we have an event that comes after it)
 				continue
 			}
 			// Keep the event in the latest events.
