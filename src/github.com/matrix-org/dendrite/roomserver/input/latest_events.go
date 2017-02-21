@@ -7,7 +7,20 @@ import (
 )
 
 // updateLatestEvents updates the list of latest events for this room.
-// The latest events are the events that aren't referenced by another event in the database.
+// The latest events are the events that aren't referenced by another event in the database:
+//
+//     Time goes down the page. 1 is the m.room.create event (root).
+//
+//        1                 After storing 1 the latest events are {1}
+//        |                 After storing 2 the latest events are {2}
+//        2                 After storing 3 the latest events are {3}
+//       / \                After storing 4 the latest events are {3,4}
+//      3   4               After storing 5 the latest events are {5,4}
+//      |   |               After storing 6 the latest events are {5,6}
+//      5   6 <--- latest   After storing 7 the latest events are {6,7}
+//      |
+//      7 <----- latest
+//
 func updateLatestEvents(
 	db RoomEventDatabase, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) (err error) {
