@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 )
 
 // VerifyAccessToken verifies that an access token was supplied in the given HTTP request
@@ -12,15 +14,17 @@ import (
 func VerifyAccessToken(req *http.Request) (userID string, err error) {
 	_, tokenErr := extractAccessToken(req)
 	if tokenErr != nil {
-		// err = MatrixError(MatrixError.M_MISSING_TOKEN, tokenErr.Error())
+		err = jsonerror.MissingToken(tokenErr.Error())
 		return
 	}
-	// TODO: Do something with the token
+	// TODO: Check the token against the database
 	return
 }
 
-// extractAccessToken from a request, or return an error detailing what went wrong.
+// extractAccessToken from a request, or return an error detailing what went wrong. The
+// error message MUST be human-readable and comprehensible to the client.
 func extractAccessToken(req *http.Request) (string, error) {
+	// cf https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/api/auth.py#L631
 	authBearer := req.Header.Get("Authorization")
 	queryToken := req.URL.Query().Get("access_token")
 	if authBearer != "" && queryToken != "" {
