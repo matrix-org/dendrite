@@ -13,10 +13,10 @@ CREATE TABLE IF NOT EXISTS rooms (
     room_nid BIGINT PRIMARY KEY DEFAULT nextval('room_nid_seq'),
     -- Textual ID for the room.
     room_id TEXT NOT NULL CONSTRAINT room_id_unique UNIQUE,
-	-- The most recent events in the room that aren't referenced by another event.
-	-- This list may empty if the server hasn't joined the room yet.
-	-- (The server will be in that state while it stores the events for the initial state of the room)
-	latest_event_nids BIGINT[] NOT NULL
+    -- The most recent events in the room that aren't referenced by another event.
+    -- This list may empty if the server hasn't joined the room yet.
+    -- (The server will be in that state while it stores the events for the initial state of the room)
+    latest_event_nids BIGINT[] NOT NULL
 );
 `
 
