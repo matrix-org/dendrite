@@ -131,7 +131,7 @@ type StateEntryList struct {
 
 // A RoomRecentEventsUpdater is used to update the recent events in a room.
 // (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
-//  lock on the a row holding the latest events for the room.)
+//  lock on the row holding the latest events for the room.)
 type RoomRecentEventsUpdater interface {
 	// Store the previous events referenced by an event.
 	StorePreviousEvents(eventNID EventNID, previousEventReferences []gomatrixserverlib.EventReference) error
