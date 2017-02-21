@@ -7,6 +7,7 @@ import (
 )
 
 // updateLatestEvents updates the list of latest events for this room.
+// The latest events are the events that aren't referenced by another event in the database.
 func updateLatestEvents(
 	db RoomEventDatabase, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) (err error) {

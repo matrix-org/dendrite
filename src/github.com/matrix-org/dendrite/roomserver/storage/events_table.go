@@ -207,7 +207,7 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventN
 			eventSHA256      []byte
 		)
 		if err = rows.Scan(
-			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventNID, &eventSHA256,
+			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID, &eventSHA256,
 		); err != nil {
 			return nil, err
 		}
