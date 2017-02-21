@@ -8,14 +8,14 @@ import (
 const previousEventSchema = `
 -- The previous events table stores the event_ids referenced by the events
 -- stored in the events table.
--- This is used to tell if a new event is already referenced by an event we 
+-- This is used to tell if a new event is already referenced by an event in
+-- the database.
 CREATE TABLE IF NOT EXISTS previous_events (
-	// The string event ID taken from the prev_events key of an event.
+	-- The string event ID taken from the prev_events key of an event.
 	previous_event_id TEXT NOT NULL,
-	// The SHA256 reference hash taken from the prev_events key of an event.
+	-- The SHA256 reference hash taken from the prev_events key of an event.
 	previous_reference_sha256 BYTEA NOT NULL,
-	// A list of numeric event IDs of events that reference this prev_event.
-	// This isn'
+	-- A list of numeric event IDs of events that reference this prev_event.
 	event_nids BIGINT[] NOT NULL,
 	CONSTRAINT previous_event_id_unique UNIQUE (region_nid, prev_event_id, prev_reference_sha256)
 );
