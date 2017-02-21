@@ -37,6 +37,7 @@ func updateLatestEvents(
 		} else {
 			// Ignore any error we get rolling back since we don't want to
 			// clobber the current error
+			// TODO: log the error here.
 			updater.Rollback()
 		}
 	}()
