@@ -136,6 +136,8 @@ type RoomRecentEventsUpdater interface {
 	IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error)
 	// Set the list of latest events for the room.
 	SetLatestEvents(roomNID RoomNID, latest []StateAtEventAndReference) error
-	// Commit or Rollback the transaction.
-	Close(commit bool) error
+	// Commit the transaction
+	Commit() error
+	// Rollback the transaction.
+	Rollback() error
 }

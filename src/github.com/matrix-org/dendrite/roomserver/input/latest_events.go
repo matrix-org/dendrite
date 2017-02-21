@@ -19,11 +19,11 @@ func updateLatestEvents(
 			// Commit if there wasn't an error.
 			// Set the returned err value if we encounter an error committing.
 			// This only works because err is a named return.
-			err = updater.Close(true)
+			err = updater.Commit()
 		} else {
 			// Ignore any error we get rolling back since we don't want to
 			// clobber the current error
-			updater.Close(false)
+			updater.Rollback()
 		}
 	}()
 

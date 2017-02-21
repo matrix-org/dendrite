@@ -248,9 +248,10 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(roomNID types.RoomNID, latest 
 	return u.d.statements.updateLatestEventNIDs(u.txn, roomNID, eventNIDs)
 }
 
-func (u *roomRecentEventsUpdater) Close(commit bool) error {
-	if commit {
-		return u.txn.Commit()
-	}
+func (u *roomRecentEventsUpdater) Commit() error {
+	return u.txn.Commit()
+}
+
+func (u *roomRecentEventsUpdater) Rollback() error {
 	return u.txn.Rollback()
 }

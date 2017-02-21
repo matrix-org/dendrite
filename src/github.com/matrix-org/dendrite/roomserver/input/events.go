@@ -35,7 +35,7 @@ type RoomEventDatabase interface {
 	// Set the state at an event.
 	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error
 	// Lookup the latest events in a room in preparation for an update.
-	// The RoomRecentEventsUpdater must be closed if this doesn't return an error.
+	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// If this returns an error then no further action is required.
 	GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, types.RoomRecentEventsUpdater, error)
 }
