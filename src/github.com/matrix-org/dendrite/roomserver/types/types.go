@@ -138,7 +138,7 @@ type RoomRecentEventsUpdater interface {
 	// Check whether the eventReference is already referenced by another matrix event.
 	IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error)
 	// Set the list of latest events for the room.
-	// This replaces the current list stored in the database with the given list.
+	// This replaces the current list stored in the database with the given list
 	SetLatestEvents(roomNID RoomNID, latest []StateAtEventAndReference) error
 	// Commit the transaction
 	Commit() error
