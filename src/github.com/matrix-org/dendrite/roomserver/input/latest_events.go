@@ -6,6 +6,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// updateLatestEvents updates the list of latest events for this room.
 func updateLatestEvents(
 	db RoomEventDatabase, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) error {
@@ -14,8 +15,15 @@ func updateLatestEvents(
 		return err
 	}
 	defer func() {
-		// Commit if there wasn't an error.
-		updater.Close(err == nil)
+		if err == nil {
+			// Commit if there wasn't an error.
+			// Set the returned err value if we encounter an error committing.
+			err = updater.Close(true)
+		} else {
+			// Ignore any error we get rolling back since we don't want to
+			// clobber the current error
+			updater.Close(false)
+		}
 	}()
 
 	var prevEvents []gomatrixserverlib.EventReference
@@ -54,11 +62,11 @@ func updateLatestEvents(
 		})
 	}
 
-	err = updater.SetLatestEvents(roomNID, newLatest)
-	if err != nil {
+	if err = updater.SetLatestEvents(roomNID, newLatest); err != nil {
 		return err
 	}
 
-	// The deferred fires and the transaction closes.
-	return nil
+	// The err should be nil at this point.
+	// But when we call Close in the defer above it might set an error here.
+	return err
 }
