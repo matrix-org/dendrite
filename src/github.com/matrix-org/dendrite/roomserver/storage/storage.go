@@ -195,3 +195,63 @@ func (d *Database) StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.S
 func (d *Database) StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error) {
 	return d.statements.bulkSelectStateDataEntries(stateBlockNIDs)
 }
+
+// GetLatestEventsForUpdate implements input.EventDatabase
+func (d *Database) GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, types.RoomRecentEventsUpdater, error) {
+	txn, err := d.db.Begin()
+	if err != nil {
+		return nil, nil, err
+	}
+	eventNIDs, err := d.statements.selectLatestEventsNIDsForUpdate(txn, roomNID)
+	if err != nil {
+		txn.Rollback()
+		return nil, nil, err
+	}
+	stateAndRefs, err := d.statements.bulkSelectStateAtEventAndReference(txn, eventNIDs)
+	if err != nil {
+		txn.Rollback()
+		return nil, nil, err
+	}
+	return stateAndRefs, &roomRecentEventsUpdater{txn, d}, nil
+}
+
+type roomRecentEventsUpdater struct {
+	txn *sql.Tx
+	d   *Database
+}
+
+func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
+	for _, ref := range previousEventReferences {
+		if err := u.d.statements.insertPreviousEvent(u.txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
+	err := u.d.statements.selectPreviousEventExists(u.txn, eventReference.EventID, eventReference.EventSHA256)
+	if err == nil {
+		return true, nil
+	}
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return false, err
+}
+
+func (u *roomRecentEventsUpdater) SetLatestEvents(roomNID types.RoomNID, latest []types.StateAtEventAndReference) error {
+	eventNIDs := make([]types.EventNID, len(latest))
+	for i := range latest {
+		eventNIDs[i] = latest[i].EventNID
+	}
+	return u.d.statements.updateLatestEventNIDs(u.txn, roomNID, eventNIDs)
+}
+
+func (u *roomRecentEventsUpdater) Commit() error {
+	return u.txn.Commit()
+}
+
+func (u *roomRecentEventsUpdater) Rollback() error {
+	return u.txn.Rollback()
+}

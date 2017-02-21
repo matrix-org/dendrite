@@ -34,6 +34,10 @@ type RoomEventDatabase interface {
 	AddState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
 	// Set the state at an event.
 	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error
+	// Lookup the latest events in a room in preparation for an update.
+	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
+	// If this returns an error then no further action is required.
+	GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, types.RoomRecentEventsUpdater, error)
 }
 
 func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
@@ -85,10 +89,12 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 		db.SetState(stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 	}
 
+	// Update the extremities of the event graph for the room
+	if err := updateLatestEvents(db, roomNID, stateAtEvent, event); err != nil {
+		return err
+	}
+
 	// TODO:
-	//  * Calcuate the state at the event if necessary.
-	//  * Store the state at the event.
-	//  * Update the extremities of the event graph for the room
 	//  * Caculate the new current state for the room if the forward extremities have changed.
 	//  * Work out the delta between the new current state and the previous current state.
 	//  * Work out the visibility of the event.
