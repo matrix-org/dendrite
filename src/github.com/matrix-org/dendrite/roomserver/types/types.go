@@ -79,6 +79,15 @@ func (s StateAtEvent) IsStateEvent() bool {
 	return s.EventStateKeyNID != 0
 }
 
+// StateAtEventAndReference is StateAtEvent and gomatrixserverlib.EventReference glued together.
+// It is used when looking up the latest events in a room in the database.
+// The gomatrixserverlib.EventReference is used to check whether a new event references the event.
+// The StateAtEvent is used to construct the current state of the room from the latest events.
+type StateAtEventAndReference struct {
+	StateAtEvent
+	gomatrixserverlib.EventReference
+}
+
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
 // It is when performing bulk event lookup in the database.
 type Event struct {
@@ -118,4 +127,25 @@ type StateBlockNIDList struct {
 type StateEntryList struct {
 	StateBlockNID StateBlockNID
 	StateEntries  []StateEntry
+}
+
+// A RoomRecentEventsUpdater is used to update the recent events in a room.
+// (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
+//  lock on the row holding the latest events for the room.)
+type RoomRecentEventsUpdater interface {
+	// Store the previous events referenced by an event.
+	// This adds the event NID to an entry in the database for each of the previous events.
+	// If there isn't an entry for one of previous events then an entry is created.
+	// If the entry already lists the event NID as a referrer then the entry unmodified.
+	// (i.e. the operation is idempotent)
+	StorePreviousEvents(eventNID EventNID, previousEventReferences []gomatrixserverlib.EventReference) error
+	// Check whether the eventReference is already referenced by another matrix event.
+	IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error)
+	// Set the list of latest events for the room.
+	// This replaces the current list stored in the database with the given list
+	SetLatestEvents(roomNID RoomNID, latest []StateAtEventAndReference) error
+	// Commit the transaction
+	Commit() error
+	// Rollback the transaction.
+	Rollback() error
 }
