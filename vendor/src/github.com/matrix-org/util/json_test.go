@@ -29,12 +29,26 @@ func TestMakeJSONAPI(t *testing.T) {
 		ExpectCode int
 		ExpectJSON string
 	}{
-		{nil, &HTTPError{nil, "Everything is broken", 500}, 500, `{"message":"Everything is broken"}`},         // Error return values
-		{nil, &HTTPError{nil, "Not here", 404}, 404, `{"message":"Not here"}`},                                 // With different status codes
-		{&MockResponse{"yep"}, nil, 200, `{"foo":"yep"}`},                                                      // Success return values
-		{[]MockResponse{{"yep"}, {"narp"}}, nil, 200, `[{"foo":"yep"},{"foo":"narp"}]`},                        // Top-level array success values
-		{[]byte(`actually bytes`), nil, 200, `actually bytes`},                                                 // raw []byte escape hatch
-		{func(cannotBe, marshalled string) {}, nil, 500, `{"message":"Failed to serialise response as JSON"}`}, // impossible marshal
+		// Error message return values
+		{nil, &HTTPError{nil, "Everything is broken", 500, nil}, 500, `{"message":"Everything is broken"}`},
+		// Error JSON return values
+		{nil, &HTTPError{nil, "Everything is broken", 500, struct {
+			Foo string `json:"foo"`
+		}{"yep"}}, 500, `{"foo":"yep"}`},
+		// Error JSON return values which fail to be marshalled should fallback to text
+		{nil, &HTTPError{nil, "Everything is broken", 500, struct {
+			Foo interface{} `json:"foo"`
+		}{func(cannotBe, marshalled string) {}}}, 500, `{"message":"Everything is broken"}`},
+		// With different status codes
+		{nil, &HTTPError{nil, "Not here", 404, nil}, 404, `{"message":"Not here"}`},
+		// Success return values
+		{&MockResponse{"yep"}, nil, 200, `{"foo":"yep"}`},
+		// Top-level array success values
+		{[]MockResponse{{"yep"}, {"narp"}}, nil, 200, `[{"foo":"yep"},{"foo":"narp"}]`},
+		// raw []byte escape hatch
+		{[]byte(`actually bytes`), nil, 200, `actually bytes`},
+		// impossible marshal
+		{func(cannotBe, marshalled string) {}, nil, 500, `{"message":"Failed to serialise response as JSON"}`},
 	}
 
 	for _, tst := range tests {
@@ -58,7 +72,7 @@ func TestMakeJSONAPI(t *testing.T) {
 func TestMakeJSONAPIRedirect(t *testing.T) {
 	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	mock := MockJSONRequestHandler{func(req *http.Request) (interface{}, *HTTPError) {
-		return nil, &HTTPError{nil, "https://matrix.org", 302}
+		return nil, &HTTPError{nil, "https://matrix.org", 302, nil}
 	}}
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	mockWriter := httptest.NewRecorder()

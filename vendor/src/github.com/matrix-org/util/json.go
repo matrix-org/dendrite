@@ -68,7 +68,10 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 					"Request panicked!\n%s", debug.Stack(),
 				)
 				jsonErrorResponse(
-					w, req, &HTTPError{nil, "Internal Server Error", 500},
+					w, req, &HTTPError{
+						Message: "Internal Server Error",
+						Code:    500,
+					},
 				)
 			}
 		}()
@@ -112,7 +115,10 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 		if !ok {
 			r, err := json.Marshal(res)
 			if err != nil {
-				jsonErrorResponse(w, req, &HTTPError{nil, "Failed to serialise response as JSON", 500})
+				jsonErrorResponse(w, req, &HTTPError{
+					Message: "Failed to serialise response as JSON",
+					Code:    500,
+				})
 				return
 			}
 			resBytes = r
@@ -135,9 +141,23 @@ func jsonErrorResponse(w http.ResponseWriter, req *http.Request, httpErr *HTTPEr
 
 	w.WriteHeader(httpErr.Code) // Set response code
 
-	r, err := json.Marshal(&JSONError{
-		Message: httpErr.Message,
-	})
+	var err error
+	var r []byte
+	if httpErr.JSON != nil {
+		r, err = json.Marshal(httpErr.JSON)
+		if err != nil {
+			// failed to marshal the supplied interface. Whine and fallback to the HTTP message.
+			logger.WithError(err).Error("Failed to marshal HTTPError.JSON")
+		}
+	}
+
+	// failed to marshal or no custom JSON was supplied, send message JSON.
+	if err != nil || httpErr.JSON == nil {
+		r, err = json.Marshal(&JSONError{
+			Message: httpErr.Message,
+		})
+	}
+
 	if err != nil {
 		// We should never fail to marshal the JSON error response, but in this event just skip
 		// marshalling altogether
