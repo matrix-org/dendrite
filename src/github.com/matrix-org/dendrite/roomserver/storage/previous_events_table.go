@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS previous_events (
 	previous_reference_sha256 BYTEA NOT NULL,
 	-- A list of numeric event IDs of events that reference this prev_event.
 	event_nids BIGINT[] NOT NULL,
-	CONSTRAINT previous_event_id_unique UNIQUE (region_nid, prev_event_id, prev_reference_sha256)
+	CONSTRAINT previous_event_id_unique UNIQUE (previous_event_id, previous_reference_sha256)
 );
 `
 
@@ -27,12 +27,12 @@ CREATE TABLE IF NOT EXISTS previous_events (
 // This should only be modified while holding a "FOR UPDATE" lock on the row in the rooms table for this room.
 // The lock is necessary to avoid data races when checking whether an event is already referenced by another event.
 const insertPreviousEventSQL = "" +
-	"INSERT INTO previous_events VALUES" +
+	"INSERT INTO previous_events" +
 	" (previous_event_id, previous_reference_sha256, event_nids)" +
-	" VALUES ($1, $2, array_append('{}', $3))" +
+	" VALUES ($1, $2, array_append('{}'::bigint[], $3))" +
 	" ON CONFLICT ON CONSTRAINT previous_event_id_unique" +
 	" DO UPDATE SET event_nids = array_append(previous_events.event_nids, $3)" +
-	" WHERE $3 != ANY(previous_events.event_nids)"
+	" WHERE $3 != ALL(previous_events.event_nids)"
 
 // Check if the event is referenced by another event in the table.
 // This should only be done while holding a "FOR UPDATE" lock on the row in the rooms table for this room.
@@ -46,7 +46,7 @@ type previousEventStatements struct {
 }
 
 func (s *previousEventStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(eventsSchema)
+	_, err = db.Exec(previousEventSchema)
 	if err != nil {
 		return
 	}
