@@ -134,6 +134,10 @@ type StateEntryList struct {
 //  lock on the row holding the latest events for the room.)
 type RoomRecentEventsUpdater interface {
 	// Store the previous events referenced by an event.
+	// This adds the event NID to an entry in the database for each of the previous events.
+	// If there isn't an entry for one of previous events then an entry is created.
+	// If the entry already lists the event NID as a referrer then the entry unmodified.
+	// (i.e. the operation is idempotent)
 	StorePreviousEvents(eventNID EventNID, previousEventReferences []gomatrixserverlib.EventReference) error
 	// Check whether the eventReference is already referenced by another matrix event.
 	IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error)
