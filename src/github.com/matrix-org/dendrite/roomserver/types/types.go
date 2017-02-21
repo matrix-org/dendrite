@@ -79,7 +79,10 @@ func (s StateAtEvent) IsStateEvent() bool {
 	return s.EventStateKeyNID != 0
 }
 
-// StateAtEventAndReference ...
+// StateAtEventAndReference is StateAtEvent and gomatrixserverlib.EventReference glued together.
+// It is used when looking up the latest events in a room in the database.
+// The gomatrixserverlib.EventReference is used to check whether a new event references the event.
+// The StateAtEvent is used to construct the current state of the room from the latest events.
 type StateAtEventAndReference struct {
 	StateAtEvent
 	gomatrixserverlib.EventReference
