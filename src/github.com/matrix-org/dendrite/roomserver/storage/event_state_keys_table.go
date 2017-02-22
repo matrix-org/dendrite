@@ -31,8 +31,7 @@ INSERT INTO event_state_keys (event_state_key_nid, event_state_key) VALUES
 const insertEventStateKeyNIDSQL = "" +
 	"INSERT INTO event_state_keys (event_state_key) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT event_state_key_unique" +
-	" DO UPDATE SET event_state_key = $1" +
-	" RETURNING (event_state_key_nid)"
+	" DO NOTHING RETURNING (event_state_key_nid)"
 
 const selectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key_nid FROM event_state_keys WHERE event_state_key = $1"
