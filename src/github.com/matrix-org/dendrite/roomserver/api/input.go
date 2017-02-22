@@ -1,6 +1,10 @@
 // Package api provides the types that are used to communicate with the roomserver.
 package api
 
+import (
+	"encoding/json"
+)
+
 const (
 	// KindOutlier event fall outside the contiguous event graph.
 	// We do not have the state for these events.
@@ -36,7 +40,51 @@ type InputRoomEvent struct {
 	// For example many matrix events forget to reference the m.room.create event even though it is needed for auth.
 	// (since synapse allows this to happen we have to allow it as well.)
 	AuthEventIDs []string
+	// Whether the state is supplied as a list of event IDs or whether it
+	// should be derived from the state at the previous events.
+	HasState bool
 	// Optional list of state event IDs forming the state before this event.
 	// These state events must have already been persisted.
 	StateEventIDs []string
+}
+
+// UnmarshalJSON implements json.Unmarshaller
+func (ire *InputRoomEvent) UnmarshalJSON(data []byte) error {
+	var content struct {
+		Kind          int
+		Event         *json.RawMessage
+		AuthEventIDs  []string
+		StateEventIDs []string
+		HasState      bool
+	}
+	if err := json.Unmarshal(data, &content); err != nil {
+		return err
+	}
+	ire.Kind = content.Kind
+	ire.AuthEventIDs = content.AuthEventIDs
+	ire.StateEventIDs = content.StateEventIDs
+	ire.HasState = content.HasState
+	if content.Event != nil {
+		ire.Event = []byte(*content.Event)
+	}
+	return nil
+}
+
+// MarshalJSON implements json.Marshaller
+func (ire InputRoomEvent) MarshalJSON() ([]byte, error) {
+	event := json.RawMessage(ire.Event)
+	content := struct {
+		Kind          int
+		Event         *json.RawMessage
+		AuthEventIDs  []string
+		StateEventIDs []string
+		HasState      bool
+	}{
+		Kind:          ire.Kind,
+		AuthEventIDs:  ire.AuthEventIDs,
+		StateEventIDs: ire.StateEventIDs,
+		Event:         &event,
+		HasState:      ire.HasState,
+	}
+	return json.Marshal(&content)
 }
