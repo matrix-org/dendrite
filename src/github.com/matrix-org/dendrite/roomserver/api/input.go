@@ -45,6 +45,8 @@ type InputRoomEvent struct {
 	HasState bool
 	// Optional list of state event IDs forming the state before this event.
 	// These state events must have already been persisted.
+	// These are only used if HasState is true.
+	// The list can be empty, for example when storing a m.room.create event.
 	StateEventIDs []string
 }
 
@@ -52,6 +54,8 @@ type InputRoomEvent struct {
 func (ire *InputRoomEvent) UnmarshalJSON(data []byte) error {
 	// Create a struct rather than unmarshalling directly into the InputRoomEvent
 	// so that we can use json.RawMessage.
+	// We use json.RawMessage so that the event JSON is sent as JSON rather than
+	// being base64 encoded which is the default for []byte.
 	var content struct {
 		Kind          int
 		Event         *json.RawMessage
@@ -76,6 +80,8 @@ func (ire *InputRoomEvent) UnmarshalJSON(data []byte) error {
 func (ire InputRoomEvent) MarshalJSON() ([]byte, error) {
 	// Create a struct rather than marshalling directly from the InputRoomEvent
 	// so that we can use json.RawMessage.
+	// We use json.RawMessage so that the event JSON is sent as JSON rather than
+	// being base64 encoded which is the default for []byte.
 	event := json.RawMessage(ire.Event)
 	content := struct {
 		Kind          int
