@@ -88,7 +88,8 @@ func doUpdateLatestEvents(
 	}
 
 	if !alreadyReferenced && !alreadyInLatest {
-		// This event is not referenced by any of the events in the room.
+		// This event is not referenced by any of the events in the room
+		// and the event is not already in the latest events.
 		// Add it to the latest events
 		newLatest = append(newLatest, types.StateAtEventAndReference{
 			StateAtEvent:   stateAtEvent,
