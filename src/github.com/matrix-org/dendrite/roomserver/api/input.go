@@ -46,7 +46,7 @@ type InputRoomEvent struct {
 	// Optional list of state event IDs forming the state before this event.
 	// These state events must have already been persisted.
 	// These are only used if HasState is true.
-	// The list can be empty, for example when storing a m.room.create event.
+	// The list can be empty, for example when storing the first event in a room.
 	StateEventIDs []string
 }
 
