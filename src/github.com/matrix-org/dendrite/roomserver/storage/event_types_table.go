@@ -51,8 +51,8 @@ INSERT INTO event_types (event_type_nid, event_type) VALUES
 // We use `RETURNING` to tell postgres to return the assigned ID.
 // But it's possible that the type was added in a query that raced with us.
 // This will result in a conflict on the event_type_unique constraint, in this
-// case we do nothing and rely on the caller to
-// postgres won't return anything unless we touch a row in the table.
+// case we do nothing. Postgresql won't return a row in that case so we rely on
+// the caller catching the sql.ErrNoRows error and running a select to get the row.
 const insertEventTypeNIDSQL = "" +
 	"INSERT INTO event_types (event_type) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT event_type_unique" +
