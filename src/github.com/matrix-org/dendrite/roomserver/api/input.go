@@ -50,6 +50,8 @@ type InputRoomEvent struct {
 
 // UnmarshalJSON implements json.Unmarshaller
 func (ire *InputRoomEvent) UnmarshalJSON(data []byte) error {
+	// Create a struct rather than unmarshalling directly into the InputRoomEvent
+	// so that we can use json.RawMessage.
 	var content struct {
 		Kind          int
 		Event         *json.RawMessage
@@ -72,6 +74,8 @@ func (ire *InputRoomEvent) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements json.Marshaller
 func (ire InputRoomEvent) MarshalJSON() ([]byte, error) {
+	// Create a struct rather than marshalling directly from the InputRoomEvent
+	// so that we can use json.RawMessage.
 	event := json.RawMessage(ire.Event)
 	content := struct {
 		Kind          int
