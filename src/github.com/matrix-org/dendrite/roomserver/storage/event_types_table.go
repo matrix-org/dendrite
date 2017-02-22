@@ -54,8 +54,10 @@ INSERT INTO event_types (event_type_nid, event_type) VALUES
 // case we do nothing. Postgresql won't return a row in that case so we rely on
 // the caller catching the sql.ErrNoRows error and running a select to get the row.
 // We could get postgresql to return the row on a conflict by updating the row
-// but it doesn't seem like a good idea to modify the rows just to make postgres
-// return it.
+// but it doesn't seem like a good idea to modify the rows just to make postgresql
+// return it. Modifying the rows will cause postgres to assign a new tuple for the
+// row even though the data doesn't change resulting in unncesssary modifications
+// to the indexes.
 const insertEventTypeNIDSQL = "" +
 	"INSERT INTO event_types (event_type) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT event_type_unique" +
