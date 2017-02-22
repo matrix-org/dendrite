@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     -- The most recent events in the room that aren't referenced by another event.
     -- This list may empty if the server hasn't joined the room yet.
     -- (The server will be in that state while it stores the events for the initial state of the room)
-    latest_event_nids BIGINT[] NOT NULL
+    latest_event_nids BIGINT[] NOT NULL DEFAULT '{}'::BIGINT[]
 );
 `
 
@@ -24,8 +24,7 @@ CREATE TABLE IF NOT EXISTS rooms (
 const insertRoomNIDSQL = "" +
 	"INSERT INTO rooms (room_id) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT room_id_unique" +
-	" DO UPDATE SET room_id = $1" +
-	" RETURNING (room_nid)"
+	" DO NOTHING RETURNING (room_nid)"
 
 const selectRoomNIDSQL = "" +
 	"SELECT room_nid FROM rooms WHERE room_id = $1"

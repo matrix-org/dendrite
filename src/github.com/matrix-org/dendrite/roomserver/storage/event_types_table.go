@@ -50,14 +50,13 @@ INSERT INTO event_types (event_type_nid, event_type) VALUES
 // In that case the ID will be assigned using the next value from the sequence.
 // We use `RETURNING` to tell postgres to return the assigned ID.
 // But it's possible that the type was added in a query that raced with us.
-// This will result in a conflict on the event_type_unique constraint.
-// We peform a update that does nothing rather that doing nothing at all because
+// This will result in a conflict on the event_type_unique constraint, in this
+// case we do nothing and rely on the caller to
 // postgres won't return anything unless we touch a row in the table.
 const insertEventTypeNIDSQL = "" +
 	"INSERT INTO event_types (event_type) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT event_type_unique" +
-	" DO UPDATE SET event_type = $1" +
-	" RETURNING (event_type_nid)"
+	" DO NOTHING RETURNING (event_type_nid)"
 
 const selectEventTypeNIDSQL = "" +
 	"SELECT event_type_nid FROM event_types WHERE event_type = $1"

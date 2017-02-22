@@ -73,7 +73,13 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []typ
 		event.EventReference().EventSHA256,
 		authEventNIDs,
 	); err != nil {
-		return 0, types.StateAtEvent{}, err
+		if err == sql.ErrNoRows {
+			// We've already inserted the event so select the numeric event ID
+			eventNID, stateNID, err = d.statements.selectEvent(event.EventID())
+		}
+		if err != nil {
+			return 0, types.StateAtEvent{}, err
+		}
 	}
 
 	if err = d.statements.insertEventJSON(eventNID, event.JSON()); err != nil {
@@ -97,12 +103,13 @@ func (d *Database) assignRoomNID(roomID string) (types.RoomNID, error) {
 	roomNID, err := d.statements.selectRoomNID(roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		return d.statements.insertRoomNID(roomID)
+		roomNID, err = d.statements.insertRoomNID(roomID)
+		if err == sql.ErrNoRows {
+			// We raced with another insert so run the select again.
+			roomNID, err = d.statements.selectRoomNID(roomID)
+		}
 	}
-	if err != nil {
-		return 0, err
-	}
-	return roomNID, nil
+	return roomNID, err
 }
 
 func (d *Database) assignEventTypeNID(eventType string) (types.EventTypeNID, error) {
@@ -110,12 +117,13 @@ func (d *Database) assignEventTypeNID(eventType string) (types.EventTypeNID, err
 	eventTypeNID, err := d.statements.selectEventTypeNID(eventType)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		return d.statements.insertEventTypeNID(eventType)
+		eventTypeNID, err = d.statements.insertEventTypeNID(eventType)
+		if err == sql.ErrNoRows {
+			// We raced with another insert so run the select again.
+			eventTypeNID, err = d.statements.selectEventTypeNID(eventType)
+		}
 	}
-	if err != nil {
-		return 0, err
-	}
-	return eventTypeNID, nil
+	return eventTypeNID, err
 }
 
 func (d *Database) assignStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
@@ -123,12 +131,13 @@ func (d *Database) assignStateKeyNID(eventStateKey string) (types.EventStateKeyN
 	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(eventStateKey)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		return d.statements.insertEventStateKeyNID(eventStateKey)
+		eventStateKeyNID, err = d.statements.insertEventStateKeyNID(eventStateKey)
+		if err == sql.ErrNoRows {
+			// We raced with another insert so run the select again.
+			eventStateKeyNID, err = d.statements.selectEventStateKeyNID(eventStateKey)
+		}
 	}
-	if err != nil {
-		return 0, err
-	}
-	return eventStateKeyNID, nil
+	return eventStateKeyNID, err
 }
 
 // StateEntriesForEventIDs implements input.EventDatabase
