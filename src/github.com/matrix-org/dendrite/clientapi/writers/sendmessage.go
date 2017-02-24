@@ -7,11 +7,8 @@ import (
 )
 
 // SendMessage implements /rooms/{roomID}/send/{eventType}
-func SendMessage(req *http.Request, roomID, eventType string) (interface{}, *util.HTTPError) {
+func SendMessage(req *http.Request, roomID, eventType string) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	logger.WithField("roomID", roomID).WithField("eventType", eventType).Info("Doing stuff...")
-	return nil, &util.HTTPError{
-		Code:    404,
-		Message: "Not implemented yet",
-	}
+	return util.MessageResponse(404, "Not implemented yet")
 }
