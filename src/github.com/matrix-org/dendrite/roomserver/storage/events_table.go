@@ -47,8 +47,11 @@ const insertEventSQL = "" +
 	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT ON CONSTRAINT event_id_unique" +
-	" DO UPDATE SET event_id = $1" +
+	" DO NOTHING" +
 	" RETURNING event_nid, state_snapshot_nid"
+
+const selectEventSQL = "" +
+	"SELECT event_nid, state_snapshot_nid FROM events WHERE event_id = $1"
 
 // Bulk lookup of events by string ID.
 // Sort by the numeric IDs for event type and state key.
@@ -71,6 +74,7 @@ const bulkSelectStateAtEventAndReferenceSQL = "" +
 
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
+	selectEventStmt                        *sql.Stmt
 	bulkSelectStateEventByIDStmt           *sql.Stmt
 	bulkSelectStateAtEventByIDStmt         *sql.Stmt
 	updateEventStateStmt                   *sql.Stmt
@@ -83,6 +87,9 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
+		return
+	}
+	if s.selectEventStmt, err = db.Prepare(selectEventSQL); err != nil {
 		return
 	}
 	if s.bulkSelectStateEventByIDStmt, err = db.Prepare(bulkSelectStateEventByIDSQL); err != nil {
@@ -119,6 +126,13 @@ func (s *eventStatements) insertEvent(
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
+func (s *eventStatements) selectEvent(eventID string) (types.EventNID, types.StateSnapshotNID, error) {
+	var eventNID int64
+	var stateNID int64
+	err := s.selectEventStmt.QueryRow(eventID).Scan(&eventNID, &stateNID)
+	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
+}
+
 func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateEntry, error) {
 	rows, err := s.bulkSelectStateEventByIDStmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
@@ -134,9 +148,9 @@ func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.S
 	for ; rows.Next(); i++ {
 		result := &results[i]
 		if err = rows.Scan(
-			&result.EventNID,
 			&result.EventTypeNID,
 			&result.EventStateKeyNID,
+			&result.EventNID,
 		); err != nil {
 			return nil, err
 		}
@@ -163,9 +177,9 @@ func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types
 	for ; rows.Next(); i++ {
 		result := &results[i]
 		if err = rows.Scan(
-			&result.EventNID,
 			&result.EventTypeNID,
 			&result.EventStateKeyNID,
+			&result.EventNID,
 			&result.BeforeStateSnapshotNID,
 		); err != nil {
 			return nil, err

@@ -69,7 +69,7 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		if input.StateEventIDs != nil {
+		if input.HasState {
 			// We've been told what the state at the event is so we don't need to calculate it.
 			// Check that those state events are in the database and store the state.
 			entries, err := db.StateEntriesForEventIDs(input.StateEventIDs)
@@ -89,6 +89,11 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 		db.SetState(stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 	}
 
+	if input.Kind == api.KindBackfill {
+		// Backfill is not implemented.
+		panic("Not implemented")
+	}
+
 	// Update the extremities of the event graph for the room
 	if err := updateLatestEvents(db, roomNID, stateAtEvent, event); err != nil {
 		return err
@@ -102,5 +107,5 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 	//      - The event itself
 	//      - The visiblity of the event, i.e. who is allowed to see the event.
 	//      - The changes to the current state of the room.
-	panic("Not implemented")
+	return nil
 }
