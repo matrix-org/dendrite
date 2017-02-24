@@ -40,7 +40,9 @@ type RoomEventDatabase interface {
 	GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, string, types.RoomRecentEventsUpdater, error)
 }
 
+// OutputRoomEventWriter has the APIs needed to write an event to the output logs.
 type OutputRoomEventWriter interface {
+	// Write an event.
 	WriteOutputRoomEvent(output api.OutputRoomEvent) error
 }
 

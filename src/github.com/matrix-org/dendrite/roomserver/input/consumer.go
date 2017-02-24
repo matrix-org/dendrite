@@ -47,6 +47,7 @@ type Consumer struct {
 	ErrorLogger ErrorLogger
 }
 
+// WriteOutputRoomEvent implements OutputRoomEventWriter
 func (c *Consumer) WriteOutputRoomEvent(output api.OutputRoomEvent) error {
 	var m sarama.ProducerMessage
 	value, err := json.Marshal(output)
