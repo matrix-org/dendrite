@@ -34,13 +34,30 @@ type Consumer struct {
 	// But any equivalent event streaming protocol could be made to implement the same interface.
 	Consumer sarama.Consumer
 	// The database used to store the room events.
-	DB ConsumerDatabase
+	DB       ConsumerDatabase
+	Producer sarama.SyncProducer
 	// The kafkaesque topic to consume room events from.
 	// This is the name used in kafka to identify the stream to consume events from.
-	RoomEventTopic string
+	InputRoomEventTopic string
+	// The kafkaesque topic to output new room events to.
+	// This is the name used in kafka to identify the stream to write events to.
+	OutputRoomEventTopic string
 	// The ErrorLogger for this consumer.
 	// If left as nil then the consumer will panic when it encounters an error
 	ErrorLogger ErrorLogger
+}
+
+func (c *Consumer) WriteOutputRoomEvent(output api.OutputRoomEvent) error {
+	var m sarama.ProducerMessage
+	value, err := json.Marshal(output)
+	if err != nil {
+		return err
+	}
+	m.Topic = c.OutputRoomEventTopic
+	m.Key = sarama.StringEncoder("")
+	m.Value = sarama.ByteEncoder(value)
+	_, _, err = c.Producer.SendMessage(&m)
+	return err
 }
 
 // Start starts the consumer consuming.
@@ -50,7 +67,7 @@ type Consumer struct {
 func (c *Consumer) Start() error {
 	offsets := map[int32]int64{}
 
-	partitions, err := c.Consumer.Partitions(c.RoomEventTopic)
+	partitions, err := c.Consumer.Partitions(c.InputRoomEventTopic)
 	if err != nil {
 		return err
 	}
@@ -59,7 +76,7 @@ func (c *Consumer) Start() error {
 		offsets[partition] = sarama.OffsetOldest
 	}
 
-	storedOffsets, err := c.DB.PartitionOffsets(c.RoomEventTopic)
+	storedOffsets, err := c.DB.PartitionOffsets(c.InputRoomEventTopic)
 	if err != nil {
 		return err
 	}
@@ -70,7 +87,7 @@ func (c *Consumer) Start() error {
 
 	var partitionConsumers []sarama.PartitionConsumer
 	for partition, offset := range offsets {
-		pc, err := c.Consumer.ConsumePartition(c.RoomEventTopic, partition, offset)
+		pc, err := c.Consumer.ConsumePartition(c.InputRoomEventTopic, partition, offset)
 		if err != nil {
 			for _, p := range partitionConsumers {
 				p.Close()
@@ -95,7 +112,7 @@ func (c *Consumer) consumePartition(pc sarama.PartitionConsumer) {
 			// If the message is invalid then log it and move onto the next message in the stream.
 			c.logError(message, err)
 		} else {
-			if err := processRoomEvent(c.DB, input); err != nil {
+			if err := processRoomEvent(c.DB, c, input); err != nil {
 				// If there was an error processing the message then log it and
 				// move onto the next message in the stream.
 				// TODO: If the error was due to a problem talking to the database
@@ -105,7 +122,7 @@ func (c *Consumer) consumePartition(pc sarama.PartitionConsumer) {
 			}
 		}
 		// Advance our position in the stream so that we will start at the right position after a restart.
-		if err := c.DB.SetPartitionOffset(c.RoomEventTopic, message.Partition, message.Offset); err != nil {
+		if err := c.DB.SetPartitionOffset(c.InputRoomEventTopic, message.Partition, message.Offset); err != nil {
 			c.logError(message, err)
 		}
 	}

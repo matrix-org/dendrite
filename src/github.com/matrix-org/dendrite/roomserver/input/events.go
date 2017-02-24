@@ -40,7 +40,11 @@ type RoomEventDatabase interface {
 	GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, string, types.RoomRecentEventsUpdater, error)
 }
 
-func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
+type OutputRoomEventWriter interface {
+	WriteOutputRoomEvent(output api.OutputRoomEvent) error
+}
+
+func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.InputRoomEvent) error {
 	// Parse and validate the event JSON
 	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(input.Event)
 	if err != nil {
@@ -95,7 +99,7 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 	}
 
 	// Update the extremities of the event graph for the room
-	if err := updateLatestEvents(db, roomNID, stateAtEvent, event); err != nil {
+	if err := updateLatestEvents(db, ow, roomNID, stateAtEvent, event); err != nil {
 		return err
 	}
 

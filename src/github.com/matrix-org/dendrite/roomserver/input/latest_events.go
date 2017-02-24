@@ -2,6 +2,7 @@ package input
 
 import (
 	"bytes"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -22,7 +23,7 @@ import (
 //      7 <----- latest
 //
 func updateLatestEvents(
-	db RoomEventDatabase, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	db RoomEventDatabase, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) (err error) {
 	oldLatest, lastEventIDSent, updater, err := db.GetLatestEventsForUpdate(roomNID)
 	if err != nil {
@@ -42,12 +43,12 @@ func updateLatestEvents(
 		}
 	}()
 
-	err = doUpdateLatestEvents(updater, oldLatest, lastEventIDSent, roomNID, stateAtEvent, event)
+	err = doUpdateLatestEvents(updater, ow, oldLatest, lastEventIDSent, roomNID, stateAtEvent, event)
 	return
 }
 
 func doUpdateLatestEvents(
-	updater types.RoomRecentEventsUpdater, oldLatest []types.StateAtEventAndReference, lastEventIDSent string, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	updater types.RoomRecentEventsUpdater, ow OutputRoomEventWriter, oldLatest []types.StateAtEventAndReference, lastEventIDSent string, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) error {
 	var err error
 	var prevEvents []gomatrixserverlib.EventReference
@@ -76,7 +77,11 @@ func doUpdateLatestEvents(
 		StateAtEvent:   stateAtEvent,
 	})
 
-	// TODO: Send the event to the output logs.
+	// Send the event to the output logs.
+	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
+	if err = writeEvent(ow, lastEventIDSent, event, newLatest); err != nil {
+		return err
+	}
 
 	if err = updater.SetLatestEvents(roomNID, newLatest, stateAtEvent.EventNID); err != nil {
 		return err
@@ -120,4 +125,18 @@ func calculateLatest(oldLatest []types.StateAtEventAndReference, alreadyReferenc
 	}
 
 	return newLatest
+}
+
+func writeEvent(ow OutputRoomEventWriter, lastEventIDSent string, event gomatrixserverlib.Event, latest []types.StateAtEventAndReference) error {
+
+	latestEventIDs := make([]string, len(latest))
+	for i := range latest {
+		latestEventIDs[i] = latest[i].EventID
+	}
+
+	return ow.WriteOutputRoomEvent(api.OutputRoomEvent{
+		Event:           event.JSON(),
+		LastSentEventID: lastEventIDSent,
+		LatestEventIDs:  latestEventIDs,
+	})
 }
