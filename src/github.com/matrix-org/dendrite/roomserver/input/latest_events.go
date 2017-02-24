@@ -24,7 +24,7 @@ import (
 func updateLatestEvents(
 	db RoomEventDatabase, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) (err error) {
-	oldLatest, updater, err := db.GetLatestEventsForUpdate(roomNID)
+	oldLatest, lastEventIDSent, updater, err := db.GetLatestEventsForUpdate(roomNID)
 	if err != nil {
 		return
 	}
@@ -42,22 +42,54 @@ func updateLatestEvents(
 		}
 	}()
 
-	err = doUpdateLatestEvents(updater, oldLatest, roomNID, stateAtEvent, event)
+	err = doUpdateLatestEvents(updater, oldLatest, lastEventIDSent, roomNID, stateAtEvent, event)
 	return
 }
 
 func doUpdateLatestEvents(
-	updater types.RoomRecentEventsUpdater, oldLatest []types.StateAtEventAndReference, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	updater types.RoomRecentEventsUpdater, oldLatest []types.StateAtEventAndReference, lastEventIDSent string, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) error {
 	var err error
 	var prevEvents []gomatrixserverlib.EventReference
 	prevEvents = event.PrevEvents()
 
+	if hasBeenSent, err := updater.HasEventBeenSent(stateAtEvent.EventNID); err != nil {
+		return err
+	} else if hasBeenSent {
+		// Already sent this event so we can stop processing
+		return nil
+	}
+
 	if err = updater.StorePreviousEvents(stateAtEvent.EventNID, prevEvents); err != nil {
 		return err
 	}
 
-	// Check if this event references any of the latest events in the room.
+	eventReference := event.EventReference()
+	// Check if this event is already referenced by another event in the room.
+	var alreadyReferenced bool
+	if alreadyReferenced, err = updater.IsReferenced(eventReference); err != nil {
+		return err
+	}
+
+	newLatest := calculateLatest(oldLatest, alreadyReferenced, prevEvents, types.StateAtEventAndReference{
+		EventReference: eventReference,
+		StateAtEvent:   stateAtEvent,
+	})
+
+	// TODO: Send the event to the output logs.
+
+	if err = updater.SetLatestEvents(roomNID, newLatest, stateAtEvent.EventNID); err != nil {
+		return err
+	}
+
+	if err = updater.MarkEventAsSent(stateAtEvent.EventNID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func calculateLatest(oldLatest []types.StateAtEventAndReference, alreadyReferenced bool, prevEvents []gomatrixserverlib.EventReference, newEvent types.StateAtEventAndReference) []types.StateAtEventAndReference {
 	var alreadyInLatest bool
 	var newLatest []types.StateAtEventAndReference
 	for _, l := range oldLatest {
@@ -71,7 +103,7 @@ func doUpdateLatestEvents(
 				break
 			}
 		}
-		if l.EventNID == stateAtEvent.EventNID {
+		if l.EventNID == newEvent.EventNID {
 			alreadyInLatest = true
 		}
 		if keep {
@@ -80,26 +112,12 @@ func doUpdateLatestEvents(
 		}
 	}
 
-	eventReference := event.EventReference()
-	// Check if this event is already referenced by another event in the room.
-	var alreadyReferenced bool
-	if alreadyReferenced, err = updater.IsReferenced(eventReference); err != nil {
-		return err
-	}
-
 	if !alreadyReferenced && !alreadyInLatest {
 		// This event is not referenced by any of the events in the room
 		// and the event is not already in the latest events.
 		// Add it to the latest events
-		newLatest = append(newLatest, types.StateAtEventAndReference{
-			StateAtEvent:   stateAtEvent,
-			EventReference: eventReference,
-		})
+		newLatest = append(newLatest, newEvent)
 	}
 
-	if err = updater.SetLatestEvents(roomNID, newLatest); err != nil {
-		return err
-	}
-
-	return nil
+	return newLatest
 }

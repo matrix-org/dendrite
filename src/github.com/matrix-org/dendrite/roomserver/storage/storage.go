@@ -206,22 +206,30 @@ func (d *Database) StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.S
 }
 
 // GetLatestEventsForUpdate implements input.EventDatabase
-func (d *Database) GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, types.RoomRecentEventsUpdater, error) {
+func (d *Database) GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, string, types.RoomRecentEventsUpdater, error) {
 	txn, err := d.db.Begin()
 	if err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
-	eventNIDs, err := d.statements.selectLatestEventsNIDsForUpdate(txn, roomNID)
+	eventNIDs, lastEventNIDSent, err := d.statements.selectLatestEventsNIDsForUpdate(txn, roomNID)
 	if err != nil {
 		txn.Rollback()
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	stateAndRefs, err := d.statements.bulkSelectStateAtEventAndReference(txn, eventNIDs)
 	if err != nil {
 		txn.Rollback()
-		return nil, nil, err
+		return nil, "", nil, err
 	}
-	return stateAndRefs, &roomRecentEventsUpdater{txn, d}, nil
+	var lastEventIDSent string
+	if lastEventNIDSent != 0 {
+		lastEventIDSent, err = d.statements.selectEventID(txn, lastEventNIDSent)
+		if err != nil {
+			txn.Rollback()
+			return nil, "", nil, err
+		}
+	}
+	return stateAndRefs, lastEventIDSent, &roomRecentEventsUpdater{txn, d}, nil
 }
 
 type roomRecentEventsUpdater struct {
@@ -249,12 +257,20 @@ func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.
 	return false, err
 }
 
-func (u *roomRecentEventsUpdater) SetLatestEvents(roomNID types.RoomNID, latest []types.StateAtEventAndReference) error {
+func (u *roomRecentEventsUpdater) SetLatestEvents(roomNID types.RoomNID, latest []types.StateAtEventAndReference, lastEventNIDSent types.EventNID) error {
 	eventNIDs := make([]types.EventNID, len(latest))
 	for i := range latest {
 		eventNIDs[i] = latest[i].EventNID
 	}
-	return u.d.statements.updateLatestEventNIDs(u.txn, roomNID, eventNIDs)
+	return u.d.statements.updateLatestEventNIDs(u.txn, roomNID, eventNIDs, lastEventNIDSent)
+}
+
+func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (bool, error) {
+	return u.d.statements.selectEventSentToOutput(u.txn, eventNID)
+}
+
+func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
+	return u.d.statements.updateEventSentToOutput(u.txn, eventNID)
 }
 
 func (u *roomRecentEventsUpdater) Commit() error {
