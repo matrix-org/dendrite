@@ -17,11 +17,11 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(servMux *http.ServeMux, httpClient *http.Client) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-	r0mux.Handle("/sync", make("sync", wrap(func(req *http.Request) (interface{}, *util.HTTPError) {
+	r0mux.Handle("/sync", make("sync", wrap(func(req *http.Request) util.JSONResponse {
 		return readers.Sync(req)
 	})))
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
-		make("send_message", wrap(func(req *http.Request) (interface{}, *util.HTTPError) {
+		make("send_message", wrap(func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return writers.SendMessage(req, vars["roomID"], vars["eventType"])
 		})),
@@ -38,12 +38,12 @@ func make(metricsName string, h util.JSONRequestHandler) http.Handler {
 
 // jsonRequestHandlerWrapper is a wrapper to allow in-line functions to conform to util.JSONRequestHandler
 type jsonRequestHandlerWrapper struct {
-	function func(req *http.Request) (interface{}, *util.HTTPError)
+	function func(req *http.Request) util.JSONResponse
 }
 
-func (r *jsonRequestHandlerWrapper) OnIncomingRequest(req *http.Request) (interface{}, *util.HTTPError) {
+func (r *jsonRequestHandlerWrapper) OnIncomingRequest(req *http.Request) util.JSONResponse {
 	return r.function(req)
 }
-func wrap(f func(req *http.Request) (interface{}, *util.HTTPError)) *jsonRequestHandlerWrapper {
+func wrap(f func(req *http.Request) util.JSONResponse) *jsonRequestHandlerWrapper {
 	return &jsonRequestHandlerWrapper{f}
 }

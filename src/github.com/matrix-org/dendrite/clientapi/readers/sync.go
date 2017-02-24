@@ -8,19 +8,16 @@ import (
 )
 
 // Sync implements /sync
-func Sync(req *http.Request) (interface{}, *util.HTTPError) {
+func Sync(req *http.Request) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID, err := auth.VerifyAccessToken(req)
 	if err != nil {
-		return nil, &util.HTTPError{
+		return util.JSONResponse{
 			Code: 403,
 			JSON: err,
 		}
 	}
 
 	logger.WithField("userID", userID).Info("Doing stuff...")
-	return nil, &util.HTTPError{
-		Code:    404,
-		Message: "Not implemented yet",
-	}
+	return util.MessageResponse(404, "Not implemented yet")
 }
