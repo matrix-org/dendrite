@@ -6,16 +6,23 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/util"
 )
 
 // VerifyAccessToken verifies that an access token was supplied in the given HTTP request
-// and returns the user ID it corresponds to. Returns an error if there is no access token
-// or the token is invalid.
-func VerifyAccessToken(req *http.Request) (userID string, err error) {
-	_, tokenErr := extractAccessToken(req)
+// and returns the user ID it corresponds to. Returns err if there was a fatal problem checking
+// the token. Returns resErr (an error response which can be sent to the client) if the token is invalid.
+func VerifyAccessToken(req *http.Request) (userID string, resErr *util.JSONResponse, err error) {
+	token, tokenErr := extractAccessToken(req)
 	if tokenErr != nil {
-		err = jsonerror.MissingToken(tokenErr.Error())
+		resErr = &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.MissingToken(tokenErr.Error()),
+		}
 		return
+	}
+	if token == "fail" {
+		err = fmt.Errorf("Fatal error")
 	}
 	// TODO: Check the token against the database
 	return
