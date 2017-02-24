@@ -3,7 +3,6 @@ package util
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"net/http"
 	"runtime/debug"
@@ -12,46 +11,51 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-// contextKeys is a type alias for string to namespace Context keys per-package.
-type contextKeys string
-
-// ctxValueRequestID is the key to extract the request ID for an HTTP request
-const ctxValueRequestID = contextKeys("requestid")
-
-// GetRequestID returns the request ID associated with this context, or the empty string
-// if one is not associated with this context.
-func GetRequestID(ctx context.Context) string {
-	id := ctx.Value(ctxValueRequestID)
-	if id == nil {
-		return ""
-	}
-	return id.(string)
+// JSONResponse represents an HTTP response which contains a JSON body.
+type JSONResponse struct {
+	// HTTP status code.
+	Code int
+	// JSON represents the JSON that should be serialized and sent to the client
+	JSON interface{}
+	// Headers represent any headers that should be sent to the client
+	Headers map[string]string
 }
 
-// ctxValueLogger is the key to extract the logrus Logger.
-const ctxValueLogger = contextKeys("logger")
+// Is2xx returns true if the Code is between 200 and 299.
+func (r JSONResponse) Is2xx() bool {
+	return r.Code/100 == 2
+}
 
-// GetLogger retrieves the logrus logger from the supplied context. Returns nil if there is no logger.
-func GetLogger(ctx context.Context) *log.Entry {
-	l := ctx.Value(ctxValueLogger)
-	if l == nil {
-		return nil
+// RedirectResponse returns a JSONResponse which 302s the client to the given location.
+func RedirectResponse(location string) JSONResponse {
+	headers := make(map[string]string)
+	headers["Location"] = location
+	return JSONResponse{
+		Code:    302,
+		JSON:    struct{}{},
+		Headers: headers,
 	}
-	return l.(*log.Entry)
+}
+
+// MessageResponse returns a JSONResponse with a 'message' key containing the given text.
+func MessageResponse(code int, msg string) JSONResponse {
+	return JSONResponse{
+		Code: code,
+		JSON: struct {
+			Message string `json:"message"`
+		}{msg},
+	}
+}
+
+// ErrorResponse returns an HTTP 500 JSONResponse with the stringified form of the given error.
+func ErrorResponse(err error) JSONResponse {
+	return MessageResponse(500, err.Error())
 }
 
 // JSONRequestHandler represents an interface that must be satisfied in order to respond to incoming
-// HTTP requests with JSON. The interface returned will be marshalled into JSON to be sent to the client,
-// unless the interface is []byte in which case the bytes are sent to the client unchanged.
-// If an error is returned, a JSON error response will also be returned, unless the error code
-// is a 302 REDIRECT in which case a redirect is sent based on the Message field.
+// HTTP requests with JSON.
 type JSONRequestHandler interface {
-	OnIncomingRequest(req *http.Request) (interface{}, *HTTPError)
-}
-
-// JSONError represents a JSON API error response
-type JSONError struct {
-	Message string `json:"message"`
+	OnIncomingRequest(req *http.Request) JSONResponse
 }
 
 // Protect panicking HTTP requests from taking down the entire process, and log them using
@@ -67,12 +71,7 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 				}).Errorf(
 					"Request panicked!\n%s", debug.Stack(),
 				)
-				jsonErrorResponse(
-					w, req, &HTTPError{
-						Message: "Internal Server Error",
-						Code:    500,
-					},
-				)
+				respond(w, req, MessageResponse(500, "Internal Server Error"))
 			}
 		}()
 		handler(w, req)
@@ -81,11 +80,11 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 
 // MakeJSONAPI creates an HTTP handler which always responds to incoming requests with JSON responses.
 // Incoming http.Requests will have a logger (with a request ID/method/path logged) attached to the Context.
-// This can be accessed via GetLogger(Context). The type of the logger is *log.Entry from github.com/Sirupsen/logrus
+// This can be accessed via GetLogger(Context).
 func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 	return Protect(func(w http.ResponseWriter, req *http.Request) {
 		reqID := RandomString(12)
-		// Set a Logger on the context
+		// Set a Logger and request ID on the context
 		ctx := context.WithValue(req.Context(), ctxValueLogger, log.WithFields(log.Fields{
 			"req.method": req.Method,
 			"req.path":   req.URL.Path,
@@ -97,75 +96,39 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 		logger := req.Context().Value(ctxValueLogger).(*log.Entry)
 		logger.Print("Incoming request")
 
-		res, httpErr := handler.OnIncomingRequest(req)
+		res := handler.OnIncomingRequest(req)
 
 		// Set common headers returned regardless of the outcome of the request
 		w.Header().Set("Content-Type", "application/json")
 		SetCORSHeaders(w)
 
-		if httpErr != nil {
-			jsonErrorResponse(w, req, httpErr)
-			return
-		}
-
-		// if they've returned bytes as the response, then just return them rather than marshalling as JSON.
-		// This gives handlers an escape hatch if they want to return cached bytes.
-		var resBytes []byte
-		resBytes, ok := res.([]byte)
-		if !ok {
-			r, err := json.Marshal(res)
-			if err != nil {
-				jsonErrorResponse(w, req, &HTTPError{
-					Message: "Failed to serialise response as JSON",
-					Code:    500,
-				})
-				return
-			}
-			resBytes = r
-		}
-		logger.Print(fmt.Sprintf("Responding (%d bytes)", len(resBytes)))
-		w.Write(resBytes)
+		respond(w, req, res)
 	})
 }
 
-func jsonErrorResponse(w http.ResponseWriter, req *http.Request, httpErr *HTTPError) {
+func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	logger := req.Context().Value(ctxValueLogger).(*log.Entry)
-	if httpErr.Code == 302 {
-		logger.WithField("err", httpErr.Error()).Print("Redirecting")
-		http.Redirect(w, req, httpErr.Message, 302)
-		return
-	}
-	logger.WithFields(log.Fields{
-		log.ErrorKey: httpErr,
-	}).Print("Responding with error")
 
-	w.WriteHeader(httpErr.Code) // Set response code
-
-	var err error
-	var r []byte
-	if httpErr.JSON != nil {
-		r, err = json.Marshal(httpErr.JSON)
-		if err != nil {
-			// failed to marshal the supplied interface. Whine and fallback to the HTTP message.
-			logger.WithError(err).Error("Failed to marshal HTTPError.JSON")
+	// Set custom headers
+	if res.Headers != nil {
+		for h, val := range res.Headers {
+			w.Header().Set(h, val)
 		}
 	}
 
-	// failed to marshal or no custom JSON was supplied, send message JSON.
-	if err != nil || httpErr.JSON == nil {
-		r, err = json.Marshal(&JSONError{
-			Message: httpErr.Message,
-		})
+	// Marshal JSON response into raw bytes to send as the HTTP body
+	resBytes, err := json.Marshal(res.JSON)
+	if err != nil {
+		logger.WithError(err).Error("Failed to marshal JSONResponse")
+		// this should never fail to be marshalled so drop err to the floor
+		res = MessageResponse(500, "Internal Server Error")
+		resBytes, _ = json.Marshal(res.JSON)
 	}
 
-	if err != nil {
-		// We should never fail to marshal the JSON error response, but in this event just skip
-		// marshalling altogether
-		logger.Warn("Failed to marshal error response")
-		w.Write([]byte(`{}`))
-		return
-	}
-	w.Write(r)
+	// Set status code and write the body
+	w.WriteHeader(res.Code)
+	logger.WithField("code", res.Code).Infof("Responding (%d bytes)", len(resBytes))
+	w.Write(resBytes)
 }
 
 // WithCORSOptions intercepts all OPTIONS requests and responds with CORS headers. The request handler
