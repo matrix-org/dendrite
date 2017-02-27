@@ -36,8 +36,11 @@ type RoomEventDatabase interface {
 	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error
 	// Lookup the latest events in a room in preparation for an update.
 	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
+	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
 	// If this returns an error then no further action is required.
-	GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, string, types.RoomRecentEventsUpdater, error)
+	GetLatestEventsForUpdate(roomNID types.RoomNID) (
+		latestEvents []types.StateAtEventAndReference, lastEventIDSent string, updater types.RoomRecentEventsUpdater, err error,
+	)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
