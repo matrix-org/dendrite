@@ -26,8 +26,8 @@ type OutputRoomEvent struct {
 	// This is used by consumers to check if they can safely update their
 	// current state using the delta supplied in AddsStateEventIDs and
 	// RemovesStateEventIDs.
-	// If they the LastSentEventID doesn't match what they were expecting it to
-	// be they can use the LatestEventIDs to request the full current state.
+	// If the LastSentEventID doesn't match what they were expecting it to be
+	// they can use the LatestEventIDs to request the full current state.
 	LastSentEventID string
 }
 
