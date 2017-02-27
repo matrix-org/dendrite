@@ -139,6 +139,8 @@ func writeEvent(ow OutputRoomEventWriter, lastEventIDSent string, event gomatrix
 		latestEventIDs[i] = latest[i].EventID
 	}
 
+	// TODO: Fill out AddsStateEventIDs and RemovesStateEventIDs
+	// TODO: Fill out VisibilityStateIDs
 	return ow.WriteOutputRoomEvent(api.OutputRoomEvent{
 		Event:           event.JSON(),
 		LastSentEventID: lastEventIDSent,
