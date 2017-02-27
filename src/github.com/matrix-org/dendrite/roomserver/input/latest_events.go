@@ -7,7 +7,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// updateLatestEvents updates the list of latest events for this room.
+// updateLatestEvents updates the list of latest events for this room in the database and writes the
+// event to the output log.
 // The latest events are the events that aren't referenced by another event in the database:
 //
 //     Time goes down the page. 1 is the m.room.create event (root).
@@ -79,6 +80,10 @@ func doUpdateLatestEvents(
 
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
+	// TODO: This assumes that writing the event to the output log is synchronous. It should be possible to
+	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
+	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
+	// necessary bookkeeping we'll keep the event sending synchronous for now.
 	if err = writeEvent(ow, lastEventIDSent, event, newLatest); err != nil {
 		return err
 	}
