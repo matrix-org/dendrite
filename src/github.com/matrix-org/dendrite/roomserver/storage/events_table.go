@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS events (
     -- Local numeric ID for the state_key of the event
     -- This is 0 if the event is not a state event.
     event_state_key_nid BIGINT NOT NULL,
+    -- Whether the event has been written to the output log.
+    sent_to_output BOOLEAN NOT NULL DEFAULT FALSE,
     -- Local numeric ID for the state at the event.
     -- This is 0 if we don't know the state at the event.
     -- If the state is not 0 then this event is part of the contiguous
@@ -68,6 +70,15 @@ const bulkSelectStateAtEventByIDSQL = "" +
 const updateEventStateSQL = "" +
 	"UPDATE events SET state_snapshot_nid = $2 WHERE event_nid = $1"
 
+const selectEventSentToOutputSQL = "" +
+	"SELECT sent_to_output FROM events WHERE event_nid = $1"
+
+const updateEventSentToOutputSQL = "" +
+	"UPDATE events SET sent_to_output = TRUE WHERE event_nid = $1"
+
+const selectEventIDSQL = "" +
+	"SELECT event_id FROM events WHERE event_nid = $1"
+
 const bulkSelectStateAtEventAndReferenceSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
 	" FROM events WHERE event_nid = ANY($1)"
@@ -78,6 +89,9 @@ type eventStatements struct {
 	bulkSelectStateEventByIDStmt           *sql.Stmt
 	bulkSelectStateAtEventByIDStmt         *sql.Stmt
 	updateEventStateStmt                   *sql.Stmt
+	selectEventSentToOutputStmt            *sql.Stmt
+	updateEventSentToOutputStmt            *sql.Stmt
+	selectEventIDStmt                      *sql.Stmt
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
 }
 
@@ -99,6 +113,15 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.updateEventStateStmt, err = db.Prepare(updateEventStateSQL); err != nil {
+		return
+	}
+	if s.updateEventSentToOutputStmt, err = db.Prepare(updateEventSentToOutputSQL); err != nil {
+		return
+	}
+	if s.selectEventSentToOutputStmt, err = db.Prepare(selectEventSentToOutputSQL); err != nil {
+		return
+	}
+	if s.selectEventIDStmt, err = db.Prepare(selectEventIDSQL); err != nil {
 		return
 	}
 	if s.bulkSelectStateAtEventAndReferenceStmt, err = db.Prepare(bulkSelectStateAtEventAndReferenceSQL); err != nil {
@@ -197,6 +220,21 @@ func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types
 func (s *eventStatements) updateEventState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error {
 	_, err := s.updateEventStateStmt.Exec(int64(eventNID), int64(stateNID))
 	return err
+}
+
+func (s *eventStatements) selectEventSentToOutput(txn *sql.Tx, eventNID types.EventNID) (sentToOutput bool, err error) {
+	err = txn.Stmt(s.selectEventSentToOutputStmt).QueryRow(int64(eventNID)).Scan(&sentToOutput)
+	return
+}
+
+func (s *eventStatements) updateEventSentToOutput(txn *sql.Tx, eventNID types.EventNID) error {
+	_, err := txn.Stmt(s.updateEventSentToOutputStmt).Exec(int64(eventNID))
+	return err
+}
+
+func (s *eventStatements) selectEventID(txn *sql.Tx, eventNID types.EventNID) (eventID string, err error) {
+	err = txn.Stmt(s.selectEventIDStmt).QueryRow(int64(eventNID)).Scan(&eventID)
+	return
 }
 
 func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventNIDs []types.EventNID) ([]types.StateAtEventAndReference, error) {

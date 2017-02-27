@@ -36,11 +36,20 @@ type RoomEventDatabase interface {
 	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error
 	// Lookup the latest events in a room in preparation for an update.
 	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
+	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
 	// If this returns an error then no further action is required.
-	GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, types.RoomRecentEventsUpdater, error)
+	GetLatestEventsForUpdate(roomNID types.RoomNID) (
+		latestEvents []types.StateAtEventAndReference, lastEventIDSent string, updater types.RoomRecentEventsUpdater, err error,
+	)
 }
 
-func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
+// OutputRoomEventWriter has the APIs needed to write an event to the output logs.
+type OutputRoomEventWriter interface {
+	// Write an event.
+	WriteOutputRoomEvent(output api.OutputRoomEvent) error
+}
+
+func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.InputRoomEvent) error {
 	// Parse and validate the event JSON
 	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(input.Event)
 	if err != nil {
@@ -95,7 +104,7 @@ func processRoomEvent(db RoomEventDatabase, input api.InputRoomEvent) error {
 	}
 
 	// Update the extremities of the event graph for the room
-	if err := updateLatestEvents(db, roomNID, stateAtEvent, event); err != nil {
+	if err := updateLatestEvents(db, ow, roomNID, stateAtEvent, event); err != nil {
 		return err
 	}
 
