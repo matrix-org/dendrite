@@ -80,6 +80,8 @@ func doUpdateLatestEvents(
 
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
+	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
+	//  the write to the output log succeeds)
 	// TODO: This assumes that writing the event to the output log is synchronous. It should be possible to
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
