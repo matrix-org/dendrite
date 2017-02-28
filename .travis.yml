@@ -5,9 +5,16 @@ install:
  - go get github.com/constabulary/gb/...
  - go get github.com/golang/lint/golint
  - go get github.com/fzipp/gocyclo
+ - ./travis-install-kafka.sh
+
+services:
+  - postgresql
+
+addons:
+  postgresql: "9.5"
 
 script:
- - gb build github.com/matrix-org/dendrite/roomserver/roomserver && ./hooks/pre-commit
+ - ./travis-test.sh
 
 notifications:
     webhooks:
