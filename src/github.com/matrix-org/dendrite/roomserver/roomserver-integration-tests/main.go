@@ -11,13 +11,20 @@ import (
 )
 
 var (
-	kafkaDir         = defaulting(os.Getenv("KAFKA_DIR"), "kafka")
-	zookeeperURI     = defaulting(os.Getenv("ZOOKEEPER_URI"), "localhost:2181")
-	kafkaURI         = defaulting(os.Getenv("KAFKA_URIS"), "localhost:9092")
-	timeoutString    = defaulting(os.Getenv("TIMEOUT"), "10s")
+	// Path to where kafka is installed.
+	kafkaDir = defaulting(os.Getenv("KAFKA_DIR"), "kafka")
+	// The URI the kafka zookeeper is listening on.
+	zookeeperURI = defaulting(os.Getenv("ZOOKEEPER_URI"), "localhost:2181")
+	// The URI the kafka server is listening on.
+	kafkaURI = defaulting(os.Getenv("KAFKA_URIS"), "localhost:9092")
+	// How long to wait for the roomserver to write the expected output messages.
+	timeoutString = defaulting(os.Getenv("TIMEOUT"), "10s")
+	// The name of maintentence database to connect to in order to create the test database.
 	postgresDatabase = defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
+	// The name of the test database to create.
 	testDatabaseName = defaulting(os.Getenv("DATABASE_NAME"), "roomserver_test")
-	testDatabase     = defaulting(os.Getenv("DATABASE"), fmt.Sprintf("dbname=%s binary_parameters=yes", testDatabaseName))
+	// The postgress connection config for connecting to the test database.
+	testDatabase = defaulting(os.Getenv("DATABASE"), fmt.Sprintf("dbname=%s binary_parameters=yes", testDatabaseName))
 )
 
 func defaulting(value, defaultValue string) string {
@@ -42,6 +49,8 @@ func createDatabase(database string) error {
 	cmd.Stdin = strings.NewReader(
 		fmt.Sprintf("DROP DATABASE IF EXISTS %s; CREATE DATABASE %s;", database, database),
 	)
+	// Send stdout and stderr to our stderr so that we see error messages from
+	// the psql process
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -56,6 +65,8 @@ func createTopic(topic string) error {
 		"--partitions", "1",
 		"--topic", topic,
 	)
+	// Send stdout and stderr to our stderr so that we see error messages from
+	// the kafka process.
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -67,15 +78,25 @@ func writeToTopic(topic string, data []string) error {
 		"--broker-list", kafkaURI,
 		"--topic", topic,
 	)
+	// Send stdout and stderr to our stderr so that we see error messages from
+	// the kafka process.
+	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = strings.NewReader(strings.Join(data, "\n"))
 	return cmd.Run()
 }
 
+// runAndReadFromTopic runs a command and waits for a number of messages to be
+// written to a kafka topic. It returns if the command exits, the number of
+// messages is reached or after a timeout. It kills the command before it returns.
+// It return a list of the messages read from the command on success or an error
+// on failure.
 func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int) ([]string, error) {
 	type result struct {
+		// data holds all of stdout on success.
 		data []byte
-		err  error
+		// err is set on failure.
+		err error
 	}
 	done := make(chan result)
 	readCmd := exec.Command(
@@ -85,8 +106,11 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int) ([]string, e
 		"--from-beginning",
 		"--max-messages", fmt.Sprintf("%d", count),
 	)
+	// Send stderr to our stderr so the user can see any error messages.
 	readCmd.Stderr = os.Stderr
+	// Run the command, read the messages and wait for a timeout in parallel.
 	go func() {
+		// Read all of stdout.
 		data, err := readCmd.Output()
 		done <- result{data, err}
 	}()
@@ -98,15 +122,26 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int) ([]string, e
 		time.Sleep(timeout)
 		done <- result{nil, fmt.Errorf("Timeout reading %d messages from topic %q", count, topic)}
 	}()
+	// Wait for one of the tasks to finsh.
 	r := <-done
 
+	// Kill both processes. We don't check if the processes are running and
+	// we ignore failures since we are just trying to clean up before returing.
 	runCmd.Process.Kill()
 	readCmd.Process.Kill()
+
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	// The kafka console consumer writes a newline character after each message.
+	// So we split on newline characters
 	lines := strings.Split(string(r.data), "\n")
 	if len(lines) > 0 {
+		// Remove the blank line at the end of the data.
 		lines = lines[:len(lines)-1]
 	}
-	return lines, r.err
+	return lines, nil
 }
 
 func deleteTopic(topic string) error {
@@ -146,6 +181,10 @@ func testRoomServer(input []string, wantOutput []string) {
 
 	cmd := exec.Command(filepath.Join(filepath.Dir(os.Args[0]), "roomserver"))
 
+	// Append the roomserver config to the existing environment.
+	// We append to the environment rather than replacing so that any additional
+	// postgres and golang environment variables such as PGHOST are passed to
+	// the roomserver process.
 	cmd.Env = append(
 		os.Environ(),
 		fmt.Sprintf("DATABASE=%s", testDatabase),
