@@ -37,7 +37,7 @@ complications for this model.
  3) A client can query the current state of the room from a reader.
 
 The writers and readers cannot extract the necessary information directly from
-the event logs because it would take to long to extract the information as the
+the event logs because it would take too long to extract the information as the
 state is built up by collecting individual state events from the event history.
 
 The writers and readers therefore need access to something that stores copies
