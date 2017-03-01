@@ -136,7 +136,7 @@ func testRoomServer(input []string, wantOutput []string) {
 		panic(err)
 	}
 
-	if err := writeToTopic(inputTopic, input); err != nil {
+	if err := writeToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
 		panic(err)
 	}
 
@@ -169,7 +169,17 @@ func testRoomServer(input []string, wantOutput []string) {
 			panic(fmt.Errorf("Wanted %q at index %d got %q", wantOutput[i], i, gotOutput[i]))
 		}
 	}
+}
 
+func canonicalJSONInput(jsonData []string) []string {
+	for i := range jsonData {
+		jsonBytes, err := gomatrixserverlib.CanonicalJSON([]byte(jsonData[i]))
+		if err != nil {
+			panic(err)
+		}
+		jsonData[i] = string(jsonBytes)
+	}
+	return jsonData
 }
 
 func equalJSON(a, b string) bool {
@@ -188,13 +198,95 @@ func main() {
 	fmt.Println("==TESTING==", os.Args[0])
 
 	input := []string{
-		`{"AuthEventIDs": [], "Kind": 1, "Event": {"origin": "matrix.org", "signatures": {"matrix.org": {"ed25519:auto": "3kXGwNtdj+zqEXlI8PWLiB76xtrQ7SxcvPuXAEVCTo+QPoBoUvLi1RkHs6O5mDz7UzIowK5bi1seAN4vOh0OBA"}}, "origin_server_ts": 1463671337837, "sender": "@richvdh:matrix.org", "event_id": "$1463671337126266wrSBX:matrix.org", "prev_events": [], "unsigned": {"age_ts": 1463671337837}, "state_key": "", "content": {"creator": "@richvdh:matrix.org"}, "depth": 1, "prev_state": [], "room_id": "!HCXfdvrfksxuYnIFiJ:matrix.org", "auth_events": [], "hashes": {"sha256": "Q05VLC8nztN2tguy+KnHxxhitI95wK9NelnsDaXRqeo"}, "type": "m.room.create"}}`,
-		`{"AuthEventIDs": ["$1463671337126266wrSBX:matrix.org"], "Kind": 2, "StateEventIDs": ["$1463671337126266wrSBX:matrix.org"], "Event": {"origin": "matrix.org", "signatures": {"matrix.org": {"ed25519:auto": "a2b3xXYVPPFeG1sHCU3hmZnAaKqZFgzGZozijRGblG5Y//ewRPAn1A2mCrI2UM5I+0zqr70cNpHgF8bmNFu4BA"}}, "origin_server_ts": 1463671339844, "sender": "@richvdh:matrix.org", "event_id": "$1463671339126270PnVwC:matrix.org", "prev_events": [["$1463671337126266wrSBX:matrix.org", {"sha256": "h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}]], "membership": "join", "state_key": "@richvdh:matrix.org", "unsigned": {"age_ts": 1463671339844}, "content": {"membership": "join", "avatar_url": "mxc://matrix.org/ZafPzsxMJtLaSaJXloBEKiws", "displayname": "richvdh"}, "depth": 2, "prev_state": [], "room_id": "!HCXfdvrfksxuYnIFiJ:matrix.org", "auth_events": [["$1463671337126266wrSBX:matrix.org", {"sha256": "h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}]], "hashes": {"sha256": "t9t3sZV1Eu0P9Jyrs7pge6UTa1zuTbRdVxeUHnrQVH0"}, "type": "m.room.member"}, "HasState": true}`,
+		`{
+			"AuthEventIDs": [],
+			"Kind": 1,
+			"Event": {
+				"origin": "matrix.org",
+				"signatures": {
+					"matrix.org": {
+						"ed25519:auto": "3kXGwNtdj+zqEXlI8PWLiB76xtrQ7SxcvPuXAEVCTo+QPoBoUvLi1RkHs6O5mDz7UzIowK5bi1seAN4vOh0OBA"
+					}
+				},
+				"origin_server_ts": 1463671337837,
+				"sender": "@richvdh:matrix.org",
+				"event_id": "$1463671337126266wrSBX:matrix.org",
+				"prev_events": [],
+				"state_key": "",
+				"content": {"creator": "@richvdh:matrix.org"},
+				"depth": 1,
+				"prev_state": [],
+				"room_id": "!HCXfdvrfksxuYnIFiJ:matrix.org",
+				"auth_events": [],
+				"hashes": {"sha256": "Q05VLC8nztN2tguy+KnHxxhitI95wK9NelnsDaXRqeo"},
+				"type": "m.room.create"}
+		}`, `{
+			"AuthEventIDs": ["$1463671337126266wrSBX:matrix.org"],
+			"Kind": 2,
+			"StateEventIDs": ["$1463671337126266wrSBX:matrix.org"],
+			"Event": {
+				"origin": "matrix.org",
+				"signatures": {
+					"matrix.org": {
+						"ed25519:auto": "a2b3xXYVPPFeG1sHCU3hmZnAaKqZFgzGZozijRGblG5Y//ewRPAn1A2mCrI2UM5I+0zqr70cNpHgF8bmNFu4BA"
+					}
+				},
+				"origin_server_ts": 1463671339844,
+				"sender": "@richvdh:matrix.org",
+				"event_id": "$1463671339126270PnVwC:matrix.org",
+				"prev_events": [[
+					"$1463671337126266wrSBX:matrix.org", {"sha256": "h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}
+				]],
+				"membership": "join",
+				"state_key": "@richvdh:matrix.org",
+				"content": {
+					"membership": "join",
+					"avatar_url": "mxc://matrix.org/ZafPzsxMJtLaSaJXloBEKiws",
+					"displayname": "richvdh"
+				},
+				"depth": 2,
+				"prev_state": [],
+				"room_id": "!HCXfdvrfksxuYnIFiJ:matrix.org",
+				"auth_events": [[
+					"$1463671337126266wrSBX:matrix.org", {"sha256": "h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}
+				]],
+				"hashes": {"sha256": "t9t3sZV1Eu0P9Jyrs7pge6UTa1zuTbRdVxeUHnrQVH0"},
+				"type": "m.room.member"},
+			"HasState": true
+		}`,
 	}
 
 	want := []string{
 		`{
-			"Event":{"auth_events":[["$1463671337126266wrSBX:matrix.org",{"sha256":"h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}]],"content":{"avatar_url":"mxc://matrix.org/ZafPzsxMJtLaSaJXloBEKiws","displayname":"richvdh","membership":"join"},"depth":2,"event_id":"$1463671339126270PnVwC:matrix.org","hashes":{"sha256":"t9t3sZV1Eu0P9Jyrs7pge6UTa1zuTbRdVxeUHnrQVH0"},"membership":"join","origin":"matrix.org","origin_server_ts":1463671339844,"prev_events":[["$1463671337126266wrSBX:matrix.org",{"sha256":"h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}]],"prev_state":[],"room_id":"!HCXfdvrfksxuYnIFiJ:matrix.org","sender":"@richvdh:matrix.org","signatures":{"matrix.org":{"ed25519:auto":"a2b3xXYVPPFeG1sHCU3hmZnAaKqZFgzGZozijRGblG5Y//ewRPAn1A2mCrI2UM5I+0zqr70cNpHgF8bmNFu4BA"}},"state_key":"@richvdh:matrix.org","type":"m.room.member","unsigned":{"age_ts":1463671339844}},
+			"Event":{
+				"auth_events":[[
+					"$1463671337126266wrSBX:matrix.org",{"sha256":"h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}
+				]],
+				"content":{
+					"avatar_url":"mxc://matrix.org/ZafPzsxMJtLaSaJXloBEKiws",
+					"displayname":"richvdh",
+					"membership":"join"
+				},
+				"depth": 2,
+				"event_id": "$1463671339126270PnVwC:matrix.org",
+				"hashes": {"sha256":"t9t3sZV1Eu0P9Jyrs7pge6UTa1zuTbRdVxeUHnrQVH0"},
+				"membership": "join",
+				"origin": "matrix.org",
+				"origin_server_ts": 1463671339844,
+				"prev_events": [[
+					"$1463671337126266wrSBX:matrix.org",{"sha256":"h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}
+				]],
+				"prev_state":[],
+				"room_id":"!HCXfdvrfksxuYnIFiJ:matrix.org",
+				"sender":"@richvdh:matrix.org",
+				"signatures":{
+					"matrix.org":{
+						"ed25519:auto":"a2b3xXYVPPFeG1sHCU3hmZnAaKqZFgzGZozijRGblG5Y//ewRPAn1A2mCrI2UM5I+0zqr70cNpHgF8bmNFu4BA"
+					}
+				},
+				"state_key":"@richvdh:matrix.org",
+				"type":"m.room.member"
+			},
 			"VisibilityEventIDs":null,
 			"LatestEventIDs":["$1463671339126270PnVwC:matrix.org"],
 			"AddsStateEventIDs":null,
