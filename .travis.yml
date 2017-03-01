@@ -1,17 +1,22 @@
 language: go
 go:
  - 1.7
+
+sudo: false
+
+dist: trusty
+
+addons:
+  postgresql: "9.5"
+
+services:
+  - postgresql
+
 install:
  - go get github.com/constabulary/gb/...
  - go get github.com/golang/lint/golint
  - go get github.com/fzipp/gocyclo
  - ./travis-install-kafka.sh
-
-services:
-  - postgresql
-
-addons:
-  postgresql: "9.5"
 
 script:
  - ./travis-test.sh
