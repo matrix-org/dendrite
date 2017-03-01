@@ -4,6 +4,7 @@ go:
 
 sudo: false
 
+# Use trusty for postgres 9.5 support
 dist: trusty
 
 addons:
