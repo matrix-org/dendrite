@@ -19,11 +19,11 @@ var (
 	kafkaURI = defaulting(os.Getenv("KAFKA_URIS"), "localhost:9092")
 	// How long to wait for the roomserver to write the expected output messages.
 	timeoutString = defaulting(os.Getenv("TIMEOUT"), "10s")
-	// The name of maintentence database to connect to in order to create the test database.
+	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
 	// The name of the test database to create.
 	testDatabaseName = defaulting(os.Getenv("DATABASE_NAME"), "roomserver_test")
-	// The postgress connection config for connecting to the test database.
+	// The postgres connection config for connecting to the test database.
 	testDatabase = defaulting(os.Getenv("DATABASE"), fmt.Sprintf("dbname=%s binary_parameters=yes", testDatabaseName))
 )
 
@@ -89,7 +89,7 @@ func writeToTopic(topic string, data []string) error {
 // runAndReadFromTopic runs a command and waits for a number of messages to be
 // written to a kafka topic. It returns if the command exits, the number of
 // messages is reached or after a timeout. It kills the command before it returns.
-// It return a list of the messages read from the command on success or an error
+// It returns a list of the messages read from the command on success or an error
 // on failure.
 func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int) ([]string, error) {
 	type result struct {
@@ -126,7 +126,7 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int) ([]string, e
 	r := <-done
 
 	// Kill both processes. We don't check if the processes are running and
-	// we ignore failures since we are just trying to clean up before returing.
+	// we ignore failures since we are just trying to clean up before returning.
 	runCmd.Process.Kill()
 	readCmd.Process.Kill()
 

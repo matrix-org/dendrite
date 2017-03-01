@@ -10,4 +10,4 @@ gb build github.com/matrix-org/dendrite/roomserver/roomserver-integration-tests
 ./hooks/pre-commit
 
 # Run the integration tests
-${DEBUG:=""} bin/roomserver-integration-tests
+bin/roomserver-integration-tests

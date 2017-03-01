@@ -1,5 +1,7 @@
 # /bin/bash
 
+set -eu
+
 # The mirror to download kafka from is picked from the list of mirrors at
 # https://www.apache.org/dyn/closer.cgi?path=/kafka/0.10.2.0/kafka_2.11-0.10.2.0.tgz
 # TODO: Check the signature since we are downloading over HTTP.
