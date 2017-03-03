@@ -21,7 +21,7 @@ var (
 	// The address the roomserver should listen on.
 	roomserverAddr = defaulting(os.Getenv("ROOMSERVER_URI"), "localhost:9876")
 	// How long to wait for the roomserver to write the expected output messages.
-	timeoutString = defaulting(os.Getenv("TIMEOUT"), "10s")
+	timeoutString = defaulting(os.Getenv("TIMEOUT"), "60s")
 	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
 	// The name of the test database to create.
