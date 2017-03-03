@@ -170,7 +170,16 @@ func deleteTopic(topic string) error {
 	return cmd.Run()
 }
 
-func testRoomServer(input []string, wantOutput []string, checkQueries func(api.RoomserverQueryAPI)) {
+// testRoomserver is used run integration tests against a single roomserver.
+// It creates new kafka topics for the input and output of the roomserver.
+// It writes the input messages to the input kafka topic, formatting each message
+// as canonical JSON so that it fits on a single line.
+// It then runs the roomserver and waits for a number of messages to be written
+// to the output topic.
+// Once those messages have been written it runs the checkQueries function passing
+// a api.RoomserverQueryAPI client. The caller can use this function to check the
+// behaviour of the query API.
+func testRoomserver(input []string, wantOutput []string, checkQueries func(api.RoomserverQueryAPI)) {
 	const (
 		inputTopic  = "roomserverInput"
 		outputTopic = "roomserverOutput"
@@ -208,7 +217,7 @@ func testRoomServer(input []string, wantOutput []string, checkQueries func(api.R
 	)
 	cmd.Stderr = os.Stderr
 
-	gotOutput, err := runAndReadFromTopic(cmd, outputTopic, 1, func() {
+	gotOutput, err := runAndReadFromTopic(cmd, outputTopic, len(wantOutput), func() {
 		queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+roomserverAddr, nil)
 		checkQueries(queryAPI)
 	})
@@ -351,7 +360,7 @@ func main() {
 		}`,
 	}
 
-	testRoomServer(input, want, func(q api.RoomserverQueryAPI) {
+	testRoomserver(input, want, func(q api.RoomserverQueryAPI) {
 		var response api.QueryLatestEventsAndStateResponse
 		if err := q.QueryLatestEventsAndState(
 			&api.QueryLatestEventsAndStateRequest{RoomID: "!HCXfdvrfksxuYnIFiJ:matrix.org"},
