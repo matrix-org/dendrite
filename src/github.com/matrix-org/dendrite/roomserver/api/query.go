@@ -1,7 +1,11 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"github.com/matrix-org/gomatrixserverlib"
+	"net/http"
 )
 
 // StateKeyTuple is a pair of an event type and state_key.
@@ -38,34 +42,53 @@ type RoomserverQueryAPI interface {
 	) error
 }
 
-// RPCServer is used to register a roomserver implementation with an RPC server.
-type RPCServer interface {
-	RegisterName(name string, rcvr interface{}) error
+// RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
+const RoomserverQueryLatestEventsAndStatePath = "/api/Roomserver/QueryLatestEventsAndState"
+
+// NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
+// If httpClient is nil then it uses the http.DefaultClient
+func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client) RoomserverQueryAPI {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	return &httpRoomserverQueryAPI{roomserverURL, *httpClient}
 }
 
-// RegisterRoomserverQueryAPI registers a RoomserverQueryAPI implementation with an RPC server.
-func RegisterRoomserverQueryAPI(rpcServer RPCServer, roomserver RoomserverQueryAPI) error {
-	return rpcServer.RegisterName("Roomserver", roomserver)
-}
-
-// RPCClient is used to invoke roomserver APIs on a remote server.
-type RPCClient interface {
-	Call(serviceMethod string, args interface{}, reply interface{}) error
-}
-
-// NewRoomserverQueryAPIFromClient creates a new query API from an RPC client.
-func NewRoomserverQueryAPIFromClient(client RPCClient) RoomserverQueryAPI {
-	return &remoteRoomserver{client}
-}
-
-type remoteRoomserver struct {
-	client RPCClient
+type httpRoomserverQueryAPI struct {
+	roomserverURL string
+	httpClient    http.Client
 }
 
 // QueryLatestEventsAndState implements RoomserverQueryAPI
-func (r *remoteRoomserver) QueryLatestEventsAndState(
+func (h *httpRoomserverQueryAPI) QueryLatestEventsAndState(
 	request *QueryLatestEventsAndStateRequest,
 	response *QueryLatestEventsAndStateResponse,
 ) error {
-	return r.client.Call("Roomserver.QueryLatestEventsAndState", request, response)
+	apiURL := h.roomserverURL + RoomserverQueryLatestEventsAndStatePath
+	return postJSON(h.httpClient, apiURL, request, response)
+}
+
+func postJSON(httpClient http.Client, apiURL string, request, response interface{}) error {
+	jsonBytes, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	res, err := httpClient.Post(apiURL, "application/json", bytes.NewReader(jsonBytes))
+	if res != nil {
+		defer res.Body.Close()
+	}
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != 200 {
+		var errorBody struct {
+			Message string `json:"message"`
+		}
+		if err = json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
+			return err
+		} else {
+			return fmt.Errorf("api: %d: %s", res.StatusCode, errorBody.Message)
+		}
+	}
+	return json.NewDecoder(res.Body).Decode(response)
 }

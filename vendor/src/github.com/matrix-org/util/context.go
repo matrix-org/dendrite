@@ -25,11 +25,13 @@ func GetRequestID(ctx context.Context) string {
 // ctxValueLogger is the key to extract the logrus Logger.
 const ctxValueLogger = contextKeys("logger")
 
-// GetLogger retrieves the logrus logger from the supplied context. Returns nil if there is no logger.
+// GetLogger retrieves the logrus logger from the supplied context. Always returns a logger,
+// even if there wasn't one originally supplied.
 func GetLogger(ctx context.Context) *log.Entry {
 	l := ctx.Value(ctxValueLogger)
 	if l == nil {
-		return nil
+		// Always return a logger so callers don't need to constantly nil check.
+		return log.WithField("context", "missing")
 	}
 	return l.(*log.Entry)
 }

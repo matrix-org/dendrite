@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/input"
 	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	sarama "gopkg.in/Shopify/sarama.v1"
 	"net/http"
-	"net/rpc"
 	"os"
 	"strings"
 )
@@ -51,11 +49,7 @@ func main() {
 
 	queryAPI := query.RoomserverQueryAPI{}
 
-	if err = api.RegisterRoomserverQueryAPI(rpc.DefaultServer, &queryAPI); err != nil {
-		panic(err)
-	}
-
-	rpc.HandleHTTP()
+	queryAPI.SetupHTTP(http.DefaultServeMux)
 
 	fmt.Println("Started roomserver")
 

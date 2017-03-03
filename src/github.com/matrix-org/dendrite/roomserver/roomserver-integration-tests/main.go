@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"net/rpc"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -210,12 +209,8 @@ func testRoomServer(input []string, wantOutput []string) {
 	cmd.Stderr = os.Stderr
 
 	gotOutput, err := runAndReadFromTopic(cmd, outputTopic, 1, func() {
-		client, err := rpc.DialHTTP("tcp", roomserverAddr)
-		if err != nil {
-			panic(err)
-		}
-		queryAPI := api.NewRoomserverQueryAPIFromClient(client)
-		if err = queryAPI.QueryLatestEventsAndState(
+		queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+roomserverAddr, nil)
+		if err := queryAPI.QueryLatestEventsAndState(
 			&api.QueryLatestEventsAndStateRequest{},
 			&api.QueryLatestEventsAndStateResponse{},
 		); err != nil {
