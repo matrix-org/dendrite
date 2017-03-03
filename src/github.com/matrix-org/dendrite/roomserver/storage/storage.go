@@ -280,3 +280,21 @@ func (u *roomRecentEventsUpdater) Commit() error {
 func (u *roomRecentEventsUpdater) Rollback() error {
 	return u.txn.Rollback()
 }
+
+// RoomNID implements query.RoomserverQueryAPIDB
+func (d *Database) RoomNID(roomID string) (types.RoomNID, error) {
+	roomNID, err := d.statements.selectRoomNID(roomID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return roomNID, err
+}
+
+// LatestEventIDs implements query.RoomserverQueryAPIDB
+func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, error) {
+	eventNIDs, err := d.statements.selectLatestEventNIDs(roomNID)
+	if err != nil {
+		return nil, err
+	}
+	return d.statements.bulkSelectEventReference(eventNIDs)
+}

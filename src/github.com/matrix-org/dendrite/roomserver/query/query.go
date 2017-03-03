@@ -2,25 +2,50 @@ package query
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 )
 
+// RoomserverQueryAPIDatabase has the storage APIs needed to implement the query API.
+type RoomserverQueryAPIDatabase interface {
+	// Lookup the numeric ID for the room.
+	// Returns 0 if the room doesn't exists.
+	// Returns an error if there was a problem talking to the database.
+	RoomNID(roomID string) (types.RoomNID, error)
+	// Lookup event references for the latest events in the room.
+	// Returns an error if there was a problem talking to the database.
+	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, error)
+}
+
 // RoomserverQueryAPI is an implemenation of RoomserverQueryAPI
 type RoomserverQueryAPI struct {
+	DB RoomserverQueryAPIDatabase
 }
 
 // QueryLatestEventsAndState implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
-) error {
-	return fmt.Errorf("Not Implemented")
+) (err error) {
+	response.QueryLatestEventsAndStateRequest = *request
+	roomNID, err := r.DB.RoomNID(request.RoomID)
+	if err != nil {
+		return err
+	}
+	if roomNID == 0 {
+		return nil
+	}
+	response.RoomExists = true
+	response.LatestEvents, err = r.DB.LatestEventIDs(roomNID)
+	// TODO: look up the current state.
+	return err
 }
 
+// SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,

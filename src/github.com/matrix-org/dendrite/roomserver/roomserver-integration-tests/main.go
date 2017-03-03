@@ -170,7 +170,7 @@ func deleteTopic(topic string) error {
 	return cmd.Run()
 }
 
-func testRoomServer(input []string, wantOutput []string) {
+func testRoomServer(input []string, wantOutput []string, checkQueries func(api.RoomserverQueryAPI)) {
 	const (
 		inputTopic  = "roomserverInput"
 		outputTopic = "roomserverOutput"
@@ -210,12 +210,7 @@ func testRoomServer(input []string, wantOutput []string) {
 
 	gotOutput, err := runAndReadFromTopic(cmd, outputTopic, 1, func() {
 		queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+roomserverAddr, nil)
-		if err := queryAPI.QueryLatestEventsAndState(
-			&api.QueryLatestEventsAndStateRequest{},
-			&api.QueryLatestEventsAndStateResponse{},
-		); err != nil {
-			panic(err)
-		}
+		checkQueries(queryAPI)
 	})
 	if err != nil {
 		panic(err)
@@ -356,7 +351,21 @@ func main() {
 		}`,
 	}
 
-	testRoomServer(input, want)
+	testRoomServer(input, want, func(q api.RoomserverQueryAPI) {
+		var response api.QueryLatestEventsAndStateResponse
+		if err := q.QueryLatestEventsAndState(
+			&api.QueryLatestEventsAndStateRequest{RoomID: "!HCXfdvrfksxuYnIFiJ:matrix.org"},
+			&response,
+		); err != nil {
+			panic(err)
+		}
+		if !response.RoomExists {
+			panic(fmt.Errorf("Wanted room \"!HCXfdvrfksxuYnIFiJ:matrix.org\" to exist"))
+		}
+		if len(response.LatestEvents) != 1 || response.LatestEvents[0].EventID != "$1463671339126270PnVwC:matrix.org" {
+			panic(fmt.Errorf("Wanted \"$1463671339126270PnVwC:matrix.org\" to be the latest event got %#v", response.LatestEvents))
+		}
+	})
 
 	fmt.Println("==PASSED==", os.Args[0])
 }

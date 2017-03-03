@@ -47,7 +47,9 @@ func main() {
 		panic(err)
 	}
 
-	queryAPI := query.RoomserverQueryAPI{}
+	queryAPI := query.RoomserverQueryAPI{
+		DB: db,
+	}
 
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 

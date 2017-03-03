@@ -27,8 +27,11 @@ type QueryLatestEventsAndStateRequest struct {
 type QueryLatestEventsAndStateResponse struct {
 	// Copy of the request for debugging.
 	QueryLatestEventsAndStateRequest
+	// Does the room exist?
+	// If the room doesn't exist this will be false and LatestEvents will be empty.
+	RoomExists bool
 	// The latest events in the room.
-	LatestEvents gomatrixserverlib.EventReference
+	LatestEvents []gomatrixserverlib.EventReference
 	// The state events requested.
 	StateEvents []gomatrixserverlib.Event
 }
@@ -86,9 +89,8 @@ func postJSON(httpClient http.Client, apiURL string, request, response interface
 		}
 		if err = json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
 			return err
-		} else {
-			return fmt.Errorf("api: %d: %s", res.StatusCode, errorBody.Message)
 		}
+		return fmt.Errorf("api: %d: %s", res.StatusCode, errorBody.Message)
 	}
 	return json.NewDecoder(res.Body).Decode(response)
 }

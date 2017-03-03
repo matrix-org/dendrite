@@ -32,16 +32,20 @@ const selectRoomNIDSQL = "" +
 	"SELECT room_nid FROM rooms WHERE room_id = $1"
 
 const selectLatestEventNIDsSQL = "" +
+	"SELECT latest_event_nids FROM rooms WHERE room_nid = $1"
+
+const selectLatestEventNIDsForUpdateSQL = "" +
 	"SELECT latest_event_nids, last_event_sent_nid FROM rooms WHERE room_nid = $1 FOR UPDATE"
 
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE rooms SET latest_event_nids = $2, last_event_sent_nid = $3 WHERE room_nid = $1"
 
 type roomStatements struct {
-	insertRoomNIDStmt         *sql.Stmt
-	selectRoomNIDStmt         *sql.Stmt
-	selectLatestEventNIDsStmt *sql.Stmt
-	updateLatestEventNIDsStmt *sql.Stmt
+	insertRoomNIDStmt                  *sql.Stmt
+	selectRoomNIDStmt                  *sql.Stmt
+	selectLatestEventNIDsStmt          *sql.Stmt
+	selectLatestEventNIDsForUpdateStmt *sql.Stmt
+	updateLatestEventNIDsStmt          *sql.Stmt
 }
 
 func (s *roomStatements) prepare(db *sql.DB) (err error) {
@@ -56,6 +60,9 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectLatestEventNIDsStmt, err = db.Prepare(selectLatestEventNIDsSQL); err != nil {
+		return
+	}
+	if s.selectLatestEventNIDsForUpdateStmt, err = db.Prepare(selectLatestEventNIDsForUpdateSQL); err != nil {
 		return
 	}
 	if s.updateLatestEventNIDsStmt, err = db.Prepare(updateLatestEventNIDsSQL); err != nil {
@@ -76,10 +83,23 @@ func (s *roomStatements) selectRoomNID(roomID string) (types.RoomNID, error) {
 	return types.RoomNID(roomNID), err
 }
 
+func (s *roomStatements) selectLatestEventNIDs(roomNID types.RoomNID) ([]types.EventNID, error) {
+	var nids pq.Int64Array
+	err := s.selectLatestEventNIDsStmt.QueryRow(int64(roomNID)).Scan(&nids)
+	if err != nil {
+		return nil, err
+	}
+	eventNIDs := make([]types.EventNID, len(nids))
+	for i := range nids {
+		eventNIDs[i] = types.EventNID(nids[i])
+	}
+	return eventNIDs, nil
+}
+
 func (s *roomStatements) selectLatestEventsNIDsForUpdate(txn *sql.Tx, roomNID types.RoomNID) ([]types.EventNID, types.EventNID, error) {
 	var nids pq.Int64Array
 	var lastEventSentNID int64
-	err := txn.Stmt(s.selectLatestEventNIDsStmt).QueryRow(int64(roomNID)).Scan(&nids, &lastEventSentNID)
+	err := txn.Stmt(s.selectLatestEventNIDsForUpdateStmt).QueryRow(int64(roomNID)).Scan(&nids, &lastEventSentNID)
 	if err != nil {
 		return nil, 0, err
 	}
