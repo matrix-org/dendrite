@@ -91,7 +91,7 @@ func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.
 			}
 		} else {
 			// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-			if stateAtEvent.BeforeStateSnapshotNID, err = calculateAndStoreState(db, event, roomNID); err != nil {
+			if stateAtEvent.BeforeStateSnapshotNID, err = calculateAndStoreStateBeforeEvent(db, event, roomNID); err != nil {
 				return err
 			}
 		}

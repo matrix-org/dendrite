@@ -10,7 +10,7 @@ import (
 // calculateAndStoreState calculates a snapshot of the state of a room before an event.
 // Stores the snapshot of the state in the database.
 // Returns a numeric ID for that snapshot.
-func calculateAndStoreState(
+func calculateAndStoreStateBeforeEvent(
 	db RoomEventDatabase, event gomatrixserverlib.Event, roomNID types.RoomNID,
 ) (types.StateSnapshotNID, error) {
 	// Load the state at the prev events.
@@ -25,6 +25,12 @@ func calculateAndStoreState(
 		return 0, err
 	}
 
+	return calculateAndStoreStateAfterEvents(db, roomNID, prevStates)
+}
+
+// calculateAndStoreStateAfterEvents finds the room state after the given events.
+// Stores the resulting state in the database and returns a numeric ID for that snapshot.
+func calculateAndStoreStateAfterEvents(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
 	if len(prevStates) == 0 {
 		// 2) There weren't any prev_events for this event so the state is
 		// empty.
@@ -57,7 +63,7 @@ func calculateAndStoreState(
 		// If there are too many deltas then we need to calculate the full state
 		// So fall through to calculateAndStoreStateMany
 	}
-	return calculateAndStoreStateMany(db, roomNID, prevStates)
+	return calculateAndStoreStateAfterManyEvents(db, roomNID, prevStates)
 }
 
 // maxStateBlockNIDs is the maximum number of state data blocks to use to encode a snapshot of room state.
@@ -67,10 +73,10 @@ func calculateAndStoreState(
 // TODO: Tune this to get the right balance between size and lookup performance.
 const maxStateBlockNIDs = 64
 
-// calculateAndStoreStateMany calculates the state of the room before an event
-// using the states at each of the event's prev events.
+// calculateAndStoreStateAfterManyEvents finds the room state after the given events.
+// This handles the slow path of calculateAndStoreStateAfterEvents for when there is more than one event.
 // Stores the resulting state and returns a numeric ID for the snapshot.
-func calculateAndStoreStateMany(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
+func calculateAndStoreStateAfterManyEvents(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
 	// Conflict resolution.
 	// First stage: load the state after each of the prev events.
 	combined, err := loadCombinedStateAfterEvents(db, prevStates)
