@@ -144,15 +144,11 @@ func (s *eventStatements) insertEvent(
 	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
 ) (types.EventNID, types.StateSnapshotNID, error) {
-	nids := make([]int64, len(authEventNIDs))
-	for i := range authEventNIDs {
-		nids[i] = int64(authEventNIDs[i])
-	}
 	var eventNID int64
 	var stateNID int64
 	err := s.insertEventStmt.QueryRow(
 		int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, referenceSHA256,
-		pq.Int64Array(nids),
+		eventNIDsAsArray(authEventNIDs),
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -246,11 +242,7 @@ func (s *eventStatements) selectEventID(txn *sql.Tx, eventNID types.EventNID) (e
 }
 
 func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventNIDs []types.EventNID) ([]types.StateAtEventAndReference, error) {
-	nids := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		nids[i] = int64(eventNIDs[i])
-	}
-	rows, err := txn.Stmt(s.bulkSelectStateAtEventAndReferenceStmt).Query(pq.Int64Array(nids))
+	rows, err := txn.Stmt(s.bulkSelectStateAtEventAndReferenceStmt).Query(eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -286,11 +278,7 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventN
 }
 
 func (s *eventStatements) bulkSelectEventReference(eventNIDs []types.EventNID) ([]gomatrixserverlib.EventReference, error) {
-	nids := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		nids[i] = int64(eventNIDs[i])
-	}
-	rows, err := s.bulkSelectEventReferenceStmt.Query(pq.Int64Array(nids))
+	rows, err := s.bulkSelectEventReferenceStmt.Query(eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -307,4 +295,12 @@ func (s *eventStatements) bulkSelectEventReference(eventNIDs []types.EventNID) (
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
 	}
 	return results, nil
+}
+
+func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
+	nids := make([]int64, len(eventNIDs))
+	for i := range eventNIDs {
+		nids[i] = int64(eventNIDs[i])
+	}
+	return nids
 }

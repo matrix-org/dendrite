@@ -2,7 +2,6 @@ package storage
 
 import (
 	"database/sql"
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -65,11 +64,7 @@ type eventJSONPair struct {
 }
 
 func (s *eventJSONStatements) bulkSelectEventJSON(eventNIDs []types.EventNID) ([]eventJSONPair, error) {
-	nids := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		nids[i] = int64(eventNIDs[i])
-	}
-	rows, err := s.bulkSelectEventJSONStmt.Query(pq.Int64Array(nids))
+	rows, err := s.bulkSelectEventJSONStmt.Query(eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
