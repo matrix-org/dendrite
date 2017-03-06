@@ -21,7 +21,7 @@ type RoomserverQueryAPIDatabase interface {
 	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, error)
 }
 
-// RoomserverQueryAPI is an implemenation of RoomserverQueryAPI
+// RoomserverQueryAPI is an implementation of RoomserverQueryAPI
 type RoomserverQueryAPI struct {
 	DB RoomserverQueryAPIDatabase
 }
