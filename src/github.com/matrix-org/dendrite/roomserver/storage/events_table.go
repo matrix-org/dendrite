@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const eventsSchema = `
@@ -83,6 +84,9 @@ const bulkSelectStateAtEventAndReferenceSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
 	" FROM events WHERE event_nid = ANY($1)"
 
+const bulkSelectEventReferenceSQL = "" +
+	"SELECT event_id, reference_sha256 FROM events WHERE event_nid = ANY($1)"
+
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
@@ -93,6 +97,7 @@ type eventStatements struct {
 	updateEventSentToOutputStmt            *sql.Stmt
 	selectEventIDStmt                      *sql.Stmt
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
+	bulkSelectEventReferenceStmt           *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -127,6 +132,9 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 	if s.bulkSelectStateAtEventAndReferenceStmt, err = db.Prepare(bulkSelectStateAtEventAndReferenceSQL); err != nil {
 		return
 	}
+	if s.bulkSelectEventReferenceStmt, err = db.Prepare(bulkSelectEventReferenceSQL); err != nil {
+		return
+	}
 	return
 }
 
@@ -136,15 +144,11 @@ func (s *eventStatements) insertEvent(
 	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
 ) (types.EventNID, types.StateSnapshotNID, error) {
-	nids := make([]int64, len(authEventNIDs))
-	for i := range authEventNIDs {
-		nids[i] = int64(authEventNIDs[i])
-	}
 	var eventNID int64
 	var stateNID int64
 	err := s.insertEventStmt.QueryRow(
 		int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, referenceSHA256,
-		pq.Int64Array(nids),
+		eventNIDsAsArray(authEventNIDs),
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -238,11 +242,7 @@ func (s *eventStatements) selectEventID(txn *sql.Tx, eventNID types.EventNID) (e
 }
 
 func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventNIDs []types.EventNID) ([]types.StateAtEventAndReference, error) {
-	nids := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		nids[i] = int64(eventNIDs[i])
-	}
-	rows, err := txn.Stmt(s.bulkSelectStateAtEventAndReferenceStmt).Query(pq.Int64Array(nids))
+	rows, err := txn.Stmt(s.bulkSelectStateAtEventAndReferenceStmt).Query(eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -275,4 +275,32 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventN
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
 	}
 	return results, nil
+}
+
+func (s *eventStatements) bulkSelectEventReference(eventNIDs []types.EventNID) ([]gomatrixserverlib.EventReference, error) {
+	rows, err := s.bulkSelectEventReferenceStmt.Query(eventNIDsAsArray(eventNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
+			return nil, err
+		}
+	}
+	if i != len(eventNIDs) {
+		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
+	}
+	return results, nil
+}
+
+func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
+	nids := make([]int64, len(eventNIDs))
+	for i := range eventNIDs {
+		nids[i] = int64(eventNIDs[i])
+	}
+	return nids
 }

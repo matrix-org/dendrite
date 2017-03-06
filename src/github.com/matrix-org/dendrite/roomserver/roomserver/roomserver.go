@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/input"
+	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	sarama "gopkg.in/Shopify/sarama.v1"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -14,6 +16,7 @@ var (
 	kafkaURIs            = strings.Split(os.Getenv("KAFKA_URIS"), ",")
 	inputRoomEventTopic  = os.Getenv("TOPIC_INPUT_ROOM_EVENT")
 	outputRoomEventTopic = os.Getenv("TOPIC_OUTPUT_ROOM_EVENT")
+	bindAddr             = os.Getenv("BIND_ADDRESS")
 )
 
 func main() {
@@ -44,9 +47,14 @@ func main() {
 		panic(err)
 	}
 
+	queryAPI := query.RoomserverQueryAPI{
+		DB: db,
+	}
+
+	queryAPI.SetupHTTP(http.DefaultServeMux)
+
 	fmt.Println("Started roomserver")
 
-	// Wait forever.
 	// TODO: Implement clean shutdown.
-	select {}
+	http.ListenAndServe(bindAddr, nil)
 }

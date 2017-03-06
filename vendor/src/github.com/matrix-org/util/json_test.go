@@ -164,8 +164,8 @@ func TestGetLogger(t *testing.T) {
 
 	noLoggerInReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	ctxLogger = GetLogger(noLoggerInReq.Context())
-	if ctxLogger != nil {
-		t.Errorf("TestGetLogger wanted nil logger, got '%v'", ctxLogger)
+	if ctxLogger == nil {
+		t.Errorf("TestGetLogger wanted logger, got nil")
 	}
 }
 

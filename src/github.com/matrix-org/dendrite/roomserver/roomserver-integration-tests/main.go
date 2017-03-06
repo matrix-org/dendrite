@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"os"
 	"os/exec"
@@ -17,8 +18,12 @@ var (
 	zookeeperURI = defaulting(os.Getenv("ZOOKEEPER_URI"), "localhost:2181")
 	// The URI the kafka server is listening on.
 	kafkaURI = defaulting(os.Getenv("KAFKA_URIS"), "localhost:9092")
+	// The address the roomserver should listen on.
+	roomserverAddr = defaulting(os.Getenv("ROOMSERVER_URI"), "localhost:9876")
 	// How long to wait for the roomserver to write the expected output messages.
-	timeoutString = defaulting(os.Getenv("TIMEOUT"), "10s")
+	// This needs to be high enough to account for the time it takes to create
+	// the postgres database tables which can take a while on travis.
+	timeoutString = defaulting(os.Getenv("TIMEOUT"), "60s")
 	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
 	// The name of the test database to create.
@@ -91,7 +96,7 @@ func writeToTopic(topic string, data []string) error {
 // messages is reached or after a timeout. It kills the command before it returns.
 // It returns a list of the messages read from the command on success or an error
 // on failure.
-func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int) ([]string, error) {
+func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int, checkQueryAPI func()) ([]string, error) {
 	type result struct {
 		// data holds all of stdout on success.
 		data []byte
@@ -111,7 +116,17 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int) ([]string, e
 	// Run the command, read the messages and wait for a timeout in parallel.
 	go func() {
 		// Read all of stdout.
+		defer func() {
+			if err := recover(); err != nil {
+				if errv, ok := err.(error); ok {
+					done <- result{nil, errv}
+				} else {
+					panic(err)
+				}
+			}
+		}()
 		data, err := readCmd.Output()
+		checkQueryAPI()
 		done <- result{data, err}
 	}()
 	go func() {
@@ -157,7 +172,16 @@ func deleteTopic(topic string) error {
 	return cmd.Run()
 }
 
-func testRoomServer(input []string, wantOutput []string) {
+// testRoomserver is used to run integration tests against a single roomserver.
+// It creates new kafka topics for the input and output of the roomserver.
+// It writes the input messages to the input kafka topic, formatting each message
+// as canonical JSON so that it fits on a single line.
+// It then runs the roomserver and waits for a number of messages to be written
+// to the output topic.
+// Once those messages have been written it runs the checkQueries function passing
+// a api.RoomserverQueryAPI client. The caller can use this function to check the
+// behaviour of the query API.
+func testRoomserver(input []string, wantOutput []string, checkQueries func(api.RoomserverQueryAPI)) {
 	const (
 		inputTopic  = "roomserverInput"
 		outputTopic = "roomserverOutput"
@@ -191,10 +215,14 @@ func testRoomServer(input []string, wantOutput []string) {
 		fmt.Sprintf("KAFKA_URIS=%s", kafkaURI),
 		fmt.Sprintf("TOPIC_INPUT_ROOM_EVENT=%s", inputTopic),
 		fmt.Sprintf("TOPIC_OUTPUT_ROOM_EVENT=%s", outputTopic),
+		fmt.Sprintf("BIND_ADDRESS=%s", roomserverAddr),
 	)
 	cmd.Stderr = os.Stderr
 
-	gotOutput, err := runAndReadFromTopic(cmd, outputTopic, 1)
+	gotOutput, err := runAndReadFromTopic(cmd, outputTopic, len(wantOutput), func() {
+		queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+roomserverAddr, nil)
+		checkQueries(queryAPI)
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -334,7 +362,21 @@ func main() {
 		}`,
 	}
 
-	testRoomServer(input, want)
+	testRoomserver(input, want, func(q api.RoomserverQueryAPI) {
+		var response api.QueryLatestEventsAndStateResponse
+		if err := q.QueryLatestEventsAndState(
+			&api.QueryLatestEventsAndStateRequest{RoomID: "!HCXfdvrfksxuYnIFiJ:matrix.org"},
+			&response,
+		); err != nil {
+			panic(err)
+		}
+		if !response.RoomExists {
+			panic(fmt.Errorf(`Wanted room "!HCXfdvrfksxuYnIFiJ:matrix.org" to exist`))
+		}
+		if len(response.LatestEvents) != 1 || response.LatestEvents[0].EventID != "$1463671339126270PnVwC:matrix.org" {
+			panic(fmt.Errorf(`Wanted "$1463671339126270PnVwC:matrix.org" to be the latest event got %#v`, response.LatestEvents))
+		}
+	})
 
 	fmt.Println("==PASSED==", os.Args[0])
 }
