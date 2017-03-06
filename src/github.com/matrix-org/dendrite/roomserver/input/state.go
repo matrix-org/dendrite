@@ -9,7 +9,7 @@ import (
 
 // calculateAndStoreState calculates a snapshot of the state of a room before an event.
 // Stores the snapshot of the state in the database.
-// Returns a numeric ID for that snapshot.
+// Returns a numeric ID for the snapshot of the state before the event.
 func calculateAndStoreStateBeforeEvent(
 	db RoomEventDatabase, event gomatrixserverlib.Event, roomNID types.RoomNID,
 ) (types.StateSnapshotNID, error) {
