@@ -19,9 +19,9 @@ CREATE TABLE IF NOT EXISTS rooms (
     latest_event_nids BIGINT[] NOT NULL DEFAULT '{}'::BIGINT[],
     -- The last event written to the output log for this room.
     last_event_sent_nid BIGINT NOT NULL DEFAULT 0,
-	-- The state of the room after the current set of latest events.
-	-- This will be 0 if there are no latest events in the room.
-	state_snapshot_nid BIGINT NOT NULL DEFAULT 0
+    -- The state of the room after the current set of latest events.
+    -- This will be 0 if there are no latest events in the room.
+    state_snapshot_nid BIGINT NOT NULL DEFAULT 0
 );
 `
 
