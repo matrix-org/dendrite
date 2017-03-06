@@ -19,7 +19,7 @@ type QueryLatestEventsAndStateRequest struct {
 	// The roomID to query the latest events for.
 	RoomID string
 	// The state key tuples to fetch from the room current state.
-	// If this list is empty or nil then no events are returned.
+	// If this list is empty or nil then no state events are returned.
 	StateToFetch []StateKeyTuple
 }
 
