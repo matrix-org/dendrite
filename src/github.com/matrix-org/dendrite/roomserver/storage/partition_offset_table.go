@@ -36,13 +36,11 @@ func (s *partitionOffsetStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.selectPartitionOffsetsStmt, err = db.Prepare(selectPartitionOffsetsSQL); err != nil {
-		return
-	}
-	if s.upsertPartitionOffsetStmt, err = db.Prepare(upsertPartitionOffsetsSQL); err != nil {
-		return
-	}
-	return
+
+	return statementList{
+		{&s.selectPartitionOffsetsStmt, selectPartitionOffsetsSQL},
+		{&s.upsertPartitionOffsetStmt, upsertPartitionOffsetsSQL},
+	}.prepare(db)
 }
 
 func (s *partitionOffsetStatements) selectPartitionOffsets(topic string) ([]types.PartitionOffset, error) {

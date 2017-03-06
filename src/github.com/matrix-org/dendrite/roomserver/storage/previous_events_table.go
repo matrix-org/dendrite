@@ -50,13 +50,11 @@ func (s *previousEventStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertPreviousEventStmt, err = db.Prepare(insertPreviousEventSQL); err != nil {
-		return
-	}
-	if s.selectPreviousEventExistsStmt, err = db.Prepare(selectPreviousEventExistsSQL); err != nil {
-		return
-	}
-	return
+
+	return statementList{
+		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
+		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},
+	}.prepare(db)
 }
 
 func (s *previousEventStatements) insertPreviousEvent(txn *sql.Tx, previousEventID string, previousEventReferenceSHA256 []byte, eventNID types.EventNID) error {

@@ -44,13 +44,10 @@ func (s *eventJSONStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertEventJSONStmt, err = db.Prepare(insertEventJSONSQL); err != nil {
-		return
-	}
-	if s.bulkSelectEventJSONStmt, err = db.Prepare(bulkSelectEventJSONSQL); err != nil {
-		return
-	}
-	return
+	return statementList{
+		{&s.insertEventJSONStmt, insertEventJSONSQL},
+		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},
+	}.prepare(db)
 }
 
 func (s *eventJSONStatements) insertEventJSON(eventNID types.EventNID, eventJSON []byte) error {

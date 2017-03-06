@@ -52,13 +52,11 @@ func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertStateStmt, err = db.Prepare(insertStateSQL); err != nil {
-		return
-	}
-	if s.bulkSelectStateBlockNIDsStmt, err = db.Prepare(bulkSelectStateBlockNIDsSQL); err != nil {
-		return
-	}
-	return
+
+	return statementList{
+		{&s.insertStateStmt, insertStateSQL},
+		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
+	}.prepare(db)
 }
 
 func (s *stateSnapshotStatements) insertState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID) (stateNID types.StateSnapshotNID, err error) {

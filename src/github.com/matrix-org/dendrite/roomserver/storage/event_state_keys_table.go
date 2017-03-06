@@ -53,16 +53,11 @@ func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertEventStateKeyNIDStmt, err = db.Prepare(insertEventStateKeyNIDSQL); err != nil {
-		return
-	}
-	if s.selectEventStateKeyNIDStmt, err = db.Prepare(selectEventStateKeyNIDSQL); err != nil {
-		return
-	}
-	if s.bulkSelectEventStateKeyNIDStmt, err = db.Prepare(bulkSelectEventStateKeyNIDSQL); err != nil {
-		return
-	}
-	return
+	return statementList{
+		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
+		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
+		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
+	}.prepare(db)
 }
 
 func (s *eventStateKeyStatements) insertEventStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {

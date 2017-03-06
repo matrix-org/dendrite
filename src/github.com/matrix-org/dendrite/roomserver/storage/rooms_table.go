@@ -56,22 +56,13 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertRoomNIDStmt, err = db.Prepare(insertRoomNIDSQL); err != nil {
-		return
-	}
-	if s.selectRoomNIDStmt, err = db.Prepare(selectRoomNIDSQL); err != nil {
-		return
-	}
-	if s.selectLatestEventNIDsStmt, err = db.Prepare(selectLatestEventNIDsSQL); err != nil {
-		return
-	}
-	if s.selectLatestEventNIDsForUpdateStmt, err = db.Prepare(selectLatestEventNIDsForUpdateSQL); err != nil {
-		return
-	}
-	if s.updateLatestEventNIDsStmt, err = db.Prepare(updateLatestEventNIDsSQL); err != nil {
-		return
-	}
-	return
+	return statementList{
+		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
+		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
+		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
+		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
+		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
+	}.prepare(db)
 }
 
 func (s *roomStatements) insertRoomNID(roomID string) (types.RoomNID, error) {
