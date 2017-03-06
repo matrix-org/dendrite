@@ -133,6 +133,12 @@ type StateEntryList struct {
 // (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
 //  lock on the row holding the latest events for the room.)
 type RoomRecentEventsUpdater interface {
+	// The latest event IDs and state in the room.
+	LatestEvents() []StateAtEventAndReference
+	// The event ID of the latest event sent in the room.
+	LastEventIDSent() string
+	// The current state of the room.
+	CurrentStateSnapshotNID() StateSnapshotNID
 	// Store the previous events referenced by an event.
 	// This adds the event NID to an entry in the database for each of the previous events.
 	// If there isn't an entry for one of previous events then an entry is created.
@@ -143,7 +149,10 @@ type RoomRecentEventsUpdater interface {
 	IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error)
 	// Set the list of latest events for the room.
 	// This replaces the current list stored in the database with the given list
-	SetLatestEvents(roomNID RoomNID, latest []StateAtEventAndReference, lastEventNIDSent EventNID) error
+	SetLatestEvents(
+		roomNID RoomNID, latest []StateAtEventAndReference, lastEventNIDSent EventNID,
+		currentStateSnapshotNID StateSnapshotNID,
+	) error
 	// Check if the event has already be written to the output logs.
 	HasEventBeenSent(eventNID EventNID) (bool, error)
 	// Mark the event as having been sent to the output logs.

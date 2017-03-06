@@ -356,7 +356,7 @@ func main() {
 			},
 			"VisibilityEventIDs":null,
 			"LatestEventIDs":["$1463671339126270PnVwC:matrix.org"],
-			"AddsStateEventIDs":null,
+			"AddsStateEventIDs":["$1463671337126266wrSBX:matrix.org", "$1463671339126270PnVwC:matrix.org"],
 			"RemovesStateEventIDs":null,
 			"LastSentEventID":""
 		}`,

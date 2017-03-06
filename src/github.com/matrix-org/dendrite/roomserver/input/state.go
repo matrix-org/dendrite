@@ -113,6 +113,98 @@ func calculateAndStoreStateAfterManyEvents(db RoomEventDatabase, roomNID types.R
 	return db.AddState(roomNID, nil, state)
 }
 
+// differenceBetweeenStateSnapshots works out which state entries have been added and removed between two snapshots.
+func differenceBetweeenStateSnapshots(db RoomEventDatabase, oldStateNID, newStateNID types.StateSnapshotNID) (
+	removed, added []types.StateEntry, err error,
+) {
+	if oldStateNID == newStateNID {
+		// If the snapshot NIDs are the same then nothing has changed
+		return nil, nil, nil
+	}
+
+	var oldEntries []types.StateEntry
+	var newEntries []types.StateEntry
+	if oldStateNID != 0 {
+		oldEntries, err = loadStateAtSnapshot(db, oldStateNID)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	if newStateNID != 0 {
+		newEntries, err = loadStateAtSnapshot(db, newStateNID)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	var oldI int
+	var newI int
+	for {
+		switch {
+		case oldI == len(oldEntries):
+			// We've reached the end of the old entries.
+			// The rest of the new list must have been newly added.
+			added = append(added, newEntries[newI:]...)
+			return
+		case newI == len(newEntries):
+			// We've reached the end of the new entries.
+			// The rest of the old list must be have been removed.
+			removed = append(removed, oldEntries[oldI:]...)
+			return
+		case oldEntries[oldI] == newEntries[newI]:
+			// The entry is in both lists so skip over it.
+			oldI++
+			newI++
+		case oldEntries[oldI].LessThan(newEntries[newI]):
+			// The lists are sorted so the old entry being less than the new entry means that it only appears in the old list.
+			removed = append(removed, oldEntries[oldI])
+			oldI++
+		default:
+			// Reaching the default case implies that the new entry is less than the old entry.
+			// Since the lists are sorted this means that it only appears in the new list.
+			added = append(added, newEntries[newI])
+			newI++
+		}
+	}
+}
+
+// loadStateAtSnapshot loads the full state of a room at a particular snapshot.
+// This is typically the state before an event or the current state of a room.
+// Returns a sorted list of state entries or an error if there was a problem talking to the database.
+func loadStateAtSnapshot(db RoomEventDatabase, stateNID types.StateSnapshotNID) ([]types.StateEntry, error) {
+	stateBlockNIDLists, err := db.StateBlockNIDs([]types.StateSnapshotNID{stateNID})
+	if err != nil {
+		return nil, err
+	}
+	stateBlockNIDList := stateBlockNIDLists[0]
+
+	stateEntryLists, err := db.StateEntries(stateBlockNIDList.StateBlockNIDs)
+	if err != nil {
+		return nil, err
+	}
+	stateEntriesMap := stateEntryListMap(stateEntryLists)
+
+	// Combined all the state entries for this snapshot.
+	// The order of state data NIDs in the list tells us the order to combine them in.
+	var fullState []types.StateEntry
+	for _, stateBlockNID := range stateBlockNIDList.StateBlockNIDs {
+		entries, ok := stateEntriesMap.lookup(stateBlockNID)
+		if !ok {
+			// This should only get hit if the database is corrupt.
+			// It should be impossible for an event to reference a NID that doesn't exist
+			panic(fmt.Errorf("Corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+		}
+		fullState = append(fullState, entries...)
+	}
+
+	// Stable sort so that the most recent entry for each state key stays
+	// remains later in the list than the older entries for the same state key.
+	sort.Stable(stateEntryByStateKeySorter(fullState))
+	// Unique returns the last entry and hence the most recent entry for each state key.
+	fullState = fullState[:unique(stateEntryByStateKeySorter(fullState))]
+	return fullState, nil
+}
+
 // loadCombinedStateAfterEvents loads a snapshot of the state after each of the events
 // and combines those snapshots together into a single list.
 func loadCombinedStateAfterEvents(db RoomEventDatabase, prevStates []types.StateAtEvent) ([]types.StateEntry, error) {
@@ -152,7 +244,7 @@ func loadCombinedStateAfterEvents(db RoomEventDatabase, prevStates []types.State
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateSnapshotNID))
+			panic(fmt.Errorf("Corrupt DB: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
 		}
 
 		// Combined all the state entries for this snapshot.
@@ -163,7 +255,7 @@ func loadCombinedStateAfterEvents(db RoomEventDatabase, prevStates []types.State
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				panic(fmt.Errorf("Corrupt DB: Missing state numeric ID %d", prevState.BeforeStateSnapshotNID))
+				panic(fmt.Errorf("Corrupt DB: Missing state block numeric ID %d", stateBlockNID))
 			}
 			fullState = append(fullState, entries...)
 		}
