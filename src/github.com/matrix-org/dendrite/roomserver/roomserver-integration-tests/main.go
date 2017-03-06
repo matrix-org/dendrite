@@ -21,6 +21,8 @@ var (
 	// The address the roomserver should listen on.
 	roomserverAddr = defaulting(os.Getenv("ROOMSERVER_URI"), "localhost:9876")
 	// How long to wait for the roomserver to write the expected output messages.
+	// This needs to be high enough to account for the time it takes to create
+	// the postgres database tables which can take a while on travis.
 	timeoutString = defaulting(os.Getenv("TIMEOUT"), "60s")
 	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
@@ -114,16 +116,16 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int, checkQueryAP
 	// Run the command, read the messages and wait for a timeout in parallel.
 	go func() {
 		// Read all of stdout.
-		data, err := readCmd.Output()
 		defer func() {
 			if err := recover(); err != nil {
 				if errv, ok := err.(error); ok {
-					done <- result{data, errv}
+					done <- result{nil, errv}
 				} else {
 					panic(err)
 				}
 			}
 		}()
+		data, err := readCmd.Output()
 		checkQueryAPI()
 		done <- result{data, err}
 	}()
@@ -170,7 +172,7 @@ func deleteTopic(topic string) error {
 	return cmd.Run()
 }
 
-// testRoomserver is used run integration tests against a single roomserver.
+// testRoomserver is used to run integration tests against a single roomserver.
 // It creates new kafka topics for the input and output of the roomserver.
 // It writes the input messages to the input kafka topic, formatting each message
 // as canonical JSON so that it fits on a single line.
@@ -369,10 +371,10 @@ func main() {
 			panic(err)
 		}
 		if !response.RoomExists {
-			panic(fmt.Errorf("Wanted room \"!HCXfdvrfksxuYnIFiJ:matrix.org\" to exist"))
+			panic(fmt.Errorf(`Wanted room "!HCXfdvrfksxuYnIFiJ:matrix.org" to exist`))
 		}
 		if len(response.LatestEvents) != 1 || response.LatestEvents[0].EventID != "$1463671339126270PnVwC:matrix.org" {
-			panic(fmt.Errorf("Wanted \"$1463671339126270PnVwC:matrix.org\" to be the latest event got %#v", response.LatestEvents))
+			panic(fmt.Errorf(`Wanted "$1463671339126270PnVwC:matrix.org" to be the latest event got %#v`, response.LatestEvents))
 		}
 	})
 
