@@ -46,7 +46,7 @@ type RoomserverQueryAPI interface {
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
-const RoomserverQueryLatestEventsAndStatePath = "/api/Roomserver/QueryLatestEventsAndState"
+const RoomserverQueryLatestEventsAndStatePath = "/api/roomserver/QueryLatestEventsAndState"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
