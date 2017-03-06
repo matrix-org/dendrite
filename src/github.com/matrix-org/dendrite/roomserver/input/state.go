@@ -61,7 +61,7 @@ func calculateAndStoreStateAfterEvents(db RoomEventDatabase, roomNID types.RoomN
 			)
 		}
 		// If there are too many deltas then we need to calculate the full state
-		// So fall through to calculateAndStoreStateMany
+		// So fall through to calculateAndStoreStateAfterManyEvents
 	}
 	return calculateAndStoreStateAfterManyEvents(db, roomNID, prevStates)
 }
@@ -185,7 +185,7 @@ func loadStateAtSnapshot(db RoomEventDatabase, stateNID types.StateSnapshotNID) 
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
 
 	// Combined all the state entries for this snapshot.
-	// The order of state data NIDs in the list tells us the order to combine them in.
+	// The order of state block NIDs in the list tells us the order to combine them in.
 	var fullState []types.StateEntry
 	for _, stateBlockNID := range stateBlockNIDList.StateBlockNIDs {
 		entries, ok := stateEntriesMap.lookup(stateBlockNID)
@@ -248,7 +248,7 @@ func loadCombinedStateAfterEvents(db RoomEventDatabase, prevStates []types.State
 		}
 
 		// Combined all the state entries for this snapshot.
-		// The order of state data NIDs in the list tells us the order to combine them in.
+		// The order of state block NIDs in the list tells us the order to combine them in.
 		var fullState []types.StateEntry
 		for _, stateBlockNID := range stateBlockNIDs {
 			entries, ok := stateEntriesMap.lookup(stateBlockNID)
