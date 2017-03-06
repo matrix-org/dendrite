@@ -295,6 +295,7 @@ func (s *eventStatements) bulkSelectEventReference(eventNIDs []types.EventNID) (
 	return results, nil
 }
 
+// bulkSelectEventID returns a map from numeric event ID to string event ID.
 func (s *eventStatements) bulkSelectEventID(eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
 	rows, err := s.bulkSelectEventIDStmt.Query(eventNIDsAsArray(eventNIDs))
 	if err != nil {
