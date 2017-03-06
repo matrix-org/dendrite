@@ -25,6 +25,7 @@ func calculateAndStoreStateBeforeEvent(
 		return 0, err
 	}
 
+	// The state before this event will be the state after the events that came before it.
 	return calculateAndStoreStateAfterEvents(db, roomNID, prevStates)
 }
 
