@@ -135,7 +135,7 @@ type StateEntryList struct {
 type RoomRecentEventsUpdater interface {
 	// The latest event IDs and state in the room.
 	LatestEvents() []StateAtEventAndReference
-	// The event ID of the latest event sent in the room.
+	// The event ID of the latest event written to the output log in the room.
 	LastEventIDSent() string
 	// The current state of the room.
 	CurrentStateSnapshotNID() StateSnapshotNID
