@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/common"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
 )
 
@@ -21,6 +23,26 @@ type createRoomRequest struct {
 	CreationContent map[string]interface{} `json:"creation_content"`
 	InitialState    json.RawMessage        `json:"initial_state"` // TODO
 	RoomAliasName   string                 `json:"room_alias_name"`
+}
+
+func (r createRoomRequest) Validate() *util.JSONResponse {
+	whitespace := "\t\n\x0b\x0c\r " // https://docs.python.org/2/library/string.html#string.whitespace
+	// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/handlers/room.py#L81
+	if strings.ContainsAny(r.RoomAliasName, whitespace) {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("room_alias_name cannot contain whitespace"),
+		}
+	}
+	for _, userID := range r.Invite {
+		if _, err := common.UserIDFromString(userID); err != nil {
+			return &util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.BadJSON("Entries in 'invite' must be valid user IDs"),
+			}
+		}
+	}
+	return nil
 }
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
@@ -42,25 +64,22 @@ func CreateRoom(req *http.Request) util.JSONResponse {
 		return *resErr
 	}
 	// TODO: apply rate-limit
-	// TODO: parse room_alias_name
-	// TODO: parse invite list (all valid user ids)
-	// TODO: invite 3pid list (all valid 3pids)
-	// TODO: visibility
+
+	if resErr = r.Validate(); resErr != nil {
+		return *resErr
+	}
+
+	// TODO: visibility/presets/raw initial state/creation content
 
 	hostname := "localhost"
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), hostname)
+	// TODO: Check room ID doesn't clash with an existing one
+	// TODO: Create room alias association
 
 	logger.WithFields(log.Fields{
 		"userID": userID,
 		"roomID": roomID,
 	}).Info("Creating room")
-
-	// TODO: Check room ID doesn't clash with an existing one
-	// TODO: Create room alias association
-
-	// TODO: handle preset
-	// TODO: handle raw initial state
-	// TODO: handle creation content
 
 	// send events into the room in order of:
 	//  1- m.room.create
