@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"sort"
 )
 
@@ -88,9 +89,8 @@ func calculateAndStoreStateAfterManyEvents(db RoomEventDatabase, roomNID types.R
 	// Collect all the entries with the same type and key together.
 	// We don't care about the order here because the conflict resolution
 	// algorithm doesn't depend on the order of the prev events.
-	sort.Sort(stateEntrySorter(combined))
 	// Remove duplicate entires.
-	combined = combined[:unique(stateEntrySorter(combined))]
+	combined = combined[:util.SortAndUnique(stateEntrySorter(combined))]
 
 	// Find the conflicts
 	conflicts := findDuplicateStateKeys(combined)
@@ -202,7 +202,7 @@ func loadStateAtSnapshot(db RoomEventDatabase, stateNID types.StateSnapshotNID) 
 	// remains later in the list than the older entries for the same state key.
 	sort.Stable(stateEntryByStateKeySorter(fullState))
 	// Unique returns the last entry and hence the most recent entry for each state key.
-	fullState = fullState[:unique(stateEntryByStateKeySorter(fullState))]
+	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
 	return fullState, nil
 }
 
@@ -270,7 +270,7 @@ func loadCombinedStateAfterEvents(db RoomEventDatabase, prevStates []types.State
 		// remains later in the list than the older entries for the same state key.
 		sort.Stable(stateEntryByStateKeySorter(fullState))
 		// Unique returns the last entry and hence the most recent entry for each state key.
-		fullState = fullState[:unique(stateEntryByStateKeySorter(fullState))]
+		fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
 		// Add the full state for this StateSnapshotNID.
 		combined = append(combined, fullState...)
 	}
@@ -357,8 +357,7 @@ func (s stateNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
 func (s stateNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 func uniqueStateSnapshotNIDs(nids []types.StateSnapshotNID) []types.StateSnapshotNID {
-	sort.Sort(stateNIDSorter(nids))
-	return nids[:unique(stateNIDSorter(nids))]
+	return nids[:util.SortAndUnique(stateNIDSorter(nids))]
 }
 
 type stateBlockNIDSorter []types.StateBlockNID
@@ -368,37 +367,5 @@ func (s stateBlockNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
 func (s stateBlockNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 func uniqueStateBlockNIDs(nids []types.StateBlockNID) []types.StateBlockNID {
-	sort.Sort(stateBlockNIDSorter(nids))
-	return nids[:unique(stateBlockNIDSorter(nids))]
-}
-
-// Remove duplicate items from a sorted list.
-// Takes the same interface as sort.Sort
-// Returns the length of the data without duplicates
-// Uses the last occurance of a duplicate.
-// O(n).
-func unique(data sort.Interface) int {
-	if data.Len() == 0 {
-		return 0
-	}
-	length := data.Len()
-	// j is the next index to output an element to.
-	j := 0
-	for i := 1; i < length; i++ {
-		// If the previous element is less than this element then they are
-		// not equal. Otherwise they must be equal because the list is sorted.
-		// If they are equal then we move onto the next element.
-		if data.Less(i-1, i) {
-			// "Write" the previous element to the output position by swaping
-			// the elements.
-			// Note that if the list has no duplicates then i-1 == j so the
-			// swap does nothing. (This assumes that data.Swap(a,b) nops if a==b)
-			data.Swap(i-1, j)
-			// Advance to the next output position in the list.
-			j++
-		}
-	}
-	// Output the last element.
-	data.Swap(length-1, j)
-	return j + 1
+	return nids[:util.SortAndUnique(stateBlockNIDSorter(nids))]
 }
