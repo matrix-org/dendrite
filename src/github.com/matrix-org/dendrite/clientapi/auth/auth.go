@@ -10,9 +10,9 @@ import (
 )
 
 // VerifyAccessToken verifies that an access token was supplied in the given HTTP request
-// and returns the user ID it corresponds to. Returns err if there was a fatal problem checking
-// the token. Returns resErr (an error response which can be sent to the client) if the token is invalid.
-func VerifyAccessToken(req *http.Request) (userID string, resErr *util.JSONResponse, err error) {
+// and returns the user ID it corresponds to. Returns resErr (an error response which can be
+// sent to the client) if the token is invalid or there was a problem querying the database.
+func VerifyAccessToken(req *http.Request) (userID string, resErr *util.JSONResponse) {
 	token, tokenErr := extractAccessToken(req)
 	if tokenErr != nil {
 		resErr = &util.JSONResponse{
@@ -22,7 +22,8 @@ func VerifyAccessToken(req *http.Request) (userID string, resErr *util.JSONRespo
 		return
 	}
 	if token == "fail" {
-		err = fmt.Errorf("Fatal error")
+		res := util.ErrorResponse(fmt.Errorf("Fatal error"))
+		resErr = &res
 	}
 	// TODO: Check the token against the database
 	return
