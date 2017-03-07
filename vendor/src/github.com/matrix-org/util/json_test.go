@@ -194,6 +194,28 @@ func TestProtect(t *testing.T) {
 	}
 }
 
+func TestProtectWithoutLogger(t *testing.T) {
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
+	mockWriter := httptest.NewRecorder()
+	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+	h := Protect(func(w http.ResponseWriter, req *http.Request) {
+		panic("oh noes!")
+	})
+
+	h(mockWriter, mockReq)
+
+	expectCode := 500
+	if mockWriter.Code != expectCode {
+		t.Errorf("TestProtect wanted HTTP status %d, got %d", expectCode, mockWriter.Code)
+	}
+
+	expectBody := `{"message":"Internal Server Error"}`
+	actualBody := mockWriter.Body.String()
+	if actualBody != expectBody {
+		t.Errorf("TestProtect wanted body %s, got %s", expectBody, actualBody)
+	}
+}
+
 func TestWithCORSOptions(t *testing.T) {
 	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	mockWriter := httptest.NewRecorder()

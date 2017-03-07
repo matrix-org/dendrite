@@ -80,7 +80,7 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger := req.Context().Value(ctxValueLogger).(*log.Entry)
+				logger := GetLogger(req.Context())
 				logger.WithFields(log.Fields{
 					"panic": r,
 				}).Errorf(
@@ -108,7 +108,7 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 		ctx = context.WithValue(ctx, ctxValueRequestID, reqID)
 		req = req.WithContext(ctx)
 
-		logger := req.Context().Value(ctxValueLogger).(*log.Entry)
+		logger := GetLogger(req.Context())
 		logger.Print("Incoming request")
 
 		res := handler.OnIncomingRequest(req)
@@ -122,7 +122,7 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 }
 
 func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
-	logger := req.Context().Value(ctxValueLogger).(*log.Entry)
+	logger := GetLogger(req.Context())
 
 	// Set custom headers
 	if res.Headers != nil {
