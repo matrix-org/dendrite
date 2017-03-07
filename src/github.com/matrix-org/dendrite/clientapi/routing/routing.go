@@ -17,6 +17,9 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(servMux *http.ServeMux, httpClient *http.Client) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux.Handle("/createRoom", make("createRoom", wrap(func(req *http.Request) util.JSONResponse {
+		return writers.CreateRoom(req)
+	})))
 	r0mux.Handle("/sync", make("sync", wrap(func(req *http.Request) util.JSONResponse {
 		return readers.Sync(req)
 	})))
