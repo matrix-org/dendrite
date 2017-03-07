@@ -10,7 +10,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// http://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
+// https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomRequest struct {
 	Invite          []string               `json:"invite"`
 	Name            string                 `json:"name"`
