@@ -326,6 +326,21 @@ func (e Event) Depth() int64 {
 	return e.fields.Depth
 }
 
+// UnmarshalJSON implements json.Unmarshaller assuming the Event is from an untrusted source.
+// This will cause more checks than might be necessary but is probably better to be safe than sorry.
+func (e *Event) UnmarshalJSON(data []byte) (err error) {
+	*e, err = NewEventFromUntrustedJSON(data)
+	return
+}
+
+// MarshalJSON implements json.Marshaller
+func (e Event) MarshalJSON() ([]byte, error) {
+	if e.eventJSON == nil {
+		return nil, fmt.Errorf("gomatrixserverlib: cannot serialise uninitialised Event")
+	}
+	return e.eventJSON, nil
+}
+
 // UnmarshalJSON implements json.Unmarshaller
 func (er *EventReference) UnmarshalJSON(data []byte) error {
 	var tuple []rawJSON

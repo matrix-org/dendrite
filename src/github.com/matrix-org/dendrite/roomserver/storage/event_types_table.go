@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -66,9 +67,16 @@ const insertEventTypeNIDSQL = "" +
 const selectEventTypeNIDSQL = "" +
 	"SELECT event_type_nid FROM event_types WHERE event_type = $1"
 
+// Bulk lookup from string event type to numeric ID for that event type.
+// Takes an array of strings as the query parameter.
+const bulkSelectEventTypeNIDSQL = "" +
+	"SELECT event_type, event_type_nid FROM event_types" +
+	" WHERE event_type = ANY($1)"
+
 type eventTypeStatements struct {
-	insertEventTypeNIDStmt *sql.Stmt
-	selectEventTypeNIDStmt *sql.Stmt
+	insertEventTypeNIDStmt     *sql.Stmt
+	selectEventTypeNIDStmt     *sql.Stmt
+	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
 func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
@@ -80,6 +88,7 @@ func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
 	return statementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
+		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
 	}.prepare(db)
 }
 
@@ -93,4 +102,23 @@ func (s *eventTypeStatements) selectEventTypeNID(eventType string) (types.EventT
 	var eventTypeNID int64
 	err := s.selectEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
+}
+
+func (s *eventTypeStatements) bulkSelectEventTypeNID(eventTypes []string) (map[string]types.EventTypeNID, error) {
+	rows, err := s.bulkSelectEventTypeNIDStmt.Query(pq.StringArray(eventTypes))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]types.EventTypeNID, len(eventTypes))
+	for rows.Next() {
+		var eventType string
+		var eventTypeNID int64
+		if err := rows.Scan(&eventType, &eventTypeNID); err != nil {
+			return nil, err
+		}
+		result[eventType] = types.EventTypeNID(eventTypeNID)
+	}
+	return result, nil
 }

@@ -35,7 +35,7 @@ const selectRoomNIDSQL = "" +
 	"SELECT room_nid FROM rooms WHERE room_id = $1"
 
 const selectLatestEventNIDsSQL = "" +
-	"SELECT latest_event_nids FROM rooms WHERE room_nid = $1"
+	"SELECT latest_event_nids, state_snapshot_nid FROM rooms WHERE room_nid = $1"
 
 const selectLatestEventNIDsForUpdateSQL = "" +
 	"SELECT latest_event_nids, last_event_sent_nid, state_snapshot_nid FROM rooms WHERE room_nid = $1 FOR UPDATE"
@@ -77,17 +77,18 @@ func (s *roomStatements) selectRoomNID(roomID string) (types.RoomNID, error) {
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) selectLatestEventNIDs(roomNID types.RoomNID) ([]types.EventNID, error) {
+func (s *roomStatements) selectLatestEventNIDs(roomNID types.RoomNID) ([]types.EventNID, types.StateSnapshotNID, error) {
 	var nids pq.Int64Array
-	err := s.selectLatestEventNIDsStmt.QueryRow(int64(roomNID)).Scan(&nids)
+	var stateSnapshotNID int64
+	err := s.selectLatestEventNIDsStmt.QueryRow(int64(roomNID)).Scan(&nids, &stateSnapshotNID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	eventNIDs := make([]types.EventNID, len(nids))
 	for i := range nids {
 		eventNIDs[i] = types.EventNID(nids[i])
 	}
-	return eventNIDs, nil
+	return eventNIDs, types.StateSnapshotNID(stateSnapshotNID), nil
 }
 
 func (s *roomStatements) selectLatestEventsNIDsForUpdate(txn *sql.Tx, roomNID types.RoomNID) (
