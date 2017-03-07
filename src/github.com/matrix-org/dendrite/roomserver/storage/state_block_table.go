@@ -57,16 +57,12 @@ func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertStateDataStmt, err = db.Prepare(insertStateDataSQL); err != nil {
-		return
-	}
-	if s.selectNextStateBlockNIDStmt, err = db.Prepare(selectNextStateBlockNIDSQL); err != nil {
-		return
-	}
-	if s.bulkSelectStateDataEntriesStmt, err = db.Prepare(bulkSelectStateDataEntriesSQL); err != nil {
-		return
-	}
-	return
+
+	return statementList{
+		{&s.insertStateDataStmt, insertStateDataSQL},
+		{&s.selectNextStateBlockNIDStmt, selectNextStateBlockNIDSQL},
+		{&s.bulkSelectStateDataEntriesStmt, bulkSelectStateDataEntriesSQL},
+	}.prepare(db)
 }
 
 func (s *stateBlockStatements) bulkInsertStateData(stateBlockNID types.StateBlockNID, entries []types.StateEntry) error {

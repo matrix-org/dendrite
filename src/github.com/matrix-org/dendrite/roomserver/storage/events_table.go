@@ -110,10 +110,7 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 
-	statements := []struct {
-		statement **sql.Stmt
-		sql       string
-	}{
+	return statementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
@@ -125,15 +122,7 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
-	}
-
-	for _, statement := range statements {
-		if *statement.statement, err = db.Prepare(statement.sql); err != nil {
-			return
-		}
-	}
-
-	return
+	}.prepare(db)
 }
 
 func (s *eventStatements) insertEvent(
