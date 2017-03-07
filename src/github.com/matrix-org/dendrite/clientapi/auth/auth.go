@@ -26,6 +26,7 @@ func VerifyAccessToken(req *http.Request) (userID string, resErr *util.JSONRespo
 		resErr = &res
 	}
 	// TODO: Check the token against the database
+	userID = token
 	return
 }
 
