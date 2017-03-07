@@ -205,30 +205,62 @@ func (d *Database) StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.S
 	return d.statements.bulkSelectStateDataEntries(stateBlockNIDs)
 }
 
+// EventIDs implements input.RoomEventDatabase
+func (d *Database) EventIDs(eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
+	return d.statements.bulkSelectEventID(eventNIDs)
+}
+
 // GetLatestEventsForUpdate implements input.EventDatabase
-func (d *Database) GetLatestEventsForUpdate(roomNID types.RoomNID) ([]types.StateAtEventAndReference, types.RoomRecentEventsUpdater, error) {
+func (d *Database) GetLatestEventsForUpdate(roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error) {
 	txn, err := d.db.Begin()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	eventNIDs, err := d.statements.selectLatestEventsNIDsForUpdate(txn, roomNID)
+	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err := d.statements.selectLatestEventsNIDsForUpdate(txn, roomNID)
 	if err != nil {
 		txn.Rollback()
-		return nil, nil, err
+		return nil, err
 	}
 	stateAndRefs, err := d.statements.bulkSelectStateAtEventAndReference(txn, eventNIDs)
 	if err != nil {
 		txn.Rollback()
-		return nil, nil, err
+		return nil, err
 	}
-	return stateAndRefs, &roomRecentEventsUpdater{txn, d}, nil
+	var lastEventIDSent string
+	if lastEventNIDSent != 0 {
+		lastEventIDSent, err = d.statements.selectEventID(txn, lastEventNIDSent)
+		if err != nil {
+			txn.Rollback()
+			return nil, err
+		}
+	}
+	return &roomRecentEventsUpdater{txn, d, stateAndRefs, lastEventIDSent, currentStateSnapshotNID}, nil
 }
 
 type roomRecentEventsUpdater struct {
-	txn *sql.Tx
-	d   *Database
+	txn                     *sql.Tx
+	d                       *Database
+	latestEvents            []types.StateAtEventAndReference
+	lastEventIDSent         string
+	currentStateSnapshotNID types.StateSnapshotNID
 }
 
+// LatestEvents implements types.RoomRecentEventsUpdater
+func (u *roomRecentEventsUpdater) LatestEvents() []types.StateAtEventAndReference {
+	return u.latestEvents
+}
+
+// LastEventIDSent implements types.RoomRecentEventsUpdater
+func (u *roomRecentEventsUpdater) LastEventIDSent() string {
+	return u.lastEventIDSent
+}
+
+// CurrentStateSnapshotNID implements types.RoomRecentEventsUpdater
+func (u *roomRecentEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
+	return u.currentStateSnapshotNID
+}
+
+// StorePreviousEvents implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
 	for _, ref := range previousEventReferences {
 		if err := u.d.statements.insertPreviousEvent(u.txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
@@ -238,6 +270,7 @@ func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, p
 	return nil
 }
 
+// IsReferenced implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
 	err := u.d.statements.selectPreviousEventExists(u.txn, eventReference.EventID, eventReference.EventSHA256)
 	if err == nil {
@@ -249,18 +282,52 @@ func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.
 	return false, err
 }
 
-func (u *roomRecentEventsUpdater) SetLatestEvents(roomNID types.RoomNID, latest []types.StateAtEventAndReference) error {
+// SetLatestEvents implements types.RoomRecentEventsUpdater
+func (u *roomRecentEventsUpdater) SetLatestEvents(
+	roomNID types.RoomNID, latest []types.StateAtEventAndReference, lastEventNIDSent types.EventNID,
+	currentStateSnapshotNID types.StateSnapshotNID,
+) error {
 	eventNIDs := make([]types.EventNID, len(latest))
 	for i := range latest {
 		eventNIDs[i] = latest[i].EventNID
 	}
-	return u.d.statements.updateLatestEventNIDs(u.txn, roomNID, eventNIDs)
+	return u.d.statements.updateLatestEventNIDs(u.txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID)
 }
 
+// HasEventBeenSent implements types.RoomRecentEventsUpdater
+func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (bool, error) {
+	return u.d.statements.selectEventSentToOutput(u.txn, eventNID)
+}
+
+// MarkEventAsSent implements types.RoomRecentEventsUpdater
+func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
+	return u.d.statements.updateEventSentToOutput(u.txn, eventNID)
+}
+
+// Commit implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) Commit() error {
 	return u.txn.Commit()
 }
 
+// Rollback implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) Rollback() error {
 	return u.txn.Rollback()
+}
+
+// RoomNID implements query.RoomserverQueryAPIDB
+func (d *Database) RoomNID(roomID string) (types.RoomNID, error) {
+	roomNID, err := d.statements.selectRoomNID(roomID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return roomNID, err
+}
+
+// LatestEventIDs implements query.RoomserverQueryAPIDB
+func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, error) {
+	eventNIDs, err := d.statements.selectLatestEventNIDs(roomNID)
+	if err != nil {
+		return nil, err
+	}
+	return d.statements.bulkSelectEventReference(eventNIDs)
 }

@@ -76,13 +76,11 @@ func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertEventTypeNIDStmt, err = db.Prepare(insertEventTypeNIDSQL); err != nil {
-		return
-	}
-	if s.selectEventTypeNIDStmt, err = db.Prepare(selectEventTypeNIDSQL); err != nil {
-		return
-	}
-	return
+
+	return statementList{
+		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
+		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
+	}.prepare(db)
 }
 
 func (s *eventTypeStatements) insertEventTypeNID(eventType string) (types.EventTypeNID, error) {

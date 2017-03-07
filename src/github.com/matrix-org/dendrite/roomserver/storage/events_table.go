@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const eventsSchema = `
@@ -23,6 +24,8 @@ CREATE TABLE IF NOT EXISTS events (
     -- Local numeric ID for the state_key of the event
     -- This is 0 if the event is not a state event.
     event_state_key_nid BIGINT NOT NULL,
+    -- Whether the event has been written to the output log.
+    sent_to_output BOOLEAN NOT NULL DEFAULT FALSE,
     -- Local numeric ID for the state at the event.
     -- This is 0 if we don't know the state at the event.
     -- If the state is not 0 then this event is part of the contiguous
@@ -68,9 +71,24 @@ const bulkSelectStateAtEventByIDSQL = "" +
 const updateEventStateSQL = "" +
 	"UPDATE events SET state_snapshot_nid = $2 WHERE event_nid = $1"
 
+const selectEventSentToOutputSQL = "" +
+	"SELECT sent_to_output FROM events WHERE event_nid = $1"
+
+const updateEventSentToOutputSQL = "" +
+	"UPDATE events SET sent_to_output = TRUE WHERE event_nid = $1"
+
+const selectEventIDSQL = "" +
+	"SELECT event_id FROM events WHERE event_nid = $1"
+
 const bulkSelectStateAtEventAndReferenceSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
 	" FROM events WHERE event_nid = ANY($1)"
+
+const bulkSelectEventReferenceSQL = "" +
+	"SELECT event_id, reference_sha256 FROM events WHERE event_nid = ANY($1)"
+
+const bulkSelectEventIDSQL = "" +
+	"SELECT event_nid, event_id FROM events WHERE event_nid = ANY($1)"
 
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
@@ -78,7 +96,12 @@ type eventStatements struct {
 	bulkSelectStateEventByIDStmt           *sql.Stmt
 	bulkSelectStateAtEventByIDStmt         *sql.Stmt
 	updateEventStateStmt                   *sql.Stmt
+	selectEventSentToOutputStmt            *sql.Stmt
+	updateEventSentToOutputStmt            *sql.Stmt
+	selectEventIDStmt                      *sql.Stmt
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
+	bulkSelectEventReferenceStmt           *sql.Stmt
+	bulkSelectEventIDStmt                  *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -86,25 +109,20 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
-		return
-	}
-	if s.selectEventStmt, err = db.Prepare(selectEventSQL); err != nil {
-		return
-	}
-	if s.bulkSelectStateEventByIDStmt, err = db.Prepare(bulkSelectStateEventByIDSQL); err != nil {
-		return
-	}
-	if s.bulkSelectStateAtEventByIDStmt, err = db.Prepare(bulkSelectStateAtEventByIDSQL); err != nil {
-		return
-	}
-	if s.updateEventStateStmt, err = db.Prepare(updateEventStateSQL); err != nil {
-		return
-	}
-	if s.bulkSelectStateAtEventAndReferenceStmt, err = db.Prepare(bulkSelectStateAtEventAndReferenceSQL); err != nil {
-		return
-	}
-	return
+
+	return statementList{
+		{&s.insertEventStmt, insertEventSQL},
+		{&s.selectEventStmt, selectEventSQL},
+		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
+		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
+		{&s.updateEventStateStmt, updateEventStateSQL},
+		{&s.updateEventSentToOutputStmt, updateEventSentToOutputSQL},
+		{&s.selectEventSentToOutputStmt, selectEventSentToOutputSQL},
+		{&s.selectEventIDStmt, selectEventIDSQL},
+		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
+		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
+		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
+	}.prepare(db)
 }
 
 func (s *eventStatements) insertEvent(
@@ -113,15 +131,11 @@ func (s *eventStatements) insertEvent(
 	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
 ) (types.EventNID, types.StateSnapshotNID, error) {
-	nids := make([]int64, len(authEventNIDs))
-	for i := range authEventNIDs {
-		nids[i] = int64(authEventNIDs[i])
-	}
 	var eventNID int64
 	var stateNID int64
 	err := s.insertEventStmt.QueryRow(
 		int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, referenceSHA256,
-		pq.Int64Array(nids),
+		eventNIDsAsArray(authEventNIDs),
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -199,12 +213,23 @@ func (s *eventStatements) updateEventState(eventNID types.EventNID, stateNID typ
 	return err
 }
 
+func (s *eventStatements) selectEventSentToOutput(txn *sql.Tx, eventNID types.EventNID) (sentToOutput bool, err error) {
+	err = txn.Stmt(s.selectEventSentToOutputStmt).QueryRow(int64(eventNID)).Scan(&sentToOutput)
+	return
+}
+
+func (s *eventStatements) updateEventSentToOutput(txn *sql.Tx, eventNID types.EventNID) error {
+	_, err := txn.Stmt(s.updateEventSentToOutputStmt).Exec(int64(eventNID))
+	return err
+}
+
+func (s *eventStatements) selectEventID(txn *sql.Tx, eventNID types.EventNID) (eventID string, err error) {
+	err = txn.Stmt(s.selectEventIDStmt).QueryRow(int64(eventNID)).Scan(&eventID)
+	return
+}
+
 func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventNIDs []types.EventNID) ([]types.StateAtEventAndReference, error) {
-	nids := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		nids[i] = int64(eventNIDs[i])
-	}
-	rows, err := txn.Stmt(s.bulkSelectStateAtEventAndReferenceStmt).Query(pq.Int64Array(nids))
+	rows, err := txn.Stmt(s.bulkSelectStateAtEventAndReferenceStmt).Query(eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -237,4 +262,55 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventN
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
 	}
 	return results, nil
+}
+
+func (s *eventStatements) bulkSelectEventReference(eventNIDs []types.EventNID) ([]gomatrixserverlib.EventReference, error) {
+	rows, err := s.bulkSelectEventReferenceStmt.Query(eventNIDsAsArray(eventNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
+			return nil, err
+		}
+	}
+	if i != len(eventNIDs) {
+		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
+	}
+	return results, nil
+}
+
+// bulkSelectEventID returns a map from numeric event ID to string event ID.
+func (s *eventStatements) bulkSelectEventID(eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
+	rows, err := s.bulkSelectEventIDStmt.Query(eventNIDsAsArray(eventNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make(map[types.EventNID]string, len(eventNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		var eventNID int64
+		var eventID string
+		if err = rows.Scan(&eventNID, &eventID); err != nil {
+			return nil, err
+		}
+		results[types.EventNID(eventNID)] = eventID
+	}
+	if i != len(eventNIDs) {
+		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
+	}
+	return results, nil
+}
+
+func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
+	nids := make([]int64, len(eventNIDs))
+	for i := range eventNIDs {
+		nids[i] = int64(eventNIDs[i])
+	}
+	return nids
 }

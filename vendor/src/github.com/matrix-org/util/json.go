@@ -58,6 +58,21 @@ type JSONRequestHandler interface {
 	OnIncomingRequest(req *http.Request) JSONResponse
 }
 
+// jsonRequestHandlerWrapper is a wrapper to allow in-line functions to conform to util.JSONRequestHandler
+type jsonRequestHandlerWrapper struct {
+	function func(req *http.Request) JSONResponse
+}
+
+// OnIncomingRequest implements util.JSONRequestHandler
+func (r *jsonRequestHandlerWrapper) OnIncomingRequest(req *http.Request) JSONResponse {
+	return r.function(req)
+}
+
+// NewJSONRequestHandler converts the given OnIncomingRequest function into a JSONRequestHandler
+func NewJSONRequestHandler(f func(req *http.Request) JSONResponse) JSONRequestHandler {
+	return &jsonRequestHandlerWrapper{f}
+}
+
 // Protect panicking HTTP requests from taking down the entire process, and log them using
 // the correct logger, returning a 500 with a JSON response rather than abruptly closing the
 // connection. The http.Request MUST have a ctxValueLogger.

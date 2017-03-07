@@ -3,16 +3,20 @@ package main
 import (
 	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/input"
+	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	sarama "gopkg.in/Shopify/sarama.v1"
+	"net/http"
 	"os"
 	"strings"
 )
 
 var (
-	database       = os.Getenv("DATABASE")
-	kafkaURIs      = strings.Split(os.Getenv("KAFKA_URIS"), ",")
-	roomEventTopic = os.Getenv("TOPIC_ROOM_EVENT")
+	database             = os.Getenv("DATABASE")
+	kafkaURIs            = strings.Split(os.Getenv("KAFKA_URIS"), ",")
+	inputRoomEventTopic  = os.Getenv("TOPIC_INPUT_ROOM_EVENT")
+	outputRoomEventTopic = os.Getenv("TOPIC_OUTPUT_ROOM_EVENT")
+	bindAddr             = os.Getenv("BIND_ADDRESS")
 )
 
 func main() {
@@ -26,19 +30,31 @@ func main() {
 		panic(err)
 	}
 
+	kafkaProducer, err := sarama.NewSyncProducer(kafkaURIs, nil)
+	if err != nil {
+		panic(err)
+	}
+
 	consumer := input.Consumer{
-		Consumer:       kafkaConsumer,
-		DB:             db,
-		RoomEventTopic: roomEventTopic,
+		Consumer:             kafkaConsumer,
+		DB:                   db,
+		Producer:             kafkaProducer,
+		InputRoomEventTopic:  inputRoomEventTopic,
+		OutputRoomEventTopic: outputRoomEventTopic,
 	}
 
 	if err = consumer.Start(); err != nil {
 		panic(err)
 	}
 
+	queryAPI := query.RoomserverQueryAPI{
+		DB: db,
+	}
+
+	queryAPI.SetupHTTP(http.DefaultServeMux)
+
 	fmt.Println("Started roomserver")
 
-	// Wait forever.
 	// TODO: Implement clean shutdown.
-	select {}
+	http.ListenAndServe(bindAddr, nil)
 }

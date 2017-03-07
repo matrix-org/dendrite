@@ -2,7 +2,6 @@ package storage
 
 import (
 	"database/sql"
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -45,13 +44,10 @@ func (s *eventJSONStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertEventJSONStmt, err = db.Prepare(insertEventJSONSQL); err != nil {
-		return
-	}
-	if s.bulkSelectEventJSONStmt, err = db.Prepare(bulkSelectEventJSONSQL); err != nil {
-		return
-	}
-	return
+	return statementList{
+		{&s.insertEventJSONStmt, insertEventJSONSQL},
+		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},
+	}.prepare(db)
 }
 
 func (s *eventJSONStatements) insertEventJSON(eventNID types.EventNID, eventJSON []byte) error {
@@ -65,11 +61,7 @@ type eventJSONPair struct {
 }
 
 func (s *eventJSONStatements) bulkSelectEventJSON(eventNIDs []types.EventNID) ([]eventJSONPair, error) {
-	nids := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		nids[i] = int64(eventNIDs[i])
-	}
-	rows, err := s.bulkSelectEventJSONStmt.Query(pq.Int64Array(nids))
+	rows, err := s.bulkSelectEventJSONStmt.Query(eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}

@@ -2,11 +2,13 @@ package input
 
 import (
 	"bytes"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// updateLatestEvents updates the list of latest events for this room.
+// updateLatestEvents updates the list of latest events for this room in the database and writes the
+// event to the output log.
 // The latest events are the events that aren't referenced by another event in the database:
 //
 //     Time goes down the page. 1 is the m.room.create event (root).
@@ -22,9 +24,9 @@ import (
 //      7 <----- latest
 //
 func updateLatestEvents(
-	db RoomEventDatabase, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	db RoomEventDatabase, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) (err error) {
-	oldLatest, updater, err := db.GetLatestEventsForUpdate(roomNID)
+	updater, err := db.GetLatestEventsForUpdate(roomNID)
 	if err != nil {
 		return
 	}
@@ -42,22 +44,81 @@ func updateLatestEvents(
 		}
 	}()
 
-	err = doUpdateLatestEvents(updater, oldLatest, roomNID, stateAtEvent, event)
+	err = doUpdateLatestEvents(db, updater, ow, roomNID, stateAtEvent, event)
 	return
 }
 
 func doUpdateLatestEvents(
-	updater types.RoomRecentEventsUpdater, oldLatest []types.StateAtEventAndReference, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) error {
 	var err error
 	var prevEvents []gomatrixserverlib.EventReference
 	prevEvents = event.PrevEvents()
+	oldLatest := updater.LatestEvents()
+	lastEventIDSent := updater.LastEventIDSent()
+	oldStateNID := updater.CurrentStateSnapshotNID()
+
+	if hasBeenSent, err := updater.HasEventBeenSent(stateAtEvent.EventNID); err != nil {
+		return err
+	} else if hasBeenSent {
+		// Already sent this event so we can stop processing
+		return nil
+	}
 
 	if err = updater.StorePreviousEvents(stateAtEvent.EventNID, prevEvents); err != nil {
 		return err
 	}
 
-	// Check if this event references any of the latest events in the room.
+	eventReference := event.EventReference()
+	// Check if this event is already referenced by another event in the room.
+	var alreadyReferenced bool
+	if alreadyReferenced, err = updater.IsReferenced(eventReference); err != nil {
+		return err
+	}
+
+	newLatest := calculateLatest(oldLatest, alreadyReferenced, prevEvents, types.StateAtEventAndReference{
+		EventReference: eventReference,
+		StateAtEvent:   stateAtEvent,
+	})
+
+	latestStateAtEvents := make([]types.StateAtEvent, len(newLatest))
+	for i := range newLatest {
+		latestStateAtEvents[i] = newLatest[i].StateAtEvent
+	}
+	newStateNID, err := calculateAndStoreStateAfterEvents(db, roomNID, latestStateAtEvents)
+	if err != nil {
+		return err
+	}
+
+	removed, added, err := differenceBetweeenStateSnapshots(db, oldStateNID, newStateNID)
+	if err != nil {
+		return err
+	}
+
+	// Send the event to the output logs.
+	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
+	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
+	//  the write to the output log succeeds)
+	// TODO: This assumes that writing the event to the output log is synchronous. It should be possible to
+	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
+	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
+	// necessary bookkeeping we'll keep the event sending synchronous for now.
+	if err = writeEvent(db, ow, lastEventIDSent, event, newLatest, removed, added); err != nil {
+		return err
+	}
+
+	if err = updater.SetLatestEvents(roomNID, newLatest, stateAtEvent.EventNID, newStateNID); err != nil {
+		return err
+	}
+
+	if err = updater.MarkEventAsSent(stateAtEvent.EventNID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func calculateLatest(oldLatest []types.StateAtEventAndReference, alreadyReferenced bool, prevEvents []gomatrixserverlib.EventReference, newEvent types.StateAtEventAndReference) []types.StateAtEventAndReference {
 	var alreadyInLatest bool
 	var newLatest []types.StateAtEventAndReference
 	for _, l := range oldLatest {
@@ -71,7 +132,7 @@ func doUpdateLatestEvents(
 				break
 			}
 		}
-		if l.EventNID == stateAtEvent.EventNID {
+		if l.EventNID == newEvent.EventNID {
 			alreadyInLatest = true
 		}
 		if keep {
@@ -80,26 +141,51 @@ func doUpdateLatestEvents(
 		}
 	}
 
-	eventReference := event.EventReference()
-	// Check if this event is already referenced by another event in the room.
-	var alreadyReferenced bool
-	if alreadyReferenced, err = updater.IsReferenced(eventReference); err != nil {
-		return err
-	}
-
 	if !alreadyReferenced && !alreadyInLatest {
 		// This event is not referenced by any of the events in the room
 		// and the event is not already in the latest events.
 		// Add it to the latest events
-		newLatest = append(newLatest, types.StateAtEventAndReference{
-			StateAtEvent:   stateAtEvent,
-			EventReference: eventReference,
-		})
+		newLatest = append(newLatest, newEvent)
 	}
 
-	if err = updater.SetLatestEvents(roomNID, newLatest); err != nil {
+	return newLatest
+}
+
+func writeEvent(
+	db RoomEventDatabase, ow OutputRoomEventWriter, lastEventIDSent string,
+	event gomatrixserverlib.Event, latest []types.StateAtEventAndReference,
+	removed, added []types.StateEntry,
+) error {
+
+	latestEventIDs := make([]string, len(latest))
+	for i := range latest {
+		latestEventIDs[i] = latest[i].EventID
+	}
+
+	ore := api.OutputRoomEvent{
+		Event:           event.JSON(),
+		LastSentEventID: lastEventIDSent,
+		LatestEventIDs:  latestEventIDs,
+	}
+
+	var stateEventNIDs []types.EventNID
+	for _, entry := range added {
+		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
+	}
+	for _, entry := range removed {
+		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
+	}
+	eventIDMap, err := db.EventIDs(stateEventNIDs)
+	if err != nil {
 		return err
 	}
+	for _, entry := range added {
+		ore.AddsStateEventIDs = append(ore.AddsStateEventIDs, eventIDMap[entry.EventNID])
+	}
+	for _, entry := range removed {
+		ore.RemovesStateEventIDs = append(ore.RemovesStateEventIDs, eventIDMap[entry.EventNID])
+	}
 
-	return nil
+	// TODO: Fill out VisibilityStateIDs
+	return ow.WriteOutputRoomEvent(ore)
 }
