@@ -1,6 +1,9 @@
 package jsonerror
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/matrix-org/util"
+)
 
 // MatrixError represents the "standard error response" in Matrix.
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#api-standards
@@ -11,6 +14,20 @@ type MatrixError struct {
 
 func (e *MatrixError) Error() string {
 	return fmt.Sprintf("%s: %s", e.ErrCode, e.Err)
+}
+
+// InternalServerError returns a 500 Internal Server Error in a matrix-compliant
+// format.
+func InternalServerError() util.JSONResponse {
+	return util.JSONResponse{
+		Code: 500,
+		JSON: Unknown("Internal Server Error"),
+	}
+}
+
+// Unknown is an unexpected error
+func Unknown(msg string) *MatrixError {
+	return &MatrixError{"M_UNKNOWN", msg}
 }
 
 // Forbidden is an error when the client tries to access a resource
