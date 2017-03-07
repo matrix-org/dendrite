@@ -11,7 +11,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// http://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
+// https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomRequest struct {
 	Invite          []string               `json:"invite"`
 	Name            string                 `json:"name"`
@@ -23,7 +23,7 @@ type createRoomRequest struct {
 	RoomAliasName   string                 `json:"room_alias_name"`
 }
 
-// http://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
+// https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomResponse struct {
 	RoomID    string `json:"room_id"`
 	RoomAlias string `json:"room_alias,omitempty"` // in synapse not spec
@@ -41,7 +41,6 @@ func CreateRoom(req *http.Request) util.JSONResponse {
 	if resErr != nil {
 		return *resErr
 	}
-
 	// TODO: apply rate-limit
 	// TODO: parse room_alias_name
 	// TODO: parse invite list (all valid user ids)
@@ -80,6 +79,5 @@ func CreateRoom(req *http.Request) util.JSONResponse {
 	// This differs from Synapse slightly. Synapse would vary the ordering of 3-7
 	// depending on if those events were in "initial_state" or not. This made it
 	// harder to reason about, hence sticking to a strict static ordering.
-
 	return util.MessageResponse(404, "Not implemented yet")
 }
