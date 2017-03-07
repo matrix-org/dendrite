@@ -87,6 +87,9 @@ const bulkSelectStateAtEventAndReferenceSQL = "" +
 const bulkSelectEventReferenceSQL = "" +
 	"SELECT event_id, reference_sha256 FROM events WHERE event_nid = ANY($1)"
 
+const bulkSelectEventIDSQL = "" +
+	"SELECT event_nid, event_id FROM events WHERE event_nid = ANY($1)"
+
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
@@ -98,6 +101,7 @@ type eventStatements struct {
 	selectEventIDStmt                      *sql.Stmt
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
 	bulkSelectEventReferenceStmt           *sql.Stmt
+	bulkSelectEventIDStmt                  *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -105,36 +109,30 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
-		return
+
+	statements := []struct {
+		statement **sql.Stmt
+		sql       string
+	}{
+		{&s.insertEventStmt, insertEventSQL},
+		{&s.selectEventStmt, selectEventSQL},
+		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
+		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
+		{&s.updateEventStateStmt, updateEventStateSQL},
+		{&s.updateEventSentToOutputStmt, updateEventSentToOutputSQL},
+		{&s.selectEventSentToOutputStmt, selectEventSentToOutputSQL},
+		{&s.selectEventIDStmt, selectEventIDSQL},
+		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
+		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
+		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 	}
-	if s.selectEventStmt, err = db.Prepare(selectEventSQL); err != nil {
-		return
+
+	for _, statement := range statements {
+		if *statement.statement, err = db.Prepare(statement.sql); err != nil {
+			return
+		}
 	}
-	if s.bulkSelectStateEventByIDStmt, err = db.Prepare(bulkSelectStateEventByIDSQL); err != nil {
-		return
-	}
-	if s.bulkSelectStateAtEventByIDStmt, err = db.Prepare(bulkSelectStateAtEventByIDSQL); err != nil {
-		return
-	}
-	if s.updateEventStateStmt, err = db.Prepare(updateEventStateSQL); err != nil {
-		return
-	}
-	if s.updateEventSentToOutputStmt, err = db.Prepare(updateEventSentToOutputSQL); err != nil {
-		return
-	}
-	if s.selectEventSentToOutputStmt, err = db.Prepare(selectEventSentToOutputSQL); err != nil {
-		return
-	}
-	if s.selectEventIDStmt, err = db.Prepare(selectEventIDSQL); err != nil {
-		return
-	}
-	if s.bulkSelectStateAtEventAndReferenceStmt, err = db.Prepare(bulkSelectStateAtEventAndReferenceSQL); err != nil {
-		return
-	}
-	if s.bulkSelectEventReferenceStmt, err = db.Prepare(bulkSelectEventReferenceSQL); err != nil {
-		return
-	}
+
 	return
 }
 
@@ -290,6 +288,29 @@ func (s *eventStatements) bulkSelectEventReference(eventNIDs []types.EventNID) (
 		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
 			return nil, err
 		}
+	}
+	if i != len(eventNIDs) {
+		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
+	}
+	return results, nil
+}
+
+// bulkSelectEventID returns a map from numeric event ID to string event ID.
+func (s *eventStatements) bulkSelectEventID(eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
+	rows, err := s.bulkSelectEventIDStmt.Query(eventNIDsAsArray(eventNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make(map[types.EventNID]string, len(eventNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		var eventNID int64
+		var eventID string
+		if err = rows.Scan(&eventNID, &eventID); err != nil {
+			return nil, err
+		}
+		results[types.EventNID(eventNID)] = eventID
 	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))

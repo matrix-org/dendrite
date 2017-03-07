@@ -26,7 +26,7 @@ import (
 func updateLatestEvents(
 	db RoomEventDatabase, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) (err error) {
-	oldLatest, lastEventIDSent, updater, err := db.GetLatestEventsForUpdate(roomNID)
+	updater, err := db.GetLatestEventsForUpdate(roomNID)
 	if err != nil {
 		return
 	}
@@ -44,16 +44,19 @@ func updateLatestEvents(
 		}
 	}()
 
-	err = doUpdateLatestEvents(updater, ow, oldLatest, lastEventIDSent, roomNID, stateAtEvent, event)
+	err = doUpdateLatestEvents(db, updater, ow, roomNID, stateAtEvent, event)
 	return
 }
 
 func doUpdateLatestEvents(
-	updater types.RoomRecentEventsUpdater, ow OutputRoomEventWriter, oldLatest []types.StateAtEventAndReference, lastEventIDSent string, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
 ) error {
 	var err error
 	var prevEvents []gomatrixserverlib.EventReference
 	prevEvents = event.PrevEvents()
+	oldLatest := updater.LatestEvents()
+	lastEventIDSent := updater.LastEventIDSent()
+	oldStateNID := updater.CurrentStateSnapshotNID()
 
 	if hasBeenSent, err := updater.HasEventBeenSent(stateAtEvent.EventNID); err != nil {
 		return err
@@ -78,6 +81,20 @@ func doUpdateLatestEvents(
 		StateAtEvent:   stateAtEvent,
 	})
 
+	latestStateAtEvents := make([]types.StateAtEvent, len(newLatest))
+	for i := range newLatest {
+		latestStateAtEvents[i] = newLatest[i].StateAtEvent
+	}
+	newStateNID, err := calculateAndStoreStateAfterEvents(db, roomNID, latestStateAtEvents)
+	if err != nil {
+		return err
+	}
+
+	removed, added, err := differenceBetweeenStateSnapshots(db, oldStateNID, newStateNID)
+	if err != nil {
+		return err
+	}
+
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
 	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
@@ -86,11 +103,11 @@ func doUpdateLatestEvents(
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = writeEvent(ow, lastEventIDSent, event, newLatest); err != nil {
+	if err = writeEvent(db, ow, lastEventIDSent, event, newLatest, removed, added); err != nil {
 		return err
 	}
 
-	if err = updater.SetLatestEvents(roomNID, newLatest, stateAtEvent.EventNID); err != nil {
+	if err = updater.SetLatestEvents(roomNID, newLatest, stateAtEvent.EventNID, newStateNID); err != nil {
 		return err
 	}
 
@@ -134,18 +151,41 @@ func calculateLatest(oldLatest []types.StateAtEventAndReference, alreadyReferenc
 	return newLatest
 }
 
-func writeEvent(ow OutputRoomEventWriter, lastEventIDSent string, event gomatrixserverlib.Event, latest []types.StateAtEventAndReference) error {
+func writeEvent(
+	db RoomEventDatabase, ow OutputRoomEventWriter, lastEventIDSent string,
+	event gomatrixserverlib.Event, latest []types.StateAtEventAndReference,
+	removed, added []types.StateEntry,
+) error {
 
 	latestEventIDs := make([]string, len(latest))
 	for i := range latest {
 		latestEventIDs[i] = latest[i].EventID
 	}
 
-	// TODO: Fill out AddsStateEventIDs and RemovesStateEventIDs
-	// TODO: Fill out VisibilityStateIDs
-	return ow.WriteOutputRoomEvent(api.OutputRoomEvent{
+	ore := api.OutputRoomEvent{
 		Event:           event.JSON(),
 		LastSentEventID: lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
-	})
+	}
+
+	var stateEventNIDs []types.EventNID
+	for _, entry := range added {
+		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
+	}
+	for _, entry := range removed {
+		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
+	}
+	eventIDMap, err := db.EventIDs(stateEventNIDs)
+	if err != nil {
+		return err
+	}
+	for _, entry := range added {
+		ore.AddsStateEventIDs = append(ore.AddsStateEventIDs, eventIDMap[entry.EventNID])
+	}
+	for _, entry := range removed {
+		ore.RemovesStateEventIDs = append(ore.RemovesStateEventIDs, eventIDMap[entry.EventNID])
+	}
+
+	// TODO: Fill out VisibilityStateIDs
+	return ow.WriteOutputRoomEvent(ore)
 }
