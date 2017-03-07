@@ -98,5 +98,12 @@ func CreateRoom(req *http.Request) util.JSONResponse {
 	// This differs from Synapse slightly. Synapse would vary the ordering of 3-7
 	// depending on if those events were in "initial_state" or not. This made it
 	// harder to reason about, hence sticking to a strict static ordering.
+
+	// f.e event:
+	// - validate required keys/types (EventValidator in synapse)
+	// - set additional keys (displayname/avatar_url for m.room.member)
+	// - set token(?) and txn id
+	// - then https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/handlers/message.py#L419
+
 	return util.MessageResponse(404, "Not implemented yet")
 }
