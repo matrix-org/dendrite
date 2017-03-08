@@ -3,6 +3,7 @@ package query
 import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/util"
 	"sort"
 )
 
@@ -13,14 +14,12 @@ func stringTuplesToNumericTuples(db RoomserverQueryAPIDatabase, stringTuples []a
 		eventTypes[i] = stringTuples[i].EventType
 		stateKeys[i] = stringTuples[i].EventStateKey
 	}
-	sort.Strings(eventTypes)
-	eventTypes = eventTypes[:unique(sort.StringSlice(eventTypes))]
+	eventTypes = util.UniqueStrings(eventTypes)
 	eventTypeMap, err := db.EventTypeNIDs(eventTypes)
 	if err != nil {
 		return nil, err
 	}
-	sort.Strings(stateKeys)
-	stateKeys = stateKeys[:unique(sort.StringSlice(stateKeys))]
+	stateKeys = util.UniqueStrings(stateKeys)
 	stateKeyMap, err := db.EventStateKeyNIDs(stateKeys)
 	if err != nil {
 		return nil, err
@@ -72,7 +71,7 @@ func loadStateAtSnapshotForTuples(db RoomserverQueryAPIDatabase, stateNID types.
 	// remains later in the list than the older entries for the same state key.
 	sort.Stable(stateEntryByStateKeySorter(fullState))
 	// Unique returns the last entry and hence the most recent entry for each state key.
-	fullState = fullState[:unique(stateEntryByStateKeySorter(fullState))]
+	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
 	return fullState, nil
 }
 
@@ -97,34 +96,3 @@ func (s stateEntryByStateKeySorter) Less(i, j int) bool {
 	return s[i].StateKeyTuple.LessThan(s[j].StateKeyTuple)
 }
 func (s stateEntryByStateKeySorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-
-// Remove duplicate items from a sorted list.
-// Takes the same interface as sort.Sort
-// Returns the length of the data without duplicates
-// Uses the last occurance of a duplicate.
-// O(n).
-func unique(data sort.Interface) int {
-	if data.Len() == 0 {
-		return 0
-	}
-	length := data.Len()
-	// j is the next index to output an element to.
-	j := 0
-	for i := 1; i < length; i++ {
-		// If the previous element is less than this element then they are
-		// not equal. Otherwise they must be equal because the list is sorted.
-		// If they are equal then we move onto the next element.
-		if data.Less(i-1, i) {
-			// "Write" the previous element to the output position by swaping
-			// the elements.
-			// Note that if the list has no duplicates then i-1 == j so the
-			// swap does nothing. (This assumes that data.Swap(a,b) nops if a==b)
-			data.Swap(i-1, j)
-			// Advance to the next output position in the list.
-			j++
-		}
-	}
-	// Output the last element.
-	data.Swap(length-1, j)
-	return j + 1
-}

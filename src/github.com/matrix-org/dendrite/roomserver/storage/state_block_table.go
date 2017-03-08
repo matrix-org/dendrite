@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/util"
 	"sort"
 )
 
@@ -233,11 +234,8 @@ func (s stateKeyTupleSorter) typesAndStateKeysAsArrays() (eventTypeNIDs pq.Int64
 		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
 		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)
 	}
-	// The event types are already sorted because the tuples were sorted.
-	eventTypeNIDs = eventTypeNIDs[:unique(int64Sorter(eventTypeNIDs))]
-	// The event state keys need to be sorted.
-	sort.Sort(int64Sorter(eventStateKeyNIDs))
-	eventStateKeyNIDs = eventStateKeyNIDs[:unique(int64Sorter(eventStateKeyNIDs))]
+	eventTypeNIDs = eventTypeNIDs[:util.SortAndUnique(int64Sorter(eventTypeNIDs))]
+	eventStateKeyNIDs = eventStateKeyNIDs[:util.SortAndUnique(int64Sorter(eventStateKeyNIDs))]
 	return
 }
 
@@ -246,34 +244,3 @@ type int64Sorter []int64
 func (s int64Sorter) Len() int           { return len(s) }
 func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
 func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
-// Remove duplicate items from a sorted list.
-// Takes the same interface as sort.Sort
-// Returns the length of the data without duplicates
-// Uses the last occurance of a duplicate.
-// O(n).
-func unique(data sort.Interface) int {
-	if data.Len() == 0 {
-		return 0
-	}
-	length := data.Len()
-	// j is the next index to output an element to.
-	j := 0
-	for i := 1; i < length; i++ {
-		// If the previous element is less than this element then they are
-		// not equal. Otherwise they must be equal because the list is sorted.
-		// If they are equal then we move onto the next element.
-		if data.Less(i-1, i) {
-			// "Write" the previous element to the output position by swaping
-			// the elements.
-			// Note that if the list has no duplicates then i-1 == j so the
-			// swap does nothing. (This assumes that data.Swap(a,b) nops if a==b)
-			data.Swap(i-1, j)
-			// Advance to the next output position in the list.
-			j++
-		}
-	}
-	// Output the last element.
-	data.Swap(length-1, j)
-	return j + 1
-}
