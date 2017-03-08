@@ -84,8 +84,8 @@ func CreateRoom(req *http.Request) util.JSONResponse {
 
 	// TODO: visibility/presets/raw initial state/creation content
 
-	hostname := "localhost"
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), hostname)
+	serverName := "localhost"
+	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), serverName)
 	// TODO: Check room ID doesn't clash with an existing one
 	// TODO: Create room alias association
 
