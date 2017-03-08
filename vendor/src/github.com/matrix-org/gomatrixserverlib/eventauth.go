@@ -18,7 +18,8 @@ package gomatrixserverlib
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
+
+	"github.com/matrix-org/util"
 )
 
 const (
@@ -43,105 +44,108 @@ type StateNeeded struct {
 	ThirdPartyInvite []string
 }
 
-// StateNeededForAuth returns the event types and state_keys needed to authenticate an event.
-// This takes a list of events to facilitate bulk processing when doing auth checks as part of state conflict resolution.
-func StateNeededForAuth(events []Event) (result StateNeeded) {
-	var members []string
-	var thirdpartyinvites []string
-
-	for _, event := range events {
-		switch event.Type() {
-		case "m.room.create":
-			// The create event doesn't require any state to authenticate.
-			// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L123
-		case "m.room.aliases":
-			// Alias events need:
-			//  * The create event.
-			//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L128
-			// Alias events need no further authentication.
-			// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L160
-			result.Create = true
-		case "m.room.member":
-			// Member events need:
-			//  * The previous membership of the target.
-			//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L355
-			//  * The current membership state of the sender.
-			//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L348
-			//  * The join rules for the room if the event is a join event.
-			//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L361
-			//  * The power levels for the room.
-			//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L370
-			//  * And optionally may require a m.third_party_invite event
-			//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L393
-			content, err := newMemberContentFromEvent(event)
-			if err != nil {
-				// If we hit an error decoding the content we ignore it here.
-				// The event will be rejected when the actual checks encounter the same error.
-				continue
-			}
-			result.Create = true
-			result.PowerLevels = true
-			stateKey := event.StateKey()
-			if stateKey != nil {
-				members = append(members, event.Sender(), *stateKey)
-			}
-			if content.Membership == join {
-				result.JoinRules = true
-			}
-			if content.ThirdPartyInvite != nil {
-				token, err := thirdPartyInviteToken(content.ThirdPartyInvite)
-				if err != nil {
-					// If we hit an error decoding the content we ignore it here.
-					// The event will be rejected when the actual checks encounter the same error.
-					continue
-				} else {
-					thirdpartyinvites = append(thirdpartyinvites, token)
-				}
-			}
-
-		default:
-			// All other events need:
-			//  * The membership of the sender.
-			//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L177
-			//  * The power levels for the room.
-			//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L196
-			result.Create = true
-			result.PowerLevels = true
-			members = append(members, event.Sender())
+// StateNeededForEventBuilder returns the event types and state_keys needed to authenticate the
+// event being built. These events should be put under 'auth_events' for the event being built.
+// Returns an error if the state needed could not be calculated with the given builder, e.g
+// if there is a m.room.member without a membership key.
+func StateNeededForEventBuilder(builder *EventBuilder) (result StateNeeded, err error) {
+	// Extract the 'content' object from the event if it is m.room.member as we need to know 'membership'
+	var content *memberContent
+	if builder.Type == "m.room.member" {
+		if err = json.Unmarshal(builder.content, &content); err != nil {
+			err = errorf("unparsable member event content: %s", err.Error())
+			return
 		}
 	}
-
-	// Deduplicate the state keys.
-	sort.Strings(members)
-	result.Member = members[:unique(sort.StringSlice(members))]
-	sort.Strings(thirdpartyinvites)
-	result.ThirdPartyInvite = thirdpartyinvites[:unique(sort.StringSlice(thirdpartyinvites))]
+	err = accumulateStateNeeded(&result, builder.Type, builder.Sender, builder.StateKey, content)
+	result.Member = util.UniqueStrings(result.Member)
+	result.ThirdPartyInvite = util.UniqueStrings(result.ThirdPartyInvite)
 	return
 }
 
-// Remove duplicate items from a sorted list.
-// Takes the same interface as sort.Sort
-// Returns the length of the data without duplicates
-// Uses the last occurrence of a duplicate.
-// O(n).
-func unique(data sort.Interface) int {
-	length := data.Len()
-	if length == 0 {
-		return 0
-	}
-	j := 0
-	for i := 1; i < length; i++ {
-		if data.Less(i-1, i) {
-			data.Swap(i-1, j)
-			j++
+// StateNeededForAuth returns the event types and state_keys needed to authenticate an event.
+// This takes a list of events to facilitate bulk processing when doing auth checks as part of state conflict resolution.
+func StateNeededForAuth(events []Event) (result StateNeeded) {
+	for _, event := range events {
+		// Extract the 'content' object from the event if it is m.room.member as we need to know 'membership'
+		var content *memberContent
+		if event.Type() == "m.room.member" {
+			c, err := newMemberContentFromEvent(event)
+			if err == nil {
+				content = &c
+			}
 		}
+		// Ignore errors when accumulating state needed.
+		// The event will be rejected when the actual checks encounter the same error.
+		_ = accumulateStateNeeded(&result, event.Type(), event.Sender(), event.StateKey(), content)
 	}
-	data.Swap(length-1, j)
-	return j + 1
+
+	// Deduplicate the state keys.
+	result.Member = util.UniqueStrings(result.Member)
+	result.ThirdPartyInvite = util.UniqueStrings(result.ThirdPartyInvite)
+	return
+}
+
+func accumulateStateNeeded(result *StateNeeded, eventType, sender string, stateKey *string, content *memberContent) (err error) {
+	switch eventType {
+	case "m.room.create":
+		// The create event doesn't require any state to authenticate.
+		// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L123
+	case "m.room.aliases":
+		// Alias events need:
+		//  * The create event.
+		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L128
+		// Alias events need no further authentication.
+		// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L160
+		result.Create = true
+	case "m.room.member":
+		// Member events need:
+		//  * The previous membership of the target.
+		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L355
+		//  * The current membership state of the sender.
+		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L348
+		//  * The join rules for the room if the event is a join event.
+		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L361
+		//  * The power levels for the room.
+		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L370
+		//  * And optionally may require a m.third_party_invite event
+		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L393
+		if content == nil {
+			err = errorf("missing memberContent for m.room.member event")
+			return
+		}
+		result.Create = true
+		result.PowerLevels = true
+		if stateKey != nil {
+			result.Member = append(result.Member, sender, *stateKey)
+		}
+		if content.Membership == join {
+			result.JoinRules = true
+		}
+		if content.ThirdPartyInvite != nil {
+			token, tokErr := thirdPartyInviteToken(content.ThirdPartyInvite)
+			if tokErr != nil {
+				err = errorf("could not get third-party token: %s", tokErr)
+				return
+			}
+			result.ThirdPartyInvite = append(result.ThirdPartyInvite, token)
+		}
+
+	default:
+		// All other events need:
+		//  * The membership of the sender.
+		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L177
+		//  * The power levels for the room.
+		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L196
+		result.Create = true
+		result.PowerLevels = true
+		result.Member = append(result.Member, sender)
+	}
+	return
 }
 
 // thirdPartyInviteToken extracts the token from the third_party_invite.
-func thirdPartyInviteToken(thirdPartyInviteData json.RawMessage) (string, error) {
+func thirdPartyInviteToken(thirdPartyInviteData rawJSON) (string, error) {
 	var thirdPartyInvite struct {
 		Signed struct {
 			Token string `json:"token"`
