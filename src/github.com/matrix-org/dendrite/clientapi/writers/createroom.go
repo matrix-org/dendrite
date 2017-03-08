@@ -35,10 +35,22 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		}
 	}
 	for _, userID := range r.Invite {
-		if _, err := common.UserIDFromString(userID); err != nil {
+		// TODO: We should put user ID parsing code into gomatrixserverlib and use that instead
+		//       (see https://github.com/matrix-org/gomatrixserverlib/blob/3394e7c7003312043208aa73727d2256eea3d1f6/eventcontent.go#L347 )
+		//       It should be a struct (with pointers into a single string to avoid copying) and
+		//       we should update all refs to use UserID types rather than strings.
+		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
+		if len(userID) == 0 || userID[0] != '@' {
 			return &util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.BadJSON("Entries in 'invite' must be valid user IDs"),
+				JSON: jsonerror.BadJSON("user id must start with '@'"),
+			}
+		}
+		parts := strings.SplitN(userID[1:], ":", 2)
+		if len(parts) != 2 {
+			return &util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),
 			}
 		}
 	}
