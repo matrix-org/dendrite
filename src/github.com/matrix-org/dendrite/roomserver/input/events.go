@@ -2,12 +2,14 @@ package input
 
 import (
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
 type RoomEventDatabase interface {
+	state.RoomStateDatabase
 	// Stores a matrix room event in the database
 	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
 	// Lookup the state entries for a list of string event IDs
@@ -24,12 +26,6 @@ type RoomEventDatabase interface {
 	// Returns an error if there is an error talking to the database
 	// or if the room state for the event IDs aren't in the database
 	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
-	// Lookup the numeric state data IDs for each numeric state snapshot ID
-	// The returned slice is sorted by numeric state snapshot ID.
-	StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
-	// Lookup the state data for each numeric state data ID
-	// The returned slice is sorted by numeric state data ID.
-	StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
 	// Store the room state at an event in the database
 	AddState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
 	// Set the state at an event.
