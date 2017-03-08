@@ -4,6 +4,7 @@ package state
 
 import (
 	"fmt"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 	"sort"
@@ -11,12 +12,24 @@ import (
 
 // A RoomStateDatabase has the storage APIs needed to load state from the database
 type RoomStateDatabase interface {
+	// Lookup the numeric IDs for a list of string event types.
+	// Returns a map from string event type to numeric ID for the event type.
+	EventTypeNIDs(eventTypes []string) (map[string]types.EventTypeNID, error)
+	// Lookup the numeric IDs for a list of string event state keys.
+	// Returns a map from string state key to numeric ID for the state key.
+	EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error)
 	// Lookup the numeric state data IDs for each numeric state snapshot ID
 	// The returned slice is sorted by numeric state snapshot ID.
 	StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
 	// Lookup the state data for each numeric state data ID
 	// The returned slice is sorted by numeric state data ID.
 	StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
+	// Lookup the state data for the state key tuples for each numeric state block ID
+	// This is used to fetch a subset of the room state at a snapshot.
+	// The returned slice is sorted by numeric state block ID.
+	StateEntriesForTuples(stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) (
+		[]types.StateEntryList, error,
+	)
 }
 
 // LoadStateAtSnapshot loads the full state of a room at a particular snapshot.
@@ -180,6 +193,79 @@ func DifferenceBetweeenStateSnapshots(db RoomStateDatabase, oldStateNID, newStat
 			newI++
 		}
 	}
+}
+
+// StringTuplesToNumericTuples converts the string state key tuples into numeric IDs
+// If there isn't a numeric ID for either the event type or the event state key then the tuple is discarded.
+// Returns an error if there was a problem talking to the database.
+func StringTuplesToNumericTuples(db RoomStateDatabase, stringTuples []api.StateKeyTuple) ([]types.StateKeyTuple, error) {
+	eventTypes := make([]string, len(stringTuples))
+	stateKeys := make([]string, len(stringTuples))
+	for i := range stringTuples {
+		eventTypes[i] = stringTuples[i].EventType
+		stateKeys[i] = stringTuples[i].EventStateKey
+	}
+	eventTypes = util.UniqueStrings(eventTypes)
+	eventTypeMap, err := db.EventTypeNIDs(eventTypes)
+	if err != nil {
+		return nil, err
+	}
+	stateKeys = util.UniqueStrings(stateKeys)
+	stateKeyMap, err := db.EventStateKeyNIDs(stateKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []types.StateKeyTuple
+	for _, stringTuple := range stringTuples {
+		var numericTuple types.StateKeyTuple
+		var ok1, ok2 bool
+		numericTuple.EventTypeNID, ok1 = eventTypeMap[stringTuple.EventType]
+		numericTuple.EventStateKeyNID, ok2 = stateKeyMap[stringTuple.EventStateKey]
+		// Discard the tuple if there wasn't a numeric ID for either the event type or the state key.
+		if ok1 && ok2 {
+			result = append(result, numericTuple)
+		}
+	}
+
+	return result, nil
+}
+
+// LoadStateAtSnapshotForTuples loads the state for a list of event type and state key pairs at a snapshot.
+// This is used when we only want to load a subset of the room state at a snapshot.
+// This is typically the state before an event or the current state of a room.
+// Returns a sorted list of state entries or an error if there was a problem talking to the database.
+func LoadStateAtSnapshotForTuples(db RoomStateDatabase, stateNID types.StateSnapshotNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntry, error) {
+	stateBlockNIDLists, err := db.StateBlockNIDs([]types.StateSnapshotNID{stateNID})
+	if err != nil {
+		return nil, err
+	}
+	stateBlockNIDList := stateBlockNIDLists[0]
+
+	stateEntryLists, err := db.StateEntriesForTuples(stateBlockNIDList.StateBlockNIDs, stateKeyTuples)
+	if err != nil {
+		return nil, err
+	}
+	stateEntriesMap := stateEntryListMap(stateEntryLists)
+
+	// Combined all the state entries for this snapshot.
+	// The order of state block NIDs in the list tells us the order to combine them in.
+	var fullState []types.StateEntry
+	for _, stateBlockNID := range stateBlockNIDList.StateBlockNIDs {
+		entries, ok := stateEntriesMap.lookup(stateBlockNID)
+		if !ok {
+			// If the block is missing from the map it means that none of its entries matched a requested tuple.
+			continue
+		}
+		fullState = append(fullState, entries...)
+	}
+
+	// Stable sort so that the most recent entry for each state key stays
+	// remains later in the list than the older entries for the same state key.
+	sort.Stable(stateEntryByStateKeySorter(fullState))
+	// Unique returns the last entry and hence the most recent entry for each state key.
+	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
+	return fullState, nil
 }
 
 type stateBlockNIDListMap []types.StateBlockNIDList

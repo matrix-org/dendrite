@@ -3,6 +3,7 @@ package query
 import (
 	"encoding/json"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -12,6 +13,7 @@ import (
 
 // RoomserverQueryAPIDatabase has the storage APIs needed to implement the query API.
 type RoomserverQueryAPIDatabase interface {
+	state.RoomStateDatabase
 	// Lookup the numeric ID for the room.
 	// Returns 0 if the room doesn't exists.
 	// Returns an error if there was a problem talking to the database.
@@ -19,20 +21,6 @@ type RoomserverQueryAPIDatabase interface {
 	// Lookup event references for the latest events in the room and the current state snapshot.
 	// Returns an error if there was a problem talking to the database.
 	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, error)
-	// Lookup the numeric IDs for a list of string event types.
-	// Returns a map from string event type to numeric ID for the event type.
-	EventTypeNIDs(eventTypes []string) (map[string]types.EventTypeNID, error)
-	// Lookup the numeric IDs for a list of string event state keys.
-	// Returns a map from string state key to numeric ID for the state key.
-	EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error)
-	// Lookup the numeric state block IDs for each numeric state snapshot ID
-	// The returned slice is sorted by numeric state snapshot ID.
-	StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
-	// Lookup the state data for the state key tuples for each numeric state block ID
-	// The returned slice is sorted by numeric state block ID.
-	StateEntriesForTuples(stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) (
-		[]types.StateEntryList, error,
-	)
 	// Lookup the Events for a list of numeric event IDs.
 	// Returns a sorted list of events.
 	Events(eventNIDs []types.EventNID) ([]types.Event, error)
@@ -64,12 +52,12 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	}
 
 	// Lookup the currrent state for the requested tuples.
-	stateTuples, err := stringTuplesToNumericTuples(r.DB, request.StateToFetch)
+	stateTuples, err := state.StringTuplesToNumericTuples(r.DB, request.StateToFetch)
 	if err != nil {
 		return err
 	}
 
-	stateEntries, err := loadStateAtSnapshotForTuples(r.DB, currentStateSnapshotNID, stateTuples)
+	stateEntries, err := state.LoadStateAtSnapshotForTuples(r.DB, currentStateSnapshotNID, stateTuples)
 	if err != nil {
 		return err
 	}

@@ -145,12 +145,12 @@ func (d *Database) StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntr
 	return d.statements.bulkSelectStateEventByID(eventIDs)
 }
 
-// EventTypeNIDs implements query.RoomserverQueryAPIDatabase
+// EventTypeNIDs implements state.RoomStateDatabase
 func (d *Database) EventTypeNIDs(eventTypes []string) (map[string]types.EventTypeNID, error) {
 	return d.statements.bulkSelectEventTypeNID(eventTypes)
 }
 
-// EventStateKeyNIDs implements input.EventDatabase and query.RoomserverQueryAPIDatabase
+// EventStateKeyNIDs implements state.RoomStateDatabase
 func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error) {
 	return d.statements.bulkSelectEventStateKeyNID(eventStateKeys)
 }
@@ -200,12 +200,12 @@ func (d *Database) StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, err
 	return d.statements.bulkSelectStateAtEventByID(eventIDs)
 }
 
-// StateBlockNIDs implements input.EventDatabase and query.RoomserverQueryAPIDatabase
+// StateBlockNIDs implements state.RoomStateDatabase
 func (d *Database) StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error) {
 	return d.statements.bulkSelectStateBlockNIDs(stateNIDs)
 }
 
-// StateEntries implements input.EventDatabase
+// StateEntries implements state.RoomStateDatabase
 func (d *Database) StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error) {
 	return d.statements.bulkSelectStateBlockEntries(stateBlockNIDs)
 }
@@ -341,7 +341,7 @@ func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.Ev
 	return references, currentStateSnapshotNID, nil
 }
 
-// StateEntriesForTuples implements query.RoomserverQueryAPIDB
+// StateEntriesForTuples implements state.RoomStateDatabase
 func (d *Database) StateEntriesForTuples(
 	stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {

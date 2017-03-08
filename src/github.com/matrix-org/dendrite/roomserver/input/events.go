@@ -16,9 +16,6 @@ type RoomEventDatabase interface {
 	// Returns an error if the there is an error talking to the database
 	// or if the event IDs aren't in the database.
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
-	// Lookup the numeric IDs for a list of string event state keys.
-	// Returns a map from string state key to numeric ID for the state key.
-	EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error)
 	// Lookup the Events for a list of numeric event IDs.
 	// Returns a sorted list of events.
 	Events(eventNIDs []types.EventNID) ([]types.Event, error)
