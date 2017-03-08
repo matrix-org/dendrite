@@ -28,7 +28,8 @@ type createRoomRequest struct {
 func (r createRoomRequest) Validate() *util.JSONResponse {
 	whitespace := "\t\n\x0b\x0c\r " // https://docs.python.org/2/library/string.html#string.whitespace
 	// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/handlers/room.py#L81
-	if strings.ContainsAny(r.RoomAliasName, whitespace) {
+	// Synapse doesn't check for ':' but we will else it will break parsers badly which split things into 2 segments.
+	if strings.ContainsAny(r.RoomAliasName, whitespace+":") {
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.BadJSON("room_alias_name cannot contain whitespace"),
