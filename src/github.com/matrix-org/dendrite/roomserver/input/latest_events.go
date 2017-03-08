@@ -3,6 +3,7 @@ package input
 import (
 	"bytes"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -90,7 +91,7 @@ func doUpdateLatestEvents(
 		return err
 	}
 
-	removed, added, err := differenceBetweeenStateSnapshots(db, oldStateNID, newStateNID)
+	removed, added, err := state.DifferenceBetweeenStateSnapshots(db, oldStateNID, newStateNID)
 	if err != nil {
 		return err
 	}
