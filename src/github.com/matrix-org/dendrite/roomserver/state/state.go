@@ -49,7 +49,7 @@ func LoadStateAtSnapshot(db RoomStateDatabase, stateNID types.StateSnapshotNID) 
 	}
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
 
-	// Combined all the state entries for this snapshot.
+	// Combine all the state entries for this snapshot.
 	// The order of state block NIDs in the list tells us the order to combine them in.
 	var fullState []types.StateEntry
 	for _, stateBlockNID := range stateBlockNIDList.StateBlockNIDs {
@@ -112,7 +112,7 @@ func LoadCombinedStateAfterEvents(db RoomStateDatabase, prevStates []types.State
 			panic(fmt.Errorf("Corrupt DB: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
 		}
 
-		// Combined all the state entries for this snapshot.
+		// Combine all the state entries for this snapshot.
 		// The order of state block NIDs in the list tells us the order to combine them in.
 		var fullState []types.StateEntry
 		for _, stateBlockNID := range stateBlockNIDs {
@@ -268,7 +268,7 @@ func loadStateAtSnapshotForNumericTuples(
 	}
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
 
-	// Combined all the state entries for this snapshot.
+	// Combine all the state entries for this snapshot.
 	// The order of state block NIDs in the list tells us the order to combine them in.
 	var fullState []types.StateEntry
 	for _, stateBlockNID := range stateBlockNIDList.StateBlockNIDs {
