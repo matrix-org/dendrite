@@ -108,7 +108,7 @@ type memberContent struct {
 	// We use the membership key in order to check if the user is in the room.
 	Membership string `json:"membership"`
 	// We use the third_party_invite key to special case thirdparty invites.
-	ThirdPartyInvite json.RawMessage `json:"third_party_invite"`
+	ThirdPartyInvite rawJSON `json:"third_party_invite,omitempty"`
 }
 
 // newMemberContentFromAuthEvents loads the member content from the member event for the user ID in the auth events.
