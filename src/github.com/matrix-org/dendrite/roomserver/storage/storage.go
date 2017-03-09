@@ -145,7 +145,12 @@ func (d *Database) StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntr
 	return d.statements.bulkSelectStateEventByID(eventIDs)
 }
 
-// EventStateKeyNIDs implements input.EventDatabase
+// EventTypeNIDs implements state.RoomStateDatabase
+func (d *Database) EventTypeNIDs(eventTypes []string) (map[string]types.EventTypeNID, error) {
+	return d.statements.bulkSelectEventTypeNID(eventTypes)
+}
+
+// EventStateKeyNIDs implements state.RoomStateDatabase
 func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error) {
 	return d.statements.bulkSelectEventStateKeyNID(eventStateKeys)
 }
@@ -195,14 +200,14 @@ func (d *Database) StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, err
 	return d.statements.bulkSelectStateAtEventByID(eventIDs)
 }
 
-// StateBlockNIDs implements input.EventDatabase
+// StateBlockNIDs implements state.RoomStateDatabase
 func (d *Database) StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error) {
 	return d.statements.bulkSelectStateBlockNIDs(stateNIDs)
 }
 
-// StateEntries implements input.EventDatabase
+// StateEntries implements state.RoomStateDatabase
 func (d *Database) StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectStateDataEntries(stateBlockNIDs)
+	return d.statements.bulkSelectStateBlockEntries(stateBlockNIDs)
 }
 
 // EventIDs implements input.RoomEventDatabase
@@ -324,10 +329,21 @@ func (d *Database) RoomNID(roomID string) (types.RoomNID, error) {
 }
 
 // LatestEventIDs implements query.RoomserverQueryAPIDB
-func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, error) {
-	eventNIDs, err := d.statements.selectLatestEventNIDs(roomNID)
+func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, error) {
+	eventNIDs, currentStateSnapshotNID, err := d.statements.selectLatestEventNIDs(roomNID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return d.statements.bulkSelectEventReference(eventNIDs)
+	references, err := d.statements.bulkSelectEventReference(eventNIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	return references, currentStateSnapshotNID, nil
+}
+
+// StateEntriesForTuples implements state.RoomStateDatabase
+func (d *Database) StateEntriesForTuples(
+	stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntryList, error) {
+	return d.statements.bulkSelectFilteredStateBlockEntries(stateBlockNIDs, stateKeyTuples)
 }

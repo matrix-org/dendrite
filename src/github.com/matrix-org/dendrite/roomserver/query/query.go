@@ -3,6 +3,7 @@ package query
 import (
 	"encoding/json"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -12,13 +13,17 @@ import (
 
 // RoomserverQueryAPIDatabase has the storage APIs needed to implement the query API.
 type RoomserverQueryAPIDatabase interface {
+	state.RoomStateDatabase
 	// Lookup the numeric ID for the room.
 	// Returns 0 if the room doesn't exists.
 	// Returns an error if there was a problem talking to the database.
 	RoomNID(roomID string) (types.RoomNID, error)
-	// Lookup event references for the latest events in the room.
+	// Lookup event references for the latest events in the room and the current state snapshot.
 	// Returns an error if there was a problem talking to the database.
-	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, error)
+	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, error)
+	// Lookup the Events for a list of numeric event IDs.
+	// Returns a list of events sorted by numeric event ID.
+	Events(eventNIDs []types.EventNID) ([]types.Event, error)
 }
 
 // RoomserverQueryAPI is an implementation of RoomserverQueryAPI
@@ -40,9 +45,33 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return nil
 	}
 	response.RoomExists = true
-	response.LatestEvents, err = r.DB.LatestEventIDs(roomNID)
-	// TODO: look up the current state.
-	return err
+	var currentStateSnapshotNID types.StateSnapshotNID
+	response.LatestEvents, currentStateSnapshotNID, err = r.DB.LatestEventIDs(roomNID)
+	if err != nil {
+		return err
+	}
+
+	// Lookup the currrent state for the requested tuples.
+	stateEntries, err := state.LoadStateAtSnapshotForStringTuples(r.DB, currentStateSnapshotNID, request.StateToFetch)
+	if err != nil {
+		return err
+	}
+
+	eventNIDs := make([]types.EventNID, len(stateEntries))
+	for i := range stateEntries {
+		eventNIDs[i] = stateEntries[i].EventNID
+	}
+
+	stateEvents, err := r.DB.Events(eventNIDs)
+	if err != nil {
+		return err
+	}
+
+	response.StateEvents = make([]gomatrixserverlib.Event, len(stateEvents))
+	for i := range stateEvents {
+		response.StateEvents[i] = stateEvents[i].Event
+	}
+	return nil
 }
 
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
