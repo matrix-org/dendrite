@@ -207,8 +207,6 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	if current.StateEntries != nil {
 		results = append(results, current)
 	}
-	// Because we have filtered the list it's possible that some of the blocks were completely removed
-	// from the result.
 	return results, nil
 }
 
