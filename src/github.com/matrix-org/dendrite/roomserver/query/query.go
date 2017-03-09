@@ -22,7 +22,7 @@ type RoomserverQueryAPIDatabase interface {
 	// Returns an error if there was a problem talking to the database.
 	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, error)
 	// Lookup the Events for a list of numeric event IDs.
-	// Returns a sorted list of events.
+	// Returns a list of events sorted by numeric event ID.
 	Events(eventNIDs []types.EventNID) ([]types.Event, error)
 }
 
