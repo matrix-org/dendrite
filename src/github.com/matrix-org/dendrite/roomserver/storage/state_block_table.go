@@ -198,8 +198,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 			if current.StateEntries != nil {
 				results = append(results, current)
 			}
-			current.StateBlockNID = types.StateBlockNID(stateBlockNID)
-			current.StateEntries = nil
+			current = types.StateEntryList{StateBlockNID: types.StateBlockNID(stateBlockNID)}
 		}
 		current.StateEntries = append(current.StateEntries, entry)
 	}
