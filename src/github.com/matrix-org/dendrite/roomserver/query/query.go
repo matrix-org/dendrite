@@ -52,12 +52,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	}
 
 	// Lookup the currrent state for the requested tuples.
-	stateTuples, err := state.StringTuplesToNumericTuples(r.DB, request.StateToFetch)
-	if err != nil {
-		return err
-	}
-
-	stateEntries, err := state.LoadStateAtSnapshotForTuples(r.DB, currentStateSnapshotNID, stateTuples)
+	stateEntries, err := state.LoadStateAtSnapshotForStringTuples(r.DB, currentStateSnapshotNID, request.StateToFetch)
 	if err != nil {
 		return err
 	}

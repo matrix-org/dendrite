@@ -195,10 +195,10 @@ func DifferenceBetweeenStateSnapshots(db RoomStateDatabase, oldStateNID, newStat
 	}
 }
 
-// StringTuplesToNumericTuples converts the string state key tuples into numeric IDs
+// stringTuplesToNumericTuples converts the string state key tuples into numeric IDs
 // If there isn't a numeric ID for either the event type or the event state key then the tuple is discarded.
 // Returns an error if there was a problem talking to the database.
-func StringTuplesToNumericTuples(db RoomStateDatabase, stringTuples []api.StateKeyTuple) ([]types.StateKeyTuple, error) {
+func stringTuplesToNumericTuples(db RoomStateDatabase, stringTuples []api.StateKeyTuple) ([]types.StateKeyTuple, error) {
 	eventTypes := make([]string, len(stringTuples))
 	stateKeys := make([]string, len(stringTuples))
 	for i := range stringTuples {
@@ -231,11 +231,29 @@ func StringTuplesToNumericTuples(db RoomStateDatabase, stringTuples []api.StateK
 	return result, nil
 }
 
-// LoadStateAtSnapshotForTuples loads the state for a list of event type and state key pairs at a snapshot.
+// LoadStateAtSnapshotForStringTuples loads the state for a list of event type and state key pairs at a snapshot.
 // This is used when we only want to load a subset of the room state at a snapshot.
+// If there is no entry for a given event type and state key pair then it will be discarded.
 // This is typically the state before an event or the current state of a room.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.
-func LoadStateAtSnapshotForTuples(db RoomStateDatabase, stateNID types.StateSnapshotNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntry, error) {
+func LoadStateAtSnapshotForStringTuples(
+	db RoomStateDatabase, stateNID types.StateSnapshotNID, stateKeyTuples []api.StateKeyTuple,
+) ([]types.StateEntry, error) {
+	numericTuples, err := stringTuplesToNumericTuples(db, stateKeyTuples)
+	if err != nil {
+		return nil, err
+	}
+	return loadStateAtSnapshotForNumericTuples(db, stateNID, numericTuples)
+}
+
+// loadStateAtSnapshotForNumericTuples loads the state for a list of event type and state key pairs at a snapshot.
+// This is used when we only want to load a subset of the room state at a snapshot.
+// If there is no entry for a given event type and state key pair then it will be discarded.
+// This is typically the state before an event or the current state of a room.
+// Returns a sorted list of state entries or an error if there was a problem talking to the database.
+func loadStateAtSnapshotForNumericTuples(
+	db RoomStateDatabase, stateNID types.StateSnapshotNID, stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntry, error) {
 	stateBlockNIDLists, err := db.StateBlockNIDs([]types.StateSnapshotNID{stateNID})
 	if err != nil {
 		return nil, err
