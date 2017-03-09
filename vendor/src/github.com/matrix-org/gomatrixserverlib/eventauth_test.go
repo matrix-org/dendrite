@@ -68,7 +68,7 @@ func (tel *testEventList) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func testStateNeededForAuth(t *testing.T, eventdata string, want StateNeeded) {
+func testStateNeededForAuth(t *testing.T, eventdata string, builder *EventBuilder, want StateNeeded) {
 	var events testEventList
 	if err := json.Unmarshal([]byte(eventdata), &events); err != nil {
 		panic(err)
@@ -77,11 +77,24 @@ func testStateNeededForAuth(t *testing.T, eventdata string, want StateNeeded) {
 	if !stateNeededEquals(got, want) {
 		t.Errorf("Testing StateNeededForAuth(%#v), wanted %#v got %#v", events, want, got)
 	}
+	if builder != nil {
+		got, err := StateNeededForEventBuilder(builder)
+		if !stateNeededEquals(got, want) {
+			t.Errorf("Testing StateNeededForEventBuilder(%#v), wanted %#v got %#v", events, want, got)
+		}
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func TestStateNeededForCreate(t *testing.T) {
 	// Create events don't need anything.
-	testStateNeededForAuth(t, `[{"type": "m.room.create"}]`, StateNeeded{})
+	skey := ""
+	testStateNeededForAuth(t, `[{"type": "m.room.create"}]`, &EventBuilder{
+		Type:     "m.room.create",
+		StateKey: &skey,
+	}, StateNeeded{})
 }
 
 func TestStateNeededForMessage(t *testing.T) {
@@ -89,7 +102,10 @@ func TestStateNeededForMessage(t *testing.T) {
 	testStateNeededForAuth(t, `[{
 		"type": "m.room.message",
 		"sender": "@u1:a"
-	}]`, StateNeeded{
+	}]`, &EventBuilder{
+		Type:   "m.room.message",
+		Sender: "@u1:a",
+	}, StateNeeded{
 		Create:      true,
 		PowerLevels: true,
 		Member:      []string{"@u1:a"},
@@ -98,18 +114,27 @@ func TestStateNeededForMessage(t *testing.T) {
 
 func TestStateNeededForAlias(t *testing.T) {
 	// Alias events need only the create event.
-	testStateNeededForAuth(t, `[{"type": "m.room.aliases"}]`, StateNeeded{
+	testStateNeededForAuth(t, `[{"type": "m.room.aliases"}]`, &EventBuilder{
+		Type: "m.room.aliases",
+	}, StateNeeded{
 		Create: true,
 	})
 }
 
 func TestStateNeededForJoin(t *testing.T) {
+	skey := "@u1:a"
+	b := EventBuilder{
+		Type:     "m.room.member",
+		StateKey: &skey,
+		Sender:   "@u1:a",
+	}
+	b.SetContent(memberContent{"join", nil})
 	testStateNeededForAuth(t, `[{
 		"type": "m.room.member",
 		"state_key": "@u1:a",
 		"sender": "@u1:a",
 		"content": {"membership": "join"}
-	}]`, StateNeeded{
+	}]`, &b, StateNeeded{
 		Create:      true,
 		JoinRules:   true,
 		PowerLevels: true,
@@ -118,12 +143,19 @@ func TestStateNeededForJoin(t *testing.T) {
 }
 
 func TestStateNeededForInvite(t *testing.T) {
+	skey := "@u2:b"
+	b := EventBuilder{
+		Type:     "m.room.member",
+		StateKey: &skey,
+		Sender:   "@u1:a",
+	}
+	b.SetContent(memberContent{"invite", nil})
 	testStateNeededForAuth(t, `[{
 		"type": "m.room.member",
 		"state_key": "@u2:b",
 		"sender": "@u1:a",
 		"content": {"membership": "invite"}
-	}]`, StateNeeded{
+	}]`, &b, StateNeeded{
 		Create:      true,
 		PowerLevels: true,
 		Member:      []string{"@u1:a", "@u2:b"},
@@ -131,6 +163,13 @@ func TestStateNeededForInvite(t *testing.T) {
 }
 
 func TestStateNeededForInvite3PID(t *testing.T) {
+	skey := "@u2:b"
+	b := EventBuilder{
+		Type:     "m.room.member",
+		StateKey: &skey,
+		Sender:   "@u1:a",
+	}
+	b.SetContent(memberContent{"invite", rawJSON(`{"signed":{"token":"my_token"}}`)})
 	testStateNeededForAuth(t, `[{
 		"type": "m.room.member",
 		"state_key": "@u2:b",
@@ -143,7 +182,7 @@ func TestStateNeededForInvite3PID(t *testing.T) {
 				}
 			}
 		}
-	}]`, StateNeeded{
+	}]`, &b, StateNeeded{
 		Create:           true,
 		PowerLevels:      true,
 		Member:           []string{"@u1:a", "@u2:b"},
