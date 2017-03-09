@@ -158,12 +158,16 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 			Depth:    int64(depth),
 		}
 		builder.SetContent(e.Content)
+		if i > 0 {
+			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
+		}
 		ev, err := buildEvent(&builder, builtEventMap, cfg)
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
 		builtEventMap[common.StateTuple{e.Type, *e.StateKey}] = ev
 		builtEvents = append(builtEvents, ev)
+
 	}
 	authEvents := authEventProvider{builtEventMap}
 
