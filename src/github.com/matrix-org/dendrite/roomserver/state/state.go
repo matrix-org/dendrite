@@ -26,6 +26,7 @@ type RoomStateDatabase interface {
 	StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
 	// Lookup the state data for the state key tuples for each numeric state block ID
 	// This is used to fetch a subset of the room state at a snapshot.
+	// If a block doesn't contain any of the requested tuples then it can be discarded from the result.
 	// The returned slice is sorted by numeric state block ID.
 	StateEntriesForTuples(stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) (
 		[]types.StateEntryList, error,
@@ -275,6 +276,8 @@ func loadStateAtSnapshotForNumericTuples(
 		entries, ok := stateEntriesMap.lookup(stateBlockNID)
 		if !ok {
 			// If the block is missing from the map it means that none of its entries matched a requested tuple.
+			// This can happen if the block doesn't contain an update for one of the requested tuples.
+			// If none of the requested tuples are in the block then it can be safely skipped.
 			continue
 		}
 		fullState = append(fullState, entries...)
