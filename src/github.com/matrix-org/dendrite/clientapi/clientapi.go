@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"golang.org/x/crypto/ed25519"
+
+	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 
 	log "github.com/Sirupsen/logrus"
@@ -36,6 +39,16 @@ func main() {
 		setupLogging(logDir)
 	}
 	log.Info("Starting clientapi")
-	routing.Setup(http.DefaultServeMux, http.DefaultClient)
+	// TODO: Rather than generating a new key on every startup, we should be
+	//       reading a PEM formatted file instead.
+	_, privKey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		log.Panicf("Failed to generate private key: %s", err)
+	}
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, config.ClientAPI{
+		ServerName: "localhost",
+		KeyID:      "ed25519:something",
+		PrivateKey: privKey,
+	})
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }
