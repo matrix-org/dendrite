@@ -66,6 +66,15 @@ type createRoomResponse struct {
 
 // CreateRoom implements /createRoom
 func CreateRoom(req *http.Request) util.JSONResponse {
+	serverName := "localhost"
+	// TODO: Check room ID doesn't clash with an existing one, and we
+	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
+	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), serverName)
+	return createRoom(req, roomID)
+}
+
+// createRoom implements /createRoom
+func createRoom(req *http.Request, roomID string) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID, resErr := auth.VerifyAccessToken(req)
 	if resErr != nil {
@@ -84,9 +93,6 @@ func CreateRoom(req *http.Request) util.JSONResponse {
 
 	// TODO: visibility/presets/raw initial state/creation content
 
-	serverName := "localhost"
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), serverName)
-	// TODO: Check room ID doesn't clash with an existing one
 	// TODO: Create room alias association
 
 	logger.WithFields(log.Fields{
