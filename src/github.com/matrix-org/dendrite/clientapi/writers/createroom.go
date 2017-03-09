@@ -131,13 +131,14 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 	// depending on if those events were in "initial_state" or not. This made it
 	// harder to reason about, hence sticking to a strict static ordering.
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
+	emptyString := ""
 	eventsToMake := []fledglingEvent{
-		{"m.room.create", emptyString(), common.CreateContent{Creator: userID}},
+		{"m.room.create", &emptyString, common.CreateContent{Creator: userID}},
 		{"m.room.member", &userID, common.MemberContent{Membership: "join"}}, // TODO: Set avatar_url / displayname
-		{"m.room.power_levels", emptyString(), common.InitialPowerLevelsContent(userID)},
+		{"m.room.power_levels", &emptyString, common.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
-		{"m.room.join_rules", emptyString(), common.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
-		{"m.room.history_visibility", emptyString(), common.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
+		{"m.room.join_rules", &emptyString, common.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
+		{"m.room.history_visibility", &emptyString, common.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
 		// TODO: m.room.guest_access
 		// TODO: Other initial state items
 		// TODO: m.room.name
@@ -147,6 +148,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 		// TODO m.room.aliases
 	}
 
+	authEvents := authEventProvider{builtEventMap}
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
@@ -165,17 +167,14 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
+
+		if err := gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
+			return util.ErrorResponse(err)
+		}
+
 		builtEventMap[common.StateTuple{e.Type, *e.StateKey}] = ev
 		builtEvents = append(builtEvents, ev)
 
-	}
-	authEvents := authEventProvider{builtEventMap}
-
-	// auth each event in turn
-	for _, e := range builtEvents {
-		if err := gomatrixserverlib.Allowed(*e, &authEvents); err != nil {
-			return util.ErrorResponse(err)
-		}
 	}
 
 	return util.JSONResponse{
@@ -266,15 +265,6 @@ func (a *authEventProvider) ThirdPartyInvite(stateKey string) (ev *gomatrixserve
 }
 
 func (a *authEventProvider) fetch(tuple common.StateTuple) (ev *gomatrixserverlib.Event, err error) {
-	ev, ok := a.events[tuple]
-	if !ok {
-		err = fmt.Errorf("Cannot find auth event %+v", tuple)
-		return
-	}
+	ev, _ = a.events[tuple]
 	return
-}
-
-func emptyString() *string {
-	skey := ""
-	return &skey
 }
