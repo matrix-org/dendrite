@@ -365,7 +365,12 @@ func main() {
 	testRoomserver(input, want, func(q api.RoomserverQueryAPI) {
 		var response api.QueryLatestEventsAndStateResponse
 		if err := q.QueryLatestEventsAndState(
-			&api.QueryLatestEventsAndStateRequest{RoomID: "!HCXfdvrfksxuYnIFiJ:matrix.org"},
+			&api.QueryLatestEventsAndStateRequest{
+				RoomID: "!HCXfdvrfksxuYnIFiJ:matrix.org",
+				StateToFetch: []api.StateKeyTuple{
+					{"m.room.member", "@richvdh:matrix.org"},
+				},
+			},
 			&response,
 		); err != nil {
 			panic(err)
@@ -375,6 +380,9 @@ func main() {
 		}
 		if len(response.LatestEvents) != 1 || response.LatestEvents[0].EventID != "$1463671339126270PnVwC:matrix.org" {
 			panic(fmt.Errorf(`Wanted "$1463671339126270PnVwC:matrix.org" to be the latest event got %#v`, response.LatestEvents))
+		}
+		if len(response.StateEvents) != 1 || response.StateEvents[0].EventID() != "$1463671339126270PnVwC:matrix.org" {
+			panic(fmt.Errorf(`Wanted "$1463671339126270PnVwC:matrix.org" to be the state event got %#v`, response.StateEvents))
 		}
 	})
 
