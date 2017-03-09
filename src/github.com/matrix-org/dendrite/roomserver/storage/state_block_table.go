@@ -153,6 +153,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
 	tuples := stateKeyTupleSorter(stateKeyTuples)
+	// Sort the tuples so that we can run binary search against them as we filter the rows returned by the db.
 	sort.Sort(tuples)
 
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
@@ -185,6 +186,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 		entry.EventStateKeyNID = types.EventStateKeyNID(eventStateKeyNID)
 		entry.EventNID = types.EventNID(eventNID)
 
+		// We can use binary search here because we sorted the tuples earlier
 		if !tuples.contains(entry.StateKeyTuple) {
 			// The select will return the cross product of types and state keys.
 			// So we need to check if type of the entry is in the list.
