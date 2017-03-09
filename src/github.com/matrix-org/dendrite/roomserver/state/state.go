@@ -40,6 +40,7 @@ func LoadStateAtSnapshot(db RoomStateDatabase, stateNID types.StateSnapshotNID) 
 	if err != nil {
 		return nil, err
 	}
+	// We've asked for exactly one snapshot from the db so we should have exactly one entry in the result.
 	stateBlockNIDList := stateBlockNIDLists[0]
 
 	stateEntryLists, err := db.StateEntries(stateBlockNIDList.StateBlockNIDs)
@@ -258,6 +259,7 @@ func loadStateAtSnapshotForNumericTuples(
 	if err != nil {
 		return nil, err
 	}
+	// We've asked for exactly one snapshot from the db so we should have exactly one entry in the result.
 	stateBlockNIDList := stateBlockNIDLists[0]
 
 	stateEntryLists, err := db.StateEntriesForTuples(stateBlockNIDList.StateBlockNIDs, stateKeyTuples)
