@@ -165,10 +165,8 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	}
 	defer rows.Close()
 
-	results := make([]types.StateEntryList, len(stateBlockNIDs))
-	// current is a pointer to the StateEntryList to append the state entries to.
-	var current *types.StateEntryList
-	i := 0
+	var results []types.StateEntryList
+	var current types.StateEntryList
 	for rows.Next() {
 		var (
 			stateBlockNID    int64
@@ -193,18 +191,25 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 			continue
 		}
 
-		if current == nil || types.StateBlockNID(stateBlockNID) != current.StateBlockNID {
+		if types.StateBlockNID(stateBlockNID) != current.StateBlockNID {
 			// The state entry row is for a different state data block to the current one.
-			// So we start appending to the next entry in the list.
-			current = &results[i]
+			// So we append the current entry to the results and start adding to a new one.
+			// The first time through the loop current will be empty.
+			if current.StateEntries != nil {
+				results = append(results, current)
+			}
 			current.StateBlockNID = types.StateBlockNID(stateBlockNID)
-			i++
+			current.StateEntries = nil
 		}
 		current.StateEntries = append(current.StateEntries, entry)
 	}
+	// Add the last entry to the list if it is not empty.
+	if current.StateEntries != nil {
+		results = append(results, current)
+	}
 	// Because we have filtered the list it's possible that some of the blocks were completely removed
 	// from the result.
-	return results[:i], nil
+	return results, nil
 }
 
 func stateBlockNIDsAsArray(stateBlockNIDs []types.StateBlockNID) pq.Int64Array {
