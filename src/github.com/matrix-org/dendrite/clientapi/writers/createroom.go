@@ -181,7 +181,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 	}
 
 	// send events to the room server
-	msgs, err := eventsToMessages(builtEvents)
+	msgs, err := eventsToMessages(builtEvents, cfg.ClientAPIOutputTopic)
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
@@ -252,7 +252,7 @@ func authEventsFromStateNeeded(eventsNeeded gomatrixserverlib.StateNeeded,
 	return
 }
 
-func eventsToMessages(events []*gomatrixserverlib.Event) ([]*sarama.ProducerMessage, error) {
+func eventsToMessages(events []*gomatrixserverlib.Event, topic string) ([]*sarama.ProducerMessage, error) {
 	msgs := make([]*sarama.ProducerMessage, len(events))
 	for i, e := range events {
 		var m sarama.ProducerMessage
@@ -273,7 +273,7 @@ func eventsToMessages(events []*gomatrixserverlib.Event) ([]*sarama.ProducerMess
 		if err != nil {
 			return nil, err
 		}
-		m.Topic = "clientapiOutput" // TODO: Make this customisable like roomserver is?
+		m.Topic = topic
 		m.Key = sarama.StringEncoder(e.EventID())
 		m.Value = sarama.ByteEncoder(value)
 		msgs[i] = &m

@@ -48,10 +48,11 @@ func main() {
 	}
 
 	cfg := config.ClientAPI{
-		ServerName:        "localhost",
-		KeyID:             "ed25519:something",
-		PrivateKey:        privKey,
-		KafkaProducerURIs: []string{"localhost:9092"},
+		ServerName:           "localhost",
+		KeyID:                "ed25519:something",
+		PrivateKey:           privKey,
+		KafkaProducerURIs:    []string{"localhost:9092"},
+		ClientAPIOutputTopic: "clientapiOutput",
 	}
 
 	log.Info("Starting clientapi")

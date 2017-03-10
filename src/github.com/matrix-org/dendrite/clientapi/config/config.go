@@ -13,4 +13,6 @@ type ClientAPI struct {
 	KeyID string
 	// A list of URIs to send events to. These kafka logs should be consumed by a Room Server.
 	KafkaProducerURIs []string
+	// The topic for events which are written to the logs.
+	ClientAPIOutputTopic string
 }
