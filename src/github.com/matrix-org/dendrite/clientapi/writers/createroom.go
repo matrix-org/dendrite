@@ -14,8 +14,10 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
@@ -77,15 +79,15 @@ type fledglingEvent struct {
 }
 
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
+func CreateRoom(req *http.Request, cfg config.ClientAPI, producer sarama.SyncProducer) util.JSONResponse {
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.ServerName)
-	return createRoom(req, cfg, roomID)
+	return createRoom(req, cfg, roomID, producer)
 }
 
 // createRoom implements /createRoom
-func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSONResponse {
+func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer sarama.SyncProducer) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID, resErr := auth.VerifyAccessToken(req)
 	if resErr != nil {
@@ -176,7 +178,15 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 		// Add the event to the list of auth events
 		builtEventMap[common.StateKeyTuple{e.Type, e.StateKey}] = ev
 		builtEvents = append(builtEvents, ev)
+	}
 
+	// send events to the room server
+	msgs, err := eventsToMessages(builtEvents, cfg.ClientAPIOutputTopic)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	if err = producer.SendMessages(msgs); err != nil {
+		return util.ErrorResponse(err)
 	}
 
 	return util.JSONResponse{
@@ -240,6 +250,35 @@ func authEventsFromStateNeeded(eventsNeeded gomatrixserverlib.StateNeeded,
 		}
 	}
 	return
+}
+
+func eventsToMessages(events []*gomatrixserverlib.Event, topic string) ([]*sarama.ProducerMessage, error) {
+	msgs := make([]*sarama.ProducerMessage, len(events))
+	for i, e := range events {
+		var m sarama.ProducerMessage
+
+		// map auth event references to IDs
+		var authEventIDs []string
+		for _, ref := range e.AuthEvents() {
+			authEventIDs = append(authEventIDs, ref.EventID)
+		}
+
+		ire := api.InputRoomEvent{
+			Kind:         api.KindNew,
+			Event:        e.JSON(),
+			AuthEventIDs: authEventIDs,
+		}
+
+		value, err := json.Marshal(ire)
+		if err != nil {
+			return nil, err
+		}
+		m.Topic = topic
+		m.Key = sarama.StringEncoder(e.EventID())
+		m.Value = sarama.ByteEncoder(value)
+		msgs[i] = &m
+	}
+	return msgs, nil
 }
 
 type authEventProvider struct {
