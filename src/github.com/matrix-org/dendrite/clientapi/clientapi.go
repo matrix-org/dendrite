@@ -51,7 +51,7 @@ func main() {
 		ServerName:        "localhost",
 		KeyID:             "ed25519:something",
 		PrivateKey:        privKey,
-		KafkaProducerURIs: []string{"localhost"},
+		KafkaProducerURIs: []string{"localhost:9092"},
 	}
 
 	log.Info("Starting clientapi")

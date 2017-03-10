@@ -16,6 +16,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
@@ -77,15 +78,15 @@ type fledglingEvent struct {
 }
 
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
+func CreateRoom(req *http.Request, cfg config.ClientAPI, producer sarama.SyncProducer) util.JSONResponse {
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.ServerName)
-	return createRoom(req, cfg, roomID)
+	return createRoom(req, cfg, roomID, producer)
 }
 
 // createRoom implements /createRoom
-func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSONResponse {
+func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer sarama.SyncProducer) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID, resErr := auth.VerifyAccessToken(req)
 	if resErr != nil {
@@ -176,7 +177,19 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 		// Add the event to the list of auth events
 		builtEventMap[common.StateKeyTuple{e.Type, e.StateKey}] = ev
 		builtEvents = append(builtEvents, ev)
+	}
 
+	// send events to the room server
+	var m sarama.ProducerMessage
+	value, err := json.Marshal(builtEvents)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	m.Topic = "clientapiOutput" // TODO: Make this customisable like roomserver is?
+	m.Key = sarama.StringEncoder("")
+	m.Value = sarama.ByteEncoder(value)
+	if _, _, err = producer.SendMessage(&m); err != nil {
+		return util.ErrorResponse(err)
 	}
 
 	return util.JSONResponse{

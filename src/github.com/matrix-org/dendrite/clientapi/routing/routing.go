@@ -20,7 +20,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/createRoom", make("createRoom", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
-		return writers.CreateRoom(req, cfg)
+		return writers.CreateRoom(req, cfg, producer)
 	})))
 	r0mux.Handle("/sync", make("sync", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 		return readers.Sync(req)
