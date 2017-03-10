@@ -100,7 +100,7 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin, keyID strin
 		EventBuilder
 		EventID        string  `json:"event_id"`
 		RawContent     rawJSON `json:"content"`
-		RawUnsigned    rawJSON `json:"unsigned"`
+		RawUnsigned    rawJSON `json:"unsigned,omitempty"`
 		OriginServerTS int64   `json:"origin_server_ts"`
 		Origin         string  `json:"origin"`
 	}

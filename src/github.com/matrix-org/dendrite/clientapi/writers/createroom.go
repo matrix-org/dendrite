@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/common"
+	"github.com/matrix-org/dendrite/clientapi/config"
+	"github.com/matrix-org/dendrite/clientapi/events"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -64,24 +69,30 @@ type createRoomResponse struct {
 	RoomAlias string `json:"room_alias,omitempty"` // in synapse not spec
 }
 
+// fledglingEvent is a helper representation of an event used when creating many events in succession.
+type fledglingEvent struct {
+	Type     string
+	StateKey string
+	Content  interface{}
+}
+
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request) util.JSONResponse {
-	serverName := "localhost"
+func CreateRoom(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), serverName)
-	return createRoom(req, roomID)
+	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.ServerName)
+	return createRoom(req, cfg, roomID)
 }
 
 // createRoom implements /createRoom
-func createRoom(req *http.Request, roomID string) util.JSONResponse {
+func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID, resErr := auth.VerifyAccessToken(req)
 	if resErr != nil {
 		return *resErr
 	}
 	var r createRoomRequest
-	resErr = common.UnmarshalJSONRequest(req, &r)
+	resErr = httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
@@ -98,7 +109,11 @@ func createRoom(req *http.Request, roomID string) util.JSONResponse {
 	logger.WithFields(log.Fields{
 		"userID": userID,
 		"roomID": roomID,
-	}).Info("Creating room")
+	}).Info("Creating new room")
+
+	// Remember events we've built and key off the state tuple so we can look them up easily when filling in auth_events
+	builtEventMap := make(map[common.StateKeyTuple]*gomatrixserverlib.Event)
+	var builtEvents []*gomatrixserverlib.Event
 
 	// send events into the room in order of:
 	//  1- m.room.create
@@ -117,12 +132,136 @@ func createRoom(req *http.Request, roomID string) util.JSONResponse {
 	// This differs from Synapse slightly. Synapse would vary the ordering of 3-7
 	// depending on if those events were in "initial_state" or not. This made it
 	// harder to reason about, hence sticking to a strict static ordering.
+	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
+	eventsToMake := []fledglingEvent{
+		{"m.room.create", "", events.CreateContent{Creator: userID}},
+		{"m.room.member", userID, events.MemberContent{Membership: "join"}}, // TODO: Set avatar_url / displayname
+		{"m.room.power_levels", "", events.InitialPowerLevelsContent(userID)},
+		// TODO: m.room.canonical_alias
+		{"m.room.join_rules", "", events.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
+		{"m.room.history_visibility", "", events.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
+		// TODO: m.room.guest_access
+		// TODO: Other initial state items
+		// TODO: m.room.name
+		// TODO: m.room.topic
+		// TODO: invite events
+		// TODO: 3pid invite events
+		// TODO m.room.aliases
+	}
 
-	// f.e event:
-	// - validate required keys/types (EventValidator in synapse)
-	// - set additional keys (displayname/avatar_url for m.room.member)
-	// - set token(?) and txn id
-	// - then https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/handlers/message.py#L419
+	authEvents := authEventProvider{builtEventMap}
+	for i, e := range eventsToMake {
+		depth := i + 1 // depth starts at 1
 
-	return util.MessageResponse(404, "Not implemented yet")
+		builder := gomatrixserverlib.EventBuilder{
+			Sender:   userID,
+			RoomID:   roomID,
+			Type:     e.Type,
+			StateKey: &e.StateKey,
+			Depth:    int64(depth),
+		}
+		builder.SetContent(e.Content)
+		if i > 0 {
+			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
+		}
+		ev, err := buildEvent(&builder, builtEventMap, cfg)
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+
+		if err := gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
+			return util.ErrorResponse(err)
+		}
+
+		// Add the event to the list of auth events
+		builtEventMap[common.StateKeyTuple{e.Type, e.StateKey}] = ev
+		builtEvents = append(builtEvents, ev)
+
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: builtEvents,
+	}
+}
+
+// buildEvent fills out auth_events for the builder then builds the event
+func buildEvent(builder *gomatrixserverlib.EventBuilder,
+	events map[common.StateKeyTuple]*gomatrixserverlib.Event,
+	cfg config.ClientAPI) (*gomatrixserverlib.Event, error) {
+
+	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	if err != nil {
+		return nil, err
+	}
+	builder.AuthEvents = authEventsFromStateNeeded(eventsNeeded, events)
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.ServerName)
+	now := time.Now()
+	event, err := builder.Build(eventID, now, cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
+	}
+	return &event, nil
+}
+
+func authEventsFromStateNeeded(eventsNeeded gomatrixserverlib.StateNeeded,
+	events map[common.StateKeyTuple]*gomatrixserverlib.Event) (authEvents []gomatrixserverlib.EventReference) {
+
+	// These events are only "needed" if they exist, so if they don't exist we can safely ignore them.
+	if eventsNeeded.Create {
+		ev := events[common.StateKeyTuple{"m.room.create", ""}]
+		if ev != nil {
+			authEvents = append(authEvents, ev.EventReference())
+		}
+	}
+	if eventsNeeded.JoinRules {
+		ev := events[common.StateKeyTuple{"m.room.join_rules", ""}]
+		if ev != nil {
+			authEvents = append(authEvents, ev.EventReference())
+		}
+	}
+	if eventsNeeded.PowerLevels {
+		ev := events[common.StateKeyTuple{"m.room.power_levels", ""}]
+		if ev != nil {
+			authEvents = append(authEvents, ev.EventReference())
+		}
+	}
+
+	for _, userID := range eventsNeeded.Member {
+		ev := events[common.StateKeyTuple{"m.room.member", userID}]
+		if ev != nil {
+			authEvents = append(authEvents, ev.EventReference())
+		}
+	}
+	for _, token := range eventsNeeded.ThirdPartyInvite {
+		ev := events[common.StateKeyTuple{"m.room.member", token}]
+		if ev != nil {
+			authEvents = append(authEvents, ev.EventReference())
+		}
+	}
+	return
+}
+
+type authEventProvider struct {
+	events map[common.StateKeyTuple]*gomatrixserverlib.Event
+}
+
+func (a *authEventProvider) Create() (ev *gomatrixserverlib.Event, err error) {
+	return a.events[common.StateKeyTuple{"m.room.create", ""}], nil
+}
+
+func (a *authEventProvider) JoinRules() (ev *gomatrixserverlib.Event, err error) {
+	return a.events[common.StateKeyTuple{"m.room.join_rules", ""}], nil
+}
+
+func (a *authEventProvider) PowerLevels() (ev *gomatrixserverlib.Event, err error) {
+	return a.events[common.StateKeyTuple{"m.room.power_levels", ""}], nil
+}
+
+func (a *authEventProvider) Member(stateKey string) (ev *gomatrixserverlib.Event, err error) {
+	return a.events[common.StateKeyTuple{"m.room.member", stateKey}], nil
+}
+
+func (a *authEventProvider) ThirdPartyInvite(stateKey string) (ev *gomatrixserverlib.Event, err error) {
+	return a.events[common.StateKeyTuple{"m.room.third_party_invite", stateKey}], nil
 }
