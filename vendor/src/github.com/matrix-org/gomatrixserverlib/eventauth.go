@@ -160,19 +160,74 @@ func thirdPartyInviteToken(thirdPartyInviteData rawJSON) (string, error) {
 	return thirdPartyInvite.Signed.Token, nil
 }
 
-// AuthEvents are the state events needed to authenticate an event.
-type AuthEvents interface {
-	// Create returns the m.room.create event for the room.
+// AuthEventProvider provides auth_events for the authentication checks.
+type AuthEventProvider interface {
+	// Create returns the m.room.create event for the room or nil if there isn't a m.room.create event.
 	Create() (*Event, error)
-	// JoinRules returns the m.room.join_rules event for the room.
+	// JoinRules returns the m.room.join_rules event for the room or nil if there isn't a m.room.join_rules event.
 	JoinRules() (*Event, error)
-	// PowerLevels returns the m.room.power_levels event for the room.
+	// PowerLevels returns the m.room.power_levels event for the room or nil if there isn't a m.room.power_levels event.
 	PowerLevels() (*Event, error)
-	// Member returns the m.room.member event for the given user_id state_key.
+	// Member returns the m.room.member event for the given user_id state_key or nil if there isn't a m.room.member event.
 	Member(stateKey string) (*Event, error)
 	// ThirdPartyInvite returns the m.room.third_party_invite event for the
-	// given state_key
+	// given state_key or nil if there isn't a m.room.third_party_invite event
 	ThirdPartyInvite(stateKey string) (*Event, error)
+}
+
+type stateKeyTuple struct {
+	Type     string
+	StateKey string
+}
+
+// AuthEvents is an implementation of AuthEventProvider backed by a map.
+type AuthEvents struct {
+	events map[stateKeyTuple]*Event
+}
+
+// AddEvent adds an event to the provider. If an event already existed for the (type, state_key) then
+// the event is replaced with the new event. Only returns an error if the event is not a state event.
+func (a *AuthEvents) AddEvent(event *Event) error {
+	if event.StateKey() == nil {
+		return fmt.Errorf("AddEvent: event %s does not have a state key", event.Type())
+	}
+	a.events[stateKeyTuple{event.Type(), *event.StateKey()}] = event
+	return nil
+}
+
+// Create implements AuthEventProvider
+func (a *AuthEvents) Create() (*Event, error) {
+	return a.events[stateKeyTuple{"m.room.create", ""}], nil
+}
+
+// JoinRules implements AuthEventProvider
+func (a *AuthEvents) JoinRules() (*Event, error) {
+	return a.events[stateKeyTuple{"m.room.join_rules", ""}], nil
+}
+
+// PowerLevels implements AuthEventProvider
+func (a *AuthEvents) PowerLevels() (*Event, error) {
+	return a.events[stateKeyTuple{"m.room.power_levels", ""}], nil
+}
+
+// Member implements AuthEventProvider
+func (a *AuthEvents) Member(stateKey string) (*Event, error) {
+	return a.events[stateKeyTuple{"m.room.member", stateKey}], nil
+}
+
+// ThirdPartyInvite implements AuthEventProvider
+func (a *AuthEvents) ThirdPartyInvite(stateKey string) (*Event, error) {
+	return a.events[stateKeyTuple{"m.room.third_party_invite", stateKey}], nil
+}
+
+// NewAuthEvents returns an AuthEventProvider backed by the given events. New events can be added by
+// calling AddEvent().
+func NewAuthEvents(events []*Event) AuthEvents {
+	a := AuthEvents{make(map[stateKeyTuple]*Event)}
+	for _, e := range events {
+		a.AddEvent(e)
+	}
+	return a
 }
 
 // A NotAllowed error is returned if an event does not pass the auth checks.
@@ -191,7 +246,7 @@ func errorf(message string, args ...interface{}) error {
 // Allowed checks whether an event is allowed by the auth events.
 // It returns a NotAllowed error if the event is not allowed.
 // If there was an error loading the auth events then it returns that error.
-func Allowed(event Event, authEvents AuthEvents) error {
+func Allowed(event Event, authEvents AuthEventProvider) error {
 	switch event.Type() {
 	case "m.room.create":
 		return createEventAllowed(event)
@@ -233,7 +288,7 @@ func createEventAllowed(event Event) error {
 
 // memberEventAllowed checks whether the m.room.member event is allowed.
 // Membership events have different authentication rules to ordinary events.
-func memberEventAllowed(event Event, authEvents AuthEvents) error {
+func memberEventAllowed(event Event, authEvents AuthEventProvider) error {
 	allower, err := newMembershipAllower(authEvents, event)
 	if err != nil {
 		return err
@@ -243,7 +298,7 @@ func memberEventAllowed(event Event, authEvents AuthEvents) error {
 
 // aliasEventAllowed checks whether the m.room.aliases event is allowed.
 // Alias events have different authentication rules to ordinary events.
-func aliasEventAllowed(event Event, authEvents AuthEvents) error {
+func aliasEventAllowed(event Event, authEvents AuthEventProvider) error {
 	// The alias events have different auth rules to ordinary events.
 	// In particular we allow any server to send a m.room.aliases event without checking if the sender is in the room.
 	// This allows server admins to update the m.room.aliases event for their server when they change the aliases on their server.
@@ -278,7 +333,7 @@ func aliasEventAllowed(event Event, authEvents AuthEvents) error {
 // powerLevelsEventAllowed checks whether the m.room.power_levels event is allowed.
 // It returns an error if the event is not allowed or if there was a problem
 // loading the auth events needed.
-func powerLevelsEventAllowed(event Event, authEvents AuthEvents) error {
+func powerLevelsEventAllowed(event Event, authEvents AuthEventProvider) error {
 	allower, err := newEventAllower(authEvents, event.Sender())
 	if err != nil {
 		return err
@@ -492,7 +547,7 @@ func checkUserLevels(senderLevel int64, senderID string, oldPowerLevels, newPowe
 // redactEventAllowed checks whether the m.room.redaction event is allowed.
 // It returns an error if the event is not allowed or if there was a problem
 // loading the auth events needed.
-func redactEventAllowed(event Event, authEvents AuthEvents) error {
+func redactEventAllowed(event Event, authEvents AuthEventProvider) error {
 	allower, err := newEventAllower(authEvents, event.Sender())
 	if err != nil {
 		return err
@@ -542,7 +597,7 @@ func redactEventAllowed(event Event, authEvents AuthEvents) error {
 // checks for events.
 // It returns an error if the event is not allowed or if there was a
 // problem loading the auth events needed.
-func defaultEventAllowed(event Event, authEvents AuthEvents) error {
+func defaultEventAllowed(event Event, authEvents AuthEventProvider) error {
 	allower, err := newEventAllower(authEvents, event.Sender())
 	if err != nil {
 		return err
@@ -564,7 +619,7 @@ type eventAllower struct {
 
 // newEventAllower loads the information needed to authorise an event sent
 // by a given user ID from the auth events.
-func newEventAllower(authEvents AuthEvents, senderID string) (e eventAllower, err error) {
+func newEventAllower(authEvents AuthEventProvider, senderID string) (e eventAllower, err error) {
 	if e.create, err = newCreateContentFromAuthEvents(authEvents); err != nil {
 		return
 	}
@@ -646,7 +701,7 @@ type membershipAllower struct {
 
 // newMembershipAllower loads the information needed to authenticate the m.room.member event
 // from the auth events.
-func newMembershipAllower(authEvents AuthEvents, event Event) (m membershipAllower, err error) {
+func newMembershipAllower(authEvents AuthEventProvider, event Event) (m membershipAllower, err error) {
 	stateKey := event.StateKey()
 	if stateKey == nil {
 		err = errorf("m.room.member must be a state event")

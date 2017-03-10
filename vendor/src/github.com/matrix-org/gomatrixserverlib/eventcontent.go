@@ -39,7 +39,7 @@ type createContent struct {
 
 // newCreateContentFromAuthEvents loads the create event content from the create event in the
 // auth events.
-func newCreateContentFromAuthEvents(authEvents AuthEvents) (c createContent, err error) {
+func newCreateContentFromAuthEvents(authEvents AuthEventProvider) (c createContent, err error) {
 	var createEvent *Event
 	if createEvent, err = authEvents.Create(); err != nil {
 		return
@@ -113,7 +113,7 @@ type memberContent struct {
 
 // newMemberContentFromAuthEvents loads the member content from the member event for the user ID in the auth events.
 // Returns an error if there was an error loading the member event or parsing the event content.
-func newMemberContentFromAuthEvents(authEvents AuthEvents, userID string) (c memberContent, err error) {
+func newMemberContentFromAuthEvents(authEvents AuthEventProvider, userID string) (c memberContent, err error) {
 	var memberEvent *Event
 	if memberEvent, err = authEvents.Member(userID); err != nil {
 		return
@@ -146,7 +146,7 @@ type joinRuleContent struct {
 
 // newJoinRuleContentFromAuthEvents loads the join rule content from the join rules event in the auth event.
 // Returns an error if there was an error loading the join rule event or parsing the content.
-func newJoinRuleContentFromAuthEvents(authEvents AuthEvents) (c joinRuleContent, err error) {
+func newJoinRuleContentFromAuthEvents(authEvents AuthEventProvider) (c joinRuleContent, err error) {
 	var joinRulesEvent *Event
 	if joinRulesEvent, err = authEvents.JoinRules(); err != nil {
 		return
@@ -210,7 +210,7 @@ func (c *powerLevelContent) eventLevel(eventType string, isState bool) int64 {
 // newPowerLevelContentFromAuthEvents loads the power level content from the
 // power level event in the auth events or returns the default values if there
 // is no power level event.
-func newPowerLevelContentFromAuthEvents(authEvents AuthEvents, creatorUserID string) (c powerLevelContent, err error) {
+func newPowerLevelContentFromAuthEvents(authEvents AuthEventProvider, creatorUserID string) (c powerLevelContent, err error) {
 	powerLevelsEvent, err := authEvents.PowerLevels()
 	if err != nil {
 		return
