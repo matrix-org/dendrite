@@ -1,4 +1,4 @@
-package common
+package httputil
 
 import (
 	"encoding/json"
@@ -7,15 +7,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
 )
-
-// StateTuple is the tuple of an event type and an event state_key, typically used as a key
-// in maps.
-type StateTuple struct {
-	// Type is the event type e.g "m.room.name"
-	Type string
-	// Key is the state key e.g. ""
-	Key string
-}
 
 // UnmarshalJSONRequest into the given interface pointer. Returns an error JSON response if
 // there was a problem unmarshalling. Calling this function consumes the request body.

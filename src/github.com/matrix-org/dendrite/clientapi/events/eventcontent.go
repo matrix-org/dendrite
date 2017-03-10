@@ -1,4 +1,4 @@
-package common
+package events
 
 // CreateContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-create
 type CreateContent struct {

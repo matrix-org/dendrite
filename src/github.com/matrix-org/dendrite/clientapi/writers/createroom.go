@@ -9,9 +9,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/common"
 	"github.com/matrix-org/dendrite/clientapi/config"
+	"github.com/matrix-org/dendrite/clientapi/events"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -90,7 +92,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 		return *resErr
 	}
 	var r createRoomRequest
-	resErr = common.UnmarshalJSONRequest(req, &r)
+	resErr = httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
@@ -110,7 +112,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 	}).Info("Creating new room")
 
 	// Remember events we've built and key off the state tuple so we can look them up easily when filling in auth_events
-	builtEventMap := make(map[common.StateTuple]*gomatrixserverlib.Event)
+	builtEventMap := make(map[common.StateKeyTuple]*gomatrixserverlib.Event)
 	var builtEvents []*gomatrixserverlib.Event
 
 	// send events into the room in order of:
@@ -133,12 +135,12 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
 	emptyString := ""
 	eventsToMake := []fledglingEvent{
-		{"m.room.create", &emptyString, common.CreateContent{Creator: userID}},
-		{"m.room.member", &userID, common.MemberContent{Membership: "join"}}, // TODO: Set avatar_url / displayname
-		{"m.room.power_levels", &emptyString, common.InitialPowerLevelsContent(userID)},
+		{"m.room.create", &emptyString, events.CreateContent{Creator: userID}},
+		{"m.room.member", &userID, events.MemberContent{Membership: "join"}}, // TODO: Set avatar_url / displayname
+		{"m.room.power_levels", &emptyString, events.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
-		{"m.room.join_rules", &emptyString, common.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
-		{"m.room.history_visibility", &emptyString, common.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
+		{"m.room.join_rules", &emptyString, events.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
+		{"m.room.history_visibility", &emptyString, events.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
 		// TODO: m.room.guest_access
 		// TODO: Other initial state items
 		// TODO: m.room.name
@@ -172,7 +174,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 			return util.ErrorResponse(err)
 		}
 
-		builtEventMap[common.StateTuple{e.Type, *e.StateKey}] = ev
+		builtEventMap[common.StateKeyTuple{e.Type, *e.StateKey}] = ev
 		builtEvents = append(builtEvents, ev)
 
 	}
@@ -185,7 +187,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 
 // buildEvent fills out auth_events for the builder then builds the event
 func buildEvent(builder *gomatrixserverlib.EventBuilder,
-	events map[common.StateTuple]*gomatrixserverlib.Event,
+	events map[common.StateKeyTuple]*gomatrixserverlib.Event,
 	cfg config.ClientAPI) (*gomatrixserverlib.Event, error) {
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
@@ -203,36 +205,36 @@ func buildEvent(builder *gomatrixserverlib.EventBuilder,
 }
 
 func authEventsFromStateNeeded(eventsNeeded gomatrixserverlib.StateNeeded,
-	events map[common.StateTuple]*gomatrixserverlib.Event) (authEvents []gomatrixserverlib.EventReference) {
+	events map[common.StateKeyTuple]*gomatrixserverlib.Event) (authEvents []gomatrixserverlib.EventReference) {
 
 	// These events are only "needed" if they exist, so if they don't exist we can safely ignore them.
 	if eventsNeeded.Create {
-		ev := events[common.StateTuple{"m.room.create", ""}]
+		ev := events[common.StateKeyTuple{"m.room.create", ""}]
 		if ev != nil {
 			authEvents = append(authEvents, ev.EventReference())
 		}
 	}
 	if eventsNeeded.JoinRules {
-		ev := events[common.StateTuple{"m.room.join_rules", ""}]
+		ev := events[common.StateKeyTuple{"m.room.join_rules", ""}]
 		if ev != nil {
 			authEvents = append(authEvents, ev.EventReference())
 		}
 	}
 	if eventsNeeded.PowerLevels {
-		ev := events[common.StateTuple{"m.room.power_levels", ""}]
+		ev := events[common.StateKeyTuple{"m.room.power_levels", ""}]
 		if ev != nil {
 			authEvents = append(authEvents, ev.EventReference())
 		}
 	}
 
 	for _, userID := range eventsNeeded.Member {
-		ev := events[common.StateTuple{"m.room.member", userID}]
+		ev := events[common.StateKeyTuple{"m.room.member", userID}]
 		if ev != nil {
 			authEvents = append(authEvents, ev.EventReference())
 		}
 	}
 	for _, token := range eventsNeeded.ThirdPartyInvite {
-		ev := events[common.StateTuple{"m.room.member", token}]
+		ev := events[common.StateKeyTuple{"m.room.member", token}]
 		if ev != nil {
 			authEvents = append(authEvents, ev.EventReference())
 		}
@@ -241,30 +243,30 @@ func authEventsFromStateNeeded(eventsNeeded gomatrixserverlib.StateNeeded,
 }
 
 type authEventProvider struct {
-	events map[common.StateTuple]*gomatrixserverlib.Event
+	events map[common.StateKeyTuple]*gomatrixserverlib.Event
 }
 
 func (a *authEventProvider) Create() (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateTuple{"m.room.create", ""})
+	return a.fetch(common.StateKeyTuple{"m.room.create", ""})
 }
 
 func (a *authEventProvider) JoinRules() (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateTuple{"m.room.join_rules", ""})
+	return a.fetch(common.StateKeyTuple{"m.room.join_rules", ""})
 }
 
 func (a *authEventProvider) PowerLevels() (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateTuple{"m.room.power_levels", ""})
+	return a.fetch(common.StateKeyTuple{"m.room.power_levels", ""})
 }
 
 func (a *authEventProvider) Member(stateKey string) (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateTuple{"m.room.member", stateKey})
+	return a.fetch(common.StateKeyTuple{"m.room.member", stateKey})
 }
 
 func (a *authEventProvider) ThirdPartyInvite(stateKey string) (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateTuple{"m.room.third_party_invite", stateKey})
+	return a.fetch(common.StateKeyTuple{"m.room.third_party_invite", stateKey})
 }
 
-func (a *authEventProvider) fetch(tuple common.StateTuple) (ev *gomatrixserverlib.Event, err error) {
+func (a *authEventProvider) fetch(tuple common.StateKeyTuple) (ev *gomatrixserverlib.Event, err error) {
 	ev, _ = a.events[tuple]
 	return
 }
