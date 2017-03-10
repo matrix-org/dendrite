@@ -168,11 +168,11 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 		}
 		ev, err := buildEvent(&builder, builtEventMap, cfg)
 		if err != nil {
-			return util.ErrorResponse(err)
+			return httputil.LogThenError(req, err)
 		}
 
 		if err := gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
-			return util.ErrorResponse(err)
+			return httputil.LogThenError(req, err)
 		}
 
 		// Add the event to the list of auth events
@@ -183,10 +183,10 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 	// send events to the room server
 	msgs, err := eventsToMessages(builtEvents, cfg.ClientAPIOutputTopic)
 	if err != nil {
-		return util.ErrorResponse(err)
+		return httputil.LogThenError(req, err)
 	}
 	if err = producer.SendMessages(msgs); err != nil {
-		return util.ErrorResponse(err)
+		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
