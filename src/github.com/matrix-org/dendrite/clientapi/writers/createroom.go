@@ -72,7 +72,7 @@ type createRoomResponse struct {
 // fledglingEvent is a helper representation of an event used when creating many events in succession.
 type fledglingEvent struct {
 	Type     string
-	StateKey *string
+	StateKey string
 	Content  interface{}
 }
 
@@ -133,14 +133,13 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 	// depending on if those events were in "initial_state" or not. This made it
 	// harder to reason about, hence sticking to a strict static ordering.
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
-	emptyString := ""
 	eventsToMake := []fledglingEvent{
-		{"m.room.create", &emptyString, events.CreateContent{Creator: userID}},
-		{"m.room.member", &userID, events.MemberContent{Membership: "join"}}, // TODO: Set avatar_url / displayname
-		{"m.room.power_levels", &emptyString, events.InitialPowerLevelsContent(userID)},
+		{"m.room.create", "", events.CreateContent{Creator: userID}},
+		{"m.room.member", userID, events.MemberContent{Membership: "join"}}, // TODO: Set avatar_url / displayname
+		{"m.room.power_levels", "", events.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
-		{"m.room.join_rules", &emptyString, events.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
-		{"m.room.history_visibility", &emptyString, events.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
+		{"m.room.join_rules", "", events.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
+		{"m.room.history_visibility", "", events.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
 		// TODO: m.room.guest_access
 		// TODO: Other initial state items
 		// TODO: m.room.name
@@ -158,7 +157,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 			Sender:   userID,
 			RoomID:   roomID,
 			Type:     e.Type,
-			StateKey: e.StateKey,
+			StateKey: &e.StateKey,
 			Depth:    int64(depth),
 		}
 		builder.SetContent(e.Content)
@@ -174,7 +173,8 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string) util.JSO
 			return util.ErrorResponse(err)
 		}
 
-		builtEventMap[common.StateKeyTuple{e.Type, *e.StateKey}] = ev
+		// Add the event to the list of auth events
+		builtEventMap[common.StateKeyTuple{e.Type, e.StateKey}] = ev
 		builtEvents = append(builtEvents, ev)
 
 	}
