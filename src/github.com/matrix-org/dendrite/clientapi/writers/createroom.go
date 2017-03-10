@@ -247,26 +247,21 @@ type authEventProvider struct {
 }
 
 func (a *authEventProvider) Create() (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateKeyTuple{"m.room.create", ""})
+	return a.events[common.StateKeyTuple{"m.room.create", ""}], nil
 }
 
 func (a *authEventProvider) JoinRules() (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateKeyTuple{"m.room.join_rules", ""})
+	return a.events[common.StateKeyTuple{"m.room.join_rules", ""}], nil
 }
 
 func (a *authEventProvider) PowerLevels() (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateKeyTuple{"m.room.power_levels", ""})
+	return a.events[common.StateKeyTuple{"m.room.power_levels", ""}], nil
 }
 
 func (a *authEventProvider) Member(stateKey string) (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateKeyTuple{"m.room.member", stateKey})
+	return a.events[common.StateKeyTuple{"m.room.member", stateKey}], nil
 }
 
 func (a *authEventProvider) ThirdPartyInvite(stateKey string) (ev *gomatrixserverlib.Event, err error) {
-	return a.fetch(common.StateKeyTuple{"m.room.third_party_invite", stateKey})
-}
-
-func (a *authEventProvider) fetch(tuple common.StateKeyTuple) (ev *gomatrixserverlib.Event, err error) {
-	ev, _ = a.events[tuple]
-	return
+	return a.events[common.StateKeyTuple{"m.room.third_party_invite", stateKey}], nil
 }
