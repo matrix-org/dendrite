@@ -14,6 +14,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	sarama "gopkg.in/Shopify/sarama.v1"
@@ -180,15 +181,11 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 	}
 
 	// send events to the room server
-	var m sarama.ProducerMessage
-	value, err := json.Marshal(builtEvents)
+	msgs, err := eventsToMessages(builtEvents)
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	m.Topic = "clientapiOutput" // TODO: Make this customisable like roomserver is?
-	m.Key = sarama.StringEncoder("")
-	m.Value = sarama.ByteEncoder(value)
-	if _, _, err = producer.SendMessage(&m); err != nil {
+	if err = producer.SendMessages(msgs); err != nil {
 		return util.ErrorResponse(err)
 	}
 
@@ -253,6 +250,35 @@ func authEventsFromStateNeeded(eventsNeeded gomatrixserverlib.StateNeeded,
 		}
 	}
 	return
+}
+
+func eventsToMessages(events []*gomatrixserverlib.Event) ([]*sarama.ProducerMessage, error) {
+	msgs := make([]*sarama.ProducerMessage, len(events))
+	for i, e := range events {
+		var m sarama.ProducerMessage
+
+		// map auth event references to IDs
+		var authEventIDs []string
+		for _, ref := range e.AuthEvents() {
+			authEventIDs = append(authEventIDs, ref.EventID)
+		}
+
+		ire := api.InputRoomEvent{
+			Kind:         api.KindNew,
+			Event:        e.JSON(),
+			AuthEventIDs: authEventIDs,
+		}
+
+		value, err := json.Marshal(ire)
+		if err != nil {
+			return nil, err
+		}
+		m.Topic = "clientapiOutput" // TODO: Make this customisable like roomserver is?
+		m.Key = sarama.StringEncoder("")
+		m.Value = sarama.ByteEncoder(value)
+		msgs[i] = &m
+	}
+	return msgs, nil
 }
 
 type authEventProvider struct {
