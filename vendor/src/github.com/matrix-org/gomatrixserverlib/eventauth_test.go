@@ -844,3 +844,46 @@ func TestRedactAllowed(t *testing.T) {
 		}]
 	}`)
 }
+
+func TestAuthEvents(t *testing.T) {
+	power, err := NewEventFromTrustedJSON(rawJSON(`{
+		"type": "m.room.power_levels",
+		"state_key": "",
+		"sender": "@u1:a",
+		"room_id": "!r1:a",
+		"event_id": "$e5:a",
+		"content": {
+			"users": {
+				"@u1:a": 100
+			},
+			"redact": 100
+		}
+	}`), false)
+	if err != nil {
+		t.Fatalf("TestAuthEvents: failed to create power_levels event: %s", err)
+	}
+	a := NewAuthEvents([]*Event{&power})
+	var e *Event
+	if e, err = a.PowerLevels(); err != nil || e != &power {
+		t.Errorf("TestAuthEvents: failed to get same power_levels event")
+	}
+	create, err := NewEventFromTrustedJSON(rawJSON(`{
+		"type": "m.room.create",
+		"state_key": "",
+		"sender": "@u1:a",
+		"room_id": "!r1:a",
+		"event_id": "$e1:a",
+		"content": {
+			"creator": "@u1:a"
+		}
+	}`), false)
+	if err != nil {
+		t.Fatalf("TestAuthEvents: failed to create create event: %s", err)
+	}
+	if err = a.AddEvent(&create); err != nil {
+		t.Errorf("TestAuthEvents: Failed to AddEvent: %s", err)
+	}
+	if e, err = a.Create(); err != nil || e != &create {
+		t.Errorf("TestAuthEvents: failed to get same create event")
+	}
+}

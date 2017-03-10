@@ -151,7 +151,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 		// TODO m.room.aliases
 	}
 
-	authEvents := authEventProvider{builtEventMap}
+	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
@@ -178,6 +178,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 		// Add the event to the list of auth events
 		builtEventMap[common.StateKeyTuple{e.Type, e.StateKey}] = ev
 		builtEvents = append(builtEvents, ev)
+		authEvents.AddEvent(ev)
 	}
 
 	// send events to the room server
@@ -279,28 +280,4 @@ func eventsToMessages(events []*gomatrixserverlib.Event, topic string) ([]*saram
 		msgs[i] = &m
 	}
 	return msgs, nil
-}
-
-type authEventProvider struct {
-	events map[common.StateKeyTuple]*gomatrixserverlib.Event
-}
-
-func (a *authEventProvider) Create() (ev *gomatrixserverlib.Event, err error) {
-	return a.events[common.StateKeyTuple{"m.room.create", ""}], nil
-}
-
-func (a *authEventProvider) JoinRules() (ev *gomatrixserverlib.Event, err error) {
-	return a.events[common.StateKeyTuple{"m.room.join_rules", ""}], nil
-}
-
-func (a *authEventProvider) PowerLevels() (ev *gomatrixserverlib.Event, err error) {
-	return a.events[common.StateKeyTuple{"m.room.power_levels", ""}], nil
-}
-
-func (a *authEventProvider) Member(stateKey string) (ev *gomatrixserverlib.Event, err error) {
-	return a.events[common.StateKeyTuple{"m.room.member", stateKey}], nil
-}
-
-func (a *authEventProvider) ThirdPartyInvite(stateKey string) (ev *gomatrixserverlib.Event, err error) {
-	return a.events[common.StateKeyTuple{"m.room.third_party_invite", stateKey}], nil
 }

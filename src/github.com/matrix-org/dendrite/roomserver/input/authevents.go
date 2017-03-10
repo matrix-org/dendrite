@@ -44,27 +44,27 @@ type authEvents struct {
 	events         eventMap
 }
 
-// Create implements gomatrixserverlib.AuthEvents
+// Create implements gomatrixserverlib.AuthEventProvider
 func (ae *authEvents) Create() (*gomatrixserverlib.Event, error) {
 	return ae.lookupEventWithEmptyStateKey(types.MRoomCreateNID), nil
 }
 
-// PowerLevels implements gomatrixserverlib.AuthEvents
+// PowerLevels implements gomatrixserverlib.AuthEventProvider
 func (ae *authEvents) PowerLevels() (*gomatrixserverlib.Event, error) {
 	return ae.lookupEventWithEmptyStateKey(types.MRoomPowerLevelsNID), nil
 }
 
-// JoinRules implements gomatrixserverlib.AuthEvents
+// JoinRules implements gomatrixserverlib.AuthEventProvider
 func (ae *authEvents) JoinRules() (*gomatrixserverlib.Event, error) {
 	return ae.lookupEventWithEmptyStateKey(types.MRoomJoinRulesNID), nil
 }
 
-// Memmber implements gomatrixserverlib.AuthEvents
+// Memmber implements gomatrixserverlib.AuthEventProvider
 func (ae *authEvents) Member(stateKey string) (*gomatrixserverlib.Event, error) {
 	return ae.lookupEvent(types.MRoomMemberNID, stateKey), nil
 }
 
-// ThirdPartyInvite implements gomatrixserverlib.AuthEvents
+// ThirdPartyInvite implements gomatrixserverlib.AuthEventProvider
 func (ae *authEvents) ThirdPartyInvite(stateKey string) (*gomatrixserverlib.Event, error) {
 	return ae.lookupEvent(types.MRoomThirdPartyInviteNID, stateKey), nil
 }
