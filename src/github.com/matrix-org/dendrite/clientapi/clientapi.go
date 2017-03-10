@@ -12,6 +12,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dugong"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 func setupLogging(logDir string) {
@@ -38,17 +39,28 @@ func main() {
 	if logDir != "" {
 		setupLogging(logDir)
 	}
-	log.Info("Starting clientapi")
+
 	// TODO: Rather than generating a new key on every startup, we should be
 	//       reading a PEM formatted file instead.
 	_, privKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		log.Panicf("Failed to generate private key: %s", err)
 	}
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, config.ClientAPI{
-		ServerName: "localhost",
-		KeyID:      "ed25519:something",
-		PrivateKey: privKey,
-	})
+
+	cfg := config.ClientAPI{
+		ServerName:        "localhost",
+		KeyID:             "ed25519:something",
+		PrivateKey:        privKey,
+		KafkaProducerURIs: []string{"localhost"},
+	}
+
+	log.Info("Starting clientapi")
+
+	producer, err := sarama.NewSyncProducer(cfg.KafkaProducerURIs, nil)
+	if err != nil {
+		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.KafkaProducerURIs, err)
+	}
+
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, producer)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }
