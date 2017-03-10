@@ -274,7 +274,7 @@ func eventsToMessages(events []*gomatrixserverlib.Event) ([]*sarama.ProducerMess
 			return nil, err
 		}
 		m.Topic = "clientapiOutput" // TODO: Make this customisable like roomserver is?
-		m.Key = sarama.StringEncoder("")
+		m.Key = sarama.StringEncoder(e.EventID())
 		m.Value = sarama.ByteEncoder(value)
 		msgs[i] = &m
 	}
