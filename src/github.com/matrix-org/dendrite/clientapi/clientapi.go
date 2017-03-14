@@ -53,7 +53,7 @@ func main() {
 		KeyID:                "ed25519:something",
 		PrivateKey:           privKey,
 		KafkaProducerURIs:    []string{"localhost:9092"},
-		ClientAPIOutputTopic: "clientapiOutput",
+		ClientAPIOutputTopic: "roomserverInput",
 		RoomserverURL:        "http://localhost:7777",
 	}
 
