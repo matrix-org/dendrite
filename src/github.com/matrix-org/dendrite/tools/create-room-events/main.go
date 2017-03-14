@@ -31,7 +31,6 @@ var (
 	//	INPUT -> api.InputRoomEvent
 	//  RAW   -> gomatrixserverlib.Event
 	format = defaulting(os.Getenv("FORMAT"), "INPUT")
-	//
 )
 
 func defaulting(value, defaultValue string) string {
