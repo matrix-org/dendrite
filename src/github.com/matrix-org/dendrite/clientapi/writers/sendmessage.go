@@ -81,8 +81,8 @@ func SendMessage(req *http.Request, roomID, eventType, txnID string, cfg config.
 
 	// check to see if this user can perform this operation
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
-	for i, e := range queryRes.StateEvents {
-		stateEvents[i] = &e
+	for i := range queryRes.StateEvents {
+		stateEvents[i] = &queryRes.StateEvents[i]
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(e, &provider); err != nil {
