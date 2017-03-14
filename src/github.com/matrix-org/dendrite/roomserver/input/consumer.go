@@ -3,6 +3,7 @@ package input
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	sarama "gopkg.in/Shopify/sarama.v1"
@@ -45,6 +46,11 @@ type Consumer struct {
 	// The ErrorLogger for this consumer.
 	// If left as nil then the consumer will panic when it encounters an error
 	ErrorLogger ErrorLogger
+	// If non-nil then the consumer will stop processing messages after this
+	// many messages and will shutdown
+	StopProcessingAfter *int
+	// If not-nil then the consumer will call this to shutdown the server.
+	ShutdownCallback func(reason string)
 }
 
 // WriteOutputRoomEvent implements OutputRoomEventWriter
@@ -107,7 +113,14 @@ func (c *Consumer) Start() error {
 // consumePartition consumes the room events for a single partition of the kafkaesque stream.
 func (c *Consumer) consumePartition(pc sarama.PartitionConsumer) {
 	defer pc.Close()
+	var processed int
 	for message := range pc.Messages() {
+		if c.StopProcessingAfter != nil && processed >= *c.StopProcessingAfter {
+			if c.ShutdownCallback != nil {
+				c.ShutdownCallback(fmt.Sprintf("Stopping processing after %d messages", processed))
+			}
+			return
+		}
 		var input api.InputRoomEvent
 		if err := json.Unmarshal(message.Value, &input); err != nil {
 			// If the message is invalid then log it and move onto the next message in the stream.
@@ -126,6 +139,7 @@ func (c *Consumer) consumePartition(pc sarama.PartitionConsumer) {
 		if err := c.DB.SetPartitionOffset(c.InputRoomEventTopic, message.Partition, message.Offset); err != nil {
 			c.logError(message, err)
 		}
+		processed++
 	}
 }
 
