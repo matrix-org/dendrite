@@ -101,7 +101,15 @@ func calculateAndStoreStateAfterManyEvents(db RoomEventDatabase, roomNID types.R
 		// 5) There are conflicting state events, for each conflict workout
 		// what the appropriate state event is.
 
-		resolved, err := resolveConflicts(db, combined, conflicts)
+		// Work out which entries aren't conflicted.
+		var notConflicted []types.StateEntry
+		for _, entry := range combined {
+			if _, ok := stateEntryMap(conflicts).lookup(entry.StateKeyTuple); !ok {
+				notConflicted = append(notConflicted, entry)
+			}
+		}
+
+		resolved, err := resolveConflicts(db, notConflicted, conflicts)
 		if err != nil {
 			return 0, err
 		}
@@ -117,7 +125,7 @@ func calculateAndStoreStateAfterManyEvents(db RoomEventDatabase, roomNID types.R
 }
 
 // loadStateEvents loads the matrix events for a list of state entries.
-// Returns a list of events and a map from string event ID back to state entry.
+// Returns a list of state events in no particular order and a map from string event ID back to state entry.
 // The map can be used to recover which numeric state entry a given event is for.
 // Returns an error if there was a problem talking to the database.
 func loadStateEvents(db RoomEventDatabase, entries []types.StateEntry) ([]gomatrixserverlib.Event, map[string]types.StateEntry, error) {
@@ -143,24 +151,18 @@ func loadStateEvents(db RoomEventDatabase, entries []types.StateEntry) ([]gomatr
 }
 
 // resolveConflicts resolves a list of conflicted state entries. It takes two lists.
-// The first is a list of all state entries both conflicted and not conflicted.
-// The second is a list of all state entries where there is more than one numeric event ID for the same state key tuple.
-// Returns a list of combining the entries without conflictes with the result of state resolution for the entries with conflicts.
+// The first is a list of all state entries that are not conflicted.
+// The second is a list of all state entries that are conflicted
+// A state entry is conflicted when there is more than one numeric event ID for the same state key tuple.
+// Returns a list that combines the entries without conflicts with the result of state resolution for the entries with conflicts.
+// The returned list is sorted by state key tuple.
 // Returns an error if there was a problem talking to the database.
-func resolveConflicts(db RoomEventDatabase, combined, conflicted []types.StateEntry) ([]types.StateEntry, error) {
+func resolveConflicts(db RoomEventDatabase, notConflicted, conflicted []types.StateEntry) ([]types.StateEntry, error) {
 
 	// Load the conflicted events
 	conflictedEvents, eventIDMap, err := loadStateEvents(db, conflicted)
 	if err != nil {
 		return nil, err
-	}
-
-	// Work out which entries aren't conflicted.
-	var notConflicted []types.StateEntry
-	for _, entry := range combined {
-		if _, ok := stateEntryMap(conflicted).lookup(entry.StateKeyTuple); !ok {
-			notConflicted = append(notConflicted, entry)
-		}
 	}
 
 	// Work out which auth events we need to load.
