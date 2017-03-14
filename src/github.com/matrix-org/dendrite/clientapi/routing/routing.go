@@ -29,7 +29,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
 		make("send_message", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return writers.SendMessage(req, vars["roomID"], vars["eventType"], vars["txnID"], cfg, queryAPI)
+			return writers.SendMessage(req, vars["roomID"], vars["eventType"], vars["txnID"], cfg, queryAPI, producer)
 		})),
 	)
 
