@@ -57,8 +57,8 @@ func main() {
 	}
 
 	flag.Parse()
-	*userID = strings.Replace("$SERVER_NAME", *serverName, *userID, 1)
-	*roomID = strings.Replace("$SERVER_NAME", *serverName, *roomID, 1)
+	*userID = strings.Replace(*userID, "$SERVER_NAME", *serverName, 1)
+	*roomID = strings.Replace(*roomID, "$SERVER_NAME", *serverName, 1)
 
 	// Decode the ed25519 private key.
 	privateKeyBytes, err := base64.RawStdEncoding.DecodeString(*privateKeyString)
