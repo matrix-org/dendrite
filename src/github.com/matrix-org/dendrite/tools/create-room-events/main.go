@@ -11,7 +11,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/ed25519"
 	"os"
-	"strconv"
+	"strings"
 	"time"
 )
 
@@ -20,40 +20,18 @@ const usage = `Usage: %s
 Generate a list of matrix room events for load testing.
 Writes the events to stdout separated by new lines
 
-Environment:
+Arguments:
 
-    SERVER_NAME     The name of the matrix server to generate events for.
-                    (default: "localhost")
-
-    KEY_ID          The ID of the key used to sign the events.
-                    (default: "ed25519:auto")
-
-    PRIVATE_KEY     Base64 encoded private key to sign events with
-                    (default: <base64 encoded key of 0>)
-
-    ROOM_ID         The room ID to generate events in.
-                    (default: "!roomid:$SERVER_NAME")
-
-    USER_ID         The user ID to use as the event sender.
-                    (default: "@userid:$SERVER_NAME")
-
-    MESSAGE_COUNT   The number of m.room.messsage events to generate.
-                    (default: 10)
-
-    FORMAT          The output format to use for the messages.
-                        InputRoomEvent
-                        Event
-                    (default: InputRoomEvent)
 `
 
 var (
-	serverName       = defaulting(os.Getenv("SERVER_NAME"), "localhost")
-	keyID            = defaulting(os.Getenv("KEY_ID"), "ed25519:auto")
-	privateKeyString = defaulting(os.Getenv("PRIVATE_KEY"), defaultKey)
-	roomID           = defaulting(os.Getenv("ROOM_ID"), "!roomid:"+serverName)
-	userID           = defaulting(os.Getenv("USER_ID"), "@userid:"+serverName)
-	messageCount     = defaulting(os.Getenv("MESSAGE_COUNT"), "10")
-	format           = defaulting(os.Getenv("FORMAT"), "INPUT")
+	serverName       = flag.String("server-name", "localhost", "The name of the matrix server to generate events for")
+	keyID            = flag.String("key-id", "ed25519:auto", "The ID of the key used to sign the events")
+	privateKeyString = flag.String("private-key", defaultKey, "Base64 encoded private key to sign events with")
+	roomID           = flag.String("room-id", "!roomid:$SERVER_NAME", "The room ID to generate events in")
+	userID           = flag.String("user-id", "@userid:$SERVER_NAME", "The user ID to use as the event sender")
+	messageCount     = flag.Int("message-count", 10, "The number of m.room.messsage events to generate")
+	format           = flag.String("Format", "InputRoomEvent", "The output format to use for the messages: InputRoomEvent or Event")
 )
 
 func defaulting(value, defaultValue string) string {
@@ -75,31 +53,31 @@ var eventID int
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, usage, os.Args[0])
+		flag.PrintDefaults()
 	}
+
 	flag.Parse()
+	*userID = strings.Replace("$SERVER_NAME", *serverName, *userID, 1)
+	*roomID = strings.Replace("$SERVER_NAME", *serverName, *roomID, 1)
+
 	// Decode the ed25519 private key.
-	privateKeyBytes, err := base64.RawStdEncoding.DecodeString(privateKeyString)
+	privateKeyBytes, err := base64.RawStdEncoding.DecodeString(*privateKeyString)
 	if err != nil {
 		panic(err)
 	}
 	privateKey = ed25519.PrivateKey(privateKeyBytes)
 
-	count, err := strconv.Atoi(messageCount)
-	if err != nil {
-		panic(err)
-	}
-
 	// Build a m.room.create event.
-	b.Sender = userID
-	b.RoomID = roomID
+	b.Sender = *userID
+	b.RoomID = *roomID
 	b.Type = "m.room.create"
 	b.StateKey = &emptyString
-	b.SetContent(map[string]string{"creator": userID})
+	b.SetContent(map[string]string{"creator": *userID})
 	create := buildAndOutput()
 
 	// Build a m.room.member event.
 	b.Type = "m.room.member"
-	b.StateKey = &userID
+	b.StateKey = userID
 	b.SetContent(map[string]string{"membership": "join"})
 	b.AuthEvents = []gomatrixserverlib.EventReference{create}
 	member := buildAndOutput()
@@ -109,7 +87,7 @@ func main() {
 	b.StateKey = nil
 	b.SetContent(map[string]string{"body": "Test Message"})
 	b.AuthEvents = []gomatrixserverlib.EventReference{create, member}
-	for i := 0; i < count; i++ {
+	for i := 0; i < *messageCount; i++ {
 		buildAndOutput()
 	}
 }
@@ -117,9 +95,9 @@ func main() {
 // Build an event and write the event to the output.
 func buildAndOutput() gomatrixserverlib.EventReference {
 	eventID++
-	id := fmt.Sprintf("$%d:%s", eventID, serverName)
+	id := fmt.Sprintf("$%d:%s", eventID, *serverName)
 	now = time.Unix(0, 0)
-	event, err := b.Build(id, now, serverName, keyID, privateKey)
+	event, err := b.Build(id, now, *serverName, *keyID, privateKey)
 	if err != nil {
 		panic(err)
 	}
@@ -133,7 +111,7 @@ func buildAndOutput() gomatrixserverlib.EventReference {
 // Write an event to the output.
 func writeEvent(event gomatrixserverlib.Event) {
 	encoder := json.NewEncoder(os.Stdout)
-	if format == "InputRoomEvent" {
+	if *format == "InputRoomEvent" {
 		var ire api.InputRoomEvent
 		ire.Kind = api.KindNew
 		ire.Event = event.JSON()
@@ -145,7 +123,7 @@ func writeEvent(event gomatrixserverlib.Event) {
 		if err := encoder.Encode(ire); err != nil {
 			panic(err)
 		}
-	} else if format == "Event" {
+	} else if *format == "Event" {
 		if err := encoder.Encode(event); err != nil {
 			panic(err)
 		}
