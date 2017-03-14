@@ -41,9 +41,9 @@ Environment:
                     (default: 10)
 
     FORMAT          The output format to use for the messages.
-                        INPUT -> api.InputRoomEvent
-                        RAW   -> gomatrixserverlib.Event
-                    (default: INPUT)
+                        InputRoomEvent
+                        Event
+                    (default: InputRoomEvent)
 `
 
 var (
@@ -95,14 +95,14 @@ func main() {
 	b.Type = "m.room.create"
 	b.StateKey = &emptyString
 	b.SetContent(map[string]string{"creator": userID})
-	create := build()
+	create := buildAndOutput()
 
 	// Build a m.room.member event.
 	b.Type = "m.room.member"
 	b.StateKey = &userID
 	b.SetContent(map[string]string{"membership": "join"})
 	b.AuthEvents = []gomatrixserverlib.EventReference{create}
-	member := build()
+	member := buildAndOutput()
 
 	// Build a number of m.room.message events.
 	b.Type = "m.room.message"
@@ -110,12 +110,12 @@ func main() {
 	b.SetContent(map[string]string{"body": "Test Message"})
 	b.AuthEvents = []gomatrixserverlib.EventReference{create, member}
 	for i := 0; i < count; i++ {
-		build()
+		buildAndOutput()
 	}
 }
 
 // Build an event and write the event to the output.
-func build() gomatrixserverlib.EventReference {
+func buildAndOutput() gomatrixserverlib.EventReference {
 	eventID++
 	id := fmt.Sprintf("$%d:%s", eventID, serverName)
 	now = time.Unix(0, 0)
@@ -133,7 +133,7 @@ func build() gomatrixserverlib.EventReference {
 // Write an event to the output.
 func writeEvent(event gomatrixserverlib.Event) {
 	encoder := json.NewEncoder(os.Stdout)
-	if format == "INPUT" {
+	if format == "InputRoomEvent" {
 		var ire api.InputRoomEvent
 		ire.Kind = api.KindNew
 		ire.Event = event.JSON()
@@ -145,7 +145,7 @@ func writeEvent(event gomatrixserverlib.Event) {
 		if err := encoder.Encode(ire); err != nil {
 			panic(err)
 		}
-	} else if format == "RAW" {
+	} else if format == "Event" {
 		if err := encoder.Encode(event); err != nil {
 			panic(err)
 		}
