@@ -13,11 +13,10 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
@@ -79,7 +78,7 @@ type fledglingEvent struct {
 }
 
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request, cfg config.ClientAPI, producer sarama.SyncProducer) util.JSONResponse {
+func CreateRoom(req *http.Request, cfg config.ClientAPI, producer *producers.RoomserverProducer) util.JSONResponse {
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.ServerName)
@@ -87,7 +86,7 @@ func CreateRoom(req *http.Request, cfg config.ClientAPI, producer sarama.SyncPro
 }
 
 // createRoom implements /createRoom
-func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer sarama.SyncProducer) util.JSONResponse {
+func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer *producers.RoomserverProducer) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID, resErr := auth.VerifyAccessToken(req)
 	if resErr != nil {
@@ -115,7 +114,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 
 	// Remember events we've built and key off the state tuple so we can look them up easily when filling in auth_events
 	builtEventMap := make(map[common.StateKeyTuple]*gomatrixserverlib.Event)
-	var builtEvents []*gomatrixserverlib.Event
+	var builtEvents []gomatrixserverlib.Event
 
 	// send events into the room in order of:
 	//  1- m.room.create
@@ -177,16 +176,12 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 
 		// Add the event to the list of auth events
 		builtEventMap[common.StateKeyTuple{e.Type, e.StateKey}] = ev
-		builtEvents = append(builtEvents, ev)
+		builtEvents = append(builtEvents, *ev)
 		authEvents.AddEvent(ev)
 	}
 
 	// send events to the room server
-	msgs, err := eventsToMessages(builtEvents, cfg.ClientAPIOutputTopic)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-	if err = producer.SendMessages(msgs); err != nil {
+	if err := producer.SendEvents(builtEvents); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -251,33 +246,4 @@ func authEventsFromStateNeeded(eventsNeeded gomatrixserverlib.StateNeeded,
 		}
 	}
 	return
-}
-
-func eventsToMessages(events []*gomatrixserverlib.Event, topic string) ([]*sarama.ProducerMessage, error) {
-	msgs := make([]*sarama.ProducerMessage, len(events))
-	for i, e := range events {
-		var m sarama.ProducerMessage
-
-		// map auth event references to IDs
-		var authEventIDs []string
-		for _, ref := range e.AuthEvents() {
-			authEventIDs = append(authEventIDs, ref.EventID)
-		}
-
-		ire := api.InputRoomEvent{
-			Kind:         api.KindNew,
-			Event:        e.JSON(),
-			AuthEventIDs: authEventIDs,
-		}
-
-		value, err := json.Marshal(ire)
-		if err != nil {
-			return nil, err
-		}
-		m.Topic = topic
-		m.Key = sarama.StringEncoder(e.EventID())
-		m.Value = sarama.ByteEncoder(value)
-		msgs[i] = &m
-	}
-	return msgs, nil
 }

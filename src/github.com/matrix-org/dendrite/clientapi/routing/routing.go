@@ -5,19 +5,19 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/config"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/readers"
 	"github.com/matrix-org/dendrite/clientapi/writers"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI, producer sarama.SyncProducer, queryAPI api.RoomserverQueryAPI) {
+func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI, producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/createRoom", make("createRoom", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
