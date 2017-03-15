@@ -3,18 +3,18 @@ package writers
 import (
 	"net/http"
 
-	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	sarama "gopkg.in/Shopify/sarama.v1"
-	"time"
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid
@@ -23,7 +23,7 @@ type sendMessageResponse struct {
 }
 
 // SendMessage implements /rooms/{roomID}/send/{eventType}/{txnID}
-func SendMessage(req *http.Request, roomID, eventType, txnID string, cfg config.ClientAPI, queryAPI api.RoomserverQueryAPI, producer sarama.SyncProducer) util.JSONResponse {
+func SendMessage(req *http.Request, roomID, eventType, txnID string, cfg config.ClientAPI, queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer) util.JSONResponse {
 	// parse the incoming http request
 	userID, resErr := auth.VerifyAccessToken(req)
 	if resErr != nil {
@@ -93,7 +93,7 @@ func SendMessage(req *http.Request, roomID, eventType, txnID string, cfg config.
 	}
 
 	// pass the new event to the roomserver
-	if err := sendToRoomserver(e, producer, cfg.ClientAPIOutputTopic); err != nil {
+	if err := producer.SendEvents([]gomatrixserverlib.Event{e}); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -101,31 +101,6 @@ func SendMessage(req *http.Request, roomID, eventType, txnID string, cfg config.
 		Code: 200,
 		JSON: sendMessageResponse{e.EventID()},
 	}
-}
-
-func sendToRoomserver(e gomatrixserverlib.Event, producer sarama.SyncProducer, topic string) error {
-	var authEventIDs []string
-	for _, ref := range e.AuthEvents() {
-		authEventIDs = append(authEventIDs, ref.EventID)
-	}
-	ire := api.InputRoomEvent{
-		Kind:         api.KindNew,
-		Event:        e.JSON(),
-		AuthEventIDs: authEventIDs,
-	}
-
-	value, err := json.Marshal(ire)
-	if err != nil {
-		return err
-	}
-	var m sarama.ProducerMessage
-	m.Topic = topic
-	m.Key = sarama.StringEncoder(e.EventID())
-	m.Value = sarama.ByteEncoder(value)
-	if _, _, err := producer.SendMessage(&m); err != nil {
-		return err
-	}
-	return nil
 }
 
 func stateNeeded(builder *gomatrixserverlib.EventBuilder) (requiredStateEvents []common.StateKeyTuple, err error) {

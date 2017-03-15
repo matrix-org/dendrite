@@ -8,12 +8,12 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/clientapi/config"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dugong"
-	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 func setupLogging(logDir string) {
@@ -59,12 +59,13 @@ func main() {
 
 	log.Info("Starting clientapi")
 
-	producer, err := sarama.NewSyncProducer(cfg.KafkaProducerURIs, nil)
+	roomserverProducer, err := producers.NewRoomserverProducer(cfg.KafkaProducerURIs, cfg.ClientAPIOutputTopic)
 	if err != nil {
 		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.KafkaProducerURIs, err)
 	}
+
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, producer, queryAPI)
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }
