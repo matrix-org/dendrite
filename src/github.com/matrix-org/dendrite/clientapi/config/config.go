@@ -15,4 +15,6 @@ type ClientAPI struct {
 	KafkaProducerURIs []string
 	// The topic for events which are written to the logs.
 	ClientAPIOutputTopic string
+	// The URL of the roomserver which can service Query API requests
+	RoomserverURL string
 }

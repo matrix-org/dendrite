@@ -9,6 +9,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/routing"
+	"github.com/matrix-org/dendrite/roomserver/api"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dugong"
@@ -52,7 +53,8 @@ func main() {
 		KeyID:                "ed25519:something",
 		PrivateKey:           privKey,
 		KafkaProducerURIs:    []string{"localhost:9092"},
-		ClientAPIOutputTopic: "clientapiOutput",
+		ClientAPIOutputTopic: "roomserverInput",
+		RoomserverURL:        "http://localhost:7777",
 	}
 
 	log.Info("Starting clientapi")
@@ -61,7 +63,8 @@ func main() {
 	if err != nil {
 		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.KafkaProducerURIs, err)
 	}
+	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, producer)
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, producer, queryAPI)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }
