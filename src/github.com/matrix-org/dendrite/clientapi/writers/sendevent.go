@@ -18,12 +18,15 @@ import (
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid
-type sendMessageResponse struct {
+// http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-state-eventtype-statekey
+type sendEventResponse struct {
 	EventID string `json:"event_id"`
 }
 
-// SendMessage implements /rooms/{roomID}/send/{eventType}/{txnID}
-func SendMessage(req *http.Request, roomID, eventType, txnID string, cfg config.ClientAPI, queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer) util.JSONResponse {
+// SendEvent implements:
+//   /rooms/{roomID}/send/{eventType}/{txnID}
+//   /rooms/{roomID}/state/{eventType}/{stateKey}
+func SendEvent(req *http.Request, roomID, eventType, txnID string, stateKey *string, cfg config.ClientAPI, queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer) util.JSONResponse {
 	// parse the incoming http request
 	userID, resErr := auth.VerifyAccessToken(req)
 	if resErr != nil {
@@ -40,7 +43,7 @@ func SendMessage(req *http.Request, roomID, eventType, txnID string, cfg config.
 		Sender:   userID,
 		RoomID:   roomID,
 		Type:     eventType,
-		StateKey: nil,
+		StateKey: stateKey,
 	}
 	builder.SetContent(r)
 
@@ -99,7 +102,7 @@ func SendMessage(req *http.Request, roomID, eventType, txnID string, cfg config.
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: sendMessageResponse{e.EventID()},
+		JSON: sendEventResponse{e.EventID()},
 	}
 }
 
