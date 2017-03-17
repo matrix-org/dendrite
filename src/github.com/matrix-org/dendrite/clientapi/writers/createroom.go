@@ -14,7 +14,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -112,8 +111,6 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 		"roomID": roomID,
 	}).Info("Creating new room")
 
-	// Remember events we've built and key off the state tuple so we can look them up easily when filling in auth_events
-	builtEventMap := make(map[common.StateKeyTuple]*gomatrixserverlib.Event)
 	var builtEvents []gomatrixserverlib.Event
 
 	// send events into the room in order of:
@@ -165,7 +162,7 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 		if i > 0 {
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
-		ev, err := buildEvent(&builder, builtEventMap, cfg)
+		ev, err := buildEvent(&builder, &authEvents, cfg)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -175,7 +172,6 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 		}
 
 		// Add the event to the list of auth events
-		builtEventMap[common.StateKeyTuple{e.Type, e.StateKey}] = ev
 		builtEvents = append(builtEvents, *ev)
 		authEvents.AddEvent(ev)
 	}
@@ -193,14 +189,18 @@ func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer
 
 // buildEvent fills out auth_events for the builder then builds the event
 func buildEvent(builder *gomatrixserverlib.EventBuilder,
-	events map[common.StateKeyTuple]*gomatrixserverlib.Event,
+	provider gomatrixserverlib.AuthEventProvider,
 	cfg config.ClientAPI) (*gomatrixserverlib.Event, error) {
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
 		return nil, err
 	}
-	builder.AuthEvents = authEventsFromStateNeeded(eventsNeeded, events)
+	refs, err := eventsNeeded.AuthEventReferences(provider)
+	if err != nil {
+		return nil, err
+	}
+	builder.AuthEvents = refs
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.ServerName)
 	now := time.Now()
 	event, err := builder.Build(eventID, now, cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
@@ -208,42 +208,4 @@ func buildEvent(builder *gomatrixserverlib.EventBuilder,
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
 	}
 	return &event, nil
-}
-
-func authEventsFromStateNeeded(eventsNeeded gomatrixserverlib.StateNeeded,
-	events map[common.StateKeyTuple]*gomatrixserverlib.Event) (authEvents []gomatrixserverlib.EventReference) {
-
-	// These events are only "needed" if they exist, so if they don't exist we can safely ignore them.
-	if eventsNeeded.Create {
-		ev := events[common.StateKeyTuple{"m.room.create", ""}]
-		if ev != nil {
-			authEvents = append(authEvents, ev.EventReference())
-		}
-	}
-	if eventsNeeded.JoinRules {
-		ev := events[common.StateKeyTuple{"m.room.join_rules", ""}]
-		if ev != nil {
-			authEvents = append(authEvents, ev.EventReference())
-		}
-	}
-	if eventsNeeded.PowerLevels {
-		ev := events[common.StateKeyTuple{"m.room.power_levels", ""}]
-		if ev != nil {
-			authEvents = append(authEvents, ev.EventReference())
-		}
-	}
-
-	for _, userID := range eventsNeeded.Member {
-		ev := events[common.StateKeyTuple{"m.room.member", userID}]
-		if ev != nil {
-			authEvents = append(authEvents, ev.EventReference())
-		}
-	}
-	for _, token := range eventsNeeded.ThirdPartyInvite {
-		ev := events[common.StateKeyTuple{"m.room.member", token}]
-		if ev != nil {
-			authEvents = append(authEvents, ev.EventReference())
-		}
-	}
-	return
 }

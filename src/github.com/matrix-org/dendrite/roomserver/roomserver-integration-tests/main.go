@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"os"
@@ -368,7 +367,7 @@ func main() {
 		if err := q.QueryLatestEventsAndState(
 			&api.QueryLatestEventsAndStateRequest{
 				RoomID: "!HCXfdvrfksxuYnIFiJ:matrix.org",
-				StateToFetch: []common.StateKeyTuple{
+				StateToFetch: []gomatrixserverlib.StateKeyTuple{
 					{"m.room.member", "@richvdh:matrix.org"},
 				},
 			},
