@@ -44,6 +44,69 @@ type StateNeeded struct {
 	ThirdPartyInvite []string
 }
 
+// Tuples returns the needed state key tuples for performing auth on an event.
+func (s StateNeeded) Tuples() (res []StateKeyTuple) {
+	if s.Create {
+		res = append(res, StateKeyTuple{"m.room.create", ""})
+	}
+	if s.JoinRules {
+		res = append(res, StateKeyTuple{"m.room.join_rules", ""})
+	}
+	if s.PowerLevels {
+		res = append(res, StateKeyTuple{"m.room.power_levels", ""})
+	}
+	for _, userID := range s.Member {
+		res = append(res, StateKeyTuple{"m.room.member", userID})
+	}
+	for _, token := range s.ThirdPartyInvite {
+		res = append(res, StateKeyTuple{"m.room.third_party_invite", token})
+	}
+	return
+}
+
+// AuthEventReferences returns the auth_events references for the StateNeeded. Returns an error if the
+// provider returns an error. If an event is missing from the provider but is required in StateNeeded, it
+// is skipped over: no error is returned.
+func (s StateNeeded) AuthEventReferences(provider AuthEventProvider) (refs []EventReference, err error) {
+	var e *Event
+	if s.Create {
+		if e, err = provider.Create(); err != nil {
+			return
+		} else if e != nil {
+			refs = append(refs, e.EventReference())
+		}
+	}
+	if s.JoinRules {
+		if e, err = provider.JoinRules(); err != nil {
+			return
+		} else if e != nil {
+			refs = append(refs, e.EventReference())
+		}
+	}
+	if s.PowerLevels {
+		if e, err = provider.PowerLevels(); err != nil {
+			return
+		} else if e != nil {
+			refs = append(refs, e.EventReference())
+		}
+	}
+	for _, userID := range s.Member {
+		if e, err = provider.Member(userID); err != nil {
+			return
+		} else if e != nil {
+			refs = append(refs, e.EventReference())
+		}
+	}
+	for _, token := range s.ThirdPartyInvite {
+		if e, err = provider.ThirdPartyInvite(token); err != nil {
+			return
+		} else if e != nil {
+			refs = append(refs, e.EventReference())
+		}
+	}
+	return
+}
+
 // StateNeededForEventBuilder returns the event types and state_keys needed to authenticate the
 // event being built. These events should be put under 'auth_events' for the event being built.
 // Returns an error if the state needed could not be calculated with the given builder, e.g
@@ -175,14 +238,9 @@ type AuthEventProvider interface {
 	ThirdPartyInvite(stateKey string) (*Event, error)
 }
 
-type stateKeyTuple struct {
-	Type     string
-	StateKey string
-}
-
 // AuthEvents is an implementation of AuthEventProvider backed by a map.
 type AuthEvents struct {
-	events map[stateKeyTuple]*Event
+	events map[StateKeyTuple]*Event
 }
 
 // AddEvent adds an event to the provider. If an event already existed for the (type, state_key) then
@@ -191,39 +249,39 @@ func (a *AuthEvents) AddEvent(event *Event) error {
 	if event.StateKey() == nil {
 		return fmt.Errorf("AddEvent: event %s does not have a state key", event.Type())
 	}
-	a.events[stateKeyTuple{event.Type(), *event.StateKey()}] = event
+	a.events[StateKeyTuple{event.Type(), *event.StateKey()}] = event
 	return nil
 }
 
 // Create implements AuthEventProvider
 func (a *AuthEvents) Create() (*Event, error) {
-	return a.events[stateKeyTuple{"m.room.create", ""}], nil
+	return a.events[StateKeyTuple{"m.room.create", ""}], nil
 }
 
 // JoinRules implements AuthEventProvider
 func (a *AuthEvents) JoinRules() (*Event, error) {
-	return a.events[stateKeyTuple{"m.room.join_rules", ""}], nil
+	return a.events[StateKeyTuple{"m.room.join_rules", ""}], nil
 }
 
 // PowerLevels implements AuthEventProvider
 func (a *AuthEvents) PowerLevels() (*Event, error) {
-	return a.events[stateKeyTuple{"m.room.power_levels", ""}], nil
+	return a.events[StateKeyTuple{"m.room.power_levels", ""}], nil
 }
 
 // Member implements AuthEventProvider
 func (a *AuthEvents) Member(stateKey string) (*Event, error) {
-	return a.events[stateKeyTuple{"m.room.member", stateKey}], nil
+	return a.events[StateKeyTuple{"m.room.member", stateKey}], nil
 }
 
 // ThirdPartyInvite implements AuthEventProvider
 func (a *AuthEvents) ThirdPartyInvite(stateKey string) (*Event, error) {
-	return a.events[stateKeyTuple{"m.room.third_party_invite", stateKey}], nil
+	return a.events[StateKeyTuple{"m.room.third_party_invite", stateKey}], nil
 }
 
 // NewAuthEvents returns an AuthEventProvider backed by the given events. New events can be added by
 // calling AddEvent().
 func NewAuthEvents(events []*Event) AuthEvents {
-	a := AuthEvents{make(map[stateKeyTuple]*Event)}
+	a := AuthEvents{make(map[StateKeyTuple]*Event)}
 	for _, e := range events {
 		a.AddEvent(e)
 	}

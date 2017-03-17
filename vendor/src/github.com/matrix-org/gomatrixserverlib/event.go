@@ -22,6 +22,18 @@ import (
 	"time"
 )
 
+// A StateKeyTuple is the combination of an event type and an event state key.
+// It is often used as a key in maps.
+type StateKeyTuple struct {
+	// The "type" key of a matrix event.
+	EventType string
+	// The "state_key" of a matrix event.
+	// The empty string is a legitimate value for the "state_key" in matrix
+	// so take care to initialise this field lest you accidentally request a
+	// "state_key" with the go default of the empty string.
+	StateKey string
+}
+
 // An EventReference is a reference to a matrix event.
 type EventReference struct {
 	// The event ID of the event.
