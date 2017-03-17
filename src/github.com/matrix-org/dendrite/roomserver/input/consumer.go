@@ -3,9 +3,11 @@ package input
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	sarama "gopkg.in/Shopify/sarama.v1"
+	"sync/atomic"
 )
 
 // A ConsumerDatabase has the storage APIs needed by the consumer.
@@ -45,6 +47,13 @@ type Consumer struct {
 	// The ErrorLogger for this consumer.
 	// If left as nil then the consumer will panic when it encounters an error
 	ErrorLogger ErrorLogger
+	// If non-nil then the consumer will stop processing messages after this
+	// many messages and will shutdown. Malformed messages are included in the count.
+	StopProcessingAfter *int64
+	// If not-nil then the consumer will call this to shutdown the server.
+	ShutdownCallback func(reason string)
+	// How many messages the consumer has processed.
+	processed int64
 }
 
 // WriteOutputRoomEvent implements OutputRoomEventWriter
@@ -125,6 +134,19 @@ func (c *Consumer) consumePartition(pc sarama.PartitionConsumer) {
 		// Advance our position in the stream so that we will start at the right position after a restart.
 		if err := c.DB.SetPartitionOffset(c.InputRoomEventTopic, message.Partition, message.Offset); err != nil {
 			c.logError(message, err)
+		}
+		// Update the number of processed messages using atomic addition because it is accessed from multiple goroutines.
+		processed := atomic.AddInt64(&c.processed, 1)
+		// Check if we should stop processing.
+		// Note that since we have multiple goroutines it's quite likely that we'll overshoot by a few messages.
+		// If we try to stop processing after M message and we have N goroutines then we will process somewhere
+		// between M and (N + M) messages because the N goroutines could all try to process what they think will be the
+		// last message. We could be more careful here but this is good enough for getting rough benchmarks.
+		if c.StopProcessingAfter != nil && processed >= int64(*c.StopProcessingAfter) {
+			if c.ShutdownCallback != nil {
+				c.ShutdownCallback(fmt.Sprintf("Stopping processing after %d messages", c.processed))
+			}
+			return
 		}
 	}
 }

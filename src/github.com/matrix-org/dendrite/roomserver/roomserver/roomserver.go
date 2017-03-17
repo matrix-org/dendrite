@@ -7,7 +7,9 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	sarama "gopkg.in/Shopify/sarama.v1"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +19,10 @@ var (
 	inputRoomEventTopic  = os.Getenv("TOPIC_INPUT_ROOM_EVENT")
 	outputRoomEventTopic = os.Getenv("TOPIC_OUTPUT_ROOM_EVENT")
 	bindAddr             = os.Getenv("BIND_ADDRESS")
+	// Shuts the roomserver down after processing a given number of messages.
+	// This is useful for running benchmarks for seeing how quickly the server
+	// can process a given number of messages.
+	stopProcessingAfter = os.Getenv("STOP_AFTER")
 )
 
 func main() {
@@ -43,6 +49,18 @@ func main() {
 		OutputRoomEventTopic: outputRoomEventTopic,
 	}
 
+	if stopProcessingAfter != "" {
+		count, err := strconv.ParseInt(stopProcessingAfter, 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		consumer.StopProcessingAfter = &count
+		consumer.ShutdownCallback = func(message string) {
+			fmt.Println("Stopping roomserver", message)
+			os.Exit(0)
+		}
+	}
+
 	if err = consumer.Start(); err != nil {
 		panic(err)
 	}
@@ -56,5 +74,7 @@ func main() {
 	fmt.Println("Started roomserver")
 
 	// TODO: Implement clean shutdown.
-	http.ListenAndServe(bindAddr, nil)
+	if err := http.ListenAndServe(bindAddr, nil); err != nil {
+		panic(err)
+	}
 }
