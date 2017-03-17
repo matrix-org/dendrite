@@ -11,6 +11,8 @@ import (
 // and works out which event should be used for each state event.
 func ResolveStateConflicts(conflicted []Event, authEvents []Event) []Event {
 	var r stateResolver
+	r.resolvedThirdPartyInvites = map[string]*Event{}
+	r.resolvedMembers = map[string]*Event{}
 	// Group the conflicted events by type and state key.
 	r.addConflicted(conflicted)
 	// Add the unconflicted auth events needed for auth checks.
@@ -124,6 +126,7 @@ func (r *stateResolver) addConflicted(events []Event) {
 			// new block to the block list.
 			offset = len(*blockList)
 			*blockList = append(*blockList, nil)
+			offsets[key] = offset
 		}
 		// Get the address of the block in the block list.
 		block := &(*blockList)[offset]
@@ -187,6 +190,9 @@ func (r *stateResolver) removeAuthEvent(eventType, stateKey string) {
 func (r *stateResolver) resolveAndAddAuthBlocks(blocks [][]Event) {
 	start := len(r.result)
 	for _, block := range blocks {
+		if len(block) == 0 {
+			continue
+		}
 		if event := r.resolveAuthBlock(block); event != nil {
 			r.result = append(r.result, *event)
 		}
