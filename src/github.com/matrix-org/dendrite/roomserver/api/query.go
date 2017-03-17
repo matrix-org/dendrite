@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"net/http"
 )
@@ -15,7 +14,7 @@ type QueryLatestEventsAndStateRequest struct {
 	RoomID string
 	// The state key tuples to fetch from the room current state.
 	// If this list is empty or nil then no state events are returned.
-	StateToFetch []common.StateKeyTuple
+	StateToFetch []gomatrixserverlib.StateKeyTuple
 }
 
 // QueryLatestEventsAndStateResponse is a response to QueryLatestEventsAndState

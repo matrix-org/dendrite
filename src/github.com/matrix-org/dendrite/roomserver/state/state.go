@@ -4,8 +4,8 @@ package state
 
 import (
 	"fmt"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"sort"
 )
@@ -200,12 +200,12 @@ func DifferenceBetweeenStateSnapshots(db RoomStateDatabase, oldStateNID, newStat
 // stringTuplesToNumericTuples converts the string state key tuples into numeric IDs
 // If there isn't a numeric ID for either the event type or the event state key then the tuple is discarded.
 // Returns an error if there was a problem talking to the database.
-func stringTuplesToNumericTuples(db RoomStateDatabase, stringTuples []common.StateKeyTuple) ([]types.StateKeyTuple, error) {
+func stringTuplesToNumericTuples(db RoomStateDatabase, stringTuples []gomatrixserverlib.StateKeyTuple) ([]types.StateKeyTuple, error) {
 	eventTypes := make([]string, len(stringTuples))
 	stateKeys := make([]string, len(stringTuples))
 	for i := range stringTuples {
 		eventTypes[i] = stringTuples[i].EventType
-		stateKeys[i] = stringTuples[i].EventStateKey
+		stateKeys[i] = stringTuples[i].StateKey
 	}
 	eventTypes = util.UniqueStrings(eventTypes)
 	eventTypeMap, err := db.EventTypeNIDs(eventTypes)
@@ -223,7 +223,7 @@ func stringTuplesToNumericTuples(db RoomStateDatabase, stringTuples []common.Sta
 		var numericTuple types.StateKeyTuple
 		var ok1, ok2 bool
 		numericTuple.EventTypeNID, ok1 = eventTypeMap[stringTuple.EventType]
-		numericTuple.EventStateKeyNID, ok2 = stateKeyMap[stringTuple.EventStateKey]
+		numericTuple.EventStateKeyNID, ok2 = stateKeyMap[stringTuple.StateKey]
 		// Discard the tuple if there wasn't a numeric ID for either the event type or the state key.
 		if ok1 && ok2 {
 			result = append(result, numericTuple)
@@ -239,7 +239,7 @@ func stringTuplesToNumericTuples(db RoomStateDatabase, stringTuples []common.Sta
 // This is typically the state before an event or the current state of a room.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.
 func LoadStateAtSnapshotForStringTuples(
-	db RoomStateDatabase, stateNID types.StateSnapshotNID, stateKeyTuples []common.StateKeyTuple,
+	db RoomStateDatabase, stateNID types.StateSnapshotNID, stateKeyTuples []gomatrixserverlib.StateKeyTuple,
 ) ([]types.StateEntry, error) {
 	numericTuples, err := stringTuplesToNumericTuples(db, stateKeyTuples)
 	if err != nil {

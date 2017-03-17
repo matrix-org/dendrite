@@ -11,7 +11,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -48,7 +47,7 @@ func SendEvent(req *http.Request, roomID, eventType, txnID string, stateKey *str
 	builder.SetContent(r)
 
 	// work out what will be required in order to send this event
-	requiredStateEvents, err := stateNeeded(&builder)
+	needed, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -56,7 +55,7 @@ func SendEvent(req *http.Request, roomID, eventType, txnID string, stateKey *str
 	// Ask the roomserver for information about this room
 	queryReq := api.QueryLatestEventsAndStateRequest{
 		RoomID:       roomID,
-		StateToFetch: requiredStateEvents,
+		StateToFetch: needed.Tuples(),
 	}
 	var queryRes api.QueryLatestEventsAndStateResponse
 	if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); queryErr != nil {
@@ -104,27 +103,4 @@ func SendEvent(req *http.Request, roomID, eventType, txnID string, stateKey *str
 		Code: 200,
 		JSON: sendEventResponse{e.EventID()},
 	}
-}
-
-func stateNeeded(builder *gomatrixserverlib.EventBuilder) (requiredStateEvents []common.StateKeyTuple, err error) {
-	authEvents, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
-	if err != nil {
-		return
-	}
-	if authEvents.Create {
-		requiredStateEvents = append(requiredStateEvents, common.StateKeyTuple{"m.room.create", ""})
-	}
-	if authEvents.JoinRules {
-		requiredStateEvents = append(requiredStateEvents, common.StateKeyTuple{"m.room.join_rules", ""})
-	}
-	if authEvents.PowerLevels {
-		requiredStateEvents = append(requiredStateEvents, common.StateKeyTuple{"m.room.power_levels", ""})
-	}
-	for _, userID := range authEvents.Member {
-		requiredStateEvents = append(requiredStateEvents, common.StateKeyTuple{"m.room.member", userID})
-	}
-	for _, token := range authEvents.ThirdPartyInvite {
-		requiredStateEvents = append(requiredStateEvents, common.StateKeyTuple{"m.room.third_party_invite", token})
-	}
-	return
 }
