@@ -20,7 +20,7 @@ Diagram:
     +----------| W |                                         +----------| S |                     +--------| R |
     |          +---+                                         | Receipts +---+                     | Client +---+
     | Federation |>=========================================>| Server     |>=====================>| Sync     |
-    | Send       |                                           |            |                       |          |
+    | Receiver   |                                           |            |                       |          |
     |            |                                 +---+     |            |                       |          |
     |            |                        +--------| W |     |            |                       |          |
     |            |                        | Client +---+     |            |                       |          |
@@ -49,8 +49,8 @@ Diagram:
     |            |                +---+     |        |                  +---+                     |          |
     |            |       +--------| W |     |        |       +----------| S |                     |          |
     |            |       | Client +---+     |        |       | Presence +---+                     |          |
-    |            |       | Room     |>=====>|        |>=====>| Server     |>=====================>|          |
-    |            |       | Send     |       +--------+       |            |                       |          |
+    |            |       | API      |>=====>|        |>=====>| Server     |>=====================>|          |
+    |            |       | /send    |       +--------+       |            |                       |          |
     |            |       |          |                        |            |                       |          |
     |            |       |          |>======================>|            |<=====================<|          |
     |            |       +----------+                        |            |                       |          |
@@ -101,7 +101,7 @@ choke-point to implement ratelimiting and backoff correctly.
  * Writes typing updates to logs.
  * Writes other updates to logs.
 
-## Client Room Send
+## Client API /send
 
  * Handles puts to `/client/v1/rooms/` that create room events.
  * Queries information needed to process events from the Room Server.

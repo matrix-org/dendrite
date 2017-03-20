@@ -62,38 +62,119 @@ so that the readers can avoid querying the room server unnecessarily.
 
 [This architecture can be extended to cover most of the APIs.](WIRING.md)
 
+## How things are supposed to work.
+
+### Local client sends an event in an existing room.
+
+  0) The client sends a PUT `/_matrix/client/r0/rooms/{roomId}/send` request
+    and an HTTP loadbalancer routes the request to a ClientAPI.
+
+  1) The ClientAPI:
+
+    * Authenticates the local user using the `access_token` sent in the HTTP
+      request.
+    * Checks if it has already processed or is processing a request with the
+      same `txnID`.
+    * Calculates which state events are needed to auth the request.
+    * Queries the necessary state events and the latest events in the room
+      from the RoomServer.
+    * Confirms that the room exists and checks whether the event is allowed by
+      the auth checks.
+    * Builds and signs the events.
+    * Writes the event to a "InputRoomEvent" kafka topic.
+    * Send a `200 OK` response to the client.
+
+  2) The RoomServer reads the event from "InputRoomEvent" kafka topic:
+
+    * Checks if it has already has a copy of the event.
+    * Checks if the event is allowed by the auth checks using the auth events
+      at the event.
+    * Calculates the room state at the event.
+    * Works out what the latest events in the room after processing this event
+      are.
+    * Calculate how the changes in the latest events affect the current state
+      of the room.
+    * TODO: Workout what events determine the visibility of this event to other
+      users
+    * Writes the event along with the changes in current state to an
+      "OutputRoomEvent" kafka topic. It writes all the events for a room to
+      the same kafka partition.
+
+  3a) The ClientSync reads the event from the "OutputRoomEvent" kafka topic:
+
+    * Updates its copy of the current state for the room.
+    * Works out which users need to be notified about the event.
+    * Wakes up any pending `/_matrix/client/r0/sync` requests for those users.
+    * Adds the event to the recent timeline events for the room.
+
+  3b) The FederationSender reads the event from the "OutputRoomEvent" kafka topic:
+
+    * Updates its copy of the current state for the room.
+    * Works out which remote servers need to be notified about the event.
+    * Sends a `/_matrix/federation/v1/send` request to those servers.
+    * Or if there is a request in progress then add the event to a queue to be
+      sent when the previous request finishes.
+
+### Remote server sends an event in an existing room.
+
+  0) The remote server sends a `PUT /_matrix/federation/v1/send` request and an
+    HTTP loadbalancer routes the request to a FederationReceiver.
+
+  1) The FederationReceiver:
+
+    * Authenticates the remote server using the "X-Matrix" authorisation header.
+    * Checks if it has already processed or is processing a request with the
+      same `txnID`.
+    * Checks the signatures for the events.
+      Fetches the ed2519 keys for the event senders if necessary.
+    * Queries the RoomServer for a copy of the state of the room at each event.
+    * If the RoomServer doesn't know the state of the room at an event then
+      query the state of the room at the event from the remote server using
+      `GET /_matrix/federation/v1/state_ids` falling back to
+      `GET /_matrix/federation/v1/state` if necessary.
+    * Once the state at each event is known check whether the events are
+      allowed by the auth checks against the state at each event.
+    * For each event that is allowed write the event to the "InputRoomEvent"
+      kafka topic.
+    * Send a 200 OK response to the remote server listing which events were
+      successfully processed and which events failed
+
+  2) The RoomServer processes the event the same as it would a local event.
+
+  3a) The ClientSync processes the event the same as it would a local event.
+
 # TODO
 
  - [ ] gomatrixlib
    - [x] Canonical JSON.
    - [x] Signed JSON.
-   - [ ] Event hashing.
-   - [ ] Event signing.
+   - [x] Event hashing.
+   - [x] Event signing.
    - [x] Federation server discovery.
    - [x] Federation key lookup.
    - [ ] Federation request signing.
    - [x] Event authentication.
    - [ ] Event visibility.
-   - [ ] State resolution.
+   - [x] State resolution.
    - [ ] Third party invites authentication.
  - [ ] Room Server
-   - [ ] Inputing new events from logs.
-   - [ ] Inputing backfilled events from logs.
-   - [ ] Outputing events and current state to logs.
+   - [x] Inputting new events from logs.
+   - [ ] Inputting back-filled events from logs.
+   - [x] Outputting events and current state to logs.
    - [ ] Querying state at an event.
-   - [ ] Querying current forward extremities and state.
+   - [x] Querying current forward extremities and state.
    - [ ] Querying message history.
    - [ ] Exporting/importing messages from other servers.
    - [ ] Other Room Server stuff.
  - [ ] Client Room Send
-   - [ ] Handling /client/r0/room/... HTTP PUTs
+   - [x] Handling /client/r0/room/... HTTP PUTs
    - [ ] Talk to remote servers for joins to remote servers.
-   - [ ] Outputting new events to logs.
+   - [x] Outputting new events to logs.
    - [ ] Updating the last active time in presence.
    - [ ] Other Client Room Send stuff.
  - [ ] Client Sync
-   - [ ] Inputing new room events and state from the logs.
+   - [ ] Inputting new room events and state from the logs.
    - [ ] Handling /client/r0/sync HTTP GETs
-   - [ ] Outputing whether the client is syncing to the logs.
+   - [ ] Outputting whether the client is syncing to the logs.
    - [ ] Other Client Sync Stuff.
  - [ ] Other Components.
