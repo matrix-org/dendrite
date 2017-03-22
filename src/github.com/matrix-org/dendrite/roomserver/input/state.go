@@ -19,10 +19,22 @@ var calculateStateDurations = prometheus.NewSummaryVec(
 		Help:      "How long it takes to calculate the state after a list of events",
 	},
 	// Takes two labels:
-	//	algorithm:
-	//		The algorithm used to calculate the state or the step it failed on if it failed.
+	//   algorithm:
+	//      The algorithm used to calculate the state or the step it failed on if it failed.
+	//      Labels starting with "_" are used to indicate when the algorithm fails halfway.
 	//  outcome:
 	//      Whether the state was successfully calculated.
+	//
+	// The possible values for algorithm are:
+	//    empty_state -> The list of events was empty so the state is empty.
+	//    no_change -> The state hasn't changed.
+	//    single_delta -> There was a single event added to the state in a way that can be encoded as a single delta
+	//    full_state_no_conflicts -> We created a new copy of the full room state, but didn't enounter any conflicts
+	//                               while doing so.
+	//    full_state_with_conflicts -> We created a new copy of the full room state and had to resolve conflicts to do so.
+	//    _load_state_block_nids -> Failed loading the state block nids for a single previous state.
+	//    _load_combined_state -> Failed to load the combined state.
+	//    _resolve_conflicts -> Failed to resolve conflicts.
 	[]string{"algorithm", "outcome"},
 )
 
