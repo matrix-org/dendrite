@@ -5,6 +5,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/input"
 	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/prometheus/client_golang/prometheus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 	"net/http"
 	_ "net/http/pprof"
@@ -70,6 +71,8 @@ func main() {
 	}
 
 	queryAPI.SetupHTTP(http.DefaultServeMux)
+
+	http.DefaultServeMux.Handle("/metrics", prometheus.Handler())
 
 	fmt.Println("Started roomserver")
 

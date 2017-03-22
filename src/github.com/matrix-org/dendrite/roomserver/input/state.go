@@ -6,8 +6,48 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"sort"
+	"time"
 )
+
+var calculateStateDurations = prometheus.NewSummaryVec(
+	prometheus.SummaryOpts{
+		Namespace: "dendrite",
+		Subsystem: "roomserver",
+		Name:      "calculate_state_duration_microseconds",
+		Help:      "How long it takes to calculate the state after a list of events",
+	},
+	// Takes two labels:
+	//	algorithm:
+	//		The algorithm used to calculate the state or the step it failed on if it failed.
+	//  outcome:
+	//      Whether the state was successfully calculated.
+	[]string{"algorithm", "outcome"},
+)
+
+type calculateStateTimer struct {
+	algorithm string
+	startTime time.Time
+}
+
+func (c *calculateStateTimer) stop(stateNID types.StateSnapshotNID, err error) (types.StateSnapshotNID, error) {
+	var outcome string
+	if err == nil {
+		outcome = "success"
+	} else {
+		outcome = "failure"
+	}
+	endTime := time.Now()
+	calculateStateDurations.WithLabelValues(c.algorithm, outcome).Observe(
+		float64(endTime.Sub(c.startTime).Nanoseconds()) / 1000.,
+	)
+	return stateNID, err
+}
+
+func init() {
+	prometheus.MustRegister(calculateStateDurations)
+}
 
 // calculateAndStoreState calculates a snapshot of the state of a room before an event.
 // Stores the snapshot of the state in the database.
@@ -34,10 +74,13 @@ func calculateAndStoreStateBeforeEvent(
 // calculateAndStoreStateAfterEvents finds the room state after the given events.
 // Stores the resulting state in the database and returns a numeric ID for that snapshot.
 func calculateAndStoreStateAfterEvents(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
+	timer := calculateStateTimer{startTime: time.Now()}
+
 	if len(prevStates) == 0 {
 		// 2) There weren't any prev_events for this event so the state is
 		// empty.
-		return db.AddState(roomNID, nil, nil)
+		timer.algorithm = "empty_state"
+		return timer.stop(db.AddState(roomNID, nil, nil))
 	}
 
 	if len(prevStates) == 1 {
@@ -47,26 +90,30 @@ func calculateAndStoreStateAfterEvents(db RoomEventDatabase, roomNID types.RoomN
 			// have the same state, so this event has exactly the same state
 			// as the previous events.
 			// This should be the common case.
-			return prevState.BeforeStateSnapshotNID, nil
+			timer.algorithm = "no_change"
+			return timer.stop(prevState.BeforeStateSnapshotNID, nil)
 		}
 		// The previous event was a state event so we need to store a copy
 		// of the previous state updated with that event.
 		stateBlockNIDLists, err := db.StateBlockNIDs([]types.StateSnapshotNID{prevState.BeforeStateSnapshotNID})
 		if err != nil {
-			return 0, err
+			timer.algorithm = "_load_state_blocks"
+			return timer.stop(0, err)
 		}
 		stateBlockNIDs := stateBlockNIDLists[0].StateBlockNIDs
 		if len(stateBlockNIDs) < maxStateBlockNIDs {
 			// 4) The number of state data blocks is small enough that we can just
 			// add the state event as a block of size one to the end of the blocks.
-			return db.AddState(
+			timer.algorithm = "single_delta"
+			return timer.stop(db.AddState(
 				roomNID, stateBlockNIDs, []types.StateEntry{prevState.StateEntry},
-			)
+			))
 		}
 		// If there are too many deltas then we need to calculate the full state
 		// So fall through to calculateAndStoreStateAfterManyEvents
 	}
-	return calculateAndStoreStateAfterManyEvents(db, roomNID, prevStates)
+
+	return calculateAndStoreStateAfterManyEvents(db, roomNID, prevStates, timer)
 }
 
 // maxStateBlockNIDs is the maximum number of state data blocks to use to encode a snapshot of room state.
@@ -79,12 +126,15 @@ const maxStateBlockNIDs = 64
 // calculateAndStoreStateAfterManyEvents finds the room state after the given events.
 // This handles the slow path of calculateAndStoreStateAfterEvents for when there is more than one event.
 // Stores the resulting state and returns a numeric ID for the snapshot.
-func calculateAndStoreStateAfterManyEvents(db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error) {
+func calculateAndStoreStateAfterManyEvents(
+	db RoomEventDatabase, roomNID types.RoomNID, prevStates []types.StateAtEvent, timer calculateStateTimer,
+) (types.StateSnapshotNID, error) {
 	// Conflict resolution.
 	// First stage: load the state after each of the prev events.
 	combined, err := state.LoadCombinedStateAfterEvents(db, prevStates)
 	if err != nil {
-		return 0, err
+		timer.algorithm = "_load_combined_state"
+		return timer.stop(0, err)
 	}
 
 	// Collect all the entries with the same type and key together.
@@ -111,17 +161,20 @@ func calculateAndStoreStateAfterManyEvents(db RoomEventDatabase, roomNID types.R
 
 		resolved, err := resolveConflicts(db, notConflicted, conflicts)
 		if err != nil {
-			return 0, err
+			timer.algorithm = "_resolve_conflicts"
+			return timer.stop(0, err)
 		}
+		timer.algorithm = "full_state_with_conflicts"
 		state = resolved
 	} else {
+		timer.algorithm = "full_state_no_conflicts"
 		// 6) There weren't any conflicts
 		state = combined
 	}
 
 	// TODO: Check if we can encode the new state as a delta against the
 	// previous state.
-	return db.AddState(roomNID, nil, state)
+	return timer.stop(db.AddState(roomNID, nil, state))
 }
 
 // loadStateEvents loads the matrix events for a list of state entries.
