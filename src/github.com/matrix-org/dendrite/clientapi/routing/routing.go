@@ -23,9 +23,6 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 	r0mux.Handle("/createRoom", make("createRoom", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 		return writers.CreateRoom(req, cfg, producer)
 	})))
-	r0mux.Handle("/sync", make("sync", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
-		return readers.Sync(req)
-	})))
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
 		make("send_message", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
@@ -47,6 +44,17 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 		})),
 	)
 
+	servMux.Handle("/metrics", prometheus.Handler())
+	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
+}
+
+// SetupSyncServer configures the given mux with sync-server listeners
+func SetupSyncServer(servMux *http.ServeMux, httpClient *http.Client, cfg config.Sync) {
+	apiMux := mux.NewRouter()
+	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux.Handle("/sync", make("sync", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		return readers.Sync(req)
+	})))
 	servMux.Handle("/metrics", prometheus.Handler())
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
