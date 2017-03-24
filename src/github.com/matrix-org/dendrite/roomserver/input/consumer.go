@@ -4,17 +4,18 @@ package input
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	sarama "gopkg.in/Shopify/sarama.v1"
 	"sync/atomic"
+
+	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // A ConsumerDatabase has the storage APIs needed by the consumer.
 type ConsumerDatabase interface {
 	RoomEventDatabase
 	// PartitionOffsets returns the offsets the consumer has reached for each partition.
-	PartitionOffsets(topic string) ([]types.PartitionOffset, error)
+	PartitionOffsets(topic string) ([]common.PartitionOffset, error)
 	// SetPartitionOffset records where the consumer has reached for a partition.
 	SetPartitionOffset(topic string, partition int32, offset int64) error
 }

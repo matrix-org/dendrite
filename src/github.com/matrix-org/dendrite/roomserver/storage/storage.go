@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -28,13 +29,13 @@ func Open(dataSourceName string) (*Database, error) {
 }
 
 // PartitionOffsets implements input.ConsumerDatabase
-func (d *Database) PartitionOffsets(topic string) ([]types.PartitionOffset, error) {
-	return d.statements.selectPartitionOffsets(topic)
+func (d *Database) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
+	return d.statements.SelectPartitionOffsets(topic)
 }
 
 // SetPartitionOffset implements input.ConsumerDatabase
 func (d *Database) SetPartitionOffset(topic string, partition int32, offset int64) error {
-	return d.statements.upsertPartitionOffset(topic, partition, offset)
+	return d.statements.UpsertPartitionOffset(topic, partition, offset)
 }
 
 // StoreEvent implements input.EventDatabase
