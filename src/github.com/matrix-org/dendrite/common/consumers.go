@@ -25,8 +25,14 @@ type PartitionStorer interface {
 // A ContinualConsumer continually consumes logs even across restarts. It requires a PartitionStorer to
 // remember the offset it reached.
 type ContinualConsumer struct {
-	Topic          string
-	Consumer       sarama.Consumer
+	// The kafkaesque topic to consume events from.
+	// This is the name used in kafka to identify the stream to consume events from.
+	Topic string
+	// A kafkaesque stream consumer providing the APIs for talking to the event source.
+	// The interface is taken from a client library for Apache Kafka.
+	// But any equivalent event streaming protocol could be made to implement the same interface.
+	Consumer sarama.Consumer
+	// A thing which can load and save partition offsets for a topic.
 	PartitionStore PartitionStorer
 	// ProcessMessage is a function which will be called for each message in the log. Return an error to
 	// stop processing messages. See ErrShutdown for specific control signals.
