@@ -5,6 +5,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/config"
+	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/readers"
 	"github.com/matrix-org/dendrite/clientapi/writers"
@@ -49,7 +50,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 }
 
 // SetupSyncServer configures the given mux with sync-server listeners
-func SetupSyncServer(servMux *http.ServeMux, httpClient *http.Client, cfg config.Sync) {
+func SetupSyncServer(servMux *http.ServeMux, httpClient *http.Client, cfg config.Sync, consumer *consumers.RoomserverConsumer) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/sync", make("sync", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {

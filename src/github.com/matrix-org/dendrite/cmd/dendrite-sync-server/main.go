@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/matrix-org/dendrite/clientapi/config"
+	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 
 	log "github.com/Sirupsen/logrus"
@@ -44,6 +45,11 @@ func main() {
 
 	log.Info("Starting sync server")
 
-	routing.SetupSyncServer(http.DefaultServeMux, http.DefaultClient, cfg)
+	consumer, err := consumers.NewRoomserverConsumer(&cfg, nil) // TODO: partition storer
+	if err != nil {
+		panic(err)
+	}
+
+	routing.SetupSyncServer(http.DefaultServeMux, http.DefaultClient, cfg, consumer)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }
