@@ -29,7 +29,7 @@ type ContinualConsumer struct {
 	Consumer       sarama.Consumer
 	PartitionStore PartitionStorer
 	// ProcessMessage is a function which will be called for each message in the log. Return an error to
-	// stop processing messages. See ErrRetryMessage and ErrShutdown for specific control signals.
+	// stop processing messages. See ErrShutdown for specific control signals.
 	ProcessMessage func(msg *sarama.ConsumerMessage) error
 	// ShutdownCallback is called when ProcessMessage returns ErrShutdown, after the partition has been saved.
 	// It is optional.
@@ -44,7 +44,6 @@ var ErrShutdown = fmt.Errorf("shutdown")
 // Returns nil once all the goroutines are started.
 // Returns an error if it can't start consuming for any of the partitions.
 func (c *ContinualConsumer) Start() error {
-	// TODO: This is nearl
 	offsets := map[int32]int64{}
 
 	partitions, err := c.Consumer.Partitions(c.Topic)
