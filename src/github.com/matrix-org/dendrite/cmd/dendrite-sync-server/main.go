@@ -8,6 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
+	"github.com/matrix-org/dendrite/clientapi/storage/sync"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dugong"
@@ -41,13 +42,19 @@ func main() {
 	cfg := config.Sync{
 		KafkaConsumerURIs:     []string{"localhost:9092"},
 		RoomserverOutputTopic: "roomserverOutput",
+		DataSource:            "",
 	}
 
 	log.Info("Starting sync server")
 
-	consumer, err := consumers.NewRoomserverConsumer(&cfg, nil) // TODO: partition storer
+	db, err := sync.NewDatabase(cfg.DataSource)
 	if err != nil {
-		panic(err)
+		log.Panicf("startup: failed to create database with data source %s : %s", cfg.DataSource, err)
+	}
+
+	consumer, err := consumers.NewRoomserverConsumer(&cfg, db)
+	if err != nil {
+		log.Panicf("startup: failed to create roomserver consumer: %s", err)
 	}
 
 	routing.SetupSyncServer(http.DefaultServeMux, http.DefaultClient, cfg, consumer)

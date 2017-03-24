@@ -25,4 +25,6 @@ type Sync struct {
 	RoomserverOutputTopic string
 	// A list of URIs to consume events from. These kafka logs should be produced by a Room Server.
 	KafkaConsumerURIs []string
+	// The postgres connection config for connecting to the database e.g a postgres:// URI
+	DataSource string
 }
