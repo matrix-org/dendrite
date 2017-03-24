@@ -1,19 +1,21 @@
-package sync
+package storage
 
 import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
+	// Import the postgres database driver.
+	_ "github.com/lib/pq"
 )
 
-// Database represents a sync server database
-type Database struct {
+// SyncServerDatabase represents a sync server database
+type SyncServerDatabase struct {
 	db         *sql.DB
 	partitions common.PartitionOffsetStatements
 }
 
-// NewDatabase creates a new sync server database
-func NewDatabase(dataSourceName string) (*Database, error) {
+// NewSyncServerDatabase creates a new sync server database
+func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 	var db *sql.DB
 	var err error
 	if db, err = sql.Open("postgres", dataSourceName); err != nil {
@@ -23,15 +25,15 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 	if err := partitions.Prepare(db); err != nil {
 		return nil, err
 	}
-	return &Database{db, partitions}, nil
+	return &SyncServerDatabase{db, partitions}, nil
 }
 
 // PartitionOffsets implements common.PartitionStorer
-func (d *Database) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
+func (d *SyncServerDatabase) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
 	return d.partitions.SelectPartitionOffsets(topic)
 }
 
 // SetPartitionOffset implements common.PartitionStorer
-func (d *Database) SetPartitionOffset(topic string, partition int32, offset int64) error {
+func (d *SyncServerDatabase) SetPartitionOffset(topic string, partition int32, offset int64) error {
 	return d.partitions.UpsertPartitionOffset(topic, partition, offset)
 }
