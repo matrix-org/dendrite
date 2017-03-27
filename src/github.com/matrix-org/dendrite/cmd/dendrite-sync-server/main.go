@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,7 +14,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dugong"
+	yaml "gopkg.in/yaml.v2"
 )
+
+var configPath = flag.String("config", "sync-server-config.yaml", "The path to the config file. For more information, see the config file in this repository.")
+var bindAddr = flag.String("listen", ":4200", "The port to listen on.")
 
 func setupLogging(logDir string) {
 	_ = os.Mkdir(logDir, os.ModePerm)
@@ -29,30 +35,46 @@ func setupLogging(logDir string) {
 	))
 }
 
+func loadConfig(configPath string) (*config.Sync, error) {
+	contents, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	var cfg config.Sync
+	if err = yaml.Unmarshal(contents, &cfg); err != nil {
+		return nil, err
+	}
+	// check required fields
+	return &cfg, nil
+}
+
 func main() {
-	bindAddr := os.Getenv("BIND_ADDRESS")
-	if bindAddr == "" {
-		log.Panic("No BIND_ADDRESS environment variable found.")
+	flag.Parse()
+
+	if *configPath == "" {
+		log.Fatal("--config must be supplied")
+	}
+	cfg, err := loadConfig(*configPath)
+	if err != nil {
+		log.Fatalf("Invalid config file: %s", err)
+	}
+
+	if *bindAddr == "" {
+		log.Fatal("--listen must be supplied")
 	}
 	logDir := os.Getenv("LOG_DIR")
 	if logDir != "" {
 		setupLogging(logDir)
 	}
 
-	cfg := config.Sync{
-		KafkaConsumerURIs:     []string{"localhost:9092"},
-		RoomserverOutputTopic: "roomserverOutput",
-		DataSource:            "postgres://dendrite:itsasecret@localhost/syncserver?sslmode=disable",
-	}
-
-	log.Info("Starting sync server")
+	log.Info("sync server config: ", cfg)
 
 	db, err := storage.NewSyncServerDatabase(cfg.DataSource)
 	if err != nil {
 		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.DataSource, err)
 	}
 
-	server, err := sync.NewServer(&cfg, db)
+	server, err := sync.NewServer(cfg, db)
 	if err != nil {
 		log.Panicf("startup: failed to create sync server: %s", err)
 	}
@@ -60,6 +82,7 @@ func main() {
 		log.Panicf("startup: failed to start sync server")
 	}
 
-	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, cfg)
-	log.Fatal(http.ListenAndServe(bindAddr, nil))
+	log.Info("Starting sync server on ", *bindAddr)
+	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, *cfg)
+	log.Fatal(http.ListenAndServe(*bindAddr, nil))
 }
