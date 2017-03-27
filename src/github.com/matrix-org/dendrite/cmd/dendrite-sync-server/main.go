@@ -42,7 +42,7 @@ func main() {
 	cfg := config.Sync{
 		KafkaConsumerURIs:     []string{"localhost:9092"},
 		RoomserverOutputTopic: "roomserverOutput",
-		DataSource:            "postgres://user:pass@localhost/dendrite-sync-server?sslmode=disable",
+		DataSource:            "postgres://dendrite:itsasecret@localhost/syncserver?sslmode=disable",
 	}
 
 	log.Info("Starting sync server")
