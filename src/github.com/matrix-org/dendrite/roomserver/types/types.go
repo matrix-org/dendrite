@@ -5,14 +5,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// A PartitionOffset is the offset into a partition of the input log.
-type PartitionOffset struct {
-	// The ID of the partition.
-	Partition int32
-	// The offset into the partition.
-	Offset int64
-}
-
 // EventTypeNID is a numeric ID for an event type.
 type EventTypeNID int64
 

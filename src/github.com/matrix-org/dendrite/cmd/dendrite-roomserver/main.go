@@ -2,16 +2,18 @@ package main
 
 import (
 	"fmt"
-	"github.com/matrix-org/dendrite/roomserver/input"
-	"github.com/matrix-org/dendrite/roomserver/query"
-	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/prometheus/client_golang/prometheus"
-	sarama "gopkg.in/Shopify/sarama.v1"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/roomserver/input"
+	"github.com/matrix-org/dendrite/roomserver/query"
+	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/prometheus/client_golang/prometheus"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 var (
@@ -43,10 +45,13 @@ func main() {
 	}
 
 	consumer := input.Consumer{
-		Consumer:             kafkaConsumer,
+		ContinualConsumer: common.ContinualConsumer{
+			Topic:          inputRoomEventTopic,
+			Consumer:       kafkaConsumer,
+			PartitionStore: db,
+		},
 		DB:                   db,
 		Producer:             kafkaProducer,
-		InputRoomEventTopic:  inputRoomEventTopic,
 		OutputRoomEventTopic: outputRoomEventTopic,
 	}
 

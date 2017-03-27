@@ -1,9 +1,6 @@
-package storage
+package common
 
-import (
-	"database/sql"
-	"github.com/matrix-org/dendrite/roomserver/types"
-)
+import "database/sql"
 
 const partitionOffsetsSchema = `
 -- The offsets that the server has processed up to.
@@ -26,32 +23,37 @@ const upsertPartitionOffsetsSQL = "" +
 	" ON CONFLICT ON CONSTRAINT topic_partition_unique" +
 	" DO UPDATE SET partition_offset = $3"
 
-type partitionOffsetStatements struct {
+// PartitionOffsetStatements represents a set of statements that can be run on a partition_offsets table.
+type PartitionOffsetStatements struct {
 	selectPartitionOffsetsStmt *sql.Stmt
 	upsertPartitionOffsetStmt  *sql.Stmt
 }
 
-func (s *partitionOffsetStatements) prepare(db *sql.DB) (err error) {
+// Prepare converts the raw SQL statements into prepared statements.
+func (s *PartitionOffsetStatements) Prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(partitionOffsetsSchema)
 	if err != nil {
 		return
 	}
-
-	return statementList{
-		{&s.selectPartitionOffsetsStmt, selectPartitionOffsetsSQL},
-		{&s.upsertPartitionOffsetStmt, upsertPartitionOffsetsSQL},
-	}.prepare(db)
+	if s.selectPartitionOffsetsStmt, err = db.Prepare(selectPartitionOffsetsSQL); err != nil {
+		return
+	}
+	if s.upsertPartitionOffsetStmt, err = db.Prepare(upsertPartitionOffsetsSQL); err != nil {
+		return
+	}
+	return
 }
 
-func (s *partitionOffsetStatements) selectPartitionOffsets(topic string) ([]types.PartitionOffset, error) {
+// SelectPartitionOffsets returns all the partition offsets for the given topic.
+func (s *PartitionOffsetStatements) SelectPartitionOffsets(topic string) ([]PartitionOffset, error) {
 	rows, err := s.selectPartitionOffsetsStmt.Query(topic)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var results []types.PartitionOffset
+	var results []PartitionOffset
 	for rows.Next() {
-		var offset types.PartitionOffset
+		var offset PartitionOffset
 		if err := rows.Scan(&offset.Partition, &offset.Offset); err != nil {
 			return nil, err
 		}
@@ -59,7 +61,8 @@ func (s *partitionOffsetStatements) selectPartitionOffsets(topic string) ([]type
 	return results, nil
 }
 
-func (s *partitionOffsetStatements) upsertPartitionOffset(topic string, partition int32, offset int64) error {
+// UpsertPartitionOffset updates or inserts the partition offset for the given topic.
+func (s *PartitionOffsetStatements) UpsertPartitionOffset(topic string, partition int32, offset int64) error {
 	_, err := s.upsertPartitionOffsetStmt.Exec(topic, partition, offset)
 	return err
 }
