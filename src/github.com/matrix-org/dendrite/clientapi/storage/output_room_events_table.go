@@ -42,7 +42,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-// InsertEvent into the output_room_events table.
+// InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs.
 func (s *outputRoomEventsStatements) InsertEvent(roomID string, eventJSON []byte, addState, removeState []string) error {
 	_, err := s.insertEventStmt.Exec(roomID, eventJSON, pq.StringArray(addState), pq.StringArray(removeState))
 	return err
