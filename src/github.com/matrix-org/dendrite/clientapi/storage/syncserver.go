@@ -23,11 +23,11 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 		return nil, err
 	}
 	partitions := common.PartitionOffsetStatements{}
-	if err := partitions.Prepare(db); err != nil {
+	if err = partitions.Prepare(db); err != nil {
 		return nil, err
 	}
 	events := outputRoomEventsStatements{}
-	if err := events.prepare(db); err != nil {
+	if err = events.prepare(db); err != nil {
 		return nil, err
 	}
 	return &SyncServerDatabase{db, partitions, events}, nil
