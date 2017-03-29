@@ -48,8 +48,8 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
 
-// SetupSyncServer configures the given mux with sync-server listeners
-func SetupSyncServer(servMux *http.ServeMux, httpClient *http.Client, cfg config.Sync) {
+// SetupSyncServerListeners configures the given mux with sync-server listeners
+func SetupSyncServerListeners(servMux *http.ServeMux, httpClient *http.Client, cfg config.Sync) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/sync", make("sync", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {

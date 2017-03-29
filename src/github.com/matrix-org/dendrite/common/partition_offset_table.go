@@ -57,6 +57,7 @@ func (s *PartitionOffsetStatements) SelectPartitionOffsets(topic string) ([]Part
 		if err := rows.Scan(&offset.Partition, &offset.Offset); err != nil {
 			return nil, err
 		}
+		results = append(results, offset)
 	}
 	return results, nil
 }
