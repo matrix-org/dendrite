@@ -2,16 +2,17 @@ package storage
 
 import (
 	"database/sql"
-
-	"github.com/matrix-org/dendrite/common"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // SyncServerDatabase represents a sync server database
 type SyncServerDatabase struct {
 	db         *sql.DB
 	partitions common.PartitionOffsetStatements
+	events     outputRoomEventsStatements
 }
 
 // NewSyncServerDatabase creates a new sync server database
@@ -25,7 +26,17 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 	if err = partitions.Prepare(db); err != nil {
 		return nil, err
 	}
-	return &SyncServerDatabase{db, partitions}, nil
+	events := outputRoomEventsStatements{}
+	if err = events.prepare(db); err != nil {
+		return nil, err
+	}
+	return &SyncServerDatabase{db, partitions, events}, nil
+}
+
+// WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
+// when generating the stream position for this event. Returns an error if there was a problem inserting this event.
+func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string) error {
+	return d.events.InsertEvent(ev.RoomID(), ev.JSON(), addStateEventIDs, removeStateEventIDs)
 }
 
 // PartitionOffsets implements common.PartitionStorer
