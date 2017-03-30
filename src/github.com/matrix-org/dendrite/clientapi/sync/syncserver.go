@@ -65,7 +65,12 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 
 	if err := s.db.WriteEvent(&ev, output.AddsStateEventIDs, output.RemovesStateEventIDs); err != nil {
 		// panic rather than continue with an inconsistent database
-		log.WithError(err).WithField("OutputRoomEvent", output).Panicf("roomserver output log: write event failure")
+		log.WithFields(log.Fields{
+			"event":      string(ev.JSON()),
+			log.ErrorKey: err,
+			"add":        output.AddsStateEventIDs,
+			"del":        output.RemovesStateEventIDs,
+		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
 
