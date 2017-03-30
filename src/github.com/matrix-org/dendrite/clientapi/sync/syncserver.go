@@ -64,7 +64,8 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 	}).Info("received event from roomserver")
 
 	if err := s.db.WriteEvent(&ev, output.AddsStateEventIDs, output.RemovesStateEventIDs); err != nil {
-		log.WithError(err).Errorf("roomserver output log: write event failure")
+		// panic rather than continue with an inconsistent database
+		log.WithError(err).WithField("OutputRoomEvent", output).Panicf("roomserver output log: write event failure")
 		return nil
 	}
 
