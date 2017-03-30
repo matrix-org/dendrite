@@ -17,8 +17,7 @@ CREATE TABLE IF NOT EXISTS output_room_events (
     room_id TEXT NOT NULL,
     -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
     event_json TEXT NOT NULL,
-    -- A list of event IDs which represent a delta of added/removed room state. May be NULL
-    -- if no state has been added/removed.
+    -- A list of event IDs which represent a delta of added/removed room state.
     add_state_ids TEXT[] NOT NULL,
     remove_state_ids TEXT[] NOT NULL
 );
