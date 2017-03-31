@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const outputRoomEventsSchema = `
