@@ -13,6 +13,7 @@ type SyncServerDatabase struct {
 	db         *sql.DB
 	partitions common.PartitionOffsetStatements
 	events     outputRoomEventsStatements
+	roomstate  currentRoomStateStatements
 }
 
 // NewSyncServerDatabase creates a new sync server database
@@ -30,13 +31,44 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 	if err = events.prepare(db); err != nil {
 		return nil, err
 	}
-	return &SyncServerDatabase{db, partitions, events}, nil
+	state := currentRoomStateStatements{}
+	if err := state.prepare(db); err != nil {
+		return nil, err
+	}
+	return &SyncServerDatabase{db, partitions, events, state}, nil
 }
 
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 // when generating the stream position for this event. Returns an error if there was a problem inserting this event.
 func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string) error {
-	return d.events.InsertEvent(ev.RoomID(), ev.JSON(), addStateEventIDs, removeStateEventIDs)
+	return runTransaction(d.db, func(txn *sql.Tx) error {
+		if err := d.events.InsertEvent(txn, ev, addStateEventIDs, removeStateEventIDs); err != nil {
+			return err
+		}
+
+		if len(addStateEventIDs) == 0 && len(removeStateEventIDs) == 0 {
+			// Nothing to do, the event may have just been a message event.
+			return nil
+		}
+
+		// Update the current room state based on the added/removed state event IDs.
+		// In the common case there is a single added event ID which is the state event itself, assuming `ev` is a state event.
+		// However, conflict resolution may result in there being different events being added, or even some removed.
+		if len(removeStateEventIDs) == 0 && len(addStateEventIDs) == 1 && addStateEventIDs[0] == ev.EventID() {
+			// common case
+			if err := d.roomstate.UpdateRoomState(txn, []gomatrixserverlib.Event{*ev}, nil); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		// uncommon case: we need to fetch the full event for each event ID mentioned, then update room state
+		added, err := d.events.Events(txn, addStateEventIDs)
+		if err != nil {
+			return err
+		}
+		return d.roomstate.UpdateRoomState(txn, added, removeStateEventIDs)
+	})
 }
 
 // PartitionOffsets implements common.PartitionStorer
@@ -47,4 +79,23 @@ func (d *SyncServerDatabase) PartitionOffsets(topic string) ([]common.PartitionO
 // SetPartitionOffset implements common.PartitionStorer
 func (d *SyncServerDatabase) SetPartitionOffset(topic string, partition int32, offset int64) error {
 	return d.partitions.UpsertPartitionOffset(topic, partition, offset)
+}
+
+func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
+	txn, err := db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			txn.Rollback()
+			panic(r)
+		} else if err != nil {
+			txn.Rollback()
+		} else {
+			err = txn.Commit()
+		}
+	}()
+	err = fn(txn)
+	return
 }
