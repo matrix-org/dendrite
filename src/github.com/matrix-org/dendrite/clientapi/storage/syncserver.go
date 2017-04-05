@@ -45,6 +45,12 @@ func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEve
 		if err := d.events.InsertEvent(txn, ev, addStateEventIDs, removeStateEventIDs); err != nil {
 			return err
 		}
+
+		if len(addStateEventIDs) == 0 && len(removeStateEventIDs) == 0 {
+			// Nothing to do, the event may have just been a message event.
+			return nil
+		}
+
 		// Update the current room state based on the added/removed state event IDs.
 		// In the common case there is a single added event ID which is the state event itself, assuming `ev` is a state event.
 		// However, conflict resolution may result in there being different events being added, or even some removed.

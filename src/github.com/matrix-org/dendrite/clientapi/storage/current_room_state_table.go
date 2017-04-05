@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS current_room_state (
     -- Clobber based on 3-uple of room_id, type and state_key
     CONSTRAINT room_state_unique UNIQUE (room_id, type, state_key)
 );
+-- for event deletion
+CREATE UNIQUE INDEX IF NOT EXISTS event_id_idx ON current_room_state(event_id);
 `
 
 const upsertRoomStateSQL = "" +

@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS output_room_events (
     add_state_ids TEXT[],
     remove_state_ids TEXT[]
 );
+-- for event selection
+CREATE UNIQUE INDEX IF NOT EXISTS event_id_idx ON output_room_events(event_id);
 `
 
 const insertEventSQL = "" +
