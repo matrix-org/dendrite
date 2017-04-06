@@ -36,9 +36,13 @@ const insertEventSQL = "" +
 const selectEventsSQL = "" +
 	"SELECT event_json FROM output_room_events WHERE event_id = ANY($1)"
 
+const selectMaxIDSQL = "" +
+	"SELECT MAX(id) FROM output_room_events"
+
 type outputRoomEventsStatements struct {
 	insertEventStmt  *sql.Stmt
 	selectEventsStmt *sql.Stmt
+	selectMaxIDStmt  *sql.Stmt
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
@@ -52,6 +56,16 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectEventsStmt, err = db.Prepare(selectEventsSQL); err != nil {
 		return
 	}
+	if s.selectMaxIDStmt, err = db.Prepare(selectMaxIDSQL); err != nil {
+		return
+	}
+	return
+}
+
+// MaxID returns the ID of the last inserted event in this table. This should only ever be used at startup, as it will
+// race with inserting events if it is done afterwards.
+func (s *outputRoomEventsStatements) MaxID() (id int64, err error) {
+	err = s.selectMaxIDStmt.QueryRow().Scan(&id)
 	return
 }
 

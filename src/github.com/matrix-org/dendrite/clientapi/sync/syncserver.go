@@ -12,15 +12,18 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
+// syncStreamPosition represents the offset in the sync stream a client is at.
+type syncStreamPosition int64
+
 // Server contains all the logic for running a sync server
 type Server struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.SyncServerDatabase
-	rp                 RequestPool
+	rp                 *RequestPool
 }
 
 // NewServer creates a new sync server. Call Start() to begin consuming from room servers.
-func NewServer(cfg *config.Sync, rp RequestPool, store *storage.SyncServerDatabase) (*Server, error) {
+func NewServer(cfg *config.Sync, rp *RequestPool, store *storage.SyncServerDatabase) (*Server, error) {
 	kafkaConsumer, err := sarama.NewConsumer(cfg.KafkaConsumerURIs, nil)
 	if err != nil {
 		return nil, err
@@ -77,7 +80,7 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.rp.OnNewEvent(&ev, syncStreamPos)
+	s.rp.OnNewEvent(&ev, syncStreamPosition(syncStreamPos))
 
 	return nil
 }

@@ -74,7 +74,10 @@ func main() {
 		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.DataSource, err)
 	}
 
-	rp := sync.NewRequestPool(db)
+	rp, err := sync.NewRequestPool(db)
+	if err != nil {
+		log.Panicf("startup: Failed to create request pool : %s", err)
+	}
 
 	server, err := sync.NewServer(cfg, rp, db)
 	if err != nil {
