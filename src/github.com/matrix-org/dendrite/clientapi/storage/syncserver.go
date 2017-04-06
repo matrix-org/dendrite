@@ -39,10 +39,13 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 }
 
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
-// when generating the stream position for this event. Returns an error if there was a problem inserting this event.
-func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string) error {
-	return runTransaction(d.db, func(txn *sql.Tx) error {
-		if err := d.events.InsertEvent(txn, ev, addStateEventIDs, removeStateEventIDs); err != nil {
+// when generating the stream position for this event. Returns the sync stream position for the inserted event.
+// Returns an error if there was a problem inserting this event.
+func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string) (streamPos int64, returnErr error) {
+	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
+		var err error
+		streamPos, err = d.events.InsertEvent(txn, ev, addStateEventIDs, removeStateEventIDs)
+		if err != nil {
 			return err
 		}
 
@@ -56,7 +59,7 @@ func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEve
 		// However, conflict resolution may result in there being different events being added, or even some removed.
 		if len(removeStateEventIDs) == 0 && len(addStateEventIDs) == 1 && addStateEventIDs[0] == ev.EventID() {
 			// common case
-			if err := d.roomstate.UpdateRoomState(txn, []gomatrixserverlib.Event{*ev}, nil); err != nil {
+			if err = d.roomstate.UpdateRoomState(txn, []gomatrixserverlib.Event{*ev}, nil); err != nil {
 				return err
 			}
 			return nil
@@ -69,6 +72,7 @@ func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEve
 		}
 		return d.roomstate.UpdateRoomState(txn, added, removeStateEventIDs)
 	})
+	return
 }
 
 // PartitionOffsets implements common.PartitionStorer

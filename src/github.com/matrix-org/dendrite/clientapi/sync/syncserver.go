@@ -65,7 +65,9 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 		"room_id":  ev.RoomID(),
 	}).Info("received event from roomserver")
 
-	if err := s.db.WriteEvent(&ev, output.AddsStateEventIDs, output.RemovesStateEventIDs); err != nil {
+	syncStreamPos, err := s.db.WriteEvent(&ev, output.AddsStateEventIDs, output.RemovesStateEventIDs)
+
+	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
@@ -75,7 +77,7 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.rp.OnNewEvent(&ev)
+	s.rp.OnNewEvent(&ev, syncStreamPos)
 
 	return nil
 }

@@ -31,7 +31,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS event_id_idx ON output_room_events(event_id);
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO output_room_events (room_id, event_id, event_json, add_state_ids, remove_state_ids) VALUES ($1, $2, $3, $4, $5)"
+	"INSERT INTO output_room_events (room_id, event_id, event_json, add_state_ids, remove_state_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id"
 
 const selectEventsSQL = "" +
 	"SELECT event_json FROM output_room_events WHERE event_id = ANY($1)"
@@ -56,11 +56,11 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 }
 
 // InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs.
-func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) error {
-	_, err := txn.Stmt(s.insertEventStmt).Exec(
+func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) (streamPos int64, err error) {
+	err = txn.Stmt(s.insertEventStmt).QueryRow(
 		event.RoomID(), event.EventID(), event.JSON(), pq.StringArray(addState), pq.StringArray(removeState),
-	)
-	return err
+	).Scan(&streamPos)
+	return
 }
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing

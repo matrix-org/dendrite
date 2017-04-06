@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -65,8 +66,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 }
 
 // OnNewEvent is called when a new event is received from the room server
-func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event) {
-
+func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, syncStreamPos int64) {
+	fmt.Println("OnNewEvent =>", ev.EventID(), syncStreamPos)
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.Event, error) {
