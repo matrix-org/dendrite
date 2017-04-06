@@ -73,11 +73,12 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.
 	// Check if we are going to return immediately and if so, calculate the current
 	// sync for this user and return.
 	if req.since == "" || req.timeout == time.Duration(0) || req.wantFullState {
-
+		return []gomatrixserverlib.Event{}, nil
 	}
 
-	// wait for an event which affects this user or one of their rooms, then recheck for new
+	// TODO: wait for an event which affects this user or one of their rooms, then recheck for new
 	// sync data.
+	time.Sleep(req.timeout)
 
 	return nil, nil
 }
