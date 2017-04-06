@@ -2,7 +2,7 @@
 consumer_uris: ["localhost:9092"]
 
 # The name of the topic which the sync server will consume events from.
-roomserver_topic: "roomserverOutput2"
+roomserver_topic: "roomserverOutput"
 
 # The database URI to store sync server information.
 database: "postgres://dendrite:itsasecret@localhost/syncserver?sslmode=disable"
