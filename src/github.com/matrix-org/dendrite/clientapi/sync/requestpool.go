@@ -73,7 +73,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 	}
 }
 
-// OnNewEvent is called when a new event is received from the room server
+// OnNewEvent is called when a new event is received from the room server. Must only be
+// called from a single goroutine.
 func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncStreamPosition) {
 	fmt.Println("OnNewEvent =>", ev.EventID(), " pos=", pos, " old_pos=", rp.currPos)
 	rp.currPos = pos
@@ -86,6 +87,25 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.
 	if req.since == 0 || req.timeout == time.Duration(0) || req.wantFullState {
 		return []gomatrixserverlib.Event{}, nil
 	}
+
+	// Steps: (no token)
+	// - get all rooms the user is joined to.
+	// - f.e room, get room state.
+	// - f.e room, get latest N messages.
+	// - rollback state by N messages.
+
+	// Steps: (up-to-date token)
+	// - Wait for new event.
+	// - Check if event should notify user.
+	// - Notify user or continue waiting, eventually timing out.
+
+	// Steps: (partial token, less than threshold)
+	// - Get rooms the user is joined to.
+	// - Get all events between token and now for those rooms.
+	// - Work out state and message delta and return.
+
+	// Steps: (partial token, more than threshold (too expensive to do the above))
+	// - Ignore for now, meaning this code path will be horrendously slow.
 
 	// TODO: wait for an event which affects this user or one of their rooms, then recheck for new
 	// sync data.
