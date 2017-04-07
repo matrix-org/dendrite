@@ -134,32 +134,6 @@ func (rp *RequestPool) waitForEvents(req syncRequest) syncStreamPosition {
 func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.Event, error) {
 	currentPos := rp.waitForEvents(req)
 	return rp.db.EventsInRange(int64(req.since), int64(currentPos))
-
-	// https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L179
-	// Check if we are going to return immediately and if so, calculate the current
-	// sync for this user and return.
-	// if req.since == 0 || req.timeout == time.Duration(0) || req.wantFullState {
-	// 	return []gomatrixserverlib.Event{}, nil
-	// }
-
-	// Steps: (no token)
-	// - get all rooms the user is joined to.
-	// - f.e room, get room state.
-	// - f.e room, get latest N messages.
-	// - rollback state by N messages.
-
-	// Steps: (up-to-date token)
-	// - Wait for new event.
-	// - Check if event should notify user.
-	// - Notify user or continue waiting, eventually timing out.
-
-	// Steps: (partial token, less than threshold)
-	// - Get rooms the user is joined to.
-	// - Get all events between token and now for those rooms.
-	// - Work out state and message delta and return.
-
-	// Steps: (partial token, more than threshold (too expensive to do the above))
-	// - Ignore for now, meaning this code path will be horrendously slow.
 }
 
 func getTimeout(timeoutMS string) time.Duration {
