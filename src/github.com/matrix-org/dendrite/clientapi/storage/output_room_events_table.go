@@ -37,7 +37,7 @@ const selectEventsSQL = "" +
 	"SELECT event_json FROM output_room_events WHERE event_id = ANY($1)"
 
 const selectEventsInRangeSQL = "" +
-	"SELECT event_json FROM output_room_events WHERE id >= $1 AND id <= $2"
+	"SELECT event_json FROM output_room_events WHERE id > $1 AND id <= $2"
 
 const selectMaxIDSQL = "" +
 	"SELECT MAX(id) FROM output_room_events"
@@ -96,8 +96,8 @@ func (s *outputRoomEventsStatements) InRange(oldPos, newPos int64) ([]gomatrixse
 		}
 		result = append(result, ev)
 	}
-	// Expect one event per position, inclusive eg old=3, new=5, expect 3,4,5 so 3 events.
-	wantNum := (1 + newPos - oldPos)
+	// Expect one event per position, exclusive of old. eg old=3, new=5, expect 4,5 so 2 events.
+	wantNum := (newPos - oldPos)
 	if i != wantNum {
 		return nil, fmt.Errorf("failed to map all positions to events: (got %d, wanted, %d)", i, wantNum)
 	}

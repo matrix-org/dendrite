@@ -90,7 +90,7 @@ func (d *SyncServerDatabase) SyncStreamPosition() (int64, error) {
 	return d.events.MaxID()
 }
 
-// EventsInRange returns all events in the given range, inclusive.
+// EventsInRange returns all events in the given range, exclusive of oldPos, inclusive of newPos.
 func (d *SyncServerDatabase) EventsInRange(oldPos, newPos int64) ([]gomatrixserverlib.Event, error) {
 	return d.events.InRange(oldPos, newPos)
 }
