@@ -39,7 +39,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 	}
 	since := req.URL.Query().Get("since")
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
-	wantFullState := req.URL.Query().Get("full_state") != ""
+	fullState := req.URL.Query().Get("full_state")
+	wantFullState := fullState != "" && fullState != "false"
 	// TODO: Additional query params: set_presence, filter
 	syncReq := syncRequest{
 		userID:        userID,

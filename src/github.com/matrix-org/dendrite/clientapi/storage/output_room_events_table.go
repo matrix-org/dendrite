@@ -86,7 +86,7 @@ func (s *outputRoomEventsStatements) Events(txn *sql.Tx, eventIDs []string) ([]g
 		result = append(result, ev)
 	}
 	if i != len(eventIDs) {
-		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted, %d)", i, len(eventIDs))
+		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", i, len(eventIDs))
 	}
 	return result, nil
 }
