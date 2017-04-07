@@ -81,12 +81,18 @@ func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncStreamPos
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.Event, error) {
+	if req.since == rp.currPos {
+		// wait for new event
+	}
+
+	return rp.db.EventsInRange(int64(req.since), int64(rp.currPos))
+
 	// https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L179
 	// Check if we are going to return immediately and if so, calculate the current
 	// sync for this user and return.
-	if req.since == 0 || req.timeout == time.Duration(0) || req.wantFullState {
-		return []gomatrixserverlib.Event{}, nil
-	}
+	// if req.since == 0 || req.timeout == time.Duration(0) || req.wantFullState {
+	// 	return []gomatrixserverlib.Event{}, nil
+	// }
 
 	// Steps: (no token)
 	// - get all rooms the user is joined to.

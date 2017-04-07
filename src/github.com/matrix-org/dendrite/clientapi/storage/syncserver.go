@@ -90,6 +90,11 @@ func (d *SyncServerDatabase) SyncStreamPosition() (int64, error) {
 	return d.events.MaxID()
 }
 
+// EventsInRange returns all events in the given range, inclusive.
+func (d *SyncServerDatabase) EventsInRange(oldPos, newPos int64) ([]gomatrixserverlib.Event, error) {
+	return d.events.InRange(oldPos, newPos)
+}
+
 func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 	txn, err := db.Begin()
 	if err != nil {

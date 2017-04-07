@@ -36,13 +36,17 @@ const insertEventSQL = "" +
 const selectEventsSQL = "" +
 	"SELECT event_json FROM output_room_events WHERE event_id = ANY($1)"
 
+const selectEventsInRangeSQL = "" +
+	"SELECT event_json FROM output_room_events WHERE id >= $1 AND id <= $2"
+
 const selectMaxIDSQL = "" +
 	"SELECT MAX(id) FROM output_room_events"
 
 type outputRoomEventsStatements struct {
-	insertEventStmt  *sql.Stmt
-	selectEventsStmt *sql.Stmt
-	selectMaxIDStmt  *sql.Stmt
+	insertEventStmt         *sql.Stmt
+	selectEventsStmt        *sql.Stmt
+	selectMaxIDStmt         *sql.Stmt
+	selectEventsInRangeStmt *sql.Stmt
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
@@ -59,6 +63,9 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectMaxIDStmt, err = db.Prepare(selectMaxIDSQL); err != nil {
 		return
 	}
+	if s.selectEventsInRangeStmt, err = db.Prepare(selectEventsInRangeSQL); err != nil {
+		return
+	}
 	return
 }
 
@@ -67,6 +74,34 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 func (s *outputRoomEventsStatements) MaxID() (id int64, err error) {
 	err = s.selectMaxIDStmt.QueryRow().Scan(&id)
 	return
+}
+
+func (s *outputRoomEventsStatements) InRange(oldPos, newPos int64) ([]gomatrixserverlib.Event, error) {
+	rows, err := s.selectEventsInRangeStmt.Query(oldPos, newPos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []gomatrixserverlib.Event
+	var i int64
+	for ; rows.Next(); i++ {
+		var eventBytes []byte
+		if err := rows.Scan(&eventBytes); err != nil {
+			return nil, err
+		}
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, ev)
+	}
+	// Expect one event per position, inclusive eg old=3, new=5, expect 3,4,5 so 3 events.
+	wantNum := (1 + newPos - oldPos)
+	if i != wantNum {
+		return nil, fmt.Errorf("failed to map all positions to events: (got %d, wanted, %d)", i, wantNum)
+	}
+	return result, nil
 }
 
 // InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs.
