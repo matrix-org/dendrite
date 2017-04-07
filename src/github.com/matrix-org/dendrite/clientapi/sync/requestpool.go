@@ -35,6 +35,15 @@ type RequestPool struct {
 	cond *sync.Cond
 }
 
+// NewRequestPool makes a new RequestPool
+func NewRequestPool(db *storage.SyncServerDatabase) (*RequestPool, error) {
+	pos, err := db.SyncStreamPosition()
+	if err != nil {
+		return nil, err
+	}
+	return &RequestPool{db, syncStreamPosition(pos), sync.NewCond(&sync.Mutex{})}, nil
+}
+
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
@@ -160,13 +169,4 @@ func getSyncStreamPosition(since string) (syncStreamPosition, error) {
 		return syncStreamPosition(0), err
 	}
 	return syncStreamPosition(i), nil
-}
-
-// NewRequestPool makes a new RequestPool
-func NewRequestPool(db *storage.SyncServerDatabase) (*RequestPool, error) {
-	pos, err := db.SyncStreamPosition()
-	if err != nil {
-		return nil, err
-	}
-	return &RequestPool{db, syncStreamPosition(pos), sync.NewCond(&sync.Mutex{})}, nil
 }
