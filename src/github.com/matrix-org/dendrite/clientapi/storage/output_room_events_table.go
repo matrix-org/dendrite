@@ -72,7 +72,7 @@ func (s *outputRoomEventsStatements) Events(txn *sql.Tx, eventIDs []string) ([]g
 	}
 	defer rows.Close()
 
-	result := make([]gomatrixserverlib.Event, len(eventIDs))
+	var result []gomatrixserverlib.Event
 	i := 0
 	for ; rows.Next(); i++ {
 		var eventBytes []byte
@@ -86,7 +86,7 @@ func (s *outputRoomEventsStatements) Events(txn *sql.Tx, eventIDs []string) ([]g
 		result = append(result, ev)
 	}
 	if i != len(eventIDs) {
-		return nil, fmt.Errorf("failed to map all event IDs to events: (%d != %d)", i, len(eventIDs))
+		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", i, len(eventIDs))
 	}
 	return result, nil
 }

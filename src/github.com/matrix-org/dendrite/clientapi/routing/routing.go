@@ -6,7 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/clientapi/readers"
+	"github.com/matrix-org/dendrite/clientapi/sync"
 	"github.com/matrix-org/dendrite/clientapi/writers"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/util"
@@ -49,11 +49,11 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 }
 
 // SetupSyncServerListeners configures the given mux with sync-server listeners
-func SetupSyncServerListeners(servMux *http.ServeMux, httpClient *http.Client, cfg config.Sync) {
+func SetupSyncServerListeners(servMux *http.ServeMux, httpClient *http.Client, cfg config.Sync, srp sync.RequestPool) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/sync", make("sync", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
-		return readers.Sync(req)
+		return srp.OnIncomingSyncRequest(req)
 	})))
 	servMux.Handle("/metrics", prometheus.Handler())
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))

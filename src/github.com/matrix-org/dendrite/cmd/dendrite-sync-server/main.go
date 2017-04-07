@@ -74,7 +74,9 @@ func main() {
 		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.DataSource, err)
 	}
 
-	server, err := sync.NewServer(cfg, db)
+	rp := sync.NewRequestPool(db)
+
+	server, err := sync.NewServer(cfg, rp, db)
 	if err != nil {
 		log.Panicf("startup: failed to create sync server: %s", err)
 	}
@@ -83,6 +85,6 @@ func main() {
 	}
 
 	log.Info("Starting sync server on ", *bindAddr)
-	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, *cfg)
+	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, *cfg, rp)
 	log.Fatal(http.ListenAndServe(*bindAddr, nil))
 }
