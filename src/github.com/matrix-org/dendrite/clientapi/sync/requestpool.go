@@ -74,7 +74,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 		"userID":  userID,
 		"since":   since,
 		"timeout": timeout,
-		"current": rp.currPos,
 	}).Info("Incoming /sync request")
 
 	// Set up a timer based on the provided timeout value.
@@ -93,6 +92,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 			timer.Stop()
 		}
 	}()
+
+	// TODO: Spawn off a 3rd goroutine to do this work so we can simply race
+	// with the timeout to determine what to return to the client.
 
 	res, err := rp.currentSyncForUser(syncReq)
 	close(done) // signal that the work is complete
