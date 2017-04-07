@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -78,11 +77,25 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 		"current": rp.currPos,
 	}).Info("Incoming /sync request")
 
-	// set the timeout going
-	ctx, cancel := context.WithTimeout(req.Context(), timeout)
-	defer cancel()
+	// Set up a timer based on the provided timeout value.
+	// In a separate goroutine, wait for it to expire or the server to respond.
+	// TODO: Send a response if timed out.
+	done := make(chan struct{})
+	timer := time.NewTimer(timeout)
+	go func() {
+		select {
+		case <-timer.C:
+			logger.Warn("Timed out!")
+			// timed out
+		case <-done:
+			logger.Info("Serviced.")
+			// serviced request before timeout expired
+			timer.Stop()
+		}
+	}()
 
-	res, err := rp.currentSyncForUser(ctx, syncReq)
+	res, err := rp.currentSyncForUser(syncReq)
+	close(done) // signal that the work is complete
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -118,7 +131,7 @@ func (rp *RequestPool) waitForEvents(req syncRequest) syncStreamPosition {
 	return currentPos
 }
 
-func (rp *RequestPool) currentSyncForUser(ctx context.Context, req syncRequest) ([]gomatrixserverlib.Event, error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.Event, error) {
 	currentPos := rp.waitForEvents(req)
 	return rp.db.EventsInRange(int64(req.since), int64(currentPos))
 
