@@ -12,15 +12,18 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
+// syncStreamPosition represents the offset in the sync stream a client is at.
+type syncStreamPosition int64
+
 // Server contains all the logic for running a sync server
 type Server struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.SyncServerDatabase
-	rp                 RequestPool
+	rp                 *RequestPool
 }
 
 // NewServer creates a new sync server. Call Start() to begin consuming from room servers.
-func NewServer(cfg *config.Sync, rp RequestPool, store *storage.SyncServerDatabase) (*Server, error) {
+func NewServer(cfg *config.Sync, rp *RequestPool, store *storage.SyncServerDatabase) (*Server, error) {
 	kafkaConsumer, err := sarama.NewConsumer(cfg.KafkaConsumerURIs, nil)
 	if err != nil {
 		return nil, err
@@ -46,6 +49,9 @@ func (s *Server) Start() error {
 	return s.roomServerConsumer.Start()
 }
 
+// onMessage is called when the sync server receives a new event from the room server output log.
+// It is not safe for this function to be called from multiple goroutines, or else the
+// sync stream position may race and be incorrectly calculated.
 func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputRoomEvent
@@ -65,7 +71,9 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 		"room_id":  ev.RoomID(),
 	}).Info("received event from roomserver")
 
-	if err := s.db.WriteEvent(&ev, output.AddsStateEventIDs, output.RemovesStateEventIDs); err != nil {
+	syncStreamPos, err := s.db.WriteEvent(&ev, output.AddsStateEventIDs, output.RemovesStateEventIDs)
+
+	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
@@ -75,7 +83,7 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.rp.OnNewEvent(&ev)
+	s.rp.OnNewEvent(&ev, syncStreamPosition(syncStreamPos))
 
 	return nil
 }

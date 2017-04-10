@@ -31,14 +31,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS event_id_idx ON output_room_events(event_id);
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO output_room_events (room_id, event_id, event_json, add_state_ids, remove_state_ids) VALUES ($1, $2, $3, $4, $5)"
+	"INSERT INTO output_room_events (room_id, event_id, event_json, add_state_ids, remove_state_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id"
 
 const selectEventsSQL = "" +
 	"SELECT event_json FROM output_room_events WHERE event_id = ANY($1)"
 
+const selectEventsInRangeSQL = "" +
+	"SELECT event_json FROM output_room_events WHERE id > $1 AND id <= $2"
+
+const selectMaxIDSQL = "" +
+	"SELECT MAX(id) FROM output_room_events"
+
 type outputRoomEventsStatements struct {
-	insertEventStmt  *sql.Stmt
-	selectEventsStmt *sql.Stmt
+	insertEventStmt         *sql.Stmt
+	selectEventsStmt        *sql.Stmt
+	selectMaxIDStmt         *sql.Stmt
+	selectEventsInRangeStmt *sql.Stmt
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
@@ -52,15 +60,63 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectEventsStmt, err = db.Prepare(selectEventsSQL); err != nil {
 		return
 	}
+	if s.selectMaxIDStmt, err = db.Prepare(selectMaxIDSQL); err != nil {
+		return
+	}
+	if s.selectEventsInRangeStmt, err = db.Prepare(selectEventsInRangeSQL); err != nil {
+		return
+	}
 	return
 }
 
-// InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs.
-func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) error {
-	_, err := txn.Stmt(s.insertEventStmt).Exec(
+// MaxID returns the ID of the last inserted event in this table. This should only ever be used at startup, as it will
+// race with inserting events if it is done afterwards. If there are no inserted events, 0 is returned.
+func (s *outputRoomEventsStatements) MaxID() (id int64, err error) {
+	var nullableID sql.NullInt64
+	err = s.selectMaxIDStmt.QueryRow().Scan(&nullableID)
+	if nullableID.Valid {
+		id = nullableID.Int64
+	}
+	return
+}
+
+// InRange returns all the events in the range between oldPos exclusive and newPos inclusive. Returns an empty array if
+// there are no events between the provided range. Returns an error if events are missing in the range.
+func (s *outputRoomEventsStatements) InRange(oldPos, newPos int64) ([]gomatrixserverlib.Event, error) {
+	rows, err := s.selectEventsInRangeStmt.Query(oldPos, newPos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []gomatrixserverlib.Event
+	var i int64
+	for ; rows.Next(); i++ {
+		var eventBytes []byte
+		if err := rows.Scan(&eventBytes); err != nil {
+			return nil, err
+		}
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, ev)
+	}
+	// Expect one event per position, exclusive of old. eg old=3, new=5, expect 4,5 so 2 events.
+	wantNum := (newPos - oldPos)
+	if i != wantNum {
+		return nil, fmt.Errorf("failed to map all positions to events: (got %d, wanted, %d)", i, wantNum)
+	}
+	return result, nil
+}
+
+// InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs. Returns the position
+// of the inserted event.
+func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) (streamPos int64, err error) {
+	err = txn.Stmt(s.insertEventStmt).QueryRow(
 		event.RoomID(), event.EventID(), event.JSON(), pq.StringArray(addState), pq.StringArray(removeState),
-	)
-	return err
+	).Scan(&streamPos)
+	return
 }
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing

@@ -2,6 +2,7 @@ package jsonerror
 
 import (
 	"fmt"
+
 	"github.com/matrix-org/util"
 )
 

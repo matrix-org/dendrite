@@ -67,7 +67,9 @@ func (c *ContinualConsumer) Start() error {
 	}
 	for _, offset := range storedOffsets {
 		// We've already processed events from this partition so advance the offset to where we got to.
-		offsets[offset.Partition] = offset.Offset
+		// ConsumePartition will start streaming from the message with the given offset (inclusive),
+		// so increment 1 to avoid getting the same message a second time.
+		offsets[offset.Partition] = 1 + offset.Offset
 	}
 
 	var partitionConsumers []sarama.PartitionConsumer
