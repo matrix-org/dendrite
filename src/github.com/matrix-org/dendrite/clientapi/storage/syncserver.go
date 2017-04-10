@@ -85,7 +85,7 @@ func (d *SyncServerDatabase) SetPartitionOffset(topic string, partition int32, o
 	return d.partitions.UpsertPartitionOffset(topic, partition, offset)
 }
 
-// SyncStreamPosition returns the latest position in the sync stream
+// SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 func (d *SyncServerDatabase) SyncStreamPosition() (int64, error) {
 	return d.events.MaxID()
 }
