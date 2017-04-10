@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -117,7 +116,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncStreamPosition) {
 	// update the current position in a guard and then notify all /sync streams
 	rp.cond.L.Lock()
-	fmt.Println("OnNewEvent =>", ev.EventID(), " pos=", pos, " old_pos=", rp.currPos)
 	rp.currPos = pos
 	rp.cond.L.Unlock()
 
