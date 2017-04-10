@@ -56,7 +56,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.InvalidSync(err.Error()),
+			JSON: jsonerror.Unknown(err.Error()),
 		}
 	}
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
@@ -112,8 +112,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 }
 
 // OnNewEvent is called when a new event is received from the room server. Must only be
-// called from a single goroutine, or else the current position in the stream may be
-// set incorrectly as it is blindly clobbered.
+// called from a single goroutine, to avoid races between updates which could set the
+// current position in the stream incorrectly.
 func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncStreamPosition) {
 	// update the current position in a guard and then notify all /sync streams
 	rp.cond.L.Lock()

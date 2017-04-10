@@ -2,6 +2,7 @@ package jsonerror
 
 import (
 	"fmt"
+
 	"github.com/matrix-org/util"
 )
 
@@ -62,12 +63,6 @@ func MissingToken(msg string) *MatrixError {
 // requires authentication and supplies a valid, but out-of-date token.
 func UnknownToken(msg string) *MatrixError {
 	return &MatrixError{"M_UNKNOWN_TOKEN", msg}
-}
-
-// InvalidSync is an error when the client tries to hit /sync with an invalid
-// ?since= parameter.
-func InvalidSync(msg string) *MatrixError {
-	return &MatrixError{"M_BAD_SYNC", msg}
 }
 
 // LimitExceededError is a rate-limiting error.

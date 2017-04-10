@@ -67,8 +67,8 @@ func (c *ContinualConsumer) Start() error {
 	}
 	for _, offset := range storedOffsets {
 		// We've already processed events from this partition so advance the offset to where we got to.
-		// Offsets are provided with each message, so if we use the same offset on startup then we'll
-		// get the same message a 2nd time, so increment 1 to indicate the next offset.
+		// ConsumePartition will start streaming from the message with the given offset (inclusive),
+		// so increment 1 to avoid getting the same message a second time.
 		offsets[offset.Partition] = 1 + offset.Offset
 	}
 
