@@ -72,7 +72,11 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 // MaxID returns the ID of the last inserted event in this table. This should only ever be used at startup, as it will
 // race with inserting events if it is done afterwards.
 func (s *outputRoomEventsStatements) MaxID() (id int64, err error) {
-	err = s.selectMaxIDStmt.QueryRow().Scan(&id)
+	var nullableID sql.NullInt64
+	err = s.selectMaxIDStmt.QueryRow().Scan(&nullableID)
+	if nullableID.Valid {
+		id = nullableID.Int64
+	}
 	return
 }
 

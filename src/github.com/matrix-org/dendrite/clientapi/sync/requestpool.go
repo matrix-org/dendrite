@@ -76,34 +76,39 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 		"timeout": timeout,
 	}).Info("Incoming /sync request")
 
-	// Set up a timer based on the provided timeout value.
-	// In a separate goroutine, wait for it to expire or the server to respond.
-	// TODO: Send a response if timed out.
-	done := make(chan struct{})
-	timer := time.NewTimer(timeout)
+	// Fork off 2 goroutines: one to do the work, and one to serve as a timeout.
+	// Whichever returns first is the one we will serve back to the client.
+	// TODO: Currently this means that cpu work is timed, which may not be what we want long term.
+	timeoutChan := make(chan struct{})
+	timer := time.AfterFunc(timeout, func() {
+		close(timeoutChan) // signal that the timeout has expired
+	})
+
+	done := make(chan util.JSONResponse)
 	go func() {
-		select {
-		case <-timer.C:
-			logger.Warn("Timed out!")
-			// timed out
-		case <-done:
-			logger.Info("Serviced.")
-			// serviced request before timeout expired
-			timer.Stop()
+		syncData, err := rp.currentSyncForUser(syncReq)
+		timer.Stop()
+		var res util.JSONResponse
+		if err != nil {
+			res = httputil.LogThenError(req, err)
+		} else {
+			res = util.JSONResponse{
+				Code: 200,
+				JSON: syncData,
+			}
 		}
+		done <- res
+		close(done)
 	}()
 
-	// TODO: Spawn off a 3rd goroutine to do this work so we can simply race
-	// with the timeout to determine what to return to the client.
-
-	res, err := rp.currentSyncForUser(syncReq)
-	close(done) // signal that the work is complete
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-	return util.JSONResponse{
-		Code: 200,
-		JSON: res,
+	select {
+	case <-timeoutChan: // timeout fired
+		return util.JSONResponse{
+			Code: 200,
+			JSON: []struct{}{}, // return empty array for now
+		}
+	case res := <-done: // received a response
+		return res
 	}
 }
 
