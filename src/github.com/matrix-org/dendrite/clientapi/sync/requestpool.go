@@ -139,6 +139,19 @@ func (rp *RequestPool) waitForEvents(req syncRequest) syncStreamPosition {
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.Event, error) {
 	currentPos := rp.waitForEvents(req)
+
+	// TODO: ignored users
+
+	// Implement https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
+	// 1) Get the CURRENT joined room list for this user
+	// 2) Get membership list changes for this user between the provided stream position and now.
+	// 3) For each room which has membership list changes:
+	//   a) Check if the room is 'newly joined' (insufficient to just check for a join event because we allow dupe joins).
+	//      If it is, then we need to send the full room state down (and 'limited' is always true).
+	//   b) Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
+	//   c) Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block. // This has a TODO: How do we handle ban -> leave in same batch?
+	// 4) Add joined rooms (joined room list)
+
 	return rp.db.EventsInRange(int64(req.since), int64(currentPos))
 }
 
