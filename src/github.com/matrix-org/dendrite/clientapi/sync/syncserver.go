@@ -6,14 +6,12 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/storage"
+	"github.com/matrix-org/dendrite/clientapi/sync/syncapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
-
-// syncStreamPosition represents the offset in the sync stream a client is at.
-type syncStreamPosition int64
 
 // Server contains all the logic for running a sync server
 type Server struct {
@@ -83,7 +81,7 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.rp.OnNewEvent(&ev, syncStreamPosition(syncStreamPos))
+	s.rp.OnNewEvent(&ev, syncapi.StreamPosition(syncStreamPos))
 
 	return nil
 }
