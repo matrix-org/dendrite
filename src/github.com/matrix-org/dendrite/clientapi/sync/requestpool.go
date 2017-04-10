@@ -138,12 +138,12 @@ func (rp *RequestPool) waitForEvents(req syncRequest) syncapi.StreamPosition {
 	return currentPos
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.Event, error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest) (*syncapi.Response, error) {
 	currentPos := rp.waitForEvents(req)
 
-	// TODO: ignored users
+	// TODO: handle ignored users
 
-	// Implement https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
+	// TODO: Implement https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// 1) Get the CURRENT joined room list for this user
 	// 2) Get membership list changes for this user between the provided stream position and now.
 	// 3) For each room which has membership list changes:
@@ -153,7 +153,23 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.
 	//   c) Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block. // Synapse has a TODO: How do we handle ban -> leave in same batch?
 	// 4) Add joined rooms (joined room list)
 
-	return rp.db.EventsInRange(int64(req.since), int64(currentPos))
+	events, err := rp.db.EventsInRange(int64(req.since), int64(currentPos))
+	if err != nil {
+		return nil, err
+	}
+
+	res := syncapi.NewResponse()
+	// for now, dump everything as join timeline events
+	for _, ev := range events {
+		roomData := res.Rooms.Join[ev.RoomID()]
+		roomData.Timeline.Events = append(roomData.Timeline.Events, ev)
+		res.Rooms.Join[ev.RoomID()] = roomData
+	}
+
+	// Make sure we send the next_batch as a string. We don't want to confuse clients by sending this
+	// as an integer even though (at the moment) it is.
+	res.NextBatch = currentPos.String()
+	return res, nil
 }
 
 func getTimeout(timeoutMS string) time.Duration {
