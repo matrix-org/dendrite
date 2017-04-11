@@ -97,8 +97,8 @@ func (d *SyncServerDatabase) SyncStreamPosition() (syncapi.StreamPosition, error
 }
 
 // EventsInRange returns all events in the given range, exclusive of oldPos, inclusive of newPos.
-func (d *SyncServerDatabase) EventsInRange(oldPos, newPos int64) ([]gomatrixserverlib.Event, error) {
-	return d.events.InRange(oldPos, newPos)
+func (d *SyncServerDatabase) EventsInRange(oldPos, newPos syncapi.StreamPosition) ([]gomatrixserverlib.Event, error) {
+	return d.events.InRange(int64(oldPos), int64(newPos))
 }
 
 func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {

@@ -153,7 +153,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*syncapi.Response, e
 	//   c) Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block. // Synapse has a TODO: How do we handle ban -> leave in same batch?
 	// 4) Add joined rooms (joined room list)
 
-	events, err := rp.db.EventsInRange(int64(req.since), int64(currentPos))
+	events, err := rp.db.EventsInRange(req.since, currentPos)
 	if err != nil {
 		return nil, err
 	}
