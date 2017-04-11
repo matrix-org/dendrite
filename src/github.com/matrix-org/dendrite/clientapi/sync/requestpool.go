@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/storage"
+	"github.com/matrix-org/dendrite/clientapi/sync/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -20,7 +21,7 @@ const defaultSyncTimeout = time.Duration(30) * time.Second
 type syncRequest struct {
 	userID        string
 	timeout       time.Duration
-	since         syncStreamPosition
+	since         syncapi.StreamPosition
 	wantFullState bool
 }
 
@@ -28,7 +29,7 @@ type syncRequest struct {
 type RequestPool struct {
 	db *storage.SyncServerDatabase
 	// The latest sync stream position: guarded by 'cond'.
-	currPos syncStreamPosition
+	currPos syncapi.StreamPosition
 	// A condition variable to notify all waiting goroutines of a new sync stream position
 	cond *sync.Cond
 }
@@ -39,7 +40,7 @@ func NewRequestPool(db *storage.SyncServerDatabase) (*RequestPool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &RequestPool{db, syncStreamPosition(pos), sync.NewCond(&sync.Mutex{})}, nil
+	return &RequestPool{db, syncapi.StreamPosition(pos), sync.NewCond(&sync.Mutex{})}, nil
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -114,7 +115,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 // OnNewEvent is called when a new event is received from the room server. Must only be
 // called from a single goroutine, to avoid races between updates which could set the
 // current position in the stream incorrectly.
-func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncStreamPosition) {
+func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncapi.StreamPosition) {
 	// update the current position in a guard and then notify all /sync streams
 	rp.cond.L.Lock()
 	rp.currPos = pos
@@ -123,7 +124,7 @@ func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncStreamPos
 	rp.cond.Broadcast() // notify ALL waiting goroutines
 }
 
-func (rp *RequestPool) waitForEvents(req syncRequest) syncStreamPosition {
+func (rp *RequestPool) waitForEvents(req syncRequest) syncapi.StreamPosition {
 	// In a guard, check if the /sync request should block, and block it until we get a new position
 	rp.cond.L.Lock()
 	currentPos := rp.currPos
@@ -137,9 +138,38 @@ func (rp *RequestPool) waitForEvents(req syncRequest) syncStreamPosition {
 	return currentPos
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest) ([]gomatrixserverlib.Event, error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest) (*syncapi.Response, error) {
 	currentPos := rp.waitForEvents(req)
-	return rp.db.EventsInRange(int64(req.since), int64(currentPos))
+
+	// TODO: handle ignored users
+
+	// TODO: Implement https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
+	// 1) Get the CURRENT joined room list for this user
+	// 2) Get membership list changes for this user between the provided stream position and now.
+	// 3) For each room which has membership list changes:
+	//   a) Check if the room is 'newly joined' (insufficient to just check for a join event because we allow dupe joins).
+	//      If it is, then we need to send the full room state down (and 'limited' is always true).
+	//   b) Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
+	//   c) Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block. // Synapse has a TODO: How do we handle ban -> leave in same batch?
+	// 4) Add joined rooms (joined room list)
+
+	events, err := rp.db.EventsInRange(req.since, currentPos)
+	if err != nil {
+		return nil, err
+	}
+
+	res := syncapi.NewResponse()
+	// for now, dump everything as join timeline events
+	for _, ev := range events {
+		roomData := res.Rooms.Join[ev.RoomID()]
+		roomData.Timeline.Events = append(roomData.Timeline.Events, ev)
+		res.Rooms.Join[ev.RoomID()] = roomData
+	}
+
+	// Make sure we send the next_batch as a string. We don't want to confuse clients by sending this
+	// as an integer even though (at the moment) it is.
+	res.NextBatch = currentPos.String()
+	return res, nil
 }
 
 func getTimeout(timeoutMS string) time.Duration {
@@ -153,13 +183,13 @@ func getTimeout(timeoutMS string) time.Duration {
 	return time.Duration(i) * time.Millisecond
 }
 
-func getSyncStreamPosition(since string) (syncStreamPosition, error) {
+func getSyncStreamPosition(since string) (syncapi.StreamPosition, error) {
 	if since == "" {
-		return syncStreamPosition(0), nil
+		return syncapi.StreamPosition(0), nil
 	}
 	i, err := strconv.Atoi(since)
 	if err != nil {
-		return syncStreamPosition(0), err
+		return syncapi.StreamPosition(0), err
 	}
-	return syncStreamPosition(i), nil
+	return syncapi.StreamPosition(i), nil
 }

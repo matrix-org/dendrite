@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/clientapi/sync/syncapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -41,13 +42,14 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 // when generating the stream position for this event. Returns the sync stream position for the inserted event.
 // Returns an error if there was a problem inserting this event.
-func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string) (streamPos int64, returnErr error) {
+func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string) (streamPos syncapi.StreamPosition, returnErr error) {
 	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
-		streamPos, err = d.events.InsertEvent(txn, ev, addStateEventIDs, removeStateEventIDs)
+		pos, err := d.events.InsertEvent(txn, ev, addStateEventIDs, removeStateEventIDs)
 		if err != nil {
 			return err
 		}
+		streamPos = syncapi.StreamPosition(pos)
 
 		if len(addStateEventIDs) == 0 && len(removeStateEventIDs) == 0 {
 			// Nothing to do, the event may have just been a message event.
@@ -86,13 +88,17 @@ func (d *SyncServerDatabase) SetPartitionOffset(topic string, partition int32, o
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
-func (d *SyncServerDatabase) SyncStreamPosition() (int64, error) {
-	return d.events.MaxID()
+func (d *SyncServerDatabase) SyncStreamPosition() (syncapi.StreamPosition, error) {
+	id, err := d.events.MaxID()
+	if err != nil {
+		return syncapi.StreamPosition(0), err
+	}
+	return syncapi.StreamPosition(id), nil
 }
 
 // EventsInRange returns all events in the given range, exclusive of oldPos, inclusive of newPos.
-func (d *SyncServerDatabase) EventsInRange(oldPos, newPos int64) ([]gomatrixserverlib.Event, error) {
-	return d.events.InRange(oldPos, newPos)
+func (d *SyncServerDatabase) EventsInRange(oldPos, newPos syncapi.StreamPosition) ([]gomatrixserverlib.Event, error) {
+	return d.events.InRange(int64(oldPos), int64(newPos))
 }
 
 func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
