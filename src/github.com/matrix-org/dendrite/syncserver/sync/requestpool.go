@@ -139,6 +139,23 @@ func (rp *RequestPool) waitForEvents(req syncRequest) types.StreamPosition {
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, error) {
+	if req.since == types.StreamPosition(0) {
+		pos, data, err := rp.db.CompleteSync(req.userID, 3)
+		if err != nil {
+			return nil, err
+		}
+		res := types.NewResponse()
+		res.NextBatch = pos.String()
+		for roomID, d := range data {
+			jr := types.NewJoinResponse()
+			jr.Timeline.Events = d.RecentEvents
+			jr.Timeline.Limited = true
+			jr.State.Events = d.State
+			res.Rooms.Join[roomID] = *jr
+		}
+		return res, nil
+	}
+
 	currentPos := rp.waitForEvents(req)
 
 	// TODO: handle ignored users

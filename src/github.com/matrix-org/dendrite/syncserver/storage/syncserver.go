@@ -96,8 +96,9 @@ func (d *SyncServerDatabase) SyncStreamPosition() (types.StreamPosition, error) 
 	return types.StreamPosition(id), nil
 }
 
-// CompleteSync returns a map of room ID to RoomData.
+// CompleteSync returns all the data needed in order to create a complete sync response.
 func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom int) (pos types.StreamPosition, data map[string]types.RoomData, returnErr error) {
+	data = make(map[string]types.RoomData)
 	// This needs to be all done in a transaction as we need to do multiple SELECTs, and we need to have
 	// a consistent view of the database throughout. This includes extracting the sync stream position.
 	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
