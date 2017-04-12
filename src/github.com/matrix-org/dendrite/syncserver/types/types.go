@@ -14,6 +14,12 @@ func (sp StreamPosition) String() string {
 	return strconv.FormatInt(int64(sp), 10)
 }
 
+// RoomData represents the data for a room suitable for building a sync response from.
+type RoomData struct {
+	State        []gomatrixserverlib.Event
+	RecentEvents []gomatrixserverlib.Event
+}
+
 // Response represents a /sync API response. See https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-client-r0-sync
 type Response struct {
 	NextBatch   string `json:"next_batch"`

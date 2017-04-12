@@ -89,11 +89,49 @@ func (d *SyncServerDatabase) SetPartitionOffset(topic string, partition int32, o
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 func (d *SyncServerDatabase) SyncStreamPosition() (types.StreamPosition, error) {
-	id, err := d.events.MaxID()
+	id, err := d.events.MaxID(nil)
 	if err != nil {
 		return types.StreamPosition(0), err
 	}
 	return types.StreamPosition(id), nil
+}
+
+// CompleteSync returns a map of room ID to RoomData.
+func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom int) (pos types.StreamPosition, data map[string]types.RoomData, returnErr error) {
+	// This needs to be all done in a transaction as we need to do multiple SELECTs, and we need to have
+	// a consistent view of the database throughout. This includes extracting the sync stream position.
+	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
+		// Get the current stream position which we will base the sync response on.
+		id, err := d.events.MaxID(txn)
+		if err != nil {
+			return err
+		}
+		pos = types.StreamPosition(id)
+
+		// Extract room state and recent events for all rooms the user is joined to.
+		roomIDs, err := d.roomstate.SelectRoomIDsWithMembership(txn, userID, "join")
+		if err != nil {
+			return err
+		}
+		for _, roomID := range roomIDs {
+			stateEvents, err := d.roomstate.CurrentState(txn, roomID)
+			if err != nil {
+				return err
+			}
+			// TODO: When filters are added, we may need to call this multiple times to get enough events.
+			//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
+			recentEvents, err := d.events.RecentEventsInRoom(txn, roomID, numRecentEventsPerRoom)
+			if err != nil {
+				return err
+			}
+			data[roomID] = types.RoomData{
+				State:        stateEvents,
+				RecentEvents: recentEvents,
+			}
+		}
+		return nil
+	})
+	return
 }
 
 // EventsInRange returns all events in the given range, exclusive of oldPos, inclusive of newPos.

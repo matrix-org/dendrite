@@ -39,9 +39,17 @@ const upsertRoomStateSQL = "" +
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM current_room_state WHERE event_id = $1"
 
+const selectRoomIDsWithMembershipSQL = "" +
+	"SELECT room_id FROM current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
+
+const selectCurrentStateSQL = "" +
+	"SELECT event_json FROM current_room_state WHERE room_id = $1"
+
 type currentRoomStateStatements struct {
-	upsertRoomStateStmt          *sql.Stmt
-	deleteRoomStateByEventIDStmt *sql.Stmt
+	upsertRoomStateStmt             *sql.Stmt
+	deleteRoomStateByEventIDStmt    *sql.Stmt
+	selectRoomIDsWithMembershipStmt *sql.Stmt
+	selectCurrentStateStmt          *sql.Stmt
 }
 
 func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
@@ -55,7 +63,55 @@ func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
 	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
 		return
 	}
+	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
+		return
+	}
+	if s.selectCurrentStateStmt, err = db.Prepare(selectCurrentStateSQL); err != nil {
+		return
+	}
 	return
+}
+
+// SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
+func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(txn *sql.Tx, userID, membership string) ([]string, error) {
+	rows, err := txn.Stmt(s.selectRoomIDsWithMembershipStmt).Query(userID, membership)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []string
+	for rows.Next() {
+		var roomID string
+		if err := rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		result = append(result, roomID)
+	}
+	return result, nil
+}
+
+// CurrentState returns all the current state events for the given room.
+func (s *currentRoomStateStatements) CurrentState(txn *sql.Tx, roomID string) ([]gomatrixserverlib.Event, error) {
+	rows, err := txn.Stmt(s.selectCurrentStateStmt).Query(roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []gomatrixserverlib.Event
+	for rows.Next() {
+		var eventBytes []byte
+		if err := rows.Scan(&eventBytes); err != nil {
+			return nil, err
+		}
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, ev)
+	}
+	return result, nil
 }
 
 func (s *currentRoomStateStatements) UpdateRoomState(txn *sql.Tx, added []gomatrixserverlib.Event, removedEventIDs []string) error {
