@@ -7,10 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/matrix-org/dendrite/clientapi/config"
-	"github.com/matrix-org/dendrite/clientapi/routing"
-	"github.com/matrix-org/dendrite/clientapi/storage"
-	"github.com/matrix-org/dendrite/clientapi/sync"
+	"github.com/matrix-org/dendrite/syncserver/config"
+	"github.com/matrix-org/dendrite/syncserver/consumers"
+	"github.com/matrix-org/dendrite/syncserver/routing"
+	"github.com/matrix-org/dendrite/syncserver/storage"
+	"github.com/matrix-org/dendrite/syncserver/sync"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dugong"
@@ -79,7 +80,7 @@ func main() {
 		log.Panicf("startup: Failed to create request pool : %s", err)
 	}
 
-	server, err := sync.NewServer(cfg, rp, db)
+	server, err := consumers.NewServer(cfg, rp, db)
 	if err != nil {
 		log.Panicf("startup: failed to create sync server: %s", err)
 	}
