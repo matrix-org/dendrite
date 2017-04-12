@@ -10,8 +10,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/storage"
-	"github.com/matrix-org/dendrite/clientapi/sync/syncapi"
+	"github.com/matrix-org/dendrite/syncserver/storage"
+	"github.com/matrix-org/dendrite/syncserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -21,7 +21,7 @@ const defaultSyncTimeout = time.Duration(30) * time.Second
 type syncRequest struct {
 	userID        string
 	timeout       time.Duration
-	since         syncapi.StreamPosition
+	since         types.StreamPosition
 	wantFullState bool
 }
 
@@ -29,7 +29,7 @@ type syncRequest struct {
 type RequestPool struct {
 	db *storage.SyncServerDatabase
 	// The latest sync stream position: guarded by 'cond'.
-	currPos syncapi.StreamPosition
+	currPos types.StreamPosition
 	// A condition variable to notify all waiting goroutines of a new sync stream position
 	cond *sync.Cond
 }
@@ -40,7 +40,7 @@ func NewRequestPool(db *storage.SyncServerDatabase) (*RequestPool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &RequestPool{db, syncapi.StreamPosition(pos), sync.NewCond(&sync.Mutex{})}, nil
+	return &RequestPool{db, types.StreamPosition(pos), sync.NewCond(&sync.Mutex{})}, nil
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -115,7 +115,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 // OnNewEvent is called when a new event is received from the room server. Must only be
 // called from a single goroutine, to avoid races between updates which could set the
 // current position in the stream incorrectly.
-func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncapi.StreamPosition) {
+func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos types.StreamPosition) {
 	// update the current position in a guard and then notify all /sync streams
 	rp.cond.L.Lock()
 	rp.currPos = pos
@@ -124,7 +124,7 @@ func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos syncapi.Strea
 	rp.cond.Broadcast() // notify ALL waiting goroutines
 }
 
-func (rp *RequestPool) waitForEvents(req syncRequest) syncapi.StreamPosition {
+func (rp *RequestPool) waitForEvents(req syncRequest) types.StreamPosition {
 	// In a guard, check if the /sync request should block, and block it until we get a new position
 	rp.cond.L.Lock()
 	currentPos := rp.currPos
@@ -138,7 +138,7 @@ func (rp *RequestPool) waitForEvents(req syncRequest) syncapi.StreamPosition {
 	return currentPos
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest) (*syncapi.Response, error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, error) {
 	currentPos := rp.waitForEvents(req)
 
 	// TODO: handle ignored users
@@ -158,7 +158,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*syncapi.Response, e
 		return nil, err
 	}
 
-	res := syncapi.NewResponse()
+	res := types.NewResponse()
 	// for now, dump everything as join timeline events
 	for _, ev := range events {
 		roomData := res.Rooms.Join[ev.RoomID()]
@@ -183,13 +183,13 @@ func getTimeout(timeoutMS string) time.Duration {
 	return time.Duration(i) * time.Millisecond
 }
 
-func getSyncStreamPosition(since string) (syncapi.StreamPosition, error) {
+func getSyncStreamPosition(since string) (types.StreamPosition, error) {
 	if since == "" {
-		return syncapi.StreamPosition(0), nil
+		return types.StreamPosition(0), nil
 	}
 	i, err := strconv.Atoi(since)
 	if err != nil {
-		return syncapi.StreamPosition(0), err
+		return types.StreamPosition(0), err
 	}
-	return syncapi.StreamPosition(i), nil
+	return types.StreamPosition(i), nil
 }

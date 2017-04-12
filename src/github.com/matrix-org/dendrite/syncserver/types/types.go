@@ -1,4 +1,4 @@
-package syncapi
+package types
 
 import (
 	"strconv"

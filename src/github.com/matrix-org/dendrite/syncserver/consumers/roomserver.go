@@ -1,14 +1,15 @@
-package sync
+package consumers
 
 import (
 	"encoding/json"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dendrite/clientapi/config"
-	"github.com/matrix-org/dendrite/clientapi/storage"
-	"github.com/matrix-org/dendrite/clientapi/sync/syncapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncserver/config"
+	"github.com/matrix-org/dendrite/syncserver/storage"
+	"github.com/matrix-org/dendrite/syncserver/sync"
+	"github.com/matrix-org/dendrite/syncserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
@@ -17,11 +18,11 @@ import (
 type Server struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.SyncServerDatabase
-	rp                 *RequestPool
+	rp                 *sync.RequestPool
 }
 
 // NewServer creates a new sync server. Call Start() to begin consuming from room servers.
-func NewServer(cfg *config.Sync, rp *RequestPool, store *storage.SyncServerDatabase) (*Server, error) {
+func NewServer(cfg *config.Sync, rp *sync.RequestPool, store *storage.SyncServerDatabase) (*Server, error) {
 	kafkaConsumer, err := sarama.NewConsumer(cfg.KafkaConsumerURIs, nil)
 	if err != nil {
 		return nil, err
@@ -81,7 +82,7 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.rp.OnNewEvent(&ev, syncapi.StreamPosition(syncStreamPos))
+	s.rp.OnNewEvent(&ev, types.StreamPosition(syncStreamPos))
 
 	return nil
 }
