@@ -158,6 +158,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 		if err := rows.Scan(&eventBytes); err != nil {
 			return nil, err
 		}
+		// TODO: Handle redacted events
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
 		if err != nil {
 			return nil, err

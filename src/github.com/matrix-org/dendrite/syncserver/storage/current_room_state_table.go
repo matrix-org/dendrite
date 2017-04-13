@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS current_room_state (
 );
 -- for event deletion
 CREATE UNIQUE INDEX IF NOT EXISTS event_id_idx ON current_room_state(event_id);
+-- for querying membership states of users
+CREATE INDEX IF NOT EXISTS membership_idx ON current_room_state(membership) WHERE membership IS NOT NULL AND membership != 'leave';
 `
 
 const upsertRoomStateSQL = "" +
@@ -105,6 +107,7 @@ func (s *currentRoomStateStatements) CurrentState(txn *sql.Tx, roomID string) ([
 		if err := rows.Scan(&eventBytes); err != nil {
 			return nil, err
 		}
+		// TODO: Handle redacted events
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
 		if err != nil {
 			return nil, err
