@@ -8,6 +8,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncserver/storage"
@@ -148,9 +149,9 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 		res.NextBatch = pos.String()
 		for roomID, d := range data {
 			jr := types.NewJoinResponse()
-			jr.Timeline.Events = d.RecentEvents
+			jr.Timeline.Events = events.ToClientEvents(d.RecentEvents)
 			jr.Timeline.Limited = true
-			jr.State.Events = d.State
+			jr.State.Events = events.ToClientEvents(d.State)
 			res.Rooms.Join[roomID] = *jr
 		}
 		return res, nil
@@ -170,16 +171,16 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 	//   c) Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block. // Synapse has a TODO: How do we handle ban -> leave in same batch?
 	// 4) Add joined rooms (joined room list)
 
-	events, err := rp.db.EventsInRange(req.since, currentPos)
+	evs, err := rp.db.EventsInRange(req.since, currentPos)
 	if err != nil {
 		return nil, err
 	}
 
 	res := types.NewResponse()
 	// for now, dump everything as join timeline events
-	for _, ev := range events {
+	for _, ev := range evs {
 		roomData := res.Rooms.Join[ev.RoomID()]
-		roomData.Timeline.Events = append(roomData.Timeline.Events, ev)
+		roomData.Timeline.Events = append(roomData.Timeline.Events, events.ToClientEvent(ev))
 		res.Rooms.Join[ev.RoomID()] = roomData
 	}
 
