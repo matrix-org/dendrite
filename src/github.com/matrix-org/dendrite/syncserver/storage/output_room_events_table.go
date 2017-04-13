@@ -39,6 +39,9 @@ const selectEventsSQL = "" +
 const selectEventsInRangeSQL = "" +
 	"SELECT event_json FROM output_room_events WHERE id > $1 AND id <= $2"
 
+const selectRecentEventsSQL = "" +
+	"SELECT event_json FROM output_room_events WHERE room_id = $1 ORDER BY id DESC LIMIT $2"
+
 const selectMaxIDSQL = "" +
 	"SELECT MAX(id) FROM output_room_events"
 
@@ -47,6 +50,7 @@ type outputRoomEventsStatements struct {
 	selectEventsStmt        *sql.Stmt
 	selectMaxIDStmt         *sql.Stmt
 	selectEventsInRangeStmt *sql.Stmt
+	selectRecentEventsStmt  *sql.Stmt
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
@@ -66,14 +70,22 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectEventsInRangeStmt, err = db.Prepare(selectEventsInRangeSQL); err != nil {
 		return
 	}
+	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
+		return
+	}
 	return
 }
 
-// MaxID returns the ID of the last inserted event in this table. This should only ever be used at startup, as it will
-// race with inserting events if it is done afterwards. If there are no inserted events, 0 is returned.
-func (s *outputRoomEventsStatements) MaxID() (id int64, err error) {
+// MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
+// then this function should only ever be used at startup, as it will race with inserting events if it is
+// done afterwards. If there are no inserted events, 0 is returned.
+func (s *outputRoomEventsStatements) MaxID(txn *sql.Tx) (id int64, err error) {
+	stmt := s.selectMaxIDStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
 	var nullableID sql.NullInt64
-	err = s.selectMaxIDStmt.QueryRow().Scan(&nullableID)
+	err = stmt.QueryRow().Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}
@@ -89,23 +101,14 @@ func (s *outputRoomEventsStatements) InRange(oldPos, newPos int64) ([]gomatrixse
 	}
 	defer rows.Close()
 
-	var result []gomatrixserverlib.Event
-	var i int64
-	for ; rows.Next(); i++ {
-		var eventBytes []byte
-		if err := rows.Scan(&eventBytes); err != nil {
-			return nil, err
-		}
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, ev)
+	result, err := rowsToEvents(rows)
+	if err != nil {
+		return nil, err
 	}
 	// Expect one event per position, exclusive of old. eg old=3, new=5, expect 4,5 so 2 events.
-	wantNum := (newPos - oldPos)
-	if i != wantNum {
-		return nil, fmt.Errorf("failed to map all positions to events: (got %d, wanted, %d)", i, wantNum)
+	wantNum := int(newPos - oldPos)
+	if len(result) != wantNum {
+		return nil, fmt.Errorf("failed to map all positions to events: (got %d, wanted, %d)", len(result), wantNum)
 	}
 	return result, nil
 }
@@ -119,6 +122,16 @@ func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixser
 	return
 }
 
+// RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
+func (s *outputRoomEventsStatements) RecentEventsInRoom(txn *sql.Tx, roomID string, limit int) ([]gomatrixserverlib.Event, error) {
+	rows, err := s.selectRecentEventsStmt.Query(roomID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return rowsToEvents(rows)
+}
+
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
 // from the database.
 func (s *outputRoomEventsStatements) Events(txn *sql.Tx, eventIDs []string) ([]gomatrixserverlib.Event, error) {
@@ -127,22 +140,30 @@ func (s *outputRoomEventsStatements) Events(txn *sql.Tx, eventIDs []string) ([]g
 		return nil, err
 	}
 	defer rows.Close()
+	result, err := rowsToEvents(rows)
+	if err != nil {
+		return nil, err
+	}
 
+	if len(result) != len(eventIDs) {
+		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(result), len(eventIDs))
+	}
+	return result, nil
+}
+
+func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 	var result []gomatrixserverlib.Event
-	i := 0
-	for ; rows.Next(); i++ {
+	for rows.Next() {
 		var eventBytes []byte
 		if err := rows.Scan(&eventBytes); err != nil {
 			return nil, err
 		}
+		// TODO: Handle redacted events
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, ev)
-	}
-	if i != len(eventIDs) {
-		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", i, len(eventIDs))
 	}
 	return result, nil
 }
