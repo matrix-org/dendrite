@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS current_room_state (
 -- for event deletion
 CREATE UNIQUE INDEX IF NOT EXISTS event_id_idx ON current_room_state(event_id);
 -- for querying membership states of users
-CREATE INDEX IF NOT EXISTS membership_idx ON current_room_state(membership) WHERE membership IS NOT NULL AND membership != 'leave';
+CREATE INDEX IF NOT EXISTS membership_idx ON current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
 `
 
 const upsertRoomStateSQL = "" +
