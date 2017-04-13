@@ -8,7 +8,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncserver/storage"
@@ -149,9 +148,9 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 		res.NextBatch = pos.String()
 		for roomID, d := range data {
 			jr := types.NewJoinResponse()
-			jr.Timeline.Events = events.ToClientEvents(d.RecentEvents)
+			jr.Timeline.Events = gomatrixserverlib.ToClientEvents(d.RecentEvents, gomatrixserverlib.FormatSync)
 			jr.Timeline.Limited = true
-			jr.State.Events = events.ToClientEvents(d.State)
+			jr.State.Events = gomatrixserverlib.ToClientEvents(d.State, gomatrixserverlib.FormatSync)
 			res.Rooms.Join[roomID] = *jr
 		}
 		return res, nil
@@ -180,7 +179,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 	// for now, dump everything as join timeline events
 	for _, ev := range evs {
 		roomData := res.Rooms.Join[ev.RoomID()]
-		roomData.Timeline.Events = append(roomData.Timeline.Events, events.ToClientEvent(ev))
+		roomData.Timeline.Events = append(roomData.Timeline.Events, gomatrixserverlib.ToClientEvent(ev, gomatrixserverlib.FormatSync))
 		res.Rooms.Join[ev.RoomID()] = roomData
 	}
 
