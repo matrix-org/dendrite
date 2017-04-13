@@ -88,16 +88,18 @@ type Event struct {
 }
 
 type eventFields struct {
-	RoomID     string           `json:"room_id"`
-	EventID    string           `json:"event_id"`
-	Sender     string           `json:"sender"`
-	Type       string           `json:"type"`
-	StateKey   *string          `json:"state_key"`
-	Content    rawJSON          `json:"content"`
-	PrevEvents []EventReference `json:"prev_events"`
-	AuthEvents []EventReference `json:"auth_events"`
-	Redacts    string           `json:"redacts"`
-	Depth      int64            `json:"depth"`
+	RoomID         string           `json:"room_id"`
+	EventID        string           `json:"event_id"`
+	Sender         string           `json:"sender"`
+	Type           string           `json:"type"`
+	StateKey       *string          `json:"state_key"`
+	Content        rawJSON          `json:"content"`
+	PrevEvents     []EventReference `json:"prev_events"`
+	AuthEvents     []EventReference `json:"auth_events"`
+	Redacts        string           `json:"redacts"`
+	Depth          int64            `json:"depth"`
+	Unsigned       rawJSON          `json:"unsigned"`
+	OriginServerTS int64            `json:"origin_server_ts"`
 }
 
 var emptyEventReferenceList = []EventReference{}
@@ -306,6 +308,16 @@ func (e Event) Sender() string {
 // Type returns the type of the event.
 func (e Event) Type() string {
 	return e.fields.Type
+}
+
+// OriginServerTS returns the unix timestamp when this event was created on the origin server, with millisecond resolution.
+func (e Event) OriginServerTS() int64 {
+	return e.fields.OriginServerTS
+}
+
+// Unsigned returns the object under the 'unsigned' key of the event.
+func (e Event) Unsigned() []byte {
+	return []byte(e.fields.Unsigned)
 }
 
 // Content returns the content JSON of the event.
