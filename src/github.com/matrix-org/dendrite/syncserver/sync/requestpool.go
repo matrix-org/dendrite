@@ -171,10 +171,10 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 	//
 	// The /sync response returns the most recent timeline events and the state of the room at the start of the timeline, for each room.
 	//
-	// Aside: There are 2 ways that a server can advance state events e.g from D' to D'':
-	//   1) by a tuple of (event type, state key)
-	//   2) by the state conflict resolution algorithm
-	// Dendrite MUST do this by 2), and that is represented by the add_state_ids and remove_state_ids that
+	// Servers advance state events (e.g from D' to D'') based on the state conflict resolution algorithm.
+	// You might think that you could advance the current state by just updating the entry for the (event type, state_key) tuple
+	// for each state event, but this state can diverge from the state calculated using the state conflict resolution algorithm.
+	// The correct advancement for state events is represented by the add_state_ids and remove_state_ids that
 	// are in OutputRoomEvents from the room server.
 
 	// This version of dendrite uses very simple indexing to calculate room state at various points.
