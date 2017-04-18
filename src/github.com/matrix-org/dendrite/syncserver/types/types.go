@@ -36,8 +36,9 @@ type Response struct {
 }
 
 // NewResponse creates an empty response with initialised maps.
-func NewResponse() *Response {
+func NewResponse(pos StreamPosition) *Response {
 	res := Response{}
+	res.NextBatch = pos.String()
 	// Pre-initalise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
 	res.Rooms.Join = make(map[string]JoinResponse)
