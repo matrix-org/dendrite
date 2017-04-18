@@ -2,7 +2,6 @@ package sync
 
 import (
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -15,15 +14,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
-
-const defaultSyncTimeout = time.Duration(30) * time.Second
-
-type syncRequest struct {
-	userID        string
-	timeout       time.Duration
-	since         types.StreamPosition
-	wantFullState bool
-}
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
@@ -53,40 +43,30 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 	if resErr != nil {
 		return *resErr
 	}
-	since, err := getSyncStreamPosition(req.URL.Query().Get("since"))
+	syncReq, err := newSyncRequest(req, userID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(err.Error()),
 		}
 	}
-	timeout := getTimeout(req.URL.Query().Get("timeout"))
-	fullState := req.URL.Query().Get("full_state")
-	wantFullState := fullState != "" && fullState != "false"
-	// TODO: Additional query params: set_presence, filter
-	syncReq := syncRequest{
-		userID:        userID,
-		timeout:       timeout,
-		since:         since,
-		wantFullState: wantFullState,
-	}
 	logger.WithFields(log.Fields{
 		"userID":  userID,
-		"since":   since,
-		"timeout": timeout,
+		"since":   syncReq.since,
+		"timeout": syncReq.timeout,
 	}).Info("Incoming /sync request")
 
 	// Fork off 2 goroutines: one to do the work, and one to serve as a timeout.
 	// Whichever returns first is the one we will serve back to the client.
 	// TODO: Currently this means that cpu work is timed, which may not be what we want long term.
 	timeoutChan := make(chan struct{})
-	timer := time.AfterFunc(timeout, func() {
+	timer := time.AfterFunc(syncReq.timeout, func() {
 		close(timeoutChan) // signal that the timeout has expired
 	})
 
 	done := make(chan util.JSONResponse)
 	go func() {
-		syncData, err := rp.currentSyncForUser(syncReq)
+		syncData, err := rp.currentSyncForUser(*syncReq)
 		timer.Stop()
 		var res util.JSONResponse
 		if err != nil {
@@ -105,7 +85,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 	case <-timeoutChan: // timeout fired
 		return util.JSONResponse{
 			Code: 200,
-			JSON: []struct{}{}, // return empty array for now
+			JSON: types.NewResponse(syncReq.since),
 		}
 	case res := <-done: // received a response
 		return res
@@ -140,12 +120,11 @@ func (rp *RequestPool) waitForEvents(req syncRequest) types.StreamPosition {
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, error) {
 	if req.since == types.StreamPosition(0) {
-		pos, data, err := rp.db.CompleteSync(req.userID, 3)
+		pos, data, err := rp.db.CompleteSync(req.userID, req.limit)
 		if err != nil {
 			return nil, err
 		}
-		res := types.NewResponse()
-		res.NextBatch = pos.String()
+		res := types.NewResponse(pos)
 		for roomID, d := range data {
 			jr := types.NewJoinResponse()
 			jr.Timeline.Events = gomatrixserverlib.ToClientEvents(d.RecentEvents, gomatrixserverlib.FormatSync)
@@ -175,7 +154,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 		return nil, err
 	}
 
-	res := types.NewResponse()
+	res := types.NewResponse(currentPos)
 	// for now, dump everything as join timeline events
 	for _, ev := range evs {
 		roomData := res.Rooms.Join[ev.RoomID()]
@@ -187,26 +166,4 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 	// as an integer even though (at the moment) it is.
 	res.NextBatch = currentPos.String()
 	return res, nil
-}
-
-func getTimeout(timeoutMS string) time.Duration {
-	if timeoutMS == "" {
-		return defaultSyncTimeout
-	}
-	i, err := strconv.Atoi(timeoutMS)
-	if err != nil {
-		return defaultSyncTimeout
-	}
-	return time.Duration(i) * time.Millisecond
-}
-
-func getSyncStreamPosition(since string) (types.StreamPosition, error) {
-	if since == "" {
-		return types.StreamPosition(0), nil
-	}
-	i, err := strconv.Atoi(since)
-	if err != nil {
-		return types.StreamPosition(0), err
-	}
-	return types.StreamPosition(i), nil
 }
