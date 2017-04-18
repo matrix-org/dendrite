@@ -174,6 +174,10 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 	// Servers advance state events (e.g from D' to D'') based on the state conflict resolution algorithm.
 	// You might think that you could advance the current state by just updating the entry for the (event type, state_key) tuple
 	// for each state event, but this state can diverge from the state calculated using the state conflict resolution algorithm.
+	// For example, if there are two "simultaneous" updates to the same state key, that is two updates at the same depth in the
+	// event graph, then the final result of the state conflict resolution algorithm might not match the order the events appear
+	// in the timeline.
+	//
 	// The correct advancement for state events is represented by the add_state_ids and remove_state_ids that
 	// are in OutputRoomEvents from the room server.
 
