@@ -1,8 +1,9 @@
 package types
 
 import (
-	"github.com/matrix-org/gomatrixserverlib"
 	"strconv"
+
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // StreamPosition represents the offset in the sync stream a client is at.
@@ -38,6 +39,8 @@ type Response struct {
 // NewResponse creates an empty response with initialised maps.
 func NewResponse(pos StreamPosition) *Response {
 	res := Response{}
+	// Make sure we send the next_batch as a string. We don't want to confuse clients by sending this
+	// as an integer even though (at the moment) it is.
 	res.NextBatch = pos.String()
 	// Pre-initalise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.

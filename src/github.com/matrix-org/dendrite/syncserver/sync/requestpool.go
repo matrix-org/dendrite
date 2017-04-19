@@ -139,31 +139,18 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 
 	// TODO: handle ignored users
 
-	// TODO: Implement https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
-	// 1) Get the CURRENT joined room list for this user
-	// 2) Get membership list changes for this user between the provided stream position and now.
-	// 3) For each room which has membership list changes:
-	//   a) Check if the room is 'newly joined' (insufficient to just check for a join event because we allow dupe joins).
-	//      If it is, then we need to send the full room state down (and 'limited' is always true).
-	//   b) Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
-	//   c) Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block. // Synapse has a TODO: How do we handle ban -> leave in same batch?
-	// 4) Add joined rooms (joined room list)
-
-	evs, err := rp.db.EventsInRange(req.since, currentPos)
+	data, err := rp.db.IncrementalSync(req.userID, req.since, currentPos, req.limit)
 	if err != nil {
 		return nil, err
 	}
 
 	res := types.NewResponse(currentPos)
-	// for now, dump everything as join timeline events
-	for _, ev := range evs {
-		roomData := res.Rooms.Join[ev.RoomID()]
-		roomData.Timeline.Events = append(roomData.Timeline.Events, gomatrixserverlib.ToClientEvent(ev, gomatrixserverlib.FormatSync))
-		res.Rooms.Join[ev.RoomID()] = roomData
+	for roomID, d := range data {
+		jr := types.NewJoinResponse()
+		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(d.RecentEvents, gomatrixserverlib.FormatSync)
+		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+		jr.State.Events = gomatrixserverlib.ToClientEvents(d.State, gomatrixserverlib.FormatSync)
+		res.Rooms.Join[roomID] = *jr
 	}
-
-	// Make sure we send the next_batch as a string. We don't want to confuse clients by sending this
-	// as an integer even though (at the moment) it is.
-	res.NextBatch = currentPos.String()
 	return res, nil
 }
