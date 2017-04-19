@@ -12,10 +12,10 @@ The logic for working out which rooms is based on [Synapse](https://github.com/m
   1) Get the CURRENT joined room list for this user.
   2) Get membership list changes for this user between the provided stream position and now.
   3) For each room which has membership list changes:
-     a) Check if the room is 'newly joined' (insufficient to just check for a join event because we allow dupe joins).
+     - Check if the room is 'newly joined' (insufficient to just check for a join event because we allow dupe joins).
         If it is, then we need to send the full room state down (and 'limited' is always true).
-     b) Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
-     c) Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block.
+     - Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
+     - Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block.
   4) Add joined rooms (joined room list)
 
 For each room, the /sync response returns the most recent timeline events and the state of the room at the start of the timeline.
@@ -30,7 +30,7 @@ timeline    [A, B, C, D, 1, 2, 3, D', 4, D'', 5, B', D''', D'''', 6]
 
 The current state of this room is: `[A, B', C, D'''']`.
 
-If this room was requested with ?since=9&limit=5 then 5 timeline events would be returned, the most recent ones:
+If this room was requested with `?since=9&limit=5` then 5 timeline events would be returned, the most recent ones:
 ```
     11 12  13    14     15
    [5, B', D''', D'''', 6]
