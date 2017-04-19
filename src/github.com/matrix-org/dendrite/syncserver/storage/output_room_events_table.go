@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/syncserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -40,10 +42,13 @@ const selectEventsInRangeSQL = "" +
 	"SELECT event_json FROM output_room_events WHERE id > $1 AND id <= $2"
 
 const selectRecentEventsSQL = "" +
-	"SELECT event_json FROM output_room_events WHERE room_id = $1 ORDER BY id DESC LIMIT $2"
+	"SELECT event_json FROM output_room_events WHERE room_id = $1 AND id > $2 AND id <= $3 ORDER BY id DESC LIMIT $4"
 
 const selectMaxIDSQL = "" +
 	"SELECT MAX(id) FROM output_room_events"
+
+const selectStateInRangeSQL = "" +
+	"SELECT event_json, add_state_ids, remove_state_ids FROM output_room_events WHERE id > $1 AND id < $2 AND add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL"
 
 type outputRoomEventsStatements struct {
 	insertEventStmt         *sql.Stmt
@@ -51,6 +56,7 @@ type outputRoomEventsStatements struct {
 	selectMaxIDStmt         *sql.Stmt
 	selectEventsInRangeStmt *sql.Stmt
 	selectRecentEventsStmt  *sql.Stmt
+	selectStateInRangeStmt  *sql.Stmt
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
@@ -73,7 +79,100 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
 		return
 	}
+	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
+		return
+	}
 	return
+}
+
+// StateBetween returns the state events between the two given stream positions, exclusive of both.
+// Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
+// two positions, only the most recent state is returned.
+func (s *outputRoomEventsStatements) StateBetween(txn *sql.Tx, oldPos, newPos types.StreamPosition) (map[string][]gomatrixserverlib.Event, error) {
+	rows, err := txn.Stmt(s.selectStateInRangeStmt).Query(oldPos, newPos)
+	if err != nil {
+		return nil, err
+	}
+	// Fetch all the state change events for all rooms between the two positions then loop each event and:
+	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
+	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
+	// For each room, map cumulative event IDs to events and return. This may need to a batch SELECT based on event ID
+	// if they aren't in the event ID cache. We don't handle state deletion yet.
+	eventIDToEvent := make(map[string]gomatrixserverlib.Event)
+
+	// RoomID => A set (map[string]bool) of state event IDs which are between the two positions
+	stateNeeded := make(map[string]map[string]bool)
+
+	for rows.Next() {
+		var (
+			eventBytes []byte
+			addIDs     pq.StringArray
+			delIDs     pq.StringArray
+		)
+		if err := rows.Scan(&eventBytes, &addIDs, &delIDs); err != nil {
+			return nil, err
+		}
+		// Sanity check for deleted state and whine if we see it. We don't need to do anything
+		// since it'll just mark the event as not being needed.
+		if len(addIDs) < len(delIDs) {
+			log.WithFields(log.Fields{
+				"since":   oldPos,
+				"current": newPos,
+				"adds":    addIDs,
+				"dels":    delIDs,
+			}).Warn("StateBetween: ignoring deleted state")
+		}
+
+		// TODO: Handle redacted events
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
+		if err != nil {
+			return nil, err
+		}
+		needSet := stateNeeded[ev.RoomID()]
+		if needSet == nil { // make set if required
+			needSet = make(map[string]bool)
+		}
+		for _, id := range delIDs {
+			needSet[id] = false
+		}
+		for _, id := range addIDs {
+			needSet[id] = true
+		}
+		stateNeeded[ev.RoomID()] = needSet
+
+		eventIDToEvent[ev.EventID()] = ev
+	}
+
+	stateBetween, missingEvents := mapEventIDsToEvents(eventIDToEvent, stateNeeded)
+
+	if len(missingEvents) > 0 {
+		return nil, fmt.Errorf("error StateBetween: TODO missing events")
+	}
+	return stateBetween, nil
+}
+
+// convert the set of event IDs into a set of events. Mark any which are missing.
+func mapEventIDsToEvents(eventIDToEvent map[string]gomatrixserverlib.Event, stateNeeded map[string]map[string]bool) (map[string][]gomatrixserverlib.Event, map[string][]string) {
+	stateBetween := make(map[string][]gomatrixserverlib.Event)
+	missingEvents := make(map[string][]string)
+	for roomID, ids := range stateNeeded {
+		events := stateBetween[roomID]
+		for id, need := range ids {
+			if !need {
+				continue // deleted state
+			}
+			e, ok := eventIDToEvent[id]
+			if ok {
+				events = append(events, e)
+			} else {
+				m := missingEvents[roomID]
+				m = append(m, id)
+				missingEvents[roomID] = m
+			}
+		}
+		stateBetween[roomID] = events
+	}
+	return stateBetween, missingEvents
 }
 
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
@@ -92,27 +191,6 @@ func (s *outputRoomEventsStatements) MaxID(txn *sql.Tx) (id int64, err error) {
 	return
 }
 
-// InRange returns all the events in the range between oldPos exclusive and newPos inclusive. Returns an empty array if
-// there are no events between the provided range. Returns an error if events are missing in the range.
-func (s *outputRoomEventsStatements) InRange(oldPos, newPos int64) ([]gomatrixserverlib.Event, error) {
-	rows, err := s.selectEventsInRangeStmt.Query(oldPos, newPos)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	result, err := rowsToEvents(rows)
-	if err != nil {
-		return nil, err
-	}
-	// Expect one event per position, exclusive of old. eg old=3, new=5, expect 4,5 so 2 events.
-	wantNum := int(newPos - oldPos)
-	if len(result) != wantNum {
-		return nil, fmt.Errorf("failed to map all positions to events: (got %d, wanted, %d)", len(result), wantNum)
-	}
-	return result, nil
-}
-
 // InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs. Returns the position
 // of the inserted event.
 func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) (streamPos int64, err error) {
@@ -123,8 +201,8 @@ func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixser
 }
 
 // RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
-func (s *outputRoomEventsStatements) RecentEventsInRoom(txn *sql.Tx, roomID string, limit int) ([]gomatrixserverlib.Event, error) {
-	rows, err := s.selectRecentEventsStmt.Query(roomID, limit)
+func (s *outputRoomEventsStatements) RecentEventsInRoom(txn *sql.Tx, roomID string, fromPos, toPos types.StreamPosition, limit int) ([]gomatrixserverlib.Event, error) {
+	rows, err := s.selectRecentEventsStmt.Query(roomID, fromPos, toPos, limit)
 	if err != nil {
 		return nil, err
 	}

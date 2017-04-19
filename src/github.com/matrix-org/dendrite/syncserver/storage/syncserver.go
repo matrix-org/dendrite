@@ -96,6 +96,36 @@ func (d *SyncServerDatabase) SyncStreamPosition() (types.StreamPosition, error) 
 	return types.StreamPosition(id), nil
 }
 
+// IncrementalSync returns all the data needed in order to create an incremental sync response.
+func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types.StreamPosition, numRecentEventsPerRoom int) (data map[string]types.RoomData, returnErr error) {
+	data = make(map[string]types.RoomData)
+	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
+		roomIDs, err := d.roomstate.SelectRoomIDsWithMembership(txn, userID, "join")
+		if err != nil {
+			return err
+		}
+
+		state, err := d.events.StateBetween(txn, fromPos, toPos)
+		if err != nil {
+			return err
+		}
+
+		for _, roomID := range roomIDs {
+			recentEvents, err := d.events.RecentEventsInRoom(txn, roomID, fromPos, toPos, numRecentEventsPerRoom)
+			if err != nil {
+				return err
+			}
+			roomData := types.RoomData{
+				State:        state[roomID],
+				RecentEvents: recentEvents,
+			}
+			data[roomID] = roomData
+		}
+		return nil
+	})
+	return
+}
+
 // CompleteSync returns all the data needed in order to create a complete sync response.
 func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom int) (pos types.StreamPosition, data map[string]types.RoomData, returnErr error) {
 	data = make(map[string]types.RoomData)
@@ -121,7 +151,7 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 			}
 			// TODO: When filters are added, we may need to call this multiple times to get enough events.
 			//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-			recentEvents, err := d.events.RecentEventsInRoom(txn, roomID, numRecentEventsPerRoom)
+			recentEvents, err := d.events.RecentEventsInRoom(txn, roomID, types.StreamPosition(0), pos, numRecentEventsPerRoom)
 			if err != nil {
 				return err
 			}
@@ -133,11 +163,6 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 		return nil
 	})
 	return
-}
-
-// EventsInRange returns all events in the given range, exclusive of oldPos, inclusive of newPos.
-func (d *SyncServerDatabase) EventsInRange(oldPos, newPos types.StreamPosition) ([]gomatrixserverlib.Event, error) {
-	return d.events.InRange(int64(oldPos), int64(newPos))
 }
 
 func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {

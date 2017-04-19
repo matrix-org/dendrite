@@ -139,21 +139,18 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 
 	// TODO: handle ignored users
 
-	evs, err := rp.db.EventsInRange(req.since, currentPos)
+	data, err := rp.db.IncrementalSync(req.userID, req.since, currentPos, req.limit)
 	if err != nil {
 		return nil, err
 	}
 
 	res := types.NewResponse(currentPos)
-	// for now, dump everything as join timeline events
-	for _, ev := range evs {
-		roomData := res.Rooms.Join[ev.RoomID()]
-		roomData.Timeline.Events = append(roomData.Timeline.Events, gomatrixserverlib.ToClientEvent(ev, gomatrixserverlib.FormatSync))
-		res.Rooms.Join[ev.RoomID()] = roomData
+	for roomID, d := range data {
+		jr := types.NewJoinResponse()
+		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(d.RecentEvents, gomatrixserverlib.FormatSync)
+		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+		jr.State.Events = gomatrixserverlib.ToClientEvents(d.State, gomatrixserverlib.FormatSync)
+		res.Rooms.Join[roomID] = *jr
 	}
-
-	// Make sure we send the next_batch as a string. We don't want to confuse clients by sending this
-	// as an integer even though (at the moment) it is.
-	res.NextBatch = currentPos.String()
 	return res, nil
 }
