@@ -224,9 +224,13 @@ func (s *outputRoomEventsStatements) RecentEventsInRoom(txn *sql.Tx, roomID stri
 		return nil, err
 	}
 	defer rows.Close()
+	events, err := rowsToEvents(rows)
+	if err != nil {
+		return nil, err
+	}
 	// reverse the order because [0] is the newest event due to the ORDER BY in SQL-land. The reverse order makes [0] the oldest event,
 	// which is correct for /sync responses.
-	return rowsToEvents(rows, rowOrderReverse)
+	return reverseEvents(events), nil
 }
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
@@ -237,7 +241,7 @@ func (s *outputRoomEventsStatements) Events(txn *sql.Tx, eventIDs []string) ([]g
 		return nil, err
 	}
 	defer rows.Close()
-	result, err := rowsToEvents(rows, rowOrderForward)
+	result, err := rowsToEvents(rows)
 	if err != nil {
 		return nil, err
 	}
@@ -248,14 +252,7 @@ func (s *outputRoomEventsStatements) Events(txn *sql.Tx, eventIDs []string) ([]g
 	return result, nil
 }
 
-type rowOrdering uint8
-
-const (
-	rowOrderForward = rowOrdering(iota)
-	rowOrderReverse
-)
-
-func rowsToEvents(rows *sql.Rows, order rowOrdering) ([]gomatrixserverlib.Event, error) {
+func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 	var result []gomatrixserverlib.Event
 	for rows.Next() {
 		var eventBytes []byte
@@ -267,14 +264,14 @@ func rowsToEvents(rows *sql.Rows, order rowOrdering) ([]gomatrixserverlib.Event,
 		if err != nil {
 			return nil, err
 		}
-		if order == rowOrderForward {
-			result = append(result, ev)
-		} else if order == rowOrderReverse {
-			result = append([]gomatrixserverlib.Event{ev}, result...)
-		} else {
-			return nil, fmt.Errorf("rowsToEvents: bad order %d", order)
-		}
-
+		result = append(result, ev)
 	}
 	return result, nil
+}
+
+func reverseEvents(input []gomatrixserverlib.Event) (output []gomatrixserverlib.Event) {
+	for i := len(input) - 1; i >= 0; i-- {
+		output = append(output, input[i])
+	}
+	return
 }
