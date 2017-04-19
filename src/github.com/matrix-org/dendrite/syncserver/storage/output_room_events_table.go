@@ -49,8 +49,8 @@ const selectMaxIDSQL = "" +
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 const selectStateInRangeSQL = "" +
-	"SELECT event_json, add_state_ids, remove_state_ids FROM output_room_events WHERE id > $1 AND id < $2 AND " +
-	"add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL ORDER BY id ASC"
+	"SELECT event_json, add_state_ids, remove_state_ids FROM output_room_events WHERE id > $1 AND id < $2 AND" +
+	" add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL ORDER BY id ASC"
 
 type outputRoomEventsStatements struct {
 	insertEventStmt         *sql.Stmt
