@@ -33,8 +33,8 @@ Arguments:
 `
 
 var (
-	syncServerURL = flag.String("sync-server-url", "", "The base URL of the listening 'dendrite-sync-server' process. E.g. 'http://localhost:4200'")
-	clientAPIURL  = flag.String("client-api-url", "", "The base URL of the listening 'dendrite-client-api' process. E.g. 'http://localhost:4321'")
+	syncServerURL = flag.String("sync-api-server-url", "", "The base URL of the listening 'dendrite-sync-api-server' process. E.g. 'http://localhost:4200'")
+	clientAPIURL  = flag.String("client-api-server-url", "", "The base URL of the listening 'dendrite-client-api-server' process. E.g. 'http://localhost:4321'")
 	bindAddress   = flag.String("bind-address", ":8008", "The listening port for the proxy.")
 )
 

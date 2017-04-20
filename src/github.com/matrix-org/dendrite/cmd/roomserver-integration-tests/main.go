@@ -203,7 +203,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		panic(err)
 	}
 
-	cmd := exec.Command(filepath.Join(filepath.Dir(os.Args[0]), "dendrite-roomserver"))
+	cmd := exec.Command(filepath.Join(filepath.Dir(os.Args[0]), "dendrite-room-server"))
 
 	// Append the roomserver config to the existing environment.
 	// We append to the environment rather than replacing so that any additional
