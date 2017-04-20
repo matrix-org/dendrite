@@ -6,6 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/clientapi/readers"
 	"github.com/matrix-org/dendrite/clientapi/writers"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/util"
@@ -40,6 +41,11 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 			vars := mux.Vars(req)
 			stateKey := vars["stateKey"]
 			return writers.SendEvent(req, vars["roomID"], vars["eventType"], vars["txnID"], &stateKey, cfg, queryAPI, producer)
+		})),
+	)
+	r0mux.Handle("/login",
+		make("login", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			return readers.Login(req)
 		})),
 	)
 
