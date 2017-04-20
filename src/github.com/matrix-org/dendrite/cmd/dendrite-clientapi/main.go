@@ -3,33 +3,17 @@ package main
 import (
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dugong"
 )
-
-func setupLogging(logDir string) {
-	_ = os.Mkdir(logDir, os.ModePerm)
-	log.AddHook(dugong.NewFSHook(
-		filepath.Join(logDir, "info.log"),
-		filepath.Join(logDir, "warn.log"),
-		filepath.Join(logDir, "error.log"),
-		&log.TextFormatter{
-			TimestampFormat:  "2006-01-02 15:04:05.000000",
-			DisableColors:    true,
-			DisableTimestamp: false,
-			DisableSorting:   false,
-		}, &dugong.DailyRotationSchedule{GZip: true},
-	))
-}
 
 func main() {
 	bindAddr := os.Getenv("BIND_ADDRESS")
@@ -38,7 +22,7 @@ func main() {
 	}
 	logDir := os.Getenv("LOG_DIR")
 	if logDir != "" {
-		setupLogging(logDir)
+		common.SetupLogging(logDir)
 	}
 
 	// TODO: Rather than generating a new key on every startup, we should be
