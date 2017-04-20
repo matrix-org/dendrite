@@ -47,13 +47,13 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 
 	// Stub endpoints required by Riot
 
-	r0mux.Handle("/login",
+	r0mux.Handle("/login", // TODO
 		make("login", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			return readers.Login(req, cfg)
 		})),
 	)
 
-	r0mux.Handle("/pushrules/",
+	r0mux.Handle("/pushrules/", // TODO
 		make("push_rules", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			res := json.RawMessage(`{
 					"global": {
@@ -71,7 +71,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 		})),
 	)
 
-	r0mux.Handle("/user/{userID}/filter",
+	r0mux.Handle("/user/{userID}/filter", // TODO
 		make("make_filter", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: 200,
@@ -80,7 +80,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 		})),
 	)
 
-	r0mux.Handle("/user/{userID}/filter/{filterID}",
+	r0mux.Handle("/user/{userID}/filter/{filterID}", // TODO
 		make("filter", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: 200,
@@ -91,7 +91,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 
 	// Riot user settings
 
-	r0mux.Handle("/profile/{userID}",
+	r0mux.Handle("/profile/{userID}", // TODO
 		make("profile", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: 200,
@@ -100,7 +100,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 		})),
 	)
 
-	r0mux.Handle("/account/3pid",
+	r0mux.Handle("/account/3pid", // TODO
 		make("account_3pid", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			res := json.RawMessage(`{"threepids":[]}`)
 			return util.JSONResponse{
@@ -111,7 +111,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 	)
 
 	// Riot logs get flooded unless this is handled
-	r0mux.Handle("/presence/{userID}/status",
+	r0mux.Handle("/presence/{userID}/status", // TODO
 		make("presence", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: 200,
