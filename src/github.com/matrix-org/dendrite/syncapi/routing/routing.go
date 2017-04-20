@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/syncserver/config"
-	"github.com/matrix-org/dendrite/syncserver/sync"
+	"github.com/matrix-org/dendrite/syncapi/config"
+	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 )

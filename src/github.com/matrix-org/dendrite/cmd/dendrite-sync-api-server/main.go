@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/matrix-org/dendrite/syncserver/config"
-	"github.com/matrix-org/dendrite/syncserver/consumers"
-	"github.com/matrix-org/dendrite/syncserver/routing"
-	"github.com/matrix-org/dendrite/syncserver/storage"
-	"github.com/matrix-org/dendrite/syncserver/sync"
+	"github.com/matrix-org/dendrite/syncapi/config"
+	"github.com/matrix-org/dendrite/syncapi/consumers"
+	"github.com/matrix-org/dendrite/syncapi/routing"
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/sync"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dugong"

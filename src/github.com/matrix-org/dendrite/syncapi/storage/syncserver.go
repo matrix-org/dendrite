@@ -5,7 +5,7 @@ import (
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/syncserver/types"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

@@ -9,8 +9,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/syncserver/storage"
-	"github.com/matrix-org/dendrite/syncserver/types"
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
