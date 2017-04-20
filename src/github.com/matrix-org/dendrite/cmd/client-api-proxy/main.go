@@ -26,6 +26,8 @@ This tool will proxy requests for all client-server URLs and forward
 them to their respective process. It will also add the '/api' path
 prefix to incoming requests.
 
+THIS TOOL IS FOR TESTING AND NOT INTENDED FOR PRODUCTION USE.
+
 Arguments:
 
 `
@@ -56,8 +58,9 @@ func makeProxy(targetURL string) (*httputil.ReverseProxy, error) {
 			path := req.URL.Path
 			path = "api" + path
 			log.WithFields(log.Fields{
-				"path": path,
-				"url":  targetURL,
+				"path":   path,
+				"url":    targetURL,
+				"method": req.Method,
 			}).Print("proxying request")
 			newURL, err := url.Parse(targetURL + path)
 			if err != nil {
@@ -113,7 +116,7 @@ func main() {
 	fmt.Println("Proxying requests to:")
 	fmt.Println("  /_matrix/client/r0/sync  => ", *syncServerURL+"/api/_matrix/client/r0/sync")
 	fmt.Println("  /*                       => ", *clientAPIURL+"/api/*")
-	fmt.Println("Listening on %s", *bindAddress)
+	fmt.Println("Listening on ", *bindAddress)
 	srv.ListenAndServe()
 
 }
