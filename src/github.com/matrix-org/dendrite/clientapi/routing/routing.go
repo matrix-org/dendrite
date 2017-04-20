@@ -47,14 +47,15 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 
 	// Stub endpoints required by Riot
 
-	r0mux.Handle("/login", // TODO
+	r0mux.Handle("/login",
 		make("login", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			return readers.Login(req, cfg)
 		})),
 	)
 
-	r0mux.Handle("/pushrules/", // TODO
+	r0mux.Handle("/pushrules/",
 		make("push_rules", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			// TODO: Implement push rules API
 			res := json.RawMessage(`{
 					"global": {
 						"content": [],
@@ -71,8 +72,9 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 		})),
 	)
 
-	r0mux.Handle("/user/{userID}/filter", // TODO
+	r0mux.Handle("/user/{userID}/filter",
 		make("make_filter", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			// TODO: Persist filter and return filter ID
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},
@@ -80,8 +82,9 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 		})),
 	)
 
-	r0mux.Handle("/user/{userID}/filter/{filterID}", // TODO
+	r0mux.Handle("/user/{userID}/filter/{filterID}",
 		make("filter", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			// TODO: Retrieve filter based on ID
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},
@@ -91,8 +94,9 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 
 	// Riot user settings
 
-	r0mux.Handle("/profile/{userID}", // TODO
+	r0mux.Handle("/profile/{userID}",
 		make("profile", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			// TODO: Get profile data for user ID
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},
@@ -100,8 +104,9 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 		})),
 	)
 
-	r0mux.Handle("/account/3pid", // TODO
+	r0mux.Handle("/account/3pid",
 		make("account_3pid", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			// TODO: Get 3pid data for user ID
 			res := json.RawMessage(`{"threepids":[]}`)
 			return util.JSONResponse{
 				Code: 200,
@@ -111,8 +116,9 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 	)
 
 	// Riot logs get flooded unless this is handled
-	r0mux.Handle("/presence/{userID}/status", // TODO
+	r0mux.Handle("/presence/{userID}/status",
 		make("presence", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			// TODO: Set presence (probably the responsibility of a presence server not clientapi)
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},

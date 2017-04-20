@@ -38,7 +38,7 @@ func passwordLogin() loginFlows {
 
 // Login implements GET and POST /login
 func Login(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
-	if req.Method == "GET" {
+	if req.Method == "GET" { // TODO: support other forms of login other than password, depending on config options
 		return util.JSONResponse{
 			Code: 200,
 			JSON: passwordLogin(),
@@ -55,6 +55,7 @@ func Login(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
 				JSON: jsonerror.BadJSON("'user' must be supplied."),
 			}
 		}
+		// TODO: Check username and password properly
 		return util.JSONResponse{
 			Code: 200,
 			JSON: loginResponse{
