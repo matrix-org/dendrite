@@ -45,7 +45,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 	)
 	r0mux.Handle("/login",
 		make("login", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
-			return readers.Login(req)
+			return readers.Login(req, cfg)
 		})),
 	)
 
