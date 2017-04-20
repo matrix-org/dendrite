@@ -146,19 +146,15 @@ func (s *outputRoomEventsStatements) StateBetween(txn *sql.Tx, oldPos, newPos ty
 		eventIDToEvent[ev.EventID()] = ev
 	}
 
-	stateBetween, missingEvents := mapEventIDsToEvents(eventIDToEvent, stateNeeded)
-
-	if len(missingEvents) > 0 {
-		return nil, fmt.Errorf("error StateBetween: TODO missing events")
-	}
-	return stateBetween, nil
+	return s.fetchStateEvents(txn, stateNeeded, eventIDToEvent)
 }
 
-// convert the set of event IDs into a set of events. Mark any which are missing.
-func mapEventIDsToEvents(eventIDToEvent map[string]gomatrixserverlib.Event, stateNeeded map[string]map[string]bool) (map[string][]gomatrixserverlib.Event, map[string][]string) {
+// fetchStateEvents converts the set of event IDs into a set of events. It will fetch any which are missing from the database.
+// Returns a map of room ID to list of events.
+func (s *outputRoomEventsStatements) fetchStateEvents(txn *sql.Tx, roomIDToEventIDSet map[string]map[string]bool, eventIDToEvent map[string]gomatrixserverlib.Event) (map[string][]gomatrixserverlib.Event, error) {
 	stateBetween := make(map[string][]gomatrixserverlib.Event)
 	missingEvents := make(map[string][]string)
-	for roomID, ids := range stateNeeded {
+	for roomID, ids := range roomIDToEventIDSet {
 		events := stateBetween[roomID]
 		for id, need := range ids {
 			if !need {
@@ -175,7 +171,25 @@ func mapEventIDsToEvents(eventIDToEvent map[string]gomatrixserverlib.Event, stat
 		}
 		stateBetween[roomID] = events
 	}
-	return stateBetween, missingEvents
+
+	if len(missingEvents) > 0 {
+		// This happens when add_state_ids has an event ID which is not in the provided range.
+		// We need to explicitly fetch them.
+		allMissingEventIDs := []string{}
+		for _, missingEvIDs := range missingEvents {
+			allMissingEventIDs = append(allMissingEventIDs, missingEvIDs...)
+		}
+		evs, err := s.Events(txn, allMissingEventIDs)
+		if err != nil {
+			return nil, err
+		}
+		// we know we got them all otherwise an error would've been returned, so just loop the events
+		for _, ev := range evs {
+			roomID := ev.RoomID()
+			stateBetween[roomID] = append(stateBetween[roomID], ev)
+		}
+	}
+	return stateBetween, nil
 }
 
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
@@ -210,7 +224,13 @@ func (s *outputRoomEventsStatements) RecentEventsInRoom(txn *sql.Tx, roomID stri
 		return nil, err
 	}
 	defer rows.Close()
-	return rowsToEvents(rows)
+	events, err := rowsToEvents(rows)
+	if err != nil {
+		return nil, err
+	}
+	// reverse the order because [0] is the newest event due to the ORDER BY in SQL-land. The reverse order makes [0] the oldest event,
+	// which is correct for /sync responses.
+	return reverseEvents(events), nil
 }
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
@@ -247,4 +267,11 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 		result = append(result, ev)
 	}
 	return result, nil
+}
+
+func reverseEvents(input []gomatrixserverlib.Event) (output []gomatrixserverlib.Event) {
+	for i := len(input) - 1; i >= 0; i-- {
+		output = append(output, input[i])
+	}
+	return
 }
