@@ -26,6 +26,8 @@ This tool will proxy requests for all client-server URLs and forward
 them to their respective process. It will also add the '/api' path
 prefix to incoming requests.
 
+THIS TOOL IS FOR TESTING AND NOT INTENDED FOR PRODUCTION USE.
+
 Arguments:
 
 `
