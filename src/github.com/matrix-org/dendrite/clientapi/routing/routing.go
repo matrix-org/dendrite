@@ -110,6 +110,16 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 		})),
 	)
 
+	// Riot logs get flooded unless this is handled
+	r0mux.Handle("/presence/{userID}/status",
+		make("presence", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct{}{},
+			}
+		})),
+	)
+
 	servMux.Handle("/metrics", prometheus.Handler())
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
