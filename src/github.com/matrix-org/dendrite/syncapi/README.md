@@ -1,4 +1,4 @@
-# Sync Server
+# Sync API Server
 
 This server is responsible for servicing `/sync` requests. It gets its data from the room server output log.
 

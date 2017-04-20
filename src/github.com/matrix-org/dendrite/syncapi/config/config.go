@@ -12,24 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package config
 
-import (
-	"database/sql"
-)
-
-// a statementList is a list of SQL statements to prepare and a pointer to where to store the resulting prepared statement.
-type statementList []struct {
-	statement **sql.Stmt
-	sql       string
-}
-
-// prepare the SQL for each statement in the list and assign the result to the prepared statement.
-func (s statementList) prepare(db *sql.DB) (err error) {
-	for _, statement := range s {
-		if *statement.statement, err = db.Prepare(statement.sql); err != nil {
-			return
-		}
-	}
-	return
+// Sync contains the config information necessary to spin up a sync-server process.
+type Sync struct {
+	// The topic for events which are written by the room server output log.
+	RoomserverOutputTopic string `yaml:"roomserver_topic"`
+	// A list of URIs to consume events from. These kafka logs should be produced by a Room Server.
+	KafkaConsumerURIs []string `yaml:"consumer_uris"`
+	// The postgres connection config for connecting to the database e.g a postgres:// URI
+	DataSource string `yaml:"database"`
 }
