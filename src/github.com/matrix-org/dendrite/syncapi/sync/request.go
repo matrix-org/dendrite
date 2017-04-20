@@ -1,7 +1,7 @@
 package sync
 
 import (
-	"github.com/matrix-org/dendrite/syncserver/types"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"net/http"
 	"strconv"
 	"time"
