@@ -47,10 +47,7 @@ func main() {
 	if *bindAddr == "" {
 		log.Fatal("--listen must be supplied")
 	}
-	logDir := os.Getenv("LOG_DIR")
-	if logDir != "" {
-		common.SetupLogging(logDir)
-	}
+	common.SetupLogging(os.Getenv("LOG_DIR"))
 
 	log.Info("sync server config: ", cfg)
 
