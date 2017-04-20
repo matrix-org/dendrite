@@ -3,7 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
+	"strings"
+	"time"
 )
 
 const usage = `Usage: %s
@@ -30,6 +36,42 @@ var (
 	bindAddress   = flag.String("bind-address", ":8008", "The listening port for the proxy.")
 )
 
+func makeProxy(targetURL string) (*httputil.ReverseProxy, error) {
+	if !strings.HasSuffix(targetURL, "/") {
+		targetURL += "/"
+	}
+	// Check that we can parse the URL.
+	_, err := url.Parse(targetURL)
+	if err != nil {
+		return nil, err
+	}
+	return &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			// URL.Path() removes the % escaping from the path.
+			// The % encoding will be added back when the url is encoded
+			// when the request is forwarded.
+			// This means that we will lose any unessecary escaping from the URL.
+			// Pratically this means that any distinction between '%2F' and '/'
+			// in the URL will be lost by the time it reaches the target.
+			path := req.URL.Path
+			path = "api" + path
+			log.WithFields(log.Fields{
+				"path": path,
+				"url":  targetURL,
+			}).Print("proxying request")
+			newURL, err := url.Parse(targetURL + path)
+			if err != nil {
+				// We already checked that we can parse the URL
+				// So this shouldn't ever get hit.
+				panic(err)
+			}
+			// Copy the query parameters from the request.
+			newURL.RawQuery = req.URL.RawQuery
+			req.URL = newURL
+		},
+	}, nil
+}
+
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, usage, os.Args[0])
@@ -50,9 +92,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	syncProxy, err := makeProxy(*syncServerURL)
+	if err != nil {
+		panic(err)
+	}
+	clientProxy, err := makeProxy(*clientAPIURL)
+	if err != nil {
+		panic(err)
+	}
+
+	http.Handle("/_matrix/client/r0/sync", syncProxy)
+	http.Handle("/", clientProxy)
+
+	srv := &http.Server{
+		Addr:         *bindAddress,
+		ReadTimeout:  1 * time.Minute, // how long we wait for the client to send the entire request (after connection accept)
+		WriteTimeout: 5 * time.Minute, // how long the proxy has to write the full response
+	}
+
 	fmt.Println("Proxying requests to:")
 	fmt.Println("  /_matrix/client/r0/sync  => ", *syncServerURL+"/api/_matrix/client/r0/sync")
 	fmt.Println("  /*                       => ", *clientAPIURL+"/api/*")
 	fmt.Println("Listening on %s", *bindAddress)
+	srv.ListenAndServe()
 
 }
