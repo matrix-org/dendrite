@@ -16,11 +16,12 @@ import (
 )
 
 func main() {
+	common.SetupLogging(os.Getenv("LOG_DIR"))
+
 	bindAddr := os.Getenv("BIND_ADDRESS")
 	if bindAddr == "" {
 		log.Panic("No BIND_ADDRESS environment variable found.")
 	}
-	common.SetupLogging(os.Getenv("LOG_DIR"))
 
 	// TODO: Rather than generating a new key on every startup, we should be
 	//       reading a PEM formatted file instead.

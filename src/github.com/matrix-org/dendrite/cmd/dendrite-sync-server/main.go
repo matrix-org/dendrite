@@ -34,6 +34,8 @@ func loadConfig(configPath string) (*config.Sync, error) {
 }
 
 func main() {
+	common.SetupLogging(os.Getenv("LOG_DIR"))
+
 	flag.Parse()
 
 	if *configPath == "" {
@@ -47,7 +49,6 @@ func main() {
 	if *bindAddr == "" {
 		log.Fatal("--listen must be supplied")
 	}
-	common.SetupLogging(os.Getenv("LOG_DIR"))
 
 	log.Info("sync server config: ", cfg)
 
