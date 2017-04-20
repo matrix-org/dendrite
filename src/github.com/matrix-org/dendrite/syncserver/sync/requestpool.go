@@ -119,6 +119,8 @@ func (rp *RequestPool) waitForEvents(req syncRequest) types.StreamPosition {
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, error) {
+	currentPos := rp.waitForEvents(req)
+
 	if req.since == types.StreamPosition(0) {
 		pos, data, err := rp.db.CompleteSync(req.userID, req.limit)
 		if err != nil {
@@ -134,8 +136,6 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, err
 		}
 		return res, nil
 	}
-
-	currentPos := rp.waitForEvents(req)
 
 	// TODO: handle ignored users
 
