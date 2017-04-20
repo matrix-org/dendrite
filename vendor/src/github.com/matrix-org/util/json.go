@@ -111,6 +111,11 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 		logger := GetLogger(req.Context())
 		logger.Print("Incoming request")
 
+		if req.Method == "OPTIONS" {
+			SetCORSHeaders(w)
+			w.WriteHeader(200)
+			return
+		}
 		res := handler.OnIncomingRequest(req)
 
 		// Set common headers returned regardless of the outcome of the request
