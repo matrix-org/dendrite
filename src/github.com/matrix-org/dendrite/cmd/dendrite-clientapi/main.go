@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/crypto/ed25519"
 
@@ -31,14 +32,30 @@ func setupLogging(logDir string) {
 	))
 }
 
+var (
+	kafkaURIs            = strings.Split(os.Getenv("KAFKA_URIS"), ",")
+	bindAddr             = os.Getenv("BIND_ADDRESS")
+	logDir               = os.Getenv("LOG_DIR")
+	roomserverURL        = os.Getenv("ROOMSERVER_URL")
+	clientAPIOutputTopic = os.Getenv("CLIENTAPI_OUTPUT_TOPIC")
+)
+
 func main() {
-	bindAddr := os.Getenv("BIND_ADDRESS")
 	if bindAddr == "" {
 		log.Panic("No BIND_ADDRESS environment variable found.")
 	}
-	logDir := os.Getenv("LOG_DIR")
 	if logDir != "" {
 		setupLogging(logDir)
+	}
+	if len(kafkaURIs) == 0 {
+		// the kafka default is :9092
+		kafkaURIs = []string{"localhost:9092"}
+	}
+	if roomserverURL == "" {
+		log.Panic("No ROOMSERVER_URL environment variable found.")
+	}
+	if clientAPIOutputTopic == "" {
+		log.Panic("No CLIENTAPI_OUTPUT_TOPIC environment variable found. This should match the roomserver input topic.")
 	}
 
 	// TODO: Rather than generating a new key on every startup, we should be
@@ -52,9 +69,9 @@ func main() {
 		ServerName:           "localhost",
 		KeyID:                "ed25519:something",
 		PrivateKey:           privKey,
-		KafkaProducerURIs:    []string{"localhost:9092"},
-		ClientAPIOutputTopic: "roomserverInput",
-		RoomserverURL:        "http://localhost:7777",
+		KafkaProducerURIs:    kafkaURIs,
+		ClientAPIOutputTopic: clientAPIOutputTopic,
+		RoomserverURL:        roomserverURL,
 	}
 
 	log.Info("Starting clientapi")
