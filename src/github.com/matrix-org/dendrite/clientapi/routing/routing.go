@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -43,9 +44,69 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 			return writers.SendEvent(req, vars["roomID"], vars["eventType"], vars["txnID"], &stateKey, cfg, queryAPI, producer)
 		})),
 	)
+
+	// Stub endpoints required by Riot
+
 	r0mux.Handle("/login",
 		make("login", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 			return readers.Login(req, cfg)
+		})),
+	)
+
+	r0mux.Handle("/pushrules/",
+		make("push_rules", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			res := json.RawMessage(`{
+					"global": {
+						"content": [],
+						"override": [],
+						"room": [],
+						"sender": [],
+						"underride": []
+					}
+				}`)
+			return util.JSONResponse{
+				Code: 200,
+				JSON: &res,
+			}
+		})),
+	)
+
+	r0mux.Handle("/user/{userID}/filter",
+		make("make_filter", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct{}{},
+			}
+		})),
+	)
+
+	r0mux.Handle("/user/{userID}/filter/{filterID}",
+		make("filter", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct{}{},
+			}
+		})),
+	)
+
+	// Riot user settings
+
+	r0mux.Handle("/profile/{userID}",
+		make("profile", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct{}{},
+			}
+		})),
+	)
+
+	r0mux.Handle("/account/3pid",
+		make("account_3pid", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+			res := json.RawMessage(`{"threepids":[]}`)
+			return util.JSONResponse{
+				Code: 200,
+				JSON: &res,
+			}
 		})),
 	)
 

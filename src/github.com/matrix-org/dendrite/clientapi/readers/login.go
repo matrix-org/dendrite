@@ -63,11 +63,6 @@ func Login(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
 				HomeServer:  cfg.ServerName,
 			},
 		}
-	} else if req.Method == "OPTIONS" {
-		return util.JSONResponse{
-			Code: 200,
-			JSON: nil,
-		}
 	}
 	return util.JSONResponse{
 		Code: 405,
