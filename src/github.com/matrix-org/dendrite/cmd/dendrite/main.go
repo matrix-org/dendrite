@@ -45,18 +45,17 @@ Options:
     -H <host>, --host=<host>
         Host to bind. The port is optional and ignored for 'serve all'. The
         default ports are: 7776 (sync-api), 7777 (room-server), and 7778 (client-api)
-        [default: "localhost"]
+        [default: localhost]
     -h, --help
         Print this usage text.
     -k <kafka-hosts>, --kafka-hosts=<kafka-hosts>
-        A comma-separated list of Kafka hosts. [default: "localhost:9092"]
+        A comma-separated list of Kafka hosts. [default: localhost:9092]
     -l <log-dir>, --log-dir=<log-dir>
         Path to log directory. If not set, logs will only be written to stderr.
     -r <room-server-host>, --room-server-host=<room-server-host>
-        Host of the room server. [default: "localhost:7777"]
+        Host of the room server. [default: localhost:7777]
     -t <topic-prefix>, --topic-prefix=<topic-prefix>
         Prefix for Kafka topics used for inter-component communication.
-        [default: ""]
     -V, --version
         Print the dendrite version.
 
