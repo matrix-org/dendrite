@@ -21,6 +21,13 @@ import (
 	"github.com/docopt/docopt-go"
 )
 
+func maybeArgToStr(arg interface{}) string {
+	if arg != nil {
+		return arg.(string)
+	}
+	return ""
+}
+
 func main() {
 	usage := `
 Usage:
@@ -67,11 +74,7 @@ Environment Variables:
 	args, _ := docopt.Parse(usage, nil, true,
 		"dendrite Matrix homeserver, version 0.0.1", false)
 
-	logDirArg := args["--log-dir"]
-	logDir := ""
-	if logDirArg != nil {
-		logDir = logDirArg.(string)
-	}
+	logDir := maybeArgToStr(args["--log-dir"])
 	common.SetupLogging(logDir)
 
 	log.Infoln(args)
