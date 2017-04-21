@@ -33,24 +33,31 @@ func (f utcFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 // SetupLogging configures the logging format and destination(s).
 func SetupLogging(logDir string) {
-	formatter := &utcFormatter{
-		&logrus.TextFormatter{
-			TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
-			DisableColors:    true,
-			DisableTimestamp: false,
-			DisableSorting:   false,
-		},
-	}
 	if logDir != "" {
 		_ = os.Mkdir(logDir, os.ModePerm)
 		logrus.AddHook(dugong.NewFSHook(
 			filepath.Join(logDir, "info.log"),
 			filepath.Join(logDir, "warn.log"),
 			filepath.Join(logDir, "error.log"),
-			formatter,
+			&utcFormatter{
+				&logrus.TextFormatter{
+					TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
+					DisableColors:    true,
+					DisableTimestamp: false,
+					DisableSorting:   false,
+				},
+			},
 			&dugong.DailyRotationSchedule{GZip: true},
 		))
 	} else {
-		logrus.SetFormatter(formatter)
+		logrus.SetFormatter(&utcFormatter{
+			&logrus.TextFormatter{
+				TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
+				FullTimestamp:    true,
+				DisableColors:    false,
+				DisableTimestamp: false,
+				DisableSorting:   false,
+			},
+		})
 	}
 }
