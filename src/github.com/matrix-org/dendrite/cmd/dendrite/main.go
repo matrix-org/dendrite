@@ -15,8 +15,9 @@
 package main
 
 import (
-	"fmt"
+	"github.com/matrix-org/dendrite/common"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt-go"
 )
 
@@ -65,5 +66,13 @@ Environment Variables:
 
 	args, _ := docopt.Parse(usage, nil, true,
 		"dendrite Matrix homeserver, version 0.0.1", false)
-	fmt.Println(args)
+
+	logDirArg := args["--log-dir"]
+	logDir := ""
+	if logDirArg != nil {
+		logDir = logDirArg.(string)
+	}
+	common.SetupLogging(logDir)
+
+	log.Infoln(args)
 }
