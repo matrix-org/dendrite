@@ -63,7 +63,7 @@ Environment Variables:
         PGSSLMODE   Defaults to "disabled"
 `
 
-	arguments, _ := docopt.Parse(usage, nil, true,
+	args, _ := docopt.Parse(usage, nil, true,
 		"dendrite Matrix homeserver, version 0.0.1", false)
-	fmt.Println(arguments)
+	fmt.Println(args)
 }
