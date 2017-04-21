@@ -25,8 +25,8 @@ type ClientAPI struct {
 	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
 	// prefix "ed25519:".
 	KeyID string
-	// A list of URIs to send events to. These kafka logs should be consumed by a Room Server.
-	KafkaProducerURIs []string
+	// A list of addresses to send events to. These kafka logs should be consumed by a Room Server.
+	KafkaProducerAddresses []string
 	// The topic for events which are written to the logs.
 	ClientAPIOutputTopic string
 	// The URL of the roomserver which can service Query API requests

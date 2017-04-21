@@ -28,6 +28,12 @@
 			"path": "/spew"
 		},
 		{
+			"importpath": "github.com/docopt/docopt-go",
+			"repository": "https://github.com/docopt/docopt-go",
+			"revision": "784ddc588536785e7299f7272f39101f7faccc3f",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/eapache/go-resiliency/breaker",
 			"repository": "https://github.com/eapache/go-resiliency",
 			"revision": "b86b1ec0dd4209a588dc1285cdd471e73525c0b3",
