@@ -62,19 +62,19 @@ func main() {
 	}
 
 	cfg := config.ClientAPI{
-		ServerName:           "localhost",
-		KeyID:                "ed25519:something",
-		PrivateKey:           privKey,
-		KafkaProducerURIs:    kafkaURIs,
-		ClientAPIOutputTopic: clientAPIOutputTopic,
-		RoomserverURL:        roomserverURL,
+		ServerName:             "localhost",
+		KeyID:                  "ed25519:something",
+		PrivateKey:             privKey,
+		KafkaProducerAddresses: kafkaURIs,
+		ClientAPIOutputTopic:   clientAPIOutputTopic,
+		RoomserverURL:          roomserverURL,
 	}
 
 	log.Info("Starting clientapi")
 
-	roomserverProducer, err := producers.NewRoomserverProducer(cfg.KafkaProducerURIs, cfg.ClientAPIOutputTopic)
+	roomserverProducer, err := producers.NewRoomserverProducer(cfg.KafkaProducerAddresses, cfg.ClientAPIOutputTopic)
 	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.KafkaProducerURIs, err)
+		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.KafkaProducerAddresses, err)
 	}
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)

@@ -41,16 +41,16 @@ Arguments:
     <server-type>   One of: client-api, room-server, sync-api.
 
 Options:
-    -c <config-file>, --config-file=<config-file>
-        Path to a YAML-format configuration file.
-    -H <host>, --host=<host>
-        Host to bind. The port is optional and ignored for 'serve all'. The
+    -a <address>, --address=<address>
+        Address to bind. The port is required but ignored for 'serve all'. The
         default ports are: 7776 (sync-api), 7777 (room-server), and 7778 (client-api)
         [default: localhost]
+    -c <config-file>, --config-file=<config-file>
+        Path to a YAML-format configuration file.
     -h, --help
         Print this usage text.
-    -k <kafka-hosts>, --kafka-hosts=<kafka-hosts>
-        A comma-separated list of Kafka hosts. [default: localhost:9092]
+    -k <kafka-addresses>, --kafka-addresses=<kafka-addresses>
+        A comma-separated list of Kafka addresses. [default: localhost:9092]
     -l <log-dir>, --log-dir=<log-dir>
         Path to log directory. If not set, logs will only be written to stderr.
     -r <room-server-host>, --room-server-host=<room-server-host>
@@ -86,9 +86,13 @@ Environment Variables:
 			switch serverType := args["<server-type>"]; serverType {
 			case "client-api":
 				log.Infof("Starting %v server...", serverType)
+				address := maybeArgToStr(args["--address"])
+				if address == "localhost" {
+					address += ":7778"
+				}
 				clientapi.App(
-					maybeArgToStr(args["--host"]),
-					maybeArgToStr(args["--kafka-hosts"]),
+					address,
+					maybeArgToStr(args["--kafka-addresses"]),
 					maybeArgToStr(args["--room-server-host"]),
 					maybeArgToStr(args["--topic-prefix"]),
 				)

@@ -17,7 +17,6 @@ package clientapi
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"golang.org/x/crypto/ed25519"
@@ -31,21 +30,17 @@ import (
 )
 
 // App is a function that configures and starts a client API server
-func App(host string, kafkaURIsStr string, roomserverURL string, topicPrefix string) {
-	if host == "" {
-		log.Panic("No host specified.")
+func App(address string, kafkaAddressesStr string, roomserverURL string, topicPrefix string) {
+	if address == "" {
+		log.Panic("No address specified.")
 	}
-	hostURL, err := url.Parse(host)
-	if hostURL.Port() == "" {
-		host += ":7778"
-	}
-	kafkaURIs := strings.Split(kafkaURIsStr, ",")
-	if len(kafkaURIs) == 0 {
+	kafkaAddresses := strings.Split(kafkaAddressesStr, ",")
+	if len(kafkaAddresses) == 0 {
 		// the kafka default is :9092
-		kafkaURIs = []string{"localhost:9092"}
+		kafkaAddresses = []string{"localhost:9092"}
 	}
 	if roomserverURL == "" {
-		log.Panic("No roomserver host specified.")
+		log.Panic("No roomserver URL specified.")
 	}
 
 	clientAPIOutputTopic := fmt.Sprintf("%sroomserver_input_topic", topicPrefix)
@@ -58,27 +53,27 @@ func App(host string, kafkaURIsStr string, roomserverURL string, topicPrefix str
 	}
 
 	cfg := config.ClientAPI{
-		ServerName:           "localhost",
-		KeyID:                "ed25519:something",
-		PrivateKey:           privKey,
-		KafkaProducerURIs:    kafkaURIs,
-		ClientAPIOutputTopic: clientAPIOutputTopic,
-		RoomserverURL:        roomserverURL,
+		ServerName:             "localhost",
+		KeyID:                  "ed25519:something",
+		PrivateKey:             privKey,
+		KafkaProducerAddresses: kafkaAddresses,
+		ClientAPIOutputTopic:   clientAPIOutputTopic,
+		RoomserverURL:          roomserverURL,
 	}
 
-	log.Infoln("clientapi host:", host)
+	log.Infoln("clientapi address:", address)
 	log.Infoln("clientapi output topic:", clientAPIOutputTopic)
-	log.Infoln("kafka URIs:", kafkaURIs)
+	log.Infoln("kafka addresses:", kafkaAddresses)
 	log.Infoln("roomserver URL:", roomserverURL)
 	log.Info("Starting clientapi")
 
-	roomserverProducer, err := producers.NewRoomserverProducer(cfg.KafkaProducerURIs, cfg.ClientAPIOutputTopic)
+	roomserverProducer, err := producers.NewRoomserverProducer(cfg.KafkaProducerAddresses, cfg.ClientAPIOutputTopic)
 	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.KafkaProducerURIs, err)
+		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.KafkaProducerAddresses, err)
 	}
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
 
 	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI)
-	log.Fatal(http.ListenAndServe(host, nil))
+	log.Fatal(http.ListenAndServe(address, nil))
 }
