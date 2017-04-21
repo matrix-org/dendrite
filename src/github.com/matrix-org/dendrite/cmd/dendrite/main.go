@@ -15,6 +15,7 @@
 package main
 
 import (
+	"github.com/matrix-org/dendrite/clientapi/clientapi-app"
 	"github.com/matrix-org/dendrite/common"
 
 	log "github.com/Sirupsen/logrus"
@@ -77,4 +78,23 @@ Environment Variables:
 	common.SetupLogging(logDir)
 
 	log.Infoln(args)
+
+	if args["serve"] != nil && args["serve"].(bool) {
+		if args["all"] != nil && args["all"].(bool) {
+			log.Panic("'serve all' is not yet supported.")
+		} else {
+			switch serverType := args["<server-type>"]; serverType {
+			case "client-api":
+				log.Infof("Starting %v server...", serverType)
+				clientapi.App(
+					maybeArgToStr(args["--host"]),
+					maybeArgToStr(args["--kafka-hosts"]),
+					maybeArgToStr(args["--room-server-host"]),
+					maybeArgToStr(args["--topic-prefix"]),
+				)
+			default:
+				log.Panicf("Server type '%v' unknown.", serverType)
+			}
+		}
+	}
 }
