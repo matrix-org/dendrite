@@ -19,8 +19,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/config"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/routing"
@@ -28,27 +28,11 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dugong"
 	yaml "gopkg.in/yaml.v2"
 )
 
 var configPath = flag.String("config", "sync-server-config.yaml", "The path to the config file. For more information, see the config file in this repository.")
 var bindAddr = flag.String("listen", ":4200", "The port to listen on.")
-
-func setupLogging(logDir string) {
-	_ = os.Mkdir(logDir, os.ModePerm)
-	log.AddHook(dugong.NewFSHook(
-		filepath.Join(logDir, "info.log"),
-		filepath.Join(logDir, "warn.log"),
-		filepath.Join(logDir, "error.log"),
-		&log.TextFormatter{
-			TimestampFormat:  "2006-01-02 15:04:05.000000",
-			DisableColors:    true,
-			DisableTimestamp: false,
-			DisableSorting:   false,
-		}, &dugong.DailyRotationSchedule{GZip: true},
-	))
-}
 
 func loadConfig(configPath string) (*config.Sync, error) {
 	contents, err := ioutil.ReadFile(configPath)
@@ -64,6 +48,8 @@ func loadConfig(configPath string) (*config.Sync, error) {
 }
 
 func main() {
+	common.SetupLogging(os.Getenv("LOG_DIR"))
+
 	flag.Parse()
 
 	if *configPath == "" {
@@ -76,10 +62,6 @@ func main() {
 
 	if *bindAddr == "" {
 		log.Fatal("--listen must be supplied")
-	}
-	logDir := os.Getenv("LOG_DIR")
-	if logDir != "" {
-		setupLogging(logDir)
 	}
 
 	log.Info("sync server config: ", cfg)

@@ -17,7 +17,6 @@ package main
 import (
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"golang.org/x/crypto/ed25519"
@@ -25,26 +24,11 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dugong"
 )
-
-func setupLogging(logDir string) {
-	_ = os.Mkdir(logDir, os.ModePerm)
-	log.AddHook(dugong.NewFSHook(
-		filepath.Join(logDir, "info.log"),
-		filepath.Join(logDir, "warn.log"),
-		filepath.Join(logDir, "error.log"),
-		&log.TextFormatter{
-			TimestampFormat:  "2006-01-02 15:04:05.000000",
-			DisableColors:    true,
-			DisableTimestamp: false,
-			DisableSorting:   false,
-		}, &dugong.DailyRotationSchedule{GZip: true},
-	))
-}
 
 var (
 	kafkaURIs            = strings.Split(os.Getenv("KAFKA_URIS"), ",")
@@ -55,11 +39,9 @@ var (
 )
 
 func main() {
+	common.SetupLogging(logDir)
 	if bindAddr == "" {
 		log.Panic("No BIND_ADDRESS environment variable found.")
-	}
-	if logDir != "" {
-		setupLogging(logDir)
 	}
 	if len(kafkaURIs) == 0 {
 		// the kafka default is :9092
