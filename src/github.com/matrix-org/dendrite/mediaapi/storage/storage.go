@@ -16,6 +16,9 @@ package storage
 
 import (
 	"database/sql"
+
+	// Import the postgres database driver.
+	_ "github.com/lib/pq"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -35,4 +38,9 @@ func Open(dataSourceName string) (*Database, error) {
 		return nil, err
 	}
 	return &d, nil
+}
+
+// CreateMedia inserts the metadata about the uploaded media into the database.
+func (d *Database) CreateMedia(mediaID string, mediaOrigin string, contentType string, contentDisposition string, fileSize int64, uploadName string, userID string) error {
+	return d.statements.insertMedia(mediaID, mediaOrigin, contentType, contentDisposition, fileSize, uploadName, userID)
 }

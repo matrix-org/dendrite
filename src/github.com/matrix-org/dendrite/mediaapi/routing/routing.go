@@ -19,6 +19,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/mediaapi/config"
+	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/writers"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,11 +29,11 @@ const pathPrefixR0 = "/_matrix/media/v1"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI) {
+func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI, db *storage.Database, repo *storage.Repository) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/upload", make("upload", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
-		return writers.Upload(req, cfg)
+		return writers.Upload(req, cfg, db, repo)
 	})))
 
 	servMux.Handle("/metrics", prometheus.Handler())

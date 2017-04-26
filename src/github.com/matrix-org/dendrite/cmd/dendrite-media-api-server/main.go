@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
+	"github.com/matrix-org/dendrite/mediaapi/storage"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -33,13 +34,10 @@ var (
 
 func main() {
 	common.SetupLogging(logDir)
+
 	if bindAddr == "" {
 		log.Panic("No BIND_ADDRESS environment variable found.")
 	}
-	// db, err := storage.Open(database)
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	cfg := config.MediaAPI{
 		ServerName: "localhost",
@@ -47,8 +45,18 @@ func main() {
 		DataSource: database,
 	}
 
+	db, err := storage.Open(cfg.DataSource)
+	if err != nil {
+		log.Panicln("Failed to open database:", err)
+	}
+
+	repo := &storage.Repository{
+		StorePrefix: cfg.BasePath,
+		MaxBytes:    61440,
+	}
+
 	log.Info("Starting mediaapi")
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg)
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, db, repo)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }

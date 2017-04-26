@@ -15,29 +15,34 @@
 package writers
 
 import (
+	"fmt"
+	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/config"
+	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/util"
 )
 
+// UploadRequest metadata included in or derivable from an upload request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-media-r0-upload
 // NOTE: ContentType is an HTTP request header and Filename is passed as a query parameter
-type uploadRequest struct {
+type UploadRequest struct {
 	ContentDisposition string
-	ContentLength      int
+	ContentLength      int64
 	ContentType        string
 	Filename           string
+	Base64FileHash     string
 	Method             string
 	UserID             string
 }
 
-func (r uploadRequest) Validate() *util.JSONResponse {
+// Validate validates the UploadRequest fields
+func (r UploadRequest) Validate() *util.JSONResponse {
 	// TODO: Any validation to be done on ContentDisposition?
 	if r.ContentLength < 1 {
 		return &util.JSONResponse{
@@ -88,7 +93,7 @@ type uploadResponse struct {
 }
 
 // Upload implements /upload
-func Upload(req *http.Request, cfg config.MediaAPI) util.JSONResponse {
+func Upload(req *http.Request, cfg config.MediaAPI, db *storage.Database, repo *storage.Repository) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 
 	// FIXME: This will require querying some other component/db but currently
@@ -98,13 +103,9 @@ func Upload(req *http.Request, cfg config.MediaAPI) util.JSONResponse {
 		return *resErr
 	}
 
-	// req.Header.Get() returns "" if no header
-	// strconv.Atoi() returns 0 when parsing ""
-	contentLength, _ := strconv.Atoi(req.Header.Get("Content-Length"))
-
-	r := uploadRequest{
+	r := &UploadRequest{
 		ContentDisposition: req.Header.Get("Content-Disposition"),
-		ContentLength:      contentLength,
+		ContentLength:      req.ContentLength,
 		ContentType:        req.Header.Get("Content-Type"),
 		Filename:           req.FormValue("filename"),
 		Method:             req.Method,
@@ -126,14 +127,50 @@ func Upload(req *http.Request, cfg config.MediaAPI) util.JSONResponse {
 	//       - progressive writing (could support Content-Length 0 and cut off
 	//         after some max upload size is exceeded)
 	//       - generate id (ideally a hash but a random string to start with)
-	//       - generate thumbnails
-	// TODO: Write metadata to database
-	// TODO: Respond to request
+	writer, err := repo.WriterToLocalRepository(storage.Description{
+		Type: r.ContentType,
+	})
+	if err != nil {
+		logger.Infof("Failed to get cache writer %q\n", err)
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("Failed to upload: %q", err)),
+		}
+	}
+
+	defer writer.Close()
+
+	if _, err = io.Copy(writer, req.Body); err != nil {
+		logger.Infof("Failed to copy %q\n", err)
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("Failed to upload: %q", err)),
+		}
+	}
+
+	r.Base64FileHash, err = writer.Finished()
+	if err != nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("Failed to upload: %q", err)),
+		}
+	}
+	// TODO: check if file with hash already exists
+
+	// TODO: generate thumbnails
+
+	err = db.CreateMedia(r.Base64FileHash, cfg.ServerName, r.ContentType, r.ContentDisposition, r.ContentLength, r.Filename, r.UserID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("Failed to upload: %q", err)),
+		}
+	}
 
 	return util.JSONResponse{
 		Code: 200,
 		JSON: uploadResponse{
-			ContentURI: "mxc://example.com/AQwafuaFswefuhsfAFAgsw",
+			ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.ServerName, r.Base64FileHash),
 		},
 	}
 }

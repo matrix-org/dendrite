@@ -16,17 +16,38 @@ package storage
 
 import (
 	"database/sql"
+	"time"
 )
 
 const mediaSchema = `
+-- The events table holds metadata for each media upload to the local server,
+-- the actual file is stored separately.
+CREATE TABLE IF NOT EXISTS media_repository (
+    -- The id used to refer to the media.
+    -- This is a base64-encoded sha256 hash of the file data
+    media_id TEXT PRIMARY KEY,
+    -- The origin of the media as requested by the client.
+    media_origin TEXT NOT NULL,
+    -- The MIME-type of the media file.
+    content_type TEXT NOT NULL,
+    -- The HTTP Content-Disposition header for the media file.
+    content_disposition TEXT NOT NULL DEFAULT 'inline',
+    -- Size of the media file in bytes.
+    file_size BIGINT NOT NULL,
+    -- When the content was uploaded in ms.
+    created_ts BIGINT NOT NULL,
+    -- The name with which the media was uploaded.
+    upload_name TEXT NOT NULL,
+    -- The user who uploaded the file.
+    user_id TEXT NOT NULL,
+    UNIQUE(media_id, media_origin)
+);
 `
 
-const insertMediaSQL = "" +
-	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)" +
-	" ON CONFLICT ON CONSTRAINT event_id_unique" +
-	" DO NOTHING" +
-	" RETURNING event_nid, state_snapshot_nid"
+const insertMediaSQL = `
+INSERT INTO media_repository (media_id, media_origin, content_type, content_disposition, file_size, created_ts, upload_name, user_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
 
 type mediaStatements struct {
 	insertMediaStmt *sql.Stmt
@@ -43,5 +64,11 @@ func (s *mediaStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *mediaStatements) insertMedia() {
+func (s *mediaStatements) insertMedia(mediaID string, mediaOrigin string, contentType string,
+	contentDisposition string, fileSize int64, uploadName string, userID string) error {
+	_, err := s.insertMediaStmt.Exec(
+		mediaID, mediaOrigin, contentType, contentDisposition, fileSize,
+		int64(time.Now().UnixNano()/1000000), uploadName, userID,
+	)
+	return err
 }
