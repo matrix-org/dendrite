@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS media_repository (
     -- The MIME-type of the media file.
     content_type TEXT NOT NULL,
     -- The HTTP Content-Disposition header for the media file.
-    content_disposition TEXT NOT NULL DEFAULT 'inline',
+    content_disposition TEXT NOT NULL,
     -- Size of the media file in bytes.
     file_size BIGINT NOT NULL,
     -- When the content was uploaded in ms.
