@@ -44,3 +44,8 @@ func Open(dataSourceName string) (*Database, error) {
 func (d *Database) CreateMedia(mediaID string, mediaOrigin string, contentType string, contentDisposition string, fileSize int64, uploadName string, userID string) error {
 	return d.statements.insertMedia(mediaID, mediaOrigin, contentType, contentDisposition, fileSize, uploadName, userID)
 }
+
+// GetMedia possibly selects the metadata about previously uploaded media from the database.
+func (d *Database) GetMedia(mediaID string, mediaOrigin string) (string, string, int64, string, error) {
+	return d.statements.selectMedia(mediaID, mediaOrigin)
+}

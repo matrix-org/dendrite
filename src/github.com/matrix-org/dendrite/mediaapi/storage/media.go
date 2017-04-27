@@ -49,8 +49,13 @@ INSERT INTO media_repository (media_id, media_origin, content_type, content_disp
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
+const selectMediaSQL = `
+SELECT content_type, content_disposition, file_size, upload_name FROM media_repository WHERE media_id = $1 AND media_origin = $2
+`
+
 type mediaStatements struct {
 	insertMediaStmt *sql.Stmt
+	selectMediaStmt *sql.Stmt
 }
 
 func (s *mediaStatements) prepare(db *sql.DB) (err error) {
@@ -61,6 +66,7 @@ func (s *mediaStatements) prepare(db *sql.DB) (err error) {
 
 	return statementList{
 		{&s.insertMediaStmt, insertMediaSQL},
+		{&s.selectMediaStmt, selectMediaSQL},
 	}.prepare(db)
 }
 
@@ -71,4 +77,13 @@ func (s *mediaStatements) insertMedia(mediaID string, mediaOrigin string, conten
 		int64(time.Now().UnixNano()/1000000), uploadName, userID,
 	)
 	return err
+}
+
+func (s *mediaStatements) selectMedia(mediaID string, mediaOrigin string) (string, string, int64, string, error) {
+	var contentType string
+	var contentDisposition string
+	var fileSize int64
+	var uploadName string
+	err := s.selectMediaStmt.QueryRow(mediaID, mediaOrigin).Scan(&contentType, &contentDisposition, &fileSize, &uploadName)
+	return string(contentType), string(contentDisposition), int64(fileSize), string(uploadName), err
 }
