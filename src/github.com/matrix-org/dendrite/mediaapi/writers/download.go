@@ -72,9 +72,17 @@ func jsonErrorResponse(w http.ResponseWriter, res util.JSONResponse, logger *log
 	w.Write(resBytes)
 }
 
-// Download implements /upload
+// Download implements /download
 func Download(w http.ResponseWriter, req *http.Request, serverName string, mediaID string, cfg config.MediaAPI, db *storage.Database, downloadServer DownloadServer) {
 	logger := util.GetLogger(req.Context())
+
+	if req.Method != "GET" {
+		jsonErrorResponse(w, util.JSONResponse{
+			Code: 405,
+			JSON: jsonerror.Unknown("request method must be GET"),
+		}, logger)
+		return
+	}
 
 	r := &DownloadRequest{
 		MediaID:    mediaID,
