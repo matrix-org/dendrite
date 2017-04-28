@@ -34,13 +34,13 @@ type contextKeys string
 const ctxValueLogger = contextKeys("logger")
 const ctxValueRequestID = contextKeys("requestid")
 
-type Fudge struct {
+type downloadRequestHandler struct {
 	Config         config.MediaAPI
 	Database       *storage.Database
 	DownloadServer writers.DownloadServer
 }
 
-func (fudge Fudge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (handler downloadRequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// NOTE: The code below is from util.Protect and respond but this is the only
 	// API that needs a different form of it to be able to pass the
 	// http.ResponseWriter to the handler
@@ -68,7 +68,7 @@ func (fudge Fudge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(req)
-	writers.Download(w, req, vars["serverName"], vars["mediaId"], fudge.Config, fudge.Database, fudge.DownloadServer)
+	writers.Download(w, req, vars["serverName"], vars["mediaId"], handler.Config, handler.Database, handler.DownloadServer)
 }
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
@@ -85,14 +85,14 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI,
 		LocalServerName: cfg.ServerName,
 	}
 
-	fudge := Fudge{
+	handler := downloadRequestHandler{
 		Config:         cfg,
 		Database:       db,
 		DownloadServer: downloadServer,
 	}
 
 	r0mux.Handle("/download/{serverName}/{mediaId}",
-		prometheus.InstrumentHandler("download", fudge),
+		prometheus.InstrumentHandler("download", handler),
 	)
 
 	servMux.Handle("/metrics", prometheus.Handler())
