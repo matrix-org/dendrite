@@ -95,15 +95,7 @@ func Download(w http.ResponseWriter, req *http.Request, serverName string, media
 	}
 
 	contentType, contentDisposition, fileSize, filename, err := db.GetMedia(r.MediaID, r.ServerName)
-	if err != nil {
-		if strings.Compare(r.ServerName, cfg.ServerName) != 0 {
-			// TODO: get remote file from remote server
-			jsonErrorResponse(w, util.JSONResponse{
-				Code: 404,
-				JSON: jsonerror.NotFound(fmt.Sprintf("NOT YET IMPLEMENTED")),
-			}, logger)
-			return
-		}
+	if err != nil && strings.Compare(r.ServerName, cfg.ServerName) == 0 {
 		jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File %q does not exist", r.MediaID)),
