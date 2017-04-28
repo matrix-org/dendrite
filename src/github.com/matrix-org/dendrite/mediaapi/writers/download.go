@@ -94,9 +94,6 @@ func Download(w http.ResponseWriter, req *http.Request, serverName string, media
 		return
 	}
 
-	// TODO:
-	// - query db to look up content type and disposition and whether we have the file
-	logger.Warnln(r.MediaID, r.ServerName, cfg.ServerName)
 	contentType, contentDisposition, fileSize, filename, err := db.GetMedia(r.MediaID, r.ServerName)
 	if err != nil {
 		if strings.Compare(r.ServerName, cfg.ServerName) != 0 {
