@@ -15,10 +15,8 @@
 package routing
 
 import (
-	"context"
 	"net/http"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
@@ -29,11 +27,6 @@ import (
 
 const pathPrefixR0 = "/_matrix/media/v1"
 
-type contextKeys string
-
-const ctxValueLogger = contextKeys("logger")
-const ctxValueRequestID = contextKeys("requestid")
-
 type downloadRequestHandler struct {
 	Config         config.MediaAPI
 	Database       *storage.Database
@@ -41,21 +34,7 @@ type downloadRequestHandler struct {
 }
 
 func (handler downloadRequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// NOTE: The code below is from util.MakeJSONAPI and respond but this is the
-	// only API that needs a different form of it to be able to pass the
-	// http.ResponseWriter to the handler
-	reqID := util.RandomString(12)
-	// Set a Logger and request ID on the context
-	ctx := context.WithValue(req.Context(), ctxValueLogger, log.WithFields(log.Fields{
-		"req.method": req.Method,
-		"req.path":   req.URL.Path,
-		"req.id":     reqID,
-	}))
-	ctx = context.WithValue(ctx, ctxValueRequestID, reqID)
-	req = req.WithContext(ctx)
-
-	logger := util.GetLogger(req.Context())
-	logger.Print("Incoming request")
+	util.SetupRequestLogging(req)
 
 	if req.Method == "OPTIONS" {
 		util.SetCORSHeaders(w)
