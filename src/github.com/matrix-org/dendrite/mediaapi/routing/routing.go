@@ -41,8 +41,8 @@ type downloadRequestHandler struct {
 }
 
 func (handler downloadRequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// NOTE: The code below is from util.Protect and respond but this is the only
-	// API that needs a different form of it to be able to pass the
+	// NOTE: The code below is from util.MakeJSONAPI and respond but this is the
+	// only API that needs a different form of it to be able to pass the
 	// http.ResponseWriter to the handler
 	reqID := util.RandomString(12)
 	// Set a Logger and request ID on the context
