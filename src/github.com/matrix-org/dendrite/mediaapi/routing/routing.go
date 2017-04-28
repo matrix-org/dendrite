@@ -36,12 +36,6 @@ type downloadRequestHandler struct {
 func (handler downloadRequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	util.SetupRequestLogging(req)
 
-	if req.Method == "OPTIONS" {
-		util.SetCORSHeaders(w)
-		w.WriteHeader(200)
-		return
-	}
-
 	// Set common headers returned regardless of the outcome of the request
 	util.SetCORSHeaders(w)
 	w.Header().Set("Content-Type", "application/json")
