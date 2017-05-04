@@ -70,6 +70,7 @@ func init() {
 	}
 }
 
+// TODO: dupes roomserver integration tests. Factor out.
 func createDatabase(database string) error {
 	cmd := exec.Command("psql", postgresDatabase)
 	cmd.Stdin = strings.NewReader(
@@ -82,6 +83,7 @@ func createDatabase(database string) error {
 	return cmd.Run()
 }
 
+// TODO: dupes roomserver integration tests. Factor out.
 func createTopic(topic string) error {
 	cmd := exec.Command(
 		filepath.Join(kafkaDir, "bin", "kafka-topics.sh"),
@@ -98,6 +100,7 @@ func createTopic(topic string) error {
 	return cmd.Run()
 }
 
+// TODO: dupes roomserver integration tests. Factor out.
 func writeToTopic(topic string, data []string) error {
 	cmd := exec.Command(
 		filepath.Join(kafkaDir, "bin", "kafka-console-producer.sh"),
@@ -112,6 +115,7 @@ func writeToTopic(topic string, data []string) error {
 	return cmd.Run()
 }
 
+// TODO: dupes roomserver integration tests. Factor out.
 func deleteTopic(topic string) error {
 	cmd := exec.Command(
 		filepath.Join(kafkaDir, "bin", "kafka-topics.sh"),
@@ -125,6 +129,7 @@ func deleteTopic(topic string) error {
 	return cmd.Run()
 }
 
+// TODO: dupes roomserver integration tests. Factor out.
 func canonicalJSONInput(jsonData []string) []string {
 	for i := range jsonData {
 		jsonBytes, err := gomatrixserverlib.CanonicalJSON([]byte(jsonData[i]))
