@@ -92,7 +92,7 @@
 		{
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
-			"revision": "fd3b9faf8492989e8f782592d37dcbdc01c44fea",
+			"revision": "9c075cb699ceb64cacd9136a0e7a0e0ff3dc9bcf",
 			"branch": "master"
 		},
 		{

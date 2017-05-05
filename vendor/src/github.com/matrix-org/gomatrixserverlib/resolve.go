@@ -38,15 +38,15 @@ type DNSResult struct {
 }
 
 // LookupServer looks up a matrix server in DNS.
-func LookupServer(serverName string) (*DNSResult, error) {
+func LookupServer(serverName ServerName) (*DNSResult, error) {
 	var result DNSResult
 	result.Hosts = map[string]HostResult{}
 
 	hosts := map[string][]net.SRV{}
-	if strings.Index(serverName, ":") == -1 {
+	if strings.Index(string(serverName), ":") == -1 {
 		// If there isn't an explicit port set then try to look up the SRV record.
 		var err error
-		result.SRVCName, result.SRVRecords, err = net.LookupSRV("matrix", "tcp", serverName)
+		result.SRVCName, result.SRVRecords, err = net.LookupSRV("matrix", "tcp", string(serverName))
 		result.SRVError = err
 
 		if err != nil {
@@ -57,8 +57,8 @@ func LookupServer(serverName string) (*DNSResult, error) {
 					return nil, err
 				}
 				// If there isn't a SRV record in DNS then fallback to "serverName:8448".
-				hosts[serverName] = []net.SRV{net.SRV{
-					Target: serverName,
+				hosts[string(serverName)] = []net.SRV{net.SRV{
+					Target: string(serverName),
 					Port:   8448,
 				}}
 			}
@@ -71,7 +71,7 @@ func LookupServer(serverName string) (*DNSResult, error) {
 	} else {
 		// There is a explicit port set in the server name.
 		// We don't need to look up any SRV records.
-		host, portStr, err := net.SplitHostPort(serverName)
+		host, portStr, err := net.SplitHostPort(string(serverName))
 		if err != nil {
 			return nil, err
 		}

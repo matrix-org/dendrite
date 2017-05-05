@@ -27,13 +27,18 @@ import (
 	"time"
 )
 
+// A ServerName is the name a matrix homeserver is identified by.
+// It is a DNS name without a trailing dot optionally followed by a port.
+// So it has the format: "[0-9A-Za-z\-]+(\.[0-9A-Za-z\-]+)*(:[0-9]+)?"
+type ServerName string
+
 // ServerKeys are the ed25519 signing keys published by a matrix server.
 // Contains SHA256 fingerprints of the TLS X509 certificates used by the server.
 type ServerKeys struct {
 	// Copy of the raw JSON for signature checking.
 	Raw []byte
 	// The server the raw JSON was downloaded from.
-	FromServer string
+	FromServer ServerName
 	// The decoded JSON fields.
 	ServerKeyFields
 }
@@ -59,7 +64,7 @@ type OldVerifyKey struct {
 // ServerKeyFields are the parsed JSON contents of the ed25519 signing keys published by a matrix server.
 type ServerKeyFields struct {
 	// The name of the server
-	ServerName string `json:"server_name"`
+	ServerName ServerName `json:"server_name"`
 	// List of SHA256 fingerprints of X509 certificates used by this server.
 	TLSFingerprints []TLSFingerprint `json:"tls_fingerprints"`
 	// The current signing keys in use on this server.
@@ -99,7 +104,7 @@ func (keys ServerKeys) PublicKey(keyID KeyID, atTS Timestamp) []byte {
 // FetchKeysDirect fetches the matrix keys directly from the given address.
 // Optionally sets a SNI header if ``sni`` is not empty.
 // Returns the server keys and the state of the TLS connection used to retrieve them.
-func FetchKeysDirect(serverName, addr, sni string) (*ServerKeys, *tls.ConnectionState, error) {
+func FetchKeysDirect(serverName ServerName, addr, sni string) (*ServerKeys, *tls.ConnectionState, error) {
 	// Create a TLS connection.
 	tcpconn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -116,7 +121,7 @@ func FetchKeysDirect(serverName, addr, sni string) (*ServerKeys, *tls.Connection
 	connectionState := tlsconn.ConnectionState()
 
 	// Write a GET /_matrix/key/v2/server down the connection.
-	requestURL := "matrix://" + serverName + "/_matrix/key/v2/server"
+	requestURL := "matrix://" + string(serverName) + "/_matrix/key/v2/server"
 	request, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, nil, err
@@ -169,7 +174,7 @@ type KeyChecks struct {
 
 // CheckKeys checks the keys returned from a server to make sure they are valid.
 // If the checks pass then also return a map of key_id to Ed25519 public key and a list of SHA256 TLS fingerprints.
-func CheckKeys(serverName string, now time.Time, keys ServerKeys, connState *tls.ConnectionState) (
+func CheckKeys(serverName ServerName, now time.Time, keys ServerKeys, connState *tls.ConnectionState) (
 	checks KeyChecks, ed25519Keys map[KeyID]Base64String, sha256Fingerprints []Base64String,
 ) {
 	checks.MatchingServerName = serverName == keys.ServerName
@@ -222,7 +227,7 @@ func checkVerifyKeys(keys ServerKeys, checks *KeyChecks) map[KeyID]Base64String 
 				ValidEd25519: len(publicKey) == 32,
 			}
 			if entry.ValidEd25519 {
-				err := VerifyJSON(keys.ServerName, keyID, []byte(publicKey), keys.Raw)
+				err := VerifyJSON(string(keys.ServerName), keyID, []byte(publicKey), keys.Raw)
 				entry.MatchingSignature = err == nil
 			}
 			checks.Ed25519Checks[keyID] = entry

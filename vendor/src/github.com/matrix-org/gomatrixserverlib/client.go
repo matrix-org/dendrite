@@ -84,8 +84,8 @@ func makeHTTPSURL(u *url.URL, addr string) (httpsURL url.URL) {
 }
 
 func (f *federationTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	host := r.URL.Host
-	dnsResult, err := LookupServer(host)
+	serverName := ServerName(r.URL.Host)
+	dnsResult, err := LookupServer(serverName)
 	if err != nil {
 		return nil, err
 	}
@@ -98,15 +98,15 @@ func (f *federationTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 			return resp, nil
 		}
 	}
-	return nil, fmt.Errorf("no address found for matrix host %v", host)
+	return nil, fmt.Errorf("no address found for matrix host %v", serverName)
 }
 
 // LookupUserInfo gets information about a user from a given matrix homeserver
 // using a bearer access token.
-func (fc *Client) LookupUserInfo(matrixServer, token string) (u UserInfo, err error) {
+func (fc *Client) LookupUserInfo(matrixServer ServerName, token string) (u UserInfo, err error) {
 	url := url.URL{
 		Scheme:   "matrix",
-		Host:     matrixServer,
+		Host:     string(matrixServer),
 		Path:     "/_matrix/federation/v1/openid/userinfo",
 		RawQuery: url.Values{"access_token": []string{token}}.Encode(),
 	}
@@ -135,7 +135,7 @@ func (fc *Client) LookupUserInfo(matrixServer, token string) (u UserInfo, err er
 	}
 
 	userParts := strings.SplitN(u.Sub, ":", 2)
-	if len(userParts) != 2 || userParts[1] != matrixServer {
+	if len(userParts) != 2 || userParts[1] != string(matrixServer) {
 		err = fmt.Errorf("userID doesn't match server name '%v' != '%v'", u.Sub, matrixServer)
 		return
 	}
@@ -153,11 +153,11 @@ func (fc *Client) LookupUserInfo(matrixServer, token string) (u UserInfo, err er
 // copy of the keys.
 // Returns the keys or an error if there was a problem talking to the server.
 func (fc *Client) LookupServerKeys(
-	matrixServer string, keyRequests map[PublicKeyRequest]Timestamp,
+	matrixServer ServerName, keyRequests map[PublicKeyRequest]Timestamp,
 ) (map[PublicKeyRequest]ServerKeys, error) {
 	url := url.URL{
 		Scheme: "matrix",
-		Host:   matrixServer,
+		Host:   string(matrixServer),
 		Path:   "/_matrix/key/v2/query",
 	}
 
@@ -167,8 +167,8 @@ func (fc *Client) LookupServerKeys(
 		MinimumValidUntilTS Timestamp `json:"minimum_valid_until_ts"`
 	}
 	request := struct {
-		ServerKeyMap map[string]map[KeyID]keyreq `json:"server_keys"`
-	}{map[string]map[KeyID]keyreq{}}
+		ServerKeyMap map[ServerName]map[KeyID]keyreq `json:"server_keys"`
+	}{map[ServerName]map[KeyID]keyreq{}}
 	for k, ts := range keyRequests {
 		server := request.ServerKeyMap[k.ServerName]
 		if server == nil {

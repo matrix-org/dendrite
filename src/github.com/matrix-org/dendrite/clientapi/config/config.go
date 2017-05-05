@@ -22,7 +22,7 @@ import (
 // ClientAPI contains the config information necessary to spin up a clientapi process.
 type ClientAPI struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
-	ServerName string
+	ServerName gomatrixserverlib.ServerName
 	// The private key which will be used to sign events.
 	PrivateKey ed25519.PrivateKey
 	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the

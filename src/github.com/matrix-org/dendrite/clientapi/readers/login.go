@@ -19,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"net/http"
 )
@@ -38,9 +39,9 @@ type passwordRequest struct {
 }
 
 type loginResponse struct {
-	UserID      string `json:"user_id"`
-	AccessToken string `json:"access_token"`
-	HomeServer  string `json:"home_server"`
+	UserID      string                       `json:"user_id"`
+	AccessToken string                       `json:"access_token"`
+	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
 }
 
 func passwordLogin() loginFlows {
@@ -85,6 +86,6 @@ func Login(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
 	}
 }
 
-func makeUserID(localpart, domain string) string {
+func makeUserID(localpart string, domain gomatrixserverlib.ServerName) string {
 	return fmt.Sprintf("@%s:%s", localpart, domain)
 }

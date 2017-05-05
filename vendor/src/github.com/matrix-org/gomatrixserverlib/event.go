@@ -109,14 +109,14 @@ var emptyEventReferenceList = []EventReference{}
 // Call this after filling out the necessary fields.
 // This can be called mutliple times on the same builder.
 // A different event ID must be supplied each time this is called.
-func (eb *EventBuilder) Build(eventID string, now time.Time, origin string, keyID KeyID, privateKey ed25519.PrivateKey) (result Event, err error) {
+func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, keyID KeyID, privateKey ed25519.PrivateKey) (result Event, err error) {
 	var event struct {
 		EventBuilder
-		EventID        string    `json:"event_id"`
-		RawContent     rawJSON   `json:"content"`
-		RawUnsigned    rawJSON   `json:"unsigned,omitempty"`
-		OriginServerTS Timestamp `json:"origin_server_ts"`
-		Origin         string    `json:"origin"`
+		EventID        string     `json:"event_id"`
+		RawContent     rawJSON    `json:"content"`
+		RawUnsigned    rawJSON    `json:"unsigned,omitempty"`
+		OriginServerTS Timestamp  `json:"origin_server_ts"`
+		Origin         ServerName `json:"origin"`
 	}
 	event.EventBuilder = *eb
 	if event.PrevEvents == nil {
@@ -143,7 +143,7 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin string, keyI
 		return
 	}
 
-	if eventJSON, err = signEvent(origin, keyID, privateKey, eventJSON); err != nil {
+	if eventJSON, err = signEvent(string(origin), keyID, privateKey, eventJSON); err != nil {
 		return
 	}
 

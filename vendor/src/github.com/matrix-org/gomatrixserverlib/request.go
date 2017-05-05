@@ -20,12 +20,12 @@ type FederationRequest struct {
 	// fields implement the JSON format needed for signing
 	// specified in https://matrix.org/docs/spec/server_server/unstable.html#request-authentication
 	fields struct {
-		Content     rawJSON                      `json:"content,omitempty"`
-		Destination string                       `json:"destination"`
-		Method      string                       `json:"method"`
-		Origin      string                       `json:"origin"`
-		RequestURI  string                       `json:"uri"`
-		Signatures  map[string]map[string]string `json:"signatures,omitempty"`
+		Content     rawJSON                         `json:"content,omitempty"`
+		Destination ServerName                      `json:"destination"`
+		Method      string                          `json:"method"`
+		Origin      ServerName                      `json:"origin"`
+		RequestURI  string                          `json:"uri"`
+		Signatures  map[ServerName]map[KeyID]string `json:"signatures,omitempty"`
 	}
 }
 
@@ -34,7 +34,7 @@ type FederationRequest struct {
 // The destination is the name of a matrix homeserver.
 // The request path must begin with a slash.
 // Eg. NewFederationRequest("GET", "matrix.org", "/_matrix/federation/v1/send/123")
-func NewFederationRequest(method, destination, requestURI string) FederationRequest {
+func NewFederationRequest(method string, destination ServerName, requestURI string) FederationRequest {
 	var r FederationRequest
 	r.fields.Destination = destination
 	r.fields.Method = strings.ToUpper(method)
@@ -70,7 +70,7 @@ func (r *FederationRequest) Content() []byte {
 }
 
 // Origin returns the server that the request originated on.
-func (r *FederationRequest) Origin() string {
+func (r *FederationRequest) Origin() ServerName {
 	return r.fields.Origin
 }
 
@@ -83,7 +83,7 @@ func (r *FederationRequest) RequestURI() string {
 // Uses the algorithm specified https://matrix.org/docs/spec/server_server/unstable.html#request-authentication
 // Updates the request with the signature in place.
 // Returns an error if there was a problem signing the request.
-func (r *FederationRequest) Sign(serverName string, keyID KeyID, privateKey ed25519.PrivateKey) error {
+func (r *FederationRequest) Sign(serverName ServerName, keyID KeyID, privateKey ed25519.PrivateKey) error {
 	if r.fields.Origin != "" && r.fields.Origin != serverName {
 		return fmt.Errorf("gomatrixserverlib: the request is already signed by a different server")
 	}
@@ -94,7 +94,7 @@ func (r *FederationRequest) Sign(serverName string, keyID KeyID, privateKey ed25
 	if err != nil {
 		return err
 	}
-	signedData, err := SignJSON(serverName, keyID, privateKey, data)
+	signedData, err := SignJSON(string(serverName), keyID, privateKey, data)
 	if err != nil {
 		return err
 	}
@@ -135,10 +135,10 @@ func (r *FederationRequest) HTTPRequest() (*http.Request, error) {
 		// Check that we can safely include the origin and key ID in the header.
 		// We don't need to check the signature since we already know that it is
 		// base64.
-		if !isSafeInHTTPQuotedString(r.fields.Origin) {
+		if !isSafeInHTTPQuotedString(string(r.fields.Origin)) {
 			return nil, fmt.Errorf("gomatrixserverlib: Request Origin isn't safe to include in an HTTP header")
 		}
-		if !isSafeInHTTPQuotedString(keyID) {
+		if !isSafeInHTTPQuotedString(string(keyID)) {
 			return nil, fmt.Errorf("gomatrixserverlib: Request key ID isn't safe to include in an HTTP header")
 		}
 		httpReq.Header.Add("Authorization", fmt.Sprintf(
@@ -191,7 +191,7 @@ func isSafeInHTTPQuotedString(text string) bool {
 // the query parameters, and the JSON content. In particular the version of
 // HTTP and the headers aren't protected by the signature.
 func VerifyHTTPRequest(
-	req *http.Request, now time.Time, destination string, keys KeyRing,
+	req *http.Request, now time.Time, destination ServerName, keys KeyRing,
 ) (*FederationRequest, util.JSONResponse) {
 	request, err := readHTTPRequest(req)
 	if err != nil {
@@ -268,7 +268,7 @@ func readHTTPRequest(req *http.Request) (*FederationRequest, error) {
 		}
 		result.fields.Origin = origin
 		if result.fields.Signatures == nil {
-			result.fields.Signatures = map[string]map[string]string{origin: map[string]string{key: sig}}
+			result.fields.Signatures = map[ServerName]map[KeyID]string{origin: map[KeyID]string{key: sig}}
 		} else {
 			result.fields.Signatures[origin][key] = sig
 		}
@@ -277,7 +277,7 @@ func readHTTPRequest(req *http.Request) (*FederationRequest, error) {
 	return &result, nil
 }
 
-func parseAuthorization(header string) (scheme, origin, key, sig string) {
+func parseAuthorization(header string) (scheme string, origin ServerName, key KeyID, sig string) {
 	parts := strings.SplitN(header, " ", 2)
 	scheme = parts[0]
 	if scheme != "X-Matrix" {
@@ -294,10 +294,10 @@ func parseAuthorization(header string) (scheme, origin, key, sig string) {
 		name := pair[0]
 		value := strings.Trim(pair[1], "\"")
 		if name == "origin" {
-			origin = value
+			origin = ServerName(value)
 		}
 		if name == "key" {
-			key = value
+			key = KeyID(value)
 		}
 		if name == "sig" {
 			sig = value
