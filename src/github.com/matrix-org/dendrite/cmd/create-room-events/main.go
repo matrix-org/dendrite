@@ -111,7 +111,7 @@ func buildAndOutput() gomatrixserverlib.EventReference {
 	eventID++
 	id := fmt.Sprintf("$%d:%s", eventID, *serverName)
 	now = time.Unix(0, 0)
-	event, err := b.Build(id, now, *serverName, *keyID, privateKey)
+	event, err := b.Build(id, now, *serverName, gomatrixserverlib.KeyID(*keyID), privateKey)
 	if err != nil {
 		panic(err)
 	}

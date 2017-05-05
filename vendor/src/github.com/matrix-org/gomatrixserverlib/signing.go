@@ -21,11 +21,17 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
+// A KeyID is the ID of a ed25519 key used to sign JSON.
+// The key IDs have a format of "ed25519:[0-9A-Za-z]+"
+// If we switch to using a different signing algorithm then we will change the
+// prefix used.
+type KeyID string
+
 // SignJSON signs a JSON object returning a copy signed with the given key.
 // https://matrix.org/docs/spec/server_server/unstable.html#signing-json
-func SignJSON(signingName, keyID string, privateKey ed25519.PrivateKey, message []byte) ([]byte, error) {
+func SignJSON(signingName string, keyID KeyID, privateKey ed25519.PrivateKey, message []byte) ([]byte, error) {
 	var object map[string]*json.RawMessage
-	var signatures map[string]map[string]Base64String
+	var signatures map[string]map[KeyID]Base64String
 	if err := json.Unmarshal(message, &object); err != nil {
 		return nil, err
 	}
@@ -39,7 +45,7 @@ func SignJSON(signingName, keyID string, privateKey ed25519.PrivateKey, message 
 		}
 		delete(object, "signatures")
 	} else {
-		signatures = map[string]map[string]Base64String{}
+		signatures = map[string]map[KeyID]Base64String{}
 	}
 
 	unsorted, err := json.Marshal(object)
@@ -58,7 +64,7 @@ func SignJSON(signingName, keyID string, privateKey ed25519.PrivateKey, message 
 	if signaturesForEntity != nil {
 		signaturesForEntity[keyID] = signature
 	} else {
-		signatures[signingName] = map[string]Base64String{keyID: signature}
+		signatures[signingName] = map[KeyID]Base64String{keyID: signature}
 	}
 
 	var rawSignatures json.RawMessage
@@ -75,10 +81,25 @@ func SignJSON(signingName, keyID string, privateKey ed25519.PrivateKey, message 
 	return json.Marshal(object)
 }
 
+// ListKeyIDs lists the key IDs a given entity has signed a message with.
+func ListKeyIDs(signingName string, message []byte) ([]KeyID, error) {
+	var object struct {
+		Signatures map[string]map[KeyID]json.RawMessage `json:"signatures"`
+	}
+	if err := json.Unmarshal(message, &object); err != nil {
+		return nil, err
+	}
+	var result []KeyID
+	for keyID := range object.Signatures[signingName] {
+		result = append(result, keyID)
+	}
+	return result, nil
+}
+
 // VerifyJSON checks that the entity has signed the message using a particular key.
-func VerifyJSON(signingName, keyID string, publicKey ed25519.PublicKey, message []byte) error {
+func VerifyJSON(signingName string, keyID KeyID, publicKey ed25519.PublicKey, message []byte) error {
 	var object map[string]*json.RawMessage
-	var signatures map[string]map[string]Base64String
+	var signatures map[string]map[KeyID]Base64String
 	if err := json.Unmarshal(message, &object); err != nil {
 		return err
 	}

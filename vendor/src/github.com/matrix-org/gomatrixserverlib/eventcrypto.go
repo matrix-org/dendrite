@@ -142,7 +142,7 @@ func referenceOfEvent(eventJSON []byte) (EventReference, error) {
 }
 
 // SignEvent adds a ED25519 signature to the event for the given key.
-func signEvent(signingName, keyID string, privateKey ed25519.PrivateKey, eventJSON []byte) ([]byte, error) {
+func signEvent(signingName string, keyID KeyID, privateKey ed25519.PrivateKey, eventJSON []byte) ([]byte, error) {
 
 	// Redact the event before signing so signature that will remain valid even if the event is redacted.
 	redactedJSON, err := redactEvent(eventJSON)
@@ -176,7 +176,7 @@ func signEvent(signingName, keyID string, privateKey ed25519.PrivateKey, eventJS
 }
 
 // VerifyEventSignature checks if the event has been signed by the given ED25519 key.
-func verifyEventSignature(signingName, keyID string, publicKey ed25519.PublicKey, eventJSON []byte) error {
+func verifyEventSignature(signingName string, keyID KeyID, publicKey ed25519.PublicKey, eventJSON []byte) error {
 	redactedJSON, err := redactEvent(eventJSON)
 	if err != nil {
 		return err
