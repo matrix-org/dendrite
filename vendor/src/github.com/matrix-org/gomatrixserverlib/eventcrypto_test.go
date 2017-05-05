@@ -30,7 +30,7 @@ func TestVerifyEventSignatureTestVectors(t *testing.T) {
 	}
 	random := bytes.NewBuffer(seed)
 	entityName := "domain"
-	keyID := "ed25519:1"
+	keyID := KeyID("ed25519:1")
 
 	publicKey, _, err := ed25519.GenerateKey(random)
 	if err != nil {
@@ -173,7 +173,7 @@ func TestSignEventTestVectors(t *testing.T) {
 	}
 	random := bytes.NewBuffer(seed)
 	entityName := "domain"
-	keyID := "ed25519:1"
+	keyID := KeyID("ed25519:1")
 
 	_, privateKey, err := ed25519.GenerateKey(random)
 	if err != nil {
