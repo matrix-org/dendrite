@@ -16,13 +16,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/matrix-org/gomatrixserverlib"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var (
@@ -37,7 +38,7 @@ var (
 	// How long to wait for the syncserver to write the expected output messages.
 	// This needs to be high enough to account for the time it takes to create
 	// the postgres database tables which can take a while on travis.
-	timeoutString = defaulting(os.Getenv("TIMEOUT"), "60s")
+	timeoutString = defaulting(os.Getenv("TIMEOUT"), "10s")
 	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
 	// The name of the test database to create.
@@ -161,7 +162,6 @@ func testSyncServer(input, want []string, since string) {
 	}
 
 	// TODO: goroutine to make HTTP hit and check response
-	// TODO: Shutdown sync server after test finishes
 
 	cmd := exec.Command(
 		filepath.Join(filepath.Dir(os.Args[0]), "dendrite-sync-api-server"),
@@ -170,10 +170,32 @@ func testSyncServer(input, want []string, since string) {
 	)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stderr
-	/*
-		if err = cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
+		panic("failed to start sync server: " + err.Error())
+	}
+	// wait for it to die or timeout
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+	select {
+	case <-time.After(timeout):
+		if err := cmd.Process.Kill(); err != nil {
 			panic(err)
-		} */
+		}
+		panic("dendrite-sync-api-server timed out")
+	case err := <-done:
+		if err != nil {
+			fmt.Println("\nERROR:")
+			fmt.Println("sync server failed to run. If failing with 'pq: password authentication failed for user' try:")
+			fmt.Println("    export PGHOST=/var/run/postgresql\n")
+			panic(err)
+		} else {
+			if err := cmd.Process.Kill(); err != nil {
+				panic(err)
+			}
+		}
+	}
 }
 
 func main() {
