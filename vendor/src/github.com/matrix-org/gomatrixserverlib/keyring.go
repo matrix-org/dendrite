@@ -10,7 +10,7 @@ import (
 // A PublicKeyRequest is a request for a public key with a particular key ID.
 type PublicKeyRequest struct {
 	// The server to fetch a key for.
-	ServerName string
+	ServerName ServerName
 	// The ID of the key to fetch.
 	KeyID KeyID
 }
@@ -46,7 +46,7 @@ type KeyRing struct {
 // signature from that server.
 type VerifyJSONRequest struct {
 	// The name of the matrix server to check for a signature for.
-	ServerName string
+	ServerName ServerName
 	// The millisecond posix timestamp the message needs to be valid at.
 	AtTS Timestamp
 	// The JSON bytes.
@@ -71,7 +71,7 @@ func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult,
 	keyIDs := make([][]KeyID, len(requests))
 
 	for i := range requests {
-		ids, err := ListKeyIDs(requests[i].ServerName, requests[i].Message)
+		ids, err := ListKeyIDs(string(requests[i].ServerName), requests[i].Message)
 		if err != nil {
 			results[i].Result = fmt.Errorf("gomatrixserverlib: error extracting key IDs")
 			continue
@@ -187,7 +187,7 @@ func (k *KeyRing) checkUsingKeys(
 				continue
 			}
 			if err := VerifyJSON(
-				requests[i].ServerName, keyID, ed25519.PublicKey(publicKey), requests[i].Message,
+				string(requests[i].ServerName), keyID, ed25519.PublicKey(publicKey), requests[i].Message,
 			); err != nil {
 				// The signature wasn't valid, record the error and try the next key ID.
 				results[i].Result = err
@@ -203,7 +203,7 @@ func (k *KeyRing) checkUsingKeys(
 // A PerspectiveKeyFetcher fetches server keys from a single perspective server.
 type PerspectiveKeyFetcher struct {
 	// The name of the perspective server to fetch keys from.
-	PerspectiveServerName string
+	PerspectiveServerName ServerName
 	// The ed25519 public keys the perspective server must sign responses with.
 	PerspectiveServerKeys map[KeyID]ed25519.PublicKey
 	// The federation client to use to fetch keys with.
@@ -219,7 +219,7 @@ func (p *PerspectiveKeyFetcher) FetchKeys(requests map[PublicKeyRequest]Timestam
 
 	for req, keys := range results {
 		var valid bool
-		keyIDs, err := ListKeyIDs(p.PerspectiveServerName, keys.Raw)
+		keyIDs, err := ListKeyIDs(string(p.PerspectiveServerName), keys.Raw)
 		if err != nil {
 			// The response from the perspective server was corrupted.
 			return nil, err
@@ -230,7 +230,7 @@ func (p *PerspectiveKeyFetcher) FetchKeys(requests map[PublicKeyRequest]Timestam
 				// We don't have a key for that keyID, skip to the next keyID.
 				continue
 			}
-			if err := VerifyJSON(p.PerspectiveServerName, keyID, perspectiveKey, keys.Raw); err != nil {
+			if err := VerifyJSON(string(p.PerspectiveServerName), keyID, perspectiveKey, keys.Raw); err != nil {
 				// An invalid signature is very bad since it means we have a
 				// problem talking to the perspective server.
 				return nil, err
@@ -263,7 +263,7 @@ type DirectKeyFetcher struct {
 
 // FetchKeys implements KeyFetcher
 func (d *DirectKeyFetcher) FetchKeys(requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]ServerKeys, error) {
-	byServer := map[string]map[PublicKeyRequest]Timestamp{}
+	byServer := map[ServerName]map[PublicKeyRequest]Timestamp{}
 	for req, ts := range requests {
 		server := byServer[req.ServerName]
 		if server == nil {
@@ -289,7 +289,7 @@ func (d *DirectKeyFetcher) FetchKeys(requests map[PublicKeyRequest]Timestamp) (m
 }
 
 func (d *DirectKeyFetcher) fetchKeysForServer(
-	serverName string, requests map[PublicKeyRequest]Timestamp,
+	serverName ServerName, requests map[PublicKeyRequest]Timestamp,
 ) (map[PublicKeyRequest]ServerKeys, error) {
 	results, err := d.Client.LookupServerKeys(serverName, requests)
 	if err != nil {
