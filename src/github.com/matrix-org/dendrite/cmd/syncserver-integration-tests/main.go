@@ -17,6 +17,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -142,6 +143,44 @@ func canonicalJSONInput(jsonData []string) []string {
 	return jsonData
 }
 
+func doSyncRequest(done chan error, want []string, since string) func() {
+	return func() {
+		cli := &http.Client{
+			Timeout: 5 * time.Second,
+		}
+		res, err := cli.Get("http://" + syncserverAddr + "/api/_matrix/client/r0/sync?access_token=@alice:localhost&since=" + since)
+		if err != nil {
+			done <- err
+			return
+		}
+		if res.StatusCode != 200 {
+			done <- fmt.Errorf("/sync returned HTTP status %d", res.StatusCode)
+			return
+		}
+		defer res.Body.Close()
+		resBytes, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			done <- err
+			return
+		}
+		jsonBytes, err := gomatrixserverlib.CanonicalJSON(resBytes)
+		if err != nil {
+			done <- err
+			return
+		}
+		if string(jsonBytes) != want[0] {
+			fmt.Println("Expected:")
+			fmt.Println(want[0])
+			fmt.Println("Got:")
+			fmt.Println(string(jsonBytes))
+			done <- fmt.Errorf("/sync returned wrong bytes")
+			return
+		}
+		// all good, clean up
+		close(done)
+	}
+}
+
 func testSyncServer(input, want []string, since string) {
 	deleteTopic(inputTopic)
 	if err := createTopic(inputTopic); err != nil {
@@ -161,8 +200,6 @@ func testSyncServer(input, want []string, since string) {
 		panic(err)
 	}
 
-	// TODO: goroutine to make HTTP hit and check response
-
 	cmd := exec.Command(
 		filepath.Join(filepath.Dir(os.Args[0]), "dendrite-sync-api-server"),
 		"--config", configFileName,
@@ -173,10 +210,23 @@ func testSyncServer(input, want []string, since string) {
 	if err := cmd.Start(); err != nil {
 		panic("failed to start sync server: " + err.Error())
 	}
-	// wait for it to die or timeout
 	done := make(chan error, 1)
+
+	// TODO: Waiting 1s is racey. Maybe keep hitting it until it doesn't get Connection Refused?
+	time.AfterFunc(1*time.Second, doSyncRequest(done, want, since))
+
+	// wait for it to die or timeout
 	go func() {
-		done <- cmd.Wait()
+		cmdErr := cmd.Wait()
+		if cmdErr != nil {
+			exitErr, ok := cmdErr.(*exec.ExitError)
+			if ok {
+				fmt.Println("\nSYNC SERVER ERROR: (", exitErr, ")")
+				fmt.Println("sync server failed to run. If failing with 'pq: password authentication failed for user' try:")
+				fmt.Println("    export PGHOST=/var/run/postgresql\n")
+			}
+		}
+		done <- cmdErr
 	}()
 	select {
 	case <-time.After(timeout):
@@ -185,15 +235,9 @@ func testSyncServer(input, want []string, since string) {
 		}
 		panic("dendrite-sync-api-server timed out")
 	case err := <-done:
+		cmd.Process.Kill() // ensure server is dead, only cleaning up so don't care about errors this returns.
 		if err != nil {
-			fmt.Println("\nERROR:")
-			fmt.Println("sync server failed to run. If failing with 'pq: password authentication failed for user' try:")
-			fmt.Println("    export PGHOST=/var/run/postgresql\n")
 			panic(err)
-		} else {
-			if err := cmd.Process.Kill(); err != nil {
-				panic(err)
-			}
 		}
 	}
 }
@@ -477,5 +521,6 @@ func main() {
 		}
 	}`,
 	}
+	want = canonicalJSONInput(want)
 	testSyncServer(input, want, since)
 }
