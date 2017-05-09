@@ -302,8 +302,8 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			if readErr != nil {
 				if readErr != io.EOF {
 					fetchError = errRead
-					break
 				}
+				break
 			}
 		}
 
