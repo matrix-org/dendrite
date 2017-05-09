@@ -230,6 +230,11 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 		}
 		r.MediaMetadata.ContentLength = types.ContentLength(contentLength)
 
+		r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
+		r.MediaMetadata.ContentDisposition = types.ContentDisposition(resp.Header.Get("Content-Disposition"))
+		// FIXME: parse from Content-Disposition header if possible, else fall back
+		//r.MediaMetadata.UploadName          = types.Filename()
+
 		logger.WithFields(log.Fields{
 			"MediaID": r.MediaMetadata.MediaID,
 			"Origin":  r.MediaMetadata.Origin,
@@ -354,6 +359,9 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 
 		// Note: After this point we have responded to the client's request and are just dealing with local caching.
 		// As we have responded with 200 OK, any errors are ineffectual to the client request and so we just log and return.
+
+		r.MediaMetadata.ContentLength = types.ContentLength(bytesWritten)
+		r.MediaMetadata.UserID = types.MatrixUserID("@unknown:" + string(r.MediaMetadata.Origin))
 
 		logger.WithFields(log.Fields{
 			"MediaID":             r.MediaMetadata.MediaID,
