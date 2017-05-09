@@ -21,8 +21,8 @@ import (
 	"strings"
 )
 
-// KafkaEnv contains the kafka environment information
-type KafkaEnv struct {
+// KafkaExecutor executes kafka scripts.
+type KafkaExecutor struct {
 	// The location of Zookeeper. Typically this is `localhost:2181`.
 	ZookeeperURI string
 	// The directory where Kafka is installed to. Used to locate kafka scripts.
@@ -34,7 +34,7 @@ type KafkaEnv struct {
 }
 
 // CreateTopic creates a new kafka topic. This is created with a single partition.
-func (e *KafkaEnv) CreateTopic(topic string) error {
+func (e *KafkaExecutor) CreateTopic(topic string) error {
 	cmd := exec.Command(
 		filepath.Join(e.KafkaDirectory, "bin", "kafka-topics.sh"),
 		"--create",
@@ -49,7 +49,7 @@ func (e *KafkaEnv) CreateTopic(topic string) error {
 }
 
 // WriteToTopic writes data to a kafka topic.
-func (e *KafkaEnv) WriteToTopic(topic string, data []string) error {
+func (e *KafkaExecutor) WriteToTopic(topic string, data []string) error {
 	cmd := exec.Command(
 		filepath.Join(e.KafkaDirectory, "bin", "kafka-console-producer.sh"),
 		"--broker-list", e.KafkaURI,
@@ -62,7 +62,7 @@ func (e *KafkaEnv) WriteToTopic(topic string, data []string) error {
 }
 
 // DeleteTopic deletes a given kafka topic if it exists.
-func (e *KafkaEnv) DeleteTopic(topic string) error {
+func (e *KafkaExecutor) DeleteTopic(topic string) error {
 	cmd := exec.Command(
 		filepath.Join(e.KafkaDirectory, "bin", "kafka-topics.sh"),
 		"--delete",

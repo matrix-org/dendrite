@@ -48,7 +48,7 @@ var (
 	testDatabase = defaulting(os.Getenv("DATABASE"), fmt.Sprintf("dbname=%s binary_parameters=yes", testDatabaseName))
 )
 
-var env = test.KafkaEnv{
+var exe = test.KafkaExecutor{
 	ZookeeperURI:   zookeeperURI,
 	KafkaDirectory: kafkaDir,
 	KafkaURI:       kafkaURI,
@@ -168,16 +168,16 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		inputTopic  = "roomserverInput"
 		outputTopic = "roomserverOutput"
 	)
-	env.DeleteTopic(inputTopic)
-	if err := env.CreateTopic(inputTopic); err != nil {
+	exe.DeleteTopic(inputTopic)
+	if err := exe.CreateTopic(inputTopic); err != nil {
 		panic(err)
 	}
-	env.DeleteTopic(outputTopic)
-	if err := env.CreateTopic(outputTopic); err != nil {
+	exe.DeleteTopic(outputTopic)
+	if err := exe.CreateTopic(outputTopic); err != nil {
 		panic(err)
 	}
 
-	if err := env.WriteToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
 		panic(err)
 	}
 

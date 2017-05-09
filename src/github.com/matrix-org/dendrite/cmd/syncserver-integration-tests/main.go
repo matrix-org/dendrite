@@ -51,7 +51,7 @@ var (
 
 const inputTopic = "syncserverInput"
 
-var env = test.KafkaEnv{
+var exe = test.KafkaExecutor{
 	ZookeeperURI:   zookeeperURI,
 	KafkaDirectory: kafkaDir,
 	KafkaURI:       kafkaURI,
@@ -146,11 +146,11 @@ func doSyncRequest(done chan error, want []string, since string) func() {
 }
 
 func testSyncServer(input, want []string, since string) {
-	env.DeleteTopic(inputTopic)
-	if err := env.CreateTopic(inputTopic); err != nil {
+	exe.DeleteTopic(inputTopic)
+	if err := exe.CreateTopic(inputTopic); err != nil {
 		panic(err)
 	}
-	if err := env.WriteToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
 		panic(err)
 	}
 
