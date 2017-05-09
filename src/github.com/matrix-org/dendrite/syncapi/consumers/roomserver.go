@@ -32,11 +32,11 @@ import (
 type Server struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.SyncServerDatabase
-	rp                 *sync.RequestPool
+	notifier           *sync.Notifier
 }
 
 // NewServer creates a new sync server. Call Start() to begin consuming from room servers.
-func NewServer(cfg *config.Sync, rp *sync.RequestPool, store *storage.SyncServerDatabase) (*Server, error) {
+func NewServer(cfg *config.Sync, n *sync.Notifier, store *storage.SyncServerDatabase) (*Server, error) {
 	kafkaConsumer, err := sarama.NewConsumer(cfg.KafkaConsumerURIs, nil)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func NewServer(cfg *config.Sync, rp *sync.RequestPool, store *storage.SyncServer
 	s := &Server{
 		roomServerConsumer: &consumer,
 		db:                 store,
-		rp:                 rp,
+		notifier:           n,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -96,7 +96,7 @@ func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.rp.OnNewEvent(&ev, types.StreamPosition(syncStreamPos))
+	s.notifier.OnNewEvent(&ev, types.StreamPosition(syncStreamPos))
 
 	return nil
 }
