@@ -173,12 +173,8 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin != cfg.ServerName {
 		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
 		logger.WithFields(log.Fields{
-			"MediaID":             r.MediaMetadata.MediaID,
-			"Origin":              r.MediaMetadata.Origin,
-			"UploadName":          r.MediaMetadata.UploadName,
-			"Content-Length":      r.MediaMetadata.ContentLength,
-			"Content-Type":        r.MediaMetadata.ContentType,
-			"Content-Disposition": r.MediaMetadata.ContentDisposition,
+			"MediaID": r.MediaMetadata.MediaID,
+			"Origin":  r.MediaMetadata.Origin,
 		}).Infof("Fetching remote file")
 
 		// TODO: lock request in hash set
@@ -234,6 +230,11 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 		}
 		r.MediaMetadata.ContentLength = types.ContentLength(contentLength)
 
+		logger.WithFields(log.Fields{
+			"MediaID": r.MediaMetadata.MediaID,
+			"Origin":  r.MediaMetadata.Origin,
+		}).Infof("Connected to remote")
+
 		w.Header().Set("Content-Type", string(r.MediaMetadata.ContentType))
 		w.Header().Set("Content-Length", strconv.FormatInt(int64(r.MediaMetadata.ContentLength), 10))
 		contentSecurityPolicy := "default-src 'none';" +
@@ -262,6 +263,11 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			return
 		}
 		defer tmpFile.Close()
+
+		logger.WithFields(log.Fields{
+			"MediaID": r.MediaMetadata.MediaID,
+			"Origin":  r.MediaMetadata.Origin,
+		}).Infof("Proxying and caching remote file")
 
 		// bytesResponded is the total number of bytes written to the response to the client request
 		// bytesWritten is the total number of bytes written to disk
@@ -349,6 +355,15 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 		// Note: After this point we have responded to the client's request and are just dealing with local caching.
 		// As we have responded with 200 OK, any errors are ineffectual to the client request and so we just log and return.
 
+		logger.WithFields(log.Fields{
+			"MediaID":             r.MediaMetadata.MediaID,
+			"Origin":              r.MediaMetadata.Origin,
+			"UploadName":          r.MediaMetadata.UploadName,
+			"Content-Length":      r.MediaMetadata.ContentLength,
+			"Content-Type":        r.MediaMetadata.ContentType,
+			"Content-Disposition": r.MediaMetadata.ContentDisposition,
+		}).Infof("Storing file metadata to media repository database")
+
 		// if written to disk, add to db
 		err = db.StoreMediaMetadata(r.MediaMetadata)
 		if err != nil {
@@ -374,6 +389,15 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			}
 			return
 		}
+
+		logger.WithFields(log.Fields{
+			"MediaID":             r.MediaMetadata.MediaID,
+			"Origin":              r.MediaMetadata.Origin,
+			"UploadName":          r.MediaMetadata.UploadName,
+			"Content-Length":      r.MediaMetadata.ContentLength,
+			"Content-Type":        r.MediaMetadata.ContentType,
+			"Content-Disposition": r.MediaMetadata.ContentDisposition,
+		}).Infof("Remote file cached")
 	} else {
 		// TODO: If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
 		jsonErrorResponse(w, util.JSONResponse{
