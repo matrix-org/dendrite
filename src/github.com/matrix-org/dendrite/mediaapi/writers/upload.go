@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -127,10 +128,14 @@ func Upload(req *http.Request, cfg config.MediaAPI, db *storage.Database) util.J
 		},
 	}
 
-	// FIXME: if no Content-Disposition then set
-
 	if resErr = r.Validate(cfg.MaxFileSize); resErr != nil {
 		return *resErr
+	}
+
+	if len(r.MediaMetadata.UploadName) > 0 {
+		r.MediaMetadata.ContentDisposition = types.ContentDisposition(
+			"inline; filename*=utf-8''" + url.PathEscape(string(r.MediaMetadata.UploadName)),
+		)
 	}
 
 	logger.WithFields(log.Fields{
