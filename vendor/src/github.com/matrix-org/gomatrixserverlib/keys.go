@@ -21,35 +21,90 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 )
 
+// A ServerName is the name a matrix homeserver is identified by.
+// It is a DNS name without a trailing dot optionally followed by a port.
+// So it has the format: "[0-9A-Za-z\-]+(\.[0-9A-Za-z\-]+)*(:[0-9]+)?"
+type ServerName string
+
 // ServerKeys are the ed25519 signing keys published by a matrix server.
 // Contains SHA256 fingerprints of the TLS X509 certificates used by the server.
 type ServerKeys struct {
-	Raw             []byte     `json:"-"`           // Copy of the raw JSON for signature checking.
-	ServerName      string     `json:"server_name"` // The name of the server.
-	TLSFingerprints []struct { // List of SHA256 fingerprints of X509 certificates.
-		SHA256 Base64String `json:"sha256"`
-	} `json:"tls_fingerprints"`
-	VerifyKeys map[string]struct { // The current signing keys in use on this server.
-		Key Base64String `json:"key"` // The public key.
-	} `json:"verify_keys"`
-	ValidUntilTS  int64               `json:"valid_until_ts"` // When this result is valid until in milliseconds.
-	OldVerifyKeys map[string]struct { // Old keys that are now only valid for checking historic events.
-		Key       Base64String `json:"key"`        // The public key.
-		ExpiredTS uint64       `json:"expired_ts"` // When this key stopped being valid for event signing.
-	} `json:"old_verify_keys"`
+	// Copy of the raw JSON for signature checking.
+	Raw []byte
+	// The server the raw JSON was downloaded from.
+	FromServer ServerName
+	// The decoded JSON fields.
+	ServerKeyFields
+}
+
+// A TLSFingerprint is a SHA256 hash of an X509 certificate.
+type TLSFingerprint struct {
+	SHA256 Base64String `json:"sha256"`
+}
+
+// A VerifyKey is a ed25519 public key for a server.
+type VerifyKey struct {
+	// The public key.
+	Key Base64String `json:"key"`
+}
+
+// An OldVerifyKey is an old ed25519 public key that is no longer valid.
+type OldVerifyKey struct {
+	VerifyKey
+	// When this key stopped being valid for event signing in milliseconds.
+	ExpiredTS Timestamp `json:"expired_ts"`
+}
+
+// ServerKeyFields are the parsed JSON contents of the ed25519 signing keys published by a matrix server.
+type ServerKeyFields struct {
+	// The name of the server
+	ServerName ServerName `json:"server_name"`
+	// List of SHA256 fingerprints of X509 certificates used by this server.
+	TLSFingerprints []TLSFingerprint `json:"tls_fingerprints"`
+	// The current signing keys in use on this server.
+	// The keys of the map are the IDs of the keys.
+	// These are valid while this response is valid.
+	VerifyKeys map[KeyID]VerifyKey `json:"verify_keys"`
+	// When this result is valid until in milliseconds.
+	ValidUntilTS Timestamp `json:"valid_until_ts"`
+	// Old keys that are now only valid for checking historic events.
+	// The keys of the map are the IDs of the keys.
+	OldVerifyKeys map[KeyID]OldVerifyKey `json:"old_verify_keys"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (keys *ServerKeys) UnmarshalJSON(data []byte) error {
+	keys.Raw = data
+	return json.Unmarshal(data, &keys.ServerKeyFields)
+}
+
+// MarshalJSON implements json.Marshaler
+func (keys ServerKeys) MarshalJSON() ([]byte, error) {
+	// We already have a copy of the serialised JSON for the keys so we can return that directly.
+	return keys.Raw, nil
+}
+
+// PublicKey returns a public key with the given ID valid at the given TS or nil if no such key exists.
+func (keys ServerKeys) PublicKey(keyID KeyID, atTS Timestamp) []byte {
+	if currentKey, ok := keys.VerifyKeys[keyID]; ok && (atTS <= keys.ValidUntilTS) {
+		return currentKey.Key
+	}
+	if oldKey, ok := keys.OldVerifyKeys[keyID]; ok && (atTS <= oldKey.ExpiredTS) {
+		return oldKey.Key
+	}
+	return nil
 }
 
 // FetchKeysDirect fetches the matrix keys directly from the given address.
 // Optionally sets a SNI header if ``sni`` is not empty.
 // Returns the server keys and the state of the TLS connection used to retrieve them.
-func FetchKeysDirect(serverName, addr, sni string) (*ServerKeys, *tls.ConnectionState, error) {
+func FetchKeysDirect(serverName ServerName, addr, sni string) (*ServerKeys, *tls.ConnectionState, error) {
 	// Create a TLS connection.
 	tcpconn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -66,7 +121,7 @@ func FetchKeysDirect(serverName, addr, sni string) (*ServerKeys, *tls.Connection
 	connectionState := tlsconn.ConnectionState()
 
 	// Write a GET /_matrix/key/v2/server down the connection.
-	requestURL := "matrix://" + serverName + "/_matrix/key/v2/server"
+	requestURL := "matrix://" + string(serverName) + "/_matrix/key/v2/server"
 	request, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, nil, err
@@ -85,10 +140,8 @@ func FetchKeysDirect(serverName, addr, sni string) (*ServerKeys, *tls.Connection
 		return nil, nil, err
 	}
 	var keys ServerKeys
-	if keys.Raw, err = ioutil.ReadAll(response.Body); err != nil {
-		return nil, nil, err
-	}
-	if err = json.Unmarshal(keys.Raw, &keys); err != nil {
+	keys.FromServer = serverName
+	if err = json.NewDecoder(response.Body).Decode(&keys); err != nil {
 		return nil, nil, err
 	}
 	return &keys, &connectionState, nil
@@ -107,25 +160,25 @@ type TLSFingerprintChecks struct {
 
 // KeyChecks are the checks that should be applied to ServerKey responses.
 type KeyChecks struct {
-	AllChecksOK               bool                     // Did all the checks pass?
-	MatchingServerName        bool                     // Does the server name match what was requested.
-	FutureValidUntilTS        bool                     // The valid until TS is in the future.
-	HasEd25519Key             bool                     // The server has at least one ed25519 key.
-	AllEd25519ChecksOK        *bool                    // All the Ed25519 checks are ok. or null if there weren't any to check.
-	Ed25519Checks             map[string]Ed25519Checks // Checks for Ed25519 keys.
-	HasTLSFingerprint         bool                     // The server has at least one fingerprint.
-	AllTLSFingerprintChecksOK *bool                    // All the fingerpint checks are ok.
-	TLSFingerprintChecks      []TLSFingerprintChecks   // Checks for TLS fingerprints.
-	MatchingTLSFingerprint    *bool                    // The TLS fingerprint for the connection matches one of the listed fingerprints.
+	AllChecksOK               bool                    // Did all the checks pass?
+	MatchingServerName        bool                    // Does the server name match what was requested.
+	FutureValidUntilTS        bool                    // The valid until TS is in the future.
+	HasEd25519Key             bool                    // The server has at least one ed25519 key.
+	AllEd25519ChecksOK        *bool                   // All the Ed25519 checks are ok. or null if there weren't any to check.
+	Ed25519Checks             map[KeyID]Ed25519Checks // Checks for Ed25519 keys.
+	HasTLSFingerprint         bool                    // The server has at least one fingerprint.
+	AllTLSFingerprintChecksOK *bool                   // All the fingerpint checks are ok.
+	TLSFingerprintChecks      []TLSFingerprintChecks  // Checks for TLS fingerprints.
+	MatchingTLSFingerprint    *bool                   // The TLS fingerprint for the connection matches one of the listed fingerprints.
 }
 
 // CheckKeys checks the keys returned from a server to make sure they are valid.
 // If the checks pass then also return a map of key_id to Ed25519 public key and a list of SHA256 TLS fingerprints.
-func CheckKeys(serverName string, now time.Time, keys ServerKeys, connState *tls.ConnectionState) (
-	checks KeyChecks, ed25519Keys map[string]Base64String, sha256Fingerprints []Base64String,
+func CheckKeys(serverName ServerName, now time.Time, keys ServerKeys, connState *tls.ConnectionState) (
+	checks KeyChecks, ed25519Keys map[KeyID]Base64String, sha256Fingerprints []Base64String,
 ) {
 	checks.MatchingServerName = serverName == keys.ServerName
-	checks.FutureValidUntilTS = now.UnixNano() < keys.ValidUntilTS*1000000
+	checks.FutureValidUntilTS = keys.ValidUntilTS.Time().After(now)
 	checks.AllChecksOK = checks.MatchingServerName && checks.FutureValidUntilTS
 
 	ed25519Keys = checkVerifyKeys(keys, &checks)
@@ -160,12 +213,12 @@ func checkFingerprint(connState *tls.ConnectionState, sha256Fingerprints []Base6
 	return false
 }
 
-func checkVerifyKeys(keys ServerKeys, checks *KeyChecks) map[string]Base64String {
+func checkVerifyKeys(keys ServerKeys, checks *KeyChecks) map[KeyID]Base64String {
 	allEd25519ChecksOK := true
-	checks.Ed25519Checks = map[string]Ed25519Checks{}
-	verifyKeys := map[string]Base64String{}
+	checks.Ed25519Checks = map[KeyID]Ed25519Checks{}
+	verifyKeys := map[KeyID]Base64String{}
 	for keyID, keyData := range keys.VerifyKeys {
-		algorithm := strings.SplitN(keyID, ":", 2)[0]
+		algorithm := strings.SplitN(string(keyID), ":", 2)[0]
 		publicKey := keyData.Key
 		if algorithm == "ed25519" {
 			checks.HasEd25519Key = true
@@ -174,7 +227,7 @@ func checkVerifyKeys(keys ServerKeys, checks *KeyChecks) map[string]Base64String
 				ValidEd25519: len(publicKey) == 32,
 			}
 			if entry.ValidEd25519 {
-				err := VerifyJSON(keys.ServerName, keyID, []byte(publicKey), keys.Raw)
+				err := VerifyJSON(string(keys.ServerName), keyID, []byte(publicKey), keys.Raw)
 				entry.MatchingSignature = err == nil
 			}
 			checks.Ed25519Checks[keyID] = entry
