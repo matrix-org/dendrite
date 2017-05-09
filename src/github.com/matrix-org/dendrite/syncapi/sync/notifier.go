@@ -15,9 +15,10 @@
 package sync
 
 import (
+	"sync"
+
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"sync"
 )
 
 // Notifier will wake up sleeping requests in the request pool when there
