@@ -42,7 +42,7 @@ func main() {
 	cfg := config.MediaAPI{
 		ServerName:  "localhost",
 		BasePath:    "/Users/robertsw/dendrite",
-		MaxFileSize: 61440,
+		MaxFileSize: 10 * 1024 * 1024,
 		DataSource:  dataSource,
 	}
 
