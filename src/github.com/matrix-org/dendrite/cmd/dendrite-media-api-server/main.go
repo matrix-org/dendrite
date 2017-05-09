@@ -27,9 +27,9 @@ import (
 )
 
 var (
-	bindAddr = os.Getenv("BIND_ADDRESS")
-	database = os.Getenv("DATABASE")
-	logDir   = os.Getenv("LOG_DIR")
+	bindAddr   = os.Getenv("BIND_ADDRESS")
+	dataSource = os.Getenv("DATABASE")
+	logDir     = os.Getenv("LOG_DIR")
 )
 
 func main() {
@@ -40,9 +40,10 @@ func main() {
 	}
 
 	cfg := config.MediaAPI{
-		ServerName: "localhost",
-		BasePath:   "/Users/robertsw/dendrite",
-		DataSource: database,
+		ServerName:  "localhost",
+		BasePath:    "/Users/robertsw/dendrite",
+		MaxFileSize: 61440,
+		DataSource:  dataSource,
 	}
 
 	db, err := storage.Open(cfg.DataSource)
@@ -50,13 +51,8 @@ func main() {
 		log.Panicln("Failed to open database:", err)
 	}
 
-	repo := &storage.Repository{
-		StorePrefix: cfg.BasePath,
-		MaxBytes:    61440,
-	}
-
 	log.Info("Starting mediaapi")
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, db, repo)
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, db)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }

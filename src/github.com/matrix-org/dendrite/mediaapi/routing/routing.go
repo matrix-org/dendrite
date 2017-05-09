@@ -20,6 +20,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
+	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/mediaapi/writers"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,45 +28,27 @@ import (
 
 const pathPrefixR0 = "/_matrix/media/v1"
 
-type downloadRequestHandler struct {
-	Config         config.MediaAPI
-	Database       *storage.Database
-	DownloadServer writers.DownloadServer
-}
-
-func (handler downloadRequestHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	util.SetupRequestLogging(req)
-
-	// Set common headers returned regardless of the outcome of the request
-	util.SetCORSHeaders(w)
-	w.Header().Set("Content-Type", "application/json")
-
-	vars := mux.Vars(req)
-	writers.Download(w, req, vars["serverName"], vars["mediaId"], handler.Config, handler.Database, handler.DownloadServer)
-}
-
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI, db *storage.Database, repo *storage.Repository) {
+func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI, db *storage.Database) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/upload", make("upload", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
-		return writers.Upload(req, cfg, db, repo)
+		return writers.Upload(req, cfg, db)
 	})))
 
-	downloadServer := writers.DownloadServer{
-		Repository:      *repo,
-		LocalServerName: cfg.ServerName,
-	}
-
-	handler := downloadRequestHandler{
-		Config:         cfg,
-		Database:       db,
-		DownloadServer: downloadServer,
-	}
-
 	r0mux.Handle("/download/{serverName}/{mediaId}",
-		prometheus.InstrumentHandler("download", handler),
+		prometheus.InstrumentHandler("download", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			util.SetupRequestLogging(req)
+
+			// Set common headers returned regardless of the outcome of the request
+			util.SetCORSHeaders(w)
+			// TODO: fix comment
+			w.Header().Set("Content-Type", "application/json")
+
+			vars := mux.Vars(req)
+			writers.Download(w, req, types.ServerName(vars["serverName"]), types.MediaID(vars["mediaId"]), cfg, db)
+		})),
 	)
 
 	servMux.Handle("/metrics", prometheus.Handler())

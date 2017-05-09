@@ -15,9 +15,14 @@
 package writers
 
 import (
+	"crypto/sha256"
+	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -25,58 +30,54 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
+	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/util"
 )
 
-// UploadRequest metadata included in or derivable from an upload request
+// uploadRequest metadata included in or derivable from an upload request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-media-r0-upload
-// NOTE: ContentType is an HTTP request header and Filename is passed as a query parameter
-type UploadRequest struct {
-	ContentDisposition string
-	ContentLength      int64
-	ContentType        string
-	Filename           string
-	Base64FileHash     string
-	Method             string
-	UserID             string
+// NOTE: The members come from HTTP request metadata such as headers, query parameters or can be derived from such
+type uploadRequest struct {
+	MediaMetadata *types.MediaMetadata
 }
 
-// Validate validates the UploadRequest fields
-func (r UploadRequest) Validate() *util.JSONResponse {
+// Validate validates the uploadRequest fields
+func (r uploadRequest) Validate(maxFileSize types.ContentLength) *util.JSONResponse {
 	// TODO: Any validation to be done on ContentDisposition?
-	if r.ContentLength < 1 {
+
+	if r.MediaMetadata.ContentLength < 1 {
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON("HTTP Content-Length request header must be greater than zero."),
+			JSON: jsonerror.Unknown("HTTP Content-Length request header must be greater than zero."),
+		}
+	}
+	if maxFileSize > 0 && r.MediaMetadata.ContentLength > maxFileSize {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSize)),
 		}
 	}
 	// TODO: Check if the Content-Type is a valid type?
-	if r.ContentType == "" {
+	if r.MediaMetadata.ContentType == "" {
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON("HTTP Content-Type request header must be set."),
+			JSON: jsonerror.Unknown("HTTP Content-Type request header must be set."),
 		}
 	}
 	// TODO: Validate filename - what are the valid characters?
-	if r.Method != "POST" {
-		return &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.BadJSON("HTTP request method must be POST."),
-		}
-	}
-	if r.UserID != "" {
+	if r.MediaMetadata.UserID != "" {
 		// TODO: We should put user ID parsing code into gomatrixserverlib and use that instead
 		//       (see https://github.com/matrix-org/gomatrixserverlib/blob/3394e7c7003312043208aa73727d2256eea3d1f6/eventcontent.go#L347 )
 		//       It should be a struct (with pointers into a single string to avoid copying) and
 		//       we should update all refs to use UserID types rather than strings.
 		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
-		if len(r.UserID) == 0 || r.UserID[0] != '@' {
+		if len(r.MediaMetadata.UserID) == 0 || r.MediaMetadata.UserID[0] != '@' {
 			return &util.JSONResponse{
 				Code: 400,
-				JSON: jsonerror.BadJSON("user id must start with '@'"),
+				JSON: jsonerror.Unknown("user id must start with '@'"),
 			}
 		}
-		parts := strings.SplitN(r.UserID[1:], ":", 2)
+		parts := strings.SplitN(string(r.MediaMetadata.UserID[1:]), ":", 2)
 		if len(parts) != 2 {
 			return &util.JSONResponse{
 				Code: 400,
@@ -93,8 +94,20 @@ type uploadResponse struct {
 }
 
 // Upload implements /upload
-func Upload(req *http.Request, cfg config.MediaAPI, db *storage.Database, repo *storage.Repository) util.JSONResponse {
+//
+// This endpoint involves uploading potentially significant amounts of data to the homeserver.
+// This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
+// Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
+// TODO: Requests time out if they have not received any data within the configured timeout period.
+func Upload(req *http.Request, cfg config.MediaAPI, db *storage.Database) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
+
+	if req.Method != "POST" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown("HTTP request method must be POST."),
+		}
+	}
 
 	// FIXME: This will require querying some other component/db but currently
 	// just accepts a user id for auth
@@ -103,74 +116,129 @@ func Upload(req *http.Request, cfg config.MediaAPI, db *storage.Database, repo *
 		return *resErr
 	}
 
-	r := &UploadRequest{
-		ContentDisposition: req.Header.Get("Content-Disposition"),
-		ContentLength:      req.ContentLength,
-		ContentType:        req.Header.Get("Content-Type"),
-		Filename:           req.FormValue("filename"),
-		Method:             req.Method,
-		UserID:             userID,
+	r := &uploadRequest{
+		MediaMetadata: &types.MediaMetadata{
+			Origin:             cfg.ServerName,
+			ContentDisposition: types.ContentDisposition(req.Header.Get("Content-Disposition")),
+			ContentLength:      types.ContentLength(req.ContentLength),
+			ContentType:        types.ContentType(req.Header.Get("Content-Type")),
+			UploadName:         types.Filename(req.FormValue("filename")),
+			UserID:             types.MatrixUserID(userID),
+		},
 	}
 
-	if resErr = r.Validate(); resErr != nil {
+	// FIXME: if no Content-Disposition then set
+
+	if resErr = r.Validate(cfg.MaxFileSize); resErr != nil {
 		return *resErr
 	}
 
 	logger.WithFields(log.Fields{
-		"ContentType": r.ContentType,
-		"Filename":    r.Filename,
-		"UserID":      r.UserID,
+		"Origin":              r.MediaMetadata.Origin,
+		"UploadName":          r.MediaMetadata.UploadName,
+		"Content-Length":      r.MediaMetadata.ContentLength,
+		"Content-Type":        r.MediaMetadata.ContentType,
+		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Info("Uploading file")
 
-	// TODO: Store file to disk
-	//       - make path to file
-	//       - progressive writing (could support Content-Length 0 and cut off
-	//         after some max upload size is exceeded)
-	//       - generate id (ideally a hash but a random string to start with)
-	writer, err := repo.WriterToLocalRepository(storage.Description{
-		Type: r.ContentType,
-	})
+	tmpDir, err := createTempDir(cfg.BasePath)
 	if err != nil {
-		logger.Infof("Failed to get cache writer %q\n", err)
+		logger.Infof("Failed to create temp dir %q\n", err)
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("Failed to upload: %q", err)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
 		}
 	}
+	file, writer, err := createFileWriter(tmpDir, "content")
+	defer file.Close()
 
-	defer writer.Close()
+	// The limited reader restricts how many bytes are read from the body to the specified maximum bytes
+	// Note: the golang HTTP server closes the request body
+	limitedBody := io.LimitReader(req.Body, int64(cfg.MaxFileSize))
+	hasher := sha256.New()
+	reader := io.TeeReader(limitedBody, hasher)
 
-	if _, err = io.Copy(writer, req.Body); err != nil {
+	bytesWritten, err := io.Copy(writer, reader)
+	if err != nil {
 		logger.Infof("Failed to copy %q\n", err)
+		tmpDirErr := os.RemoveAll(string(tmpDir))
+		if tmpDirErr != nil {
+			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+		}
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("Failed to upload: %q", err)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
 		}
 	}
 
-	r.Base64FileHash, err = writer.Finished()
-	if err != nil {
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("Failed to upload: %q", err)),
-		}
+	writer.Flush()
+
+	if bytesWritten != int64(r.MediaMetadata.ContentLength) {
+		logger.Warnf("Bytes uploaded (%v) != claimed Content-Length (%v)", bytesWritten, r.MediaMetadata.ContentLength)
 	}
-	// TODO: check if file with hash already exists
+
+	hash := hasher.Sum(nil)
+	r.MediaMetadata.MediaID = types.MediaID(base64.URLEncoding.EncodeToString(hash[:]))
+
+	logger.WithFields(log.Fields{
+		"MediaID":             r.MediaMetadata.MediaID,
+		"Origin":              r.MediaMetadata.Origin,
+		"UploadName":          r.MediaMetadata.UploadName,
+		"Content-Length":      r.MediaMetadata.ContentLength,
+		"Content-Type":        r.MediaMetadata.ContentType,
+		"Content-Disposition": r.MediaMetadata.ContentDisposition,
+	}).Info("File uploaded")
+
+	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
+	err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, r.MediaMetadata)
+	if err == nil {
+		tmpDirErr := os.RemoveAll(string(tmpDir))
+		if tmpDirErr != nil {
+			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+		}
+		return util.JSONResponse{
+			Code: 200,
+			JSON: uploadResponse{
+				ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.ServerName, r.MediaMetadata.MediaID),
+			},
+		}
+	} else if err != nil && err != sql.ErrNoRows {
+		logger.Warnf("Failed to query database for %v: %q", r.MediaMetadata.MediaID, err)
+	}
 
 	// TODO: generate thumbnails
 
-	err = db.CreateMedia(r.Base64FileHash, cfg.ServerName, r.ContentType, r.ContentDisposition, r.ContentLength, r.Filename, r.UserID)
+	err = db.StoreMediaMetadata(r.MediaMetadata)
 	if err != nil {
+		tmpDirErr := os.RemoveAll(string(tmpDir))
+		if tmpDirErr != nil {
+			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+		}
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("Failed to upload: %q", err)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
+		}
+	}
+
+	err = moveFile(
+		types.Path(path.Join(string(tmpDir), "content")),
+		types.Path(getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)),
+	)
+	if err != nil {
+		tmpDirErr := os.RemoveAll(string(tmpDir))
+		if tmpDirErr != nil {
+			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+		}
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
 		}
 	}
 
 	return util.JSONResponse{
 		Code: 200,
 		JSON: uploadResponse{
-			ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.ServerName, r.Base64FileHash),
+			ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.ServerName, r.MediaMetadata.MediaID),
 		},
 	}
 }

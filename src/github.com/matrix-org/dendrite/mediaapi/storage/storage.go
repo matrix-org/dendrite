@@ -19,6 +19,7 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/mediaapi/types"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -40,12 +41,19 @@ func Open(dataSourceName string) (*Database, error) {
 	return &d, nil
 }
 
-// CreateMedia inserts the metadata about the uploaded media into the database.
-func (d *Database) CreateMedia(mediaID string, mediaOrigin string, contentType string, contentDisposition string, fileSize int64, uploadName string, userID string) error {
-	return d.statements.insertMedia(mediaID, mediaOrigin, contentType, contentDisposition, fileSize, uploadName, userID)
+// StoreMediaMetadata inserts the metadata about the uploaded media into the database.
+func (d *Database) StoreMediaMetadata(mediaMetadata *types.MediaMetadata) error {
+	return d.statements.insertMedia(mediaMetadata)
 }
 
-// GetMedia possibly selects the metadata about previously uploaded media from the database.
-func (d *Database) GetMedia(mediaID string, mediaOrigin string) (string, string, int64, string, error) {
-	return d.statements.selectMedia(mediaID, mediaOrigin)
+// GetMediaMetadata possibly selects the metadata about previously uploaded media from the database.
+func (d *Database) GetMediaMetadata(mediaID types.MediaID, mediaOrigin types.ServerName, mediaMetadata *types.MediaMetadata) error {
+	metadata, err := d.statements.selectMedia(mediaID, mediaOrigin)
+	mediaMetadata.ContentType = metadata.ContentType
+	mediaMetadata.ContentDisposition = metadata.ContentDisposition
+	mediaMetadata.ContentLength = metadata.ContentLength
+	mediaMetadata.CreationTimestamp = metadata.CreationTimestamp
+	mediaMetadata.UploadName = metadata.UploadName
+	mediaMetadata.UserID = metadata.UserID
+	return err
 }

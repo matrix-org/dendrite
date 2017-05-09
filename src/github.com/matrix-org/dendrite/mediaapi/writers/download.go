@@ -15,11 +15,14 @@
 package writers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -27,30 +30,30 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
+	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/util"
 )
 
-// DownloadRequest metadata included in or derivable from an upload request
+// downloadRequest metadata included in or derivable from an download request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-media-r0-download
-type DownloadRequest struct {
-	MediaID    string
-	ServerName string
+type downloadRequest struct {
+	MediaMetadata *types.MediaMetadata
 }
 
-// Validate validates the DownloadRequest fields
-func (r DownloadRequest) Validate() *util.JSONResponse {
+// Validate validates the downloadRequest fields
+func (r downloadRequest) Validate() *util.JSONResponse {
 	// FIXME: the following errors aren't bad JSON, rather just a bad request path
 	// maybe give the URL pattern in the routing, these are not even possible as the handler would not be hit...?
-	if r.MediaID == "" {
+	if r.MediaMetadata.MediaID == "" {
 		return &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.BadJSON("mediaId must be a non-empty string"),
+			Code: 404,
+			JSON: jsonerror.NotFound("mediaId must be a non-empty string"),
 		}
 	}
-	if r.ServerName == "" {
+	if r.MediaMetadata.Origin == "" {
 		return &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.BadJSON("serverName must be a non-empty string"),
+			Code: 404,
+			JSON: jsonerror.NotFound("serverName must be a non-empty string"),
 		}
 	}
 	return nil
@@ -72,10 +75,21 @@ func jsonErrorResponse(w http.ResponseWriter, res util.JSONResponse, logger *log
 	w.Write(resBytes)
 }
 
+var errFileIsTooLarge = fmt.Errorf("file is too large")
+var errRead = fmt.Errorf("failed to read response from remote server")
+var errResponse = fmt.Errorf("failed to write file data to response body")
+var errWrite = fmt.Errorf("failed to write file to disk")
+
 // Download implements /download
-func Download(w http.ResponseWriter, req *http.Request, serverName string, mediaID string, cfg config.MediaAPI, db *storage.Database, downloadServer DownloadServer) {
+// Files from this server (i.e. origin == cfg.ServerName) are served directly
+// Files from remote servers (i.e. origin != cfg.ServerName) are cached locally.
+// If they are present in the cache, they are served directly.
+// If they are not present in the cache, they are obtained from the remote server and
+// simultaneously served back to the client and written into the cache.
+func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName, mediaID types.MediaID, cfg config.MediaAPI, db *storage.Database) {
 	logger := util.GetLogger(req.Context())
 
+	// request validation
 	if req.Method != "GET" {
 		jsonErrorResponse(w, util.JSONResponse{
 			Code: 405,
@@ -84,9 +98,11 @@ func Download(w http.ResponseWriter, req *http.Request, serverName string, media
 		return
 	}
 
-	r := &DownloadRequest{
-		MediaID:    mediaID,
-		ServerName: serverName,
+	r := &downloadRequest{
+		MediaMetadata: &types.MediaMetadata{
+			MediaID: mediaID,
+			Origin:  origin,
+		},
 	}
 
 	if resErr := r.Validate(); resErr != nil {
@@ -94,190 +110,285 @@ func Download(w http.ResponseWriter, req *http.Request, serverName string, media
 		return
 	}
 
-	contentType, contentDisposition, fileSize, filename, err := db.GetMedia(r.MediaID, r.ServerName)
-	if err != nil && strings.Compare(r.ServerName, cfg.ServerName) == 0 {
+	// check if we have a record of the media in our database
+	err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, r.MediaMetadata)
+
+	if err == nil {
+		// If we have a record, we can respond from the local file
+		logger.WithFields(log.Fields{
+			"MediaID":             r.MediaMetadata.MediaID,
+			"Origin":              r.MediaMetadata.Origin,
+			"UploadName":          r.MediaMetadata.UploadName,
+			"Content-Length":      r.MediaMetadata.ContentLength,
+			"Content-Type":        r.MediaMetadata.ContentType,
+			"Content-Disposition": r.MediaMetadata.ContentDisposition,
+		}).Infof("Downloading file")
+
+		filePath := getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)
+		file, err := os.Open(filePath)
+		if err != nil {
+			// FIXME: Remove erroneous file from database?
+			jsonErrorResponse(w, util.JSONResponse{
+				Code: 404,
+				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+			}, logger)
+			return
+		}
+
+		stat, err := file.Stat()
+		if err != nil {
+			// FIXME: Remove erroneous file from database?
+			jsonErrorResponse(w, util.JSONResponse{
+				Code: 404,
+				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+			}, logger)
+			return
+		}
+
+		if r.MediaMetadata.ContentLength > 0 && int64(r.MediaMetadata.ContentLength) != stat.Size() {
+			logger.Warnf("File size in database (%v) and on disk (%v) differ.", r.MediaMetadata.ContentLength, stat.Size())
+			// FIXME: Remove erroneous file from database?
+		}
+
+		w.Header().Set("Content-Type", string(r.MediaMetadata.ContentType))
+		w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
+		contentSecurityPolicy := "default-src 'none';" +
+			" script-src 'none';" +
+			" plugin-types application/pdf;" +
+			" style-src 'unsafe-inline';" +
+			" object-src 'self';"
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+
+		if bytesResponded, err := io.Copy(w, file); err != nil {
+			logger.Warnf("Failed to copy from cache %v\n", err)
+			if bytesResponded == 0 {
+				jsonErrorResponse(w, util.JSONResponse{
+					Code: 500,
+					JSON: jsonerror.NotFound(fmt.Sprintf("Failed to respond with file with media ID %q", r.MediaMetadata.MediaID)),
+				}, logger)
+			}
+			// If we have written any data then we have already responded with 200 OK and all we can do is close the connection
+			return
+		}
+	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin != cfg.ServerName {
+		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
+		logger.WithFields(log.Fields{
+			"MediaID":             r.MediaMetadata.MediaID,
+			"Origin":              r.MediaMetadata.Origin,
+			"UploadName":          r.MediaMetadata.UploadName,
+			"Content-Length":      r.MediaMetadata.ContentLength,
+			"Content-Type":        r.MediaMetadata.ContentType,
+			"Content-Disposition": r.MediaMetadata.ContentDisposition,
+		}).Infof("Fetching remote file")
+
+		// TODO: lock request in hash set
+
+		// FIXME: Only request once (would race if multiple requests for the same remote file)
+		// Use a hash set based on the origin and media ID (the request URL should be fine...) and synchronise adding / removing members
+		urls := getMatrixUrls(r.MediaMetadata.Origin)
+
+		logger.Printf("Connecting to remote %q\n", urls[0])
+
+		remoteReqAddr := urls[0] + "/_matrix/media/v1/download/" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
+		remoteReq, err := http.NewRequest("GET", remoteReqAddr, nil)
+		if err != nil {
+			jsonErrorResponse(w, util.JSONResponse{
+				Code: 500,
+				JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
+			}, logger)
+			return
+		}
+
+		remoteReq.Header.Set("Host", string(r.MediaMetadata.Origin))
+
+		client := http.Client{}
+		resp, err := client.Do(remoteReq)
+		if err != nil {
+			jsonErrorResponse(w, util.JSONResponse{
+				Code: 502,
+				JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
+			}, logger)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			logger.Printf("Server responded with %d\n", resp.StatusCode)
+			if resp.StatusCode == 404 {
+				jsonErrorResponse(w, util.JSONResponse{
+					Code: 404,
+					JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+				}, logger)
+				return
+			}
+			jsonErrorResponse(w, util.JSONResponse{
+				Code: 502,
+				JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
+			}, logger)
+			return
+		}
+
+		contentLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
+		if err != nil {
+			logger.Warn("Failed to parse content length")
+		}
+		r.MediaMetadata.ContentLength = types.ContentLength(contentLength)
+
+		w.Header().Set("Content-Type", string(r.MediaMetadata.ContentType))
+		w.Header().Set("Content-Length", strconv.FormatInt(int64(r.MediaMetadata.ContentLength), 10))
+		contentSecurityPolicy := "default-src 'none';" +
+			" script-src 'none';" +
+			" plugin-types application/pdf;" +
+			" style-src 'unsafe-inline';" +
+			" object-src 'self';"
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+
+		tmpDir, err := createTempDir(cfg.BasePath)
+		if err != nil {
+			logger.Infof("Failed to create temp dir %q\n", err)
+			jsonErrorResponse(w, util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
+			}, logger)
+			return
+		}
+		tmpFile, writer, err := createFileWriter(tmpDir, types.Filename(r.MediaMetadata.MediaID[3:]))
+		if err != nil {
+			logger.Infof("Failed to create file writer %q\n", err)
+			jsonErrorResponse(w, util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
+			}, logger)
+			return
+		}
+		defer tmpFile.Close()
+
+		// bytesResponded is the total number of bytes written to the response to the client request
+		// bytesWritten is the total number of bytes written to disk
+		var bytesResponded, bytesWritten int64 = 0, 0
+		var fetchError error
+		// Note: the buffer size is the same as is used in io.Copy()
+		buffer := make([]byte, 32*1024)
+		for {
+			// read from remote request's response body
+			bytesRead, readErr := resp.Body.Read(buffer)
+			if bytesRead > 0 {
+				// write to client request's response body
+				bytesTemp, respErr := w.Write(buffer[:bytesRead])
+				if bytesTemp != bytesRead || (respErr != nil && respErr != io.EOF) {
+					// TODO: BORKEN
+					logger.Errorf("bytesTemp %v != bytesRead %v : %v", bytesTemp, bytesRead, respErr)
+					fetchError = errResponse
+					break
+				}
+				bytesResponded += int64(bytesTemp)
+				if fetchError == nil || (fetchError != errFileIsTooLarge && fetchError != errWrite) {
+					// if larger than cfg.MaxFileSize then stop writing to disk and discard cached file
+					if bytesWritten+int64(len(buffer)) > int64(cfg.MaxFileSize) {
+						// TODO: WAAAAHNING and clean up temp files
+						fetchError = errFileIsTooLarge
+					} else {
+						// write to disk
+						bytesTemp, writeErr := writer.Write(buffer)
+						if writeErr != nil && writeErr != io.EOF {
+							// TODO: WAAAAHNING and clean up temp files
+							fetchError = errWrite
+						} else {
+							bytesWritten += int64(bytesTemp)
+						}
+					}
+				}
+			}
+			if readErr != nil {
+				if readErr != io.EOF {
+					fetchError = errRead
+					break
+				}
+			}
+		}
+
+		writer.Flush()
+
+		if fetchError != nil {
+			logFields := log.Fields{
+				"MediaID": r.MediaMetadata.MediaID,
+				"Origin":  r.MediaMetadata.Origin,
+			}
+			if fetchError == errFileIsTooLarge {
+				logFields["MaxFileSize"] = cfg.MaxFileSize
+			}
+			logger.WithFields(logFields).Warnln(fetchError)
+			tmpDirErr := os.RemoveAll(string(tmpDir))
+			if tmpDirErr != nil {
+				logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+			}
+			// Note: if we have responded with any data in the body at all then we have already sent 200 OK and we can only abort at this point
+			if bytesResponded < 1 {
+				jsonErrorResponse(w, util.JSONResponse{
+					Code: 502,
+					JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
+				}, logger)
+			} else {
+				// We attempt to bluntly close the connection because that is the
+				// best thing we can do after we've sent a 200 OK
+				logger.Println("Attempting to close the connection.")
+				hijacker, ok := w.(http.Hijacker)
+				if ok {
+					connection, _, hijackErr := hijacker.Hijack()
+					if hijackErr == nil {
+						logger.Println("Closing")
+						connection.Close()
+					} else {
+						logger.Printf("Error trying to hijack: %v", hijackErr)
+					}
+				}
+			}
+			return
+		}
+
+		// Note: After this point we have responded to the client's request and are just dealing with local caching.
+		// As we have responded with 200 OK, any errors are ineffectual to the client request and so we just log and return.
+
+		// if written to disk, add to db
+		err = db.StoreMediaMetadata(r.MediaMetadata)
+		if err != nil {
+			tmpDirErr := os.RemoveAll(string(tmpDir))
+			if tmpDirErr != nil {
+				logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+			}
+			return
+		}
+
+		// TODO: unlock request in hash set
+
+		// TODO: generate thumbnails
+
+		err = moveFile(
+			types.Path(path.Join(string(tmpDir), "content")),
+			types.Path(getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)),
+		)
+		if err != nil {
+			tmpDirErr := os.RemoveAll(string(tmpDir))
+			if tmpDirErr != nil {
+				logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+			}
+			return
+		}
+	} else {
+		// TODO: If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
 		jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound(fmt.Sprintf("File %q does not exist", r.MediaID)),
+			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
 		}, logger)
-		return
 	}
-
-	// - read file and respond
-	logger.WithFields(log.Fields{
-		"MediaID":             r.MediaID,
-		"ServerName":          r.ServerName,
-		"Filename":            filename,
-		"Content-Type":        contentType,
-		"Content-Disposition": contentDisposition,
-	}).Infof("Downloading file")
-
-	logger.WithField("code", 200).Infof("Responding (%d bytes)", fileSize)
-
-	respWriter := httpResponseWriter{resp: w}
-	if err = downloadServer.getImage(respWriter, r.ServerName, r.MediaID); err != nil {
-		if respWriter.haveWritten() {
-			closeConnection(w)
-			return
-		}
-
-		errStatus := 500
-		switch err {
-		case errNotFound:
-			errStatus = 404
-		case errProxy:
-			errStatus = 502
-		}
-		http.Error(w, err.Error(), errStatus)
-		return
-	}
-
-	return
-}
-
-// DownloadServer serves and caches remote media.
-type DownloadServer struct {
-	Client          http.Client
-	Repository      storage.Repository
-	LocalServerName string
-}
-
-func (handler *DownloadServer) getImage(w responseWriter, host, name string) error {
-	var file io.ReadCloser
-	var descr *storage.Description
-	var err error
-	if host == handler.LocalServerName {
-		file, descr, err = handler.Repository.ReaderFromLocalRepo(name)
-	} else {
-		file, descr, err = handler.Repository.ReaderFromRemoteCache(host, name)
-	}
-
-	if err == nil {
-		log.Println("Found in Cache")
-		w.setContentType(descr.Type)
-
-		size := strconv.FormatInt(descr.Length, 10)
-		w.setContentLength(size)
-		w.setContentSecurityPolicy()
-		if _, err = io.Copy(w, file); err != nil {
-			log.Printf("Failed to copy from cache %v\n", err)
-			return err
-		}
-		w.Close()
-		return nil
-	} else if !storage.IsNotExists(err) {
-		log.Printf("Error looking in cache: %v\n", err)
-		return err
-	}
-
-	if host == handler.LocalServerName {
-		// Its fatal if we can't find local files in our cache.
-		return errNotFound
-	}
-
-	respBody, desc, err := handler.fetchRemoteMedia(host, name)
-	if err != nil {
-		return err
-	}
-
-	defer respBody.Close()
-
-	w.setContentType(desc.Type)
-	if desc.Length > 0 {
-		w.setContentLength(strconv.FormatInt(desc.Length, 10))
-	}
-
-	writer, err := handler.Repository.WriterToRemoteCache(host, name, *desc)
-	if err != nil {
-		log.Printf("Failed to get cache writer %q\n", err)
-		return err
-	}
-
-	defer writer.Close()
-
-	reader := io.TeeReader(respBody, w)
-	if _, err := io.Copy(writer, reader); err != nil {
-		log.Printf("Failed to copy %q\n", err)
-		return err
-	}
-
-	writer.Finished()
-
-	log.Println("Finished conn")
-
-	return nil
-}
-
-func (handler *DownloadServer) fetchRemoteMedia(host, name string) (io.ReadCloser, *storage.Description, error) {
-	urls := getMatrixUrls(host)
-
-	log.Printf("Connecting to remote %q\n", urls[0])
-
-	remoteReq, err := http.NewRequest("GET", urls[0]+"/_matrix/media/v1/download/"+host+"/"+name, nil)
-	if err != nil {
-		log.Printf("Failed to connect to remote: %q\n", err)
-		return nil, nil, err
-	}
-
-	remoteReq.Header.Set("Host", host)
-
-	resp, err := handler.Client.Do(remoteReq)
-	if err != nil {
-		log.Printf("Failed to connect to remote: %q\n", err)
-		return nil, nil, errProxy
-	}
-
-	if resp.StatusCode != 200 {
-		resp.Body.Close()
-		log.Printf("Server responded with %d\n", resp.StatusCode)
-		if resp.StatusCode == 404 {
-			return nil, nil, errNotFound
-		}
-		return nil, nil, errProxy
-	}
-
-	desc := storage.Description{
-		Type:   resp.Header.Get("Content-Type"),
-		Length: -1,
-	}
-
-	length, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
-	if err == nil {
-		desc.Length = length
-	}
-
-	return resp.Body, &desc, nil
-}
-
-// Given a http.ResponseWriter, attempt to force close the connection.
-//
-// This is useful if you get a fatal error after sending the initial 200 OK
-// response.
-func closeConnection(w http.ResponseWriter) {
-	log.Println("Attempting to close connection")
-
-	// We attempt to bluntly close the connection because that is the
-	// best thing we can do after we've sent a 200 OK
-	hijack, ok := w.(http.Hijacker)
-	if ok {
-		conn, _, err := hijack.Hijack()
-		if err != nil {
-			fmt.Printf("Err trying to hijack: %v", err)
-			return
-		}
-		log.Println("Closing")
-		conn.Close()
-		return
-	}
-	log.Println("Not hijacker")
 }
 
 // Given a matrix server name, attempt to discover URLs to contact the server
 // on.
-func getMatrixUrls(host string) []string {
-	_, srvs, err := net.LookupSRV("matrix", "tcp", host)
+func getMatrixUrls(serverName types.ServerName) []string {
+	_, srvs, err := net.LookupSRV("matrix", "tcp", string(serverName))
 	if err != nil {
-		return []string{"https://" + host + ":8448"}
+		return []string{"https://" + string(serverName) + ":8448"}
 	}
 
 	results := make([]string, 0, len(srvs))
@@ -294,65 +405,3 @@ func getMatrixUrls(host string) []string {
 
 	return results
 }
-
-// Given a path of the form '/<host>/<name>' extract the host and name.
-func getMediaIDFromPath(path string) (host, name string, err error) {
-	parts := strings.Split(path, "/")
-	if len(parts) != 3 {
-		err = fmt.Errorf("Invalid path %q", path)
-		return
-	}
-
-	host, name = parts[1], parts[2]
-
-	if host == "" || name == "" {
-		err = fmt.Errorf("Invalid path %q", path)
-		return
-	}
-
-	return
-}
-
-type responseWriter interface {
-	io.WriteCloser
-	setContentLength(string)
-	setContentSecurityPolicy()
-	setContentType(string)
-	haveWritten() bool
-}
-
-type httpResponseWriter struct {
-	resp    http.ResponseWriter
-	written bool
-}
-
-func (writer httpResponseWriter) haveWritten() bool {
-	return writer.written
-}
-
-func (writer httpResponseWriter) Write(p []byte) (n int, err error) {
-	writer.written = true
-	return writer.resp.Write(p)
-}
-
-func (writer httpResponseWriter) Close() error { return nil }
-
-func (writer httpResponseWriter) setContentType(contentType string) {
-	writer.resp.Header().Set("Content-Type", contentType)
-}
-
-func (writer httpResponseWriter) setContentLength(length string) {
-	writer.resp.Header().Set("Content-Length", length)
-}
-
-func (writer httpResponseWriter) setContentSecurityPolicy() {
-	contentSecurityPolicy := "default-src 'none';" +
-		" script-src 'none';" +
-		" plugin-types application/pdf;" +
-		" style-src 'unsafe-inline';" +
-		" object-src 'self';"
-	writer.resp.Header().Set("Content-Security-Policy", contentSecurityPolicy)
-}
-
-var errProxy = fmt.Errorf("Failed to contact remote")
-var errNotFound = fmt.Errorf("Image not found")

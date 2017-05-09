@@ -14,12 +14,17 @@
 
 package config
 
+import "github.com/matrix-org/dendrite/mediaapi/types"
+
 // MediaAPI contains the config information necessary to spin up a mediaapi process.
 type MediaAPI struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
-	ServerName string `yaml:"server_name"`
+	ServerName types.ServerName `yaml:"server_name"`
 	// The base path to where media files will be stored.
-	BasePath string `yaml:"base_path"`
+	BasePath types.Path `yaml:"base_path"`
+	// The maximum file size in bytes that is allowed to be stored on this server.
+	// Note that remote files larger than this can still be proxied to a client, they will just not be cached.
+	MaxFileSize types.ContentLength `yaml:"base_path"`
 	// The postgres connection config for connecting to the database e.g a postgres:// URI
 	DataSource string `yaml:"database"`
 }
