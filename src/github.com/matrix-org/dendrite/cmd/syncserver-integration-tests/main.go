@@ -237,9 +237,9 @@ func testSyncServer(input, want []string, since string) {
 			panic(err)
 		}
 		panic("dendrite-sync-api-server timed out")
-	case err := <-done:
+	case err, open := <-done:
 		cmd.Process.Kill() // ensure server is dead, only cleaning up so don't care about errors this returns.
-		if err != nil {
+		if open {          // channel is closed on success
 			fmt.Println("=============================================================================================")
 			fmt.Println("sync server failed to run. If failing with 'pq: password authentication failed for user' try:")
 			fmt.Println("    export PGHOST=/var/run/postgresql\n")
