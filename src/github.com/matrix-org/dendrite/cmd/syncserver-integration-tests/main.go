@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/common/test"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -49,6 +50,15 @@ var (
 )
 
 const inputTopic = "syncserverInput"
+
+var exe = test.KafkaExecutor{
+	ZookeeperURI:   zookeeperURI,
+	KafkaDirectory: kafkaDir,
+	KafkaURI:       kafkaURI,
+	// Send stdout and stderr to our stderr so that we see error messages from
+	// the kafka process.
+	OutputWriter: os.Stderr,
+}
 
 var syncServerConfigFileContents = (`consumer_uris: ["` + kafkaURI + `"]
 roomserver_topic: "` + inputTopic + `"
@@ -82,52 +92,6 @@ func createDatabase(database string) error {
 	// the psql process
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-// TODO: dupes roomserver integration tests. Factor out.
-func createTopic(topic string) error {
-	cmd := exec.Command(
-		filepath.Join(kafkaDir, "bin", "kafka-topics.sh"),
-		"--create",
-		"--zookeeper", zookeeperURI,
-		"--replication-factor", "1",
-		"--partitions", "1",
-		"--topic", topic,
-	)
-	// Send stdout and stderr to our stderr so that we see error messages from
-	// the kafka process.
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-// TODO: dupes roomserver integration tests. Factor out.
-func writeToTopic(topic string, data []string) error {
-	cmd := exec.Command(
-		filepath.Join(kafkaDir, "bin", "kafka-console-producer.sh"),
-		"--broker-list", kafkaURI,
-		"--topic", topic,
-	)
-	// Send stdout and stderr to our stderr so that we see error messages from
-	// the kafka process.
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = strings.NewReader(strings.Join(data, "\n"))
-	return cmd.Run()
-}
-
-// TODO: dupes roomserver integration tests. Factor out.
-func deleteTopic(topic string) error {
-	cmd := exec.Command(
-		filepath.Join(kafkaDir, "bin", "kafka-topics.sh"),
-		"--delete",
-		"--if-exists",
-		"--zookeeper", zookeeperURI,
-		"--topic", topic,
-	)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stderr
 	return cmd.Run()
 }
 
@@ -182,11 +146,11 @@ func doSyncRequest(done chan error, want []string, since string) func() {
 }
 
 func testSyncServer(input, want []string, since string) {
-	deleteTopic(inputTopic)
-	if err := createTopic(inputTopic); err != nil {
+	exe.DeleteTopic(inputTopic)
+	if err := exe.CreateTopic(inputTopic); err != nil {
 		panic(err)
 	}
-	if err := writeToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
 		panic(err)
 	}
 

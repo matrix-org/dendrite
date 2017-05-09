@@ -16,13 +16,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/matrix-org/dendrite/common/test"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var (
@@ -45,6 +47,15 @@ var (
 	// The postgres connection config for connecting to the test database.
 	testDatabase = defaulting(os.Getenv("DATABASE"), fmt.Sprintf("dbname=%s binary_parameters=yes", testDatabaseName))
 )
+
+var exe = test.KafkaExecutor{
+	ZookeeperURI:   zookeeperURI,
+	KafkaDirectory: kafkaDir,
+	KafkaURI:       kafkaURI,
+	// Send stdout and stderr to our stderr so that we see error messages from
+	// the kafka process.
+	OutputWriter: os.Stderr,
+}
 
 func defaulting(value, defaultValue string) string {
 	if value == "" {
@@ -72,36 +83,6 @@ func createDatabase(database string) error {
 	// the psql process
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func createTopic(topic string) error {
-	cmd := exec.Command(
-		filepath.Join(kafkaDir, "bin", "kafka-topics.sh"),
-		"--create",
-		"--zookeeper", zookeeperURI,
-		"--replication-factor", "1",
-		"--partitions", "1",
-		"--topic", topic,
-	)
-	// Send stdout and stderr to our stderr so that we see error messages from
-	// the kafka process.
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func writeToTopic(topic string, data []string) error {
-	cmd := exec.Command(
-		filepath.Join(kafkaDir, "bin", "kafka-console-producer.sh"),
-		"--broker-list", kafkaURI,
-		"--topic", topic,
-	)
-	// Send stdout and stderr to our stderr so that we see error messages from
-	// the kafka process.
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = strings.NewReader(strings.Join(data, "\n"))
 	return cmd.Run()
 }
 
@@ -173,19 +154,6 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int, checkQueryAP
 	return lines, nil
 }
 
-func deleteTopic(topic string) error {
-	cmd := exec.Command(
-		filepath.Join(kafkaDir, "bin", "kafka-topics.sh"),
-		"--delete",
-		"--if-exists",
-		"--zookeeper", zookeeperURI,
-		"--topic", topic,
-	)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stderr
-	return cmd.Run()
-}
-
 // testRoomserver is used to run integration tests against a single roomserver.
 // It creates new kafka topics for the input and output of the roomserver.
 // It writes the input messages to the input kafka topic, formatting each message
@@ -200,16 +168,16 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		inputTopic  = "roomserverInput"
 		outputTopic = "roomserverOutput"
 	)
-	deleteTopic(inputTopic)
-	if err := createTopic(inputTopic); err != nil {
+	exe.DeleteTopic(inputTopic)
+	if err := exe.CreateTopic(inputTopic); err != nil {
 		panic(err)
 	}
-	deleteTopic(outputTopic)
-	if err := createTopic(outputTopic); err != nil {
+	exe.DeleteTopic(outputTopic)
+	if err := exe.CreateTopic(outputTopic); err != nil {
 		panic(err)
 	}
 
-	if err := writeToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
 		panic(err)
 	}
 
