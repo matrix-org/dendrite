@@ -279,7 +279,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 						fetchError = errFileIsTooLarge
 					} else {
 						// write to disk
-						bytesTemp, writeErr := writer.Write(buffer)
+						bytesTemp, writeErr := writer.Write(buffer[:bytesRead])
 						if writeErr != nil && writeErr != io.EOF {
 							fetchError = errWrite
 						} else {
