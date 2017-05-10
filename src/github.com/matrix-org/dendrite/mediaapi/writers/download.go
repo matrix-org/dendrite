@@ -339,7 +339,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 		// As we have responded with 200 OK, any errors are ineffectual to the client request and so we just log and return.
 
 		r.MediaMetadata.ContentLength = types.ContentLength(bytesWritten)
-		r.MediaMetadata.UserID = types.MatrixUserID("@unknown:" + string(r.MediaMetadata.Origin))
+		r.MediaMetadata.UserID = types.MatrixUserID("@:" + string(r.MediaMetadata.Origin))
 
 		logger.WithFields(log.Fields{
 			"MediaID":             r.MediaMetadata.MediaID,
