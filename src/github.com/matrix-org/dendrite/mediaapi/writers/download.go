@@ -239,7 +239,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			}, logger)
 			return
 		}
-		tmpFile, writer, err := createFileWriter(tmpDir, types.Filename(r.MediaMetadata.MediaID[3:]))
+		tmpFile, writer, err := createFileWriter(tmpDir, "content")
 		if err != nil {
 			logger.Infof("Failed to create file writer %q\n", err)
 			jsonErrorResponse(w, util.JSONResponse{
