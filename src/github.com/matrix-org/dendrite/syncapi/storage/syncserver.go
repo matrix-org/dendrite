@@ -169,6 +169,30 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 			if err != nil {
 				return err
 			}
+
+			// There may be some overlap where events in stateEvents are already in recentEvents, so filter
+			// them out so we don't include them twice in the /sync response. They should be in recentEvents
+			// only, so clients get to the correct state once they have rolled forward.
+			for _, recentEv := range recentEvents {
+				if recentEv.StateKey() == nil {
+					continue // not a state event
+				}
+				// TODO: This is a linear scan over all the current state events in this room. This will
+				//       be slow for big rooms. We should instead sort the state events by event ID  (ORDER BY)
+				//       then do a binary search to find matching events, similar to what roomserver does.
+				for j := 0; j < len(stateEvents); j++ {
+					if stateEvents[j].EventID() == recentEv.EventID() {
+						// overwrite the element to remove with the last element then pop the last element.
+						// This is orders of magnitude faster than re-slicing, but doesn't preserve ordering
+						// (we don't care about the order of stateEvents)
+						stateEvents[j] = stateEvents[len(stateEvents)-1]
+						stateEvents = stateEvents[:len(stateEvents)-1]
+						break // there shouldn't be multiple events with the same event ID
+					}
+				}
+
+			}
+
 			data[roomID] = types.RoomData{
 				State:        stateEvents,
 				RecentEvents: recentEvents,
