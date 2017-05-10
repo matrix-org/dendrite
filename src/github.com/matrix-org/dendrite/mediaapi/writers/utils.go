@@ -68,12 +68,12 @@ func moveFile(src types.Path, dst types.Path) error {
 
 	err := os.MkdirAll(dstDir, 0770)
 	if err != nil {
-		log.Printf("Failed to make directory: %v\n", dstDir)
+		log.Printf("Failed to make directory: %q", err)
 		return err
 	}
 	err = os.Rename(string(src), string(dst))
 	if err != nil {
-		log.Printf("Failed to move directory: %v to %v\n", src, dst)
+		log.Printf("Failed to move directory: %q", err)
 		return err
 	}
 	return nil
