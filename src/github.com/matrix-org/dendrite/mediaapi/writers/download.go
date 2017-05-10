@@ -268,7 +268,6 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 				// write to client request's response body
 				bytesTemp, respErr := w.Write(buffer[:bytesRead])
 				if bytesTemp != bytesRead || (respErr != nil && respErr != io.EOF) {
-					// TODO: BORKEN
 					logger.Errorf("bytesTemp %v != bytesRead %v : %v", bytesTemp, bytesRead, respErr)
 					fetchError = errResponse
 					break
@@ -277,13 +276,11 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 				if fetchError == nil || (fetchError != errFileIsTooLarge && fetchError != errWrite) {
 					// if larger than cfg.MaxFileSize then stop writing to disk and discard cached file
 					if bytesWritten+int64(len(buffer)) > int64(cfg.MaxFileSize) {
-						// TODO: WAAAAHNING and clean up temp files
 						fetchError = errFileIsTooLarge
 					} else {
 						// write to disk
 						bytesTemp, writeErr := writer.Write(buffer)
 						if writeErr != nil && writeErr != io.EOF {
-							// TODO: WAAAAHNING and clean up temp files
 							fetchError = errWrite
 						} else {
 							bytesWritten += int64(bytesTemp)
