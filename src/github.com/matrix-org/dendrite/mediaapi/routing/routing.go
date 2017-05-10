@@ -43,7 +43,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI,
 
 			// Set common headers returned regardless of the outcome of the request
 			util.SetCORSHeaders(w)
-			// TODO: fix comment
+			// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 			w.Header().Set("Content-Type", "application/json")
 
 			vars := mux.Vars(req)
