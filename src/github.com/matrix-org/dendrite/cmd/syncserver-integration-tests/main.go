@@ -134,7 +134,7 @@ func canonicalJSONInput(jsonData []string) []string {
 
 // clientEventJSONForOutputRoomEvent parses the given output room event and extracts the 'Event' JSON. It is
 // trimmed to the client format and then canonicalised and returned as a string.
-// Panics if there was a problem unmarshalling.
+// Panics if there are any problems.
 func clientEventJSONForOutputRoomEvent(outputRoomEvent string) string {
 	var out api.OutputRoomEvent
 	if err := json.Unmarshal([]byte(outputRoomEvent), &out); err != nil {
@@ -208,8 +208,8 @@ func syncRequestUntilSuccess(done chan error, userID, since, want string) {
 }
 
 // startSyncServer creates the database and config file needed for the sync server to run and
-// then starts the sync server. A channel is returned, which will have any termination errors
-// sent down it, followed immediately by the channel being closed.
+// then starts the sync server. The Cmd being executed is returned. A channel is also returned,
+// which will have any termination errors sent down it, followed immediately by the channel being closed.
 func startSyncServer() (*exec.Cmd, chan error) {
 	if err := createDatabase(testDatabaseName); err != nil {
 		panic(err)
@@ -264,8 +264,8 @@ func testSyncServer(syncServerCmdChan chan error, userID, since, want string) {
 	go syncRequestUntilSuccess(done, userID, since, canonicalJSONInput([]string{want})[0])
 
 	// wait for one of:
-	// - the test to pass (channel is closed)
-	// - the sync server to exit with an error (error sent on channel)
+	// - the test to pass (done channel is closed)
+	// - the sync server to exit with an error (error sent on syncServerCmdChan)
 	// - our test timeout to expire
 	// We don't need to clean up since the main() function handles that in the event we panic
 	var testPassed bool
@@ -456,6 +456,7 @@ func main() {
 		}
 	}`)
 
+	// TODO: Add more tests
 	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@bob:localhost?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello alice"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/1?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"name":"A Different Custom Room Name"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
@@ -475,62 +476,4 @@ func main() {
 	// $ curl -XPUT -d '{"name":"Everyone welcome"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@charlie:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hiiiii"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@charlie:localhost"
-	_ = `{
-		"next_batch": "5",
-		"account_data": {
-			"events": []
-		},
-		"presence": {
-			"events": []
-		},
-		"rooms": {
-			"join": {
-				"!gnrFfNAK7yGBWXFd:localhost": {
-					"state": {
-						"events": [{
-							"content": {
-								"join_rule": "public"
-							},
-							"event_id": "$zCgCrw3aZwVaKm34:localhost",
-							"origin_server_ts": 1493908927172,
-							"sender": "@alice:localhost",
-							"state_key": "",
-							"type": "m.room.join_rules"
-						}]
-					},
-					"timeline": {
-						"events": [{
-							"content": {
-								"join_rule": "public"
-							},
-							"event_id": "$zCgCrw3aZwVaKm34:localhost",
-							"origin_server_ts": 1493908927172,
-							"sender": "@alice:localhost",
-							"state_key": "",
-							"type": "m.room.join_rules"
-						}, {
-							"content": {
-								"history_visibility": "joined"
-							},
-							"event_id": "$0NUtdnY7KWMhOR9E:localhost",
-							"origin_server_ts": 1493908927174,
-							"sender": "@alice:localhost",
-							"state_key": "",
-							"type": "m.room.history_visibility"
-						}],
-						"limited": false,
-						"prev_batch": ""
-					},
-					"ephemeral": {
-						"events": []
-					},
-					"account_data": {
-						"events": []
-					}
-				}
-			},
-			"invite": {},
-			"leave": {}
-		}
-	}`
 }

@@ -175,7 +175,7 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 			// only, so clients get to the correct state once they have rolled forward.
 			for i := 0; i < len(recentEvents); i++ {
 				if recentEvents[i].StateKey() == nil {
-					continue
+					continue // not a state event
 				}
 				// TODO: This is a linear scan over all the current state events in this room. This will
 				//       be slow for big rooms. We should instead sort the state events by event ID  (ORDER BY)
@@ -187,7 +187,7 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 						// (we don't care about the order of stateEvents)
 						stateEvents[j] = stateEvents[len(stateEvents)-1]
 						stateEvents = stateEvents[:len(stateEvents)-1]
-						break // there shouldn't be multiple events with the same ID
+						break // there shouldn't be multiple events with the same event ID
 					}
 				}
 
