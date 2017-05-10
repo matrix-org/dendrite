@@ -93,10 +93,10 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// SetupRequestLogging sets up standard logging for http.Requests.
+// RequestWithLogging sets up standard logging for http.Requests.
 // http.Requests will have a logger (with a request ID/method/path logged) attached to the Context.
 // This can be accessed via GetLogger(Context).
-func SetupRequestLogging(req *http.Request) {
+func RequestWithLogging(req *http.Request) *http.Request {
 	reqID := RandomString(12)
 	// Set a Logger and request ID on the context
 	ctx := context.WithValue(req.Context(), ctxValueLogger, log.WithFields(log.Fields{
@@ -109,6 +109,8 @@ func SetupRequestLogging(req *http.Request) {
 
 	logger := GetLogger(req.Context())
 	logger.Print("Incoming request")
+
+	return req
 }
 
 // MakeJSONAPI creates an HTTP handler which always responds to incoming requests with JSON responses.
@@ -116,7 +118,7 @@ func SetupRequestLogging(req *http.Request) {
 // This can be accessed via GetLogger(Context).
 func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 	return Protect(func(w http.ResponseWriter, req *http.Request) {
-		SetupRequestLogging(req)
+		req = RequestWithLogging(req)
 
 		if req.Method == "OPTIONS" {
 			SetCORSHeaders(w)

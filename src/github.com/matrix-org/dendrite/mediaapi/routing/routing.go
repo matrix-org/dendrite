@@ -39,7 +39,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI,
 
 	r0mux.Handle("/download/{serverName}/{mediaId}",
 		prometheus.InstrumentHandler("download", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			util.SetupRequestLogging(req)
+			req = util.RequestWithLogging(req)
 
 			// Set common headers returned regardless of the outcome of the request
 			util.SetCORSHeaders(w)

@@ -16,7 +16,6 @@ package sync
 
 import (
 	"net/http"
-	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -31,20 +30,13 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db *storage.SyncServerDatabase
-	// The latest sync stream position: guarded by 'cond'.
-	currPos types.StreamPosition
-	// A condition variable to notify all waiting goroutines of a new sync stream position
-	cond *sync.Cond
+	db       *storage.SyncServerDatabase
+	notifier *Notifier
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db *storage.SyncServerDatabase) (*RequestPool, error) {
-	pos, err := db.SyncStreamPosition()
-	if err != nil {
-		return nil, err
-	}
-	return &RequestPool{db, types.StreamPosition(pos), sync.NewCond(&sync.Mutex{})}, nil
+func NewRequestPool(db *storage.SyncServerDatabase, n *Notifier) *RequestPool {
+	return &RequestPool{db, n}
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -106,34 +98,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 	}
 }
 
-// OnNewEvent is called when a new event is received from the room server. Must only be
-// called from a single goroutine, to avoid races between updates which could set the
-// current position in the stream incorrectly.
-func (rp *RequestPool) OnNewEvent(ev *gomatrixserverlib.Event, pos types.StreamPosition) {
-	// update the current position in a guard and then notify all /sync streams
-	rp.cond.L.Lock()
-	rp.currPos = pos
-	rp.cond.L.Unlock()
-
-	rp.cond.Broadcast() // notify ALL waiting goroutines
-}
-
-func (rp *RequestPool) waitForEvents(req syncRequest) types.StreamPosition {
-	// In a guard, check if the /sync request should block, and block it until we get a new position
-	rp.cond.L.Lock()
-	currentPos := rp.currPos
-	for req.since == currentPos {
-		// we need to wait for a new event.
-		// TODO: This waits for ANY new event, we need to only wait for events which we care about.
-		rp.cond.Wait() // atomically unlocks and blocks goroutine, then re-acquires lock on unblock
-		currentPos = rp.currPos
-	}
-	rp.cond.L.Unlock()
-	return currentPos
-}
-
 func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, error) {
-	currentPos := rp.waitForEvents(req)
+	currentPos := rp.notifier.WaitForEvents(req)
 
 	if req.since == types.StreamPosition(0) {
 		pos, data, err := rp.db.CompleteSync(req.userID, req.limit)

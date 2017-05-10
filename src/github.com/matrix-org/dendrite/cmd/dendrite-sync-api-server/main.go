@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/types"
 
 	log "github.com/Sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
@@ -71,12 +72,13 @@ func main() {
 		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.DataSource, err)
 	}
 
-	rp, err := sync.NewRequestPool(db)
+	pos, err := db.SyncStreamPosition()
 	if err != nil {
-		log.Panicf("startup: Failed to create request pool : %s", err)
+		log.Panicf("startup: failed to get latest sync stream position : %s", err)
 	}
 
-	server, err := consumers.NewServer(cfg, rp, db)
+	n := sync.NewNotifier(types.StreamPosition(pos))
+	server, err := consumers.NewServer(cfg, n, db)
 	if err != nil {
 		log.Panicf("startup: failed to create sync server: %s", err)
 	}
@@ -85,6 +87,6 @@ func main() {
 	}
 
 	log.Info("Starting sync server on ", *bindAddr)
-	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, *cfg, rp)
+	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, *cfg, sync.NewRequestPool(db, n))
 	log.Fatal(http.ListenAndServe(*bindAddr, nil))
 }

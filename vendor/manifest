@@ -98,7 +98,7 @@
 		{
 			"importpath": "github.com/matrix-org/util",
 			"repository": "https://github.com/matrix-org/util",
-			"revision": "8b11d9882e131d58ff40525c8f7b9a7f4b811a43",
+			"revision": "53326ed5598b226681112cbd441f59f3cffc9c82",
 			"branch": "master"
 		},
 		{
