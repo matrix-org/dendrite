@@ -115,61 +115,8 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 
 	if err == nil {
 		// If we have a record, we can respond from the local file
-		logger.WithFields(log.Fields{
-			"MediaID":             r.MediaMetadata.MediaID,
-			"Origin":              r.MediaMetadata.Origin,
-			"UploadName":          r.MediaMetadata.UploadName,
-			"Content-Length":      r.MediaMetadata.ContentLength,
-			"Content-Type":        r.MediaMetadata.ContentType,
-			"Content-Disposition": r.MediaMetadata.ContentDisposition,
-		}).Infof("Downloading file")
-
-		filePath := getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)
-		file, err := os.Open(filePath)
-		if err != nil {
-			// FIXME: Remove erroneous file from database?
-			jsonErrorResponse(w, util.JSONResponse{
-				Code: 404,
-				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
-			}, logger)
-			return
-		}
-
-		stat, err := file.Stat()
-		if err != nil {
-			// FIXME: Remove erroneous file from database?
-			jsonErrorResponse(w, util.JSONResponse{
-				Code: 404,
-				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
-			}, logger)
-			return
-		}
-
-		if r.MediaMetadata.ContentLength > 0 && int64(r.MediaMetadata.ContentLength) != stat.Size() {
-			logger.Warnf("File size in database (%v) and on disk (%v) differ.", r.MediaMetadata.ContentLength, stat.Size())
-			// FIXME: Remove erroneous file from database?
-		}
-
-		w.Header().Set("Content-Type", string(r.MediaMetadata.ContentType))
-		w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
-		contentSecurityPolicy := "default-src 'none';" +
-			" script-src 'none';" +
-			" plugin-types application/pdf;" +
-			" style-src 'unsafe-inline';" +
-			" object-src 'self';"
-		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
-
-		if bytesResponded, err := io.Copy(w, file); err != nil {
-			logger.Warnf("Failed to copy from cache %v\n", err)
-			if bytesResponded == 0 {
-				jsonErrorResponse(w, util.JSONResponse{
-					Code: 500,
-					JSON: jsonerror.NotFound(fmt.Sprintf("Failed to respond with file with media ID %q", r.MediaMetadata.MediaID)),
-				}, logger)
-			}
-			// If we have written any data then we have already responded with 200 OK and all we can do is close the connection
-			return
-		}
+		respondFromLocalFile(w, logger, r.MediaMetadata, cfg)
+		return
 	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin != cfg.ServerName {
 		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
 		logger.WithFields(log.Fields{
@@ -412,6 +359,64 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
 		}, logger)
+	}
+}
+
+func respondFromLocalFile(w http.ResponseWriter, logger *log.Entry, mediaMetadata *types.MediaMetadata, cfg config.MediaAPI) {
+	logger.WithFields(log.Fields{
+		"MediaID":             mediaMetadata.MediaID,
+		"Origin":              mediaMetadata.Origin,
+		"UploadName":          mediaMetadata.UploadName,
+		"Content-Length":      mediaMetadata.ContentLength,
+		"Content-Type":        mediaMetadata.ContentType,
+		"Content-Disposition": mediaMetadata.ContentDisposition,
+	}).Infof("Downloading file")
+
+	filePath := getPathFromMediaMetadata(mediaMetadata, cfg.BasePath)
+	file, err := os.Open(filePath)
+	if err != nil {
+		// FIXME: Remove erroneous file from database?
+		jsonErrorResponse(w, util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", mediaMetadata.MediaID)),
+		}, logger)
+		return
+	}
+
+	stat, err := file.Stat()
+	if err != nil {
+		// FIXME: Remove erroneous file from database?
+		jsonErrorResponse(w, util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", mediaMetadata.MediaID)),
+		}, logger)
+		return
+	}
+
+	if mediaMetadata.ContentLength > 0 && int64(mediaMetadata.ContentLength) != stat.Size() {
+		logger.Warnf("File size in database (%v) and on disk (%v) differ.", mediaMetadata.ContentLength, stat.Size())
+		// FIXME: Remove erroneous file from database?
+	}
+
+	w.Header().Set("Content-Type", string(mediaMetadata.ContentType))
+	w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
+	contentSecurityPolicy := "default-src 'none';" +
+		" script-src 'none';" +
+		" plugin-types application/pdf;" +
+		" style-src 'unsafe-inline';" +
+		" object-src 'self';"
+	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+
+	if bytesResponded, err := io.Copy(w, file); err != nil {
+		logger.Warnf("Failed to copy from cache %v\n", err)
+		if bytesResponded == 0 {
+			jsonErrorResponse(w, util.JSONResponse{
+				Code: 500,
+				JSON: jsonerror.NotFound(fmt.Sprintf("Failed to respond with file with media ID %q", mediaMetadata.MediaID)),
+			}, logger)
+		}
+		// If we have written any data then we have already responded with 200 OK and all we can do is close the connection
+		return
 	}
 }
 
