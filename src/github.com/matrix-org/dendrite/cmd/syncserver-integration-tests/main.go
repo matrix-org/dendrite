@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/common/test"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -91,12 +93,17 @@ func defaulting(value, defaultValue string) string {
 }
 
 var timeout time.Duration
+var clientEventTestData []string
 
 func init() {
 	var err error
 	timeout, err = time.ParseDuration(timeoutString)
 	if err != nil {
 		panic(err)
+	}
+
+	for _, s := range outputRoomEventTestData {
+		clientEventTestData = append(clientEventTestData, clientEventJSONForOutputRoomEvent(s))
 	}
 }
 
@@ -123,6 +130,30 @@ func canonicalJSONInput(jsonData []string) []string {
 		jsonData[i] = string(jsonBytes)
 	}
 	return jsonData
+}
+
+// clientEventJSONForOutputRoomEvent parses the given output room event and extracts the 'Event' JSON. It is
+// trimmed to the client format and then canonicalised and returned as a string.
+// Panics if there was a problem unmarshalling.
+func clientEventJSONForOutputRoomEvent(outputRoomEvent string) string {
+	var out api.OutputRoomEvent
+	if err := json.Unmarshal([]byte(outputRoomEvent), &out); err != nil {
+		panic("failed to unmarshal output room event: " + err.Error())
+	}
+	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(out.Event, false)
+	if err != nil {
+		panic("failed to convert event field in output room event to Event: " + err.Error())
+	}
+	clientEvs := gomatrixserverlib.ToClientEvents([]gomatrixserverlib.Event{ev}, gomatrixserverlib.FormatSync)
+	b, err := json.Marshal(clientEvs[0])
+	if err != nil {
+		panic("failed to marshal client event as json: " + err.Error())
+	}
+	jsonBytes, err := gomatrixserverlib.CanonicalJSON(b)
+	if err != nil {
+		panic("failed to turn event json into canonical json: " + err.Error())
+	}
+	return string(jsonBytes)
 }
 
 // doSyncRequest does a /sync request and returns an error if it fails or doesn't
@@ -156,10 +187,14 @@ func doSyncRequest(syncServerURL, want string) error {
 // syncRequestUntilSuccess blocks and performs the same /sync request over and over until
 // the response returns the wanted string, where it will close the given channel and return.
 // It will keep track of the last error in `lastRequestErr`.
-func syncRequestUntilSuccess(done chan error, want string, since string) {
+func syncRequestUntilSuccess(done chan error, userID, since, want string) {
 	for {
+		sinceQuery := ""
+		if since != "" {
+			sinceQuery = "&since=" + since
+		}
 		err := doSyncRequest(
-			"http://"+syncserverAddr+"/api/_matrix/client/r0/sync?access_token=@alice:localhost&since="+since,
+			"http://"+syncserverAddr+"/api/_matrix/client/r0/sync?access_token="+userID+sinceQuery,
 			want,
 		)
 		if err != nil {
@@ -172,9 +207,10 @@ func syncRequestUntilSuccess(done chan error, want string, since string) {
 	}
 }
 
-// prepareSyncServer creates the database and config file needed for the sync server to run.
-// It also prepares the CLI command to execute.
-func prepareSyncServer() *exec.Cmd {
+// startSyncServer creates the database and config file needed for the sync server to run and
+// then starts the sync server. A channel is returned, which will have any termination errors
+// sent down it, followed immediately by the channel being closed.
+func startSyncServer() (*exec.Cmd, chan error) {
 	if err := createDatabase(testDatabaseName); err != nil {
 		panic(err)
 	}
@@ -192,23 +228,28 @@ func prepareSyncServer() *exec.Cmd {
 	)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stderr
-	return cmd
+
+	if err := cmd.Start(); err != nil {
+		panic("failed to start sync server: " + err.Error())
+	}
+	syncServerCmdChan := make(chan error, 1)
+	go func() {
+		syncServerCmdChan <- cmd.Wait()
+		close(syncServerCmdChan)
+	}()
+	return cmd, syncServerCmdChan
 }
 
-func testSyncServer(input, want []string, since string) {
-	// Write the logs to kafka so the sync server has some data to work with.
+// prepareKafka creates the topics which will be written to by the tests.
+func prepareKafka() {
 	exe.DeleteTopic(inputTopic)
 	if err := exe.CreateTopic(inputTopic); err != nil {
 		panic(err)
 	}
-	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
-		panic(err)
-	}
+}
 
-	cmd := prepareSyncServer()
-	if err := cmd.Start(); err != nil {
-		panic("failed to start sync server: " + err.Error())
-	}
+func testSyncServer(syncServerCmdChan chan error, userID, since, want string) {
+	fmt.Printf("==TESTING== testSyncServer(%s,%s)\n", userID, since)
 	done := make(chan error, 1)
 
 	// We need to wait for the sync server to:
@@ -220,256 +261,221 @@ func testSyncServer(input, want []string, since string) {
 	// We can't even wait for the first valid 200 OK response because it's possible to race
 	// with consuming the kafka logs (so the /sync response will be missing events and
 	// therefore fail the test).
-	go syncRequestUntilSuccess(done, want[0], since)
+	go syncRequestUntilSuccess(done, userID, since, canonicalJSONInput([]string{want})[0])
 
-	// wait for the sync server to exit or our test timeout to expire
-	go func() {
-		done <- cmd.Wait()
-	}()
+	// wait for one of:
+	// - the test to pass (channel is closed)
+	// - the sync server to exit with an error (error sent on channel)
+	// - our test timeout to expire
+	// We don't need to clean up since the main() function handles that in the event we panic
+	var testPassed bool
+
 	select {
 	case <-time.After(timeout):
+		if testPassed {
+			break
+		}
+		fmt.Printf("==TESTING== testSyncServer(%s,%s) TIMEOUT\n", userID, since)
 		if reqErr := getLastRequestError(); reqErr != nil {
 			fmt.Println("Last /sync request error:")
 			fmt.Println(reqErr)
 		}
-
-		if err := cmd.Process.Kill(); err != nil {
-			panic(err)
-		}
 		panic("dendrite-sync-api-server timed out")
-	case err, open := <-done:
-		cmd.Process.Kill() // ensure server is dead, only cleaning up so don't care about errors this returns.
-		if open {          // channel is closed on success
+	case err := <-syncServerCmdChan:
+		if err != nil {
 			fmt.Println("=============================================================================================")
 			fmt.Println("sync server failed to run. If failing with 'pq: password authentication failed for user' try:")
 			fmt.Println("    export PGHOST=/var/run/postgresql\n")
 			fmt.Println("=============================================================================================")
 			panic(err)
 		}
+	case <-done:
+		testPassed = true
+		fmt.Printf("==TESTING== testSyncServer(%s,%s) PASSED\n", userID, since)
 	}
 }
 
+// Runs a battery of sync server tests against test data in testdata.go
+// testdata.go has a list of OutputRoomEvents which will be fed into the kafka log which the sync server will consume.
+// The tests will pause at various points in this list to conduct tests on the /sync responses before continuing.
+// For ease of understanding, the curl commands used to create the OutputRoomEvents are listed along with each write to kafka.
 func main() {
 	fmt.Println("==TESTING==", os.Args[0])
-	// room creation for @alice:localhost
-	input := []string{
-		`{
-		"Event": {
-			"auth_events": [],
-			"content": {
-				"creator": "@alice:localhost"
-			},
-			"depth": 1,
-			"event_id": "$rOaxKSu6K1s0nOsW:localhost",
-			"hashes": {
-				"sha256": "g1QC1jZauIcVw+HCGizUqlUaLSmAkEGwGmIcLac5TKk"
-			},
-			"origin": "localhost",
-			"origin_server_ts": 1493908927170,
-			"prev_events": [],
-			"room_id": "!gnrFfNAK7yGBWXFd:localhost",
-			"sender": "@alice:localhost",
-			"signatures": {
-				"localhost": {
-					"ed25519:something": "WCaImDmpkhNCCoUyRHcrV93SeJpJbq34yWbtjBgNNXVJaoiLSTys6t/gCvVqNYfX6Dt9c+z/sx5LikOLmLm1Dg"
-				}
-			},
-			"state_key": "",
-			"type": "m.room.create"
-		},
-		"VisibilityEventIDs": null,
-		"LatestEventIDs": ["$rOaxKSu6K1s0nOsW:localhost"],
-		"AddsStateEventIDs": ["$rOaxKSu6K1s0nOsW:localhost"],
-		"RemovesStateEventIDs": null,
-		"LastSentEventID": ""
-	}`,
-		`{
-		"Event": {
-			"auth_events": [
-				["$rOaxKSu6K1s0nOsW:localhost", {
-					"sha256": "XFb+VOx/74T3RPw2PXTY4AXDZaEy8uLCSFuHCK4XYHg"
-				}]
-			],
-			"content": {
-				"membership": "join"
-			},
-			"depth": 2,
-			"event_id": "$uEDYwFpBO936HTfM:localhost",
-			"hashes": {
-				"sha256": "y5AQAnnzremC678QTIFEi677wdbMwluPiweZnuvUmz0"
-			},
-			"origin": "localhost",
-			"origin_server_ts": 1493908927170,
-			"prev_events": [
-				["$rOaxKSu6K1s0nOsW:localhost", {
-					"sha256": "XFb+VOx/74T3RPw2PXTY4AXDZaEy8uLCSFuHCK4XYHg"
-				}]
-			],
-			"room_id": "!gnrFfNAK7yGBWXFd:localhost",
-			"sender": "@alice:localhost",
-			"signatures": {
-				"localhost": {
-					"ed25519:something": "5Pl8GkgcyUu2QY7T38OkuufVQQV13f0kl2PLFI2OILBIcy0XPf8hSaFclemYckoo2nRgffIzsHO/ZgqfoBu0BA"
-				}
-			},
-			"state_key": "@alice:localhost",
-			"type": "m.room.member"
-		},
-		"VisibilityEventIDs": null,
-		"LatestEventIDs": ["$uEDYwFpBO936HTfM:localhost"],
-		"AddsStateEventIDs": ["$uEDYwFpBO936HTfM:localhost"],
-		"RemovesStateEventIDs": null,
-		"LastSentEventID": "$rOaxKSu6K1s0nOsW:localhost"
-	}`,
-		`{
-		"Event": {
-			"auth_events": [
-				["$rOaxKSu6K1s0nOsW:localhost", {
-					"sha256": "XFb+VOx/74T3RPw2PXTY4AXDZaEy8uLCSFuHCK4XYHg"
-				}],
-				["$uEDYwFpBO936HTfM:localhost", {
-					"sha256": "3z+JL3VmTtVROucpsrEWkxNVzn8ZOP2I1jU362pQIUU"
-				}]
-			],
-			"content": {
-				"ban": 50,
-				"events": {
-					"m.room.avatar": 50,
-					"m.room.canonical_alias": 50,
-					"m.room.history_visibility": 100,
-					"m.room.name": 50,
-					"m.room.power_levels": 100
-				},
-				"events_default": 0,
-				"invite": 0,
-				"kick": 50,
-				"redact": 50,
-				"state_default": 50,
-				"users": {
-					"@alice:localhost": 100
-				},
-				"users_default": 0
-			},
-			"depth": 3,
-			"event_id": "$Axp7qdQXf0bz7zBy:localhost",
-			"hashes": {
-				"sha256": "oObDsGkeVtQgyVPauoLIqk+J+Jsz6HOol79uRMTRFFM"
-			},
-			"origin": "localhost",
-			"origin_server_ts": 1493908927171,
-			"prev_events": [
-				["$uEDYwFpBO936HTfM:localhost", {
-					"sha256": "3z+JL3VmTtVROucpsrEWkxNVzn8ZOP2I1jU362pQIUU"
-				}]
-			],
-			"room_id": "!gnrFfNAK7yGBWXFd:localhost",
-			"sender": "@alice:localhost",
-			"signatures": {
-				"localhost": {
-					"ed25519:something": "3kV1Wm2E1zUPQ8YUIC1x/8ks1SGvXE0olQ+b0BRMJm7fduY2fNcb/4A4aKbQLRtOwvCNUVuqQkkkdp1Zor1LCw"
-				}
-			},
-			"state_key": "",
-			"type": "m.room.power_levels"
-		},
-		"VisibilityEventIDs": null,
-		"LatestEventIDs": ["$Axp7qdQXf0bz7zBy:localhost"],
-		"AddsStateEventIDs": ["$Axp7qdQXf0bz7zBy:localhost"],
-		"RemovesStateEventIDs": null,
-		"LastSentEventID": "$uEDYwFpBO936HTfM:localhost"
-	}`,
-		`{
-		"Event": {
-			"auth_events": [
-				["$rOaxKSu6K1s0nOsW:localhost", {
-					"sha256": "XFb+VOx/74T3RPw2PXTY4AXDZaEy8uLCSFuHCK4XYHg"
-				}],
-				["$Axp7qdQXf0bz7zBy:localhost", {
-					"sha256": "5KIh9uRcgXuiYdO965JSfIOSGeMrasf8N9eEzxisErI"
-				}],
-				["$uEDYwFpBO936HTfM:localhost", {
-					"sha256": "3z+JL3VmTtVROucpsrEWkxNVzn8ZOP2I1jU362pQIUU"
-				}]
-			],
-			"content": {
-				"join_rule": "public"
-			},
-			"depth": 4,
-			"event_id": "$zCgCrw3aZwVaKm34:localhost",
-			"hashes": {
-				"sha256": "KmJ7wAUznMy74MhAB3iDsBdFAkGypWXamDDQeLVzp1w"
-			},
-			"origin": "localhost",
-			"origin_server_ts": 1493908927172,
-			"prev_events": [
-				["$Axp7qdQXf0bz7zBy:localhost", {
-					"sha256": "5KIh9uRcgXuiYdO965JSfIOSGeMrasf8N9eEzxisErI"
-				}]
-			],
-			"room_id": "!gnrFfNAK7yGBWXFd:localhost",
-			"sender": "@alice:localhost",
-			"signatures": {
-				"localhost": {
-					"ed25519:something": "BkqU/1QARxNWEDfgKenvrhhGd6nmNZYHugHB0kFqUSQRZo+RV/zThLA0FxMXfmbGqfJdi1wXmxIR3QIwvGuhCg"
-				}
-			},
-			"state_key": "",
-			"type": "m.room.join_rules"
-		},
-		"VisibilityEventIDs": null,
-		"LatestEventIDs": ["$zCgCrw3aZwVaKm34:localhost"],
-		"AddsStateEventIDs": ["$zCgCrw3aZwVaKm34:localhost"],
-		"RemovesStateEventIDs": null,
-		"LastSentEventID": "$Axp7qdQXf0bz7zBy:localhost"
-	}`,
-		`{
-		"Event": {
-			"auth_events": [
-				["$rOaxKSu6K1s0nOsW:localhost", {
-					"sha256": "XFb+VOx/74T3RPw2PXTY4AXDZaEy8uLCSFuHCK4XYHg"
-				}],
-				["$Axp7qdQXf0bz7zBy:localhost", {
-					"sha256": "5KIh9uRcgXuiYdO965JSfIOSGeMrasf8N9eEzxisErI"
-				}],
-				["$uEDYwFpBO936HTfM:localhost", {
-					"sha256": "3z+JL3VmTtVROucpsrEWkxNVzn8ZOP2I1jU362pQIUU"
-				}]
-			],
-			"content": {
-				"history_visibility": "joined"
-			},
-			"depth": 5,
-			"event_id": "$0NUtdnY7KWMhOR9E:localhost",
-			"hashes": {
-				"sha256": "9CBp3jcnGKzoKCVYRCFCoe0CJ8IfZZAOhudAoDr2jqU"
-			},
-			"origin": "localhost",
-			"origin_server_ts": 1493908927174,
-			"prev_events": [
-				["$zCgCrw3aZwVaKm34:localhost", {
-					"sha256": "8kNj8j5K6YFWpFa0CLy1pR5Lp9nao0X6TW2iUIya2Tc"
-				}]
-			],
-			"room_id": "!gnrFfNAK7yGBWXFd:localhost",
-			"sender": "@alice:localhost",
-			"signatures": {
-				"localhost": {
-					"ed25519:something": "92Dz7JXAxuc87L3+jMps0HC6Z4V5PhMZQIomI8Dod/im1bkfhYUPMOF5EWWMGMDSq+mSpJPVizWAIGa8bIFcDA"
-				}
-			},
-			"state_key": "",
-			"type": "m.room.history_visibility"
-		},
-		"VisibilityEventIDs": null,
-		"LatestEventIDs": ["$0NUtdnY7KWMhOR9E:localhost"],
-		"AddsStateEventIDs": ["$0NUtdnY7KWMhOR9E:localhost"],
-		"RemovesStateEventIDs": null,
-		"LastSentEventID": "$zCgCrw3aZwVaKm34:localhost"
-	}`,
+	prepareKafka()
+	cmd, syncServerCmdChan := startSyncServer()
+	defer cmd.Process.Kill() // ensure server is dead, only cleaning up so don't care about errors this returns.
+
+	// $ curl -XPOST -d '{}' "http://localhost:8009/_matrix/client/r0/createRoom?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello world"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/1?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello world 2"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/2?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello world 3"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"name":"Custom Room Name"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[0:9])); err != nil {
+		panic(err)
 	}
-	since := "3"
-	want := []string{
-		`{
+	testSyncServer(syncServerCmdChan, "@alice:localhost", "", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "9",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {
+				"!PjrbIMW2cIiaYF4t:localhost": {
+					"account_data": {
+						"events": []
+					},
+					"ephemeral": {
+						"events": []
+					},
+					"state": {
+						"events": []
+					},
+					"timeline": {
+						"events": [{
+							"content": {
+								"creator": "@alice:localhost"
+							},
+							"event_id": "$xz0fUB8zNMTGFh1W:localhost",
+							"origin_server_ts": 1494411218382,
+							"sender": "@alice:localhost",
+							"state_key": "",
+							"type": "m.room.create"
+						}, {
+							"content": {
+								"membership": "join"
+							},
+							"event_id": "$QTen1vksfcRTpUCk:localhost",
+							"origin_server_ts": 1494411218385,
+							"sender": "@alice:localhost",
+							"state_key": "@alice:localhost",
+							"type": "m.room.member"
+						}, {
+							"content": {
+								"ban": 50,
+								"events": {
+									"m.room.avatar": 50,
+									"m.room.canonical_alias": 50,
+									"m.room.history_visibility": 100,
+									"m.room.name": 50,
+									"m.room.power_levels": 100
+								},
+								"events_default": 0,
+								"invite": 0,
+								"kick": 50,
+								"redact": 50,
+								"state_default": 50,
+								"users": {
+									"@alice:localhost": 100
+								},
+								"users_default": 0
+							},
+							"event_id": "$RWsxGlfPHAcijTgu:localhost",
+							"origin_server_ts": 1494411218385,
+							"sender": "@alice:localhost",
+							"state_key": "",
+							"type": "m.room.power_levels"
+						}, {
+							"content": {
+								"join_rule": "public"
+							},
+							"event_id": "$2O2DpHB37CuwwJOe:localhost",
+							"origin_server_ts": 1494411218386,
+							"sender": "@alice:localhost",
+							"state_key": "",
+							"type": "m.room.join_rules"
+						}, {
+							"content": {
+								"history_visibility": "joined"
+							},
+							"event_id": "$5LRiBskVCROnL5WY:localhost",
+							"origin_server_ts": 1494411218387,
+							"sender": "@alice:localhost",
+							"state_key": "",
+							"type": "m.room.history_visibility"
+						}, {
+							"content": {
+								"body": "hello world",
+								"msgtype": "m.text"
+							},
+							"event_id": "$Z8ZJik7ghwzSYTH9:localhost",
+							"origin_server_ts": 1494411339207,
+							"sender": "@alice:localhost",
+							"type": "m.room.message"
+						}, {
+							"content": {
+								"body": "hello world 2",
+								"msgtype": "m.text"
+							},
+							"event_id": "$8382Ah682eL4hxjN:localhost",
+							"origin_server_ts": 1494411380282,
+							"sender": "@alice:localhost",
+							"type": "m.room.message"
+						}, {
+							"content": {
+								"body": "hello world 3",
+								"msgtype": "m.text"
+							},
+							"event_id": "$17SfHsvSeTQthSWF:localhost",
+							"origin_server_ts": 1494411396560,
+							"sender": "@alice:localhost",
+							"type": "m.room.message"
+						}, {
+							"content": {
+								"name": "Custom Room Name"
+							},
+							"event_id": "$j7KtuOzM0K15h3Kr:localhost",
+							"origin_server_ts": 1494411482625,
+							"sender": "@alice:localhost",
+							"state_key": "",
+							"type": "m.room.name"
+						}],
+						"limited": true,
+						"prev_batch": ""
+					}
+				}
+			},
+			"leave": {}
+		}
+	}`)
+	testSyncServer(syncServerCmdChan, "@bob:localhost", "", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "9",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {},
+			"leave": {}
+		}
+	}`)
+
+	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@bob:localhost?access_token=@bob:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello alice"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/1?access_token=@bob:localhost"
+	// $ curl -XPUT -d '{"name":"A Different Custom Room Name"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello bob"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/2?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"membership":"invite"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@bob:localhost"
+	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@charlie:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"not charlie..."}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"membership":"leave"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"why did you kick charlie"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
+	// $ curl -XPUT -d '{"name":"No Charlies"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"whatever"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
+	// $ curl -XPUT -d '{"membership":"leave"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@bob:localhost?access_token=@bob:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"im alone now"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"membership":"invite"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@bob:localhost?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"membership":"leave"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@bob:localhost?access_token=@bob:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"so alone"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"name":"Everyone welcome"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
+	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@charlie:localhost"
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hiiiii"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@charlie:localhost"
+	_ = `{
 		"next_batch": "5",
 		"account_data": {
 			"events": []
@@ -526,8 +532,5 @@ func main() {
 			"invite": {},
 			"leave": {}
 		}
-	}`,
-	}
-	want = canonicalJSONInput(want)
-	testSyncServer(input, want, since)
+	}`
 }
