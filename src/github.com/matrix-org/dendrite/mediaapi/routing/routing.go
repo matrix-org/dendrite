@@ -16,6 +16,7 @@ package routing
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/mediaapi/config"
@@ -37,6 +38,9 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI,
 		return writers.Upload(req, cfg, db)
 	})))
 
+	activeRemoteRequests := &types.ActiveRemoteRequests{
+		Set: map[string]*sync.Cond{},
+	}
 	r0mux.Handle("/download/{serverName}/{mediaId}",
 		prometheus.InstrumentHandler("download", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			req = util.RequestWithLogging(req)
@@ -47,7 +51,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.MediaAPI,
 			w.Header().Set("Content-Type", "application/json")
 
 			vars := mux.Vars(req)
-			writers.Download(w, req, types.ServerName(vars["serverName"]), types.MediaID(vars["mediaId"]), cfg, db)
+			writers.Download(w, req, types.ServerName(vars["serverName"]), types.MediaID(vars["mediaId"]), cfg, db, activeRemoteRequests)
 		})),
 	)
 

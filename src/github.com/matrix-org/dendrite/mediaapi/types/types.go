@@ -14,6 +14,8 @@
 
 package types
 
+import "sync"
+
 // ContentDisposition is an HTTP Content-Disposition header string
 type ContentDisposition string
 
@@ -54,4 +56,11 @@ type MediaMetadata struct {
 	CreationTimestamp  UnixMs
 	UploadName         Filename
 	UserID             MatrixUserID
+}
+
+// ActiveRemoteRequests is a lockable map of media URIs requested from remote homeservers
+// It is used for ensuring multiple requests for the same file do not clobber each other.
+type ActiveRemoteRequests struct {
+	sync.Mutex
+	Set map[string]*sync.Cond
 }

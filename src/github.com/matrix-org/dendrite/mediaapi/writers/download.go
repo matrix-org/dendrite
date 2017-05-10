@@ -25,6 +25,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -80,13 +81,15 @@ var errRead = fmt.Errorf("failed to read response from remote server")
 var errResponse = fmt.Errorf("failed to write file data to response body")
 var errWrite = fmt.Errorf("failed to write file to disk")
 
+var nAttempts = 5
+
 // Download implements /download
 // Files from this server (i.e. origin == cfg.ServerName) are served directly
 // Files from remote servers (i.e. origin != cfg.ServerName) are cached locally.
 // If they are present in the cache, they are served directly.
 // If they are not present in the cache, they are obtained from the remote server and
 // simultaneously served back to the client and written into the cache.
-func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName, mediaID types.MediaID, cfg config.MediaAPI, db *storage.Database) {
+func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName, mediaID types.MediaID, cfg config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	logger := util.GetLogger(req.Context())
 
 	// request validation
@@ -124,7 +127,38 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			"Origin":  r.MediaMetadata.Origin,
 		}).Infof("Fetching remote file")
 
-		// TODO: lock request in hash set
+		mxcURL := "mxc://" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
+
+		for attempts := 0; ; attempts++ {
+			activeRemoteRequests.Lock()
+			err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, r.MediaMetadata)
+			if err == nil {
+				// If we have a record, we can respond from the local file
+				respondFromLocalFile(w, logger, r.MediaMetadata, cfg)
+				activeRemoteRequests.Unlock()
+				return
+			}
+			if activeRemoteRequestCondition, ok := activeRemoteRequests.Set[mxcURL]; ok {
+				if attempts >= nAttempts {
+					logger.Warnf("Other goroutines are trying to download the remote file and failing.")
+					jsonErrorResponse(w, util.JSONResponse{
+						Code: 500,
+						JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
+					}, logger)
+					return
+				}
+				logger.WithFields(log.Fields{
+					"Origin":  r.MediaMetadata.Origin,
+					"MediaID": r.MediaMetadata.MediaID,
+				}).Infof("Waiting for another goroutine to fetch the file.")
+				activeRemoteRequestCondition.Wait()
+				activeRemoteRequests.Unlock()
+			} else {
+				activeRemoteRequests.Set[mxcURL] = &sync.Cond{L: activeRemoteRequests}
+				activeRemoteRequests.Unlock()
+				break
+			}
+		}
 
 		// FIXME: Only request once (would race if multiple requests for the same remote file)
 		// Use a hash set based on the origin and media ID (the request URL should be fine...) and synchronise adding / removing members
@@ -319,20 +353,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			"Content-Disposition": r.MediaMetadata.ContentDisposition,
 		}).Infof("Storing file metadata to media repository database")
 
-		// if written to disk, add to db
-		err = db.StoreMediaMetadata(r.MediaMetadata)
-		if err != nil {
-			tmpDirErr := os.RemoveAll(string(tmpDir))
-			if tmpDirErr != nil {
-				logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
-			}
-			return
-		}
-
-		// TODO: unlock request in hash set
-
-		// TODO: generate thumbnails
-
+		// The database is the source of truth so we need to have moved the file first
 		err = moveFile(
 			types.Path(path.Join(string(tmpDir), "content")),
 			types.Path(getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)),
@@ -344,6 +365,36 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			}
 			return
 		}
+
+		// Writing the metadata to the media repository database and removing the mxcURL from activeRemoteRequests needs to be atomic.
+		// If it were not atomic, a new request for the same file could come in in routine A and check the database before the INSERT.
+		// Routine B which was fetching could then have its INSERT complete and remove the mxcURL from the activeRemoteRequests.
+		// If routine A then checked the activeRemoteRequests it would think it needed to fetch the file when it's already in the database.
+		// The locking below mitigates this situation.
+		activeRemoteRequests.Lock()
+		// FIXME: unlock after timeout of db request
+		// if written to disk, add to db
+		err = db.StoreMediaMetadata(r.MediaMetadata)
+		if err != nil {
+			finalDir := path.Dir(getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath))
+			finalDirErr := os.RemoveAll(finalDir)
+			if finalDirErr != nil {
+				logger.Warnf("Failed to remove finalDir (%v): %q\n", finalDir, finalDirErr)
+			}
+			delete(activeRemoteRequests.Set, mxcURL)
+			activeRemoteRequests.Unlock()
+			return
+		}
+		activeRemoteRequestCondition, _ := activeRemoteRequests.Set[mxcURL]
+		logger.WithFields(log.Fields{
+			"Origin":  r.MediaMetadata.Origin,
+			"MediaID": r.MediaMetadata.MediaID,
+		}).Infof("Signalling other goroutines waiting for us to fetch the file.")
+		activeRemoteRequestCondition.Broadcast()
+		delete(activeRemoteRequests.Set, mxcURL)
+		activeRemoteRequests.Unlock()
+
+		// TODO: generate thumbnails
 
 		logger.WithFields(log.Fields{
 			"MediaID":             r.MediaMetadata.MediaID,
