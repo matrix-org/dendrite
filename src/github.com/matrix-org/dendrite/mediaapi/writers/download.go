@@ -15,7 +15,6 @@
 package writers
 
 import (
-	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -276,27 +275,6 @@ func createRemoteRequest(mediaMetadata *types.MediaMetadata, logger *log.Entry) 
 	}
 
 	return resp, nil
-}
-
-// FIXME: move to utils and use in upload as well
-func createTempFileWriter(basePath types.Path, logger *log.Entry) (*bufio.Writer, *os.File, types.Path, *util.JSONResponse) {
-	tmpDir, err := createTempDir(basePath)
-	if err != nil {
-		logger.Infof("Failed to create temp dir %q\n", err)
-		return nil, nil, "", &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
-		}
-	}
-	tmpFile, writer, err := createFileWriter(tmpDir, "content")
-	if err != nil {
-		logger.Infof("Failed to create file writer %q\n", err)
-		return nil, nil, "", &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
-		}
-	}
-	return writer, tmpFile, tmpDir, nil
 }
 
 // copyToActiveAndPassive works like io.Copy except it copies from the reader to both of the writers

@@ -146,15 +146,10 @@ func Upload(req *http.Request, cfg config.MediaAPI, db *storage.Database) util.J
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Info("Uploading file")
 
-	tmpDir, err := createTempDir(cfg.BasePath)
-	if err != nil {
-		logger.Infof("Failed to create temp dir %q\n", err)
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
-		}
+	writer, file, tmpDir, errorResponse := createTempFileWriter(cfg.BasePath, logger)
+	if errorResponse != nil {
+		return *errorResponse
 	}
-	file, writer, err := createFileWriter(tmpDir, "content")
 	defer file.Close()
 
 	// The limited reader restricts how many bytes are read from the body to the specified maximum bytes
