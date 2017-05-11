@@ -122,6 +122,9 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 		return
 	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin != cfg.ServerName {
 		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
+		// The following code using activeRemoteRequests is avoiding duplication of fetches from the remote server in the case
+		// of multiple simultaneous incoming requests for the same remote file - it will be downloaded once, cached and served
+		// to all clients.
 
 		mxcURL := "mxc://" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
 
@@ -256,6 +259,7 @@ func respondFromRemoteFile(w http.ResponseWriter, logger *log.Entry, mediaMetada
 		}
 	}()
 
+	// create request for remote file
 	urls := getMatrixUrls(mediaMetadata.Origin)
 
 	logger.Printf("Connecting to remote %q\n", urls[0])
@@ -299,6 +303,7 @@ func respondFromRemoteFile(w http.ResponseWriter, logger *log.Entry, mediaMetada
 		return
 	}
 
+	// get metadata from request and set metadata on response
 	contentLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
 	if err != nil {
 		logger.Warn("Failed to parse content length")
@@ -324,6 +329,7 @@ func respondFromRemoteFile(w http.ResponseWriter, logger *log.Entry, mediaMetada
 		" object-src 'self';"
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
+	// create the temporary file writer
 	tmpDir, err := createTempDir(cfg.BasePath)
 	if err != nil {
 		logger.Infof("Failed to create temp dir %q\n", err)
@@ -344,6 +350,8 @@ func respondFromRemoteFile(w http.ResponseWriter, logger *log.Entry, mediaMetada
 	}
 	defer tmpFile.Close()
 
+	// read the remote request's response body
+	// simultaneously write it to the incoming request's response body and the temporary file
 	logger.WithFields(log.Fields{
 		"MediaID": mediaMetadata.MediaID,
 		"Origin":  mediaMetadata.Origin,
@@ -429,9 +437,14 @@ func respondFromRemoteFile(w http.ResponseWriter, logger *log.Entry, mediaMetada
 		return
 	}
 
+	// The file has been fetched. It is moved to its final destination and its metadata is inserted into the database.
+
 	// Note: After this point we have responded to the client's request and are just dealing with local caching.
 	// As we have responded with 200 OK, any errors are ineffectual to the client request and so we just log and return.
 
+	// It's possible the bytesWritten to the temporary file is different to the reported Content-Length from the remote
+	// request's response. bytesWritten is therefore used as it is what would be sent to clients when reading from the local
+	// file.
 	mediaMetadata.ContentLength = types.ContentLength(bytesWritten)
 	mediaMetadata.UserID = types.MatrixUserID("@:" + string(mediaMetadata.Origin))
 
