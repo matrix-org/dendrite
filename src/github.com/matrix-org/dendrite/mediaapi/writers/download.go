@@ -144,6 +144,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 						Code: 500,
 						JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
 					}, logger)
+					activeRemoteRequests.Unlock()
 					return
 				}
 				logger.WithFields(log.Fields{
