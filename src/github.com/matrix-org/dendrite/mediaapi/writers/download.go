@@ -153,7 +153,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 				logger.WithFields(log.Fields{
 					"Origin":  r.MediaMetadata.Origin,
 					"MediaID": r.MediaMetadata.MediaID,
-				}).Infof("Waiting for another goroutine to fetch the file.")
+				}).Infof("Waiting for another goroutine to fetch the remote file.")
 				activeRemoteRequestCondition.Wait()
 				activeRemoteRequests.Unlock()
 			} else {
