@@ -81,7 +81,7 @@ var errRead = fmt.Errorf("failed to read response from remote server")
 var errResponse = fmt.Errorf("failed to write file data to response body")
 var errWrite = fmt.Errorf("failed to write file to disk")
 
-var nAttempts = 5
+var nTries = 5
 
 // Download implements /download
 // Files from this server (i.e. origin == cfg.ServerName) are served directly
@@ -129,7 +129,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 
 		mxcURL := "mxc://" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
 
-		for attempts := 0; ; attempts++ {
+		for tries := 0; ; tries++ {
 			activeRemoteRequests.Lock()
 			err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, r.MediaMetadata)
 			if err == nil {
@@ -139,7 +139,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 				return
 			}
 			if activeRemoteRequestCondition, ok := activeRemoteRequests.Set[mxcURL]; ok {
-				if attempts >= nAttempts {
+				if tries >= nTries {
 					logger.Warnf("Other goroutines are trying to download the remote file and failing.")
 					jsonErrorResponse(w, util.JSONResponse{
 						Code: 500,
