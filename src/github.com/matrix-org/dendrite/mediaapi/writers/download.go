@@ -235,6 +235,48 @@ func respondFromLocalFile(w http.ResponseWriter, logger *log.Entry, mediaMetadat
 	}
 }
 
+func createRemoteRequest(mediaMetadata *types.MediaMetadata, logger *log.Entry) (*http.Response, *util.JSONResponse) {
+	urls := getMatrixUrls(mediaMetadata.Origin)
+
+	logger.Printf("Connecting to remote %q\n", urls[0])
+
+	remoteReqAddr := urls[0] + "/_matrix/media/v1/download/" + string(mediaMetadata.Origin) + "/" + string(mediaMetadata.MediaID)
+	remoteReq, err := http.NewRequest("GET", remoteReqAddr, nil)
+	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", mediaMetadata.MediaID, mediaMetadata.Origin)),
+		}
+	}
+
+	remoteReq.Header.Set("Host", string(mediaMetadata.Origin))
+
+	client := http.Client{}
+	resp, err := client.Do(remoteReq)
+	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: 502,
+			JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", mediaMetadata.MediaID, mediaMetadata.Origin)),
+		}
+	}
+
+	if resp.StatusCode != 200 {
+		logger.Printf("Server responded with %d\n", resp.StatusCode)
+		if resp.StatusCode == 404 {
+			return nil, &util.JSONResponse{
+				Code: 404,
+				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", mediaMetadata.MediaID)),
+			}
+		}
+		return nil, &util.JSONResponse{
+			Code: 502,
+			JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", mediaMetadata.MediaID, mediaMetadata.Origin)),
+		}
+	}
+
+	return resp, nil
+}
+
 func respondFromRemoteFile(w http.ResponseWriter, logger *log.Entry, mediaMetadata *types.MediaMetadata, cfg config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	logger.WithFields(log.Fields{
 		"MediaID": mediaMetadata.MediaID,
@@ -259,49 +301,12 @@ func respondFromRemoteFile(w http.ResponseWriter, logger *log.Entry, mediaMetada
 		}
 	}()
 
-	// create request for remote file
-	urls := getMatrixUrls(mediaMetadata.Origin)
-
-	logger.Printf("Connecting to remote %q\n", urls[0])
-
-	remoteReqAddr := urls[0] + "/_matrix/media/v1/download/" + string(mediaMetadata.Origin) + "/" + string(mediaMetadata.MediaID)
-	remoteReq, err := http.NewRequest("GET", remoteReqAddr, nil)
-	if err != nil {
-		jsonErrorResponse(w, util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", mediaMetadata.MediaID, mediaMetadata.Origin)),
-		}, logger)
-		return
-	}
-
-	remoteReq.Header.Set("Host", string(mediaMetadata.Origin))
-
-	client := http.Client{}
-	resp, err := client.Do(remoteReq)
-	if err != nil {
-		jsonErrorResponse(w, util.JSONResponse{
-			Code: 502,
-			JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", mediaMetadata.MediaID, mediaMetadata.Origin)),
-		}, logger)
+	resp, errorResponse := createRemoteRequest(mediaMetadata, logger)
+	if errorResponse != nil {
+		jsonErrorResponse(w, *errorResponse, logger)
 		return
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		logger.Printf("Server responded with %d\n", resp.StatusCode)
-		if resp.StatusCode == 404 {
-			jsonErrorResponse(w, util.JSONResponse{
-				Code: 404,
-				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", mediaMetadata.MediaID)),
-			}, logger)
-			return
-		}
-		jsonErrorResponse(w, util.JSONResponse{
-			Code: 502,
-			JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", mediaMetadata.MediaID, mediaMetadata.Origin)),
-		}, logger)
-		return
-	}
 
 	// get metadata from request and set metadata on response
 	contentLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
