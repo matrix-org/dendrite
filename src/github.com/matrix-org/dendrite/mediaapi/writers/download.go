@@ -166,7 +166,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 
 		respondFromRemoteFile(w, logger, r.MediaMetadata, cfg, db, activeRemoteRequests)
 	} else {
-		// TODO: If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
+		// If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
 		jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
