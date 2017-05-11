@@ -45,7 +45,7 @@ func createTempDir(baseDirectory types.Path) (types.Path, error) {
 
 // createFileWriter creates a buffered file writer with a new file at directory/filename
 // Returns the file handle as it needs to be closed when writing is complete
-func createFileWriter(directory types.Path, filename types.Filename) (*os.File, *bufio.Writer, error) {
+func createFileWriter(directory types.Path, filename types.Filename) (*bufio.Writer, *os.File, error) {
 	filePath := path.Join(string(directory), string(filename))
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -53,7 +53,7 @@ func createFileWriter(directory types.Path, filename types.Filename) (*os.File, 
 		return nil, nil, err
 	}
 
-	return file, bufio.NewWriter(file), nil
+	return bufio.NewWriter(file), file, nil
 }
 
 func createTempFileWriter(basePath types.Path, logger *log.Entry) (*bufio.Writer, *os.File, types.Path, *util.JSONResponse) {
@@ -65,7 +65,7 @@ func createTempFileWriter(basePath types.Path, logger *log.Entry) (*bufio.Writer
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
 		}
 	}
-	tmpFile, writer, err := createFileWriter(tmpDir, "content")
+	writer, tmpFile, err := createFileWriter(tmpDir, "content")
 	if err != nil {
 		logger.Infof("Failed to create file writer %q\n", err)
 		return nil, nil, "", &util.JSONResponse{
