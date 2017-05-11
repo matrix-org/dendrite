@@ -194,7 +194,8 @@ func syncRequestUntilSuccess(done chan error, userID, since, want string) {
 			sinceQuery = "&since=" + since
 		}
 		err := doSyncRequest(
-			"http://"+syncserverAddr+"/api/_matrix/client/r0/sync?access_token="+userID+sinceQuery,
+			// low value timeout so polling with an up-to-date token returns quickly
+			"http://"+syncserverAddr+"/api/_matrix/client/r0/sync?timeout=100&access_token="+userID+sinceQuery,
 			want,
 		)
 		if err != nil {
@@ -313,6 +314,7 @@ func main() {
 	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[0:9])); err != nil {
 		panic(err)
 	}
+	// Make sure initial sync works TODO: prev_batch
 	testSyncServer(syncServerCmdChan, "@alice:localhost", "", `{
 		"account_data": {
 			"events": []
@@ -335,104 +337,16 @@ func main() {
 						"events": []
 					},
 					"timeline": {
-						"events": [{
-							"content": {
-								"creator": "@alice:localhost"
-							},
-							"event_id": "$xz0fUB8zNMTGFh1W:localhost",
-							"origin_server_ts": 1494411218382,
-							"sender": "@alice:localhost",
-							"state_key": "",
-							"type": "m.room.create"
-						}, {
-							"content": {
-								"membership": "join"
-							},
-							"event_id": "$QTen1vksfcRTpUCk:localhost",
-							"origin_server_ts": 1494411218385,
-							"sender": "@alice:localhost",
-							"state_key": "@alice:localhost",
-							"type": "m.room.member"
-						}, {
-							"content": {
-								"ban": 50,
-								"events": {
-									"m.room.avatar": 50,
-									"m.room.canonical_alias": 50,
-									"m.room.history_visibility": 100,
-									"m.room.name": 50,
-									"m.room.power_levels": 100
-								},
-								"events_default": 0,
-								"invite": 0,
-								"kick": 50,
-								"redact": 50,
-								"state_default": 50,
-								"users": {
-									"@alice:localhost": 100
-								},
-								"users_default": 0
-							},
-							"event_id": "$RWsxGlfPHAcijTgu:localhost",
-							"origin_server_ts": 1494411218385,
-							"sender": "@alice:localhost",
-							"state_key": "",
-							"type": "m.room.power_levels"
-						}, {
-							"content": {
-								"join_rule": "public"
-							},
-							"event_id": "$2O2DpHB37CuwwJOe:localhost",
-							"origin_server_ts": 1494411218386,
-							"sender": "@alice:localhost",
-							"state_key": "",
-							"type": "m.room.join_rules"
-						}, {
-							"content": {
-								"history_visibility": "joined"
-							},
-							"event_id": "$5LRiBskVCROnL5WY:localhost",
-							"origin_server_ts": 1494411218387,
-							"sender": "@alice:localhost",
-							"state_key": "",
-							"type": "m.room.history_visibility"
-						}, {
-							"content": {
-								"body": "hello world",
-								"msgtype": "m.text"
-							},
-							"event_id": "$Z8ZJik7ghwzSYTH9:localhost",
-							"origin_server_ts": 1494411339207,
-							"sender": "@alice:localhost",
-							"type": "m.room.message"
-						}, {
-							"content": {
-								"body": "hello world 2",
-								"msgtype": "m.text"
-							},
-							"event_id": "$8382Ah682eL4hxjN:localhost",
-							"origin_server_ts": 1494411380282,
-							"sender": "@alice:localhost",
-							"type": "m.room.message"
-						}, {
-							"content": {
-								"body": "hello world 3",
-								"msgtype": "m.text"
-							},
-							"event_id": "$17SfHsvSeTQthSWF:localhost",
-							"origin_server_ts": 1494411396560,
-							"sender": "@alice:localhost",
-							"type": "m.room.message"
-						}, {
-							"content": {
-								"name": "Custom Room Name"
-							},
-							"event_id": "$j7KtuOzM0K15h3Kr:localhost",
-							"origin_server_ts": 1494411482625,
-							"sender": "@alice:localhost",
-							"state_key": "",
-							"type": "m.room.name"
-						}],
+						"events": [`+
+		clientEventTestData[0]+","+
+		clientEventTestData[1]+","+
+		clientEventTestData[2]+","+
+		clientEventTestData[3]+","+
+		clientEventTestData[4]+","+
+		clientEventTestData[5]+","+
+		clientEventTestData[6]+","+
+		clientEventTestData[7]+","+
+		clientEventTestData[8]+`],
 						"limited": true,
 						"prev_batch": ""
 					}
@@ -441,6 +355,7 @@ func main() {
 			"leave": {}
 		}
 	}`)
+	// Make sure alice's rooms don't leak to bob
 	testSyncServer(syncServerCmdChan, "@bob:localhost", "", `{
 		"account_data": {
 			"events": []
@@ -455,10 +370,102 @@ func main() {
 			"leave": {}
 		}
 	}`)
+	// Make sure polling with an up-to-date token returns nothing new
+	testSyncServer(syncServerCmdChan, "@alice:localhost", "9", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "9",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {},
+			"leave": {}
+		}
+	}`)
 
-	// TODO: Add more tests
 	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@bob:localhost?access_token=@bob:localhost"
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput([]string{outputRoomEventTestData[9]})); err != nil {
+		panic(err)
+	}
+
+	// Make sure alice sees it TODO: prev_batch
+	// TODO: Make sure bob sees it AND all the current room state
+	testSyncServer(syncServerCmdChan, "@alice:localhost", "9", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "10",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {
+				"!PjrbIMW2cIiaYF4t:localhost": {
+					"account_data": {
+						"events": []
+					},
+					"ephemeral": {
+						"events": []
+					},
+					"state": {
+						"events": []
+					},
+					"timeline": {
+						"limited": false,
+						"prev_batch": "",
+						"events": [`+clientEventTestData[9]+`]
+					}
+				}
+			},
+			"leave": {}
+		}
+	}`)
+
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello alice"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/1?access_token=@bob:localhost"
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput([]string{outputRoomEventTestData[10]})); err != nil {
+		panic(err)
+	}
+	// Make sure alice can see everything around the join point for bob TODO: prev_batch
+	testSyncServer(syncServerCmdChan, "@alice:localhost", "7", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "11",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {
+				"!PjrbIMW2cIiaYF4t:localhost": {
+					"account_data": {
+						"events": []
+					},
+					"ephemeral": {
+						"events": []
+					},
+					"state": {
+						"events": []
+					},
+					"timeline": {
+						"limited": false,
+						"prev_batch": "",
+						"events": [`+
+		clientEventTestData[7]+","+
+		clientEventTestData[8]+","+
+		clientEventTestData[9]+","+
+		clientEventTestData[10]+`]
+					}
+				}
+			},
+			"leave": {}
+		}
+	}`)
+
 	// $ curl -XPUT -d '{"name":"A Different Custom Room Name"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello bob"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/2?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"membership":"invite"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@bob:localhost"
