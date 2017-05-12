@@ -15,10 +15,13 @@
 package sync
 
 import (
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"net/http"
 	"strconv"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/util"
 )
 
 const defaultSyncTimeout = time.Duration(30) * time.Second
@@ -31,6 +34,7 @@ type syncRequest struct {
 	timeout       time.Duration
 	since         types.StreamPosition
 	wantFullState bool
+	log           *log.Entry
 }
 
 func newSyncRequest(req *http.Request, userID string) (*syncRequest, error) {
@@ -48,6 +52,7 @@ func newSyncRequest(req *http.Request, userID string) (*syncRequest, error) {
 		since:         since,
 		wantFullState: wantFullState,
 		limit:         defaultTimelineLimit, // TODO: read from filter
+		log:           util.GetLogger(req.Context()),
 	}, nil
 }
 
