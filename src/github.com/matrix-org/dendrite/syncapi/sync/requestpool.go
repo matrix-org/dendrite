@@ -64,7 +64,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 
 	// Fork off 2 goroutines: one to do the work, and one to serve as a timeout.
 	// Whichever returns first is the one we will serve back to the client.
-	// TODO: Currently this means that cpu work is timed, which may not be what we want long term.
 	timeoutChan := make(chan struct{})
 	timer := time.AfterFunc(syncReq.timeout, func() {
 		close(timeoutChan) // signal that the timeout has expired
@@ -72,8 +71,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 
 	done := make(chan util.JSONResponse)
 	go func() {
-		syncData, err := rp.currentSyncForUser(*syncReq)
+		currentPos := rp.notifier.WaitForEvents(*syncReq)
+		// We stop the timer BEFORE calculating the response so the cpu work
+		// done to calculate the response is not timed. This stops us from
+		// doing lots of work then timing out and sending back an empty response.
 		timer.Stop()
+		syncData, err := rp.currentSyncForUser(*syncReq, currentPos)
 		var res util.JSONResponse
 		if err != nil {
 			res = httputil.LogThenError(req, err)
@@ -98,9 +101,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 	}
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, error) {
-	currentPos := rp.notifier.WaitForEvents(req)
-
+func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (*types.Response, error) {
 	if req.since == types.StreamPosition(0) {
 		pos, data, err := rp.db.CompleteSync(req.userID, req.limit)
 		if err != nil {

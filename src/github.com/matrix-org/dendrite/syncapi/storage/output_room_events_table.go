@@ -64,7 +64,7 @@ const selectMaxIDSQL = "" +
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 const selectStateInRangeSQL = "" +
 	"SELECT event_json, add_state_ids, remove_state_ids FROM output_room_events" +
-	" WHERE (id > $1 AND id < $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
+	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
 	" ORDER BY id ASC"
 
 type outputRoomEventsStatements struct {
@@ -102,7 +102,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-// StateBetween returns the state events between the two given stream positions, exclusive of both.
+// StateBetween returns the state events between the two given stream positions, exclusive of oldPos, inclusive of newPos.
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) StateBetween(txn *sql.Tx, oldPos, newPos types.StreamPosition) (map[string][]gomatrixserverlib.Event, error) {

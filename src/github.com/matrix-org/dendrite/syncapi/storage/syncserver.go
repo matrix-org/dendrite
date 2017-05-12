@@ -16,8 +16,10 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -122,6 +124,41 @@ func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types
 		state, err := d.events.StateBetween(txn, fromPos, toPos)
 		if err != nil {
 			return err
+		}
+
+		// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
+		// - Get membership list changes for this user in this sync response
+		// - For each room which has membership list changes:
+		//     * Check if the room is 'newly joined' (insufficient to just check for a join event because we allow dupe joins TODO).
+		//       If it is, then we need to send the full room state down (and 'limited' is always true).
+		//     * TODO Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
+		//     * TODO Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block.
+
+		// work out which rooms transitioned to 'joined' between the 2 stream positions and add full state where needed.
+		for roomID, stateEvents := range state {
+			for _, ev := range stateEvents {
+				// TODO: Currently this will incorrectly add rooms which were ALREADY joined but they sent another no-op join event.
+				//       We should be checking if the user was already joined at fromPos and not proceed if so. As a result of this,
+				//       dupe join events will result in the entire room state coming down to the client again. This is added in
+				//       the 'state' part of the response though, so is transparent modulo bandwidth concerns as it is not added to
+				//       the timeline.
+				if ev.Type() == "m.room.member" && ev.StateKeyEquals(userID) {
+					var memberContent events.MemberContent
+					if err := json.Unmarshal(ev.Content(), &memberContent); err != nil {
+						return err
+					}
+					if memberContent.Membership != "join" {
+						continue
+					}
+
+					allState, err := d.roomstate.CurrentState(txn, roomID)
+					if err != nil {
+						return err
+					}
+					state[roomID] = allState
+				}
+
+			}
 		}
 
 		for _, roomID := range roomIDs {
