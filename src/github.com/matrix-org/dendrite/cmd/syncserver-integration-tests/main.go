@@ -392,7 +392,6 @@ func main() {
 	}
 
 	// Make sure alice sees it TODO: prev_batch
-	// TODO: Make sure bob sees it AND all the current room state
 	testSyncServer(syncServerCmdChan, "@alice:localhost", "9", `{
 		"account_data": {
 			"events": []
@@ -418,6 +417,46 @@ func main() {
 						"limited": false,
 						"prev_batch": "",
 						"events": [`+clientEventTestData[9]+`]
+					}
+				}
+			},
+			"leave": {}
+		}
+	}`)
+
+	// Make sure bob sees the room AND all the current room state TODO: history visibility
+	testSyncServer(syncServerCmdChan, "@bob:localhost", "9", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "10",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {
+				"!PjrbIMW2cIiaYF4t:localhost": {
+					"account_data": {
+						"events": []
+					},
+					"ephemeral": {
+						"events": []
+					},
+					"state": {
+						"events": [`+
+		clientEventTestData[0]+","+
+		clientEventTestData[1]+","+
+		clientEventTestData[2]+","+
+		clientEventTestData[3]+","+
+		clientEventTestData[4]+","+
+		clientEventTestData[8]+`]
+					},
+					"timeline": {
+						"limited": false,
+						"prev_batch": "",
+						"events": [`+
+		clientEventTestData[9]+`]
 					}
 				}
 			},
