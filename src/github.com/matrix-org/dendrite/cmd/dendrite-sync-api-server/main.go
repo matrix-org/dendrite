@@ -78,6 +78,9 @@ func main() {
 	}
 
 	n := sync.NewNotifier(types.StreamPosition(pos))
+	if err := n.Load(db); err != nil {
+		log.Panicf("startup: failed to set up notifier: %s", err)
+	}
 	server, err := consumers.NewServer(cfg, n, db)
 	if err != nil {
 		log.Panicf("startup: failed to create sync server: %s", err)

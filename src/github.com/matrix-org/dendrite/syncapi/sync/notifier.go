@@ -20,6 +20,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/events"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -46,7 +47,7 @@ type Notifier struct {
 
 // NewNotifier creates a new notifier set to the given stream position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
-// the joined users within each of them by calling Notifier.UsersJoinedToRooms().
+// the joined users within each of them by calling Notifier.LoadFromDatabase().
 func NewNotifier(pos types.StreamPosition) *Notifier {
 	return &Notifier{
 		currPos:                  pos,
@@ -127,10 +128,20 @@ func (n *Notifier) WaitForEvents(req syncRequest) types.StreamPosition {
 	}
 }
 
-// UsersJoinedToRooms marks the given users as 'joined' to the given rooms, such that new events from
+// Load the membership states required to notify users correctly.
+func (n *Notifier) Load(db *storage.SyncServerDatabase) error {
+	roomToUsers, err := db.AllJoinedUsersInRooms()
+	if err != nil {
+		return err
+	}
+	n.usersJoinedToRooms(roomToUsers)
+	return nil
+}
+
+// usersJoinedToRooms marks the given users as 'joined' to the given rooms, such that new events from
 // these rooms will wake the given users /sync requests. This should be called prior to ANY calls to
 // OnNewEvent (eg on startup) to prevent racing.
-func (n *Notifier) UsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
+func (n *Notifier) usersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	// This is just the bulk form of userJoined where we only lock once.
 	n.roomIDToJoinedUsersMutex.Lock()
 	defer n.roomIDToJoinedUsersMutex.Unlock()

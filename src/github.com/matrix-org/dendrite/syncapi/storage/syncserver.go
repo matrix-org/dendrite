@@ -53,6 +53,11 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 	return &SyncServerDatabase{db, partitions, events, state}, nil
 }
 
+// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
+func (d *SyncServerDatabase) AllJoinedUsersInRooms() (map[string][]string, error) {
+	return d.roomstate.JoinedMemberLists()
+}
+
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 // when generating the stream position for this event. Returns the sync stream position for the inserted event.
 // Returns an error if there was a problem inserting this event.
