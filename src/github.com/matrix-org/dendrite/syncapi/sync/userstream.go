@@ -45,10 +45,10 @@ func NewUserStream(userID string) *UserStream {
 // Wait blocks until there is a new stream position for this user, which is then returned.
 func (s *UserStream) Wait() (pos types.StreamPosition) {
 	s.cond.L.Lock()
-	s.numWaiting += 1
+	s.numWaiting++
 	s.cond.Wait()
 	pos = s.pos
-	s.numWaiting -= 1
+	s.numWaiting--
 	s.cond.L.Unlock()
 	return
 }
