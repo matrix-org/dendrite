@@ -84,7 +84,7 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, pos types.StreamPosit
 			case "invite":
 				userIDs = append(userIDs, userID)
 			case "join":
-				n.userJoined(ev.RoomID(), userID)
+				n.addJoinedUser(ev.RoomID(), userID)
 			case "leave":
 				fallthrough
 			case "ban":
@@ -131,14 +131,14 @@ func (n *Notifier) Load(db *storage.SyncServerDatabase) error {
 	if err != nil {
 		return err
 	}
-	n.usersJoinedToRooms(roomToUsers)
+	n.setUsersJoinedToRooms(roomToUsers)
 	return nil
 }
 
-// usersJoinedToRooms marks the given users as 'joined' to the given rooms, such that new events from
+// setUsersJoinedToRooms marks the given users as 'joined' to the given rooms, such that new events from
 // these rooms will wake the given users /sync requests. This should be called prior to ANY calls to
 // OnNewEvent (eg on startup) to prevent racing.
-func (n *Notifier) usersJoinedToRooms(roomIDToUserIDs map[string][]string) {
+func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	// This is just the bulk form of userJoined where we only lock once.
 	n.roomIDToJoinedUsersMutex.Lock()
 	defer n.roomIDToJoinedUsersMutex.Unlock()
@@ -180,7 +180,7 @@ func (n *Notifier) fetchUserStream(userID string, makeIfNotExists bool) *UserStr
 	return stream
 }
 
-func (n *Notifier) userJoined(roomID, userID string) {
+func (n *Notifier) addJoinedUser(roomID, userID string) {
 	n.roomIDToJoinedUsersMutex.Lock()
 	defer n.roomIDToJoinedUsersMutex.Unlock()
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {

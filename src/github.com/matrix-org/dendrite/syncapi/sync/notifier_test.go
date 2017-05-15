@@ -103,7 +103,7 @@ func TestImmediateNotification(t *testing.T) {
 // Test that new events to a joined room unblocks the request.
 func TestNewEventAndJoinedToRoom(t *testing.T) {
 	n := NewNotifier(streamPositionBefore)
-	n.usersJoinedToRooms(map[string][]string{
+	n.setUsersJoinedToRooms(map[string][]string{
 		roomID: []string{alice, bob},
 	})
 
@@ -131,7 +131,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 // Test that an invite unblocks the request
 func TestNewInviteEventForUser(t *testing.T) {
 	n := NewNotifier(streamPositionBefore)
-	n.usersJoinedToRooms(map[string][]string{
+	n.setUsersJoinedToRooms(map[string][]string{
 		roomID: []string{alice, bob},
 	})
 
@@ -159,7 +159,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 // Test that all blocked requests get woken up on a new event.
 func TestMultipleRequestWakeup(t *testing.T) {
 	n := NewNotifier(streamPositionBefore)
-	n.usersJoinedToRooms(map[string][]string{
+	n.setUsersJoinedToRooms(map[string][]string{
 		roomID: []string{alice, bob},
 	})
 
@@ -197,7 +197,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	// listen as bob. Make bob leave room. Make alice send event to room.
 	// Make sure alice gets woken up only and not bob as well.
 	n := NewNotifier(streamPositionBefore)
-	n.usersJoinedToRooms(map[string][]string{
+	n.setUsersJoinedToRooms(map[string][]string{
 		roomID: []string{alice, bob},
 	})
 
