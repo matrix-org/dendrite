@@ -99,7 +99,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest) (*types.Response, error) {
-	currentPos := rp.notifier.WaitForEvents(req, false)
+	currentPos := rp.notifier.WaitForEvents(req)
 
 	if req.since == types.StreamPosition(0) {
 		pos, data, err := rp.db.CompleteSync(req.userID, req.limit)

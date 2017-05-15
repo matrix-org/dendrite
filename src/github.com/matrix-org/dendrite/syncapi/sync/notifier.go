@@ -99,10 +99,8 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, pos types.StreamPosit
 	}
 }
 
-// WaitForEvents blocks until there are new events for this request. If forceBlock is true, the request
-// will be forcibly waited until a new event wakes it up. This is typically only useful for testing
-// blocking code.
-func (n *Notifier) WaitForEvents(req syncRequest, forceBlock bool) types.StreamPosition {
+// WaitForEvents blocks until there are new events for this request.
+func (n *Notifier) WaitForEvents(req syncRequest) types.StreamPosition {
 	// Do what synapse does: https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/notifier.py#L298
 	// - Bucket request into a lookup map keyed off a list of joined room IDs and separately a user ID
 	// - Incoming events wake requests for a matching room ID
@@ -110,8 +108,6 @@ func (n *Notifier) WaitForEvents(req syncRequest, forceBlock bool) types.StreamP
 
 	// TODO: v1 /events 'peeking' has an 'explicit room ID' which is also tracked,
 	//       but given we don't do /events, let's pretend it doesn't exist.
-
-	var hasBlocked bool
 	for {
 		// In a guard, check if the /sync request should block, and block it until we get woken up
 		n.currPosMutex.RLock()
@@ -122,15 +118,12 @@ func (n *Notifier) WaitForEvents(req syncRequest, forceBlock bool) types.StreamP
 		//       with a pos which contains no new events for this user. We should probably re-wait for events
 		//       automatically in this case.
 		if req.since != currentPos {
-			if !forceBlock || (forceBlock && hasBlocked) {
-				return currentPos
-			}
+			return currentPos
 		}
 
 		// wait to be woken up, and then re-check the stream position
 		req.log.WithField("user_id", req.userID).Info("Waiting for event")
 		n.blockUser(req.userID)
-		hasBlocked = true
 	}
 }
 
