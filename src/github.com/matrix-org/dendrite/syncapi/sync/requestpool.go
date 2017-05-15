@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -102,36 +101,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONRespons
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (*types.Response, error) {
-	if req.since == types.StreamPosition(0) {
-		pos, data, err := rp.db.CompleteSync(req.userID, req.limit)
-		if err != nil {
-			return nil, err
-		}
-		res := types.NewResponse(pos)
-		for roomID, d := range data {
-			jr := types.NewJoinResponse()
-			jr.Timeline.Events = gomatrixserverlib.ToClientEvents(d.RecentEvents, gomatrixserverlib.FormatSync)
-			jr.Timeline.Limited = true
-			jr.State.Events = gomatrixserverlib.ToClientEvents(d.State, gomatrixserverlib.FormatSync)
-			res.Rooms.Join[roomID] = *jr
-		}
-		return res, nil
-	}
-
 	// TODO: handle ignored users
-
-	data, err := rp.db.IncrementalSync(req.userID, req.since, currentPos, req.limit)
-	if err != nil {
-		return nil, err
+	if req.since == types.StreamPosition(0) {
+		return rp.db.CompleteSync(req.userID, req.limit)
 	}
-
-	res := types.NewResponse(currentPos)
-	for roomID, d := range data {
-		jr := types.NewJoinResponse()
-		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(d.RecentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
-		jr.State.Events = gomatrixserverlib.ToClientEvents(d.State, gomatrixserverlib.FormatSync)
-		res.Rooms.Join[roomID] = *jr
-	}
-	return res, nil
+	return rp.db.IncrementalSync(req.userID, req.since, currentPos, req.limit)
 }
