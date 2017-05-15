@@ -38,11 +38,10 @@ type Notifier struct {
 	// A map of RoomID => Set<UserID> : Map access is guarded by roomIDToJoinedUsersMutex.
 	roomIDToJoinedUsers      map[string]set
 	roomIDToJoinedUsersMutex *sync.Mutex
-	// A map of user_id => Cond which can be used to wake a given user's /sync request.
-	// Because this is a Cond, we can notify all waiting goroutines so this works
-	// across devices. Map access is guarded by userIDCondsMutex.
-	userIDConds      map[string]*sync.Cond
-	userIDCondsMutex *sync.Mutex
+	// A map of user_id => UserStream which can be used to wake a given user's /sync request.
+	// Map access is guarded by userStreamsMutex.
+	userStreams      map[string]*UserStream
+	userStreamsMutex *sync.Mutex
 }
 
 // NewNotifier creates a new notifier set to the given stream position.
@@ -54,8 +53,8 @@ func NewNotifier(pos types.StreamPosition) *Notifier {
 		currPosMutex:             &sync.RWMutex{},
 		roomIDToJoinedUsers:      make(map[string]set),
 		roomIDToJoinedUsersMutex: &sync.Mutex{},
-		userIDConds:              make(map[string]*sync.Cond),
-		userIDCondsMutex:         &sync.Mutex{},
+		userStreams:              make(map[string]*UserStream),
+		userStreamsMutex:         &sync.Mutex{},
 	}
 }
 
@@ -95,7 +94,7 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, pos types.StreamPosit
 	}
 
 	for _, userID := range userIDs {
-		n.wakeupUser(userID)
+		n.wakeupUser(userID, pos)
 	}
 }
 
@@ -154,36 +153,34 @@ func (n *Notifier) usersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	}
 }
 
-func (n *Notifier) wakeupUser(userID string) {
-	cond := n.fetchUserCond(userID, false)
-	if cond == nil {
+func (n *Notifier) wakeupUser(userID string, newPos types.StreamPosition) {
+	stream := n.fetchUserStream(userID, false)
+	if stream == nil {
 		return
 	}
-	cond.Broadcast() // wakeup all goroutines Wait()ing on this Cond
+	stream.Broadcast(newPos) // wakeup all goroutines Wait()ing on this stream
 }
 
 func (n *Notifier) blockUser(userID string) {
-	cond := n.fetchUserCond(userID, true)
-	cond.L.Lock()
-	cond.Wait()
-	cond.L.Unlock()
+	stream := n.fetchUserStream(userID, true)
+	stream.Wait()
 }
 
-// fetchUserCond retrieves a Cond unique to the given user. If makeIfNotExists is true,
-// a Cond will be made for this user if one doesn't exist and it will be returned. This
-// function does not lock the Cond.
-func (n *Notifier) fetchUserCond(userID string, makeIfNotExists bool) *sync.Cond {
+// fetchUserStream retrieves a stream unique to the given user. If makeIfNotExists is true,
+// a stream will be made for this user if one doesn't exist and it will be returned. This
+// function does not wait for data to be available on the stream.
+func (n *Notifier) fetchUserStream(userID string, makeIfNotExists bool) *UserStream {
 	// There is a bit of a locking dance here, we want to lock the mutex protecting the map
 	// but NOT the Cond that we may be returning/creating.
-	n.userIDCondsMutex.Lock()
-	defer n.userIDCondsMutex.Unlock()
-	cond, ok := n.userIDConds[userID]
+	n.userStreamsMutex.Lock()
+	defer n.userStreamsMutex.Unlock()
+	stream, ok := n.userStreams[userID]
 	if !ok {
-		// TODO: Unbounded growth of locks (1 per user)
-		cond = sync.NewCond(&sync.Mutex{})
-		n.userIDConds[userID] = cond
+		// TODO: Unbounded growth of streams (1 per user)
+		stream = NewUserStream(userID)
+		n.userStreams[userID] = stream
 	}
-	return cond
+	return stream
 }
 
 func (n *Notifier) userJoined(roomID, userID string) {
