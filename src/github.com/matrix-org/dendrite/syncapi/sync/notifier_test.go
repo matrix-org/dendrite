@@ -80,7 +80,9 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 		}
 		wg.Done()
 	}()
-	time.Sleep(1 * time.Millisecond)
+
+	stream := n.fetchUserStream("@bob:localhost", true)
+	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&randomMessageEvent, types.StreamPosition(12))
 
@@ -122,6 +124,14 @@ func waitForEvents(n *Notifier, req syncRequest) (types.StreamPosition, error) {
 		)
 	case p := <-done:
 		return p, nil
+	}
+}
+
+// Wait until something is Wait()ing on the user stream.
+func waitForBlocking(s *UserStream, numBlocking int) {
+	for numBlocking != s.NumWaiting() {
+		// This is horrible but I don't want to add a signalling mechanism JUST for testing.
+		time.Sleep(1 * time.Microsecond)
 	}
 }
 
