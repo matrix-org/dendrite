@@ -508,6 +508,35 @@ func main() {
 	// $ curl -XPUT -d '{"name":"A Different Custom Room Name"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello bob"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/2?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"membership":"invite"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@bob:localhost"
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[11:14])); err != nil {
+		panic(err)
+	}
+
+	// Make sure charlie sees the invite both with and without a ?since= token
+	// TODO: Invite state should include the invite event and the room name.
+	charlieInviteData := `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "14",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {
+				"!PjrbIMW2cIiaYF4t:localhost": {
+					"invite_state": {
+						"events": []
+					}
+				}
+			},
+			"join": {},
+			"leave": {}
+		}
+	}`
+	testSyncServer(syncServerCmdChan, "@charlie:localhost", "7", charlieInviteData)
+	testSyncServer(syncServerCmdChan, "@charlie:localhost", "", charlieInviteData)
+
 	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@charlie:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"not charlie..."}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"membership":"leave"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@alice:localhost"
