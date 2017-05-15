@@ -132,7 +132,7 @@ func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types
 		// - For each room which has membership list changes:
 		//     * Check if the room is 'newly joined' (insufficient to just check for a join event because we allow dupe joins TODO).
 		//       If it is, then we need to send the full room state down (and 'limited' is always true).
-		//     * TODO Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
+		//     * Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
 		//     * TODO Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block.
 
 		// work out which rooms transitioned to 'joined' between the 2 stream positions and add full state where needed.
@@ -175,7 +175,8 @@ func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types
 			jr.State.Events = gomatrixserverlib.ToClientEvents(state[roomID], gomatrixserverlib.FormatSync)
 			res.Rooms.Join[roomID] = *jr
 		}
-		return nil
+
+		return d.addInvitesToResponse(txn, userID, res)
 	})
 	return
 }
@@ -200,7 +201,7 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 			return err
 		}
 
-		// Build up a /sync response
+		// Build up a /sync response. Add joined rooms.
 		res = types.NewResponse(pos)
 		for _, roomID := range roomIDs {
 			stateEvents, err := d.roomstate.CurrentState(txn, roomID)
@@ -221,10 +222,24 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 			jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 			res.Rooms.Join[roomID] = *jr
 		}
-		// TODO: Add invites!
-		return nil
+
+		return d.addInvitesToResponse(txn, userID, res)
 	})
 	return
+}
+
+func (d *SyncServerDatabase) addInvitesToResponse(txn *sql.Tx, userID string, res *types.Response) error {
+	// Add invites - TODO: This will break over federation as they won't be in the current state table according to Mark.
+	roomIDs, err := d.roomstate.SelectRoomIDsWithMembership(txn, userID, "invite")
+	if err != nil {
+		return err
+	}
+	for _, roomID := range roomIDs {
+		ir := types.NewInviteResponse()
+		// TODO: invite_state. The state won't be in the current state table in cases where you get invited over federation
+		res.Rooms.Invite[roomID] = *ir
+	}
+	return nil
 }
 
 // There may be some overlap where events in stateEvents are already in recentEvents, so filter

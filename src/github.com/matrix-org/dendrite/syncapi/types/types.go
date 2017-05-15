@@ -97,7 +97,7 @@ func NewJoinResponse() *JoinResponse {
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
 type InviteResponse struct {
 	InviteState struct {
-		Events []gomatrixserverlib.ClientEvent
+		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"invite_state"`
 }
 
