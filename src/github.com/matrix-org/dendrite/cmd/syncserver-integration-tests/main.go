@@ -574,6 +574,25 @@ func main() {
 
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"why did you kick charlie"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"name":"No Charlies"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[17:19])); err != nil {
+		panic(err)
+	}
+	// Check that users don't see state changes in rooms after they have left
+	testSyncServer(syncServerCmdChan, "@charlie:localhost", "17", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "19",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {},
+			"leave": {}
+		}
+	}`)
+
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"whatever"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"membership":"leave"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@bob:localhost?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"im alone now"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"

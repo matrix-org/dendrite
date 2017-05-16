@@ -232,27 +232,14 @@ func (d *SyncServerDatabase) getStateDeltas(txn *sql.Tx, fromPos, toPos types.St
 	//     * Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
 	//     * Check if the user is CURRENTLY (TODO) left/banned. If so, add room to 'archived' block.
 	// - Get all CURRENTLY joined rooms, and add them to 'joined' block.
+	var deltas []stateDelta
+
+	// get all the state events ever between these two positions
 	state, err := d.events.StateBetween(txn, fromPos, toPos)
 	if err != nil {
 		return nil, err
 	}
-
-	// Add in currently joined rooms which weren't already added (because no state changes for these rooms)
-	joinedRoomIDs, err := d.roomstate.SelectRoomIDsWithMembership(txn, userID, "join")
-	if err != nil {
-		return nil, err
-	}
-	for _, joinedRoomID := range joinedRoomIDs {
-		if len(state[joinedRoomID]) > 0 {
-			continue // we already have a state delta
-		}
-		// explicitly state there is a 0 delta using an empty array so it marshals as []
-		state[joinedRoomID] = []gomatrixserverlib.Event{}
-	}
-
-	var deltas []stateDelta
 	for roomID, stateEvents := range state {
-		var added bool
 		for _, ev := range stateEvents {
 			// TODO: Currently this will incorrectly add rooms which were ALREADY joined but they sent another no-op join event.
 			//       We should be checking if the user was already joined at fromPos and not proceed if so. As a result of this,
@@ -262,11 +249,13 @@ func (d *SyncServerDatabase) getStateDeltas(txn *sql.Tx, fromPos, toPos types.St
 			if membership := getMembershipFromEvent(&ev, userID); membership != "" {
 				if membership == "join" {
 					// send full room state down instead of a delta
-					allState, err := d.roomstate.CurrentState(txn, roomID)
+					var allState []gomatrixserverlib.Event
+					allState, err = d.roomstate.CurrentState(txn, roomID)
 					if err != nil {
 						return nil, err
 					}
-					stateEvents = allState
+					state[roomID] = allState
+					continue // we'll add this room in when we do joined rooms
 				}
 
 				deltas = append(deltas, stateDelta{
@@ -274,20 +263,22 @@ func (d *SyncServerDatabase) getStateDeltas(txn *sql.Tx, fromPos, toPos types.St
 					stateEvents: stateEvents,
 					roomID:      roomID,
 				})
-				added = true
 				break
 			}
 		}
-		if !added {
-			// We can hit this case if:
-			// - There is a 0 delta
-			// - There is a delta but it contains no membership changes
-			deltas = append(deltas, stateDelta{
-				membership:  "join",
-				roomID:      roomID,
-				stateEvents: stateEvents,
-			})
-		}
+	}
+
+	// Add in currently joined rooms
+	joinedRoomIDs, err := d.roomstate.SelectRoomIDsWithMembership(txn, userID, "join")
+	if err != nil {
+		return nil, err
+	}
+	for _, joinedRoomID := range joinedRoomIDs {
+		deltas = append(deltas, stateDelta{
+			membership:  "join",
+			stateEvents: state[joinedRoomID],
+			roomID:      joinedRoomID,
+		})
 	}
 
 	return deltas, nil
