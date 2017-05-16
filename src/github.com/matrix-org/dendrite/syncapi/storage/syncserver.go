@@ -16,8 +16,10 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -116,8 +118,7 @@ func (d *SyncServerDatabase) SyncStreamPosition() (types.StreamPosition, error) 
 }
 
 // IncrementalSync returns all the data needed in order to create an incremental sync response.
-func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types.StreamPosition, numRecentEventsPerRoom int) (data map[string]types.RoomData, returnErr error) {
-	data = make(map[string]types.RoomData)
+func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types.StreamPosition, numRecentEventsPerRoom int) (res *types.Response, returnErr error) {
 	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
 		roomIDs, err := d.roomstate.SelectRoomIDsWithMembership(txn, userID, "join")
 		if err != nil {
@@ -129,41 +130,84 @@ func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types
 			return err
 		}
 
+		res = types.NewResponse(toPos)
+
+		// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
+		// - Get membership list changes for this user in this sync response
+		// - For each room which has membership list changes:
+		//     * Check if the room is 'newly joined' (insufficient to just check for a join event because we allow dupe joins TODO).
+		//       If it is, then we need to send the full room state down (and 'limited' is always true).
+		//     * Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
+		//     * TODO Check if the user is CURRENTLY left/banned. If so, add room to 'archived' block.
+
+		// work out which rooms transitioned to 'joined' between the 2 stream positions and add full state where needed.
+		for roomID, stateEvents := range state {
+			for _, ev := range stateEvents {
+				// TODO: Currently this will incorrectly add rooms which were ALREADY joined but they sent another no-op join event.
+				//       We should be checking if the user was already joined at fromPos and not proceed if so. As a result of this,
+				//       dupe join events will result in the entire room state coming down to the client again. This is added in
+				//       the 'state' part of the response though, so is transparent modulo bandwidth concerns as it is not added to
+				//       the timeline.
+				if ev.Type() == "m.room.member" && ev.StateKeyEquals(userID) {
+					var memberContent events.MemberContent
+					if err := json.Unmarshal(ev.Content(), &memberContent); err != nil {
+						return err
+					}
+					if memberContent.Membership != "join" {
+						continue
+					}
+
+					allState, err := d.roomstate.CurrentState(txn, roomID)
+					if err != nil {
+						return err
+					}
+					state[roomID] = allState
+				}
+
+			}
+		}
+
 		for _, roomID := range roomIDs {
 			recentEvents, err := d.events.RecentEventsInRoom(txn, roomID, fromPos, toPos, numRecentEventsPerRoom)
 			if err != nil {
 				return err
 			}
 			state[roomID] = removeDuplicates(state[roomID], recentEvents)
-			roomData := types.RoomData{
-				State:        state[roomID],
-				RecentEvents: recentEvents,
-			}
-			data[roomID] = roomData
+
+			jr := types.NewJoinResponse()
+			jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+			jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+			jr.State.Events = gomatrixserverlib.ToClientEvents(state[roomID], gomatrixserverlib.FormatSync)
+			res.Rooms.Join[roomID] = *jr
 		}
-		return nil
+
+		return d.addInvitesToResponse(txn, userID, res)
 	})
 	return
 }
 
-// CompleteSync returns all the data needed in order to create a complete sync response.
-func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom int) (pos types.StreamPosition, data map[string]types.RoomData, returnErr error) {
-	data = make(map[string]types.RoomData)
+// CompleteSync a complete /sync API response for the given user.
+func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom int) (res *types.Response, returnErr error) {
 	// This needs to be all done in a transaction as we need to do multiple SELECTs, and we need to have
 	// a consistent view of the database throughout. This includes extracting the sync stream position.
+	// This does have the unfortunate side-effect that all the matrixy logic resides in this function,
+	// but it's better to not hide the fact that this is being done in a transaction.
 	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
 		// Get the current stream position which we will base the sync response on.
 		id, err := d.events.MaxID(txn)
 		if err != nil {
 			return err
 		}
-		pos = types.StreamPosition(id)
+		pos := types.StreamPosition(id)
 
 		// Extract room state and recent events for all rooms the user is joined to.
 		roomIDs, err := d.roomstate.SelectRoomIDsWithMembership(txn, userID, "join")
 		if err != nil {
 			return err
 		}
+
+		// Build up a /sync response. Add joined rooms.
+		res = types.NewResponse(pos)
 		for _, roomID := range roomIDs {
 			stateEvents, err := d.roomstate.CurrentState(txn, roomID)
 			if err != nil {
@@ -177,15 +221,30 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 			}
 
 			stateEvents = removeDuplicates(stateEvents, recentEvents)
-
-			data[roomID] = types.RoomData{
-				State:        stateEvents,
-				RecentEvents: recentEvents,
-			}
+			jr := types.NewJoinResponse()
+			jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+			jr.Timeline.Limited = true
+			jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
+			res.Rooms.Join[roomID] = *jr
 		}
-		return nil
+
+		return d.addInvitesToResponse(txn, userID, res)
 	})
 	return
+}
+
+func (d *SyncServerDatabase) addInvitesToResponse(txn *sql.Tx, userID string, res *types.Response) error {
+	// Add invites - TODO: This will break over federation as they won't be in the current state table according to Mark.
+	roomIDs, err := d.roomstate.SelectRoomIDsWithMembership(txn, userID, "invite")
+	if err != nil {
+		return err
+	}
+	for _, roomID := range roomIDs {
+		ir := types.NewInviteResponse()
+		// TODO: invite_state. The state won't be in the current state table in cases where you get invited over federation
+		res.Rooms.Invite[roomID] = *ir
+	}
+	return nil
 }
 
 // There may be some overlap where events in stateEvents are already in recentEvents, so filter
