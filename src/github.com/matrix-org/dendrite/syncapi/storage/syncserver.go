@@ -148,6 +148,8 @@ func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types
 			case "leave":
 				fallthrough // transitions to leave are the same as ban
 			case "ban":
+				// TODO: recentEvents may contain events that this user is not allowed to see because they are
+				//       no longer in the room.
 				lr := types.NewLeaveResponse()
 				lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 				lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true

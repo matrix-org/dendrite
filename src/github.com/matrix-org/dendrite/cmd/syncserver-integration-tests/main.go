@@ -572,6 +572,39 @@ func main() {
 		}
 	}`)
 
+	// Test joining and leaving the same room in a single /sync request puts the room in the 'leave' section.
+	// TODO: Use an earlier since value to assert that the /sync response doesn't leak messages
+	//       from before charlie was joined to the room. Currently it does leak because RecentEvents doesn't
+	//       take membership into account.
+	testSyncServer(syncServerCmdChan, "@charlie:localhost", "14", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "17",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {},
+			"leave": {
+				"!PjrbIMW2cIiaYF4t:localhost": {
+					"state": {
+						"events": []
+					},
+					"timeline": {
+						"limited": false,
+						"prev_batch": "",
+						"events": [`+
+		clientEventTestData[14]+","+
+		clientEventTestData[15]+","+
+		clientEventTestData[16]+`]
+					}
+				}
+			}
+		}
+	}`)
+
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"why did you kick charlie"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"name":"No Charlies"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
 	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[17:19])); err != nil {
