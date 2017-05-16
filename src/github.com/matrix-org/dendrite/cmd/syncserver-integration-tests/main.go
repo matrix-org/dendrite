@@ -540,6 +540,38 @@ func main() {
 	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@charlie:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"not charlie..."}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"membership":"leave"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@alice:localhost"
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[14:17])); err != nil {
+		panic(err)
+	}
+	// Check transitions to leave work
+	testSyncServer(syncServerCmdChan, "@charlie:localhost", "15", `{
+		"account_data": {
+			"events": []
+		},
+		"next_batch": "17",
+		"presence": {
+			"events": []
+		},
+		"rooms": {
+			"invite": {},
+			"join": {},
+			"leave": {
+				"!PjrbIMW2cIiaYF4t:localhost": {
+					"state": {
+						"events": []
+					},
+					"timeline": {
+						"limited": false,
+						"prev_batch": "",
+						"events": [`+
+		clientEventTestData[15]+","+
+		clientEventTestData[16]+`]
+					}
+				}
+			}
+		}
+	}`)
+
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"why did you kick charlie"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"name":"No Charlies"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"whatever"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
