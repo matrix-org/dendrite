@@ -296,6 +296,16 @@ func testSyncServer(syncServerCmdChan chan error, userID, since, want string) {
 	}
 }
 
+func writeToRoomServerLog(indexes ...int) {
+	var roomEvents []string
+	for _, i := range indexes {
+		roomEvents = append(roomEvents, outputRoomEventTestData[i])
+	}
+	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(roomEvents)); err != nil {
+		panic(err)
+	}
+}
+
 // Runs a battery of sync server tests against test data in testdata.go
 // testdata.go has a list of OutputRoomEvents which will be fed into the kafka log which the sync server will consume.
 // The tests will pause at various points in this list to conduct tests on the /sync responses before continuing.
@@ -311,9 +321,11 @@ func main() {
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello world 2"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/2?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello world 3"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"name":"Custom Room Name"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
-	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[0:9])); err != nil {
-		panic(err)
-	}
+	writeToRoomServerLog(
+		i0StateRoomCreate, i1StateAliceJoin, i2StatePowerLevels, i3StateJoinRules, i4StateHistoryVisibility,
+		i5AliceMsg, i6AliceMsg, i7AliceMsg, i8StateAliceRoomName,
+	)
+
 	// Make sure initial sync works TODO: prev_batch
 	testSyncServer(syncServerCmdChan, "@alice:localhost", "", `{
 		"account_data": {
@@ -338,15 +350,15 @@ func main() {
 					},
 					"timeline": {
 						"events": [`+
-		clientEventTestData[0]+","+
-		clientEventTestData[1]+","+
-		clientEventTestData[2]+","+
-		clientEventTestData[3]+","+
-		clientEventTestData[4]+","+
-		clientEventTestData[5]+","+
-		clientEventTestData[6]+","+
-		clientEventTestData[7]+","+
-		clientEventTestData[8]+`],
+		clientEventTestData[i0StateRoomCreate]+","+
+		clientEventTestData[i1StateAliceJoin]+","+
+		clientEventTestData[i2StatePowerLevels]+","+
+		clientEventTestData[i3StateJoinRules]+","+
+		clientEventTestData[i4StateHistoryVisibility]+","+
+		clientEventTestData[i5AliceMsg]+","+
+		clientEventTestData[i6AliceMsg]+","+
+		clientEventTestData[i7AliceMsg]+","+
+		clientEventTestData[i8StateAliceRoomName]+`],
 						"limited": true,
 						"prev_batch": ""
 					}
@@ -387,9 +399,7 @@ func main() {
 	}`)
 
 	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@bob:localhost?access_token=@bob:localhost"
-	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput([]string{outputRoomEventTestData[9]})); err != nil {
-		panic(err)
-	}
+	writeToRoomServerLog(i9StateBobJoin)
 
 	// Make sure alice sees it TODO: prev_batch
 	testSyncServer(syncServerCmdChan, "@alice:localhost", "9", `{
@@ -416,7 +426,7 @@ func main() {
 					"timeline": {
 						"limited": false,
 						"prev_batch": "",
-						"events": [`+clientEventTestData[9]+`]
+						"events": [`+clientEventTestData[i9StateBobJoin]+`]
 					}
 				}
 			},
@@ -445,18 +455,18 @@ func main() {
 					},
 					"state": {
 						"events": [`+
-		clientEventTestData[0]+","+
-		clientEventTestData[1]+","+
-		clientEventTestData[2]+","+
-		clientEventTestData[3]+","+
-		clientEventTestData[4]+","+
-		clientEventTestData[8]+`]
+		clientEventTestData[i0StateRoomCreate]+","+
+		clientEventTestData[i1StateAliceJoin]+","+
+		clientEventTestData[i2StatePowerLevels]+","+
+		clientEventTestData[i3StateJoinRules]+","+
+		clientEventTestData[i4StateHistoryVisibility]+","+
+		clientEventTestData[i8StateAliceRoomName]+`]
 					},
 					"timeline": {
 						"limited": false,
 						"prev_batch": "",
 						"events": [`+
-		clientEventTestData[9]+`]
+		clientEventTestData[i9StateBobJoin]+`]
 					}
 				}
 			},
@@ -465,9 +475,8 @@ func main() {
 	}`)
 
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello alice"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/1?access_token=@bob:localhost"
-	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput([]string{outputRoomEventTestData[10]})); err != nil {
-		panic(err)
-	}
+	writeToRoomServerLog(i10BobMsg)
+
 	// Make sure alice can see everything around the join point for bob TODO: prev_batch
 	testSyncServer(syncServerCmdChan, "@alice:localhost", "7", `{
 		"account_data": {
@@ -494,10 +503,10 @@ func main() {
 						"limited": false,
 						"prev_batch": "",
 						"events": [`+
-		clientEventTestData[7]+","+
-		clientEventTestData[8]+","+
-		clientEventTestData[9]+","+
-		clientEventTestData[10]+`]
+		clientEventTestData[i7AliceMsg]+","+
+		clientEventTestData[i8StateAliceRoomName]+","+
+		clientEventTestData[i9StateBobJoin]+","+
+		clientEventTestData[i10BobMsg]+`]
 					}
 				}
 			},
@@ -508,9 +517,7 @@ func main() {
 	// $ curl -XPUT -d '{"name":"A Different Custom Room Name"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello bob"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/2?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"membership":"invite"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@bob:localhost"
-	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[11:14])); err != nil {
-		panic(err)
-	}
+	writeToRoomServerLog(i11StateAliceRoomName, i12AliceMsg, i13StateBobInviteCharlie)
 
 	// Make sure charlie sees the invite both with and without a ?since= token
 	// TODO: Invite state should include the invite event and the room name.
@@ -540,9 +547,8 @@ func main() {
 	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@charlie:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"not charlie..."}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"membership":"leave"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@alice:localhost"
-	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[14:17])); err != nil {
-		panic(err)
-	}
+	writeToRoomServerLog(i14StateCharlieJoin, i15AliceMsg, i16StateAliceKickCharlie)
+
 	// Check transitions to leave work
 	testSyncServer(syncServerCmdChan, "@charlie:localhost", "15", `{
 		"account_data": {
@@ -564,8 +570,8 @@ func main() {
 						"limited": false,
 						"prev_batch": "",
 						"events": [`+
-		clientEventTestData[15]+","+
-		clientEventTestData[16]+`]
+		clientEventTestData[i15AliceMsg]+","+
+		clientEventTestData[i16StateAliceKickCharlie]+`]
 					}
 				}
 			}
@@ -596,9 +602,9 @@ func main() {
 						"limited": false,
 						"prev_batch": "",
 						"events": [`+
-		clientEventTestData[14]+","+
-		clientEventTestData[15]+","+
-		clientEventTestData[16]+`]
+		clientEventTestData[i14StateCharlieJoin]+","+
+		clientEventTestData[i15AliceMsg]+","+
+		clientEventTestData[i16StateAliceKickCharlie]+`]
 					}
 				}
 			}
@@ -607,9 +613,8 @@ func main() {
 
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"why did you kick charlie"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"name":"No Charlies"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
-	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(outputRoomEventTestData[17:19])); err != nil {
-		panic(err)
-	}
+	writeToRoomServerLog(i17BobMsg, i18StateAliceRoomName)
+
 	// Check that users don't see state changes in rooms after they have left
 	testSyncServer(syncServerCmdChan, "@charlie:localhost", "17", `{
 		"account_data": {
