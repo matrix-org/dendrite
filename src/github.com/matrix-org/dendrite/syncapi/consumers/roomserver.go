@@ -28,15 +28,15 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
-// Server contains all the logic for running a sync server
-type Server struct {
+// OutputRoomEvent consumes events that originated in the room server.
+type OutputRoomEvent struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.SyncServerDatabase
 	notifier           *sync.Notifier
 }
 
-// NewServer creates a new sync server. Call Start() to begin consuming from room servers.
-func NewServer(cfg *config.Sync, n *sync.Notifier, store *storage.SyncServerDatabase) (*Server, error) {
+// NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
+func NewOutputRoomEvent(cfg *config.Sync, n *sync.Notifier, store *storage.SyncServerDatabase) (*OutputRoomEvent, error) {
 	kafkaConsumer, err := sarama.NewConsumer(cfg.KafkaConsumerURIs, nil)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func NewServer(cfg *config.Sync, n *sync.Notifier, store *storage.SyncServerData
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
-	s := &Server{
+	s := &OutputRoomEvent{
 		roomServerConsumer: &consumer,
 		db:                 store,
 		notifier:           n,
@@ -58,14 +58,14 @@ func NewServer(cfg *config.Sync, n *sync.Notifier, store *storage.SyncServerData
 }
 
 // Start consuming from room servers
-func (s *Server) Start() error {
+func (s *OutputRoomEvent) Start() error {
 	return s.roomServerConsumer.Start()
 }
 
 // onMessage is called when the sync server receives a new event from the room server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *Server) onMessage(msg *sarama.ConsumerMessage) error {
+func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputRoomEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {

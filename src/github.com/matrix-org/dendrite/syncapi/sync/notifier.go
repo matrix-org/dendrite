@@ -32,11 +32,10 @@ import (
 // in missed events.
 type Notifier struct {
 	// A map of RoomID => Set<UserID> : Must only be accessed by the OnNewEvent goroutine
-	roomIDToJoinedUsers map[string]set
+	roomIDToJoinedUsers map[string]userIDSet
 	// Protects currPos and userStreams.
 	streamLock *sync.Mutex
-	// The latest sync stream position: guarded by 'currPosMutex' which is RW to allow
-	// for concurrent reads on /sync requests
+	// The latest sync stream position
 	currPos types.StreamPosition
 	// A map of user_id => UserStream which can be used to wake a given user's /sync request.
 	userStreams map[string]*UserStream
@@ -44,11 +43,11 @@ type Notifier struct {
 
 // NewNotifier creates a new notifier set to the given stream position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
-// the joined users within each of them by calling Notifier.LoadFromDatabase().
+// the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
 func NewNotifier(pos types.StreamPosition) *Notifier {
 	return &Notifier{
 		currPos:             pos,
-		roomIDToJoinedUsers: make(map[string]set),
+		roomIDToJoinedUsers: make(map[string]userIDSet),
 		userStreams:         make(map[string]*UserStream),
 		streamLock:          &sync.Mutex{},
 	}
@@ -142,7 +141,7 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	// This is just the bulk form of addJoinedUser
 	for roomID, userIDs := range roomIDToUserIDs {
 		if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-			n.roomIDToJoinedUsers[roomID] = make(set)
+			n.roomIDToJoinedUsers[roomID] = make(userIDSet)
 		}
 		for _, userID := range userIDs {
 			n.roomIDToJoinedUsers[roomID].add(userID)
@@ -174,7 +173,7 @@ func (n *Notifier) fetchUserStream(userID string, makeIfNotExists bool) *UserStr
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) addJoinedUser(roomID, userID string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-		n.roomIDToJoinedUsers[roomID] = make(set)
+		n.roomIDToJoinedUsers[roomID] = make(userIDSet)
 	}
 	n.roomIDToJoinedUsers[roomID].add(userID)
 }
@@ -182,7 +181,7 @@ func (n *Notifier) addJoinedUser(roomID, userID string) {
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) removeJoinedUser(roomID, userID string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-		n.roomIDToJoinedUsers[roomID] = make(set)
+		n.roomIDToJoinedUsers[roomID] = make(userIDSet)
 	}
 	n.roomIDToJoinedUsers[roomID].remove(userID)
 }
@@ -196,17 +195,17 @@ func (n *Notifier) joinedUsers(roomID string) (userIDs []string) {
 }
 
 // A string set, mainly existing for improving clarity of structs in this file.
-type set map[string]bool
+type userIDSet map[string]bool
 
-func (s set) add(str string) {
+func (s userIDSet) add(str string) {
 	s[str] = true
 }
 
-func (s set) remove(str string) {
+func (s userIDSet) remove(str string) {
 	delete(s, str)
 }
 
-func (s set) values() (vals []string) {
+func (s userIDSet) values() (vals []string) {
 	for str := range s {
 		vals = append(vals, str)
 	}
