@@ -547,14 +547,15 @@ func main() {
 	// $ curl -XPUT -d '{"membership":"join"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@charlie:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"not charlie..."}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"membership":"leave"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.member/@charlie:localhost?access_token=@alice:localhost"
-	writeToRoomServerLog(i14StateCharlieJoin, i15AliceMsg, i16StateAliceKickCharlie)
+	// $ curl -XPUT -d '{"msgtype":"m.text","body":"why did you kick charlie"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
+	writeToRoomServerLog(i14StateCharlieJoin, i15AliceMsg, i16StateAliceKickCharlie, i17BobMsg)
 
 	// Check transitions to leave work
 	testSyncServer(syncServerCmdChan, "@charlie:localhost", "15", `{
 		"account_data": {
 			"events": []
 		},
-		"next_batch": "17",
+		"next_batch": "18",
 		"presence": {
 			"events": []
 		},
@@ -586,7 +587,7 @@ func main() {
 		"account_data": {
 			"events": []
 		},
-		"next_batch": "17",
+		"next_batch": "18",
 		"presence": {
 			"events": []
 		},
@@ -611,9 +612,8 @@ func main() {
 		}
 	}`)
 
-	// $ curl -XPUT -d '{"msgtype":"m.text","body":"why did you kick charlie"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/3?access_token=@bob:localhost"
 	// $ curl -XPUT -d '{"name":"No Charlies"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/state/m.room.name?access_token=@alice:localhost"
-	writeToRoomServerLog(i17BobMsg, i18StateAliceRoomName)
+	writeToRoomServerLog(i18StateAliceRoomName)
 
 	// Check that users don't see state changes in rooms after they have left
 	testSyncServer(syncServerCmdChan, "@charlie:localhost", "17", `{

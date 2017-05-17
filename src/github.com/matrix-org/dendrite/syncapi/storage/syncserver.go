@@ -29,6 +29,15 @@ type stateDelta struct {
 	roomID      string
 	stateEvents []gomatrixserverlib.Event
 	membership  string
+	// The stream position of the latest membership event for this user, if applicable.
+	// Can be 0 if there is no membership event in this delta.
+	membershipPos types.StreamPosition
+}
+
+// Same as gomatrixserverlib.Event but also has the stream position for this event.
+type streamEvent struct {
+	gomatrixserverlib.Event
+	streamPosition types.StreamPosition
 }
 
 // SyncServerDatabase represents a sync server database
@@ -94,7 +103,7 @@ func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEve
 		if err != nil {
 			return err
 		}
-		return d.roomstate.UpdateRoomState(txn, added, removeStateEventIDs)
+		return d.roomstate.UpdateRoomState(txn, streamEventsToEvents(added), removeStateEventIDs)
 	})
 	return
 }
@@ -132,10 +141,21 @@ func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types
 
 		res = types.NewResponse(toPos)
 		for _, delta := range deltas {
-			recentEvents, err := d.events.RecentEventsInRoom(txn, delta.roomID, fromPos, toPos, numRecentEventsPerRoom)
+			endPos := toPos
+			if delta.membershipPos > 0 && delta.membership == "leave" {
+				// make sure we don't leak recent events after the leave event.
+				// TODO: History visibility makes this somewhat complex to handle correctly. For example:
+				// TODO: This doesn't work for join -> leave in a single /sync request (see events prior to join).
+				// TODO: This will fail on join -> leave -> sensitive msg -> join -> leave
+				//       in a single /sync request
+				// This is all "okay" assuming history_visibility == "shared" which it is by default.
+				endPos = delta.membershipPos
+			}
+			recentStreamEvents, err := d.events.RecentEventsInRoom(txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom)
 			if err != nil {
 				return err
 			}
+			recentEvents := streamEventsToEvents(recentStreamEvents)
 			delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 
 			switch delta.membership {
@@ -193,10 +213,11 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 			}
 			// TODO: When filters are added, we may need to call this multiple times to get enough events.
 			//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-			recentEvents, err := d.events.RecentEventsInRoom(txn, roomID, types.StreamPosition(0), pos, numRecentEventsPerRoom)
+			recentStreamEvents, err := d.events.RecentEventsInRoom(txn, roomID, types.StreamPosition(0), pos, numRecentEventsPerRoom)
 			if err != nil {
 				return err
 			}
+			recentEvents := streamEventsToEvents(recentStreamEvents)
 
 			stateEvents = removeDuplicates(stateEvents, recentEvents)
 			jr := types.NewJoinResponse()
@@ -241,14 +262,14 @@ func (d *SyncServerDatabase) getStateDeltas(txn *sql.Tx, fromPos, toPos types.St
 	if err != nil {
 		return nil, err
 	}
-	for roomID, stateEvents := range state {
-		for _, ev := range stateEvents {
+	for roomID, stateStreamEvents := range state {
+		for _, ev := range stateStreamEvents {
 			// TODO: Currently this will incorrectly add rooms which were ALREADY joined but they sent another no-op join event.
 			//       We should be checking if the user was already joined at fromPos and not proceed if so. As a result of this,
 			//       dupe join events will result in the entire room state coming down to the client again. This is added in
 			//       the 'state' part of the response though, so is transparent modulo bandwidth concerns as it is not added to
 			//       the timeline.
-			if membership := getMembershipFromEvent(&ev, userID); membership != "" {
+			if membership := getMembershipFromEvent(&ev.Event, userID); membership != "" {
 				if membership == "join" {
 					// send full room state down instead of a delta
 					var allState []gomatrixserverlib.Event
@@ -256,14 +277,19 @@ func (d *SyncServerDatabase) getStateDeltas(txn *sql.Tx, fromPos, toPos types.St
 					if err != nil {
 						return nil, err
 					}
-					state[roomID] = allState
+					s := make([]streamEvent, len(allState))
+					for i := 0; i < len(s); i++ {
+						s[i] = streamEvent{allState[i], types.StreamPosition(0)}
+					}
+					state[roomID] = s
 					continue // we'll add this room in when we do joined rooms
 				}
 
 				deltas = append(deltas, stateDelta{
-					membership:  membership,
-					stateEvents: stateEvents,
-					roomID:      roomID,
+					membership:    membership,
+					membershipPos: ev.streamPosition,
+					stateEvents:   streamEventsToEvents(stateStreamEvents),
+					roomID:        roomID,
 				})
 				break
 			}
@@ -278,12 +304,20 @@ func (d *SyncServerDatabase) getStateDeltas(txn *sql.Tx, fromPos, toPos types.St
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, stateDelta{
 			membership:  "join",
-			stateEvents: state[joinedRoomID],
+			stateEvents: streamEventsToEvents(state[joinedRoomID]),
 			roomID:      joinedRoomID,
 		})
 	}
 
 	return deltas, nil
+}
+
+func streamEventsToEvents(in []streamEvent) []gomatrixserverlib.Event {
+	out := make([]gomatrixserverlib.Event, len(in))
+	for i := 0; i < len(in); i++ {
+		out[i] = in[i].Event
+	}
+	return out
 }
 
 // There may be some overlap where events in stateEvents are already in recentEvents, so filter
