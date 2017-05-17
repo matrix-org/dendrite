@@ -118,7 +118,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 
 	if err == nil {
 		// If we have a record, we can respond from the local file
-		r.respondFromLocalFile(w, cfg)
+		r.respondFromLocalFile(w, cfg.BasePath)
 		return
 	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin != cfg.ServerName {
 		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
@@ -133,7 +133,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, r.MediaMetadata)
 			if err == nil {
 				// If we have a record, we can respond from the local file
-				r.respondFromLocalFile(w, cfg)
+				r.respondFromLocalFile(w, cfg.BasePath)
 				activeRemoteRequests.Unlock()
 				return
 			}
@@ -177,7 +177,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 	}
 }
 
-func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, cfg config.MediaAPI) {
+func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, basePath types.Path) {
 	r.Logger.WithFields(log.Fields{
 		"MediaID":             r.MediaMetadata.MediaID,
 		"Origin":              r.MediaMetadata.Origin,
@@ -187,7 +187,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, cfg config
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Infof("Downloading file")
 
-	filePath := getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)
+	filePath := getPathFromMediaMetadata(r.MediaMetadata, basePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
