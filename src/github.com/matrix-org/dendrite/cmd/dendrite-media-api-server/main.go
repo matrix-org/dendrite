@@ -39,7 +39,7 @@ func main() {
 		log.Panic("No BIND_ADDRESS environment variable found.")
 	}
 
-	cfg := config.MediaAPI{
+	cfg := &config.MediaAPI{
 		ServerName:  "localhost",
 		BasePath:    "/Users/robertsw/dendrite",
 		MaxFileSize: 10 * 1024 * 1024,

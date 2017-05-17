@@ -89,7 +89,7 @@ var nTries = 5
 // If they are present in the cache, they are served directly.
 // If they are not present in the cache, they are obtained from the remote server and
 // simultaneously served back to the client and written into the cache.
-func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName, mediaID types.MediaID, cfg config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
+func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName, mediaID types.MediaID, cfg *config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	logger := util.GetLogger(req.Context())
 
 	// request validation

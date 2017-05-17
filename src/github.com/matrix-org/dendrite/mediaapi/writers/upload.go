@@ -100,7 +100,7 @@ type uploadResponse struct {
 // This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
 // Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
 // TODO: Requests time out if they have not received any data within the configured timeout period.
-func Upload(req *http.Request, cfg config.MediaAPI, db *storage.Database) util.JSONResponse {
+func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 
 	if req.Method != "POST" {
