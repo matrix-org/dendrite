@@ -81,12 +81,12 @@ func main() {
 	if err := n.Load(db); err != nil {
 		log.Panicf("startup: failed to set up notifier: %s", err)
 	}
-	server, err := consumers.NewServer(cfg, n, db)
+	consumer, err := consumers.NewRoomserver(cfg, n, db)
 	if err != nil {
-		log.Panicf("startup: failed to create sync server: %s", err)
+		log.Panicf("startup: failed to create room server consumer: %s", err)
 	}
-	if err = server.Start(); err != nil {
-		log.Panicf("startup: failed to start sync server")
+	if err = consumer.Start(); err != nil {
+		log.Panicf("startup: failed to start room server consumer")
 	}
 
 	log.Info("Starting sync server on ", *bindAddr)
