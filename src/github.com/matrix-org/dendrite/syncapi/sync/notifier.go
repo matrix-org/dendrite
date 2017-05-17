@@ -122,7 +122,7 @@ func (n *Notifier) WaitForEvents(req syncRequest) types.StreamPosition {
 	// give up the stream lock prior to waiting on the user lock
 	stream := n.fetchUserStream(req.userID, true)
 	n.streamLock.Unlock()
-	return stream.Wait()
+	return stream.Wait(currentPos)
 }
 
 // Load the membership states required to notify users correctly.
