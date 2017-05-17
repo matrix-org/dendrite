@@ -14,6 +14,37 @@
 
 package main
 
+const (
+	i0StateRoomCreate = iota
+	i1StateAliceJoin
+	i2StatePowerLevels
+	i3StateJoinRules
+	i4StateHistoryVisibility
+	i5AliceMsg
+	i6AliceMsg
+	i7AliceMsg
+	i8StateAliceRoomName
+	i9StateBobJoin
+	i10BobMsg
+	i11StateAliceRoomName
+	i12AliceMsg
+	i13StateBobInviteCharlie
+	i14StateCharlieJoin
+	i15AliceMsg
+	i16StateAliceKickCharlie
+	i17BobMsg
+	i18StateAliceRoomName
+	i19BobMsg
+	i20StateBobLeave
+	i21AliceMsg
+	i22StateAliceInviteBob
+	i23StateBobRejectInvite
+	i24AliceMsg
+	i25StateAliceRoomName
+	i26StateCharlieJoin
+	i27CharlieMsg
+)
+
 var outputRoomEventTestData = []string{
 	// $ curl -XPOST -d '{}' "http://localhost:8009/_matrix/client/r0/createRoom?access_token=@alice:localhost"
 	`{"Event":{"auth_events":[],"content":{"creator":"@alice:localhost"},"depth":1,"event_id":"$xz0fUB8zNMTGFh1W:localhost","hashes":{"sha256":"KKkpxS8NoH0igBbL3J+nJ39MRlmA7QgW4BGL7Fv4ASI"},"origin":"localhost","origin_server_ts":1494411218382,"prev_events":[],"room_id":"!PjrbIMW2cIiaYF4t:localhost","sender":"@alice:localhost","signatures":{"localhost":{"ed25519:something":"uZG5Q/Hs2Z611gFlZPdwomomRJKf70xV2FQV+gLWM1XgzkLDRlRF3cBZc9y3CnHKnV/upTcXs7Op2/GmgD3UBw"}},"state_key":"","type":"m.room.create"},"VisibilityEventIDs":null,"LatestEventIDs":["$xz0fUB8zNMTGFh1W:localhost"],"AddsStateEventIDs":["$xz0fUB8zNMTGFh1W:localhost"],"RemovesStateEventIDs":null,"LastSentEventID":""}`,
