@@ -167,7 +167,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			}
 		}
 
-		r.respondFromRemoteFile(w, cfg, db, activeRemoteRequests)
+		r.respondFromRemoteFile(w, cfg.BasePath, cfg.MaxFileSize, db, activeRemoteRequests)
 	} else {
 		// If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
 		r.jsonErrorResponse(w, util.JSONResponse{
@@ -409,7 +409,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, basePath type
 	return updateActiveRemoteRequests
 }
 
-func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, cfg config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
+func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath types.Path, maxFileSize types.ContentLength, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	r.Logger.WithFields(log.Fields{
 		"MediaID": r.MediaMetadata.MediaID,
 		"Origin":  r.MediaMetadata.Origin,
@@ -465,7 +465,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, cfg confi
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
 	// create the temporary file writer
-	tmpFileWriter, tmpFile, tmpDir, errorResponse := createTempFileWriter(cfg.BasePath, r.Logger)
+	tmpFileWriter, tmpFile, tmpDir, errorResponse := createTempFileWriter(basePath, r.Logger)
 	if errorResponse != nil {
 		r.jsonErrorResponse(w, *errorResponse)
 		return
@@ -481,7 +481,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, cfg confi
 
 	// bytesResponded is the total number of bytes written to the response to the client request
 	// bytesWritten is the total number of bytes written to disk
-	bytesResponded, bytesWritten, fetchError := copyToActiveAndPassive(resp.Body, w, tmpFileWriter, cfg.MaxFileSize, r.MediaMetadata, r.Logger)
+	bytesResponded, bytesWritten, fetchError := copyToActiveAndPassive(resp.Body, w, tmpFileWriter, maxFileSize, r.MediaMetadata, r.Logger)
 	tmpFileWriter.Flush()
 	if fetchError != nil {
 		tmpDirErr := os.RemoveAll(string(tmpDir))
@@ -514,7 +514,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, cfg confi
 	r.MediaMetadata.ContentLength = types.ContentLength(bytesWritten)
 	r.MediaMetadata.UserID = types.MatrixUserID("@:" + string(r.MediaMetadata.Origin))
 
-	updateActiveRemoteRequests = r.commitFileAndMetadata(tmpDir, cfg.BasePath, activeRemoteRequests, db, mxcURL)
+	updateActiveRemoteRequests = r.commitFileAndMetadata(tmpDir, basePath, activeRemoteRequests, db, mxcURL)
 
 	// TODO: generate thumbnails
 
