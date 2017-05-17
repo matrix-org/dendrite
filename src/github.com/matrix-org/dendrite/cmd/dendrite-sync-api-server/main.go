@@ -81,7 +81,7 @@ func main() {
 	if err := n.Load(db); err != nil {
 		log.Panicf("startup: failed to set up notifier: %s", err)
 	}
-	consumer, err := consumers.NewRoomserver(cfg, n, db)
+	consumer, err := consumers.NewOutputRoomEvent(cfg, n, db)
 	if err != nil {
 		log.Panicf("startup: failed to create room server consumer: %s", err)
 	}
