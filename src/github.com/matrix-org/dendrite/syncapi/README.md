@@ -83,3 +83,4 @@ very large. This is mitigated slightly with indexes, but better data structures 
 - Invites over federation (if it existed) won't work as they aren't "real" events and so won't be in the right tables.
 - `invite_state` is not implemented (for similar reasons to the above point).
 - The current implementation scales badly when a very old `since` token is provided.
+- The entire current room state can be re-sent to the client if they send a duplicate "join" event which should be a no-op.
