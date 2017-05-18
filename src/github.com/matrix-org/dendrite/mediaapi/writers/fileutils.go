@@ -20,6 +20,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -75,13 +77,42 @@ func createTempFileWriter(absBasePath types.Path, logger *log.Entry) (*bufio.Wri
 	return writer, tmpFile, tmpDir, nil
 }
 
-func getPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) string {
-	return path.Join(
+// getPathFromMediaMetadata validates and constructs the on-disk path to the media
+// based on its origin and mediaID
+// If a mediaID is too short, which could happen for other homeserver implementations,
+// place it into a short-id subdirectory of the origin directory
+// If the mediaID is long enough, we split it in two using one part as a subdirectory
+// name and the other part as the file name. This is to allow storage of more files due
+// to filesystem limitations on the number of files in a directory. For example, if
+// mediaID is 'qwerty', we create subdirectory called 'qwe' and place the file in 'qwe'
+// and call it 'rty'.
+func getPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) (string, error) {
+	var subDir string
+	var fileName string
+
+	if len(m.MediaID) > 3 {
+		subDir = string(m.MediaID[:3])
+		fileName = string(m.MediaID[3:])
+	} else {
+		subDir = "short-id"
+		fileName = string(m.MediaID)
+	}
+
+	filePath, err := filepath.Abs(path.Join(
 		string(absBasePath),
 		string(m.Origin),
-		string(m.MediaID[:3]),
-		string(m.MediaID[3:]),
-	)
+		subDir,
+		fileName,
+	))
+
+	// check if the absolute absBasePath is a prefix of the absolute filePath
+	// if so, no directory escape has occurred and the filePath is valid
+	// Note: absBasePath is already absolute
+	if err != nil || strings.HasPrefix(filePath, string(absBasePath)) == false {
+		return "", fmt.Errorf("Invalid filePath (not within absBasePath %v): %v", absBasePath, filePath)
+	}
+
+	return filePath, nil
 }
 
 // moveFile attempts to move the file src to dst

@@ -187,7 +187,16 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Infof("Downloading file")
 
-	filePath := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
+	filePath, err := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
+	if err != nil {
+		// FIXME: Remove erroneous file from database?
+		r.Logger.Warnln("Failed to get file path from metadata:", err)
+		r.jsonErrorResponse(w, util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+		})
+		return
+	}
 	file, err := os.Open(filePath)
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
@@ -364,9 +373,19 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	}).Infof("Storing file metadata to media repository database")
 
 	// The database is the source of truth so we need to have moved the file first
-	err := moveFile(
+	finalPath, err := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
+	if err != nil {
+		r.Logger.Warnf("Failed to get file path from metadata: %q\n", err)
+		tmpDirErr := os.RemoveAll(string(tmpDir))
+		if tmpDirErr != nil {
+			r.Logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+		}
+		return updateActiveRemoteRequests
+	}
+
+	err = moveFile(
 		types.Path(path.Join(string(tmpDir), "content")),
-		types.Path(getPathFromMediaMetadata(r.MediaMetadata, absBasePath)),
+		types.Path(finalPath),
 	)
 	if err != nil {
 		tmpDirErr := os.RemoveAll(string(tmpDir))
@@ -387,7 +406,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	// if written to disk, add to db
 	err = db.StoreMediaMetadata(r.MediaMetadata)
 	if err != nil {
-		finalDir := path.Dir(getPathFromMediaMetadata(r.MediaMetadata, absBasePath))
+		finalDir := path.Dir(finalPath)
 		finalDirErr := os.RemoveAll(finalDir)
 		if finalDirErr != nil {
 			r.Logger.Warnf("Failed to remove finalDir (%v): %q\n", finalDir, finalDirErr)

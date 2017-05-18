@@ -210,7 +210,15 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 
 	// TODO: generate thumbnails
 
-	finalPath := getPathFromMediaMetadata(r.MediaMetadata, cfg.AbsBasePath)
+	finalPath, err := getPathFromMediaMetadata(r.MediaMetadata, cfg.AbsBasePath)
+	if err != nil {
+		logger.Warnf("Failed to get file path from metadata: %q\n", err)
+		removeDir(tmpDir, logger)
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+		}
+	}
 
 	err = moveFile(
 		types.Path(path.Join(string(tmpDir), "content")),
