@@ -61,11 +61,15 @@ const selectRoomIDsWithMembershipSQL = "" +
 const selectCurrentStateSQL = "" +
 	"SELECT event_json FROM current_room_state WHERE room_id = $1"
 
+const selectJoinedUsersSQL = "" +
+	"SELECT room_id, state_key FROM current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
+
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
 	selectCurrentStateStmt          *sql.Stmt
+	selectJoinedUsersStmt           *sql.Stmt
 }
 
 func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
@@ -85,7 +89,32 @@ func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
 	if s.selectCurrentStateStmt, err = db.Prepare(selectCurrentStateSQL); err != nil {
 		return
 	}
+	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
+		return
+	}
 	return
+}
+
+// JoinedMemberLists returns a map of room ID to a list of joined user IDs.
+func (s *currentRoomStateStatements) JoinedMemberLists() (map[string][]string, error) {
+	rows, err := s.selectJoinedUsersStmt.Query()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string][]string)
+	for rows.Next() {
+		var roomID string
+		var userID string
+		if err := rows.Scan(&roomID, &userID); err != nil {
+			return nil, err
+		}
+		users := result[roomID]
+		users = append(users, userID)
+		result[roomID] = users
+	}
+	return result, nil
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.

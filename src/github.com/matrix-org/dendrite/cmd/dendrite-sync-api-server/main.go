@@ -78,12 +78,15 @@ func main() {
 	}
 
 	n := sync.NewNotifier(types.StreamPosition(pos))
-	server, err := consumers.NewServer(cfg, n, db)
-	if err != nil {
-		log.Panicf("startup: failed to create sync server: %s", err)
+	if err := n.Load(db); err != nil {
+		log.Panicf("startup: failed to set up notifier: %s", err)
 	}
-	if err = server.Start(); err != nil {
-		log.Panicf("startup: failed to start sync server")
+	consumer, err := consumers.NewOutputRoomEvent(cfg, n, db)
+	if err != nil {
+		log.Panicf("startup: failed to create room server consumer: %s", err)
+	}
+	if err = consumer.Start(); err != nil {
+		log.Panicf("startup: failed to start room server consumer")
 	}
 
 	log.Info("Starting sync server on ", *bindAddr)

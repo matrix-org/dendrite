@@ -1,6 +1,13 @@
 # Sync API Server
 
-This server is responsible for servicing `/sync` requests. It gets its data from the room server output log.
+This server is responsible for servicing `/sync` requests. It gets its data from the room server output log. Currently, the sync server will:
+ - Return a valid `/sync` response for the user represented by the provided `access_token`.
+ - Return a "complete sync" if no `since` value is provided, and return a valid `next_batch` token. This contains all rooms the user has been invited to or has joined. For joined rooms, this includes the complete current room state and the most recent 20 (hard-coded) events in the timeline.
+ - For "incremental syncs" (a `since` value is provided), as you get invited to, join, or leave rooms they will be reflected correctly in the `/sync` response.
+ - For very large state deltas, the `state` section of a room is correctly populated with the state of the room at the *start* of the timeline.
+ - When you join a room, the `/sync` which transitions your client to be "joined" will include the complete current room state as per the specification.
+ - Only wake up user streams it needs to wake up.
+ - Honours the `timeout` query parameter value.
 
 ## Internals
 
@@ -59,3 +66,21 @@ are in `OutputRoomEvents` from the room server.
 This version of the sync server uses very simple indexing to calculate room state at various points.
 This is inefficient when a very old `since` value is provided, or the `full_state` is requested, as the state delta becomes
 very large. This is mitigated slightly with indexes, but better data structures could be used in the future.
+
+## Known Issues
+
+- `m.room.history_visibility` is not honoured: it is always treated as "shared".
+- All ephemeral events are not implemented (presence, typing, receipts).
+- Account data (both user and room) is not implemented.
+- `to_device` messages are not implemented.
+- Back-pagination via `prev_batch` is not implemented.
+- The `limited` flag can lie.
+- Filters are not honoured or implemented. The `limit` for each room is hard-coded to 20.
+- The `full_state` query parameter is not implemented.
+- The `set_presence` query parameter is not implemented.
+- "Ignored" users are not ignored.
+- Redacted events are still sent to clients.
+- Invites over federation (if it existed) won't work as they aren't "real" events and so won't be in the right tables.
+- `invite_state` is not implemented (for similar reasons to the above point).
+- The current implementation scales badly when a very old `since` token is provided.
+- The entire current room state can be re-sent to the client if they send a duplicate "join" event which should be a no-op.
