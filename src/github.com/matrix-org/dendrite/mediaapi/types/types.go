@@ -63,5 +63,6 @@ type MediaMetadata struct {
 // It is used for ensuring multiple requests for the same file do not clobber each other.
 type ActiveRemoteRequests struct {
 	sync.Mutex
+	// The string key is an mxc:// URL
 	Set map[string]*sync.Cond
 }
