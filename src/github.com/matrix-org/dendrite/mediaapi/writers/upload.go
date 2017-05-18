@@ -101,17 +101,12 @@ func removeDir(dir types.Path, logger *log.Entry) {
 	}
 }
 
-// Upload implements /upload
-//
-// This endpoint involves uploading potentially significant amounts of data to the homeserver.
-// This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
-// Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
-// TODO: Requests time out if they have not received any data within the configured timeout period.
-func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.JSONResponse {
-	logger := util.GetLogger(req.Context())
-
+// parseAndValidateRequest parses the incoming upload request to validate and extract
+// all the metadata about the media being uploaded. Returns either an uploadRequest or
+// an error formatted as a util.JSONResponse
+func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRequest, *util.JSONResponse) {
 	if req.Method != "POST" {
-		return util.JSONResponse{
+		return nil, &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown("HTTP request method must be POST."),
 		}
@@ -121,7 +116,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	// just accepts a user id for auth
 	userID, resErr := auth.VerifyAccessToken(req)
 	if resErr != nil {
-		return *resErr
+		return nil, resErr
 	}
 
 	r := &uploadRequest{
@@ -136,13 +131,108 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	}
 
 	if resErr = r.Validate(cfg.MaxFileSizeBytes); resErr != nil {
-		return *resErr
+		return nil, resErr
 	}
 
 	if len(r.MediaMetadata.UploadName) > 0 {
 		r.MediaMetadata.ContentDisposition = types.ContentDisposition(
 			"inline; filename*=utf-8''" + url.PathEscape(string(r.MediaMetadata.UploadName)),
 		)
+	}
+
+	return r, nil
+}
+
+// writeFileWithLimitAndHash reads data from an io.Reader and writes it to a temporary
+// file named 'content' in the returned temporary directory. It only reads up to a limit of
+// cfg.MaxFileSizeBytes from the io.Reader. The data written is hashed and the hashsum is
+// returned. If any errors occur, a util.JSONResponse error is returned.
+func writeFileWithLimitAndHash(r io.Reader, cfg *config.MediaAPI, logger *log.Entry, contentLength types.ContentLength) ([]byte, types.Path, *util.JSONResponse) {
+	writer, file, tmpDir, errorResponse := createTempFileWriter(cfg.AbsBasePath, logger)
+	if errorResponse != nil {
+		return nil, "", errorResponse
+	}
+	defer file.Close()
+
+	// The limited reader restricts how many bytes are read from the body to the specified maximum bytes
+	// Note: the golang HTTP server closes the request body
+	limitedBody := io.LimitReader(r, int64(cfg.MaxFileSizeBytes))
+	hasher := sha256.New()
+	reader := io.TeeReader(limitedBody, hasher)
+
+	bytesWritten, err := io.Copy(writer, reader)
+	if err != nil {
+		logger.Warnf("Failed to copy %q\n", err)
+		removeDir(tmpDir, logger)
+		return nil, "", &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+		}
+	}
+
+	writer.Flush()
+
+	if bytesWritten != int64(contentLength) {
+		logger.Warnf("Bytes uploaded (%v) != claimed Content-Length (%v)", bytesWritten, contentLength)
+	}
+
+	return hasher.Sum(nil), tmpDir, nil
+}
+
+// storeFileAndMetadata first moves a temporary file named content from tmpDir to its
+// final path (see getPathFromMediaMetadata for details.) Once the file is moved, the
+// metadata about the file is written into the media repository database.
+// In case of any error, appropriate files and directories are cleaned up a
+// util.JSONResponse error is returned.
+func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetadata *types.MediaMetadata, db *storage.Database, logger *log.Entry) *util.JSONResponse {
+	finalPath, err := getPathFromMediaMetadata(mediaMetadata, absBasePath)
+	if err != nil {
+		logger.Warnf("Failed to get file path from metadata: %q\n", err)
+		removeDir(tmpDir, logger)
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+		}
+	}
+
+	err = moveFile(
+		types.Path(path.Join(string(tmpDir), "content")),
+		types.Path(finalPath),
+	)
+	if err != nil {
+		logger.Warnf("Failed to move file to final destination: %q\n", err)
+		removeDir(tmpDir, logger)
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+		}
+	}
+
+	err = db.StoreMediaMetadata(mediaMetadata)
+	if err != nil {
+		logger.Warnf("Failed to store metadata: %q\n", err)
+		removeDir(types.Path(path.Dir(finalPath)), logger)
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+		}
+	}
+
+	return nil
+}
+
+// Upload implements /upload
+//
+// This endpoint involves uploading potentially significant amounts of data to the homeserver.
+// This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
+// Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
+// TODO: Requests time out if they have not received any data within the configured timeout period.
+func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.JSONResponse {
+	logger := util.GetLogger(req.Context())
+
+	r, resErr := parseAndValidateRequest(req, cfg)
+	if resErr != nil {
+		return *resErr
 	}
 
 	logger.WithFields(log.Fields{
@@ -153,35 +243,10 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Info("Uploading file")
 
-	writer, file, tmpDir, errorResponse := createTempFileWriter(cfg.AbsBasePath, logger)
-	if errorResponse != nil {
-		return *errorResponse
+	hash, tmpDir, resErr := writeFileWithLimitAndHash(req.Body, cfg, logger, r.MediaMetadata.ContentLength)
+	if resErr != nil {
+		return *resErr
 	}
-	defer file.Close()
-
-	// The limited reader restricts how many bytes are read from the body to the specified maximum bytes
-	// Note: the golang HTTP server closes the request body
-	limitedBody := io.LimitReader(req.Body, int64(cfg.MaxFileSizeBytes))
-	hasher := sha256.New()
-	reader := io.TeeReader(limitedBody, hasher)
-
-	bytesWritten, err := io.Copy(writer, reader)
-	if err != nil {
-		logger.Warnf("Failed to copy %q\n", err)
-		removeDir(tmpDir, logger)
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
-		}
-	}
-
-	writer.Flush()
-
-	if bytesWritten != int64(r.MediaMetadata.ContentLength) {
-		logger.Warnf("Bytes uploaded (%v) != claimed Content-Length (%v)", bytesWritten, r.MediaMetadata.ContentLength)
-	}
-
-	hash := hasher.Sum(nil)
 	r.MediaMetadata.MediaID = types.MediaID(base64.URLEncoding.EncodeToString(hash[:]))
 
 	logger.WithFields(log.Fields{
@@ -210,37 +275,9 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 
 	// TODO: generate thumbnails
 
-	finalPath, err := getPathFromMediaMetadata(r.MediaMetadata, cfg.AbsBasePath)
-	if err != nil {
-		logger.Warnf("Failed to get file path from metadata: %q\n", err)
-		removeDir(tmpDir, logger)
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
-		}
-	}
-
-	err = moveFile(
-		types.Path(path.Join(string(tmpDir), "content")),
-		types.Path(finalPath),
-	)
-	if err != nil {
-		logger.Warnf("Failed to move file to final destination: %q\n", err)
-		removeDir(tmpDir, logger)
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
-		}
-	}
-
-	err = db.StoreMediaMetadata(r.MediaMetadata)
-	if err != nil {
-		logger.Warnf("Failed to store metadata: %q\n", err)
-		removeDir(types.Path(path.Dir(finalPath)), logger)
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
-		}
+	resErr = storeFileAndMetadata(tmpDir, cfg.AbsBasePath, r.MediaMetadata, db, logger)
+	if resErr != nil {
+		return *resErr
 	}
 
 	return util.JSONResponse{
