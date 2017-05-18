@@ -203,7 +203,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 				ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.ServerName, r.MediaMetadata.MediaID),
 			},
 		}
-	} else if err != nil && err != sql.ErrNoRows {
+	} else if err != sql.ErrNoRows {
 		logger.Warnf("Failed to query database for %v: %q", r.MediaMetadata.MediaID, err)
 	}
 
