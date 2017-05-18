@@ -209,9 +209,14 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 
 	// TODO: generate thumbnails
 
-	err = db.StoreMediaMetadata(r.MediaMetadata)
+	finalPath := getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)
+
+	err = moveFile(
+		types.Path(path.Join(string(tmpDir), "content")),
+		types.Path(finalPath),
+	)
 	if err != nil {
-		logger.Warnf("Failed to store metadata: %q\n", err)
+		logger.Warnf("Failed to move file to final destination: %q\n", err)
 		removeDir(tmpDir, logger)
 		return util.JSONResponse{
 			Code: 400,
@@ -219,13 +224,10 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		}
 	}
 
-	err = moveFile(
-		types.Path(path.Join(string(tmpDir), "content")),
-		types.Path(getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)),
-	)
+	err = db.StoreMediaMetadata(r.MediaMetadata)
 	if err != nil {
-		logger.Warnf("Failed to move file to final destination: %q\n", err)
-		removeDir(tmpDir, logger)
+		logger.Warnf("Failed to store metadata: %q\n", err)
+		removeDir(types.Path(path.Dir(finalPath)), logger)
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
