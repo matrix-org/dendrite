@@ -157,10 +157,6 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 				activeRemoteRequestCondition.Wait()
 				activeRemoteRequests.Unlock()
 			} else {
-				r.Logger.WithFields(log.Fields{
-					"MediaID": r.MediaMetadata.MediaID,
-					"Origin":  r.MediaMetadata.Origin,
-				}).Infof("Fetching remote file")
 				activeRemoteRequests.Set[mxcURL] = &sync.Cond{L: activeRemoteRequests}
 				activeRemoteRequests.Unlock()
 				break
