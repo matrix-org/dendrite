@@ -32,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -90,7 +91,7 @@ var nTries = 5
 // If they are present in the cache, they are served directly.
 // If they are not present in the cache, they are obtained from the remote server and
 // simultaneously served back to the client and written into the cache.
-func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName, mediaID types.MediaID, cfg *config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
+func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib.ServerName, mediaID types.MediaID, cfg *config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	r := &downloadRequest{
 		MediaMetadata: &types.MediaMetadata{
 			MediaID: mediaID,
@@ -529,7 +530,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath 
 
 // Given a matrix server name, attempt to discover URLs to contact the server
 // on.
-func getMatrixUrls(serverName types.ServerName) []string {
+func getMatrixUrls(serverName gomatrixserverlib.ServerName) []string {
 	_, srvs, err := net.LookupSRV("matrix", "tcp", string(serverName))
 	if err != nil {
 		return []string{"https://" + string(serverName) + ":8448"}

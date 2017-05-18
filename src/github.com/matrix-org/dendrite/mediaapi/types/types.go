@@ -14,7 +14,11 @@
 
 package types
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/matrix-org/gomatrixserverlib"
+)
 
 // ContentDisposition is an HTTP Content-Disposition header string
 type ContentDisposition string
@@ -34,9 +38,6 @@ type Path string
 // MediaID is a string representing the unique identifier for a file (could be a hash but does not have to be)
 type MediaID string
 
-// ServerName is the host of a matrix homeserver, e.g. matrix.org
-type ServerName string
-
 // RequestMethod is an HTTP request method i.e. GET, POST, etc
 type RequestMethod string
 
@@ -49,7 +50,7 @@ type UnixMs int64
 // MediaMetadata is metadata associated with a media file
 type MediaMetadata struct {
 	MediaID            MediaID
-	Origin             ServerName
+	Origin             gomatrixserverlib.ServerName
 	ContentType        ContentType
 	ContentDisposition ContentDisposition
 	ContentLength      ContentLength

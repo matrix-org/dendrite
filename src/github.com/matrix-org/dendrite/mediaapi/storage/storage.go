@@ -20,6 +20,7 @@ import (
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -47,7 +48,7 @@ func (d *Database) StoreMediaMetadata(mediaMetadata *types.MediaMetadata) error 
 }
 
 // GetMediaMetadata possibly selects the metadata about previously uploaded media from the database.
-func (d *Database) GetMediaMetadata(mediaID types.MediaID, mediaOrigin types.ServerName, mediaMetadata *types.MediaMetadata) error {
+func (d *Database) GetMediaMetadata(mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName, mediaMetadata *types.MediaMetadata) error {
 	metadata, err := d.statements.selectMedia(mediaID, mediaOrigin)
 	mediaMetadata.ContentType = metadata.ContentType
 	mediaMetadata.ContentDisposition = metadata.ContentDisposition

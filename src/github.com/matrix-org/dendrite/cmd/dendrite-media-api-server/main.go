@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -56,7 +57,7 @@ func main() {
 	}
 
 	cfg := &config.MediaAPI{
-		ServerName:       types.ServerName(serverName),
+		ServerName:       gomatrixserverlib.ServerName(serverName),
 		BasePath:         types.Path(basePath),
 		MaxFileSizeBytes: types.ContentLength(maxFileSizeBytes),
 		DataSource:       dataSource,

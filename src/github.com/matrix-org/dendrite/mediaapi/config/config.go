@@ -14,12 +14,15 @@
 
 package config
 
-import "github.com/matrix-org/dendrite/mediaapi/types"
+import (
+	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
+)
 
 // MediaAPI contains the config information necessary to spin up a mediaapi process.
 type MediaAPI struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
-	ServerName types.ServerName `yaml:"server_name"`
+	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 	// The base path to where media files will be stored.
 	BasePath types.Path `yaml:"base_path"`
 	// The maximum file size in bytes that is allowed to be stored on this server.

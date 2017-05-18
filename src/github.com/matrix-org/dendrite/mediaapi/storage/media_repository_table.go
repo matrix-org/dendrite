@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const mediaSchema = `
@@ -88,7 +89,7 @@ func (s *mediaStatements) insertMedia(mediaMetadata *types.MediaMetadata) error 
 	return err
 }
 
-func (s *mediaStatements) selectMedia(mediaID types.MediaID, mediaOrigin types.ServerName) (*types.MediaMetadata, error) {
+func (s *mediaStatements) selectMedia(mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		MediaID: mediaID,
 		Origin:  mediaOrigin,
