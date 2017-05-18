@@ -17,6 +17,7 @@ package main
 import (
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/matrix-org/dendrite/common"
@@ -47,6 +48,10 @@ func main() {
 	if basePath == "" {
 		log.Panic("No BASE_PATH environment variable found.")
 	}
+	absBasePath, err := filepath.Abs(basePath)
+	if err != nil {
+		log.Panicf("BASE_PATH is invalid (must be able to make absolute): %v\n", err)
+	}
 
 	if serverName == "" {
 		serverName = "localhost"
@@ -59,7 +64,7 @@ func main() {
 
 	cfg := &config.MediaAPI{
 		ServerName:       gomatrixserverlib.ServerName(serverName),
-		BasePath:         types.Path(basePath),
+		BasePath:         types.Path(absBasePath),
 		MaxFileSizeBytes: types.ContentLength(maxFileSizeBytes),
 		DataSource:       dataSource,
 	}
