@@ -163,7 +163,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 			}
 		}
 
-		r.respondFromRemoteFile(w, cfg.BasePath, cfg.MaxFileSize, db, activeRemoteRequests)
+		r.respondFromRemoteFile(w, cfg.BasePath, cfg.MaxFileSizeBytes, db, activeRemoteRequests)
 	} else {
 		// If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
 		r.Logger.Warnln("Failed to look up file in database:", err)
@@ -280,8 +280,8 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONRespo
 // copyToActiveAndPassive works like io.Copy except it copies from the reader to both of the writers
 // If there is an error with the reader or the active writer, that is considered an error
 // If there is an error with the passive writer, that is non-critical and copying continues
-// maxFileSize limits the amount of data written to the passive writer
-func copyToActiveAndPassive(r io.Reader, wActive io.Writer, wPassive io.Writer, maxFileSize types.ContentLength, mediaMetadata *types.MediaMetadata) (int64, int64, error) {
+// maxFileSizeBytes limits the amount of data written to the passive writer
+func copyToActiveAndPassive(r io.Reader, wActive io.Writer, wPassive io.Writer, maxFileSizeBytes types.ContentLength, mediaMetadata *types.MediaMetadata) (int64, int64, error) {
 	var bytesResponded, bytesWritten int64 = 0, 0
 	var copyError error
 	// Note: the buffer size is the same as is used in io.Copy()
@@ -301,8 +301,8 @@ func copyToActiveAndPassive(r io.Reader, wActive io.Writer, wPassive io.Writer, 
 				// Note: if we get here then copyError != errFileIsTooLarge && copyError != errWrite
 				//   as if copyError == errResponse || copyError == errWrite then we would have broken
 				//   out of the loop and there are no other cases
-				// if larger than maxFileSize then stop writing to disk and discard cached file
-				if bytesWritten+int64(len(buffer)) > int64(maxFileSize) {
+				// if larger than maxFileSizeBytes then stop writing to disk and discard cached file
+				if bytesWritten+int64(len(buffer)) > int64(maxFileSizeBytes) {
 					copyError = errFileIsTooLarge
 				} else {
 					// write to disk
@@ -400,7 +400,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, basePath type
 	return updateActiveRemoteRequests
 }
 
-func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath types.Path, maxFileSize types.ContentLength, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
+func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath types.Path, maxFileSizeBytes types.ContentLength, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	r.Logger.WithFields(log.Fields{
 		"MediaID": r.MediaMetadata.MediaID,
 		"Origin":  r.MediaMetadata.Origin,
@@ -472,7 +472,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath 
 
 	// bytesResponded is the total number of bytes written to the response to the client request
 	// bytesWritten is the total number of bytes written to disk
-	bytesResponded, bytesWritten, fetchError := copyToActiveAndPassive(resp.Body, w, tmpFileWriter, maxFileSize, r.MediaMetadata)
+	bytesResponded, bytesWritten, fetchError := copyToActiveAndPassive(resp.Body, w, tmpFileWriter, maxFileSizeBytes, r.MediaMetadata)
 	tmpFileWriter.Flush()
 	if fetchError != nil {
 		logFields := log.Fields{
@@ -480,7 +480,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath 
 			"Origin":  r.MediaMetadata.Origin,
 		}
 		if fetchError == errFileIsTooLarge {
-			logFields["MaxFileSize"] = maxFileSize
+			logFields["MaxFileSizeBytes"] = maxFileSizeBytes
 		}
 		r.Logger.WithFields(logFields).Warnln(fetchError)
 		tmpDirErr := os.RemoveAll(string(tmpDir))

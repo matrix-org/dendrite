@@ -43,7 +43,7 @@ type uploadRequest struct {
 }
 
 // Validate validates the uploadRequest fields
-func (r uploadRequest) Validate(maxFileSize types.ContentLength) *util.JSONResponse {
+func (r uploadRequest) Validate(maxFileSizeBytes types.ContentLength) *util.JSONResponse {
 	// TODO: Any validation to be done on ContentDisposition?
 
 	if r.MediaMetadata.ContentLength < 1 {
@@ -52,10 +52,10 @@ func (r uploadRequest) Validate(maxFileSize types.ContentLength) *util.JSONRespo
 			JSON: jsonerror.Unknown("HTTP Content-Length request header must be greater than zero."),
 		}
 	}
-	if maxFileSize > 0 && r.MediaMetadata.ContentLength > maxFileSize {
+	if maxFileSizeBytes > 0 && r.MediaMetadata.ContentLength > maxFileSizeBytes {
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSize)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
 		}
 	}
 	// TODO: Check if the Content-Type is a valid type?
@@ -135,7 +135,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		},
 	}
 
-	if resErr = r.Validate(cfg.MaxFileSize); resErr != nil {
+	if resErr = r.Validate(cfg.MaxFileSizeBytes); resErr != nil {
 		return *resErr
 	}
 
@@ -161,7 +161,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 
 	// The limited reader restricts how many bytes are read from the body to the specified maximum bytes
 	// Note: the golang HTTP server closes the request body
-	limitedBody := io.LimitReader(req.Body, int64(cfg.MaxFileSize))
+	limitedBody := io.LimitReader(req.Body, int64(cfg.MaxFileSizeBytes))
 	hasher := sha256.New()
 	reader := io.TeeReader(limitedBody, hasher)
 

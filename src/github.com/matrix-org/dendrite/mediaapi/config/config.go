@@ -24,7 +24,7 @@ type MediaAPI struct {
 	BasePath types.Path `yaml:"base_path"`
 	// The maximum file size in bytes that is allowed to be stored on this server.
 	// Note that remote files larger than this can still be proxied to a client, they will just not be cached.
-	MaxFileSize types.ContentLength `yaml:"base_path"`
+	MaxFileSizeBytes types.ContentLength `yaml:"base_path"`
 	// The postgres connection config for connecting to the database e.g a postgres:// URI
 	DataSource string `yaml:"database"`
 }

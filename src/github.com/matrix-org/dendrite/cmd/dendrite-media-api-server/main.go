@@ -50,10 +50,10 @@ func main() {
 	}
 
 	cfg := &config.MediaAPI{
-		ServerName:  types.ServerName(serverName),
-		BasePath:    types.Path(basePath),
-		MaxFileSize: 10 * 1024 * 1024,
-		DataSource:  dataSource,
+		ServerName:       types.ServerName(serverName),
+		BasePath:         types.Path(basePath),
+		MaxFileSizeBytes: 10 * 1024 * 1024,
+		DataSource:       dataSource,
 	}
 
 	db, err := storage.Open(cfg.DataSource)
