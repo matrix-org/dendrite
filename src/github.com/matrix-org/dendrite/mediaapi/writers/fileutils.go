@@ -105,6 +105,11 @@ func getPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) (s
 		fileName,
 	))
 
+	// FIXME:
+	// - validate origin
+	// - sanitize mediaID (e.g. '/' characters and such)
+	// - validate length of origin and mediaID according to common filesystem limitations
+
 	// check if the absolute absBasePath is a prefix of the absolute filePath
 	// if so, no directory escape has occurred and the filePath is valid
 	// Note: absBasePath is already absolute
