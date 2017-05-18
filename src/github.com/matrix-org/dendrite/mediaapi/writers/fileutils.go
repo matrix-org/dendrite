@@ -30,8 +30,7 @@ import (
 // createTempDir creates a tmp/<random string> directory within baseDirectory and returns its path
 func createTempDir(baseDirectory types.Path) (types.Path, error) {
 	baseTmpDir := path.Join(string(baseDirectory), "tmp")
-	err := os.MkdirAll(baseTmpDir, 0770)
-	if err != nil {
+	if err := os.MkdirAll(baseTmpDir, 0770); err != nil {
 		log.Printf("Failed to create base temp dir: %v\n", err)
 		return "", err
 	}
