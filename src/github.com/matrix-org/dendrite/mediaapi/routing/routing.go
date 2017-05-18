@@ -35,9 +35,9 @@ const pathPrefixR0 = "/_matrix/media/v1"
 func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI, db *storage.Database) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-	r0mux.Handle("/upload", make("upload", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+	r0mux.Handle("/upload", makeAPI("upload", func(req *http.Request) util.JSONResponse {
 		return writers.Upload(req, cfg, db)
-	})))
+	}))
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
 		Set: map[string]*sync.Cond{},
@@ -60,7 +60,8 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
 
-// make a util.JSONRequestHandler into an http.Handler
-func make(metricsName string, h util.JSONRequestHandler) http.Handler {
+// make a util.JSONRequestHandler function into an http.Handler.
+func makeAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+	h := util.NewJSONRequestHandler(f)
 	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
 }
