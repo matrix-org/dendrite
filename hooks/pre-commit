@@ -4,6 +4,6 @@ set -eu
 
 golint src/...
 go fmt ./src/...
-go tool vet --shadow ./src
+go tool vet --all --shadow ./src
 gocyclo -over 12 src/
 gb test
