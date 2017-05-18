@@ -160,14 +160,14 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 
 	bytesWritten, err := io.Copy(writer, reader)
 	if err != nil {
-		logger.Infof("Failed to copy %q\n", err)
+		logger.Warnf("Failed to copy %q\n", err)
 		tmpDirErr := os.RemoveAll(string(tmpDir))
 		if tmpDirErr != nil {
 			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
 		}
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
 		}
 	}
 
@@ -210,13 +210,14 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 
 	err = db.StoreMediaMetadata(r.MediaMetadata)
 	if err != nil {
+		logger.Warnf("Failed to store metadata: %q\n", err)
 		tmpDirErr := os.RemoveAll(string(tmpDir))
 		if tmpDirErr != nil {
 			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
 		}
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
 		}
 	}
 
@@ -225,13 +226,14 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		types.Path(getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)),
 	)
 	if err != nil {
+		logger.Warnf("Failed to move file to final destination: %q\n", err)
 		tmpDirErr := os.RemoveAll(string(tmpDir))
 		if tmpDirErr != nil {
 			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
 		}
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
 		}
 	}
 

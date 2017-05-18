@@ -62,7 +62,7 @@ func createTempFileWriter(basePath types.Path, logger *log.Entry) (*bufio.Writer
 		logger.Infof("Failed to create temp dir %q\n", err)
 		return nil, nil, "", &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
 		}
 	}
 	writer, tmpFile, err := createFileWriter(tmpDir, "content")
@@ -70,7 +70,7 @@ func createTempFileWriter(basePath types.Path, logger *log.Entry) (*bufio.Writer
 		logger.Infof("Failed to create file writer %q\n", err)
 		return nil, nil, "", &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload: %q", err)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
 		}
 	}
 	return writer, tmpFile, tmpDir, nil
