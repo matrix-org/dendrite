@@ -44,11 +44,14 @@ func NewAccountDatabase(dataSourceName string, serverName gomatrixserverlib.Serv
 // GetAccountByPassword returns the account associated with the given localpart and password.
 // Returns sql.ErrNoRows if no account exists which matches the given credentials.
 func (d *AccountDatabase) GetAccountByPassword(localpart, plaintextPassword string) (*types.Account, error) {
-	hash, err := hashPassword(plaintextPassword)
+	hash, err := d.accounts.selectPasswordHash(localpart)
 	if err != nil {
 		return nil, err
 	}
-	return d.accounts.selectAccountByPasswordHash(localpart, hash)
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(plaintextPassword)); err != nil {
+		return nil, err
+	}
+	return d.accounts.selectAccountByLocalpart(localpart)
 }
 
 // CreateAccount makes a new account with the given login name and password. If no password is supplied,
