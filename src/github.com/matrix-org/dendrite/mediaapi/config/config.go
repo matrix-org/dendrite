@@ -23,8 +23,8 @@ import (
 type MediaAPI struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
 	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
-	// The base path to where media files will be stored.
-	BasePath types.Path `yaml:"base_path"`
+	// The absolute base path to where media files will be stored.
+	AbsBasePath types.Path `yaml:"abs_base_path"`
 	// The maximum file size in bytes that is allowed to be stored on this server.
 	// Note that remote files larger than this can still be proxied to a client, they will just not be cached.
 	MaxFileSizeBytes types.ContentLength `yaml:"max_file_size_bytes"`

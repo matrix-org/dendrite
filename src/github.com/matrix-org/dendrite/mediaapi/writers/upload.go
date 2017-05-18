@@ -153,7 +153,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Info("Uploading file")
 
-	writer, file, tmpDir, errorResponse := createTempFileWriter(cfg.BasePath, logger)
+	writer, file, tmpDir, errorResponse := createTempFileWriter(cfg.AbsBasePath, logger)
 	if errorResponse != nil {
 		return *errorResponse
 	}
@@ -210,7 +210,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 
 	// TODO: generate thumbnails
 
-	finalPath := getPathFromMediaMetadata(r.MediaMetadata, cfg.BasePath)
+	finalPath := getPathFromMediaMetadata(r.MediaMetadata, cfg.AbsBasePath)
 
 	err = moveFile(
 		types.Path(path.Join(string(tmpDir), "content")),

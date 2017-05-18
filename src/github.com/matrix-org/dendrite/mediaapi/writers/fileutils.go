@@ -55,8 +55,8 @@ func createFileWriter(directory types.Path, filename types.Filename) (*bufio.Wri
 	return bufio.NewWriter(file), file, nil
 }
 
-func createTempFileWriter(basePath types.Path, logger *log.Entry) (*bufio.Writer, *os.File, types.Path, *util.JSONResponse) {
-	tmpDir, err := createTempDir(basePath)
+func createTempFileWriter(absBasePath types.Path, logger *log.Entry) (*bufio.Writer, *os.File, types.Path, *util.JSONResponse) {
+	tmpDir, err := createTempDir(absBasePath)
 	if err != nil {
 		logger.Infof("Failed to create temp dir %q\n", err)
 		return nil, nil, "", &util.JSONResponse{
@@ -75,9 +75,9 @@ func createTempFileWriter(basePath types.Path, logger *log.Entry) (*bufio.Writer
 	return writer, tmpFile, tmpDir, nil
 }
 
-func getPathFromMediaMetadata(m *types.MediaMetadata, basePath types.Path) string {
+func getPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) string {
 	return path.Join(
-		string(basePath),
+		string(absBasePath),
 		string(m.Origin),
 		string(m.MediaID[:3]),
 		string(m.MediaID[3:]),

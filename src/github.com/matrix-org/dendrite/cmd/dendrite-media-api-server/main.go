@@ -64,7 +64,7 @@ func main() {
 
 	cfg := &config.MediaAPI{
 		ServerName:       gomatrixserverlib.ServerName(serverName),
-		BasePath:         types.Path(absBasePath),
+		AbsBasePath:      types.Path(absBasePath),
 		MaxFileSizeBytes: types.ContentLength(maxFileSizeBytes),
 		DataSource:       dataSource,
 	}

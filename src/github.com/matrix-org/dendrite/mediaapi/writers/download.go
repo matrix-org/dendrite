@@ -120,7 +120,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 	if err == nil {
 		// If we have a record, we can respond from the local file
 		r.MediaMetadata = mediaMetadata
-		r.respondFromLocalFile(w, cfg.BasePath)
+		r.respondFromLocalFile(w, cfg.AbsBasePath)
 		return
 	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin != cfg.ServerName {
 		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
@@ -136,7 +136,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 			if err == nil {
 				// If we have a record, we can respond from the local file
 				r.MediaMetadata = mediaMetadata
-				r.respondFromLocalFile(w, cfg.BasePath)
+				r.respondFromLocalFile(w, cfg.AbsBasePath)
 				activeRemoteRequests.Unlock()
 				return
 			}
@@ -166,7 +166,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 			}
 		}
 
-		r.respondFromRemoteFile(w, cfg.BasePath, cfg.MaxFileSizeBytes, db, activeRemoteRequests)
+		r.respondFromRemoteFile(w, cfg.AbsBasePath, cfg.MaxFileSizeBytes, db, activeRemoteRequests)
 	} else {
 		// If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
 		r.Logger.Warnln("Failed to look up file in database:", err)
@@ -177,7 +177,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 	}
 }
 
-func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, basePath types.Path) {
+func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePath types.Path) {
 	r.Logger.WithFields(log.Fields{
 		"MediaID":             r.MediaMetadata.MediaID,
 		"Origin":              r.MediaMetadata.Origin,
@@ -187,7 +187,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, basePath t
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Infof("Downloading file")
 
-	filePath := getPathFromMediaMetadata(r.MediaMetadata, basePath)
+	filePath := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
@@ -351,7 +351,7 @@ func completeRemoteRequest(activeRemoteRequests *types.ActiveRemoteRequests, mxc
 	activeRemoteRequests.Unlock()
 }
 
-func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, basePath types.Path, activeRemoteRequests *types.ActiveRemoteRequests, db *storage.Database, mxcURL string) bool {
+func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath types.Path, activeRemoteRequests *types.ActiveRemoteRequests, db *storage.Database, mxcURL string) bool {
 	updateActiveRemoteRequests := true
 
 	r.Logger.WithFields(log.Fields{
@@ -366,7 +366,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, basePath type
 	// The database is the source of truth so we need to have moved the file first
 	err := moveFile(
 		types.Path(path.Join(string(tmpDir), "content")),
-		types.Path(getPathFromMediaMetadata(r.MediaMetadata, basePath)),
+		types.Path(getPathFromMediaMetadata(r.MediaMetadata, absBasePath)),
 	)
 	if err != nil {
 		tmpDirErr := os.RemoveAll(string(tmpDir))
@@ -387,7 +387,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, basePath type
 	// if written to disk, add to db
 	err = db.StoreMediaMetadata(r.MediaMetadata)
 	if err != nil {
-		finalDir := path.Dir(getPathFromMediaMetadata(r.MediaMetadata, basePath))
+		finalDir := path.Dir(getPathFromMediaMetadata(r.MediaMetadata, absBasePath))
 		finalDirErr := os.RemoveAll(finalDir)
 		if finalDirErr != nil {
 			r.Logger.Warnf("Failed to remove finalDir (%v): %q\n", finalDir, finalDirErr)
@@ -403,7 +403,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, basePath type
 	return updateActiveRemoteRequests
 }
 
-func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath types.Path, maxFileSizeBytes types.ContentLength, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
+func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePath types.Path, maxFileSizeBytes types.ContentLength, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	r.Logger.WithFields(log.Fields{
 		"MediaID": r.MediaMetadata.MediaID,
 		"Origin":  r.MediaMetadata.Origin,
@@ -459,7 +459,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath 
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
 	// create the temporary file writer
-	tmpFileWriter, tmpFile, tmpDir, errorResponse := createTempFileWriter(basePath, r.Logger)
+	tmpFileWriter, tmpFile, tmpDir, errorResponse := createTempFileWriter(absBasePath, r.Logger)
 	if errorResponse != nil {
 		r.jsonErrorResponse(w, *errorResponse)
 		return
@@ -516,7 +516,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, basePath 
 	r.MediaMetadata.ContentLength = types.ContentLength(bytesWritten)
 	r.MediaMetadata.UserID = types.MatrixUserID("@:" + string(r.MediaMetadata.Origin))
 
-	updateActiveRemoteRequests = r.commitFileAndMetadata(tmpDir, basePath, activeRemoteRequests, db, mxcURL)
+	updateActiveRemoteRequests = r.commitFileAndMetadata(tmpDir, absBasePath, activeRemoteRequests, db, mxcURL)
 
 	// TODO: generate thumbnails
 
