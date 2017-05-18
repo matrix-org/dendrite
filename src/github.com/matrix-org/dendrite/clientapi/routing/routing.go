@@ -35,40 +35,42 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI, producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-	r0mux.Handle("/createRoom", make("createRoom", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
-		return writers.CreateRoom(req, cfg, producer)
-	})))
+	r0mux.Handle("/createRoom",
+		makeAPI("createRoom", func(req *http.Request) util.JSONResponse {
+			return writers.CreateRoom(req, cfg, producer)
+		}),
+	)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
-		make("send_message", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("send_message", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return writers.SendEvent(req, vars["roomID"], vars["eventType"], vars["txnID"], nil, cfg, queryAPI, producer)
-		})),
+		}),
 	)
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}",
-		make("send_message", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("send_message", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			emptyString := ""
 			return writers.SendEvent(req, vars["roomID"], vars["eventType"], vars["txnID"], &emptyString, cfg, queryAPI, producer)
-		})),
+		}),
 	)
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
-		make("send_message", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("send_message", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			stateKey := vars["stateKey"]
 			return writers.SendEvent(req, vars["roomID"], vars["eventType"], vars["txnID"], &stateKey, cfg, queryAPI, producer)
-		})),
+		}),
 	)
 
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
-		make("login", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("login", func(req *http.Request) util.JSONResponse {
 			return readers.Login(req, cfg)
-		})),
+		}),
 	)
 
 	r0mux.Handle("/pushrules/",
-		make("push_rules", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("push_rules", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement push rules API
 			res := json.RawMessage(`{
 					"global": {
@@ -83,68 +85,69 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 				Code: 200,
 				JSON: &res,
 			}
-		})),
+		}),
 	)
 
 	r0mux.Handle("/user/{userID}/filter",
-		make("make_filter", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("make_filter", func(req *http.Request) util.JSONResponse {
 			// TODO: Persist filter and return filter ID
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},
 			}
-		})),
+		}),
 	)
 
 	r0mux.Handle("/user/{userID}/filter/{filterID}",
-		make("filter", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("filter", func(req *http.Request) util.JSONResponse {
 			// TODO: Retrieve filter based on ID
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},
 			}
-		})),
+		}),
 	)
 
 	// Riot user settings
 
 	r0mux.Handle("/profile/{userID}",
-		make("profile", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("profile", func(req *http.Request) util.JSONResponse {
 			// TODO: Get profile data for user ID
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},
 			}
-		})),
+		}),
 	)
 
 	r0mux.Handle("/account/3pid",
-		make("account_3pid", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("account_3pid", func(req *http.Request) util.JSONResponse {
 			// TODO: Get 3pid data for user ID
 			res := json.RawMessage(`{"threepids":[]}`)
 			return util.JSONResponse{
 				Code: 200,
 				JSON: &res,
 			}
-		})),
+		}),
 	)
 
 	// Riot logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",
-		make("presence", util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		makeAPI("presence", func(req *http.Request) util.JSONResponse {
 			// TODO: Set presence (probably the responsibility of a presence server not clientapi)
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},
 			}
-		})),
+		}),
 	)
 
 	servMux.Handle("/metrics", prometheus.Handler())
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
 
-// make a util.JSONRequestHandler into an http.Handler
-func make(metricsName string, h util.JSONRequestHandler) http.Handler {
+// make a util.JSONRequestHandler function into an http.Handler.
+func makeAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+	h := util.NewJSONRequestHander(f)
 	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
 }
