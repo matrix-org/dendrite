@@ -115,10 +115,11 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 	}
 
 	// check if we have a record of the media in our database
-	err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, r.MediaMetadata)
+	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 
 	if err == nil {
 		// If we have a record, we can respond from the local file
+		r.MediaMetadata = mediaMetadata
 		r.respondFromLocalFile(w, cfg.BasePath)
 		return
 	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin != cfg.ServerName {
@@ -131,9 +132,10 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 
 		for tries := 0; ; tries++ {
 			activeRemoteRequests.Lock()
-			err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, r.MediaMetadata)
+			mediaMetadata, err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 			if err == nil {
 				// If we have a record, we can respond from the local file
+				r.MediaMetadata = mediaMetadata
 				r.respondFromLocalFile(w, cfg.BasePath)
 				activeRemoteRequests.Unlock()
 				return

@@ -48,13 +48,6 @@ func (d *Database) StoreMediaMetadata(mediaMetadata *types.MediaMetadata) error 
 }
 
 // GetMediaMetadata possibly selects the metadata about previously uploaded media from the database.
-func (d *Database) GetMediaMetadata(mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName, mediaMetadata *types.MediaMetadata) error {
-	metadata, err := d.statements.selectMedia(mediaID, mediaOrigin)
-	mediaMetadata.ContentType = metadata.ContentType
-	mediaMetadata.ContentDisposition = metadata.ContentDisposition
-	mediaMetadata.ContentLength = metadata.ContentLength
-	mediaMetadata.CreationTimestamp = metadata.CreationTimestamp
-	mediaMetadata.UploadName = metadata.UploadName
-	mediaMetadata.UserID = metadata.UserID
-	return err
+func (d *Database) GetMediaMetadata(mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) (*types.MediaMetadata, error) {
+	return d.statements.selectMedia(mediaID, mediaOrigin)
 }

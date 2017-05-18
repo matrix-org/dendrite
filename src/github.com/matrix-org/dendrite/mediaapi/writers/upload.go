@@ -194,8 +194,9 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	}).Info("File uploaded")
 
 	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
-	err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, &types.MediaMetadata{})
+	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	if err == nil {
+		r.MediaMetadata = mediaMetadata
 		removeDir(tmpDir, logger)
 		return util.JSONResponse{
 			Code: 200,
