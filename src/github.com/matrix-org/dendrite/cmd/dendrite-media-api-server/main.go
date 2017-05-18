@@ -53,7 +53,7 @@ func main() {
 	maxFileSizeBytes, err := strconv.ParseInt(os.Getenv("MAX_FILE_SIZE_BYTES"), 10, 64)
 	if err != nil {
 		maxFileSizeBytes = 10 * 1024 * 1024
-		log.Info("Failed to parse MAX_FILE_SIZE_BYTES. Defaulting to %v bytes.", maxFileSizeBytes)
+		log.Infof("Failed to parse MAX_FILE_SIZE_BYTES. Defaulting to %v bytes.", maxFileSizeBytes)
 	}
 
 	cfg := &config.MediaAPI{
