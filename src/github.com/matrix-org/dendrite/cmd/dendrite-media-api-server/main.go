@@ -30,11 +30,12 @@ import (
 )
 
 var (
-	bindAddr   = os.Getenv("BIND_ADDRESS")
-	dataSource = os.Getenv("DATABASE")
-	logDir     = os.Getenv("LOG_DIR")
-	serverName = os.Getenv("SERVER_NAME")
-	basePath   = os.Getenv("BASE_PATH")
+	bindAddr               = os.Getenv("BIND_ADDRESS")
+	dataSource             = os.Getenv("DATABASE")
+	logDir                 = os.Getenv("LOG_DIR")
+	serverName             = os.Getenv("SERVER_NAME")
+	basePath               = os.Getenv("BASE_PATH")
+	maxFileSizeBytesString = os.Getenv("MAX_FILE_SIZE_BYTES")
 )
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 	if serverName == "" {
 		serverName = "localhost"
 	}
-	maxFileSizeBytes, err := strconv.ParseInt(os.Getenv("MAX_FILE_SIZE_BYTES"), 10, 64)
+	maxFileSizeBytes, err := strconv.ParseInt(maxFileSizeBytesString, 10, 64)
 	if err != nil {
 		maxFileSizeBytes = 10 * 1024 * 1024
 		log.Infof("Failed to parse MAX_FILE_SIZE_BYTES. Defaulting to %v bytes.", maxFileSizeBytes)
