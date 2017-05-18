@@ -148,6 +148,6 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 
 // make a util.JSONRequestHandler function into an http.Handler.
 func makeAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
-	h := util.NewJSONRequestHander(f)
+	h := util.NewJSONRequestHandler(f)
 	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
 }
