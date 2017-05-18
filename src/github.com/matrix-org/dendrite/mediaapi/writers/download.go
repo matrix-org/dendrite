@@ -166,6 +166,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin types.ServerName,
 		r.respondFromRemoteFile(w, cfg.BasePath, cfg.MaxFileSize, db, activeRemoteRequests)
 	} else {
 		// If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
+		r.Logger.Warnln("Failed to look up file in database:", err)
 		r.jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -187,6 +188,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, basePath t
 	file, err := os.Open(filePath)
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
+		r.Logger.Warnln("Failed to open file:", err)
 		r.jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -197,6 +199,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, basePath t
 	stat, err := file.Stat()
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
+		r.Logger.Warnln("Failed to stat file:", err)
 		r.jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -259,6 +262,7 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONRespo
 	if resp.StatusCode != 200 {
 		r.Logger.Printf("Server responded with %d\n", resp.StatusCode)
 		if resp.StatusCode == 404 {
+			r.Logger.Warnln("Remote server says file does not exist")
 			return nil, &util.JSONResponse{
 				Code: 404,
 				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
