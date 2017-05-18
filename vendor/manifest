@@ -90,9 +90,15 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/matrix-org/gomatrix",
+			"repository": "https://github.com/matrix-org/gomatrix",
+			"revision": "27ae91d1b3a3be1d83864c6c4dc38c2297f11aae",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
-			"revision": "9c075cb699ceb64cacd9136a0e7a0e0ff3dc9bcf",
+			"revision": "8e7504f3b62366e621525c962314f53c045512e3",
 			"branch": "master"
 		},
 		{
