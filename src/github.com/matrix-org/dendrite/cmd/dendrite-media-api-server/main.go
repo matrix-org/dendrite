@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
+	"github.com/matrix-org/dendrite/mediaapi/types"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -30,6 +31,7 @@ var (
 	bindAddr   = os.Getenv("BIND_ADDRESS")
 	dataSource = os.Getenv("DATABASE")
 	logDir     = os.Getenv("LOG_DIR")
+	serverName = os.Getenv("SERVER_NAME")
 )
 
 func main() {
@@ -39,8 +41,12 @@ func main() {
 		log.Panic("No BIND_ADDRESS environment variable found.")
 	}
 
+	if serverName == "" {
+		serverName = "localhost"
+	}
+
 	cfg := &config.MediaAPI{
-		ServerName:  "localhost",
+		ServerName:  types.ServerName(serverName),
 		BasePath:    "/Users/robertsw/dendrite",
 		MaxFileSize: 10 * 1024 * 1024,
 		DataSource:  dataSource,
