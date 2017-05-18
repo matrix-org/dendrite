@@ -32,6 +32,7 @@ var (
 	dataSource = os.Getenv("DATABASE")
 	logDir     = os.Getenv("LOG_DIR")
 	serverName = os.Getenv("SERVER_NAME")
+	basePath   = os.Getenv("BASE_PATH")
 )
 
 func main() {
@@ -40,6 +41,9 @@ func main() {
 	if bindAddr == "" {
 		log.Panic("No BIND_ADDRESS environment variable found.")
 	}
+	if basePath == "" {
+		log.Panic("No BASE_PATH environment variable found.")
+	}
 
 	if serverName == "" {
 		serverName = "localhost"
@@ -47,7 +51,7 @@ func main() {
 
 	cfg := &config.MediaAPI{
 		ServerName:  types.ServerName(serverName),
-		BasePath:    "/Users/robertsw/dendrite",
+		BasePath:    types.Path(basePath),
 		MaxFileSize: 10 * 1024 * 1024,
 		DataSource:  dataSource,
 	}
