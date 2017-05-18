@@ -94,6 +94,13 @@ type uploadResponse struct {
 	ContentURI string `json:"content_uri"`
 }
 
+func removeDir(dir types.Path, logger *log.Entry) {
+	dirErr := os.RemoveAll(string(dir))
+	if dirErr != nil {
+		logger.Warnf("Failed to remove directory (%v): %q\n", dir, dirErr)
+	}
+}
+
 // Upload implements /upload
 //
 // This endpoint involves uploading potentially significant amounts of data to the homeserver.
@@ -161,10 +168,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	bytesWritten, err := io.Copy(writer, reader)
 	if err != nil {
 		logger.Warnf("Failed to copy %q\n", err)
-		tmpDirErr := os.RemoveAll(string(tmpDir))
-		if tmpDirErr != nil {
-			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
-		}
+		removeDir(tmpDir, logger)
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
@@ -192,10 +196,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
 	err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, &types.MediaMetadata{})
 	if err == nil {
-		tmpDirErr := os.RemoveAll(string(tmpDir))
-		if tmpDirErr != nil {
-			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
-		}
+		removeDir(tmpDir, logger)
 		return util.JSONResponse{
 			Code: 200,
 			JSON: uploadResponse{
@@ -211,10 +212,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	err = db.StoreMediaMetadata(r.MediaMetadata)
 	if err != nil {
 		logger.Warnf("Failed to store metadata: %q\n", err)
-		tmpDirErr := os.RemoveAll(string(tmpDir))
-		if tmpDirErr != nil {
-			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
-		}
+		removeDir(tmpDir, logger)
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
@@ -227,10 +225,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	)
 	if err != nil {
 		logger.Warnf("Failed to move file to final destination: %q\n", err)
-		tmpDirErr := os.RemoveAll(string(tmpDir))
-		if tmpDirErr != nil {
-			logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
-		}
+		removeDir(tmpDir, logger)
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
