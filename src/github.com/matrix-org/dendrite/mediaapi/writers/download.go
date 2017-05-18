@@ -297,7 +297,10 @@ func copyToActiveAndPassive(r io.Reader, wActive io.Writer, wPassive io.Writer, 
 				break
 			}
 			bytesResponded += int64(bytesTemp)
-			if copyError == nil || (copyError != errFileIsTooLarge && copyError != errWrite) {
+			if copyError == nil {
+				// Note: if we get here then copyError != errFileIsTooLarge && copyError != errWrite
+				//   as if copyError == errResponse || copyError == errWrite then we would have broken
+				//   out of the loop and there are no other cases
 				// if larger than maxFileSize then stop writing to disk and discard cached file
 				if bytesWritten+int64(len(buffer)) > int64(maxFileSize) {
 					copyError = errFileIsTooLarge
