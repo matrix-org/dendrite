@@ -47,7 +47,9 @@ func (d *Database) StoreMediaMetadata(mediaMetadata *types.MediaMetadata) error 
 	return d.statements.insertMedia(mediaMetadata)
 }
 
-// GetMediaMetadata possibly selects the metadata about previously uploaded media from the database.
+// GetMediaMetadata returns metadata about media stored on this server. The media could
+// have been uploaded to this server or fetched from another server and cached here.
+// Returns sql.ErrNoRows if there is no metadata associated with this media.
 func (d *Database) GetMediaMetadata(mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) (*types.MediaMetadata, error) {
 	return d.statements.selectMedia(mediaID, mediaOrigin)
 }
