@@ -31,7 +31,7 @@ func LocalKeys(req *http.Request, cfg config.FederationAPI) util.JSONResponse {
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	return util.JSONResponse{JSON: keys}
+	return util.JSONResponse{Code: 200, JSON: keys}
 }
 
 func localKeys(cfg config.FederationAPI, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
