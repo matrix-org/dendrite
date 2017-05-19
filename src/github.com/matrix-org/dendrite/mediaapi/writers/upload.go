@@ -162,6 +162,8 @@ func writeFileWithLimitAndHash(r io.Reader, cfg *config.MediaAPI, logger *log.En
 	// integrity checks on the file data in the repository. The hash gets used as
 	// the MediaID.
 	hasher := sha256.New()
+	// A TeeReader is used to allow us to read from the limitedBody and simultaneously
+	// write to the hasher here and to the http.ResponseWriter via the io.Copy call below.
 	reader := io.TeeReader(limitedBody, hasher)
 
 	bytesWritten, err := io.Copy(writer, reader)
