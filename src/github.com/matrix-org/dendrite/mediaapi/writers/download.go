@@ -388,6 +388,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 		types.Path(finalPath),
 	)
 	if err != nil {
+		r.Logger.Warnf("Failed to move file to final destination: %q\n", err)
 		tmpDirErr := os.RemoveAll(string(tmpDir))
 		if tmpDirErr != nil {
 			r.Logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)

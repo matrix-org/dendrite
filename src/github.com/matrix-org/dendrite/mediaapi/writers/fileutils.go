@@ -33,13 +33,11 @@ import (
 func createTempDir(baseDirectory types.Path) (types.Path, error) {
 	baseTmpDir := path.Join(string(baseDirectory), "tmp")
 	if err := os.MkdirAll(baseTmpDir, 0770); err != nil {
-		log.Printf("Failed to create base temp dir: %v\n", err)
-		return "", err
+		return "", fmt.Errorf("Failed to create base temp dir: %v", err)
 	}
 	tmpDir, err := ioutil.TempDir(baseTmpDir, "")
 	if err != nil {
-		log.Printf("Failed to create temp dir: %v\n", err)
-		return "", err
+		return "", fmt.Errorf("Failed to create temp dir: %v", err)
 	}
 	return types.Path(tmpDir), nil
 }
@@ -50,8 +48,7 @@ func createFileWriter(directory types.Path, filename types.Filename) (*bufio.Wri
 	filePath := path.Join(string(directory), string(filename))
 	file, err := os.Create(filePath)
 	if err != nil {
-		log.Printf("Failed to create file: %v\n", err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Failed to create file: %v", err)
 	}
 
 	return bufio.NewWriter(file), file, nil
@@ -60,7 +57,7 @@ func createFileWriter(directory types.Path, filename types.Filename) (*bufio.Wri
 func createTempFileWriter(absBasePath types.Path, logger *log.Entry) (*bufio.Writer, *os.File, types.Path, *util.JSONResponse) {
 	tmpDir, err := createTempDir(absBasePath)
 	if err != nil {
-		logger.Infof("Failed to create temp dir %q\n", err)
+		logger.Warnf("Failed to create temp dir: %q\n", err)
 		return nil, nil, "", &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
@@ -68,7 +65,7 @@ func createTempFileWriter(absBasePath types.Path, logger *log.Entry) (*bufio.Wri
 	}
 	writer, tmpFile, err := createFileWriter(tmpDir, "content")
 	if err != nil {
-		logger.Infof("Failed to create file writer %q\n", err)
+		logger.Warnf("Failed to create file writer: %q\n", err)
 		return nil, nil, "", &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
@@ -126,13 +123,11 @@ func moveFile(src types.Path, dst types.Path) error {
 
 	err := os.MkdirAll(dstDir, 0770)
 	if err != nil {
-		log.Printf("Failed to make directory: %q", err)
-		return err
+		return fmt.Errorf("Failed to make directory: %q", err)
 	}
 	err = os.Rename(string(src), string(dst))
 	if err != nil {
-		log.Printf("Failed to move directory: %q", err)
-		return err
+		return fmt.Errorf("Failed to move directory: %q", err)
 	}
 	return nil
 }
