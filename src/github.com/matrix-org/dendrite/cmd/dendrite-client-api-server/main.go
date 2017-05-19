@@ -81,7 +81,7 @@ func main() {
 	}
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
-	accountDB, err := storage.NewAccountDatabase("", serverName)
+	accountDB, err := storage.NewAccountDatabase(accountDataSource, serverName)
 	if err != nil {
 		log.Panicf("Failed to setup account database(%s): %s", accountDataSource, err.Error())
 	}

@@ -19,6 +19,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
+	// Import the postgres database driver.
+	_ "github.com/lib/pq"
 )
 
 // AccountDatabase represents an account database
