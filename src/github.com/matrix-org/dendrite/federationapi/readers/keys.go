@@ -24,6 +24,16 @@ import (
 	"time"
 )
 
+// LocalKeys returns the local keys for the server.
+// See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
+func LocalKeys(req *http.Request, cfg config.FederationAPI) util.JSONResponse {
+	keys, err := localKeys(cfg, time.Now().Add(cfg.ValidityPeriod))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	return util.JSONResponse{JSON: keys}
+}
+
 func localKeys(cfg config.FederationAPI, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
 
@@ -53,13 +63,4 @@ func localKeys(cfg config.FederationAPI, validUntil time.Time) (*gomatrixserverl
 	}
 
 	return &keys, nil
-}
-
-// LocalKeys returns the local keys for the server.
-func LocalKeys(req *http.Request, cfg config.FederationAPI) util.JSONResponse {
-	keys, err := localKeys(cfg, time.Now().Add(cfg.ValidityPeriod))
-	if err != nil {
-		return util.ErrorResponse(err)
-	}
-	return util.JSONResponse{JSON: keys}
 }
