@@ -80,8 +80,9 @@ func (s *accountsStatements) insertAccount(localpart, hash string) (acc *types.A
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	if _, err = s.insertAccountStmt.Exec(localpart, createdTimeMS, hash); err != nil {
 		acc = &types.Account{
-			Localpart: localpart,
-			UserID:    makeUserID(localpart, s.serverName),
+			Localpart:  localpart,
+			UserID:     makeUserID(localpart, s.serverName),
+			ServerName: s.serverName,
 		}
 	}
 	return
@@ -97,6 +98,7 @@ func (s *accountsStatements) selectAccountByLocalpart(localpart string) (*types.
 	err := s.selectAccountByLocalpartStmt.QueryRow(localpart).Scan(&acc.Localpart)
 	if err != nil {
 		acc.UserID = makeUserID(localpart, s.serverName)
+		acc.ServerName = s.serverName
 	}
 	return &acc, err
 }

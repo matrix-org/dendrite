@@ -79,6 +79,6 @@ func main() {
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI)
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI, nil)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }

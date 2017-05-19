@@ -79,6 +79,12 @@ func UnknownToken(msg string) *MatrixError {
 	return &MatrixError{"M_UNKNOWN_TOKEN", msg}
 }
 
+// WeakPassword is an error which is returned when the client tries to register
+// using a weak password. http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
+func WeakPassword(msg string) *MatrixError {
+	return &MatrixError{"M_WEAK_PASSWORD", msg}
+}
+
 // LimitExceededError is a rate-limiting error.
 type LimitExceededError struct {
 	MatrixError
