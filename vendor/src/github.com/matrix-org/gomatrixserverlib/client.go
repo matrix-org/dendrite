@@ -40,8 +40,16 @@ type UserInfo struct {
 
 // NewClient makes a new Client
 func NewClient() *Client {
+	return &Client{client: http.Client{Transport: newFederationTripper()}}
+}
+
+type federationTripper struct {
+	transport http.RoundTripper
+}
+
+func newFederationTripper() *federationTripper {
 	// TODO: Verify ceritificates
-	tripper := federationTripper{
+	return &federationTripper{
 		transport: &http.Transport{
 			// Set our own DialTLS function to avoid the default net/http SNI.
 			// By default net/http and crypto/tls set the SNI to the target host.
@@ -66,14 +74,6 @@ func NewClient() *Client {
 			},
 		},
 	}
-
-	return &Client{
-		client: http.Client{Transport: &tripper},
-	}
-}
-
-type federationTripper struct {
-	transport http.RoundTripper
 }
 
 func makeHTTPSURL(u *url.URL, addr string) (httpsURL url.URL) {

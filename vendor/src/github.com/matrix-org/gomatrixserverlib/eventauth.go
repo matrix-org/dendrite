@@ -115,7 +115,7 @@ func StateNeededForEventBuilder(builder *EventBuilder) (result StateNeeded, err 
 	// Extract the 'content' object from the event if it is m.room.member as we need to know 'membership'
 	var content *memberContent
 	if builder.Type == "m.room.member" {
-		if err = json.Unmarshal(builder.content, &content); err != nil {
+		if err = json.Unmarshal(builder.Content, &content); err != nil {
 			err = errorf("unparsable member event content: %s", err.Error())
 			return
 		}
