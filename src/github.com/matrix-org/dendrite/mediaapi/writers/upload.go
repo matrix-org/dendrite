@@ -190,7 +190,9 @@ func writeFileWithLimitAndHash(r io.Reader, cfg *config.MediaAPI, logger *log.En
 
 // storeFileAndMetadata first moves a temporary file named content from tmpDir to its
 // final path (see getPathFromMediaMetadata for details.) Once the file is moved, the
-// metadata about the file is written into the media repository database.
+// metadata about the file is written into the media repository database. This order
+// of operations is important as it avoids metadata entering the database before the file
+// is ready and if we fail to move the file, it never gets added to the database.
 // In case of any error, appropriate files and directories are cleaned up a
 // util.JSONResponse error is returned.
 func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetadata *types.MediaMetadata, db *storage.Database, logger *log.Entry) *util.JSONResponse {
