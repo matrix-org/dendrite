@@ -19,13 +19,12 @@ import (
 	"os"
 	"strings"
 
-	"golang.org/x/crypto/ed25519"
-
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -36,6 +35,8 @@ var (
 	logDir               = os.Getenv("LOG_DIR")
 	roomserverURL        = os.Getenv("ROOMSERVER_URL")
 	clientAPIOutputTopic = os.Getenv("CLIENTAPI_OUTPUT_TOPIC")
+	serverName           = gomatrixserverlib.ServerName(os.Getenv("SERVER_NAME"))
+	serverKey            = os.Getenv("SERVER_KEY")
 )
 
 func main() {
@@ -53,21 +54,21 @@ func main() {
 	if clientAPIOutputTopic == "" {
 		log.Panic("No CLIENTAPI_OUTPUT_TOPIC environment variable found. This should match the roomserver input topic.")
 	}
-
-	// TODO: Rather than generating a new key on every startup, we should be
-	//       reading a PEM formatted file instead.
-	_, privKey, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		log.Panicf("Failed to generate private key: %s", err)
+	if serverName == "" {
+		serverName = "localhost"
 	}
 
 	cfg := config.ClientAPI{
-		ServerName:           "localhost",
-		KeyID:                "ed25519:something",
-		PrivateKey:           privKey,
+		ServerName:           serverName,
 		KafkaProducerURIs:    kafkaURIs,
 		ClientAPIOutputTopic: clientAPIOutputTopic,
 		RoomserverURL:        roomserverURL,
+	}
+
+	var err error
+	cfg.KeyID, cfg.PrivateKey, err = common.ReadKey(serverKey)
+	if err != nil {
+		log.Panicf("Failed to load private key: %s", err)
 	}
 
 	log.Info("Starting clientapi")
