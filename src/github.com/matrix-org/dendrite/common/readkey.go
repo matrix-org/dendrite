@@ -25,6 +25,10 @@ import (
 )
 
 // ReadKey reads a server's private ed25519 key.
+// If the key is the empty string then a random key is generated.
+// Otherwise the key is the key ID and the base64 encoded private key
+// separated by a single space character.
+// E.g "ed25519:abcd ABCDEFGHIJKLMNOPabcdefghijklmnop01234567890"
 func ReadKey(key string) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
 	var keyID gomatrixserverlib.KeyID
 	var seed io.Reader
