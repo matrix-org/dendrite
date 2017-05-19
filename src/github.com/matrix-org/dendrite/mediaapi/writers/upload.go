@@ -157,6 +157,10 @@ func writeFileWithLimitAndHash(r io.Reader, cfg *config.MediaAPI, logger *log.En
 	// The limited reader restricts how many bytes are read from the body to the specified maximum bytes
 	// Note: the golang HTTP server closes the request body
 	limitedBody := io.LimitReader(r, int64(cfg.MaxFileSizeBytes))
+	// The file data is hashed and the hash is returned. The hash is useful as a
+	// method of deduplicating files to save storage, as well as a way to conduct
+	// integrity checks on the file data in the repository. The hash gets used as
+	// the MediaID.
 	hasher := sha256.New()
 	reader := io.TeeReader(limitedBody, hasher)
 
@@ -243,6 +247,9 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Info("Uploading file")
 
+	// The file data is hashed and the hash is used as the MediaID. The hash is useful as a
+	// method of deduplicating files to save storage, as well as a way to conduct
+	// integrity checks on the file data in the repository.
 	hash, tmpDir, resErr := writeFileWithLimitAndHash(req.Body, cfg, logger, r.MediaMetadata.ContentLength)
 	if resErr != nil {
 		return *resErr
