@@ -219,8 +219,7 @@ func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetada
 		}
 	}
 
-	err = db.StoreMediaMetadata(mediaMetadata)
-	if err != nil {
+	if err = db.StoreMediaMetadata(mediaMetadata); err != nil {
 		logger.WithError(err).Warn("Failed to store metadata")
 		removeDir(types.Path(path.Dir(finalPath)), logger)
 		return &util.JSONResponse{
