@@ -78,29 +78,42 @@ func createTempFileWriter(absBasePath types.Path, logger *log.Entry) (*bufio.Wri
 // based on its origin and mediaID
 // If a mediaID is too short, which could happen for other homeserver implementations,
 // place it into a short-id subdirectory of the origin directory
-// If the mediaID is long enough, we split it in two using one part as a subdirectory
-// name and the other part as the file name. This is to allow storage of more files due
-// to filesystem limitations on the number of files in a directory. For example, if
-// mediaID is 'qwerty', we create subdirectory called 'qwe' and place the file in 'qwe'
-// and call it 'rty'.
+// If the mediaID is long enough, we split it into pieces, creating up to 2 subdirectories
+// for more manageable browsing and use the remainder as the file name. For example, if
+// mediaID is 'qwerty', we create subdirectories 'q', 'w' within 'q' and place the file
+// in 'q/w' calling it 'erty'. If the mediaID is shorter than 3 characters, the last
+// character is the file name and the preceding character, if any, is a subdirectory name.
 func getPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) (string, error) {
-	var subDir string
-	var fileName string
+	var subPath, fileName string
 
-	if len(m.MediaID) > 3 {
-		subDir = string(m.MediaID[:3])
-		fileName = string(m.MediaID[3:])
-	} else {
-		subDir = "short-id"
+	mediaIDLen := len(m.MediaID)
+
+	switch {
+	case mediaIDLen < 1:
+		return "", fmt.Errorf("Invalid filePath (MediaID too short): %q", m.MediaID)
+	case mediaIDLen < 2:
+		subPath = ""
 		fileName = string(m.MediaID)
+	case mediaIDLen < 3:
+		subPath = string(m.MediaID[0:1])
+		fileName = string(m.MediaID[1:])
+	default:
+		subPath = path.Join(
+			string(m.MediaID[0:1]),
+			string(m.MediaID[1:2]),
+		)
+		fileName = string(m.MediaID[2:])
 	}
 
 	filePath, err := filepath.Abs(path.Join(
 		string(absBasePath),
 		string(m.Origin),
-		subDir,
+		subPath,
 		fileName,
 	))
+	if err != nil {
+		return "", fmt.Errorf("Unable to construct filePath: %q", err)
+	}
 
 	// FIXME:
 	// - validate origin
@@ -110,7 +123,7 @@ func getPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) (s
 	// check if the absolute absBasePath is a prefix of the absolute filePath
 	// if so, no directory escape has occurred and the filePath is valid
 	// Note: absBasePath is already absolute
-	if err != nil || strings.HasPrefix(filePath, string(absBasePath)) == false {
+	if strings.HasPrefix(filePath, string(absBasePath)) == false {
 		return "", fmt.Errorf("Invalid filePath (not within absBasePath %v): %v", absBasePath, filePath)
 	}
 
