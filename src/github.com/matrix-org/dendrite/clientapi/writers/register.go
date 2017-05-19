@@ -29,6 +29,7 @@ type registerRequest struct {
 type authDict struct {
 	Type    types.LoginType `json:"type"`
 	Session string          `json:"session"`
+	// TODO: Lots of custom keys depending on the type
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
@@ -106,7 +107,8 @@ func Register(req *http.Request, accountDB *storage.AccountDatabase) util.JSONRe
 	if r.Auth.Type == "" {
 		return util.JSONResponse{
 			Code: 401,
-			// Hard-coded 'dummy' auth for now with a bogus session ID.
+			// TODO: Hard-coded 'dummy' auth for now with a bogus session ID.
+			//       Server admins should be able to change things around (eg enable captcha)
 			JSON: newUserInteractiveResponse("totallyuniquesessionid", []flow{
 				flow{[]types.LoginType{types.LoginTypeDummy}},
 			}),

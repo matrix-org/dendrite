@@ -5,7 +5,5 @@ type LoginType string
 
 // The relevant login types implemented in Dendrite
 const (
-	LoginTypeDummy     = "m.login.dummy"
-	LoginTypeRecaptcha = "m.login.recaptcha"
-	LoginTypePassword  = "m.login.password"
+	LoginTypeDummy = "m.login.dummy"
 )
