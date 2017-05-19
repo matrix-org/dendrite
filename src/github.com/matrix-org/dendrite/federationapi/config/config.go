@@ -31,6 +31,9 @@ type FederationAPI struct {
 	KeyID gomatrixserverlib.KeyID
 	// A list of SHA256 TLS fingerprints for this server.
 	TLSFingerPrints []gomatrixserverlib.TLSFingerprint
-	// How long the keys are valid for.
+	// How long a remote server can cache our server key for before requesting it again.
+	// Increasing this number will reduce the number of requests made by remote servers
+	// for our key, but increases the period a compromised key will be considered valid
+	// by remote servers.
 	ValidityPeriod time.Duration
 }
