@@ -97,7 +97,7 @@ type uploadResponse struct {
 func removeDir(dir types.Path, logger *log.Entry) {
 	dirErr := os.RemoveAll(string(dir))
 	if dirErr != nil {
-		logger.Warnf("Failed to remove directory (%v): %q\n", dir, dirErr)
+		logger.WithError(dirErr).WithField("dir", dir).Warn("Failed to remove directory")
 	}
 }
 
@@ -168,7 +168,7 @@ func writeFileWithLimitAndHash(r io.Reader, cfg *config.MediaAPI, logger *log.En
 
 	bytesWritten, err := io.Copy(writer, reader)
 	if err != nil {
-		logger.Warnf("Failed to copy %q\n", err)
+		logger.WithError(err).Warn("Failed to copy")
 		removeDir(tmpDir, logger)
 		return nil, "", &util.JSONResponse{
 			Code: 400,
@@ -179,7 +179,10 @@ func writeFileWithLimitAndHash(r io.Reader, cfg *config.MediaAPI, logger *log.En
 	writer.Flush()
 
 	if bytesWritten != int64(contentLength) {
-		logger.Warnf("Bytes uploaded (%v) != claimed Content-Length (%v)", bytesWritten, contentLength)
+		logger.WithFields(log.Fields{
+			"bytesWritten":  bytesWritten,
+			"contentLength": contentLength,
+		}).Warn("Fewer bytes written than expected")
 	}
 
 	return hasher.Sum(nil), tmpDir, nil
@@ -193,7 +196,7 @@ func writeFileWithLimitAndHash(r io.Reader, cfg *config.MediaAPI, logger *log.En
 func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetadata *types.MediaMetadata, db *storage.Database, logger *log.Entry) *util.JSONResponse {
 	finalPath, err := getPathFromMediaMetadata(mediaMetadata, absBasePath)
 	if err != nil {
-		logger.Warnf("Failed to get file path from metadata: %q\n", err)
+		logger.WithError(err).Warn("Failed to get file path from metadata")
 		removeDir(tmpDir, logger)
 		return &util.JSONResponse{
 			Code: 400,
@@ -206,7 +209,7 @@ func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetada
 		types.Path(finalPath),
 	)
 	if err != nil {
-		logger.Warnf("Failed to move file to final destination: %q\n", err)
+		logger.WithError(err).WithField("dst", finalPath).Warn("Failed to move file to final destination")
 		removeDir(tmpDir, logger)
 		return &util.JSONResponse{
 			Code: 400,
@@ -216,7 +219,7 @@ func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetada
 
 	err = db.StoreMediaMetadata(mediaMetadata)
 	if err != nil {
-		logger.Warnf("Failed to store metadata: %q\n", err)
+		logger.WithError(err).Warn("Failed to store metadata")
 		removeDir(types.Path(path.Dir(finalPath)), logger)
 		return &util.JSONResponse{
 			Code: 400,
@@ -279,7 +282,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 			},
 		}
 	} else if err != sql.ErrNoRows {
-		logger.Warnf("Failed to query database for %v: %q", r.MediaMetadata.MediaID, err)
+		logger.WithError(err).WithField("MediaID", r.MediaMetadata.MediaID).Warn("Failed to query database")
 	}
 
 	// TODO: generate thumbnails

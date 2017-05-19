@@ -145,7 +145,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 					r.Logger.WithFields(log.Fields{
 						"MediaID": r.MediaMetadata.MediaID,
 						"Origin":  r.MediaMetadata.Origin,
-					}).Warnf("Other goroutines are trying to download the remote file and failing.")
+					}).Warn("Other goroutines are trying to download the remote file and failing.")
 					r.jsonErrorResponse(w, util.JSONResponse{
 						Code: 500,
 						JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
@@ -156,7 +156,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 				r.Logger.WithFields(log.Fields{
 					"Origin":  r.MediaMetadata.Origin,
 					"MediaID": r.MediaMetadata.MediaID,
-				}).Infof("Waiting for another goroutine to fetch the remote file.")
+				}).Info("Waiting for another goroutine to fetch the remote file.")
 				activeRemoteRequestCondition.Wait()
 				activeRemoteRequests.Unlock()
 			} else {
@@ -169,7 +169,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 		r.respondFromRemoteFile(w, cfg.AbsBasePath, cfg.MaxFileSizeBytes, db, activeRemoteRequests)
 	} else {
 		// If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
-		r.Logger.Warnln("Failed to look up file in database:", err)
+		r.Logger.WithError(err).Warn("Failed to look up file in database")
 		r.jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -190,7 +190,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 	filePath, err := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
-		r.Logger.Warnln("Failed to get file path from metadata:", err)
+		r.Logger.WithError(err).Warn("Failed to get file path from metadata")
 		r.jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -200,7 +200,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 	file, err := os.Open(filePath)
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
-		r.Logger.Warnln("Failed to open file:", err)
+		r.Logger.WithError(err).Warn("Failed to open file")
 		r.jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -211,7 +211,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 	stat, err := file.Stat()
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
-		r.Logger.Warnln("Failed to stat file:", err)
+		r.Logger.WithError(err).Warn("Failed to stat file")
 		r.jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -220,7 +220,10 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 	}
 
 	if r.MediaMetadata.ContentLength > 0 && int64(r.MediaMetadata.ContentLength) != stat.Size() {
-		r.Logger.Warnf("File size in database (%v) and on disk (%v) differ.", r.MediaMetadata.ContentLength, stat.Size())
+		r.Logger.WithFields(log.Fields{
+			"contentLength": r.MediaMetadata.ContentLength,
+			"fileSize":      stat.Size(),
+		}).Warn("Content-Length in database and on-disk file size differ.")
 		// FIXME: Remove erroneous file from database?
 	}
 
@@ -234,7 +237,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
 	if bytesResponded, err := io.Copy(w, file); err != nil {
-		r.Logger.Warnf("Failed to copy from cache %v\n", err)
+		r.Logger.WithError(err).Warn("Failed to copy from cache")
 		if bytesResponded == 0 {
 			r.jsonErrorResponse(w, util.JSONResponse{
 				Code: 500,
@@ -249,7 +252,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONResponse) {
 	urls := getMatrixUrls(r.MediaMetadata.Origin)
 
-	r.Logger.Printf("Connecting to remote %q\n", urls[0])
+	r.Logger.WithField("URL", urls[0]).Info("Connecting to remote")
 
 	remoteReqAddr := urls[0] + "/_matrix/media/v1/download/" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
 	remoteReq, err := http.NewRequest("GET", remoteReqAddr, nil)
@@ -272,9 +275,17 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONRespo
 	}
 
 	if resp.StatusCode != 200 {
-		r.Logger.Printf("Server responded with %d\n", resp.StatusCode)
+		r.Logger.WithFields(log.Fields{
+			"Origin":     r.MediaMetadata.Origin,
+			"MediaID":    r.MediaMetadata.MediaID,
+			"StatusCode": resp.StatusCode,
+		}).Info("Received error response")
 		if resp.StatusCode == 404 {
-			r.Logger.Warnln("Remote server says file does not exist")
+			r.Logger.WithFields(log.Fields{
+				"Origin":     r.MediaMetadata.Origin,
+				"MediaID":    r.MediaMetadata.MediaID,
+				"StatusCode": resp.StatusCode,
+			}).Warn("Remote server says file does not exist")
 			return nil, &util.JSONResponse{
 				Code: 404,
 				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -339,15 +350,24 @@ func copyToActiveAndPassive(r io.Reader, wActive io.Writer, wPassive io.Writer, 
 }
 
 func (r *downloadRequest) closeConnection(w http.ResponseWriter) {
-	r.Logger.Println("Attempting to close the connection.")
+	r.Logger.WithFields(log.Fields{
+		"Origin":  r.MediaMetadata.Origin,
+		"MediaID": r.MediaMetadata.MediaID,
+	}).Info("Attempting to close the connection.")
 	hijacker, ok := w.(http.Hijacker)
 	if ok {
 		connection, _, hijackErr := hijacker.Hijack()
 		if hijackErr == nil {
-			r.Logger.Println("Closing")
+			r.Logger.WithFields(log.Fields{
+				"Origin":  r.MediaMetadata.Origin,
+				"MediaID": r.MediaMetadata.MediaID,
+			}).Info("Closing")
 			connection.Close()
 		} else {
-			r.Logger.Printf("Error trying to hijack: %v", hijackErr)
+			r.Logger.WithError(hijackErr).WithFields(log.Fields{
+				"Origin":  r.MediaMetadata.Origin,
+				"MediaID": r.MediaMetadata.MediaID,
+			}).Warn("Error trying to hijack and close connection")
 		}
 	}
 }
@@ -370,15 +390,15 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 		"Content-Length":      r.MediaMetadata.ContentLength,
 		"Content-Type":        r.MediaMetadata.ContentType,
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
-	}).Infof("Storing file metadata to media repository database")
+	}).Info("Storing file metadata to media repository database")
 
 	// The database is the source of truth so we need to have moved the file first
 	finalPath, err := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
 	if err != nil {
-		r.Logger.Warnf("Failed to get file path from metadata: %q\n", err)
+		r.Logger.WithError(err).Warn("Failed to get file path from metadata")
 		tmpDirErr := os.RemoveAll(string(tmpDir))
 		if tmpDirErr != nil {
-			r.Logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+			r.Logger.WithError(tmpDirErr).WithField("dir", tmpDir).Warn("Failed to remove tmpDir")
 		}
 		return updateActiveRemoteRequests
 	}
@@ -388,10 +408,10 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 		types.Path(finalPath),
 	)
 	if err != nil {
-		r.Logger.Warnf("Failed to move file to final destination: %q\n", err)
+		r.Logger.WithError(err).WithField("dst", finalPath).Warn("Failed to move file to final destination")
 		tmpDirErr := os.RemoveAll(string(tmpDir))
 		if tmpDirErr != nil {
-			r.Logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+			r.Logger.WithError(tmpDirErr).WithField("dir", tmpDir).Warn("Failed to remove tmpDir")
 		}
 		return updateActiveRemoteRequests
 	}
@@ -410,7 +430,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 		finalDir := path.Dir(finalPath)
 		finalDirErr := os.RemoveAll(finalDir)
 		if finalDirErr != nil {
-			r.Logger.Warnf("Failed to remove finalDir (%v): %q\n", finalDir, finalDirErr)
+			r.Logger.WithError(finalDirErr).WithField("dir", finalDir).Warn("Failed to remove finalDir")
 		}
 		completeRemoteRequest(activeRemoteRequests, mxcURL)
 		return updateActiveRemoteRequests
@@ -418,15 +438,15 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	r.Logger.WithFields(log.Fields{
 		"Origin":  r.MediaMetadata.Origin,
 		"MediaID": r.MediaMetadata.MediaID,
-	}).Infof("Signalling other goroutines waiting for us to fetch the file.")
+	}).Info("Signalling other goroutines waiting for us to fetch the file.")
 	completeRemoteRequest(activeRemoteRequests, mxcURL)
 	return updateActiveRemoteRequests
 }
 
 func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePath types.Path, maxFileSizeBytes types.ContentLength, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	r.Logger.WithFields(log.Fields{
-		"MediaID": r.MediaMetadata.MediaID,
 		"Origin":  r.MediaMetadata.Origin,
+		"MediaID": r.MediaMetadata.MediaID,
 	}).Infof("Fetching remote file")
 
 	mxcURL := "mxc://" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
@@ -455,7 +475,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 	// get metadata from request and set metadata on response
 	contentLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
 	if err != nil {
-		r.Logger.Warn("Failed to parse content length")
+		r.Logger.WithError(err).Warn("Failed to parse content length")
 	}
 	r.MediaMetadata.ContentLength = types.ContentLength(contentLength)
 
@@ -505,10 +525,10 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 		if fetchError == errFileIsTooLarge {
 			logFields["MaxFileSizeBytes"] = maxFileSizeBytes
 		}
-		r.Logger.WithFields(logFields).Warnln(fetchError)
+		r.Logger.WithError(fetchError).WithFields(logFields).Warn("Error while fetching file")
 		tmpDirErr := os.RemoveAll(string(tmpDir))
 		if tmpDirErr != nil {
-			r.Logger.Warnf("Failed to remove tmpDir (%v): %q\n", tmpDir, tmpDirErr)
+			r.Logger.WithError(tmpDirErr).WithField("dir", tmpDir).Warn("Failed to remove tmpDir")
 		}
 		// Note: if we have responded with any data in the body at all then we have already sent 200 OK and we can only abort at this point
 		if bytesResponded < 1 {

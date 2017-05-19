@@ -50,7 +50,7 @@ func main() {
 	}
 	absBasePath, err := filepath.Abs(basePath)
 	if err != nil {
-		log.Panicf("BASE_PATH is invalid (must be able to make absolute): %v\n", err)
+		log.WithError(err).WithField("BASE_PATH", basePath).Panic("BASE_PATH is invalid (must be able to make absolute)")
 	}
 
 	if serverName == "" {
@@ -59,7 +59,7 @@ func main() {
 	maxFileSizeBytes, err := strconv.ParseInt(maxFileSizeBytesString, 10, 64)
 	if err != nil {
 		maxFileSizeBytes = 10 * 1024 * 1024
-		log.Infof("Failed to parse MAX_FILE_SIZE_BYTES. Defaulting to %v bytes.", maxFileSizeBytes)
+		log.WithError(err).WithField("MAX_FILE_SIZE_BYTES", maxFileSizeBytesString).Warnf("Failed to parse MAX_FILE_SIZE_BYTES. Defaulting to %v bytes.", maxFileSizeBytes)
 	}
 
 	cfg := &config.MediaAPI{
@@ -71,10 +71,17 @@ func main() {
 
 	db, err := storage.Open(cfg.DataSource)
 	if err != nil {
-		log.Panicln("Failed to open database:", err)
+		log.WithError(err).Panic("Failed to open database")
 	}
 
-	log.Info("Starting mediaapi")
+	log.WithFields(log.Fields{
+		"BASE_PATH":           absBasePath,
+		"BIND_ADDRESS":        bindAddr,
+		"DATABASE":            dataSource,
+		"LOG_DIR":             logDir,
+		"MAX_FILE_SIZE_BYTES": maxFileSizeBytes,
+		"SERVER_NAME":         serverName,
+	}).Info("Starting mediaapi")
 
 	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, db)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))

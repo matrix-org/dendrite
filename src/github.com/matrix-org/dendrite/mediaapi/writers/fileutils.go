@@ -57,7 +57,7 @@ func createFileWriter(directory types.Path, filename types.Filename) (*bufio.Wri
 func createTempFileWriter(absBasePath types.Path, logger *log.Entry) (*bufio.Writer, *os.File, types.Path, *util.JSONResponse) {
 	tmpDir, err := createTempDir(absBasePath)
 	if err != nil {
-		logger.Warnf("Failed to create temp dir: %q\n", err)
+		logger.WithError(err).WithField("dir", tmpDir).Warn("Failed to create temp dir")
 		return nil, nil, "", &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
@@ -65,7 +65,7 @@ func createTempFileWriter(absBasePath types.Path, logger *log.Entry) (*bufio.Wri
 	}
 	writer, tmpFile, err := createFileWriter(tmpDir, "content")
 	if err != nil {
-		logger.Warnf("Failed to create file writer: %q\n", err)
+		logger.WithError(err).Warn("Failed to create file writer")
 		return nil, nil, "", &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
