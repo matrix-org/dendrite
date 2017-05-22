@@ -90,9 +90,15 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/matrix-org/gomatrix",
+			"repository": "https://github.com/matrix-org/gomatrix",
+			"revision": "27ae91d1b3a3be1d83864c6c4dc38c2297f11aae",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
-			"revision": "9c075cb699ceb64cacd9136a0e7a0e0ff3dc9bcf",
+			"revision": "8e7504f3b62366e621525c962314f53c045512e3",
 			"branch": "master"
 		},
 		{
@@ -172,6 +178,20 @@
 			"repository": "https://github.com/sirupsen/logrus",
 			"revision": "61e43dc76f7ee59a82bdf3d71033dc12bea4c77d",
 			"branch": "master"
+		},
+		{
+			"importpath": "golang.org/x/crypto/bcrypt",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "0fe963104e9d1877082f8fb38f816fcd97eb1d10",
+			"branch": "master",
+			"path": "/bcrypt"
+		},
+		{
+			"importpath": "golang.org/x/crypto/blowfish",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "0fe963104e9d1877082f8fb38f816fcd97eb1d10",
+			"branch": "master",
+			"path": "/blowfish"
 		},
 		{
 			"importpath": "golang.org/x/crypto/ed25519",

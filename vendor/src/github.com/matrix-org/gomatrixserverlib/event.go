@@ -43,6 +43,8 @@ type EventReference struct {
 }
 
 // An EventBuilder is used to build a new event.
+// These can be exchanged between matrix servers in the federation APIs when
+// joining or leaving a room.
 type EventBuilder struct {
 	// The user ID of the user sending the event.
 	Sender string `json:"sender"`
@@ -60,20 +62,22 @@ type EventBuilder struct {
 	Redacts string `json:"redacts,omitempty"`
 	// The depth of the event, This should be one greater than the maximum depth of the previous events.
 	// The create event has a depth of 1.
-	Depth    int64 `json:"depth"`
-	content  []byte
-	unsigned []byte
+	Depth int64 `json:"depth"`
+	// The JSON object for "content" key of the event.
+	Content rawJSON `json:"content"`
+	// The JSON object for the "unsigned" key
+	Unsigned rawJSON `json:"unsigned,omitempty"`
 }
 
 // SetContent sets the JSON content key of the event.
 func (eb *EventBuilder) SetContent(content interface{}) (err error) {
-	eb.content, err = json.Marshal(content)
+	eb.Content, err = json.Marshal(content)
 	return
 }
 
 // SetUnsigned sets the JSON unsigned key of the event.
 func (eb *EventBuilder) SetUnsigned(unsigned interface{}) (err error) {
-	eb.unsigned, err = json.Marshal(unsigned)
+	eb.Unsigned, err = json.Marshal(unsigned)
 	return
 }
 
@@ -113,8 +117,6 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, 
 	var event struct {
 		EventBuilder
 		EventID        string     `json:"event_id"`
-		RawContent     rawJSON    `json:"content"`
-		RawUnsigned    rawJSON    `json:"unsigned,omitempty"`
 		OriginServerTS Timestamp  `json:"origin_server_ts"`
 		Origin         ServerName `json:"origin"`
 	}
@@ -125,8 +127,6 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, 
 	if event.AuthEvents == nil {
 		event.AuthEvents = emptyEventReferenceList
 	}
-	event.RawContent = rawJSON(event.content)
-	event.RawUnsigned = rawJSON(event.unsigned)
 	event.OriginServerTS = AsTimestamp(now)
 	event.Origin = origin
 	event.EventID = eventID

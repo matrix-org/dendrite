@@ -286,7 +286,7 @@ func testSyncServer(syncServerCmdChan chan error, userID, since, want string) {
 		if err != nil {
 			fmt.Println("=============================================================================================")
 			fmt.Println("sync server failed to run. If failing with 'pq: password authentication failed for user' try:")
-			fmt.Println("    export PGHOST=/var/run/postgresql\n")
+			fmt.Println("    export PGHOST=/var/run/postgresql")
 			fmt.Println("=============================================================================================")
 			panic(err)
 		}
