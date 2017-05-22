@@ -32,6 +32,9 @@ type ContentType string
 // Filename is a string representing the name of a file
 type Filename string
 
+// Base64Hash is a base64 URLEncoding string representation of a SHA-256 hash sum
+type Base64Hash string
+
 // Path is an absolute or relative UNIX filesystem path
 type Path string
 
@@ -56,6 +59,7 @@ type MediaMetadata struct {
 	ContentLength      ContentLength
 	CreationTimestamp  UnixMs
 	UploadName         Filename
+	Base64Hash         Base64Hash
 	UserID             MatrixUserID
 }
 

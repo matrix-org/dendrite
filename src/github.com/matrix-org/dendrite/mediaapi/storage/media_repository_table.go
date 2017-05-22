@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS media_repository (
     creation_ts BIGINT NOT NULL,
     -- The file name with which the media was uploaded.
     upload_name TEXT NOT NULL,
+    -- A golang base64 URLEncoding string representation of a SHA-256 hash sum of the file data.
+    base64hash TEXT NOT NULL,
     -- The user who uploaded the file. Should be a Matrix user ID.
     user_id TEXT NOT NULL
 );
@@ -49,12 +51,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS media_repository_index ON media_repository (me
 `
 
 const insertMediaSQL = `
-INSERT INTO media_repository (media_id, media_origin, content_type, content_disposition, content_length, creation_ts, upload_name, user_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO media_repository (media_id, media_origin, content_type, content_disposition, content_length, creation_ts, upload_name, base64hash, user_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 
 const selectMediaSQL = `
-SELECT content_type, content_disposition, content_length, creation_ts, upload_name, user_id FROM media_repository WHERE media_id = $1 AND media_origin = $2
+SELECT content_type, content_disposition, content_length, creation_ts, upload_name, base64hash, user_id FROM media_repository WHERE media_id = $1 AND media_origin = $2
 `
 
 type mediaStatements struct {
@@ -84,6 +86,7 @@ func (s *mediaStatements) insertMedia(mediaMetadata *types.MediaMetadata) error 
 		mediaMetadata.ContentLength,
 		mediaMetadata.CreationTimestamp,
 		mediaMetadata.UploadName,
+		mediaMetadata.Base64Hash,
 		mediaMetadata.UserID,
 	)
 	return err
@@ -102,6 +105,7 @@ func (s *mediaStatements) selectMedia(mediaID types.MediaID, mediaOrigin gomatri
 		&mediaMetadata.ContentLength,
 		&mediaMetadata.CreationTimestamp,
 		&mediaMetadata.UploadName,
+		&mediaMetadata.Base64Hash,
 		&mediaMetadata.UserID,
 	)
 	return &mediaMetadata, err

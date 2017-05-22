@@ -332,6 +332,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	r.Logger.WithFields(log.Fields{
 		"MediaID":             r.MediaMetadata.MediaID,
 		"Origin":              r.MediaMetadata.Origin,
+		"Base64Hash":          r.MediaMetadata.Base64Hash,
 		"UploadName":          r.MediaMetadata.UploadName,
 		"Content-Length":      r.MediaMetadata.ContentLength,
 		"Content-Type":        r.MediaMetadata.ContentType,
@@ -483,6 +484,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 	// request's response. bytesWritten is therefore used as it is what would be sent to clients when reading from the local
 	// file.
 	r.MediaMetadata.ContentLength = types.ContentLength(bytesWritten)
+	r.MediaMetadata.Base64Hash = hash
 	r.MediaMetadata.UserID = types.MatrixUserID("@:" + string(r.MediaMetadata.Origin))
 
 	updateActiveRemoteRequests = r.commitFileAndMetadata(tmpDir, absBasePath, activeRemoteRequests, db, mxcURL)

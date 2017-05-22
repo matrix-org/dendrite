@@ -220,11 +220,13 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	}
 
 	r.MediaMetadata.ContentLength = bytesWritten
+	r.MediaMetadata.Base64Hash = hash
 	r.MediaMetadata.MediaID = types.MediaID(hash)
 
 	logger.WithFields(log.Fields{
 		"MediaID":             r.MediaMetadata.MediaID,
 		"Origin":              r.MediaMetadata.Origin,
+		"Base64Hash":          r.MediaMetadata.Base64Hash,
 		"UploadName":          r.MediaMetadata.UploadName,
 		"Content-Length":      r.MediaMetadata.ContentLength,
 		"Content-Type":        r.MediaMetadata.ContentType,
