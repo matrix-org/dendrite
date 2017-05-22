@@ -118,12 +118,12 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 		return
 	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin != cfg.ServerName {
 		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
-		// The following code using activeRemoteRequests is avoiding duplication of fetches from the remote server in the case
-		// of multiple simultaneous incoming requests for the same remote file - it will be downloaded once, cached and served
-		// to all clients.
 
 		mxcURL := "mxc://" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
 
+		// The following code using activeRemoteRequests is avoiding duplication of fetches from the remote server in the case
+		// of multiple simultaneous incoming requests for the same remote file - it will be downloaded once, cached and served
+		// to all clients.
 		activeRemoteRequests.Lock()
 		mediaMetadata, err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 		if err == nil {
