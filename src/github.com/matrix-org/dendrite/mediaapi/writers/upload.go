@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/config"
+	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/util"
@@ -142,7 +143,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 // In case of any error, appropriate files and directories are cleaned up a
 // util.JSONResponse error is returned.
 func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetadata *types.MediaMetadata, db *storage.Database, logger *log.Entry) *util.JSONResponse {
-	finalPath, duplicate, err := moveFileWithHashCheck(tmpDir, mediaMetadata, absBasePath, logger)
+	finalPath, duplicate, err := fileutils.MoveFileWithHashCheck(tmpDir, mediaMetadata, absBasePath, logger)
 	if err != nil {
 		logger.WithError(err).Error("Failed to move file.")
 		return &util.JSONResponse{
@@ -160,7 +161,7 @@ func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetada
 		// there is valid metadata in the database for that file. As such we only
 		// remove the file if it is not a duplicate.
 		if duplicate == false {
-			removeDir(types.Path(path.Dir(finalPath)), logger)
+			fileutils.RemoveDir(types.Path(path.Dir(finalPath)), logger)
 		}
 		return &util.JSONResponse{
 			Code: 400,
@@ -197,18 +198,18 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	// bytesWritten is the total number of bytes written to disk
-	hash, _, bytesWritten, tmpDir, copyError := readAndHashAndWriteWithLimit(req.Body, cfg.MaxFileSizeBytes, cfg.AbsBasePath, nil)
+	hash, _, bytesWritten, tmpDir, copyError := fileutils.ReadAndHashAndWriteWithLimit(req.Body, cfg.MaxFileSizeBytes, cfg.AbsBasePath, nil)
 
 	if copyError != nil {
 		logFields := log.Fields{
 			"Origin":  r.MediaMetadata.Origin,
 			"MediaID": r.MediaMetadata.MediaID,
 		}
-		if copyError == errFileIsTooLarge {
+		if copyError == fileutils.ErrFileIsTooLarge {
 			logFields["MaxFileSizeBytes"] = cfg.MaxFileSizeBytes
 		}
 		logger.WithError(copyError).WithFields(logFields).Warn("Error while transferring file")
-		removeDir(tmpDir, logger)
+		fileutils.RemoveDir(tmpDir, logger)
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
@@ -233,7 +234,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	if err == nil {
 		r.MediaMetadata = mediaMetadata
-		removeDir(tmpDir, logger)
+		fileutils.RemoveDir(tmpDir, logger)
 		return util.JSONResponse{
 			Code: 200,
 			JSON: uploadResponse{

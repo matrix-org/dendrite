@@ -30,6 +30,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/config"
+	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -183,7 +184,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Infof("Downloading file")
 
-	filePath, err := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
+	filePath, err := fileutils.GetPathFromMediaMetadata(r.MediaMetadata, absBasePath)
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
 		r.Logger.WithError(err).Warn("Failed to get file path from metadata")
@@ -341,7 +342,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	}).Info("Storing file metadata to media repository database")
 
 	// The database is the source of truth so we need to have moved the file first
-	finalPath, duplicate, err := moveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
+	finalPath, duplicate, err := fileutils.MoveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to move file.")
 		return updateActiveRemoteRequests
@@ -367,7 +368,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 		// remove the file if it is not a duplicate.
 		if duplicate == false {
 			finalDir := path.Dir(finalPath)
-			removeDir(types.Path(finalDir), r.Logger)
+			fileutils.RemoveDir(types.Path(finalDir), r.Logger)
 		}
 		completeRemoteRequest(activeRemoteRequests, mxcURL)
 		return updateActiveRemoteRequests
@@ -447,18 +448,18 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 	// integrity checks on the file data in the repository.
 	// bytesResponded is the total number of bytes written to the response to the client request
 	// bytesWritten is the total number of bytes written to disk
-	hash, bytesResponded, bytesWritten, tmpDir, copyError := readAndHashAndWriteWithLimit(resp.Body, maxFileSizeBytes, absBasePath, w)
+	hash, bytesResponded, bytesWritten, tmpDir, copyError := fileutils.ReadAndHashAndWriteWithLimit(resp.Body, maxFileSizeBytes, absBasePath, w)
 
 	if copyError != nil {
 		logFields := log.Fields{
 			"MediaID": r.MediaMetadata.MediaID,
 			"Origin":  r.MediaMetadata.Origin,
 		}
-		if copyError == errFileIsTooLarge {
+		if copyError == fileutils.ErrFileIsTooLarge {
 			logFields["MaxFileSizeBytes"] = maxFileSizeBytes
 		}
 		r.Logger.WithError(copyError).WithFields(logFields).Warn("Error while transferring file")
-		removeDir(tmpDir, r.Logger)
+		fileutils.RemoveDir(tmpDir, r.Logger)
 		// Note: if we have responded with any data in the body at all then we have already sent 200 OK and we can only abort at this point
 		if bytesResponded < 1 {
 			r.jsonErrorResponse(w, util.JSONResponse{
