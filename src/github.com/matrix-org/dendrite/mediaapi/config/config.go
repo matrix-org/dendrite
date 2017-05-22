@@ -28,7 +28,7 @@ type MediaAPI struct {
 	// The maximum file size in bytes that is allowed to be stored on this server.
 	// Note that remote files larger than this can still be proxied to a client, they will just not be cached.
 	// Note: if MaxFileSizeBytes is set to 0, the size is unlimited.
-	MaxFileSizeBytes types.ContentLength `yaml:"max_file_size_bytes"`
+	MaxFileSizeBytes types.FileSizeBytes `yaml:"max_file_size_bytes"`
 	// The postgres connection config for connecting to the database e.g a postgres:// URI
 	DataSource string `yaml:"database"`
 }

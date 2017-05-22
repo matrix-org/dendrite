@@ -23,8 +23,8 @@ import (
 // ContentDisposition is an HTTP Content-Disposition header string
 type ContentDisposition string
 
-// ContentLength is an HTTP Content-Length header which is a number of bytes to be expected in a request body
-type ContentLength int64
+// FileSizeBytes is a file size in bytes
+type FileSizeBytes int64
 
 // ContentType is an HTTP Content-Type header string representing the MIME type of a request body
 type ContentType string
@@ -56,7 +56,7 @@ type MediaMetadata struct {
 	Origin             gomatrixserverlib.ServerName
 	ContentType        ContentType
 	ContentDisposition ContentDisposition
-	ContentLength      ContentLength
+	FileSizeBytes      FileSizeBytes
 	CreationTimestamp  UnixMs
 	UploadName         Filename
 	Base64Hash         Base64Hash

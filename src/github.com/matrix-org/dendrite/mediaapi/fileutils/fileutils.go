@@ -103,7 +103,7 @@ func writeToResponse(respWriter http.ResponseWriter, buffer []byte, bytesToWrite
 // writeToDiskAndHasher takes bytesToWrite bytes from buffer and writes them to tmpFileWriter and hasher.
 // Returns bytes written and an error. In case of error, including if writing would exceed maxFileSizeBytes,
 // the number of bytes written will be 0.
-func writeToDiskAndHasher(tmpFileWriter *bufio.Writer, hasher hash.Hash, bytesWritten int64, maxFileSizeBytes types.ContentLength, buffer []byte, bytesToWrite int) (int64, error) {
+func writeToDiskAndHasher(tmpFileWriter *bufio.Writer, hasher hash.Hash, bytesWritten int64, maxFileSizeBytes types.FileSizeBytes, buffer []byte, bytesToWrite int) (int64, error) {
 	// if larger than maxFileSizeBytes then stop writing to disk and discard cached file
 	if bytesWritten+int64(bytesToWrite) > int64(maxFileSizeBytes) {
 		return 0, ErrFileIsTooLarge
@@ -129,7 +129,7 @@ func writeToDiskAndHasher(tmpFileWriter *bufio.Writer, hasher hash.Hash, bytesWr
 // If a respWriter is provided, all the data will be proxied from the reqReader to
 // the respWriter, regardless of errors or limits on writing to disk.
 // Returns all of the hash sum, bytes written to disk, and temporary directory path, or an error.
-func ReadAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.ContentLength, absBasePath types.Path, respWriter http.ResponseWriter) (types.Base64Hash, types.ContentLength, types.ContentLength, types.Path, error) {
+func ReadAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.FileSizeBytes, absBasePath types.Path, respWriter http.ResponseWriter) (types.Base64Hash, types.FileSizeBytes, types.FileSizeBytes, types.Path, error) {
 	// create the temporary file writer
 	tmpFileWriter, tmpFile, tmpDir, err := createTempFileWriter(absBasePath)
 	if err != nil {
@@ -185,7 +185,7 @@ func ReadAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.Co
 	tmpFileWriter.Flush()
 
 	hash := hasher.Sum(nil)
-	return types.Base64Hash(base64.URLEncoding.EncodeToString(hash[:])), types.ContentLength(bytesResponded), types.ContentLength(bytesWritten), tmpDir, nil
+	return types.Base64Hash(base64.URLEncoding.EncodeToString(hash[:])), types.FileSizeBytes(bytesResponded), types.FileSizeBytes(bytesWritten), tmpDir, nil
 }
 
 // GetPathFromMediaMetadata validates and constructs the on-disk path to the media
@@ -257,8 +257,8 @@ func moveFile(src types.Path, dst types.Path) error {
 
 // MoveFileWithHashCheck attempts to move the file src to dst and checks for hash collisions based on metadata
 // Check if destination file exists. As the destination is based on a hash of the file data,
-// if it exists and the content length does not match then there is a hash collision for two different files. If
-// it exists and the content length matches, it is believable that it is the same file and we can just
+// if it exists and the file size does not match then there is a hash collision for two different files. If
+// it exists and the file size matches, it is believable that it is the same file and we can just
 // discard the temporary file.
 func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata, absBasePath types.Path, logger *log.Entry) (string, bool, error) {
 	duplicate := false
@@ -271,7 +271,7 @@ func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata
 	var stat os.FileInfo
 	if stat, err = os.Stat(finalPath); os.IsExist(err) {
 		duplicate = true
-		if stat.Size() == int64(mediaMetadata.ContentLength) {
+		if stat.Size() == int64(mediaMetadata.FileSizeBytes) {
 			RemoveDir(tmpDir, logger)
 			return finalPath, duplicate, nil
 		}

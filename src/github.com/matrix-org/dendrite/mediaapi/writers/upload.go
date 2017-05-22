@@ -40,16 +40,16 @@ type uploadRequest struct {
 }
 
 // Validate validates the uploadRequest fields
-func (r uploadRequest) Validate(maxFileSizeBytes types.ContentLength) *util.JSONResponse {
+func (r uploadRequest) Validate(maxFileSizeBytes types.FileSizeBytes) *util.JSONResponse {
 	// TODO: Any validation to be done on ContentDisposition?
 
-	if r.MediaMetadata.ContentLength < 1 {
+	if r.MediaMetadata.FileSizeBytes < 1 {
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown("HTTP Content-Length request header must be greater than zero."),
 		}
 	}
-	if maxFileSizeBytes > 0 && r.MediaMetadata.ContentLength > maxFileSizeBytes {
+	if maxFileSizeBytes > 0 && r.MediaMetadata.FileSizeBytes > maxFileSizeBytes {
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
@@ -113,7 +113,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 		MediaMetadata: &types.MediaMetadata{
 			Origin:             cfg.ServerName,
 			ContentDisposition: types.ContentDisposition(req.Header.Get("Content-Disposition")),
-			ContentLength:      types.ContentLength(req.ContentLength),
+			FileSizeBytes:      types.FileSizeBytes(req.ContentLength),
 			ContentType:        types.ContentType(req.Header.Get("Content-Type")),
 			UploadName:         types.Filename(req.FormValue("filename")),
 			UserID:             types.MatrixUserID(userID),
@@ -189,7 +189,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	logger.WithFields(log.Fields{
 		"Origin":              r.MediaMetadata.Origin,
 		"UploadName":          r.MediaMetadata.UploadName,
-		"Content-Length":      r.MediaMetadata.ContentLength,
+		"FileSizeBytes":       r.MediaMetadata.FileSizeBytes,
 		"Content-Type":        r.MediaMetadata.ContentType,
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Info("Uploading file")
@@ -216,7 +216,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		}
 	}
 
-	r.MediaMetadata.ContentLength = bytesWritten
+	r.MediaMetadata.FileSizeBytes = bytesWritten
 	r.MediaMetadata.Base64Hash = hash
 	r.MediaMetadata.MediaID = types.MediaID(hash)
 
@@ -225,7 +225,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		"Origin":              r.MediaMetadata.Origin,
 		"Base64Hash":          r.MediaMetadata.Base64Hash,
 		"UploadName":          r.MediaMetadata.UploadName,
-		"Content-Length":      r.MediaMetadata.ContentLength,
+		"FileSizeBytes":       r.MediaMetadata.FileSizeBytes,
 		"Content-Type":        r.MediaMetadata.ContentType,
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Info("File uploaded")

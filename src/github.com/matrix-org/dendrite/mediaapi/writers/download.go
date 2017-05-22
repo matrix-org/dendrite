@@ -179,7 +179,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 		"Origin":              r.MediaMetadata.Origin,
 		"UploadName":          r.MediaMetadata.UploadName,
 		"Base64Hash":          r.MediaMetadata.Base64Hash,
-		"Content-Length":      r.MediaMetadata.ContentLength,
+		"FileSizeBytes":       r.MediaMetadata.FileSizeBytes,
 		"Content-Type":        r.MediaMetadata.ContentType,
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Infof("Downloading file")
@@ -216,11 +216,11 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 		return
 	}
 
-	if r.MediaMetadata.ContentLength > 0 && int64(r.MediaMetadata.ContentLength) != stat.Size() {
+	if r.MediaMetadata.FileSizeBytes > 0 && int64(r.MediaMetadata.FileSizeBytes) != stat.Size() {
 		r.Logger.WithFields(log.Fields{
-			"contentLength": r.MediaMetadata.ContentLength,
-			"fileSize":      stat.Size(),
-		}).Warn("Content-Length in database and on-disk file size differ.")
+			"fileSizeDatabase": r.MediaMetadata.FileSizeBytes,
+			"fileSizeDisk":     stat.Size(),
+		}).Warn("File size in database and on-disk differ.")
 		// FIXME: Remove erroneous file from database?
 	}
 
@@ -336,7 +336,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 		"Origin":              r.MediaMetadata.Origin,
 		"Base64Hash":          r.MediaMetadata.Base64Hash,
 		"UploadName":          r.MediaMetadata.UploadName,
-		"Content-Length":      r.MediaMetadata.ContentLength,
+		"FileSizeBytes":       r.MediaMetadata.FileSizeBytes,
 		"Content-Type":        r.MediaMetadata.ContentType,
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Info("Storing file metadata to media repository database")
@@ -381,7 +381,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	return updateActiveRemoteRequests
 }
 
-func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePath types.Path, maxFileSizeBytes types.ContentLength, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
+func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePath types.Path, maxFileSizeBytes types.FileSizeBytes, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	r.Logger.WithFields(log.Fields{
 		"Origin":  r.MediaMetadata.Origin,
 		"MediaID": r.MediaMetadata.MediaID,
@@ -415,7 +415,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 	if err != nil {
 		r.Logger.WithError(err).Warn("Failed to parse content length")
 	}
-	r.MediaMetadata.ContentLength = types.ContentLength(contentLength)
+	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(contentLength)
 
 	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
 	r.MediaMetadata.ContentDisposition = types.ContentDisposition(resp.Header.Get("Content-Disposition"))
@@ -428,7 +428,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 	}).Infof("Connected to remote")
 
 	w.Header().Set("Content-Type", string(r.MediaMetadata.ContentType))
-	w.Header().Set("Content-Length", strconv.FormatInt(int64(r.MediaMetadata.ContentLength), 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(int64(r.MediaMetadata.FileSizeBytes), 10))
 	contentSecurityPolicy := "default-src 'none';" +
 		" script-src 'none';" +
 		" plugin-types application/pdf;" +
@@ -483,7 +483,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 	// It's possible the bytesWritten to the temporary file is different to the reported Content-Length from the remote
 	// request's response. bytesWritten is therefore used as it is what would be sent to clients when reading from the local
 	// file.
-	r.MediaMetadata.ContentLength = types.ContentLength(bytesWritten)
+	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(bytesWritten)
 	r.MediaMetadata.Base64Hash = hash
 	r.MediaMetadata.UserID = types.MatrixUserID("@:" + string(r.MediaMetadata.Origin))
 
@@ -496,7 +496,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 		"Origin":              r.MediaMetadata.Origin,
 		"UploadName":          r.MediaMetadata.UploadName,
 		"Base64Hash":          r.MediaMetadata.Base64Hash,
-		"Content-Length":      r.MediaMetadata.ContentLength,
+		"FileSizeBytes":       r.MediaMetadata.FileSizeBytes,
 		"Content-Type":        r.MediaMetadata.ContentType,
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Infof("Remote file cached")
