@@ -152,6 +152,9 @@ func WriteTempFile(reqReader io.Reader, maxFileSizeBytes types.FileSizeBytes, ab
 			if respWriter != nil {
 				bytesTemp, copyError = writeToResponse(respWriter, buffer, bytesRead)
 				bytesResponded += bytesTemp
+				if copyError != nil {
+					break
+				}
 			}
 			if copyError == nil {
 				// Note: if we get here then copyError != ErrFileIsTooLarge && copyError != errWrite
