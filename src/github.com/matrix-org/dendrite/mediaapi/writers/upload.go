@@ -198,7 +198,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	// bytesWritten is the total number of bytes written to disk
-	hash, _, bytesWritten, tmpDir, copyError := fileutils.ReadAndHashAndWriteWithLimit(req.Body, cfg.MaxFileSizeBytes, cfg.AbsBasePath, nil)
+	hash, _, bytesWritten, tmpDir, copyError := fileutils.WriteTempFile(req.Body, cfg.MaxFileSizeBytes, cfg.AbsBasePath, nil)
 
 	if copyError != nil {
 		logFields := log.Fields{

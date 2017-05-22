@@ -448,7 +448,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 	// integrity checks on the file data in the repository.
 	// bytesResponded is the total number of bytes written to the response to the client request
 	// bytesWritten is the total number of bytes written to disk
-	hash, bytesResponded, bytesWritten, tmpDir, copyError := fileutils.ReadAndHashAndWriteWithLimit(resp.Body, maxFileSizeBytes, absBasePath, w)
+	hash, bytesResponded, bytesWritten, tmpDir, copyError := fileutils.WriteTempFile(resp.Body, maxFileSizeBytes, absBasePath, w)
 
 	if copyError != nil {
 		logFields := log.Fields{

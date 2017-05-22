@@ -115,17 +115,15 @@ func writeToDiskAndHasher(tmpFileWriter *bufio.Writer, hasher hash.Hash, bytesWr
 	return int64(bytesTemp), nil
 }
 
-// ReadAndHashAndWriteWithLimit works like io.Copy except it copies from the reqReader to the
-// optionally-supplied respWriter and a temporary file named 'content' using a bufio.Writer.
-// The data written to disk is hashed using the SHA-256 algorithm.
-// If there is an error with the reqReader or the respWriter, that is considered an error.
-// If there is an error with the hasher or tmpFileWriter, that is non-critical and copying
-// to the respWriter continues.
-// maxFileSizeBytes limits the amount of data written to disk and the hasher.
-// If a respWriter is provided, all the data will be proxied from the reqReader to
-// the respWriter, regardless of errors or limits on writing to disk.
-// Returns all of the hash sum, bytes written to disk, and temporary directory path, or an error.
-func ReadAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.FileSizeBytes, absBasePath types.Path, respWriter http.ResponseWriter) (types.Base64Hash, types.FileSizeBytes, types.FileSizeBytes, types.Path, error) {
+// WriteTempFile writes to a new temporary file
+// * creates a temporary file
+// * writes data from reqReader to disk and simultaneously hash it
+// * the amount of data written to disk and hashed is limited by maxFileSizeBytes
+// * if a respWriter is supplied, the data is also simultaneously written to that
+// * data written to the respWriter is _not_ limited to maxFileSizeBytes such that
+//   the homeserver can proxy files larger than it is willing to cache
+// Returns all of the hash sum, bytes written to disk, bytes proxied, and temporary directory path, or an error.
+func WriteTempFile(reqReader io.Reader, maxFileSizeBytes types.FileSizeBytes, absBasePath types.Path, respWriter http.ResponseWriter) (types.Base64Hash, types.FileSizeBytes, types.FileSizeBytes, types.Path, error) {
 	// create the temporary file writer
 	tmpFileWriter, tmpFile, tmpDir, err := createTempFileWriter(absBasePath)
 	if err != nil {
@@ -135,8 +133,7 @@ func ReadAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.Fi
 
 	// The file data is hashed and the hash is returned. The hash is useful as a
 	// method of deduplicating files to save storage, as well as a way to conduct
-	// integrity checks on the file data in the repository. The hash gets used as
-	// the MediaID.
+	// integrity checks on the file data in the repository.
 	hasher := sha256.New()
 
 	// bytesResponded is the total number of bytes written to the response to the client request
