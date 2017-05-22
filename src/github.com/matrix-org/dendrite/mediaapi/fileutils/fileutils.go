@@ -189,14 +189,10 @@ func ReadAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.Fi
 }
 
 // GetPathFromMediaMetadata validates and constructs the on-disk path to the media
-// based on its origin and mediaID
-// If a mediaID is too short, which could happen for other homeserver implementations,
-// place it into a short-id subdirectory of the origin directory
-// If the mediaID is long enough, we split it into pieces, creating up to 2 subdirectories
-// for more manageable browsing and use the remainder as the file name. For example, if
-// mediaID is 'qwerty', we create subdirectories 'q', 'w' within 'q' and place the file
-// in 'q/w' calling it 'erty'. If the mediaID is shorter than 3 characters, the last
-// character is the file name and the preceding character, if any, is a subdirectory name.
+// based on its Base64Hash
+// If the Base64Hash is long enough, we split it into pieces, creating up to 2 subdirectories
+// for more manageable browsing and use the remainder as the file name.
+// For example, if Base64Hash is 'qwerty', the path will be 'q/w/erty'.
 func GetPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) (string, error) {
 	var subPath, fileName string
 
