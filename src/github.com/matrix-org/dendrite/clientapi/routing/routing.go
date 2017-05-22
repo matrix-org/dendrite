@@ -20,6 +20,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage"
+	"github.com/matrix-org/dendrite/clientapi/auth/types"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/readers"
@@ -149,6 +150,18 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 
 	servMux.Handle("/metrics", prometheus.Handler())
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
+}
+
+// make a util.JSONRequestHandler function into an http.Handler which checks the access token in the request.
+func makeAuthAPI(metricsName string, deviceDB *devices.Database, f func(*http.Request, types.Device) util.JSONResponse) http.Handler {
+	h := util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+		device, resErr := auth.VerifyAccessToken(req, deviceDB)
+		if resErr != nil {
+			return resErr
+		}
+		return f(req, device)
+	})
+	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
 }
 
 // make a util.JSONRequestHandler function into an http.Handler.
