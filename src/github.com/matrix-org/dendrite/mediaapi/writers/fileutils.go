@@ -250,3 +250,38 @@ func moveFile(src types.Path, dst types.Path) error {
 	}
 	return nil
 }
+
+// moveFileWithHashCheck attempts to move the file src to dst and checks for hash collisions based on metadata
+// Check if destination file exists. As the destination is based on a hash of the file data,
+// if it exists and the content length does not match then there is a hash collision for two different files. If
+// it exists and the content length matches, it is believable that it is the same file and we can just
+// discard the temporary file.
+func moveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata, absBasePath types.Path, logger *log.Entry) (string, bool, error) {
+	duplicate := false
+	finalPath, err := getPathFromMediaMetadata(mediaMetadata, absBasePath)
+	if err != nil {
+		removeDir(tmpDir, logger)
+		return "", duplicate, fmt.Errorf("failed to get file path from metadata: %q", err)
+	}
+
+	var stat os.FileInfo
+	if stat, err = os.Stat(finalPath); os.IsExist(err) {
+		duplicate = true
+		if stat.Size() == int64(mediaMetadata.ContentLength) {
+			removeDir(tmpDir, logger)
+			return finalPath, duplicate, nil
+		}
+		// Remove the tmpDir as we anyway cannot cache the file on disk due to the hash collision
+		removeDir(tmpDir, logger)
+		return "", duplicate, fmt.Errorf("downloaded file with hash collision but different file size (%v)", finalPath)
+	}
+	err = moveFile(
+		types.Path(path.Join(string(tmpDir), "content")),
+		types.Path(finalPath),
+	)
+	if err != nil {
+		removeDir(tmpDir, logger)
+		return "", duplicate, fmt.Errorf("failed to move file to final destination (%v): %q", finalPath, err)
+	}
+	return finalPath, duplicate, nil
+}

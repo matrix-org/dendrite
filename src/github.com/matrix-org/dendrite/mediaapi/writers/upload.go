@@ -142,32 +142,26 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 // In case of any error, appropriate files and directories are cleaned up a
 // util.JSONResponse error is returned.
 func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetadata *types.MediaMetadata, db *storage.Database, logger *log.Entry) *util.JSONResponse {
-	finalPath, err := getPathFromMediaMetadata(mediaMetadata, absBasePath)
+	finalPath, duplicate, err := moveFileWithHashCheck(tmpDir, mediaMetadata, absBasePath, logger)
 	if err != nil {
-		logger.WithError(err).Warn("Failed to get file path from metadata")
-		removeDir(tmpDir, logger)
+		logger.WithError(err).Error("Failed to move file.")
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
 		}
 	}
-
-	err = moveFile(
-		types.Path(path.Join(string(tmpDir), "content")),
-		types.Path(finalPath),
-	)
-	if err != nil {
-		logger.WithError(err).WithField("dst", finalPath).Warn("Failed to move file to final destination")
-		removeDir(tmpDir, logger)
-		return &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
-		}
+	if duplicate == true {
+		logger.WithField("dst", finalPath).Info("File was stored previously - discarding duplicate")
 	}
 
 	if err = db.StoreMediaMetadata(mediaMetadata); err != nil {
 		logger.WithError(err).Warn("Failed to store metadata")
-		removeDir(types.Path(path.Dir(finalPath)), logger)
+		// If the file is a duplicate (has the same hash as an existing file) then
+		// there is valid metadata in the database for that file. As such we only
+		// remove the file if it is not a duplicate.
+		if duplicate == false {
+			removeDir(types.Path(path.Dir(finalPath)), logger)
+		}
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),

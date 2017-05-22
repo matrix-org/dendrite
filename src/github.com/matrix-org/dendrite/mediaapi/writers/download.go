@@ -341,21 +341,14 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	}).Info("Storing file metadata to media repository database")
 
 	// The database is the source of truth so we need to have moved the file first
-	finalPath, err := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
+	finalPath, duplicate, err := moveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
 	if err != nil {
-		r.Logger.WithError(err).Warn("Failed to get file path from metadata")
-		removeDir(tmpDir, r.Logger)
+		r.Logger.WithError(err).Error("Failed to move file.")
 		return updateActiveRemoteRequests
 	}
-
-	err = moveFile(
-		types.Path(path.Join(string(tmpDir), "content")),
-		types.Path(finalPath),
-	)
-	if err != nil {
-		r.Logger.WithError(err).WithField("dst", finalPath).Warn("Failed to move file to final destination")
-		removeDir(tmpDir, r.Logger)
-		return updateActiveRemoteRequests
+	if duplicate == true {
+		r.Logger.WithField("dst", finalPath).Info("File was stored previously - discarding duplicate")
+		// Continue on to store the metadata in the database
 	}
 
 	// Writing the metadata to the media repository database and removing the mxcURL from activeRemoteRequests needs to be atomic.
@@ -369,8 +362,13 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	// if written to disk, add to db
 	err = db.StoreMediaMetadata(r.MediaMetadata)
 	if err != nil {
-		finalDir := path.Dir(finalPath)
-		removeDir(types.Path(finalDir), r.Logger)
+		// If the file is a duplicate (has the same hash as an existing file) then
+		// there is valid metadata in the database for that file. As such we only
+		// remove the file if it is not a duplicate.
+		if duplicate == false {
+			finalDir := path.Dir(finalPath)
+			removeDir(types.Path(finalDir), r.Logger)
+		}
 		completeRemoteRequest(activeRemoteRequests, mxcURL)
 		return updateActiveRemoteRequests
 	}
