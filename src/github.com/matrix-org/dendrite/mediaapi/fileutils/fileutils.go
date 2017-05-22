@@ -87,17 +87,13 @@ var (
 )
 
 // writeToResponse takes bytesToWrite bytes from buffer and writes them to respWriter
-// Returns bytes written and an error. In case of error, or if there is no respWriter,
-// the number of bytes written will be 0.
+// Returns bytes written and an error. In case of error, the number of bytes written will be 0.
 func writeToResponse(respWriter http.ResponseWriter, buffer []byte, bytesToWrite int) (int64, error) {
-	if respWriter != nil {
-		bytesWritten, respErr := respWriter.Write(buffer[:bytesToWrite])
-		if bytesWritten != bytesToWrite || (respErr != nil && respErr != io.EOF) {
-			return 0, errResponse
-		}
-		return int64(bytesWritten), nil
+	bytesWritten, respErr := respWriter.Write(buffer[:bytesToWrite])
+	if bytesWritten != bytesToWrite || (respErr != nil && respErr != io.EOF) {
+		return 0, errResponse
 	}
-	return 0, nil
+	return int64(bytesWritten), nil
 }
 
 // writeToDiskAndHasher takes bytesToWrite bytes from buffer and writes them to tmpFileWriter and hasher.
@@ -156,8 +152,10 @@ func ReadAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.Fi
 		if bytesRead > 0 {
 			// Note: This code allows proxying files larger than maxFileSizeBytes!
 			// write to client request's response body
-			bytesTemp, copyError = writeToResponse(respWriter, buffer, bytesRead)
-			bytesResponded += bytesTemp
+			if respWriter != nil {
+				bytesTemp, copyError = writeToResponse(respWriter, buffer, bytesRead)
+				bytesResponded += bytesTemp
+			}
 			if copyError == nil {
 				// Note: if we get here then copyError != ErrFileIsTooLarge && copyError != errWrite
 				//   as if copyError == errResponse || copyError == errWrite then we would have broken
