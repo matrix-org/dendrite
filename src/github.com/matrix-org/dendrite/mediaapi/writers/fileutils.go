@@ -196,39 +196,35 @@ func readAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.Co
 func getPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) (string, error) {
 	var subPath, fileName string
 
-	mediaIDLen := len(m.MediaID)
+	hashLen := len(m.Base64Hash)
 
 	switch {
-	case mediaIDLen < 1:
-		return "", fmt.Errorf("Invalid filePath (MediaID too short): %q", m.MediaID)
-	case mediaIDLen < 2:
+	case hashLen < 1:
+		return "", fmt.Errorf("Invalid filePath (Base64Hash too short): %q", m.Base64Hash)
+	case hashLen > 255:
+		return "", fmt.Errorf("Invalid filePath (Base64Hash too long - max 255 characters): %q", m.Base64Hash)
+	case hashLen < 2:
 		subPath = ""
-		fileName = string(m.MediaID)
-	case mediaIDLen < 3:
-		subPath = string(m.MediaID[0:1])
-		fileName = string(m.MediaID[1:])
+		fileName = string(m.Base64Hash)
+	case hashLen < 3:
+		subPath = string(m.Base64Hash[0:1])
+		fileName = string(m.Base64Hash[1:])
 	default:
 		subPath = path.Join(
-			string(m.MediaID[0:1]),
-			string(m.MediaID[1:2]),
+			string(m.Base64Hash[0:1]),
+			string(m.Base64Hash[1:2]),
 		)
-		fileName = string(m.MediaID[2:])
+		fileName = string(m.Base64Hash[2:])
 	}
 
 	filePath, err := filepath.Abs(path.Join(
 		string(absBasePath),
-		string(m.Origin),
 		subPath,
 		fileName,
 	))
 	if err != nil {
 		return "", fmt.Errorf("Unable to construct filePath: %q", err)
 	}
-
-	// FIXME:
-	// - validate origin
-	// - sanitize mediaID (e.g. '/' characters and such)
-	// - validate length of origin and mediaID according to common filesystem limitations
 
 	// check if the absolute absBasePath is a prefix of the absolute filePath
 	// if so, no directory escape has occurred and the filePath is valid
