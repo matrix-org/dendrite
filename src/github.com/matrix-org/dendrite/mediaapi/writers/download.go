@@ -464,7 +464,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 		if bytesResponded < 1 {
 			r.jsonErrorResponse(w, util.JSONResponse{
 				Code: 502,
-				JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
+				JSON: jsonerror.Unknown(fmt.Sprintf("File could not be downloaded from remote server")),
 			})
 		} else {
 			// We attempt to bluntly close the connection because that is the
