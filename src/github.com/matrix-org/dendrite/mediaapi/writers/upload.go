@@ -151,7 +151,7 @@ func storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, mediaMetada
 			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
 		}
 	}
-	if duplicate == true {
+	if duplicate {
 		logger.WithField("dst", finalPath).Info("File was stored previously - discarding duplicate")
 	}
 

@@ -347,7 +347,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 		r.Logger.WithError(err).Error("Failed to move file.")
 		return updateActiveRemoteRequests
 	}
-	if duplicate == true {
+	if duplicate {
 		r.Logger.WithField("dst", finalPath).Info("File was stored previously - discarding duplicate")
 		// Continue on to store the metadata in the database
 	}
