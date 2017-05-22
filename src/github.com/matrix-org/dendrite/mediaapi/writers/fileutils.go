@@ -76,11 +76,13 @@ func createTempFileWriter(absBasePath types.Path) (*bufio.Writer, *os.File, type
 	return writer, tmpFile, tmpDir, nil
 }
 
-var errFileIsTooLarge = fmt.Errorf("file is too large")
-var errRead = fmt.Errorf("failed to read response from remote server")
-var errResponse = fmt.Errorf("failed to write file data to response body")
-var errHash = fmt.Errorf("failed to hash file data")
-var errWrite = fmt.Errorf("failed to write file to disk")
+var (
+	errFileIsTooLarge = fmt.Errorf("file is too large")
+	errRead           = fmt.Errorf("failed to read response from remote server")
+	errResponse       = fmt.Errorf("failed to write file data to response body")
+	errHash           = fmt.Errorf("failed to hash file data")
+	errWrite          = fmt.Errorf("failed to write file to disk")
+)
 
 // writeToResponse takes bytesToWrite bytes from buffer and writes them to respWriter
 // Returns bytes written and an error. In case of error, or if there is no respWriter,
