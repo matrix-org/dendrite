@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/types"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -90,7 +90,7 @@ func (r *registerRequest) Validate() *util.JSONResponse {
 }
 
 // Register processes a /register request. http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
-func Register(req *http.Request, accountDB *storage.AccountDatabase) util.JSONResponse {
+func Register(req *http.Request, accountDB *accounts.Database) util.JSONResponse {
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
@@ -140,7 +140,7 @@ func Register(req *http.Request, accountDB *storage.AccountDatabase) util.JSONRe
 	}
 }
 
-func completeRegistration(accountDB *storage.AccountDatabase, username, password string) util.JSONResponse {
+func completeRegistration(accountDB *accounts.Database, username, password string) util.JSONResponse {
 	acc, err := accountDB.CreateAccount(username, password)
 	if err != nil {
 		return util.JSONResponse{

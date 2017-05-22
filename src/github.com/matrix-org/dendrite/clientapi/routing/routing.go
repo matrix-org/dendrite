@@ -19,7 +19,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/readers"
@@ -33,7 +33,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI, producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI, accountDB *storage.AccountDatabase) {
+func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI, producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI, accountDB *accounts.Database) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/createRoom",
