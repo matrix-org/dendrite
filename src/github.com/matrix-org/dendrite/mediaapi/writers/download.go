@@ -247,7 +247,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 }
 
 func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONResponse) {
-	urls := getMatrixUrls(r.MediaMetadata.Origin)
+	urls := getMatrixURLs(r.MediaMetadata.Origin)
 
 	r.Logger.WithField("URL", urls[0]).Info("Connecting to remote")
 
@@ -504,7 +504,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 
 // Given a matrix server name, attempt to discover URLs to contact the server
 // on.
-func getMatrixUrls(serverName gomatrixserverlib.ServerName) []string {
+func getMatrixURLs(serverName gomatrixserverlib.ServerName) []string {
 	_, srvs, err := net.LookupSRV("matrix", "tcp", string(serverName))
 	if err != nil {
 		return []string{"https://" + string(serverName) + ":8448"}
