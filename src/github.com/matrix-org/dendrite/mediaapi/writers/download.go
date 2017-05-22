@@ -79,8 +79,6 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 	w.Write(resBytes)
 }
 
-var nTries = 5
-
 // Download implements /download
 // Files from this server (i.e. origin == cfg.ServerName) are served directly
 // Files from remote servers (i.e. origin != cfg.ServerName) are cached locally.
@@ -126,41 +124,43 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 
 		mxcURL := "mxc://" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
 
-		for tries := 0; ; tries++ {
+		activeRemoteRequests.Lock()
+		mediaMetadata, err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+		if err == nil {
+			// If we have a record, we can respond from the local file
+			r.MediaMetadata = mediaMetadata
+			r.respondFromLocalFile(w, cfg.AbsBasePath)
+			activeRemoteRequests.Unlock()
+			return
+		}
+		if activeRemoteRequestCondition, ok := activeRemoteRequests.Set[mxcURL]; ok {
+			r.Logger.WithFields(log.Fields{
+				"Origin":  r.MediaMetadata.Origin,
+				"MediaID": r.MediaMetadata.MediaID,
+			}).Info("Waiting for another goroutine to fetch the remote file.")
+			activeRemoteRequestCondition.Wait()
+			activeRemoteRequests.Unlock()
 			activeRemoteRequests.Lock()
 			mediaMetadata, err = db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 			if err == nil {
 				// If we have a record, we can respond from the local file
 				r.MediaMetadata = mediaMetadata
 				r.respondFromLocalFile(w, cfg.AbsBasePath)
-				activeRemoteRequests.Unlock()
-				return
-			}
-			if activeRemoteRequestCondition, ok := activeRemoteRequests.Set[mxcURL]; ok {
-				if tries >= nTries {
-					r.Logger.WithFields(log.Fields{
-						"MediaID": r.MediaMetadata.MediaID,
-						"Origin":  r.MediaMetadata.Origin,
-					}).Warn("Other goroutines are trying to download the remote file and failing.")
-					r.jsonErrorResponse(w, util.JSONResponse{
-						Code: 500,
-						JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
-					})
-					activeRemoteRequests.Unlock()
-					return
-				}
-				r.Logger.WithFields(log.Fields{
-					"Origin":  r.MediaMetadata.Origin,
-					"MediaID": r.MediaMetadata.MediaID,
-				}).Info("Waiting for another goroutine to fetch the remote file.")
-				activeRemoteRequestCondition.Wait()
-				activeRemoteRequests.Unlock()
 			} else {
-				activeRemoteRequests.Set[mxcURL] = &sync.Cond{L: activeRemoteRequests}
-				activeRemoteRequests.Unlock()
-				break
+				r.Logger.WithFields(log.Fields{
+					"MediaID": r.MediaMetadata.MediaID,
+					"Origin":  r.MediaMetadata.Origin,
+				}).Warn("Other goroutine failed to fetch remote file.")
+				r.jsonErrorResponse(w, util.JSONResponse{
+					Code: 500,
+					JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
+				})
 			}
+			activeRemoteRequests.Unlock()
+			return
 		}
+		activeRemoteRequests.Set[mxcURL] = &sync.Cond{L: activeRemoteRequests}
+		activeRemoteRequests.Unlock()
 
 		r.respondFromRemoteFile(w, cfg.AbsBasePath, cfg.MaxFileSizeBytes, db, activeRemoteRequests)
 	} else {
