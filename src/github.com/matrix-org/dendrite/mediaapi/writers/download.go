@@ -38,7 +38,7 @@ import (
 )
 
 // downloadRequest metadata included in or derivable from an download request
-// https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-media-r0-download
+// https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
 type downloadRequest struct {
 	MediaMetadata *types.MediaMetadata
 	Logger        *log.Entry
