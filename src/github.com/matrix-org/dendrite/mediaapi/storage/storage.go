@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// A Database is used to store room events and stream offsets.
+// A Database is used to store metadata about a repository of media files.
 type Database struct {
 	statements statements
 	db         *sql.DB
