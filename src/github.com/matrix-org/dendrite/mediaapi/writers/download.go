@@ -396,10 +396,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	finalPath, err := getPathFromMediaMetadata(r.MediaMetadata, absBasePath)
 	if err != nil {
 		r.Logger.WithError(err).Warn("Failed to get file path from metadata")
-		tmpDirErr := os.RemoveAll(string(tmpDir))
-		if tmpDirErr != nil {
-			r.Logger.WithError(tmpDirErr).WithField("dir", tmpDir).Warn("Failed to remove tmpDir")
-		}
+		removeDir(tmpDir, r.Logger)
 		return updateActiveRemoteRequests
 	}
 
@@ -409,10 +406,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	)
 	if err != nil {
 		r.Logger.WithError(err).WithField("dst", finalPath).Warn("Failed to move file to final destination")
-		tmpDirErr := os.RemoveAll(string(tmpDir))
-		if tmpDirErr != nil {
-			r.Logger.WithError(tmpDirErr).WithField("dir", tmpDir).Warn("Failed to remove tmpDir")
-		}
+		removeDir(tmpDir, r.Logger)
 		return updateActiveRemoteRequests
 	}
 
@@ -428,10 +422,7 @@ func (r *downloadRequest) commitFileAndMetadata(tmpDir types.Path, absBasePath t
 	err = db.StoreMediaMetadata(r.MediaMetadata)
 	if err != nil {
 		finalDir := path.Dir(finalPath)
-		finalDirErr := os.RemoveAll(finalDir)
-		if finalDirErr != nil {
-			r.Logger.WithError(finalDirErr).WithField("dir", finalDir).Warn("Failed to remove finalDir")
-		}
+		removeDir(types.Path(finalDir), r.Logger)
 		completeRemoteRequest(activeRemoteRequests, mxcURL)
 		return updateActiveRemoteRequests
 	}
@@ -526,10 +517,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 			logFields["MaxFileSizeBytes"] = maxFileSizeBytes
 		}
 		r.Logger.WithError(fetchError).WithFields(logFields).Warn("Error while fetching file")
-		tmpDirErr := os.RemoveAll(string(tmpDir))
-		if tmpDirErr != nil {
-			r.Logger.WithError(tmpDirErr).WithField("dir", tmpDir).Warn("Failed to remove tmpDir")
-		}
+		removeDir(tmpDir, r.Logger)
 		// Note: if we have responded with any data in the body at all then we have already sent 200 OK and we can only abort at this point
 		if bytesResponded < 1 {
 			r.jsonErrorResponse(w, util.JSONResponse{

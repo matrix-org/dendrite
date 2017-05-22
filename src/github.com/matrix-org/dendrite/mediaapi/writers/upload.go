@@ -94,13 +94,6 @@ type uploadResponse struct {
 	ContentURI string `json:"content_uri"`
 }
 
-func removeDir(dir types.Path, logger *log.Entry) {
-	dirErr := os.RemoveAll(string(dir))
-	if dirErr != nil {
-		logger.WithError(dirErr).WithField("dir", dir).Warn("Failed to remove directory")
-	}
-}
-
 // parseAndValidateRequest parses the incoming upload request to validate and extract
 // all the metadata about the media being uploaded. Returns either an uploadRequest or
 // an error formatted as a util.JSONResponse

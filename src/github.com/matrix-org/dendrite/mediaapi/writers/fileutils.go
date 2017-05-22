@@ -29,6 +29,13 @@ import (
 	"github.com/matrix-org/util"
 )
 
+func removeDir(dir types.Path, logger *log.Entry) {
+	dirErr := os.RemoveAll(string(dir))
+	if dirErr != nil {
+		logger.WithError(dirErr).WithField("dir", dir).Warn("Failed to remove directory")
+	}
+}
+
 // createTempDir creates a tmp/<random string> directory within baseDirectory and returns its path
 func createTempDir(baseDirectory types.Path) (types.Path, error) {
 	baseTmpDir := path.Join(string(baseDirectory), "tmp")
