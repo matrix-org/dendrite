@@ -1,6 +1,7 @@
 package writers
 
 import (
+	"fmt"
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
@@ -10,6 +11,12 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+)
+
+const (
+	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
+	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
 )
 
 // registerRequest represents the submitted registration request.
@@ -34,17 +41,19 @@ type authDict struct {
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
 type userInteractiveResponse struct {
-	Flows     []flow                 `json:"flows"`
+	Flows     []authFlow             `json:"flows"`
 	Completed []types.LoginType      `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
 	Session   string                 `json:"session"`
 }
 
-type flow struct {
+// authFlow represents one possible way that the client can authenticate a request.
+// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
+type authFlow struct {
 	Stages []types.LoginType `json:"stages"`
 }
 
-func newUserInteractiveResponse(sessionID string, fs []flow) userInteractiveResponse {
+func newUserInteractiveResponse(sessionID string, fs []authFlow) userInteractiveResponse {
 	return userInteractiveResponse{
 		fs, []types.LoginType{}, make(map[string]interface{}), sessionID,
 	}
@@ -61,20 +70,20 @@ type registerResponse struct {
 // Validate returns an error response if the request fails to validate.
 func (r *registerRequest) Validate() *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
-	if len(r.Password) > 512 {
+	if len(r.Password) > maxPasswordLength {
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON("'password' >512 characters"),
+			JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
 		}
-	} else if len(r.Username) > 512 {
+	} else if len(r.Username) > maxUsernameLength {
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON("'username' >512 characters"),
+			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
 		}
-	} else if len(r.Password) > 0 && len(r.Password) < 8 {
+	} else if len(r.Password) > 0 && len(r.Password) < minPasswordLength {
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.WeakPassword("password too weak: min 8 chars"),
+			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
 		}
 	}
 	return nil
@@ -109,8 +118,8 @@ func Register(req *http.Request, accountDB *storage.AccountDatabase) util.JSONRe
 			Code: 401,
 			// TODO: Hard-coded 'dummy' auth for now with a bogus session ID.
 			//       Server admins should be able to change things around (eg enable captcha)
-			JSON: newUserInteractiveResponse("totallyuniquesessionid", []flow{
-				flow{[]types.LoginType{types.LoginTypeDummy}},
+			JSON: newUserInteractiveResponse("totallyuniquesessionid", []authFlow{
+				{[]types.LoginType{types.LoginTypeDummy}},
 			}),
 		}
 	}
@@ -147,7 +156,7 @@ func completeRegistration(accountDB *storage.AccountDatabase, username, password
 			UserID:      acc.UserID,
 			AccessToken: acc.UserID, // FIXME
 			HomeServer:  acc.ServerName,
-			DeviceID:    "dendrite",
+			DeviceID:    "kindauniquedeviceid",
 		},
 	}
 }
