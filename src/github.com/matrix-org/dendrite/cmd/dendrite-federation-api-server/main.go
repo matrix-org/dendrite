@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"net/http"
 	"os"
 	"time"
@@ -32,6 +33,14 @@ var (
 	logDir     = os.Getenv("LOG_DIR")
 	serverName = gomatrixserverlib.ServerName(os.Getenv("SERVER_NAME"))
 	serverKey  = os.Getenv("SERVER_KEY")
+	// Base64 encoded SHA256 TLS fingerprint of the X509 certificate used by
+	// the public federation listener for this server.
+	// Can be generated from a PEM certificate called "server.crt" using:
+	//
+	//  openssl x509 -noout -fingerprint -sha256 -inform pem -in server.crt |\
+	//	python -c 'print raw_input()[19:].replace(":","").decode("hex").encode("base64").rstrip("=\n")'
+	//
+	tlsFingerprint = os.Getenv("TLS_FINGERPRINT")
 )
 
 func main() {
@@ -44,13 +53,14 @@ func main() {
 		serverName = "localhost"
 	}
 
+	if tlsFingerprint == "" {
+		log.Panic("No TLS_FINGERPRINT environment variable found.")
+	}
+
 	cfg := config.FederationAPI{
 		ServerName: serverName,
 		// TODO: make the validity period configurable.
 		ValidityPeriod: 24 * time.Hour,
-	}
-	cfg.TLSFingerPrints = []gomatrixserverlib.TLSFingerprint{
-		{[]byte("o\xe2\xd1\x05A7g\xd6=\x10\xdfq\x9e4\xb1:/\x9co>\x01g\x1d\xb8\xbebFf]\xf0\x89N")},
 	}
 
 	var err error
@@ -58,6 +68,12 @@ func main() {
 	if err != nil {
 		log.Panicf("Failed to load private key: %s", err)
 	}
+
+	var fingerprintSHA256 []byte
+	if fingerprintSHA256, err = base64.RawStdEncoding.DecodeString(tlsFingerprint); err != nil {
+		log.Panicf("Failed to load TLS fingerprint: %s", err)
+	}
+	cfg.TLSFingerPrints = []gomatrixserverlib.TLSFingerprint{{fingerprintSHA256}}
 
 	routing.Setup(http.DefaultServeMux, cfg)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
