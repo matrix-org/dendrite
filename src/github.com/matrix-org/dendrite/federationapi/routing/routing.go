@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	pathPrefixV2Keys = "/_matrix/keys/v2"
+	pathPrefixV2Keys = "/_matrix/key/v2"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -32,11 +32,12 @@ func Setup(servMux *http.ServeMux, cfg config.FederationAPI) {
 	apiMux := mux.NewRouter()
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 
-	v2keysmux.Handle("/server/",
-		makeAPI("localkeys", func(req *http.Request) util.JSONResponse {
-			return readers.LocalKeys(req, cfg)
-		}),
-	)
+	localKeys := makeAPI("localkeys", func(req *http.Request) util.JSONResponse {
+		return readers.LocalKeys(req, cfg)
+	})
+
+	v2keysmux.Handle("/server/{keyID}", localKeys)
+	v2keysmux.Handle("/server/", localKeys)
 
 	servMux.Handle("/metrics", prometheus.Handler())
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))

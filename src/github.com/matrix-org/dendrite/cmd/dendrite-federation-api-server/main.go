@@ -49,6 +49,9 @@ func main() {
 		// TODO: make the validity period configurable.
 		ValidityPeriod: 24 * time.Hour,
 	}
+	cfg.TLSFingerPrints = []gomatrixserverlib.TLSFingerprint{
+		{[]byte("o\xe2\xd1\x05A7g\xd6=\x10\xdfq\x9e4\xb1:/\x9co>\x01g\x1d\xb8\xbebFf]\xf0\x89N")},
+	}
 
 	var err error
 	cfg.KeyID, cfg.PrivateKey, err = common.ReadKey(serverKey)
