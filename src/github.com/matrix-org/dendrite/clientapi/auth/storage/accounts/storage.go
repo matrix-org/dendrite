@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package accounts
 
 import (
 	"database/sql"
@@ -23,14 +23,14 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// AccountDatabase represents an account database
-type AccountDatabase struct {
+// Database represents an account database
+type Database struct {
 	db       *sql.DB
 	accounts accountsStatements
 }
 
-// NewAccountDatabase creates a new accounts database
-func NewAccountDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*AccountDatabase, error) {
+// NewDatabase creates a new accounts database
+func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
 	if db, err = sql.Open("postgres", dataSourceName); err != nil {
@@ -40,12 +40,12 @@ func NewAccountDatabase(dataSourceName string, serverName gomatrixserverlib.Serv
 	if err = a.prepare(db, serverName); err != nil {
 		return nil, err
 	}
-	return &AccountDatabase{db, a}, nil
+	return &Database{db, a}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
 // Returns sql.ErrNoRows if no account exists which matches the given credentials.
-func (d *AccountDatabase) GetAccountByPassword(localpart, plaintextPassword string) (*types.Account, error) {
+func (d *Database) GetAccountByPassword(localpart, plaintextPassword string) (*types.Account, error) {
 	hash, err := d.accounts.selectPasswordHash(localpart)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (d *AccountDatabase) GetAccountByPassword(localpart, plaintextPassword stri
 
 // CreateAccount makes a new account with the given login name and password. If no password is supplied,
 // the account will be a passwordless account.
-func (d *AccountDatabase) CreateAccount(localpart, plaintextPassword string) (*types.Account, error) {
+func (d *Database) CreateAccount(localpart, plaintextPassword string) (*types.Account, error) {
 	hash, err := hashPassword(plaintextPassword)
 	if err != nil {
 		return nil, err
