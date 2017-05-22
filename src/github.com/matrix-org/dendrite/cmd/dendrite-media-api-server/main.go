@@ -31,11 +31,12 @@ import (
 )
 
 var (
-	bindAddr               = os.Getenv("BIND_ADDRESS")
-	dataSource             = os.Getenv("DATABASE")
-	logDir                 = os.Getenv("LOG_DIR")
-	serverName             = os.Getenv("SERVER_NAME")
-	basePath               = os.Getenv("BASE_PATH")
+	bindAddr   = os.Getenv("BIND_ADDRESS")
+	dataSource = os.Getenv("DATABASE")
+	logDir     = os.Getenv("LOG_DIR")
+	serverName = os.Getenv("SERVER_NAME")
+	basePath   = os.Getenv("BASE_PATH")
+	// Note: if the MAX_FILE_SIZE_BYTES is set to 0, it will be unlimited
 	maxFileSizeBytesString = os.Getenv("MAX_FILE_SIZE_BYTES")
 )
 
