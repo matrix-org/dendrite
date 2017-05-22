@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package devices
 
-import (
-	"github.com/matrix-org/gomatrixserverlib"
-)
+// Database represents a device database.
+type Database struct {
+	// TODO
+}
 
-// Account represents a Matrix account on this home server.
-type Account struct {
-	UserID     string
-	Localpart  string
-	ServerName gomatrixserverlib.ServerName
-	// TODO: Other flags like IsAdmin, IsGuest
-	// TODO: Devices
-	// TODO: Associations (e.g. with application services)
+// NewDatabase creates a new device database
+func NewDatabase() *Database {
+	return &Database{}
 }

@@ -19,7 +19,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
@@ -81,7 +81,7 @@ func main() {
 	}
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
-	accountDB, err := storage.NewAccountDatabase(accountDataSource, serverName)
+	accountDB, err := accounts.NewDatabase(accountDataSource, serverName)
 	if err != nil {
 		log.Panicf("Failed to setup account database(%s): %s", accountDataSource, err.Error())
 	}
