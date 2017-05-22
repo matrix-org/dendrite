@@ -78,11 +78,6 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 	w.Write(resBytes)
 }
 
-var errFileIsTooLarge = fmt.Errorf("file is too large")
-var errRead = fmt.Errorf("failed to read response from remote server")
-var errResponse = fmt.Errorf("failed to write file data to response body")
-var errWrite = fmt.Errorf("failed to write file to disk")
-
 var nTries = 5
 
 // Download implements /download
@@ -300,55 +295,6 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONRespo
 	return resp, nil
 }
 
-// copyToActiveAndPassive works like io.Copy except it copies from the reader to both of the writers
-// If there is an error with the reader or the active writer, that is considered an error
-// If there is an error with the passive writer, that is non-critical and copying continues
-// maxFileSizeBytes limits the amount of data written to the passive writer
-func copyToActiveAndPassive(r io.Reader, wActive io.Writer, wPassive io.Writer, maxFileSizeBytes types.ContentLength, mediaMetadata *types.MediaMetadata) (int64, int64, error) {
-	var bytesResponded, bytesWritten int64 = 0, 0
-	var copyError error
-	// Note: the buffer size is the same as is used in io.Copy()
-	buffer := make([]byte, 32*1024)
-	for {
-		// read from remote request's response body
-		bytesRead, readErr := r.Read(buffer)
-		if bytesRead > 0 {
-			// write to client request's response body
-			bytesTemp, respErr := wActive.Write(buffer[:bytesRead])
-			if bytesTemp != bytesRead || (respErr != nil && respErr != io.EOF) {
-				copyError = errResponse
-				break
-			}
-			bytesResponded += int64(bytesTemp)
-			if copyError == nil {
-				// Note: if we get here then copyError != errFileIsTooLarge && copyError != errWrite
-				//   as if copyError == errResponse || copyError == errWrite then we would have broken
-				//   out of the loop and there are no other cases
-				// if larger than maxFileSizeBytes then stop writing to disk and discard cached file
-				if bytesWritten+int64(len(buffer)) > int64(maxFileSizeBytes) {
-					copyError = errFileIsTooLarge
-				} else {
-					// write to disk
-					bytesTemp, writeErr := wPassive.Write(buffer[:bytesRead])
-					if writeErr != nil && writeErr != io.EOF {
-						copyError = errWrite
-					} else {
-						bytesWritten += int64(bytesTemp)
-					}
-				}
-			}
-		}
-		if readErr != nil {
-			if readErr != io.EOF {
-				copyError = errRead
-			}
-			break
-		}
-	}
-
-	return bytesResponded, bytesWritten, copyError
-}
-
 func (r *downloadRequest) closeConnection(w http.ResponseWriter) {
 	r.Logger.WithFields(log.Fields{
 		"Origin":  r.MediaMetadata.Origin,
@@ -489,14 +435,6 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 		" object-src 'self';"
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
-	// create the temporary file writer
-	tmpFileWriter, tmpFile, tmpDir, errorResponse := createTempFileWriter(absBasePath, r.Logger)
-	if errorResponse != nil {
-		r.jsonErrorResponse(w, *errorResponse)
-		return
-	}
-	defer tmpFile.Close()
-
 	// read the remote request's response body
 	// simultaneously write it to the incoming request's response body and the temporary file
 	r.Logger.WithFields(log.Fields{
@@ -504,19 +442,22 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 		"Origin":  r.MediaMetadata.Origin,
 	}).Infof("Proxying and caching remote file")
 
+	// The file data is hashed but is NOT used as the MediaID, unlike in Upload. The hash is useful as a
+	// method of deduplicating files to save storage, as well as a way to conduct
+	// integrity checks on the file data in the repository.
 	// bytesResponded is the total number of bytes written to the response to the client request
 	// bytesWritten is the total number of bytes written to disk
-	bytesResponded, bytesWritten, fetchError := copyToActiveAndPassive(resp.Body, w, tmpFileWriter, maxFileSizeBytes, r.MediaMetadata)
-	tmpFileWriter.Flush()
-	if fetchError != nil {
+	hash, bytesResponded, bytesWritten, tmpDir, copyError := readAndHashAndWriteWithLimit(resp.Body, maxFileSizeBytes, absBasePath, w)
+
+	if copyError != nil {
 		logFields := log.Fields{
 			"MediaID": r.MediaMetadata.MediaID,
 			"Origin":  r.MediaMetadata.Origin,
 		}
-		if fetchError == errFileIsTooLarge {
+		if copyError == errFileIsTooLarge {
 			logFields["MaxFileSizeBytes"] = maxFileSizeBytes
 		}
-		r.Logger.WithError(fetchError).WithFields(logFields).Warn("Error while fetching file")
+		r.Logger.WithError(copyError).WithFields(logFields).Warn("Error while transferring file")
 		removeDir(tmpDir, r.Logger)
 		// Note: if we have responded with any data in the body at all then we have already sent 200 OK and we can only abort at this point
 		if bytesResponded < 1 {

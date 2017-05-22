@@ -15,14 +15,10 @@
 package writers
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 
@@ -136,51 +132,6 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 	return r, nil
 }
 
-// writeFileWithLimitAndHash reads data from an io.Reader and writes it to a temporary
-// file named 'content' in the returned temporary directory. It only reads up to a limit of
-// cfg.MaxFileSizeBytes from the io.Reader. The data written is hashed and the hashsum is
-// returned. If any errors occur, a util.JSONResponse error is returned.
-func writeFileWithLimitAndHash(r io.Reader, cfg *config.MediaAPI, logger *log.Entry, contentLength types.ContentLength) ([]byte, types.Path, *util.JSONResponse) {
-	writer, file, tmpDir, errorResponse := createTempFileWriter(cfg.AbsBasePath, logger)
-	if errorResponse != nil {
-		return nil, "", errorResponse
-	}
-	defer file.Close()
-
-	// The limited reader restricts how many bytes are read from the body to the specified maximum bytes
-	// Note: the golang HTTP server closes the request body
-	limitedBody := io.LimitReader(r, int64(cfg.MaxFileSizeBytes))
-	// The file data is hashed and the hash is returned. The hash is useful as a
-	// method of deduplicating files to save storage, as well as a way to conduct
-	// integrity checks on the file data in the repository. The hash gets used as
-	// the MediaID.
-	hasher := sha256.New()
-	// A TeeReader is used to allow us to read from the limitedBody and simultaneously
-	// write to the hasher here and to the http.ResponseWriter via the io.Copy call below.
-	reader := io.TeeReader(limitedBody, hasher)
-
-	bytesWritten, err := io.Copy(writer, reader)
-	if err != nil {
-		logger.WithError(err).Warn("Failed to copy")
-		removeDir(tmpDir, logger)
-		return nil, "", &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
-		}
-	}
-
-	writer.Flush()
-
-	if bytesWritten != int64(contentLength) {
-		logger.WithFields(log.Fields{
-			"bytesWritten":  bytesWritten,
-			"contentLength": contentLength,
-		}).Warn("Fewer bytes written than expected")
-	}
-
-	return hasher.Sum(nil), tmpDir, nil
-}
-
 // storeFileAndMetadata first moves a temporary file named content from tmpDir to its
 // final path (see getPathFromMediaMetadata for details.) Once the file is moved, the
 // metadata about the file is written into the media repository database. This order
@@ -249,11 +200,27 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	// The file data is hashed and the hash is used as the MediaID. The hash is useful as a
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
-	hash, tmpDir, resErr := writeFileWithLimitAndHash(req.Body, cfg, logger, r.MediaMetadata.ContentLength)
-	if resErr != nil {
-		return *resErr
+	// bytesWritten is the total number of bytes written to disk
+	hash, _, bytesWritten, tmpDir, copyError := readAndHashAndWriteWithLimit(req.Body, cfg.MaxFileSizeBytes, cfg.AbsBasePath, nil)
+
+	if copyError != nil {
+		logFields := log.Fields{
+			"Origin":  r.MediaMetadata.Origin,
+			"MediaID": r.MediaMetadata.MediaID,
+		}
+		if copyError == errFileIsTooLarge {
+			logFields["MaxFileSizeBytes"] = cfg.MaxFileSizeBytes
+		}
+		logger.WithError(copyError).WithFields(logFields).Warn("Error while transferring file")
+		removeDir(tmpDir, logger)
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+		}
 	}
-	r.MediaMetadata.MediaID = types.MediaID(base64.URLEncoding.EncodeToString(hash[:]))
+
+	r.MediaMetadata.ContentLength = bytesWritten
+	r.MediaMetadata.MediaID = types.MediaID(hash)
 
 	logger.WithFields(log.Fields{
 		"MediaID":             r.MediaMetadata.MediaID,
