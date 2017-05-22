@@ -191,28 +191,28 @@ func ReadAndHashAndWriteWithLimit(reqReader io.Reader, maxFileSizeBytes types.Fi
 // If the Base64Hash is long enough, we split it into pieces, creating up to 2 subdirectories
 // for more manageable browsing and use the remainder as the file name.
 // For example, if Base64Hash is 'qwerty', the path will be 'q/w/erty'.
-func GetPathFromMediaMetadata(m *types.MediaMetadata, absBasePath types.Path) (string, error) {
+func GetPathFromMediaMetadata(base64Hash types.Base64Hash, absBasePath types.Path) (string, error) {
 	var subPath, fileName string
 
-	hashLen := len(m.Base64Hash)
+	hashLen := len(base64Hash)
 
 	switch {
 	case hashLen < 1:
-		return "", fmt.Errorf("Invalid filePath (Base64Hash too short): %q", m.Base64Hash)
+		return "", fmt.Errorf("Invalid filePath (Base64Hash too short): %q", base64Hash)
 	case hashLen > 255:
-		return "", fmt.Errorf("Invalid filePath (Base64Hash too long - max 255 characters): %q", m.Base64Hash)
+		return "", fmt.Errorf("Invalid filePath (Base64Hash too long - max 255 characters): %q", base64Hash)
 	case hashLen < 2:
 		subPath = ""
-		fileName = string(m.Base64Hash)
+		fileName = string(base64Hash)
 	case hashLen < 3:
-		subPath = string(m.Base64Hash[0:1])
-		fileName = string(m.Base64Hash[1:])
+		subPath = string(base64Hash[0:1])
+		fileName = string(base64Hash[1:])
 	default:
 		subPath = path.Join(
-			string(m.Base64Hash[0:1]),
-			string(m.Base64Hash[1:2]),
+			string(base64Hash[0:1]),
+			string(base64Hash[1:2]),
 		)
-		fileName = string(m.Base64Hash[2:])
+		fileName = string(base64Hash[2:])
 	}
 
 	filePath, err := filepath.Abs(path.Join(
@@ -256,7 +256,7 @@ func moveFile(src types.Path, dst types.Path) error {
 // discard the temporary file.
 func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata, absBasePath types.Path, logger *log.Entry) (string, bool, error) {
 	duplicate := false
-	finalPath, err := GetPathFromMediaMetadata(mediaMetadata, absBasePath)
+	finalPath, err := GetPathFromMediaMetadata(mediaMetadata.Base64Hash, absBasePath)
 	if err != nil {
 		RemoveDir(tmpDir, logger)
 		return "", duplicate, fmt.Errorf("failed to get file path from metadata: %q", err)

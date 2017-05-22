@@ -184,7 +184,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 		"Content-Disposition": r.MediaMetadata.ContentDisposition,
 	}).Infof("Downloading file")
 
-	filePath, err := fileutils.GetPathFromMediaMetadata(r.MediaMetadata, absBasePath)
+	filePath, err := fileutils.GetPathFromMediaMetadata(r.MediaMetadata.Base64Hash, absBasePath)
 	if err != nil {
 		// FIXME: Remove erroneous file from database?
 		r.Logger.WithError(err).Warn("Failed to get file path from metadata")
