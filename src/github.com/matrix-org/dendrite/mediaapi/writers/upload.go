@@ -123,6 +123,8 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 		return nil, resErr
 	}
 
+	// FIXME: do we want to always override ContentDisposition here or only if
+	// there is no Content-Disposition header set?
 	if len(r.MediaMetadata.UploadName) > 0 {
 		r.MediaMetadata.ContentDisposition = types.ContentDisposition(
 			"inline; filename*=utf-8''" + url.PathEscape(string(r.MediaMetadata.UploadName)),
