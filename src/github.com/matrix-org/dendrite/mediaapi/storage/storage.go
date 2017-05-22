@@ -43,6 +43,7 @@ func Open(dataSourceName string) (*Database, error) {
 }
 
 // StoreMediaMetadata inserts the metadata about the uploaded media into the database.
+// Returns an error if the combination of MediaID and Origin are not unique in the table.
 func (d *Database) StoreMediaMetadata(mediaMetadata *types.MediaMetadata) error {
 	return d.statements.insertMedia(mediaMetadata)
 }
