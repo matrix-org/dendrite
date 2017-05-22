@@ -14,10 +14,15 @@
 
 package types
 
+import (
+	"github.com/matrix-org/gomatrixserverlib"
+)
+
 // Account represents a Matrix account on this home server.
 type Account struct {
-	UserID    string
-	Localpart string
+	UserID     string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 	// TODO: Other flags like IsAdmin, IsGuest
 	// TODO: Device IDs
 	// TODO: Associations (e.g. with application services)

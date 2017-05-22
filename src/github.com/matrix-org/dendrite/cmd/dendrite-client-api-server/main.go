@@ -19,6 +19,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/storage"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
@@ -37,6 +38,7 @@ var (
 	clientAPIOutputTopic = os.Getenv("CLIENTAPI_OUTPUT_TOPIC")
 	serverName           = gomatrixserverlib.ServerName(os.Getenv("SERVER_NAME"))
 	serverKey            = os.Getenv("SERVER_KEY")
+	accountDataSource    = os.Getenv("ACCOUNT_DATABASE")
 )
 
 func main() {
@@ -79,7 +81,11 @@ func main() {
 	}
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
+	accountDB, err := storage.NewAccountDatabase(accountDataSource, serverName)
+	if err != nil {
+		log.Panicf("Failed to setup account database(%s): %s", accountDataSource, err.Error())
+	}
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI)
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI, accountDB)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }
