@@ -186,12 +186,11 @@ func WriteTempFile(reqReader io.Reader, maxFileSizeBytes types.FileSizeBytes, ab
 	return types.Base64Hash(base64.URLEncoding.EncodeToString(hash[:])), types.FileSizeBytes(bytesResponded), types.FileSizeBytes(bytesWritten), tmpDir, nil
 }
 
-// GetPathFromMediaMetadata validates and constructs the on-disk path to the media
-// based on its Base64Hash
+// GetPathFromBase64Hash evaluates the path to a media file from its Base64Hash
 // If the Base64Hash is long enough, we split it into pieces, creating up to 2 subdirectories
 // for more manageable browsing and use the remainder as the file name.
 // For example, if Base64Hash is 'qwerty', the path will be 'q/w/erty'.
-func GetPathFromMediaMetadata(base64Hash types.Base64Hash, absBasePath types.Path) (string, error) {
+func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath types.Path) (string, error) {
 	var subPath, fileName string
 
 	hashLen := len(base64Hash)
@@ -249,14 +248,14 @@ func moveFile(src types.Path, dst types.Path) error {
 	return nil
 }
 
-// MoveFileWithHashCheck attempts to move the file src to dst and checks for hash collisions based on metadata
+// MoveFileWithHashCheck checks for hash collisions when moving a temporary file to its destination based on metadata
 // Check if destination file exists. As the destination is based on a hash of the file data,
 // if it exists and the file size does not match then there is a hash collision for two different files. If
 // it exists and the file size matches, it is believable that it is the same file and we can just
 // discard the temporary file.
 func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata, absBasePath types.Path, logger *log.Entry) (string, bool, error) {
 	duplicate := false
-	finalPath, err := GetPathFromMediaMetadata(mediaMetadata.Base64Hash, absBasePath)
+	finalPath, err := GetPathFromBase64Hash(mediaMetadata.Base64Hash, absBasePath)
 	if err != nil {
 		RemoveDir(tmpDir, logger)
 		return "", duplicate, fmt.Errorf("failed to get file path from metadata: %q", err)
