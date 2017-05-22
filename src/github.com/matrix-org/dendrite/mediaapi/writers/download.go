@@ -163,12 +163,22 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 		activeRemoteRequests.Unlock()
 
 		r.respondFromRemoteFile(w, cfg.AbsBasePath, cfg.MaxFileSizeBytes, db, activeRemoteRequests)
-	} else {
-		// If we do not have a record and the origin is local, or if we have another error from the database, the file is not found
+	} else if err == sql.ErrNoRows && r.MediaMetadata.Origin == cfg.ServerName {
+		// If we do not have a record and the origin is local, the file is not found
 		r.Logger.WithError(err).Warn("Failed to look up file in database")
 		r.jsonErrorResponse(w, util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+		})
+	} else {
+		// Another error from the database
+		r.Logger.WithError(err).WithFields(log.Fields{
+			"MediaID": r.MediaMetadata.MediaID,
+			"Origin":  r.MediaMetadata.Origin,
+		}).Error("Error querying the database.")
+		r.jsonErrorResponse(w, util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Internal server error"),
 		})
 	}
 }
