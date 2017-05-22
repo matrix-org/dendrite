@@ -194,6 +194,14 @@ func (r joinRoomReq) joinRoomUsingServers(
 		// TODO: validate the state response.
 		// TODO: check that the join event passes auth against the state response.
 		// TODO: send the state and the join event to the room server.
+
+		return util.JSONResponse{
+			Code: 200,
+			// TODO: Put the response struct somewhere common.
+			JSON: struct {
+				RoomID string `json:"room_id"`
+			}{roomID},
+		}
 	}
 
 	if err != nil {
