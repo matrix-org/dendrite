@@ -441,7 +441,7 @@ func (r *downloadRequest) respondFromRemoteFile(w http.ResponseWriter, absBasePa
 	r.Logger.WithFields(log.Fields{
 		"MediaID": r.MediaMetadata.MediaID,
 		"Origin":  r.MediaMetadata.Origin,
-	}).Infof("Proxying and caching remote file")
+	}).Info("Proxying and caching remote file")
 
 	// The file data is hashed but is NOT used as the MediaID, unlike in Upload. The hash is useful as a
 	// method of deduplicating files to save storage, as well as a way to conduct
