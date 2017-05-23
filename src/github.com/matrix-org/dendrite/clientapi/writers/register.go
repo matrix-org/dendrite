@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/types"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -34,15 +34,15 @@ type registerRequest struct {
 }
 
 type authDict struct {
-	Type    types.LoginType `json:"type"`
-	Session string          `json:"session"`
+	Type    authtypes.LoginType `json:"type"`
+	Session string              `json:"session"`
 	// TODO: Lots of custom keys depending on the type
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
 type userInteractiveResponse struct {
 	Flows     []authFlow             `json:"flows"`
-	Completed []types.LoginType      `json:"completed"`
+	Completed []authtypes.LoginType  `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
 	Session   string                 `json:"session"`
 }
@@ -50,12 +50,12 @@ type userInteractiveResponse struct {
 // authFlow represents one possible way that the client can authenticate a request.
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
 type authFlow struct {
-	Stages []types.LoginType `json:"stages"`
+	Stages []authtypes.LoginType `json:"stages"`
 }
 
 func newUserInteractiveResponse(sessionID string, fs []authFlow) userInteractiveResponse {
 	return userInteractiveResponse{
-		fs, []types.LoginType{}, make(map[string]interface{}), sessionID,
+		fs, []authtypes.LoginType{}, make(map[string]interface{}), sessionID,
 	}
 }
 
@@ -119,7 +119,7 @@ func Register(req *http.Request, accountDB *accounts.Database) util.JSONResponse
 			// TODO: Hard-coded 'dummy' auth for now with a bogus session ID.
 			//       Server admins should be able to change things around (eg enable captcha)
 			JSON: newUserInteractiveResponse("totallyuniquesessionid", []authFlow{
-				{[]types.LoginType{types.LoginTypeDummy}},
+				{[]authtypes.LoginType{authtypes.LoginTypeDummy}},
 			}),
 		}
 	}
@@ -129,7 +129,7 @@ func Register(req *http.Request, accountDB *accounts.Database) util.JSONResponse
 
 	// TODO: email / msisdn / recaptcha auth types.
 	switch r.Auth.Type {
-	case types.LoginTypeDummy:
+	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		return completeRegistration(accountDB, r.Username, r.Password)
 	default:

@@ -22,7 +22,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -91,22 +91,19 @@ type fledglingEvent struct {
 }
 
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request, cfg config.ClientAPI, producer *producers.RoomserverProducer) util.JSONResponse {
+func CreateRoom(req *http.Request, device *authtypes.Device, cfg config.ClientAPI, producer *producers.RoomserverProducer) util.JSONResponse {
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.ServerName)
-	return createRoom(req, cfg, roomID, producer)
+	return createRoom(req, device, cfg, roomID, producer)
 }
 
 // createRoom implements /createRoom
-func createRoom(req *http.Request, cfg config.ClientAPI, roomID string, producer *producers.RoomserverProducer) util.JSONResponse {
+func createRoom(req *http.Request, device *authtypes.Device, cfg config.ClientAPI, roomID string, producer *producers.RoomserverProducer) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
-	userID, resErr := auth.VerifyAccessToken(req)
-	if resErr != nil {
-		return *resErr
-	}
+	userID := device.UserID
 	var r createRoomRequest
-	resErr = httputil.UnmarshalJSONRequest(req, &r)
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}

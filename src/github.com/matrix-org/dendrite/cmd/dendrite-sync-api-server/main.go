@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/config"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
@@ -72,6 +73,12 @@ func main() {
 		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.DataSource, err)
 	}
 
+	// TODO: DO NOT USE THIS DATA SOURCE (it's the sync one, not devices!)
+	deviceDB, err := devices.NewDatabase(cfg.DataSource)
+	if err != nil {
+		log.Panicf("startup: failed to create device database with data source %s : %s", cfg.DataSource, err)
+	}
+
 	pos, err := db.SyncStreamPosition()
 	if err != nil {
 		log.Panicf("startup: failed to get latest sync stream position : %s", err)
@@ -90,6 +97,6 @@ func main() {
 	}
 
 	log.Info("Starting sync server on ", *bindAddr)
-	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, *cfg, sync.NewRequestPool(db, n))
+	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, *cfg, sync.NewRequestPool(db, n), deviceDB)
 	log.Fatal(http.ListenAndServe(*bindAddr, nil))
 }

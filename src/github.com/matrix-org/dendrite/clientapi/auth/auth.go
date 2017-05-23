@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package auth implements authentication checks and storage.
 package auth
 
 import (
@@ -19,28 +20,31 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
 )
 
 // VerifyAccessToken verifies that an access token was supplied in the given HTTP request
-// and returns the user ID it corresponds to. Returns resErr (an error response which can be
+// and returns the device it corresponds to. Returns resErr (an error response which can be
 // sent to the client) if the token is invalid or there was a problem querying the database.
-func VerifyAccessToken(req *http.Request) (userID string, resErr *util.JSONResponse) {
-	token, tokenErr := extractAccessToken(req)
-	if tokenErr != nil {
+func VerifyAccessToken(req *http.Request, deviceDB *devices.Database) (device *authtypes.Device, resErr *util.JSONResponse) {
+	token, err := extractAccessToken(req)
+	if err != nil {
 		resErr = &util.JSONResponse{
 			Code: 401,
-			JSON: jsonerror.MissingToken(tokenErr.Error()),
+			JSON: jsonerror.MissingToken(err.Error()),
 		}
 		return
 	}
-	if token == "fail" {
-		res := util.ErrorResponse(fmt.Errorf("Fatal error"))
-		resErr = &res
+	device, err = deviceDB.GetDeviceByAccessToken(token)
+	if err != nil {
+		resErr = &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Failed to check access token"),
+		}
 	}
-	// TODO: Check the token against the database
-	userID = token
 	return
 }
 
