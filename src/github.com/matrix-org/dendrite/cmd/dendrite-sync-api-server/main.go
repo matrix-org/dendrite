@@ -73,7 +73,7 @@ func main() {
 		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.DataSource, err)
 	}
 
-	// TODO: DO NOT USE THIS DATABASE
+	// TODO: DO NOT USE THIS DATA SOURCE (it's the sync one, not devices!)
 	deviceDB, err := devices.NewDatabase(cfg.DataSource)
 	if err != nil {
 		log.Panicf("startup: failed to create device database with data source %s : %s", cfg.DataSource, err)
