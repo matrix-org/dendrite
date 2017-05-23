@@ -7,3 +7,9 @@ go fmt ./src/...
 go tool vet --all --shadow ./src
 gocyclo -over 12 src/
 gb test
+
+# Check that all the packages can build.
+# When `go build` is given multiple packages it won't output anything, and just
+# checks that everything builds. This seems to do a better job of handling
+# missing imports than `gb build` does.
+GOPATH=$(pwd):$(pwd)/vendor go build github.com/matrix-org/dendrite/cmd/...

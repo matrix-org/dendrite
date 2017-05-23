@@ -119,6 +119,10 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, 
 		EventID        string     `json:"event_id"`
 		OriginServerTS Timestamp  `json:"origin_server_ts"`
 		Origin         ServerName `json:"origin"`
+		// This key is either absent or an empty list.
+		// If it is absent then the pointer is nil and omitempty removes it.
+		// Otherwise it points to an empty list and omitempty keeps it.
+		PrevState *[]EventReference `json:"prev_state,omitempty"`
 	}
 	event.EventBuilder = *eb
 	if event.PrevEvents == nil {
@@ -130,6 +134,16 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, 
 	event.OriginServerTS = AsTimestamp(now)
 	event.Origin = origin
 	event.EventID = eventID
+
+	if event.StateKey != nil {
+		// In early versions of the matrix protocol state events
+		// had a "prev_state" key that listed the state events with
+		// the same type and state key that this event replaced.
+		// This was later dropped from the protocol.
+		// Synapse ignores the contents of the key but still expects
+		// the key to be present in state events.
+		event.PrevState = &emptyEventReferenceList
+	}
 
 	// TODO: Check size limits.
 

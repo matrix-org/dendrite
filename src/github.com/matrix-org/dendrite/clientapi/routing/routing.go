@@ -19,7 +19,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage"
+	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/auth/types"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -34,7 +36,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI, producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI, accountDB *storage.AccountDatabase) {
+func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI, producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI, accountDB *accounts.Database) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/createRoom",
@@ -155,11 +157,11 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI
 // make a util.JSONRequestHandler function into an http.Handler which checks the access token in the request.
 func makeAuthAPI(metricsName string, deviceDB *devices.Database, f func(*http.Request, types.Device) util.JSONResponse) http.Handler {
 	h := util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
-		device, resErr := auth.VerifyAccessToken(req, deviceDB)
+		device, resErr := auth.VerifyAccessTokenNew(req, deviceDB)
 		if resErr != nil {
-			return resErr
+			return *resErr
 		}
-		return f(req, device)
+		return f(req, *device)
 	})
 	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
 }
