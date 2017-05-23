@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -39,14 +39,11 @@ type sendEventResponse struct {
 // SendEvent implements:
 //   /rooms/{roomID}/send/{eventType}/{txnID}
 //   /rooms/{roomID}/state/{eventType}/{stateKey}
-func SendEvent(req *http.Request, roomID, eventType, txnID string, stateKey *string, cfg config.ClientAPI, queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer) util.JSONResponse {
+func SendEvent(req *http.Request, device *authtypes.Device, roomID, eventType, txnID string, stateKey *string, cfg config.ClientAPI, queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer) util.JSONResponse {
 	// parse the incoming http request
-	userID, resErr := auth.VerifyAccessToken(req)
-	if resErr != nil {
-		return *resErr
-	}
+	userID := device.UserID
 	var r map[string]interface{} // must be a JSON object
-	resErr = httputil.UnmarshalJSONRequest(req, &r)
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}

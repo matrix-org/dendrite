@@ -16,7 +16,7 @@ package accounts
 
 import (
 	"database/sql"
-	"github.com/matrix-org/dendrite/clientapi/auth/types"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	// Import the postgres database driver.
@@ -45,7 +45,7 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
 // Returns sql.ErrNoRows if no account exists which matches the given credentials.
-func (d *Database) GetAccountByPassword(localpart, plaintextPassword string) (*types.Account, error) {
+func (d *Database) GetAccountByPassword(localpart, plaintextPassword string) (*authtypes.Account, error) {
 	hash, err := d.accounts.selectPasswordHash(localpart)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (d *Database) GetAccountByPassword(localpart, plaintextPassword string) (*t
 
 // CreateAccount makes a new account with the given login name and password. If no password is supplied,
 // the account will be a passwordless account.
-func (d *Database) CreateAccount(localpart, plaintextPassword string) (*types.Account, error) {
+func (d *Database) CreateAccount(localpart, plaintextPassword string) (*authtypes.Account, error) {
 	hash, err := hashPassword(plaintextPassword)
 	if err != nil {
 		return nil, err

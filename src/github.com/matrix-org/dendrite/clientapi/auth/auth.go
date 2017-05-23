@@ -20,30 +20,16 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/auth/types"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
 )
 
-// VerifyAccessToken TODO: Remove me.
-func VerifyAccessToken(req *http.Request) (userID string, resErr *util.JSONResponse) {
-	token, err := extractAccessToken(req)
-	if err != nil {
-		resErr = &util.JSONResponse{
-			Code: 401,
-			JSON: jsonerror.MissingToken(err.Error()),
-		}
-		return
-	}
-	userID = token
-	return
-}
-
-// VerifyAccessTokenNew verifies that an access token was supplied in the given HTTP request
+// VerifyAccessToken verifies that an access token was supplied in the given HTTP request
 // and returns the device it corresponds to. Returns resErr (an error response which can be
 // sent to the client) if the token is invalid or there was a problem querying the database.
-func VerifyAccessTokenNew(req *http.Request, deviceDB *devices.Database) (device *types.Device, resErr *util.JSONResponse) {
+func VerifyAccessToken(req *http.Request, deviceDB *devices.Database) (device *authtypes.Device, resErr *util.JSONResponse) {
 	token, err := extractAccessToken(req)
 	if err != nil {
 		resErr = &util.JSONResponse{

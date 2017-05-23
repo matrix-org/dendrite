@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
@@ -85,7 +86,11 @@ func main() {
 	if err != nil {
 		log.Panicf("Failed to setup account database(%s): %s", accountDataSource, err.Error())
 	}
+	deviceDB, err := devices.NewDatabase(accountDataSource)
+	if err != nil {
+		log.Panicf("Failed to setup device database(%s): %s", accountDataSource, err.Error())
+	}
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI, accountDB)
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI, accountDB, deviceDB)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }

@@ -15,7 +15,7 @@
 package devices
 
 import (
-	"github.com/matrix-org/dendrite/clientapi/auth/types"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 // Database represents a device database.
@@ -24,14 +24,14 @@ type Database struct {
 }
 
 // NewDatabase creates a new device database
-func NewDatabase() *Database {
-	return &Database{}
+func NewDatabase(dataSource string) (*Database, error) {
+	return &Database{}, nil
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.
-func (d *Database) GetDeviceByAccessToken(token string) (*types.Device, error) {
+func (d *Database) GetDeviceByAccessToken(token string) (*authtypes.Device, error) {
 	// TODO: Actual implementation
-	return &types.Device{
+	return &authtypes.Device{
 		UserID: token,
 	}, nil
 }

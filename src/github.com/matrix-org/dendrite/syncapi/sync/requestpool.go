@@ -19,7 +19,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -41,13 +41,10 @@ func NewRequestPool(db *storage.SyncServerDatabase, n *Notifier) *RequestPool {
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
-func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request) util.JSONResponse {
+func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtypes.Device) util.JSONResponse {
 	// Extract values from request
 	logger := util.GetLogger(req.Context())
-	userID, resErr := auth.VerifyAccessToken(req)
-	if resErr != nil {
-		return *resErr
-	}
+	userID := device.UserID
 	syncReq, err := newSyncRequest(req, userID)
 	if err != nil {
 		return util.JSONResponse{

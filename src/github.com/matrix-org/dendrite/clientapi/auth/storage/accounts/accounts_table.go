@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/types"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -76,10 +76,10 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // insertAccount creates a new account. 'hash' should be the password hash for this account. If it is missing,
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
-func (s *accountsStatements) insertAccount(localpart, hash string) (acc *types.Account, err error) {
+func (s *accountsStatements) insertAccount(localpart, hash string) (acc *authtypes.Account, err error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	if _, err = s.insertAccountStmt.Exec(localpart, createdTimeMS, hash); err == nil {
-		acc = &types.Account{
+		acc = &authtypes.Account{
 			Localpart:  localpart,
 			UserID:     makeUserID(localpart, s.serverName),
 			ServerName: s.serverName,
@@ -93,8 +93,8 @@ func (s *accountsStatements) selectPasswordHash(localpart string) (hash string, 
 	return
 }
 
-func (s *accountsStatements) selectAccountByLocalpart(localpart string) (*types.Account, error) {
-	var acc types.Account
+func (s *accountsStatements) selectAccountByLocalpart(localpart string) (*authtypes.Account, error) {
+	var acc authtypes.Account
 	err := s.selectAccountByLocalpartStmt.QueryRow(localpart).Scan(&acc.Localpart)
 	if err != nil {
 		acc.UserID = makeUserID(localpart, s.serverName)
