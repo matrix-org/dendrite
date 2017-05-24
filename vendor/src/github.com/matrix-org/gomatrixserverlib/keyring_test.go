@@ -70,8 +70,8 @@ func TestVerifyJSONsSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 1 || results[0].Result != nil {
-		t.Fatalf("VerifyJSON(): Wanted [{Result: nil}] got %#v", results)
+	if len(results) != 1 || results[0].Error != nil {
+		t.Fatalf("VerifyJSON(): Wanted [{Error: nil}] got %#v", results)
 	}
 }
 
@@ -86,8 +86,8 @@ func TestVerifyJSONsUnknownServerFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 1 || results[0].Result == nil {
-		t.Fatalf("VerifyJSON(): Wanted [{Result: <some error>}] got %#v", results)
+	if len(results) != 1 || results[0].Error == nil {
+		t.Fatalf("VerifyJSON(): Wanted [{Error: <some error>}] got %#v", results)
 	}
 }
 
@@ -103,8 +103,8 @@ func TestVerifyJSONsDistantFutureFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 1 || results[0].Result == nil {
-		t.Fatalf("VerifyJSON(): Wanted [{Result: <some error>}] got %#v", results)
+	if len(results) != 1 || results[0].Error == nil {
+		t.Fatalf("VerifyJSON(): Wanted [{Error: <some error>}] got %#v", results)
 	}
 }
 

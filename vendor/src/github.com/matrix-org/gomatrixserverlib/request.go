@@ -224,9 +224,9 @@ func VerifyHTTPRequest(
 		util.GetLogger(req.Context()).WithError(err).Print(message)
 		return nil, util.MessageResponse(500, message)
 	}
-	if results[0].Result != nil {
+	if results[0].Error != nil {
 		message := "Invalid request signature"
-		util.GetLogger(req.Context()).WithError(results[0].Result).Print(message)
+		util.GetLogger(req.Context()).WithError(results[0].Error).Print(message)
 		return nil, util.MessageResponse(401, message)
 	}
 

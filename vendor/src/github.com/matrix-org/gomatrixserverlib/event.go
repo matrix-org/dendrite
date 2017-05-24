@@ -103,7 +103,8 @@ type eventFields struct {
 	Redacts        string           `json:"redacts"`
 	Depth          int64            `json:"depth"`
 	Unsigned       rawJSON          `json:"unsigned"`
-	OriginServerTS int64            `json:"origin_server_ts"`
+	OriginServerTS Timestamp        `json:"origin_server_ts"`
+	Origin         ServerName       `json:"origin"`
 }
 
 var emptyEventReferenceList = []EventReference{}
@@ -145,8 +146,6 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, 
 		event.PrevState = &emptyEventReferenceList
 	}
 
-	// TODO: Check size limits.
-
 	var eventJSON []byte
 
 	if eventJSON, err = json.Marshal(&event); err != nil {
@@ -166,7 +165,14 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, 
 	}
 
 	result.eventJSON = eventJSON
-	err = json.Unmarshal(eventJSON, &result.fields)
+	if err = json.Unmarshal(eventJSON, &result.fields); err != nil {
+		return
+	}
+
+	if err = result.CheckFields(); err != nil {
+		return
+	}
+
 	return
 }
 
@@ -184,9 +190,6 @@ func NewEventFromUntrustedJSON(eventJSON []byte) (result Event, err error) {
 	delete(event, "outlier")
 	delete(event, "destinations")
 	delete(event, "age_ts")
-
-	// TODO: Check that the event fields are correctly defined.
-	// TODO: Check size limits.
 
 	if eventJSON, err = json.Marshal(event); err != nil {
 		return
@@ -206,7 +209,14 @@ func NewEventFromUntrustedJSON(eventJSON []byte) (result Event, err error) {
 	}
 
 	result.eventJSON = eventJSON
-	err = json.Unmarshal(eventJSON, &result.fields)
+	if err = json.Unmarshal(eventJSON, &result.fields); err != nil {
+		return
+	}
+
+	if err = result.CheckFields(); err != nil {
+		return
+	}
+
 	return
 }
 
@@ -303,6 +313,125 @@ func (e Event) StateKeyEquals(stateKey string) bool {
 	return *e.fields.StateKey == stateKey
 }
 
+const (
+	// The event ID, room ID, sender, event type and state key fields cannot be
+	// bigger than this.
+	// https://github.com/matrix-org/synapse/blob/v0.21.0/synapse/event_auth.py#L173-L182
+	maxIDLength = 255
+	// The entire event JSON, including signatures cannot be bigger than this.
+	// https://github.com/matrix-org/synapse/blob/v0.21.0/synapse/event_auth.py#L183-184
+	maxEventLength = 65536
+)
+
+// CheckFields checks that the event fields are valid.
+// Returns an error if the IDs have the wrong format or too long.
+// Returns an error if the total length of the event JSON is too long.
+// Returns an error if the event ID doesn't match the origin of the event.
+// https://matrix.org/docs/spec/client_server/r0.2.0.html#size-limits
+func (e Event) CheckFields() error {
+	if len(e.eventJSON) > maxEventLength {
+		return fmt.Errorf(
+			"gomatrixserverlib: event is too long, length %d > maximum %d",
+			len(e.eventJSON), maxEventLength,
+		)
+	}
+
+	if len(e.fields.Type) > maxIDLength {
+		return fmt.Errorf(
+			"gomatrixserverlib: event type is too long, length %d > maximum %d",
+			len(e.fields.Type), maxIDLength,
+		)
+	}
+
+	if e.fields.StateKey != nil && len(*e.fields.StateKey) > maxIDLength {
+		return fmt.Errorf(
+			"gomatrixserverlib: state key is too long, length %d > maximum %d",
+			len(*e.fields.StateKey), maxIDLength,
+		)
+	}
+
+	_, err := checkID(e.fields.RoomID, "room", '!')
+	if err != nil {
+		return err
+	}
+
+	senderDomain, err := checkID(e.fields.Sender, "user", '@')
+	if err != nil {
+		return err
+	}
+
+	eventDomain, err := checkID(e.fields.EventID, "event", '$')
+	if err != nil {
+		return err
+	}
+
+	// Synapse requires that the event ID domain has a valid signature.
+	// https://github.com/matrix-org/synapse/blob/v0.21.0/synapse/event_auth.py#L66-L68
+	// Synapse requires that the event origin has a valid signature.
+	// https://github.com/matrix-org/synapse/blob/v0.21.0/synapse/federation/federation_base.py#L133-L136
+	// Since both domains must be valid domains, and there is no good reason for them
+	// to be different we might as well ensure that they are the same since it
+	// makes the signature checks simpler.
+	if e.fields.Origin != ServerName(eventDomain) {
+		return fmt.Errorf(
+			"gomatrixserverlib: event ID domain doesn't match origin: %q != %q",
+			eventDomain, e.fields.Origin,
+		)
+	}
+
+	if eventDomain != senderDomain {
+		// For the most part all events should be sent by a user on the
+		// originating server
+		// However "m.room.member" events created from third-party invites
+		// are allowed to have a different sender because they have the same
+		// sender as the "m.room.third_party_invite" event they derived from.
+		// https://github.com/matrix-org/synapse/blob/v0.21.0/synapse/event_auth.py#L58-L64
+		if e.fields.Type != "m.room.member" {
+			return fmt.Errorf(
+				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
+				eventDomain, e.fields.Origin,
+			)
+		}
+		c, err := newMemberContentFromEvent(e)
+		if err != nil {
+			return err
+		}
+		if c.Membership != invite || c.ThirdPartyInvite == nil {
+			return fmt.Errorf(
+				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
+				eventDomain, e.fields.Origin,
+			)
+		}
+	}
+
+	return nil
+}
+
+func checkID(id, kind string, sigil byte) (domain string, err error) {
+	domain, err = domainFromID(id)
+	if err != nil {
+		return
+	}
+	if id[0] != sigil {
+		err = fmt.Errorf(
+			"gomatrixserverlib: invalid %s ID, wanted first byte to be '%c' got '%c'",
+			kind, sigil, id[0],
+		)
+		return
+	}
+	if len(id) > maxIDLength {
+		err = fmt.Errorf(
+			"gomatrixserverlib: %s ID is too long, length %d > maximum %d",
+			kind, len(id), maxIDLength,
+		)
+		return
+	}
+	return
+}
+
+// Origin returns the name of the server that sent the event
+func (e Event) Origin() ServerName { return e.fields.Origin }
+
 // EventID returns the event ID of the event.
 func (e Event) EventID() string {
 	return e.fields.EventID
@@ -319,7 +448,7 @@ func (e Event) Type() string {
 }
 
 // OriginServerTS returns the unix timestamp when this event was created on the origin server, with millisecond resolution.
-func (e Event) OriginServerTS() int64 {
+func (e Event) OriginServerTS() Timestamp {
 	return e.fields.OriginServerTS
 }
 

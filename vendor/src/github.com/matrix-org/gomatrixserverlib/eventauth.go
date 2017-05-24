@@ -247,7 +247,7 @@ type AuthEvents struct {
 // the event is replaced with the new event. Only returns an error if the event is not a state event.
 func (a *AuthEvents) AddEvent(event *Event) error {
 	if event.StateKey() == nil {
-		return fmt.Errorf("AddEvent: event %s does not have a state key", event.Type())
+		return fmt.Errorf("AddEvent: event %q does not have a state key", event.Type())
 	}
 	a.events[StateKeyTuple{event.Type(), *event.StateKey()}] = event
 	return nil

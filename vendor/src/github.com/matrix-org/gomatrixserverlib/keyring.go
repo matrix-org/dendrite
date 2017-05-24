@@ -58,7 +58,7 @@ type VerifyJSONResult struct {
 	// Whether the message passed the signature checks.
 	// This will be nil if the message passed the checks.
 	// This will have an error if the message did not pass the checks.
-	Result error
+	Error error
 }
 
 // VerifyJSONs performs bulk JSON signature verification for a list of VerifyJSONRequests.
@@ -73,7 +73,7 @@ func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult,
 	for i := range requests {
 		ids, err := ListKeyIDs(string(requests[i].ServerName), requests[i].Message)
 		if err != nil {
-			results[i].Result = fmt.Errorf("gomatrixserverlib: error extracting key IDs")
+			results[i].Error = fmt.Errorf("gomatrixserverlib: error extracting key IDs")
 			continue
 		}
 		for _, keyID := range ids {
@@ -82,7 +82,7 @@ func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult,
 			}
 		}
 		if len(keyIDs[i]) == 0 {
-			results[i].Result = fmt.Errorf(
+			results[i].Error = fmt.Errorf(
 				"gomatrixserverlib: not signed by %q with a supported algorithm", requests[i].ServerName,
 			)
 			continue
@@ -91,7 +91,7 @@ func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult,
 		// This will be unset if one of the signature checks passes.
 		// This will be overwritten if one of the signature checks fails.
 		// Therefore this will only remain in place if the keys couldn't be downloaded.
-		results[i].Result = fmt.Errorf(
+		results[i].Error = fmt.Errorf(
 			"gomatrixserverlib: could not download key for %q", requests[i].ServerName,
 		)
 	}
@@ -139,7 +139,7 @@ func (k *KeyRing) isAlgorithmSupported(keyID KeyID) bool {
 func (k *KeyRing) publicKeyRequests(requests []VerifyJSONRequest, results []VerifyJSONResult, keyIDs [][]KeyID) map[PublicKeyRequest]Timestamp {
 	keyRequests := map[PublicKeyRequest]Timestamp{}
 	for i := range requests {
-		if results[i].Result == nil {
+		if results[i].Error == nil {
 			// We've already verified this message, we don't need to refetch the keys for it.
 			continue
 		}
@@ -165,7 +165,7 @@ func (k *KeyRing) checkUsingKeys(
 	keys map[PublicKeyRequest]ServerKeys,
 ) {
 	for i := range requests {
-		if results[i].Result == nil {
+		if results[i].Error == nil {
 			// We've already checked this message and it passed the signature checks.
 			// So we can skip to the next message.
 			continue
@@ -180,7 +180,7 @@ func (k *KeyRing) checkUsingKeys(
 			if publicKey == nil {
 				// The key wasn't valid at the timestamp we needed it to be valid at.
 				// So skip onto the next key.
-				results[i].Result = fmt.Errorf(
+				results[i].Error = fmt.Errorf(
 					"gomatrixserverlib: key with ID %q for %q not valid at %d",
 					keyID, requests[i].ServerName, requests[i].AtTS,
 				)
@@ -190,11 +190,11 @@ func (k *KeyRing) checkUsingKeys(
 				string(requests[i].ServerName), keyID, ed25519.PublicKey(publicKey), requests[i].Message,
 			); err != nil {
 				// The signature wasn't valid, record the error and try the next key ID.
-				results[i].Result = err
+				results[i].Error = err
 				continue
 			}
 			// The signature is valid, set the result to nil.
-			results[i].Result = nil
+			results[i].Error = nil
 			break
 		}
 	}

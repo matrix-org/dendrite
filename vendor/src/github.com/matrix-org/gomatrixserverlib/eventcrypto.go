@@ -184,3 +184,55 @@ func verifyEventSignature(signingName string, keyID KeyID, publicKey ed25519.Pub
 
 	return VerifyJSON(signingName, keyID, publicKey, redactedJSON)
 }
+
+// VerifyEventSignatures checks that each event in a list of events has valid
+// signatures from the server that sent it.
+func VerifyEventSignatures(events []Event, keyRing KeyRing) error {
+	var toVerify []VerifyJSONRequest
+	for _, event := range events {
+		redactedJSON, err := redactEvent(event.eventJSON)
+		if err != nil {
+			return err
+		}
+		v := VerifyJSONRequest{
+			Message:    redactedJSON,
+			AtTS:       event.OriginServerTS(),
+			ServerName: event.Origin(),
+		}
+		toVerify = append(toVerify, v)
+
+		// "m.room.member" invite events are signed by both the server sending
+		// the invite and the server the invite is for.
+		if event.Type() == "m.room.member" && event.StateKey() != nil {
+			targetDomain, err := domainFromID(*event.StateKey())
+			if err != nil {
+				return err
+			}
+			if ServerName(targetDomain) != event.Origin() {
+				c, err := newMemberContentFromEvent(event)
+				if err != nil {
+					return err
+				}
+				if c.Membership == invite {
+					v.ServerName = ServerName(targetDomain)
+					toVerify = append(toVerify, v)
+				}
+			}
+		}
+	}
+
+	results, err := keyRing.VerifyJSONs(toVerify)
+	if err != nil {
+		return err
+	}
+
+	// Check that all the event JSON was correctly signed.
+	for _, result := range results {
+		if result.Error != nil {
+			return result.Error
+		}
+	}
+
+	// Everything was okay.
+	return nil
+}
