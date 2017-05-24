@@ -15,17 +15,30 @@
 package devices
 
 import (
+	"database/sql"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // Database represents a device database.
 type Database struct {
-	// TODO
+	db      *sql.DB
+	devices devicesStatements
 }
 
 // NewDatabase creates a new device database
-func NewDatabase(dataSource string) (*Database, error) {
-	return &Database{}, nil
+func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
+	var db *sql.DB
+	var err error
+	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+		return nil, err
+	}
+	d := devicesStatements{}
+	if err = d.prepare(db, serverName); err != nil {
+		return nil, err
+	}
+	return &Database{db, d}, nil
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.

@@ -46,6 +46,9 @@ func loadConfig(configPath string) (*config.Sync, error) {
 		return nil, err
 	}
 	// check required fields
+	if cfg.ServerName == "" {
+		log.Fatalf("'server_name' must be supplied in %s", configPath)
+	}
 	return &cfg, nil
 }
 
@@ -74,7 +77,7 @@ func main() {
 	}
 
 	// TODO: DO NOT USE THIS DATA SOURCE (it's the sync one, not devices!)
-	deviceDB, err := devices.NewDatabase(cfg.DataSource)
+	deviceDB, err := devices.NewDatabase(cfg.DataSource, cfg.ServerName)
 	if err != nil {
 		log.Panicf("startup: failed to create device database with data source %s : %s", cfg.DataSource, err)
 	}

@@ -14,6 +14,10 @@
 
 package config
 
+import (
+	"github.com/matrix-org/gomatrixserverlib"
+)
+
 // Sync contains the config information necessary to spin up a sync-server process.
 type Sync struct {
 	// The topic for events which are written by the room server output log.
@@ -22,4 +26,6 @@ type Sync struct {
 	KafkaConsumerURIs []string `yaml:"consumer_uris"`
 	// The postgres connection config for connecting to the database e.g a postgres:// URI
 	DataSource string `yaml:"database"`
+	// The server_name of the running process e.g "localhost"
+	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 }

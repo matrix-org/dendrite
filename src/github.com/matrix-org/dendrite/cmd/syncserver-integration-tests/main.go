@@ -83,6 +83,7 @@ func getLastRequestError() error {
 var syncServerConfigFileContents = (`consumer_uris: ["` + kafkaURI + `"]
 roomserver_topic: "` + inputTopic + `"
 database: "` + testDatabase + `"
+server_name: "localhost"
 `)
 
 func defaulting(value, defaultValue string) string {
