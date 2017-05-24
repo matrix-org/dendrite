@@ -75,6 +75,7 @@ func (d *Database) CreateDevice(localpart, deviceID string) (dev *authtypes.Devi
 	return
 }
 
+// TODO: factor out to common
 func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 	txn, err := db.Begin()
 	if err != nil {
