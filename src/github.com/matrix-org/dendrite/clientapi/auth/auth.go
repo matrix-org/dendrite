@@ -16,6 +16,7 @@
 package auth
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -40,9 +41,16 @@ func VerifyAccessToken(req *http.Request, deviceDB *devices.Database) (device *a
 	}
 	device, err = deviceDB.GetDeviceByAccessToken(token)
 	if err != nil {
-		resErr = &util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.Unknown("Failed to check access token"),
+		if err == sql.ErrNoRows {
+			resErr = &util.JSONResponse{
+				Code: 403,
+				JSON: jsonerror.Unknown("Invalid access token"),
+			}
+		} else {
+			resErr = &util.JSONResponse{
+				Code: 500,
+				JSON: jsonerror.Unknown("Failed to check access token"),
+			}
 		}
 	}
 	return
