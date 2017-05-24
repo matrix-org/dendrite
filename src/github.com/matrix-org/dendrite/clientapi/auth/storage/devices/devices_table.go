@@ -88,6 +88,7 @@ func (s *devicesStatements) insertDevice(txn *sql.Tx, id, localpart, accessToken
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	if _, err = s.insertDeviceStmt.Exec(id, localpart, accessToken, createdTimeMS); err == nil {
 		dev = &authtypes.Device{
+			ID:          id,
 			UserID:      makeUserID(localpart, s.serverName),
 			AccessToken: accessToken,
 		}
@@ -103,7 +104,7 @@ func (s *devicesStatements) deleteDevice(txn *sql.Tx, id, localpart string) erro
 func (s *devicesStatements) selectDeviceByToken(accessToken string) (*authtypes.Device, error) {
 	var dev authtypes.Device
 	var localpart string
-	err := s.selectDeviceByTokenStmt.QueryRow(accessToken).Scan(&localpart)
+	err := s.selectDeviceByTokenStmt.QueryRow(accessToken).Scan(&dev.ID, &localpart)
 	if err != nil {
 		dev.UserID = makeUserID(localpart, s.serverName)
 		dev.AccessToken = accessToken
