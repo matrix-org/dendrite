@@ -160,57 +160,20 @@ func (r joinRoomReq) joinRoomUsingServers(
 		panic(fmt.Errorf("Joining rooms that the server already in is not implemented"))
 	}
 
-	var event gomatrixserverlib.Event
-	var respMakeJoin gomatrixserverlib.RespMakeJoin
-	var respSendJoin gomatrixserverlib.RespSendJoin
+	var response util.JSONResponse
 	for _, server := range servers {
-		respMakeJoin, err = r.federation.MakeJoin(server, roomID, r.userID)
+		response, err = r.joinRoomUsingServer(roomID, server)
 		if err != nil {
-			// TODO: Check if the user was not allowed to join the room.
-
-			// Try the next server in the list.
+			// There was a problem talking to one of the servers.
+			util.GetLogger(r.req.Context()).WithError(err).WithField("server", server).Warn("Failed to join room using server")
+			// Try the next server.
 			continue
 		}
-
-		// Set all the fields to be what they should be, this should be a no-op
-		// but it's possible that the remote server returned us something "odd"
-		r.writeToBuilder(&respMakeJoin.JoinEvent, roomID)
-
-		now := time.Now()
-		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.ServerName)
-		if event, err = respMakeJoin.JoinEvent.Build(
-			eventID, now, r.cfg.ServerName, r.cfg.KeyID, r.cfg.PrivateKey,
-		); err != nil {
-			return httputil.LogThenError(r.req, err)
-		}
-		respSendJoin, err = r.federation.SendJoin(server, event)
-		if err != nil {
-			// Try the next server in the list.
-			continue
-		}
-
-		if err = respSendJoin.Check(r.keyRing, event); err != nil {
-			// Try the next server in the list.
-			continue
-		}
-
-		if err = r.producer.SendEventWithState(
-			gomatrixserverlib.RespState(respSendJoin), event,
-		); err != nil {
-			return httputil.LogThenError(r.req, err)
-		}
-
-		return util.JSONResponse{
-			Code: 200,
-			// TODO: Put the response struct somewhere common.
-			JSON: struct {
-				RoomID string `json:"room_id"`
-			}{roomID},
-		}
+		return response
 	}
 
 	if err != nil {
-		// TODO: Gerenerate the correct HTTP status code for all different
+		// TODO: Generate the correct HTTP status code for all different
 		// kinds of errors that could have happened.
 		// The possible errors include:
 		//   1) We can't connect to the remote servers.
@@ -230,6 +193,56 @@ func (r joinRoomReq) joinRoomUsingServers(
 		Code: 404,
 		JSON: jsonerror.NotFound("No candidate servers found for room"),
 	}
+}
+
+// joinRoomUsingServer tries to join a remote room using a given matrix server.
+// If there was a failure communicating with the server or the response from the
+// server was invalid this returns an error.
+// Otherwise this returns a JSONResponse.
+func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (util.JSONResponse, error) {
+	respMakeJoin, err := r.federation.MakeJoin(server, roomID, r.userID)
+	if err != nil {
+		// TODO: Check if the user was not allowed to join the room.
+		return util.JSONResponse{}, err
+	}
+
+	// Set all the fields to be what they should be, this should be a no-op
+	// but it's possible that the remote server returned us something "odd"
+	r.writeToBuilder(&respMakeJoin.JoinEvent, roomID)
+
+	now := time.Now()
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.ServerName)
+	event, err := respMakeJoin.JoinEvent.Build(
+		eventID, now, r.cfg.ServerName, r.cfg.KeyID, r.cfg.PrivateKey,
+	)
+	if err != nil {
+		return httputil.LogThenError(r.req, err), nil
+	}
+
+	respSendJoin, err := r.federation.SendJoin(server, event)
+	if err != nil {
+		// Try the next server in the list.
+		return util.JSONResponse{}, err
+	}
+
+	if err = respSendJoin.Check(r.keyRing, event); err != nil {
+		// Try the next server in the list.
+		return util.JSONResponse{}, err
+	}
+
+	if err = r.producer.SendEventWithState(
+		gomatrixserverlib.RespState(respSendJoin), event,
+	); err != nil {
+		return httputil.LogThenError(r.req, err), nil
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		// TODO: Put the response struct somewhere common.
+		JSON: struct {
+			RoomID string `json:"room_id"`
+		}{roomID},
+	}, nil
 }
 
 // domainFromID returns everything after the first ":" character to extract
