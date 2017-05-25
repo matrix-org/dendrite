@@ -167,12 +167,13 @@ func (r joinRoomReq) joinRoomUsingServers(
 		}
 	}
 
+	var lastErr error
 	for _, server := range servers {
 		var response *util.JSONResponse
-		response, err = r.joinRoomUsingServer(roomID, server)
-		if err != nil {
+		response, lastErr = r.joinRoomUsingServer(roomID, server)
+		if lastErr != nil {
 			// There was a problem talking to one of the servers.
-			util.GetLogger(r.req.Context()).WithError(err).WithField("server", server).Warn("Failed to join room using server")
+			util.GetLogger(r.req.Context()).WithError(lastErr).WithField("server", server).Warn("Failed to join room using server")
 			// Try the next server.
 			continue
 		}
@@ -192,7 +193,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 	//   4) We couldn't fetch the public keys needed to verify the
 	//      signatures on the state events.
 	//   5) ...
-	return httputil.LogThenError(r.req, err)
+	return httputil.LogThenError(r.req, lastErr)
 }
 
 // joinRoomUsingServer tries to join a remote room using a given matrix server.
