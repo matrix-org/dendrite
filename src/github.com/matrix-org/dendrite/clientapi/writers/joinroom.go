@@ -74,10 +74,10 @@ type joinRoomReq struct {
 	keyRing    gomatrixserverlib.KeyRing
 }
 
-// joinRoomByID joins a room by roomID
+// joinRoomByID joins a room by room ID
 func (r joinRoomReq) joinRoomByID() util.JSONResponse {
 	// TODO: Implement joining rooms by ID.
-	// A client should only join a room by roomID when it has an invite
+	// A client should only join a room by room ID when it has an invite
 	// to the room. If the server is already in the room then we can
 	// lookup the invite and process the request as a normal state event.
 	// If the server is not in the room the we will need to look up the
