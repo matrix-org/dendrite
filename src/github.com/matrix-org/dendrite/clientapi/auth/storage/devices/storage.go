@@ -44,18 +44,15 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 // GetDeviceByAccessToken returns the device matching the given access token.
 // Returns sql.ErrNoRows if no matching device was found.
 func (d *Database) GetDeviceByAccessToken(token string) (*authtypes.Device, error) {
-	// return d.devices.selectDeviceByToken(token) TODO: Figure out how to make integ tests pass
-	return &authtypes.Device{
-		UserID:      token,
-		AccessToken: token,
-	}, nil
+	return d.devices.selectDeviceByToken(token)
 }
 
 // CreateDevice makes a new device associated with the given user ID localpart.
 // If there is already a device with the same device ID for this user, that access token will be revoked
-// and replaced with a newly generated token.
+// and replaced with a newly generated token. If 'desiredAccessToken' is specified, the device will be
+// created with that access_token and an error will be returned if this is not possible.
 // Returns the device on success.
-func (d *Database) CreateDevice(localpart, deviceID string) (dev *authtypes.Device, returnErr error) {
+func (d *Database) CreateDevice(localpart, deviceID, desiredAccessToken string) (dev *authtypes.Device, returnErr error) {
 	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
 		// Revoke existing token for this device
@@ -65,6 +62,10 @@ func (d *Database) CreateDevice(localpart, deviceID string) (dev *authtypes.Devi
 		// TODO: generate an access token. We should probably make sure that it's not possible for this
 		//       token to be the same as the one we just revoked...
 		accessToken := makeUserID(localpart, d.devices.serverName)
+
+		if desiredAccessToken != "" {
+			accessToken = desiredAccessToken
+		}
 
 		dev, err = d.devices.insertDevice(txn, deviceID, localpart, accessToken)
 		if err != nil {
