@@ -38,6 +38,8 @@ type RoomserverQueryAPIDatabase interface {
 	// Lookup the Events for a list of numeric event IDs.
 	// Returns a list of events sorted by numeric event ID.
 	Events(eventNIDs []types.EventNID) ([]types.Event, error)
+	// Lookup the state at a list of string event IDs.
+	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
 }
 
 // RoomserverQueryAPI is an implementation of RoomserverQueryAPI
@@ -88,6 +90,33 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	return nil
 }
 
+// QueryStateAfterEvents implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryStateAfterEvents(
+	request *api.QueryStateAfterEventsRequest,
+	response *api.QueryStateAfterEventsResponse,
+) (err error) {
+	response.QueryStateAfterEventsRequest = *request
+	roomNID, err := r.DB.RoomNID(request.RoomID)
+	if err != nil {
+		return err
+	}
+	if roomNID == 0 {
+		return nil
+	}
+	response.RoomExists = true
+
+	_, err = r.DB.StateAtEventIDs(request.PrevEventIDs)
+	if err != nil {
+		// TODO: Check if the error was because we are missing events from the
+		// database or are missing state at events from the database.
+		return err
+	}
+	response.PrevEventsExist = true
+
+	// TODO: Calculate the state and return it.
+	return nil
+}
+
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
@@ -99,6 +128,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryLatestEventsAndState(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryStateAfterEventsPath,
+		makeAPI("query_state_after_events", func(req *http.Request) util.JSONResponse {
+			var request api.QueryStateAfterEventsRequest
+			var response api.QueryStateAfterEventsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryStateAfterEvents(&request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
