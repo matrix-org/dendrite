@@ -167,8 +167,8 @@ func (r joinRoomReq) joinRoomUsingServers(
 		}
 	}
 
-	var response util.JSONResponse
 	for _, server := range servers {
+		var response *util.JSONResponse
 		response, err = r.joinRoomUsingServer(roomID, server)
 		if err != nil {
 			// There was a problem talking to one of the servers.
@@ -176,7 +176,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 			// Try the next server.
 			continue
 		}
-		return response
+		return *response
 	}
 
 	// Every server we tried to join through resulted in an error.
@@ -199,11 +199,11 @@ func (r joinRoomReq) joinRoomUsingServers(
 // If there was a failure communicating with the server or the response from the
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
-func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (util.JSONResponse, error) {
+func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
 	respMakeJoin, err := r.federation.MakeJoin(server, roomID, r.userID)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
-		return util.JSONResponse{}, err
+		return nil, err
 	}
 
 	// Set all the fields to be what they should be, this should be a no-op
@@ -216,25 +216,27 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		eventID, now, r.cfg.ServerName, r.cfg.KeyID, r.cfg.PrivateKey,
 	)
 	if err != nil {
-		return httputil.LogThenError(r.req, err), nil
+		res := httputil.LogThenError(r.req, err)
+		return &res, nil
 	}
 
 	respSendJoin, err := r.federation.SendJoin(server, event)
 	if err != nil {
-		return util.JSONResponse{}, err
+		return nil, err
 	}
 
 	if err = respSendJoin.Check(r.keyRing, event); err != nil {
-		return util.JSONResponse{}, err
+		return nil, err
 	}
 
 	if err = r.producer.SendEventWithState(
 		gomatrixserverlib.RespState(respSendJoin), event,
 	); err != nil {
-		return httputil.LogThenError(r.req, err), nil
+		res := httputil.LogThenError(r.req, err)
+		return &res, nil
 	}
 
-	return util.JSONResponse{
+	return &util.JSONResponse{
 		Code: 200,
 		// TODO: Put the response struct somewhere common.
 		JSON: struct {
