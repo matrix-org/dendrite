@@ -28,6 +28,22 @@ const (
 	leave  = "leave"
 	invite = "invite"
 	public = "public"
+	// MRoomCreate https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-create
+	MRoomCreate = "m.room.create"
+	// MRoomJoinRules https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-join-rules
+	MRoomJoinRules = "m.room.join_rules"
+	// MRoomPowerLevels https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-power-levels
+	MRoomPowerLevels = "m.room.power_levels"
+	// MRoomMember https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-member
+	MRoomMember = "m.room.member"
+	// MRoomThirdPartyInvite https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-third-party-invite
+	MRoomThirdPartyInvite = "m.room.third_party_invite"
+	// MRoomAliases https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-aliases
+	MRoomAliases = "m.room.aliases"
+	// MRoomHistoryVisibility https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-history-visibility
+	MRoomHistoryVisibility = "m.room.history_visibility"
+	// MRoomRedaction https://matrix.org/docs/spec/client_server/r0.2.0.html#id21
+	MRoomRedaction = "m.room.redaction"
 )
 
 // StateNeeded lists the event types and state_keys needed to authenticate an event.
@@ -47,19 +63,19 @@ type StateNeeded struct {
 // Tuples returns the needed state key tuples for performing auth on an event.
 func (s StateNeeded) Tuples() (res []StateKeyTuple) {
 	if s.Create {
-		res = append(res, StateKeyTuple{"m.room.create", ""})
+		res = append(res, StateKeyTuple{MRoomCreate, ""})
 	}
 	if s.JoinRules {
-		res = append(res, StateKeyTuple{"m.room.join_rules", ""})
+		res = append(res, StateKeyTuple{MRoomJoinRules, ""})
 	}
 	if s.PowerLevels {
-		res = append(res, StateKeyTuple{"m.room.power_levels", ""})
+		res = append(res, StateKeyTuple{MRoomPowerLevels, ""})
 	}
 	for _, userID := range s.Member {
-		res = append(res, StateKeyTuple{"m.room.member", userID})
+		res = append(res, StateKeyTuple{MRoomMember, userID})
 	}
 	for _, token := range s.ThirdPartyInvite {
-		res = append(res, StateKeyTuple{"m.room.third_party_invite", token})
+		res = append(res, StateKeyTuple{MRoomThirdPartyInvite, token})
 	}
 	return
 }
@@ -114,7 +130,7 @@ func (s StateNeeded) AuthEventReferences(provider AuthEventProvider) (refs []Eve
 func StateNeededForEventBuilder(builder *EventBuilder) (result StateNeeded, err error) {
 	// Extract the 'content' object from the event if it is m.room.member as we need to know 'membership'
 	var content *memberContent
-	if builder.Type == "m.room.member" {
+	if builder.Type == MRoomMember {
 		if err = json.Unmarshal(builder.Content, &content); err != nil {
 			err = errorf("unparsable member event content: %s", err.Error())
 			return
@@ -132,7 +148,7 @@ func StateNeededForAuth(events []Event) (result StateNeeded) {
 	for _, event := range events {
 		// Extract the 'content' object from the event if it is m.room.member as we need to know 'membership'
 		var content *memberContent
-		if event.Type() == "m.room.member" {
+		if event.Type() == MRoomMember {
 			c, err := newMemberContentFromEvent(event)
 			if err == nil {
 				content = &c
@@ -151,17 +167,17 @@ func StateNeededForAuth(events []Event) (result StateNeeded) {
 
 func accumulateStateNeeded(result *StateNeeded, eventType, sender string, stateKey *string, content *memberContent) (err error) {
 	switch eventType {
-	case "m.room.create":
+	case MRoomCreate:
 		// The create event doesn't require any state to authenticate.
 		// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L123
-	case "m.room.aliases":
+	case MRoomAliases:
 		// Alias events need:
 		//  * The create event.
 		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L128
 		// Alias events need no further authentication.
 		// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L160
 		result.Create = true
-	case "m.room.member":
+	case MRoomMember:
 		// Member events need:
 		//  * The previous membership of the target.
 		//    https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L355
@@ -255,27 +271,27 @@ func (a *AuthEvents) AddEvent(event *Event) error {
 
 // Create implements AuthEventProvider
 func (a *AuthEvents) Create() (*Event, error) {
-	return a.events[StateKeyTuple{"m.room.create", ""}], nil
+	return a.events[StateKeyTuple{MRoomCreate, ""}], nil
 }
 
 // JoinRules implements AuthEventProvider
 func (a *AuthEvents) JoinRules() (*Event, error) {
-	return a.events[StateKeyTuple{"m.room.join_rules", ""}], nil
+	return a.events[StateKeyTuple{MRoomJoinRules, ""}], nil
 }
 
 // PowerLevels implements AuthEventProvider
 func (a *AuthEvents) PowerLevels() (*Event, error) {
-	return a.events[StateKeyTuple{"m.room.power_levels", ""}], nil
+	return a.events[StateKeyTuple{MRoomPowerLevels, ""}], nil
 }
 
 // Member implements AuthEventProvider
 func (a *AuthEvents) Member(stateKey string) (*Event, error) {
-	return a.events[StateKeyTuple{"m.room.member", stateKey}], nil
+	return a.events[StateKeyTuple{MRoomMember, stateKey}], nil
 }
 
 // ThirdPartyInvite implements AuthEventProvider
 func (a *AuthEvents) ThirdPartyInvite(stateKey string) (*Event, error) {
-	return a.events[StateKeyTuple{"m.room.third_party_invite", stateKey}], nil
+	return a.events[StateKeyTuple{MRoomThirdPartyInvite, stateKey}], nil
 }
 
 // NewAuthEvents returns an AuthEventProvider backed by the given events. New events can be added by
@@ -306,15 +322,15 @@ func errorf(message string, args ...interface{}) error {
 // If there was an error loading the auth events then it returns that error.
 func Allowed(event Event, authEvents AuthEventProvider) error {
 	switch event.Type() {
-	case "m.room.create":
+	case MRoomCreate:
 		return createEventAllowed(event)
-	case "m.room.aliases":
+	case MRoomAliases:
 		return aliasEventAllowed(event, authEvents)
-	case "m.room.member":
+	case MRoomMember:
 		return memberEventAllowed(event, authEvents)
-	case "m.room.power_levels":
+	case MRoomPowerLevels:
 		return powerLevelsEventAllowed(event, authEvents)
-	case "m.room.redaction":
+	case MRoomRedaction:
 		return redactEventAllowed(event, authEvents)
 	default:
 		return defaultEventAllowed(event, authEvents)

@@ -76,7 +76,11 @@ func makeProxy(targetURL string) (*httputil.ReverseProxy, error) {
 				"url":    targetURL,
 				"method": req.Method,
 			}).Print("proxying request")
-			newURL, err := url.Parse(targetURL + path)
+			newURL, err := url.Parse(targetURL)
+			// Set the path separately as we need to preserve '#' characters
+			// that would otherwise be interpreted as being the start of a URL
+			// fragment.
+			newURL.Path += path
 			if err != nil {
 				// We already checked that we can parse the URL
 				// So this shouldn't ever get hit.

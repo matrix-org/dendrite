@@ -386,7 +386,7 @@ func (e Event) CheckFields() error {
 		// are allowed to have a different sender because they have the same
 		// sender as the "m.room.third_party_invite" event they derived from.
 		// https://github.com/matrix-org/synapse/blob/v0.21.0/synapse/event_auth.py#L58-L64
-		if e.fields.Type != "m.room.member" {
+		if e.fields.Type != MRoomMember {
 			return fmt.Errorf(
 				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
 				eventDomain, e.fields.Origin,

@@ -201,9 +201,9 @@ func VerifyEventSignatures(events []Event, keyRing KeyRing) error {
 		}
 		toVerify = append(toVerify, v)
 
-		// "m.room.member" invite events are signed by both the server sending
+		// MRoomMember invite events are signed by both the server sending
 		// the invite and the server the invite is for.
-		if event.Type() == "m.room.member" && event.StateKey() != nil {
+		if event.Type() == MRoomMember && event.StateKey() != nil {
 			targetDomain, err := domainFromID(*event.StateKey())
 			if err != nil {
 				return err

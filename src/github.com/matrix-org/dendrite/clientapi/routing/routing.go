@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/writers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -36,13 +37,27 @@ const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI, producer *producers.RoomserverProducer,
-	queryAPI api.RoomserverQueryAPI, accountDB *accounts.Database, deviceDB *devices.Database) {
+func Setup(
+	servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI,
+	producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+	federation *gomatrixserverlib.FederationClient,
+	keyRing gomatrixserverlib.KeyRing,
+) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/createRoom",
 		common.MakeAuthAPI("createRoom", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return writers.CreateRoom(req, device, cfg, producer)
+		}),
+	)
+	r0mux.Handle("/join/{roomIDOrAlias}",
+		common.MakeAuthAPI("join", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return writers.JoinRoomByIDOrAlias(
+				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, keyRing,
+			)
 		}),
 	)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",

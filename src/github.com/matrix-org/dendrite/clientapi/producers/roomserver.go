@@ -45,20 +45,59 @@ func NewRoomserverProducer(kafkaURIs []string, topic string) (*RoomserverProduce
 func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event) error {
 	eventIDs := make([]string, len(events))
 	ires := make([]api.InputRoomEvent, len(events))
-	for i := range events {
-		var authEventIDs []string
-		for _, ref := range events[i].AuthEvents() {
-			authEventIDs = append(authEventIDs, ref.EventID)
-		}
-		ire := api.InputRoomEvent{
+	for i, event := range events {
+		ires[i] = api.InputRoomEvent{
 			Kind:         api.KindNew,
-			Event:        events[i].JSON(),
-			AuthEventIDs: authEventIDs,
+			Event:        event.JSON(),
+			AuthEventIDs: authEventIDs(event),
 		}
-		ires[i] = ire
-		eventIDs[i] = events[i].EventID()
+		eventIDs[i] = event.EventID()
 	}
 	return c.SendInputRoomEvents(ires, eventIDs)
+}
+
+// SendEventWithState writes an event with KindNew to the roomserver input log
+// with the state at the event as KindOutlier before it.
+func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespState, event gomatrixserverlib.Event) error {
+	outliers, err := state.Events()
+	if err != nil {
+		return err
+	}
+
+	eventIDs := make([]string, len(outliers)+1)
+	ires := make([]api.InputRoomEvent, len(outliers)+1)
+	for i, outlier := range outliers {
+		ires[i] = api.InputRoomEvent{
+			Kind:         api.KindOutlier,
+			Event:        outlier.JSON(),
+			AuthEventIDs: authEventIDs(outlier),
+		}
+		eventIDs[i] = outlier.EventID()
+	}
+
+	stateEventIDs := make([]string, len(state.StateEvents))
+	for i := range state.StateEvents {
+		stateEventIDs[i] = state.StateEvents[i].EventID()
+	}
+
+	ires[len(outliers)] = api.InputRoomEvent{
+		Kind:          api.KindNew,
+		Event:         event.JSON(),
+		AuthEventIDs:  authEventIDs(event),
+		HasState:      true,
+		StateEventIDs: stateEventIDs,
+	}
+	eventIDs[len(outliers)] = event.EventID()
+
+	return c.SendInputRoomEvents(ires, eventIDs)
+}
+
+// TODO Make this a method on gomatrixserverlib.Event
+func authEventIDs(event gomatrixserverlib.Event) (ids []string) {
+	for _, ref := range event.AuthEvents() {
+		ids = append(ids, ref.EventID)
+	}
+	return
 }
 
 // SendInputRoomEvents writes the given input room events to the roomserver input log. The length of both
