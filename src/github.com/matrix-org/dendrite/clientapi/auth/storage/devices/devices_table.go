@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS devices (
     access_token TEXT NOT NULL PRIMARY KEY,
     -- The device identifier. This only needs to uniquely identify a device for a given user, not globally.
     -- access_tokens will be clobbered based on the device ID for a user.
-    id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
     -- The Matrix user ID localpart for this device. This is preferable to storing the full user_id
     -- as it is smaller, makes it clearer that we only manage devices for our own users, and may make
     -- migration to different domain names easier.
@@ -42,17 +42,17 @@ CREATE TABLE IF NOT EXISTS devices (
 );
 
 -- Device IDs must be unique for a given user.
-CREATE UNIQUE INDEX IF NOT EXISTS localpart_id_idx ON devices(localpart, id);
+CREATE UNIQUE INDEX IF NOT EXISTS localpart_id_idx ON devices(localpart, device_id);
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO devices(id, localpart, access_token, created_ts) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO devices(device_id, localpart, access_token, created_ts) VALUES ($1, $2, $3, $4)"
 
 const selectDeviceByTokenSQL = "" +
-	"SELECT id, localpart FROM devices WHERE access_token = $1"
+	"SELECT device_id, localpart FROM devices WHERE access_token = $1"
 
 const deleteDeviceSQL = "" +
-	"DELETE FROM devices WHERE id = $1 AND localpart = $2"
+	"DELETE FROM devices WHERE device_id = $1 AND localpart = $2"
 
 // TODO: List devices?
 
