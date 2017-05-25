@@ -160,6 +160,13 @@ func (r joinRoomReq) joinRoomUsingServers(
 		panic(fmt.Errorf("Joining rooms that the server already in is not implemented"))
 	}
 
+	if len(servers) == 0 {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("No candidate servers found for room"),
+		}
+	}
+
 	var response util.JSONResponse
 	for _, server := range servers {
 		response, err = r.joinRoomUsingServer(roomID, server)
@@ -172,27 +179,20 @@ func (r joinRoomReq) joinRoomUsingServers(
 		return response
 	}
 
-	if err != nil {
-		// TODO: Generate the correct HTTP status code for all different
-		// kinds of errors that could have happened.
-		// The possible errors include:
-		//   1) We can't connect to the remote servers.
-		//   2) None of the servers we could connect to think we are allowed
-		//	    to join the room.
-		//   3) The remote server returned something invalid.
-		//   4) We couldn't fetch the public keys needed to verify the
-		//      signatures on the state events.
-		//   5) ...
-		return httputil.LogThenError(r.req, err)
-	}
+	// Every server we tried to join through resulted in an error.
+	// We return the error from the last server.
 
-	// This should only be reached if the list of candidate servers was empty.
-	// If the list was non-empty then either the loop body would have returned
-	// or err would be non-nil.
-	return util.JSONResponse{
-		Code: 404,
-		JSON: jsonerror.NotFound("No candidate servers found for room"),
-	}
+	// TODO: Generate the correct HTTP status code for all different
+	// kinds of errors that could have happened.
+	// The possible errors include:
+	//   1) We can't connect to the remote servers.
+	//   2) None of the servers we could connect to think we are allowed
+	//	    to join the room.
+	//   3) The remote server returned something invalid.
+	//   4) We couldn't fetch the public keys needed to verify the
+	//      signatures on the state events.
+	//   5) ...
+	return httputil.LogThenError(r.req, err)
 }
 
 // joinRoomUsingServer tries to join a remote room using a given matrix server.
@@ -221,12 +221,10 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 
 	respSendJoin, err := r.federation.SendJoin(server, event)
 	if err != nil {
-		// Try the next server in the list.
 		return util.JSONResponse{}, err
 	}
 
 	if err = respSendJoin.Check(r.keyRing, event); err != nil {
-		// Try the next server in the list.
 		return util.JSONResponse{}, err
 	}
 
