@@ -36,6 +36,10 @@ func Setup(servMux *http.ServeMux, cfg config.FederationAPI) {
 		return readers.LocalKeys(req, cfg)
 	})
 
+	// Ignore the {keyID} argument as we only have a single server key so we always
+	// return that key.
+	// Even if we had more than one server key, we would probably still ignore the
+	// {keyID} argument and always return a response containing all of the keys.
 	v2keysmux.Handle("/server/{keyID}", localKeys)
 	v2keysmux.Handle("/server/", localKeys)
 
