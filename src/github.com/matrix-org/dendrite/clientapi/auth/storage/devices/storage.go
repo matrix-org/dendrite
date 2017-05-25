@@ -49,22 +49,15 @@ func (d *Database) GetDeviceByAccessToken(token string) (*authtypes.Device, erro
 
 // CreateDevice makes a new device associated with the given user ID localpart.
 // If there is already a device with the same device ID for this user, that access token will be revoked
-// and replaced with a newly generated token. If 'desiredAccessToken' is specified, the device will be
-// created with that access_token and an error will be returned if this is not possible.
+// and replaced with the given accessToken. If the given accessToken is already in use for another device,
+// an error will be returned.
 // Returns the device on success.
-func (d *Database) CreateDevice(localpart, deviceID, desiredAccessToken string) (dev *authtypes.Device, returnErr error) {
+func (d *Database) CreateDevice(localpart, deviceID, accessToken string) (dev *authtypes.Device, returnErr error) {
 	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
 		// Revoke existing token for this device
 		if err = d.devices.deleteDevice(txn, deviceID, localpart); err != nil {
 			return err
-		}
-		// TODO: generate an access token. We should probably make sure that it's not possible for this
-		//       token to be the same as the one we just revoked...
-		accessToken := makeUserID(localpart, d.devices.serverName)
-
-		if desiredAccessToken != "" {
-			accessToken = desiredAccessToken
 		}
 
 		dev, err = d.devices.insertDevice(txn, deviceID, localpart, accessToken)
