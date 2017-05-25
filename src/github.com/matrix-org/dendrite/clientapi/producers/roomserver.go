@@ -92,6 +92,7 @@ func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespStat
 	return c.SendInputRoomEvents(ires, eventIDs)
 }
 
+// TODO Make this a method on gomatrixserverlib.Event
 func authEventIDs(event gomatrixserverlib.Event) (ids []string) {
 	for _, ref := range event.AuthEvents() {
 		ids = append(ids, ref.EventID)
