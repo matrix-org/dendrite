@@ -86,7 +86,7 @@ func main() {
 	if err != nil {
 		log.Panicf("Failed to setup account database(%s): %s", accountDataSource, err.Error())
 	}
-	deviceDB, err := devices.NewDatabase(accountDataSource)
+	deviceDB, err := devices.NewDatabase(accountDataSource, serverName)
 	if err != nil {
 		log.Panicf("Failed to setup device database(%s): %s", accountDataSource, err.Error())
 	}
