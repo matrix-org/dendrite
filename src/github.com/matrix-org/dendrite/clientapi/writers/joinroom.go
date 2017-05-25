@@ -117,7 +117,7 @@ func (r joinRoomReq) joinRoomByRemoteAlias(
 				}
 			}
 		}
-		return util.ErrorResponse(err)
+		return httputil.LogThenError(r.req, err)
 	}
 
 	return r.joinRoomUsingServers(resp.RoomID, resp.Servers)
@@ -181,7 +181,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 		if event, err = respMakeJoin.JoinEvent.Build(
 			eventID, now, r.cfg.ServerName, r.cfg.KeyID, r.cfg.PrivateKey,
 		); err != nil {
-			return util.ErrorResponse(err)
+			return httputil.LogThenError(r.req, err)
 		}
 		respSendJoin, err = r.federation.SendJoin(server, event)
 		if err != nil {
@@ -197,7 +197,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 		if err = r.producer.SendEventWithState(
 			gomatrixserverlib.RespState(respSendJoin), event,
 		); err != nil {
-			return util.ErrorResponse(err)
+			return httputil.LogThenError(r.req, err)
 		}
 
 		return util.JSONResponse{
@@ -210,9 +210,22 @@ func (r joinRoomReq) joinRoomUsingServers(
 	}
 
 	if err != nil {
-		return util.ErrorResponse(err)
+		// TODO: Gerenerate the correct HTTP status code for all different
+		// kinds of errors that could have happened.
+		// The possible errors include:
+		//   1) We can't connect to the remote servers.
+		//   2) None of the servers we could connect to think we are allowed
+		//	    to join the room.
+		//   3) The remote server returned something invalid.
+		//   4) We couldn't fetch the public keys needed to verify the
+		//      signatures on the state events.
+		//   5) ...
+		return httputil.LogThenError(r.req, err)
 	}
 
+	// This should only be reached if the list of candidate servers was empty.
+	// If the list was non-empty then either the loop body would have returned
+	// or err would be non-nil.
 	return util.JSONResponse{
 		Code: 404,
 		JSON: jsonerror.NotFound("No candidate servers found for room"),
