@@ -105,7 +105,7 @@ func (s *devicesStatements) selectDeviceByToken(accessToken string) (*authtypes.
 	var dev authtypes.Device
 	var localpart string
 	err := s.selectDeviceByTokenStmt.QueryRow(accessToken).Scan(&dev.ID, &localpart)
-	if err != nil {
+	if err == nil {
 		dev.UserID = makeUserID(localpart, s.serverName)
 		dev.AccessToken = accessToken
 	}
