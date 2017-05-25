@@ -16,7 +16,7 @@ package writers
 
 import (
 	"fmt"
-	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -34,16 +34,14 @@ import (
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-join-roomidoralias
 func JoinRoomByIDOrAlias(
 	req *http.Request,
+	device *authtypes.Device,
 	roomIDOrAlias string,
 	cfg config.ClientAPI,
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
 	queryAPI api.RoomserverQueryAPI,
+	keyRing gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
-	userID, resErr := auth.VerifyAccessToken(req)
-	if resErr != nil {
-		return *resErr
-	}
 	var content map[string]interface{} // must be a JSON object
 	if resErr := httputil.UnmarshalJSONRequest(req, &content); resErr != nil {
 		return *resErr
@@ -51,7 +49,7 @@ func JoinRoomByIDOrAlias(
 
 	content["membership"] = "join"
 
-	r := joinRoomReq{req, content, userID, cfg, federation, producer, queryAPI}
+	r := joinRoomReq{req, content, device.UserID, cfg, federation, producer, queryAPI, keyRing}
 
 	if strings.HasPrefix(roomIDOrAlias, "!") {
 		return r.joinRoomByID()
@@ -73,6 +71,7 @@ type joinRoomReq struct {
 	federation *gomatrixserverlib.FederationClient
 	producer   *producers.RoomserverProducer
 	queryAPI   api.RoomserverQueryAPI
+	keyRing    gomatrixserverlib.KeyRing
 }
 
 // joinRoomByID joins a room by roomID
@@ -163,7 +162,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 
 	var event gomatrixserverlib.Event
 	var respMakeJoin gomatrixserverlib.RespMakeJoin
-	//var respSendJoin gomatrixserverlib.RespSendJoin
+	var respSendJoin gomatrixserverlib.RespSendJoin
 	for _, server := range servers {
 		respMakeJoin, err = r.federation.MakeJoin(server, roomID, r.userID)
 		if err != nil {
@@ -184,16 +183,22 @@ func (r joinRoomReq) joinRoomUsingServers(
 		); err != nil {
 			return util.ErrorResponse(err)
 		}
-
-		_, err = r.federation.SendJoin(server, event)
+		respSendJoin, err = r.federation.SendJoin(server, event)
 		if err != nil {
 			// Try the next server in the list.
 			continue
 		}
 
-		// TODO: validate the state response.
-		// TODO: check that the join event passes auth against the state response.
-		// TODO: send the state and the join event to the room server.
+		if err = respSendJoin.Check(r.keyRing, event); err != nil {
+			// Try the next server in the list.
+			continue
+		}
+
+		if err = r.producer.SendEventWithState(
+			gomatrixserverlib.RespState(respSendJoin), event,
+		); err != nil {
+			return util.ErrorResponse(err)
+		}
 
 		return util.JSONResponse{
 			Code: 200,

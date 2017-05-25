@@ -40,9 +40,10 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(
 	servMux *http.ServeMux, httpClient *http.Client, cfg config.ClientAPI,
 	producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
-	accountDB *storage.AccountDatabase,
+	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	federation *gomatrixserverlib.FederationClient,
+	keyRing gomatrixserverlib.KeyRing,
 ) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
@@ -52,10 +53,10 @@ func Setup(
 		}),
 	)
 	r0mux.Handle("/join/{roomIDOrAlias}",
-		makeAPI("join", func(req *http.Request) util.JSONResponse {
+		common.MakeAuthAPI("join", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return writers.JoinRoomByIDOrAlias(
-				req, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI,
+				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, keyRing,
 			)
 		}),
 	)

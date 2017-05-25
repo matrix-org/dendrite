@@ -191,7 +191,7 @@ func (c *powerLevelContent) userLevel(userID string) int64 {
 
 // eventLevel returns the power level needed to send an event in the room.
 func (c *powerLevelContent) eventLevel(eventType string, isState bool) int64 {
-	if eventType == "m.room.third_party_invite" {
+	if eventType == MRoomThirdPartyInvite {
 		// Special case third_party_invite events to have the same level as
 		// m.room.member invite events.
 		// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L182

@@ -94,6 +94,32 @@ func main() {
 		log.Panicf("Failed to setup device database(%s): %s", accountDataSource, err.Error())
 	}
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer, queryAPI, accountDB, deviceDB, federation)
+	keyRing := gomatrixserverlib.KeyRing{
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{
+			// TODO: Use perspective key fetchers for production.
+			&gomatrixserverlib.DirectKeyFetcher{federation.Client},
+		},
+		KeyDatabase: &dummyKeyDatabase{},
+	}
+
+	routing.Setup(
+		http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer,
+		queryAPI, accountDB, deviceDB, federation, keyRing,
+	)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
+}
+
+// TODO: Implement a proper key database.
+type dummyKeyDatabase struct{}
+
+func (d *dummyKeyDatabase) FetchKeys(
+	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
+) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys, error) {
+	return nil, nil
+}
+
+func (d *dummyKeyDatabase) StoreKeys(
+	map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys,
+) error {
+	return nil
 }
