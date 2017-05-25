@@ -57,7 +57,7 @@ func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event) error 
 }
 
 // SendEventWithState writes an event with KindNew to the roomserver input log
-// preceeded by the state at the event as KindOutlier.
+// with the state at the event as KindOutlier before it.
 func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespState, event gomatrixserverlib.Event) error {
 	outliers, err := state.Events()
 	if err != nil {
