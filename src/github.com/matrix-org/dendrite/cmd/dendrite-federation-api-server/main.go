@@ -38,7 +38,7 @@ var (
 	// Can be generated from a PEM certificate called "server.crt" using:
 	//
 	//  openssl x509 -noout -fingerprint -sha256 -inform pem -in server.crt |\
-	//	python -c 'print raw_input()[19:].replace(":","").decode("hex").encode("base64").rstrip("=\n")'
+	//     python -c 'print raw_input()[19:].replace(":","").decode("hex").encode("base64").rstrip("=\n")'
 	//
 	tlsFingerprint = os.Getenv("TLS_FINGERPRINT")
 )
