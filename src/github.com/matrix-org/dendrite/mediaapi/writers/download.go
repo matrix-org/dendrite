@@ -16,7 +16,9 @@ package writers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"regexp"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -25,6 +27,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
+
+const mediaIDCharacters = "A-Za-z0-9_=-"
+
+// Note: unfortunately regex.MustCompile() cannot be assigned to a const
+var mediaIDRegex = regexp.MustCompile("[" + mediaIDCharacters + "]+")
 
 // downloadRequest metadata included in or derivable from an download request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
@@ -78,11 +85,10 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 
 // Validate validates the downloadRequest fields
 func (r *downloadRequest) Validate() *util.JSONResponse {
-	// maybe give the URL pattern in the routing, these are not even possible as the handler would not be hit...?
-	if r.MediaMetadata.MediaID == "" {
+	if mediaIDRegex.MatchString(string(r.MediaMetadata.MediaID)) == false {
 		return &util.JSONResponse{
 			Code: 404,
-			JSON: jsonerror.NotFound("mediaId must be a non-empty string"),
+			JSON: jsonerror.NotFound(fmt.Sprintf("mediaId must be a non-empty string using only characters in %v", mediaIDCharacters)),
 		}
 	}
 	if r.MediaMetadata.Origin == "" {
