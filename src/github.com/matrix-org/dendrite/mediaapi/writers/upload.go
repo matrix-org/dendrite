@@ -57,11 +57,10 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	}
 
 	r.Logger.WithFields(log.Fields{
-		"Origin":              r.MediaMetadata.Origin,
-		"UploadName":          r.MediaMetadata.UploadName,
-		"FileSizeBytes":       r.MediaMetadata.FileSizeBytes,
-		"Content-Type":        r.MediaMetadata.ContentType,
-		"Content-Disposition": r.MediaMetadata.ContentDisposition,
+		"Origin":        r.MediaMetadata.Origin,
+		"UploadName":    r.MediaMetadata.UploadName,
+		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
+		"Content-Type":  r.MediaMetadata.ContentType,
 	}).Info("Uploading file")
 
 	// The file data is hashed and the hash is used as the MediaID. The hash is useful as a
@@ -89,13 +88,12 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 	r.MediaMetadata.MediaID = types.MediaID(hash)
 
 	r.Logger.WithFields(log.Fields{
-		"MediaID":             r.MediaMetadata.MediaID,
-		"Origin":              r.MediaMetadata.Origin,
-		"Base64Hash":          r.MediaMetadata.Base64Hash,
-		"UploadName":          r.MediaMetadata.UploadName,
-		"FileSizeBytes":       r.MediaMetadata.FileSizeBytes,
-		"Content-Type":        r.MediaMetadata.ContentType,
-		"Content-Disposition": r.MediaMetadata.ContentDisposition,
+		"MediaID":       r.MediaMetadata.MediaID,
+		"Origin":        r.MediaMetadata.Origin,
+		"Base64Hash":    r.MediaMetadata.Base64Hash,
+		"UploadName":    r.MediaMetadata.UploadName,
+		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
+		"Content-Type":  r.MediaMetadata.ContentType,
 	}).Info("File uploaded")
 
 	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
@@ -141,23 +139,16 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 
 	r := &uploadRequest{
 		MediaMetadata: &types.MediaMetadata{
-			Origin:             cfg.ServerName,
-			ContentDisposition: types.ContentDisposition(req.Header.Get("Content-Disposition")),
-			FileSizeBytes:      types.FileSizeBytes(req.ContentLength),
-			ContentType:        types.ContentType(req.Header.Get("Content-Type")),
-			UploadName:         types.Filename(url.PathEscape(req.FormValue("filename"))),
+			Origin:        cfg.ServerName,
+			FileSizeBytes: types.FileSizeBytes(req.ContentLength),
+			ContentType:   types.ContentType(req.Header.Get("Content-Type")),
+			UploadName:    types.Filename(url.PathEscape(req.FormValue("filename"))),
 		},
 		Logger: util.GetLogger(req.Context()),
 	}
 
 	if resErr := r.Validate(cfg.MaxFileSizeBytes); resErr != nil {
 		return nil, resErr
-	}
-
-	if len(r.MediaMetadata.UploadName) > 0 {
-		r.MediaMetadata.ContentDisposition = types.ContentDisposition(
-			"inline; filename*=utf-8''" + string(r.MediaMetadata.UploadName),
-		)
 	}
 
 	return r, nil

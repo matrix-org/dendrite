@@ -34,8 +34,6 @@ CREATE TABLE IF NOT EXISTS media_repository (
     media_origin TEXT NOT NULL,
     -- The MIME-type of the media file as specified when uploading.
     content_type TEXT NOT NULL,
-    -- The HTTP Content-Disposition header for the media file as specified when uploading.
-    content_disposition TEXT NOT NULL,
     -- Size of the media file in bytes.
     file_size_bytes BIGINT NOT NULL,
     -- When the content was uploaded in UNIX epoch ms.
@@ -51,12 +49,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS media_repository_index ON media_repository (me
 `
 
 const insertMediaSQL = `
-INSERT INTO media_repository (media_id, media_origin, content_type, content_disposition, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO media_repository (media_id, media_origin, content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 const selectMediaSQL = `
-SELECT content_type, content_disposition, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM media_repository WHERE media_id = $1 AND media_origin = $2
+SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM media_repository WHERE media_id = $1 AND media_origin = $2
 `
 
 type mediaStatements struct {
@@ -82,7 +80,6 @@ func (s *mediaStatements) insertMedia(mediaMetadata *types.MediaMetadata) error 
 		mediaMetadata.MediaID,
 		mediaMetadata.Origin,
 		mediaMetadata.ContentType,
-		mediaMetadata.ContentDisposition,
 		mediaMetadata.FileSizeBytes,
 		mediaMetadata.CreationTimestamp,
 		mediaMetadata.UploadName,
@@ -101,7 +98,6 @@ func (s *mediaStatements) selectMedia(mediaID types.MediaID, mediaOrigin gomatri
 		mediaMetadata.MediaID, mediaMetadata.Origin,
 	).Scan(
 		&mediaMetadata.ContentType,
-		&mediaMetadata.ContentDisposition,
 		&mediaMetadata.FileSizeBytes,
 		&mediaMetadata.CreationTimestamp,
 		&mediaMetadata.UploadName,
