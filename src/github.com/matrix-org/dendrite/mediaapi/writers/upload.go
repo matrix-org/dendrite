@@ -17,6 +17,7 @@ package writers
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -56,65 +57,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 		return *resErr
 	}
 
-	r.Logger.WithFields(log.Fields{
-		"Origin":        r.MediaMetadata.Origin,
-		"UploadName":    r.MediaMetadata.UploadName,
-		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-		"Content-Type":  r.MediaMetadata.ContentType,
-	}).Info("Uploading file")
-
-	// The file data is hashed and the hash is used as the MediaID. The hash is useful as a
-	// method of deduplicating files to save storage, as well as a way to conduct
-	// integrity checks on the file data in the repository.
-	hash, bytesWritten, tmpDir, copyError := fileutils.WriteTempFile(req.Body, cfg.MaxFileSizeBytes, cfg.AbsBasePath)
-	if copyError != nil {
-		logFields := log.Fields{
-			"Origin":  r.MediaMetadata.Origin,
-			"MediaID": r.MediaMetadata.MediaID,
-		}
-		if copyError == fileutils.ErrFileIsTooLarge {
-			logFields["MaxFileSizeBytes"] = cfg.MaxFileSizeBytes
-		}
-		r.Logger.WithError(copyError).WithFields(logFields).Warn("Error while transferring file")
-		fileutils.RemoveDir(tmpDir, r.Logger)
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
-		}
-	}
-
-	r.MediaMetadata.FileSizeBytes = bytesWritten
-	r.MediaMetadata.Base64Hash = hash
-	r.MediaMetadata.MediaID = types.MediaID(hash)
-
-	r.Logger.WithFields(log.Fields{
-		"MediaID":       r.MediaMetadata.MediaID,
-		"Origin":        r.MediaMetadata.Origin,
-		"Base64Hash":    r.MediaMetadata.Base64Hash,
-		"UploadName":    r.MediaMetadata.UploadName,
-		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-		"Content-Type":  r.MediaMetadata.ContentType,
-	}).Info("File uploaded")
-
-	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
-	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
-	if err == nil {
-		r.MediaMetadata = mediaMetadata
-		fileutils.RemoveDir(tmpDir, r.Logger)
-		return util.JSONResponse{
-			Code: 200,
-			JSON: uploadResponse{
-				ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.ServerName, r.MediaMetadata.MediaID),
-			},
-		}
-	} else if err != sql.ErrNoRows {
-		r.Logger.WithError(err).WithField("MediaID", r.MediaMetadata.MediaID).Warn("Failed to query database")
-	}
-
-	// TODO: generate thumbnails
-
-	resErr = r.storeFileAndMetadata(tmpDir, cfg.AbsBasePath, db)
-	if resErr != nil {
+	if resErr = r.doUpload(req.Body, cfg, db); resErr != nil {
 		return *resErr
 	}
 
@@ -152,6 +95,71 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 	}
 
 	return r, nil
+}
+
+func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *storage.Database) *util.JSONResponse {
+	r.Logger.WithFields(log.Fields{
+		"Origin":        r.MediaMetadata.Origin,
+		"UploadName":    r.MediaMetadata.UploadName,
+		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
+		"Content-Type":  r.MediaMetadata.ContentType,
+	}).Info("Uploading file")
+
+	// The file data is hashed and the hash is used as the MediaID. The hash is useful as a
+	// method of deduplicating files to save storage, as well as a way to conduct
+	// integrity checks on the file data in the repository.
+	hash, bytesWritten, tmpDir, copyError := fileutils.WriteTempFile(reqReader, cfg.MaxFileSizeBytes, cfg.AbsBasePath)
+	if copyError != nil {
+		logFields := log.Fields{
+			"Origin":  r.MediaMetadata.Origin,
+			"MediaID": r.MediaMetadata.MediaID,
+		}
+		if copyError == fileutils.ErrFileIsTooLarge {
+			logFields["MaxFileSizeBytes"] = cfg.MaxFileSizeBytes
+		}
+		r.Logger.WithError(copyError).WithFields(logFields).Warn("Error while transferring file")
+		fileutils.RemoveDir(tmpDir, r.Logger)
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+		}
+	}
+
+	r.MediaMetadata.FileSizeBytes = bytesWritten
+	r.MediaMetadata.Base64Hash = hash
+	r.MediaMetadata.MediaID = types.MediaID(hash)
+
+	r.Logger.WithFields(log.Fields{
+		"MediaID":       r.MediaMetadata.MediaID,
+		"Origin":        r.MediaMetadata.Origin,
+		"Base64Hash":    r.MediaMetadata.Base64Hash,
+		"UploadName":    r.MediaMetadata.UploadName,
+		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
+		"Content-Type":  r.MediaMetadata.ContentType,
+	}).Info("File uploaded")
+
+	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
+	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+	if err == nil {
+		r.MediaMetadata = mediaMetadata
+		fileutils.RemoveDir(tmpDir, r.Logger)
+		return &util.JSONResponse{
+			Code: 200,
+			JSON: uploadResponse{
+				ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.ServerName, r.MediaMetadata.MediaID),
+			},
+		}
+	} else if err != sql.ErrNoRows {
+		r.Logger.WithError(err).WithField("MediaID", r.MediaMetadata.MediaID).Warn("Failed to query database")
+	}
+
+	// TODO: generate thumbnails
+
+	if resErr := r.storeFileAndMetadata(tmpDir, cfg.AbsBasePath, db); resErr != nil {
+		return resErr
+	}
+
+	return nil
 }
 
 // Validate validates the uploadRequest fields
