@@ -16,12 +16,16 @@ package readers
 
 import (
 	"fmt"
+	"net/http"
+
+	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"net/http"
 )
 
 type loginFlows struct {
@@ -52,7 +56,7 @@ func passwordLogin() loginFlows {
 }
 
 // Login implements GET and POST /login
-func Login(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
+func Login(req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database, cfg config.ClientAPI) util.JSONResponse {
 	if req.Method == "GET" { // TODO: support other forms of login other than password, depending on config options
 		return util.JSONResponse{
 			Code: 200,
@@ -70,12 +74,41 @@ func Login(req *http.Request, cfg config.ClientAPI) util.JSONResponse {
 				JSON: jsonerror.BadJSON("'user' must be supplied."),
 			}
 		}
-		// TODO: Check username and password properly
+
+		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
+
+		acc, err := accountDB.GetAccountByPassword(r.User, r.Password)
+		if err != nil {
+			// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+			// but that would leak the existence of the user.
+			return util.JSONResponse{
+				Code: 403,
+				JSON: jsonerror.BadJSON("username or password was incorrect, or the account does not exist"),
+			}
+		}
+
+		token, err := auth.GenerateAccessToken()
+		if err != nil {
+			return util.JSONResponse{
+				Code: 500,
+				JSON: jsonerror.Unknown("Failed to generate access token"),
+			}
+		}
+
+		// TODO: Use the device ID in the request
+		dev, err := deviceDB.CreateDevice(acc.Localpart, auth.UnknownDeviceID, token)
+		if err != nil {
+			return util.JSONResponse{
+				Code: 500,
+				JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+			}
+		}
+
 		return util.JSONResponse{
 			Code: 200,
 			JSON: loginResponse{
-				UserID:      makeUserID(r.User, cfg.ServerName),
-				AccessToken: makeUserID(r.User, cfg.ServerName), // FIXME: token is the user ID for now
+				UserID:      dev.UserID,
+				AccessToken: dev.AccessToken,
 				HomeServer:  cfg.ServerName,
 			},
 		}

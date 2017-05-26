@@ -82,14 +82,14 @@ func Setup(
 	)
 
 	r0mux.Handle("/register", common.MakeAPI("register", func(req *http.Request) util.JSONResponse {
-		return writers.Register(req, accountDB)
+		return writers.Register(req, accountDB, deviceDB)
 	}))
 
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
 		common.MakeAPI("login", func(req *http.Request) util.JSONResponse {
-			return readers.Login(req, cfg)
+			return readers.Login(req, accountDB, deviceDB, cfg)
 		}),
 	)
 
