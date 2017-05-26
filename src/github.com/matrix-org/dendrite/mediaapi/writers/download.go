@@ -78,7 +78,6 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 
 // Validate validates the downloadRequest fields
 func (r *downloadRequest) Validate() *util.JSONResponse {
-	// FIXME: the following errors aren't bad JSON, rather just a bad request path
 	// maybe give the URL pattern in the routing, these are not even possible as the handler would not be hit...?
 	if r.MediaMetadata.MediaID == "" {
 		return &util.JSONResponse{
