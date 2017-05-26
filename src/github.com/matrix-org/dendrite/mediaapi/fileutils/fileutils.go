@@ -30,16 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/types"
 )
 
-// FIXME: make into error types
-var (
-	// ErrFileIsTooLarge indicates that the uploaded file is larger than the configured maximum file size
-	ErrFileIsTooLarge = fmt.Errorf("file is too large")
-	errRead           = fmt.Errorf("failed to read response from remote server")
-	errResponse       = fmt.Errorf("failed to write file data to response body")
-	errHash           = fmt.Errorf("failed to hash file data")
-	errWrite          = fmt.Errorf("failed to write file to disk")
-)
-
 // GetPathFromBase64Hash evaluates the path to a media file from its Base64Hash
 // If the Base64Hash is long enough, we split it into pieces, creating up to 2 subdirectories
 // for more manageable browsing and use the remainder as the file name.
