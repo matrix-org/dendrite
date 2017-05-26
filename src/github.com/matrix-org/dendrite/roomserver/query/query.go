@@ -68,20 +68,12 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return err
 	}
 
-	eventNIDs := make([]types.EventNID, len(stateEntries))
-	for i := range stateEntries {
-		eventNIDs[i] = stateEntries[i].EventNID
-	}
-
-	stateEvents, err := r.DB.Events(eventNIDs)
+	stateEvents, err := r.loadStateEvents(stateEntries)
 	if err != nil {
 		return err
 	}
 
-	response.StateEvents = make([]gomatrixserverlib.Event, len(stateEvents))
-	for i := range stateEvents {
-		response.StateEvents[i] = stateEvents[i].Event
-	}
+	response.StateEvents = stateEvents
 	return nil
 }
 
@@ -100,7 +92,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	}
 	response.RoomExists = true
 
-	_, err = r.DB.StateAtEventIDs(request.PrevEventIDs)
+	prevStates, err := r.DB.StateAtEventIDs(request.PrevEventIDs)
 	if err != nil {
 		// TODO: Check if the error was because we are missing events from the
 		// database or are missing state at events from the database.
@@ -108,8 +100,37 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	}
 	response.PrevEventsExist = true
 
-	// TODO: Calculate the state and return it.
+	// Lookup the currrent state for the requested tuples.
+	stateEntries, err := state.LoadStateAfterEventsForStringTuples(r.DB, prevStates, request.StateToFetch)
+	if err != nil {
+		return err
+	}
+
+	stateEvents, err := r.loadStateEvents(stateEntries)
+	if err != nil {
+		return err
+	}
+
+	response.StateEvents = stateEvents
 	return nil
+}
+
+func (r *RoomserverQueryAPI) loadStateEvents(stateEntries []types.StateEntry) ([]gomatrixserverlib.Event, error) {
+	eventNIDs := make([]types.EventNID, len(stateEntries))
+	for i := range stateEntries {
+		eventNIDs[i] = stateEntries[i].EventNID
+	}
+
+	stateEvents, err := r.DB.Events(eventNIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]gomatrixserverlib.Event, len(stateEvents))
+	for i := range stateEvents {
+		result[i] = stateEvents[i].Event
+	}
+	return result, nil
 }
 
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
