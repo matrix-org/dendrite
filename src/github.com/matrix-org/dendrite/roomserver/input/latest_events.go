@@ -100,7 +100,7 @@ func doUpdateLatestEvents(
 	for i := range newLatest {
 		latestStateAtEvents[i] = newLatest[i].StateAtEvent
 	}
-	newStateNID, err := calculateAndStoreStateAfterEvents(db, roomNID, latestStateAtEvents)
+	newStateNID, err := state.CalculateAndStoreStateAfterEvents(db, roomNID, latestStateAtEvents)
 	if err != nil {
 		return err
 	}

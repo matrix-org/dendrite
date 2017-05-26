@@ -35,9 +35,6 @@ type RoomserverQueryAPIDatabase interface {
 	// Lookup event references for the latest events in the room and the current state snapshot.
 	// Returns an error if there was a problem talking to the database.
 	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, error)
-	// Lookup the Events for a list of numeric event IDs.
-	// Returns a list of events sorted by numeric event ID.
-	Events(eventNIDs []types.EventNID) ([]types.Event, error)
 }
 
 // RoomserverQueryAPI is an implementation of RoomserverQueryAPI

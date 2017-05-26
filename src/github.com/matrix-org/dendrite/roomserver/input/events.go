@@ -30,15 +30,6 @@ type RoomEventDatabase interface {
 	// Returns an error if the there is an error talking to the database
 	// or if the event IDs aren't in the database.
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
-	// Lookup the Events for a list of numeric event IDs.
-	// Returns a sorted list of events.
-	Events(eventNIDs []types.EventNID) ([]types.Event, error)
-	// Lookup the state of a room at each event for a list of string event IDs.
-	// Returns an error if there is an error talking to the database
-	// or if the room state for the event IDs aren't in the database
-	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
-	// Store the room state at an event in the database
-	AddState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
 	// Set the state at an event.
 	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error
 	// Lookup the latest events in a room in preparation for an update.
@@ -98,7 +89,7 @@ func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.
 			}
 		} else {
 			// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-			if stateAtEvent.BeforeStateSnapshotNID, err = calculateAndStoreStateBeforeEvent(db, event, roomNID); err != nil {
+			if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(db, event, roomNID); err != nil {
 				return err
 			}
 		}
