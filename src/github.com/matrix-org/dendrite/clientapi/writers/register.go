@@ -185,7 +185,7 @@ func completeRegistration(accountDB *accounts.Database, deviceDB *devices.Databa
 		Code: 200,
 		JSON: registerResponse{
 			UserID:      dev.UserID,
-			AccessToken: dev.AccessToken, // FIXME
+			AccessToken: dev.AccessToken,
 			HomeServer:  acc.ServerName,
 			DeviceID:    dev.ID,
 		},
