@@ -91,6 +91,8 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 			JSON: jsonerror.NotFound(fmt.Sprintf("mediaId must be a non-empty string using only characters in %v", mediaIDCharacters)),
 		}
 	}
+	// Note: the origin will be validated either by comparison to the configured server name of this homeserver
+	// or by a DNS SRV record lookup when creating a request for remote files
 	if r.MediaMetadata.Origin == "" {
 		return &util.JSONResponse{
 			Code: 404,
