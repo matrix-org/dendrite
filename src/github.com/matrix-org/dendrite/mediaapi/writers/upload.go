@@ -81,7 +81,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 			ContentDisposition: types.ContentDisposition(req.Header.Get("Content-Disposition")),
 			FileSizeBytes:      types.FileSizeBytes(req.ContentLength),
 			ContentType:        types.ContentType(req.Header.Get("Content-Type")),
-			UploadName:         types.Filename(req.FormValue("filename")),
+			UploadName:         types.Filename(url.PathEscape(req.FormValue("filename"))),
 		},
 		Logger: util.GetLogger(req.Context()),
 	}
@@ -90,11 +90,9 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 		return nil, resErr
 	}
 
-	// FIXME: do we want to always override ContentDisposition here or only if
-	// there is no Content-Disposition header set?
 	if len(r.MediaMetadata.UploadName) > 0 {
 		r.MediaMetadata.ContentDisposition = types.ContentDisposition(
-			"inline; filename*=utf-8''" + url.PathEscape(string(r.MediaMetadata.UploadName)),
+			"inline; filename*=utf-8''" + string(r.MediaMetadata.UploadName),
 		)
 	}
 
@@ -103,8 +101,6 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 
 // Validate validates the uploadRequest fields
 func (r *uploadRequest) Validate(maxFileSizeBytes types.FileSizeBytes) *util.JSONResponse {
-	// TODO: Any validation to be done on ContentDisposition?
-
 	if r.MediaMetadata.FileSizeBytes < 1 {
 		return &util.JSONResponse{
 			Code: 400,
@@ -122,6 +118,12 @@ func (r *uploadRequest) Validate(maxFileSizeBytes types.FileSizeBytes) *util.JSO
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown("HTTP Content-Type request header must be set."),
+		}
+	}
+	if r.MediaMetadata.UploadName[0] == '~' {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown("File name must not begin with '~'."),
 		}
 	}
 	// TODO: Validate filename - what are the valid characters?
