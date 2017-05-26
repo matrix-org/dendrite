@@ -213,13 +213,11 @@ func (r *uploadRequest) Validate(maxFileSizeBytes types.FileSizeBytes) *util.JSO
 	return nil
 }
 
-// storeFileAndMetadata first moves a temporary file named content from tmpDir to its
-// final path (see getPathFromMediaMetadata for details.) Once the file is moved, the
-// metadata about the file is written into the media repository database. This order
-// of operations is important as it avoids metadata entering the database before the file
-// is ready and if we fail to move the file, it never gets added to the database.
-// In case of any error, appropriate files and directories are cleaned up a
-// util.JSONResponse error is returned.
+// storeFileAndMetadata moves the temporary file to its final path based on metadata and stores the metadata in the database
+// See getPathFromMediaMetadata in fileutils for details of the final path.
+// The order of operations is important as it avoids metadata entering the database before the file
+// is ready, and if we fail to move the file, it never gets added to the database.
+// Returns a util.JSONResponse error and cleans up directories in case of error.
 func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, db *storage.Database) *util.JSONResponse {
 	finalPath, duplicate, err := fileutils.MoveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
 	if err != nil {
