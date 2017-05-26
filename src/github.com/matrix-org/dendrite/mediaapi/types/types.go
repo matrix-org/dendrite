@@ -68,5 +68,5 @@ type MediaMetadata struct {
 type ActiveRemoteRequests struct {
 	sync.Mutex
 	// The string key is an mxc:// URL
-	Set map[string]*sync.Cond
+	MXCToCond map[string]*sync.Cond
 }

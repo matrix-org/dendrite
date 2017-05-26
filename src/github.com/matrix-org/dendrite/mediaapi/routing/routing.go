@@ -40,7 +40,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI
 	}))
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
-		Set: map[string]*sync.Cond{},
+		MXCToCond: map[string]*sync.Cond{},
 	}
 	r0mux.Handle("/download/{serverName}/{mediaId}",
 		prometheus.InstrumentHandler("download", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
