@@ -21,6 +21,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/mediaapi/config"
+	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/mediaapi/writers"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -32,11 +33,12 @@ const pathPrefixR0 = "/_matrix/media/v1"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI) {
+func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI, db *storage.Database) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	// FIXME: /upload should use common.MakeAuthAPI()
 	r0mux.Handle("/upload", common.MakeAPI("upload", func(req *http.Request) util.JSONResponse {
-		return writers.Upload(req, cfg)
+		return writers.Upload(req, cfg, db)
 	}))
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
