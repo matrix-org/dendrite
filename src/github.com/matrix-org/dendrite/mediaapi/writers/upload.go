@@ -240,7 +240,7 @@ func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath type
 		// there is valid metadata in the database for that file. As such we only
 		// remove the file if it is not a duplicate.
 		if duplicate == false {
-			fileutils.RemoveDir(types.Path(path.Dir(finalPath)), r.Logger)
+			fileutils.RemoveDir(types.Path(path.Dir(string(finalPath))), r.Logger)
 		}
 		return &util.JSONResponse{
 			Code: 400,
