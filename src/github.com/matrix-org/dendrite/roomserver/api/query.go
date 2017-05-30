@@ -24,7 +24,7 @@ import (
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
 type QueryLatestEventsAndStateRequest struct {
-	// The roomID to query the latest events for.
+	// The room ID to query the latest events for.
 	RoomID string
 	// The state key tuples to fetch from the room current state.
 	// If this list is empty or nil then no state events are returned.
@@ -44,6 +44,30 @@ type QueryLatestEventsAndStateResponse struct {
 	StateEvents []gomatrixserverlib.Event
 }
 
+// QueryStateAfterEventsRequest is a request to QueryStateAfterEvents
+type QueryStateAfterEventsRequest struct {
+	// The room ID to query the state in.
+	RoomID string
+	// The list of previous events to return the events after.
+	PrevEventIDs []string
+	// The state key tuples to fetch from the state
+	StateToFetch []gomatrixserverlib.StateKeyTuple
+}
+
+// QueryStateAfterEventsResponse is a response to QueryStateAfterEvents
+type QueryStateAfterEventsResponse struct {
+	// Copy of the request for debugging.
+	QueryStateAfterEventsRequest
+	// Does the room exist on this roomserver?
+	// If the room doesn't exist this will be false and StateEvents will be empty.
+	RoomExists bool
+	// Do all the previous events exist on this roomserver?
+	// If some of previous events do not exist this will be false and StateEvents will be empty.
+	PrevEventsExist bool
+	// The state events requested.
+	StateEvents []gomatrixserverlib.Event
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -51,10 +75,19 @@ type RoomserverQueryAPI interface {
 		request *QueryLatestEventsAndStateRequest,
 		response *QueryLatestEventsAndStateResponse,
 	) error
+
+	// Query the state after a list of events in a room from the room server.
+	QueryStateAfterEvents(
+		request *QueryStateAfterEventsRequest,
+		response *QueryStateAfterEventsResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
 const RoomserverQueryLatestEventsAndStatePath = "/api/roomserver/QueryLatestEventsAndState"
+
+// RoomserverQueryStateAfterEventsPath is the HTTP path for the QueryStateAfterEvents API.
+const RoomserverQueryStateAfterEventsPath = "/api/roomserver/QueryStateAfterEvents"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -76,6 +109,15 @@ func (h *httpRoomserverQueryAPI) QueryLatestEventsAndState(
 	response *QueryLatestEventsAndStateResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryLatestEventsAndStatePath
+	return postJSON(h.httpClient, apiURL, request, response)
+}
+
+// QueryStateAfterEvents implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) QueryStateAfterEvents(
+	request *QueryStateAfterEventsRequest,
+	response *QueryStateAfterEventsResponse,
+) error {
+	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 

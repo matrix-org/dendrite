@@ -16,12 +16,12 @@ package query
 
 import (
 	"encoding/json"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 )
 
@@ -68,6 +68,54 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return err
 	}
 
+	stateEvents, err := r.loadStateEvents(stateEntries)
+	if err != nil {
+		return err
+	}
+
+	response.StateEvents = stateEvents
+	return nil
+}
+
+// QueryStateAfterEvents implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryStateAfterEvents(
+	request *api.QueryStateAfterEventsRequest,
+	response *api.QueryStateAfterEventsResponse,
+) (err error) {
+	response.QueryStateAfterEventsRequest = *request
+	roomNID, err := r.DB.RoomNID(request.RoomID)
+	if err != nil {
+		return err
+	}
+	if roomNID == 0 {
+		return nil
+	}
+	response.RoomExists = true
+
+	prevStates, err := r.DB.StateAtEventIDs(request.PrevEventIDs)
+	if err != nil {
+		// TODO: Check if the error was because we are missing events from the
+		// database or are missing state at events from the database.
+		return err
+	}
+	response.PrevEventsExist = true
+
+	// Lookup the currrent state for the requested tuples.
+	stateEntries, err := state.LoadStateAfterEventsForStringTuples(r.DB, prevStates, request.StateToFetch)
+	if err != nil {
+		return err
+	}
+
+	stateEvents, err := r.loadStateEvents(stateEntries)
+	if err != nil {
+		return err
+	}
+
+	response.StateEvents = stateEvents
+	return nil
+}
+
+func (r *RoomserverQueryAPI) loadStateEvents(stateEntries []types.StateEntry) ([]gomatrixserverlib.Event, error) {
 	eventNIDs := make([]types.EventNID, len(stateEntries))
 	for i := range stateEntries {
 		eventNIDs[i] = stateEntries[i].EventNID
@@ -75,21 +123,21 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 
 	stateEvents, err := r.DB.Events(eventNIDs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	response.StateEvents = make([]gomatrixserverlib.Event, len(stateEvents))
+	result := make([]gomatrixserverlib.Event, len(stateEvents))
 	for i := range stateEvents {
-		response.StateEvents[i] = stateEvents[i].Event
+		result[i] = stateEvents[i].Event
 	}
-	return nil
+	return result, nil
 }
 
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,
-		makeAPI("query_latest_events_and_state", func(req *http.Request) util.JSONResponse {
+		common.MakeAPI("query_latest_events_and_state", func(req *http.Request) util.JSONResponse {
 			var request api.QueryLatestEventsAndStateRequest
 			var response api.QueryLatestEventsAndStateResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -101,8 +149,18 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: 200, JSON: &response}
 		}),
 	)
-}
-
-func makeAPI(metric string, apiFunc func(req *http.Request) util.JSONResponse) http.Handler {
-	return prometheus.InstrumentHandler(metric, util.MakeJSONAPI(util.NewJSONRequestHandler(apiFunc)))
+	servMux.Handle(
+		api.RoomserverQueryStateAfterEventsPath,
+		common.MakeAPI("query_state_after_events", func(req *http.Request) util.JSONResponse {
+			var request api.QueryStateAfterEventsRequest
+			var response api.QueryStateAfterEventsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryStateAfterEvents(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
 }
