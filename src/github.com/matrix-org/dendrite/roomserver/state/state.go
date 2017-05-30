@@ -345,6 +345,12 @@ func loadStateAfterEventsForNumericTuples(
 			return nil, err
 		}
 		if prevState.IsStateEvent() {
+			// The result is current the state before the requested event.
+			// We want the state after the requested event.
+			// If the requested event was a state event then we need to
+			// update that key in the result.
+			// If the requested event wasn't a state event then the state after
+			// it is the same as the state before it.
 			for i := range result {
 				if result[i].StateKeyTuple == prevState.StateKeyTuple {
 					result[i] = prevState.StateEntry
@@ -357,12 +363,12 @@ func loadStateAfterEventsForNumericTuples(
 	// Slow path for more that one event.
 	// Load the entire state so that we can do conflict resolution if we need to.
 	// TODO: The are some optimistations we could do here:
-	//    1) We only need to do conflict resolution if the is a conflict in the
+	//    1) We only need to do conflict resolution if there is a conflict in the
 	//       requested tuples so we might try loading just those tuples and then
 	//       checking for conflicts.
 	//    2) When there is a conflict we still only need to load the state
 	//       needed to do conflict resolution which would save us having to load
-	//		 the full state.
+	//       the full state.
 
 	// TODO: Add metrics for this as it could take a long time for big rooms
 	// with large conflicts.
