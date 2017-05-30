@@ -16,12 +16,12 @@ package query
 
 import (
 	"encoding/json"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 )
 
@@ -137,7 +137,7 @@ func (r *RoomserverQueryAPI) loadStateEvents(stateEntries []types.StateEntry) ([
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,
-		makeAPI("query_latest_events_and_state", func(req *http.Request) util.JSONResponse {
+		common.MakeAPI("query_latest_events_and_state", func(req *http.Request) util.JSONResponse {
 			var request api.QueryLatestEventsAndStateRequest
 			var response api.QueryLatestEventsAndStateResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -151,7 +151,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryStateAfterEventsPath,
-		makeAPI("query_state_after_events", func(req *http.Request) util.JSONResponse {
+		common.MakeAPI("query_state_after_events", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAfterEventsRequest
 			var response api.QueryStateAfterEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -163,8 +163,4 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: 200, JSON: &response}
 		}),
 	)
-}
-
-func makeAPI(metric string, apiFunc func(req *http.Request) util.JSONResponse) http.Handler {
-	return prometheus.InstrumentHandler(metric, util.MakeJSONAPI(util.NewJSONRequestHandler(apiFunc)))
 }
