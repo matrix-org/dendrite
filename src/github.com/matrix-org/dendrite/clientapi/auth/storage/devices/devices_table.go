@@ -86,7 +86,7 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(txn *sql.Tx, id, localpart, accessToken string) (dev *authtypes.Device, err error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
-	if _, err = s.insertDeviceStmt.Exec(id, localpart, accessToken, createdTimeMS); err == nil {
+	if _, err = txn.Stmt(s.insertDeviceStmt).Exec(id, localpart, accessToken, createdTimeMS); err == nil {
 		dev = &authtypes.Device{
 			ID:          id,
 			UserID:      makeUserID(localpart, s.serverName),

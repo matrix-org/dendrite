@@ -16,6 +16,7 @@ package accounts
 
 import (
 	"database/sql"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
@@ -44,7 +45,7 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
-// Returns sql.ErrNoRows if no account exists which matches the given credentials.
+// Returns sql.ErrNoRows if no account exists which matches the given localpart.
 func (d *Database) GetAccountByPassword(localpart, plaintextPassword string) (*authtypes.Account, error) {
 	hash, err := d.accounts.selectPasswordHash(localpart)
 	if err != nil {

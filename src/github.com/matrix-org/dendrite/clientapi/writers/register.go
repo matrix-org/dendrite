@@ -5,8 +5,10 @@ import (
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -90,7 +92,7 @@ func (r *registerRequest) Validate() *util.JSONResponse {
 }
 
 // Register processes a /register request. http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
-func Register(req *http.Request, accountDB *accounts.Database) util.JSONResponse {
+func Register(req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database) util.JSONResponse {
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
@@ -131,7 +133,7 @@ func Register(req *http.Request, accountDB *accounts.Database) util.JSONResponse
 	switch r.Auth.Type {
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(accountDB, r.Username, r.Password)
+		return completeRegistration(accountDB, deviceDB, r.Username, r.Password)
 	default:
 		return util.JSONResponse{
 			Code: 501,
@@ -140,7 +142,20 @@ func Register(req *http.Request, accountDB *accounts.Database) util.JSONResponse
 	}
 }
 
-func completeRegistration(accountDB *accounts.Database, username, password string) util.JSONResponse {
+func completeRegistration(accountDB *accounts.Database, deviceDB *devices.Database, username, password string) util.JSONResponse {
+	if username == "" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("missing username"),
+		}
+	}
+	if password == "" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("missing password"),
+		}
+	}
+
 	acc, err := accountDB.CreateAccount(username, password)
 	if err != nil {
 		return util.JSONResponse{
@@ -148,15 +163,31 @@ func completeRegistration(accountDB *accounts.Database, username, password strin
 			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
 		}
 	}
-	// TODO: Make and store a proper access_token
-	// TODO: Store the client's device information?
+
+	token, err := auth.GenerateAccessToken()
+	if err != nil {
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Failed to generate access token"),
+		}
+	}
+
+	// // TODO: Use the device ID in the request.
+	dev, err := deviceDB.CreateDevice(username, auth.UnknownDeviceID, token)
+	if err != nil {
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+		}
+	}
+
 	return util.JSONResponse{
 		Code: 200,
 		JSON: registerResponse{
-			UserID:      acc.UserID,
-			AccessToken: acc.UserID, // FIXME
+			UserID:      dev.UserID,
+			AccessToken: dev.AccessToken,
 			HomeServer:  acc.ServerName,
-			DeviceID:    "kindauniquedeviceid",
+			DeviceID:    dev.ID,
 		},
 	}
 }
