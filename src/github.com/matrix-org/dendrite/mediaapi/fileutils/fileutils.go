@@ -76,7 +76,9 @@ func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata
 	}
 
 	var stat os.FileInfo
-	if stat, err = os.Stat(finalPath); os.IsExist(err) {
+	// Note: The double-negative is intentional as os.IsExist(err) != !os.IsNotExist(err).
+	// The functions are error checkers to be used in different cases.
+	if stat, err = os.Stat(finalPath); !os.IsNotExist(err) {
 		duplicate = true
 		if stat.Size() == int64(mediaMetadata.FileSizeBytes) {
 			return types.Path(finalPath), duplicate, nil
