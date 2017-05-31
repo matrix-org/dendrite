@@ -15,7 +15,6 @@
 package writers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,13 +37,6 @@ const mediaIDCharacters = "A-Za-z0-9_=-"
 
 // Note: unfortunately regex.MustCompile() cannot be assigned to a const
 var mediaIDRegex = regexp.MustCompile("[" + mediaIDCharacters + "]+")
-
-// Error types used by downloadRequest.getMediaMetadata
-// FIXME: make into types
-var (
-	errDBQuery    = fmt.Errorf("error querying database for media")
-	errDBNotFound = fmt.Errorf("media not found")
-)
 
 // downloadRequest metadata included in or derivable from an download request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
@@ -121,15 +113,17 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 
 func (r *downloadRequest) doDownload(w http.ResponseWriter, cfg *config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) *util.JSONResponse {
 	// check if we have a record of the media in our database
-	mediaMetadata, err := r.getMediaMetadata(db)
-	if err == nil {
-		// If we have a record, we can respond from the local file
-		r.MediaMetadata = mediaMetadata
-		return r.respondFromLocalFile(w, cfg.AbsBasePath)
-	} else if err == errDBNotFound {
+	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+	if err != nil {
+		r.Logger.WithError(err).Error("Error querying the database.")
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+	if mediaMetadata == nil {
 		if r.MediaMetadata.Origin == cfg.ServerName {
 			// If we do not have a record and the origin is local, the file is not found
-			r.Logger.WithError(err).Warn("Failed to look up file in database")
 			return &util.JSONResponse{
 				Code: 404,
 				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
@@ -141,35 +135,9 @@ func (r *downloadRequest) doDownload(w http.ResponseWriter, cfg *config.MediaAPI
 			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
 		}
 	}
-	// Another error from the database
-	r.Logger.WithError(err).WithFields(log.Fields{
-		"MediaID": r.MediaMetadata.MediaID,
-		"Origin":  r.MediaMetadata.Origin,
-	}).Error("Error querying the database.")
-	return &util.JSONResponse{
-		Code: 500,
-		JSON: jsonerror.InternalServerError(),
-	}
-}
-
-// getMediaMetadata queries the database for media metadata
-func (r *downloadRequest) getMediaMetadata(db *storage.Database) (*types.MediaMetadata, error) {
-	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			r.Logger.WithFields(log.Fields{
-				"Origin":  r.MediaMetadata.Origin,
-				"MediaID": r.MediaMetadata.MediaID,
-			}).Info("Media not found in database.")
-			return nil, errDBNotFound
-		}
-		r.Logger.WithError(err).WithFields(log.Fields{
-			"Origin":  r.MediaMetadata.Origin,
-			"MediaID": r.MediaMetadata.MediaID,
-		}).Error("Error querying database for media.")
-		return nil, errDBQuery
-	}
-	return mediaMetadata, nil
+	// If we have a record, we can respond from the local file
+	r.MediaMetadata = mediaMetadata
+	return r.respondFromLocalFile(w, cfg.AbsBasePath)
 }
 
 // respondFromLocalFile reads a file from local storage and writes it to the http.ResponseWriter
