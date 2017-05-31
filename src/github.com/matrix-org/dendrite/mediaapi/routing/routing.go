@@ -16,7 +16,6 @@ package routing
 
 import (
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/common"
@@ -42,7 +41,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI
 	}))
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
-		MXCToCond: map[string]*sync.Cond{},
+		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
 	r0mux.Handle("/download/{serverName}/{mediaId}",
 		prometheus.InstrumentHandler("download", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

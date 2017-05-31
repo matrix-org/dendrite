@@ -59,10 +59,18 @@ type MediaMetadata struct {
 	UserID            MatrixUserID
 }
 
+// RemoteRequestResult is used for broadcasting the result of a request for a remote file to routines waiting on the condition
+type RemoteRequestResult struct {
+	// Condition used for the requester to signal the result to all other routines waiting on this condition
+	Cond *sync.Cond
+	// Resulting HTTP status code from the request
+	Result int
+}
+
 // ActiveRemoteRequests is a lockable map of media URIs requested from remote homeservers
 // It is used for ensuring multiple requests for the same file do not clobber each other.
 type ActiveRemoteRequests struct {
 	sync.Mutex
 	// The string key is an mxc:// URL
-	MXCToCond map[string]*sync.Cond
+	MXCToResult map[string]*RemoteRequestResult
 }
