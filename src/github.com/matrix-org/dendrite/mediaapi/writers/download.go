@@ -148,30 +148,27 @@ func (r *downloadRequest) doDownload(w http.ResponseWriter, cfg *config.MediaAPI
 func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePath types.Path) *util.JSONResponse {
 	filePath, err := fileutils.GetPathFromBase64Hash(r.MediaMetadata.Base64Hash, absBasePath)
 	if err != nil {
-		// FIXME: Remove erroneous file from database?
-		r.Logger.WithError(err).Warn("Failed to get file path from metadata")
+		r.Logger.WithError(err).Error("Failed to get file path from metadata")
 		return &util.JSONResponse{
-			Code: 404,
-			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+			Code: 500,
+			JSON: jsonerror.InternalServerError(),
 		}
 	}
 	file, err := os.Open(filePath)
 	defer file.Close()
 	if err != nil {
-		// FIXME: Remove erroneous file from database?
-		r.Logger.WithError(err).Warn("Failed to open file")
+		r.Logger.WithError(err).Error("Failed to open file")
 		return &util.JSONResponse{
-			Code: 404,
-			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+			Code: 500,
+			JSON: jsonerror.InternalServerError(),
 		}
 	}
 	stat, err := file.Stat()
 	if err != nil {
-		// FIXME: Remove erroneous file from database?
-		r.Logger.WithError(err).Warn("Failed to stat file")
+		r.Logger.WithError(err).Error("Failed to stat file")
 		return &util.JSONResponse{
-			Code: 404,
-			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+			Code: 500,
+			JSON: jsonerror.InternalServerError(),
 		}
 	}
 
