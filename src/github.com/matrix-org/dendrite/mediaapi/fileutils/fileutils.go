@@ -31,37 +31,22 @@ import (
 )
 
 // GetPathFromBase64Hash evaluates the path to a media file from its Base64Hash
-// If the Base64Hash is long enough, we split it into pieces, creating up to 2 subdirectories
-// for more manageable browsing and use the remainder as the file name.
-// For example, if Base64Hash is 'qwerty', the path will be 'q/w/erty'.
+// 3 subdirectories are created for more manageable browsing and use the remainder as the file name.
+// For example, if Base64Hash is 'qwerty', the path will be 'q/w/erty/file'.
 func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath types.Path) (string, error) {
-	var subPath, fileName string
-
-	hashLen := len(base64Hash)
-
-	switch {
-	case hashLen < 1:
-		return "", fmt.Errorf("Invalid filePath (Base64Hash too short): %q", base64Hash)
-	case hashLen > 255:
+	if len(base64Hash) < 3 {
+		return "", fmt.Errorf("Invalid filePath (Base64Hash too short - min 3 characters): %q", base64Hash)
+	}
+	if len(base64Hash) > 255 {
 		return "", fmt.Errorf("Invalid filePath (Base64Hash too long - max 255 characters): %q", base64Hash)
-	case hashLen < 2:
-		subPath = ""
-		fileName = string(base64Hash)
-	case hashLen < 3:
-		subPath = string(base64Hash[0:1])
-		fileName = string(base64Hash[1:])
-	default:
-		subPath = path.Join(
-			string(base64Hash[0:1]),
-			string(base64Hash[1:2]),
-		)
-		fileName = string(base64Hash[2:])
 	}
 
 	filePath, err := filepath.Abs(path.Join(
 		string(absBasePath),
-		subPath,
-		fileName,
+		string(base64Hash[0:1]),
+		string(base64Hash[1:2]),
+		string(base64Hash[2:]),
+		"file",
 	))
 	if err != nil {
 		return "", fmt.Errorf("Unable to construct filePath: %q", err)
