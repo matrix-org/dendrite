@@ -22,7 +22,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -41,7 +40,7 @@ func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath types.Path) 
 		return "", fmt.Errorf("Invalid filePath (Base64Hash too long - max 255 characters): %q", base64Hash)
 	}
 
-	filePath, err := filepath.Abs(path.Join(
+	filePath, err := filepath.Abs(filepath.Join(
 		string(absBasePath),
 		string(base64Hash[0:1]),
 		string(base64Hash[1:2]),
@@ -85,7 +84,7 @@ func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata
 		return "", duplicate, fmt.Errorf("downloaded file with hash collision but different file size (%v)", finalPath)
 	}
 	err = moveFile(
-		types.Path(path.Join(string(tmpDir), "content")),
+		types.Path(filepath.Join(string(tmpDir), "content")),
 		types.Path(finalPath),
 	)
 	if err != nil {
@@ -129,7 +128,7 @@ func WriteTempFile(reqReader io.Reader, maxFileSizeBytes types.FileSizeBytes, ab
 
 // moveFile attempts to move the file src to dst
 func moveFile(src types.Path, dst types.Path) error {
-	dstDir := path.Dir(string(dst))
+	dstDir := filepath.Dir(string(dst))
 
 	err := os.MkdirAll(dstDir, 0770)
 	if err != nil {
@@ -156,7 +155,7 @@ func createTempFileWriter(absBasePath types.Path) (*bufio.Writer, *os.File, type
 
 // createTempDir creates a tmp/<random string> directory within baseDirectory and returns its path
 func createTempDir(baseDirectory types.Path) (types.Path, error) {
-	baseTmpDir := path.Join(string(baseDirectory), "tmp")
+	baseTmpDir := filepath.Join(string(baseDirectory), "tmp")
 	if err := os.MkdirAll(baseTmpDir, 0770); err != nil {
 		return "", fmt.Errorf("Failed to create base temp dir: %v", err)
 	}
@@ -171,7 +170,7 @@ func createTempDir(baseDirectory types.Path) (types.Path, error) {
 // The caller should flush the writer before closing the file.
 // Returns the file handle as it needs to be closed when writing is complete
 func createFileWriter(directory types.Path, filename types.Filename) (*bufio.Writer, *os.File, error) {
-	filePath := path.Join(string(directory), string(filename))
+	filePath := filepath.Join(string(directory), string(filename))
 	file, err := os.Create(filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to create file: %v", err)
