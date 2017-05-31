@@ -111,6 +111,7 @@ func WriteTempFile(reqReader io.Reader, maxFileSizeBytes types.FileSizeBytes, ab
 	}
 	defer tmpFile.Close()
 
+	// The amount of data read is limited to maxFileSizeBytes. At this point, if there is more data it will be truncated.
 	limitedReader := io.LimitReader(reqReader, int64(maxFileSizeBytes))
 	// Hash the file data. The hash will be returned. The hash is useful as a
 	// method of deduplicating files to save storage, as well as a way to conduct
