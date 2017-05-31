@@ -53,7 +53,10 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 			MediaID: mediaID,
 			Origin:  origin,
 		},
-		Logger: util.GetLogger(req.Context()),
+		Logger: util.GetLogger(req.Context()).WithFields(log.Fields{
+			"Origin":  origin,
+			"MediaID": mediaID,
+		}),
 	}
 
 	// request validation
@@ -181,8 +184,6 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 	}
 
 	r.Logger.WithFields(log.Fields{
-		"MediaID":       r.MediaMetadata.MediaID,
-		"Origin":        r.MediaMetadata.Origin,
 		"UploadName":    r.MediaMetadata.UploadName,
 		"Base64Hash":    r.MediaMetadata.Base64Hash,
 		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
@@ -214,24 +215,15 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 }
 
 func (r *downloadRequest) closeConnection(w http.ResponseWriter) {
-	r.Logger.WithFields(log.Fields{
-		"Origin":  r.MediaMetadata.Origin,
-		"MediaID": r.MediaMetadata.MediaID,
-	}).Info("Attempting to close the connection.")
+	r.Logger.Info("Attempting to close the connection.")
 	hijacker, ok := w.(http.Hijacker)
 	if ok {
 		connection, _, hijackErr := hijacker.Hijack()
 		if hijackErr == nil {
-			r.Logger.WithFields(log.Fields{
-				"Origin":  r.MediaMetadata.Origin,
-				"MediaID": r.MediaMetadata.MediaID,
-			}).Info("Closing")
+			r.Logger.Info("Closing")
 			connection.Close()
 		} else {
-			r.Logger.WithError(hijackErr).WithFields(log.Fields{
-				"Origin":  r.MediaMetadata.Origin,
-				"MediaID": r.MediaMetadata.MediaID,
-			}).Warn("Error trying to hijack and close connection")
+			r.Logger.WithError(hijackErr).Warn("Error trying to hijack and close connection")
 		}
 	}
 }
