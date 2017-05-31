@@ -177,7 +177,10 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 			"fileSizeDatabase": r.MediaMetadata.FileSizeBytes,
 			"fileSizeDisk":     stat.Size(),
 		}).Warn("File size in database and on-disk differ.")
-		// FIXME: Remove erroneous file from database?
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.InternalServerError(),
+		}
 	}
 
 	r.Logger.WithFields(log.Fields{
