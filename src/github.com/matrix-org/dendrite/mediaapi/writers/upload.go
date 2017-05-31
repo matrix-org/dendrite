@@ -136,10 +136,8 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *
 	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	if err != nil {
 		r.Logger.WithError(err).Error("Error querying the database.")
-		return &util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.InternalServerError(),
-		}
+		resErr := jsonerror.InternalServerError()
+		return &resErr
 	}
 
 	if mediaMetadata != nil {

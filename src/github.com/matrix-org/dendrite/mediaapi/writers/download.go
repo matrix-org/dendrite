@@ -119,10 +119,8 @@ func (r *downloadRequest) doDownload(w http.ResponseWriter, cfg *config.MediaAPI
 	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	if err != nil {
 		r.Logger.WithError(err).Error("Error querying the database.")
-		return &util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.InternalServerError(),
-		}
+		resErr := jsonerror.InternalServerError()
+		return &resErr
 	}
 	if mediaMetadata == nil {
 		if r.MediaMetadata.Origin == cfg.ServerName {
@@ -149,27 +147,21 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 	filePath, err := fileutils.GetPathFromBase64Hash(r.MediaMetadata.Base64Hash, absBasePath)
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to get file path from metadata")
-		return &util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.InternalServerError(),
-		}
+		resErr := jsonerror.InternalServerError()
+		return &resErr
 	}
 	file, err := os.Open(filePath)
 	defer file.Close()
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to open file")
-		return &util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.InternalServerError(),
-		}
+		resErr := jsonerror.InternalServerError()
+		return &resErr
 	}
 	stat, err := file.Stat()
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to stat file")
-		return &util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.InternalServerError(),
-		}
+		resErr := jsonerror.InternalServerError()
+		return &resErr
 	}
 
 	if r.MediaMetadata.FileSizeBytes > 0 && int64(r.MediaMetadata.FileSizeBytes) != stat.Size() {
@@ -177,10 +169,8 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 			"fileSizeDatabase": r.MediaMetadata.FileSizeBytes,
 			"fileSizeDisk":     stat.Size(),
 		}).Warn("File size in database and on-disk differ.")
-		return &util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.InternalServerError(),
-		}
+		resErr := jsonerror.InternalServerError()
+		return &resErr
 	}
 
 	r.Logger.WithFields(log.Fields{
@@ -202,10 +192,8 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 	if bytesResponded, err := io.Copy(w, file); err != nil {
 		r.Logger.WithError(err).Warn("Failed to copy from cache")
 		if bytesResponded == 0 {
-			return &util.JSONResponse{
-				Code: 500,
-				JSON: jsonerror.NotFound(fmt.Sprintf("Failed to respond with file with media ID %q", r.MediaMetadata.MediaID)),
-			}
+			resErr := jsonerror.InternalServerError()
+			return &resErr
 		}
 		// If we have written any data then we have already responded with 200 OK and all we can do is close the connection
 		return nil
