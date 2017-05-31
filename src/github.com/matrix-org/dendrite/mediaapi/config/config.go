@@ -26,8 +26,8 @@ type MediaAPI struct {
 	// The absolute base path to where media files will be stored.
 	AbsBasePath types.Path `yaml:"abs_base_path"`
 	// The maximum file size in bytes that is allowed to be stored on this server.
-	// Note that remote files larger than this can still be proxied to a client, they will just not be cached.
 	// Note: if MaxFileSizeBytes is set to 0, the size is unlimited.
+	// Note: if max_file_size_bytes is not set, it will default to 10485760 (10MB)
 	MaxFileSizeBytes types.FileSizeBytes `yaml:"max_file_size_bytes"`
 	// The postgres connection config for connecting to the database e.g a postgres:// URI
 	DataSource string `yaml:"database"`
