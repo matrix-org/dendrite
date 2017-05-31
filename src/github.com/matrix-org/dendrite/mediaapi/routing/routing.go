@@ -54,7 +54,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI
 			w.Header().Set("Content-Type", "application/json")
 
 			vars := mux.Vars(req)
-			writers.Download(w, req, gomatrixserverlib.ServerName(vars["serverName"]), types.MediaID(vars["mediaId"]), cfg, activeRemoteRequests)
+			writers.Download(w, req, gomatrixserverlib.ServerName(vars["serverName"]), types.MediaID(vars["mediaId"]), cfg, db, activeRemoteRequests)
 		})),
 	)
 

@@ -15,14 +15,20 @@
 package writers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"regexp"
+	"strconv"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/mediaapi/config"
+	"github.com/matrix-org/dendrite/mediaapi/fileutils"
+	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -33,6 +39,13 @@ const mediaIDCharacters = "A-Za-z0-9_=-"
 // Note: unfortunately regex.MustCompile() cannot be assigned to a const
 var mediaIDRegex = regexp.MustCompile("[" + mediaIDCharacters + "]+")
 
+// Error types used by downloadRequest.getMediaMetadata
+// FIXME: make into types
+var (
+	errDBQuery    = fmt.Errorf("error querying database for media")
+	errDBNotFound = fmt.Errorf("media not found")
+)
+
 // downloadRequest metadata included in or derivable from an download request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
 type downloadRequest struct {
@@ -41,7 +54,8 @@ type downloadRequest struct {
 }
 
 // Download implements /download
-func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib.ServerName, mediaID types.MediaID, cfg *config.MediaAPI, activeRemoteRequests *types.ActiveRemoteRequests) {
+// Files from this server (i.e. origin == cfg.ServerName) are served directly
+func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib.ServerName, mediaID types.MediaID, cfg *config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) {
 	r := &downloadRequest{
 		MediaMetadata: &types.MediaMetadata{
 			MediaID: mediaID,
@@ -64,7 +78,10 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 		return
 	}
 
-	// doDownload
+	if resErr := r.doDownload(w, cfg, db, activeRemoteRequests); resErr != nil {
+		r.jsonErrorResponse(w, *resErr)
+		return
+	}
 }
 
 func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSONResponse) {
@@ -100,4 +117,153 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 		}
 	}
 	return nil
+}
+
+func (r *downloadRequest) doDownload(w http.ResponseWriter, cfg *config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests) *util.JSONResponse {
+	// check if we have a record of the media in our database
+	mediaMetadata, err := r.getMediaMetadata(db)
+	if err == nil {
+		// If we have a record, we can respond from the local file
+		r.MediaMetadata = mediaMetadata
+		return r.respondFromLocalFile(w, cfg.AbsBasePath)
+	} else if err == errDBNotFound {
+		if r.MediaMetadata.Origin == cfg.ServerName {
+			// If we do not have a record and the origin is local, the file is not found
+			r.Logger.WithError(err).Warn("Failed to look up file in database")
+			return &util.JSONResponse{
+				Code: 404,
+				JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+			}
+		}
+		// TODO: If we do not have a record and the origin is remote, we need to fetch it and respond with that file
+		return &util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+		}
+	}
+	// Another error from the database
+	r.Logger.WithError(err).WithFields(log.Fields{
+		"MediaID": r.MediaMetadata.MediaID,
+		"Origin":  r.MediaMetadata.Origin,
+	}).Error("Error querying the database.")
+	return &util.JSONResponse{
+		Code: 500,
+		JSON: jsonerror.InternalServerError(),
+	}
+}
+
+// getMediaMetadata queries the database for media metadata
+func (r *downloadRequest) getMediaMetadata(db *storage.Database) (*types.MediaMetadata, error) {
+	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			r.Logger.WithFields(log.Fields{
+				"Origin":  r.MediaMetadata.Origin,
+				"MediaID": r.MediaMetadata.MediaID,
+			}).Info("Media not found in database.")
+			return nil, errDBNotFound
+		}
+		r.Logger.WithError(err).WithFields(log.Fields{
+			"Origin":  r.MediaMetadata.Origin,
+			"MediaID": r.MediaMetadata.MediaID,
+		}).Error("Error querying database for media.")
+		return nil, errDBQuery
+	}
+	return mediaMetadata, nil
+}
+
+// respondFromLocalFile reads a file from local storage and writes it to the http.ResponseWriter
+// Returns a util.JSONResponse error in case of error
+func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePath types.Path) *util.JSONResponse {
+	filePath, err := fileutils.GetPathFromBase64Hash(r.MediaMetadata.Base64Hash, absBasePath)
+	if err != nil {
+		// FIXME: Remove erroneous file from database?
+		r.Logger.WithError(err).Warn("Failed to get file path from metadata")
+		return &util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+		}
+	}
+	file, err := os.Open(filePath)
+	defer file.Close()
+	if err != nil {
+		// FIXME: Remove erroneous file from database?
+		r.Logger.WithError(err).Warn("Failed to open file")
+		return &util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+		}
+	}
+	stat, err := file.Stat()
+	if err != nil {
+		// FIXME: Remove erroneous file from database?
+		r.Logger.WithError(err).Warn("Failed to stat file")
+		return &util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(fmt.Sprintf("File with media ID %q does not exist", r.MediaMetadata.MediaID)),
+		}
+	}
+
+	if r.MediaMetadata.FileSizeBytes > 0 && int64(r.MediaMetadata.FileSizeBytes) != stat.Size() {
+		r.Logger.WithFields(log.Fields{
+			"fileSizeDatabase": r.MediaMetadata.FileSizeBytes,
+			"fileSizeDisk":     stat.Size(),
+		}).Warn("File size in database and on-disk differ.")
+		// FIXME: Remove erroneous file from database?
+	}
+
+	r.Logger.WithFields(log.Fields{
+		"MediaID":       r.MediaMetadata.MediaID,
+		"Origin":        r.MediaMetadata.Origin,
+		"UploadName":    r.MediaMetadata.UploadName,
+		"Base64Hash":    r.MediaMetadata.Base64Hash,
+		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
+		"Content-Type":  r.MediaMetadata.ContentType,
+	}).Info("Responding with file")
+
+	w.Header().Set("Content-Type", string(r.MediaMetadata.ContentType))
+	w.Header().Set("Content-Length", strconv.FormatInt(int64(r.MediaMetadata.FileSizeBytes), 10))
+	contentSecurityPolicy := "default-src 'none';" +
+		" script-src 'none';" +
+		" plugin-types application/pdf;" +
+		" style-src 'unsafe-inline';" +
+		" object-src 'self';"
+	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+
+	if bytesResponded, err := io.Copy(w, file); err != nil {
+		r.Logger.WithError(err).Warn("Failed to copy from cache")
+		if bytesResponded == 0 {
+			return &util.JSONResponse{
+				Code: 500,
+				JSON: jsonerror.NotFound(fmt.Sprintf("Failed to respond with file with media ID %q", r.MediaMetadata.MediaID)),
+			}
+		}
+		// If we have written any data then we have already responded with 200 OK and all we can do is close the connection
+		// FIXME: close the connection here or just return?
+		r.closeConnection(w)
+	}
+	return nil
+}
+
+func (r *downloadRequest) closeConnection(w http.ResponseWriter) {
+	r.Logger.WithFields(log.Fields{
+		"Origin":  r.MediaMetadata.Origin,
+		"MediaID": r.MediaMetadata.MediaID,
+	}).Info("Attempting to close the connection.")
+	hijacker, ok := w.(http.Hijacker)
+	if ok {
+		connection, _, hijackErr := hijacker.Hijack()
+		if hijackErr == nil {
+			r.Logger.WithFields(log.Fields{
+				"Origin":  r.MediaMetadata.Origin,
+				"MediaID": r.MediaMetadata.MediaID,
+			}).Info("Closing")
+			connection.Close()
+		} else {
+			r.Logger.WithError(hijackErr).WithFields(log.Fields{
+				"Origin":  r.MediaMetadata.Origin,
+				"MediaID": r.MediaMetadata.MediaID,
+			}).Warn("Error trying to hijack and close connection")
+		}
+	}
 }
