@@ -75,7 +75,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.
 func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRequest, *util.JSONResponse) {
 	if req.Method != "POST" {
 		return nil, &util.JSONResponse{
-			Code: 400,
+			Code: 405,
 			JSON: jsonerror.Unknown("HTTP request method must be POST."),
 		}
 	}
@@ -164,13 +164,13 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *
 func (r *uploadRequest) Validate(maxFileSizeBytes types.FileSizeBytes) *util.JSONResponse {
 	if r.MediaMetadata.FileSizeBytes < 1 {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: 411,
 			JSON: jsonerror.Unknown("HTTP Content-Length request header must be greater than zero."),
 		}
 	}
 	if maxFileSizeBytes > 0 && r.MediaMetadata.FileSizeBytes > maxFileSizeBytes {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: 413,
 			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
 		}
 	}
