@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS media_repository (
     creation_ts BIGINT NOT NULL,
     -- The file name with which the media was uploaded.
     upload_name TEXT NOT NULL,
-    -- A golang base64 URLEncoding string representation of a SHA-256 hash sum of the file data.
+    -- Alternate RFC 4648 unpadded base64 encoding string representation of a SHA-256 hash sum of the file data.
     base64hash TEXT NOT NULL,
     -- The user who uploaded the file. Should be a Matrix user ID.
     user_id TEXT NOT NULL
