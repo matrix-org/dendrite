@@ -15,7 +15,6 @@
 package writers
 
 import (
-	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -127,18 +126,26 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *
 	r.MediaMetadata.Base64Hash = hash
 	r.MediaMetadata.MediaID = types.MediaID(hash)
 
+	r.Logger = r.Logger.WithField("MediaID", r.MediaMetadata.MediaID)
+
 	r.Logger.WithFields(log.Fields{
-		"MediaID":       r.MediaMetadata.MediaID,
-		"Origin":        r.MediaMetadata.Origin,
 		"Base64Hash":    r.MediaMetadata.Base64Hash,
 		"UploadName":    r.MediaMetadata.UploadName,
 		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-		"Content-Type":  r.MediaMetadata.ContentType,
+		"ContentType":   r.MediaMetadata.ContentType,
 	}).Info("File uploaded")
 
 	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
 	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
-	if err == nil {
+	if err != nil {
+		r.Logger.WithError(err).Error("Error querying the database.")
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+
+	if mediaMetadata != nil {
 		r.MediaMetadata = mediaMetadata
 		fileutils.RemoveDir(tmpDir, r.Logger)
 		return &util.JSONResponse{
@@ -147,8 +154,6 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *
 				ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.ServerName, r.MediaMetadata.MediaID),
 			},
 		}
-	} else if err != sql.ErrNoRows {
-		r.Logger.WithError(err).WithField("MediaID", r.MediaMetadata.MediaID).Warn("Failed to query database")
 	}
 
 	// TODO: generate thumbnails
