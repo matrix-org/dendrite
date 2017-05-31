@@ -208,22 +208,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 			}
 		}
 		// If we have written any data then we have already responded with 200 OK and all we can do is close the connection
-		// FIXME: close the connection here or just return?
-		r.closeConnection(w)
+		return nil
 	}
 	return nil
-}
-
-func (r *downloadRequest) closeConnection(w http.ResponseWriter) {
-	r.Logger.Info("Attempting to close the connection.")
-	hijacker, ok := w.(http.Hijacker)
-	if ok {
-		connection, _, hijackErr := hijacker.Hijack()
-		if hijackErr == nil {
-			r.Logger.Info("Closing")
-			connection.Close()
-		} else {
-			r.Logger.WithError(hijackErr).Warn("Error trying to hijack and close connection")
-		}
-	}
 }
