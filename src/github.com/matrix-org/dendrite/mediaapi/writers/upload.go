@@ -119,7 +119,7 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *
 		fileutils.RemoveDir(tmpDir, r.Logger)
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+			JSON: jsonerror.Unknown("Failed to upload"),
 		}
 	}
 
@@ -222,7 +222,7 @@ func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath type
 		r.Logger.WithError(err).Error("Failed to move file.")
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+			JSON: jsonerror.Unknown("Failed to upload"),
 		}
 	}
 	if duplicate {
@@ -239,7 +239,7 @@ func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath type
 		}
 		return &util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Failed to upload")),
+			JSON: jsonerror.Unknown("Failed to upload"),
 		}
 	}
 
