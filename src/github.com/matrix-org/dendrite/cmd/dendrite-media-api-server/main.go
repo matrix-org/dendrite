@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
+	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -69,6 +70,11 @@ func main() {
 		DataSource:       dataSource,
 	}
 
+	db, err := storage.Open(cfg.DataSource)
+	if err != nil {
+		log.WithError(err).Panic("Failed to open database")
+	}
+
 	log.WithFields(log.Fields{
 		"BASE_PATH":           absBasePath,
 		"BIND_ADDRESS":        bindAddr,
@@ -78,6 +84,6 @@ func main() {
 		"SERVER_NAME":         serverName,
 	}).Info("Starting mediaapi")
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg)
+	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, db)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }

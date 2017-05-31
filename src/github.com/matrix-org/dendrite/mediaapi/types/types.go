@@ -20,9 +20,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// ContentDisposition is an HTTP Content-Disposition header string
-type ContentDisposition string
-
 // FileSizeBytes is a file size in bytes
 type FileSizeBytes int64
 
@@ -52,15 +49,14 @@ type UnixMs int64
 
 // MediaMetadata is metadata associated with a media file
 type MediaMetadata struct {
-	MediaID            MediaID
-	Origin             gomatrixserverlib.ServerName
-	ContentType        ContentType
-	ContentDisposition ContentDisposition
-	FileSizeBytes      FileSizeBytes
-	CreationTimestamp  UnixMs
-	UploadName         Filename
-	Base64Hash         Base64Hash
-	UserID             MatrixUserID
+	MediaID           MediaID
+	Origin            gomatrixserverlib.ServerName
+	ContentType       ContentType
+	FileSizeBytes     FileSizeBytes
+	CreationTimestamp UnixMs
+	UploadName        Filename
+	Base64Hash        Base64Hash
+	UserID            MatrixUserID
 }
 
 // ActiveRemoteRequests is a lockable map of media URIs requested from remote homeservers
