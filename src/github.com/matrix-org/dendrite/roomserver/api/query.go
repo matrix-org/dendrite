@@ -68,6 +68,22 @@ type QueryStateAfterEventsResponse struct {
 	StateEvents []gomatrixserverlib.Event
 }
 
+// QueryEventsByIDRequest is a request to QueryEventsByID
+type QueryEventsByIDRequest struct {
+	// The event IDs to look up.
+	EventIDs []string
+}
+
+// QueryEventsByIDResponse is a response to QueryEventsByID
+type QueryEventsByIDResponse struct {
+	// Copy of the request for debugging.
+	QueryEventsByIDRequest
+	// A list of events with the request IDs.
+	// If the roomserver does not have a copy of a requested event
+	// then it will omit that event from the list.
+	Events []gomatrixserverlib.Event
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -81,6 +97,12 @@ type RoomserverQueryAPI interface {
 		request *QueryStateAfterEventsRequest,
 		response *QueryStateAfterEventsResponse,
 	) error
+
+	// Query a list of events by event ID.
+	QueryEventsByID(
+		request *QueryEventsByIDRequest,
+		response *QueryEventsByIDResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -88,6 +110,9 @@ const RoomserverQueryLatestEventsAndStatePath = "/api/roomserver/QueryLatestEven
 
 // RoomserverQueryStateAfterEventsPath is the HTTP path for the QueryStateAfterEvents API.
 const RoomserverQueryStateAfterEventsPath = "/api/roomserver/QueryStateAfterEvents"
+
+// RoomserverQueryEventsByIDPath is the HTTP path for the QueryEventsByID API.
+const RoomserverQueryEventsByIDPath = "/api/roomserver/QueryEventsByID"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -118,6 +143,15 @@ func (h *httpRoomserverQueryAPI) QueryStateAfterEvents(
 	response *QueryStateAfterEventsResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
+	return postJSON(h.httpClient, apiURL, request, response)
+}
+
+// QueryEventsByID implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) QueryEventsByID(
+	request *QueryEventsByIDRequest,
+	response *QueryEventsByIDResponse,
+) error {
+	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 
