@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"mime"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -422,34 +421,11 @@ func (r *downloadRequest) fetchRemoteFile(absBasePath types.Path, maxFileSizeByt
 }
 
 func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONResponse) {
-	dnsResult, err := gomatrixserverlib.LookupServer(r.MediaMetadata.Origin)
+	matrixClient := gomatrixserverlib.NewClient()
+
+	resp, err := matrixClient.CreateMediaDownloadRequest(r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
 	if err != nil {
-		if dnsErr, ok := err.(*net.DNSError); ok && dnsErr.Timeout() {
-			return nil, &util.JSONResponse{
-				Code: 504,
-				JSON: jsonerror.Unknown(fmt.Sprintf("DNS look up for homeserver at %v timed out", r.MediaMetadata.Origin)),
-			}
-		}
-		resErr := jsonerror.InternalServerError()
-		return nil, &resErr
-	}
-	httpsURL := "https://" + dnsResult.Addrs[0]
-
-	r.Logger.WithField("URL", httpsURL).Info("Connecting to remote")
-
-	remoteReqAddr := httpsURL + "/_matrix/media/v1/download/" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
-	remoteReq, err := http.NewRequest("GET", remoteReqAddr, nil)
-	if err != nil {
-		resErr := jsonerror.InternalServerError()
-		return nil, &resErr
-	}
-
-	remoteReq.Header.Set("Host", string(r.MediaMetadata.Origin))
-
-	client := http.Client{}
-	resp, err := client.Do(remoteReq)
-	if err != nil {
-		r.Logger.Warn("Failed to execute request for remote file")
+		r.Logger.WithError(err).Error("Failed to create download request")
 		return nil, &util.JSONResponse{
 			Code: 502,
 			JSON: jsonerror.Unknown(fmt.Sprintf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)),
