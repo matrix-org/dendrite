@@ -226,9 +226,11 @@ func (r *downloadRequest) getRemoteFile(cfg *config.MediaAPI, db *storage.Databa
 		r.MediaMetadata = mediaMetadata
 	} else {
 		// Note: This is an active request that MUST broadcastMediaMetadata to wake up waiting goroutines!
-		// Note: errorResponse is the named return variable
 		// Note: broadcastMediaMetadata uses mutexes and conditions from activeRemoteRequests
-		defer r.broadcastMediaMetadata(activeRemoteRequests, errorResponse)
+		defer func() {
+			// Note: errorResponse is the named return variable so we wrap this in a closure to re-evaluate the arguments at defer-time
+			r.broadcastMediaMetadata(activeRemoteRequests, errorResponse)
+		}()
 
 		// check if we have a record of the media in our database
 		mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
