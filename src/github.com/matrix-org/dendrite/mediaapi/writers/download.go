@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -375,7 +375,10 @@ func (r *downloadRequest) fetchRemoteFile(absBasePath types.Path, maxFileSizeByt
 	}
 	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(contentLength)
 	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
-	r.MediaMetadata.UploadName = types.Filename(contentDispositionToFilename(resp.Header.Get("Content-Disposition")))
+	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
+	if err == nil && params["filename"] != "" {
+		r.MediaMetadata.UploadName = types.Filename(params["filename"])
+	}
 
 	r.Logger.Info("Transferring remote file")
 
@@ -430,11 +433,11 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONRespo
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
-	url := "https://" + dnsResult.Addrs[0]
+	httpsURL := "https://" + dnsResult.Addrs[0]
 
-	r.Logger.WithField("URL", url).Info("Connecting to remote")
+	r.Logger.WithField("URL", httpsURL).Info("Connecting to remote")
 
-	remoteReqAddr := url + "/_matrix/media/v1/download/" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
+	remoteReqAddr := httpsURL + "/_matrix/media/v1/download/" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
 	remoteReq, err := http.NewRequest("GET", remoteReqAddr, nil)
 	if err != nil {
 		resErr := jsonerror.InternalServerError()
@@ -470,19 +473,4 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONRespo
 	}
 
 	return resp, nil
-}
-
-var contentDispositionRegex = regexp.MustCompile("filename([*])?=(utf-8'')?([A-Za-z0-9._-]+)")
-
-func contentDispositionToFilename(contentDisposition string) types.Filename {
-	filename := ""
-	if matches := contentDispositionRegex.FindStringSubmatch(contentDisposition); len(matches) == 4 {
-		// Note: the filename should already be escaped. If not, unescape should be close to a no-op. This way filename is sure to be safe.
-		unescaped, err := url.PathUnescape(matches[3])
-		if err != nil {
-			unescaped = matches[3]
-		}
-		filename = url.PathEscape(unescaped)
-	}
-	return types.Filename(filename)
 }
