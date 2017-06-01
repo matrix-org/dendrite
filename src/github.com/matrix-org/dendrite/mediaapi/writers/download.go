@@ -229,6 +229,11 @@ func (r *downloadRequest) getRemoteFile(cfg *config.MediaAPI, db *storage.Databa
 		// Note: broadcastMediaMetadata uses mutexes and conditions from activeRemoteRequests
 		defer func() {
 			// Note: errorResponse is the named return variable so we wrap this in a closure to re-evaluate the arguments at defer-time
+			if err := recover(); err != nil {
+				resErr := jsonerror.InternalServerError()
+				r.broadcastMediaMetadata(activeRemoteRequests, &resErr)
+				panic(err)
+			}
 			r.broadcastMediaMetadata(activeRemoteRequests, errorResponse)
 		}()
 
