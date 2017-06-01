@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 // FileSizeBytes is a file size in bytes
@@ -63,8 +64,10 @@ type MediaMetadata struct {
 type RemoteRequestResult struct {
 	// Condition used for the requester to signal the result to all other routines waiting on this condition
 	Cond *sync.Cond
-	// Resulting HTTP status code from the request
-	Result int
+	// MediaMetadata of the requested file to avoid querying the database for every waiting routine
+	MediaMetadata *MediaMetadata
+	// An error in util.JSONResponse form. nil in case of no error.
+	ErrorResponse *util.JSONResponse
 }
 
 // ActiveRemoteRequests is a lockable map of media URIs requested from remote homeservers
