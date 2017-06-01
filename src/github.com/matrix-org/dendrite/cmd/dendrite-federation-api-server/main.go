@@ -18,11 +18,14 @@ import (
 	"encoding/base64"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationapi/config"
 	"github.com/matrix-org/dendrite/federationapi/routing"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	log "github.com/Sirupsen/logrus"
@@ -40,7 +43,10 @@ var (
 	//  openssl x509 -noout -fingerprint -sha256 -inform pem -in server.crt |\
 	//     python -c 'print raw_input()[19:].replace(":","").decode("hex").encode("base64").rstrip("=\n")'
 	//
-	tlsFingerprint = os.Getenv("TLS_FINGERPRINT")
+	tlsFingerprint       = os.Getenv("TLS_FINGERPRINT")
+	kafkaURIs            = strings.Split(os.Getenv("KAFKA_URIS"), ",")
+	roomserverURL        = os.Getenv("ROOMSERVER_URL")
+	roomserverInputTopic = os.Getenv("TOPIC_INPUT_ROOM_EVENT")
 )
 
 func main() {
@@ -57,6 +63,18 @@ func main() {
 		log.Panic("No TLS_FINGERPRINT environment variable found.")
 	}
 
+	if len(kafkaURIs) == 0 {
+		// the kafka default is :9092
+		kafkaURIs = []string{"localhost:9092"}
+	}
+
+	if roomserverURL == "" {
+		log.Panic("No ROOMSERVER_URL environment variable found.")
+	}
+
+	if roomserverInputTopic == "" {
+		log.Panic("No TOPIC_INPUT_ROOM_EVENT environment variable found. This should match the roomserver input topic.")
+	}
 	cfg := config.FederationAPI{
 		ServerName: serverName,
 		// TODO: make the validity period configurable.
@@ -75,6 +93,37 @@ func main() {
 	}
 	cfg.TLSFingerPrints = []gomatrixserverlib.TLSFingerprint{{fingerprintSHA256}}
 
-	routing.Setup(http.DefaultServeMux, cfg)
+	federation := gomatrixserverlib.NewFederationClient(cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
+
+	keyRing := gomatrixserverlib.KeyRing{
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{
+			// TODO: Use perspective key fetchers for production.
+			&gomatrixserverlib.DirectKeyFetcher{federation.Client},
+		},
+		KeyDatabase: &dummyKeyDatabase{},
+	}
+	queryAPI := api.NewRoomserverQueryAPIHTTP(roomserverURL, nil)
+
+	roomserverProducer, err := producers.NewRoomserverProducer(kafkaURIs, roomserverInputTopic)
+	if err != nil {
+		log.Panicf("Failed to setup kafka producers(%s): %s", kafkaURIs, err)
+	}
+
+	routing.Setup(http.DefaultServeMux, cfg, queryAPI, roomserverProducer, keyRing)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
+}
+
+// TODO: Implement a proper key database.
+type dummyKeyDatabase struct{}
+
+func (d *dummyKeyDatabase) FetchKeys(
+	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
+) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys, error) {
+	return nil, nil
+}
+
+func (d *dummyKeyDatabase) StoreKeys(
+	map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys,
+) error {
+	return nil
 }

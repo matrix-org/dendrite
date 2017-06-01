@@ -3,7 +3,9 @@ package writers
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -18,6 +20,8 @@ func Send(
 	txnID gomatrixserverlib.TransactionID,
 	now time.Time,
 	cfg config.FederationAPI,
+	query api.RoomserverQueryAPI,
+	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
 	request, errResp := gomatrixserverlib.VerifyHTTPRequest(req, now, cfg.ServerName, keys)
@@ -37,21 +41,76 @@ func Send(
 	content.TransactionID = txnID
 	content.Destination = cfg.ServerName
 
-	// TODO: process the transaction.
+	resp, err := processTransaction(content, query, producer, keys)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: gomatrixserverlib.RespSend{},
+		JSON: resp,
 	}
 }
 
-func processTransaction(t gomatrixserverlib.Transaction, query api.RoomserverQueryAPI) {
+func processTransaction(
+	t gomatrixserverlib.Transaction,
+	query api.RoomserverQueryAPI,
+	producer *producers.RoomserverProducer,
+	keys gomatrixserverlib.KeyRing,
+) (*gomatrixserverlib.RespSend, error) {
+	// Check the event signatures
+	if err := gomatrixserverlib.VerifyEventSignatures(t.PDUs, keys); err != nil {
+		return nil, err
+	}
 
+	// Process the events.
+	results := map[string]gomatrixserverlib.PDUResult{}
+	for _, e := range t.PDUs {
+		err := processEvent(e, query, producer)
+		if err != nil {
+			// If the error is due to the event itself being bad then we skip
+			// it and move onto the next event. We report an error so that the
+			// sender knows that we have skipped processing it.
+			//
+			// However if the event is due to a temporary failure in our server
+			// such as a database being unavailable then we should bail, and
+			// hope that the sender will retry when we are feeling better.
+			//
+			// It is uncertain what we should do if an event fails because
+			// we failed to fetch more information from the sending server.
+			// For example if a request to /state fails.
+			// If we skip the event then we risk missing the event until we
+			// receive another event referencing it.
+			// If we bail and stop processing then we risk wedging incoming
+			// transactions from that server forever.
+			switch err.(type) {
+			case unknownRoomError:
+			case *gomatrixserverlib.NotAllowed:
+			default:
+				// Any other error should be the result of a temporary error in
+				// our server so we should bail processing the transaction entirely.
+				return nil, err
+			}
+			results[e.EventID()] = gomatrixserverlib.PDUResult{err.Error()}
+		} else {
+			results[e.EventID()] = gomatrixserverlib.PDUResult{}
+		}
+	}
+
+	// TODO: Process the EDUs.
+
+	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
-var errUnknownRoom = fmt.Errorf("unknown room")
+type unknownRoomError string
 
-func processEvent(e gomatrixserverlib.Event, query api.RoomserverQueryAPI) error {
+func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e) }
+
+func processEvent(
+	e gomatrixserverlib.Event,
+	query api.RoomserverQueryAPI,
+	producer *producers.RoomserverProducer,
+) error {
 	refs := e.PrevEvents()
 	prevEventIDs := make([]string, len(refs))
 	for i := range refs {
@@ -77,7 +136,7 @@ func processEvent(e gomatrixserverlib.Event, query api.RoomserverQueryAPI) error
 		// that this server is unaware of.
 		// However generally speaking we should reject events for rooms we
 		// aren't a member of.
-		return errUnknownRoom
+		return unknownRoomError(e.RoomID())
 	}
 
 	if !stateResp.PrevEventsExist {
@@ -101,12 +160,21 @@ func processEvent(e gomatrixserverlib.Event, query api.RoomserverQueryAPI) error
 		panic(fmt.Errorf("Receiving events with missing prev_events is no implemented"))
 	}
 
+	// Check that the event is allowed by the state at the event.
 	authUsingState := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range stateResp.StateEvents {
 		authUsingState.AddEvent(&stateResp.StateEvents[i])
 	}
 	err := gomatrixserverlib.Allowed(e, &authUsingState)
 	if err != nil {
+		return err
+	}
+
+	// TODO: Check that the roomserver has a copy of all of the auth_events.
+	// TODO: Check that the event is allowed by its auth_events.
+
+	// pass the event to the roomserver
+	if err := producer.SendEvents([]gomatrixserverlib.Event{e}); err != nil {
 		return err
 	}
 
