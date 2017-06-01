@@ -253,10 +253,8 @@ func (r *downloadRequest) getMediaMetadataForRemoteFile(db *storage.Database, ac
 	if activeRemoteRequestResult, ok := activeRemoteRequests.MXCToResult[mxcURL]; ok {
 		r.Logger.Info("Waiting for another goroutine to fetch the remote file.")
 
+		// NOTE: Wait unlocks and locks again internally. There is still a deferred Unlock() that will unlock this.
 		activeRemoteRequestResult.Cond.Wait()
-		activeRemoteRequests.Unlock()
-		// NOTE: there is still a deferred Unlock() that will unlock this
-		activeRemoteRequests.Lock()
 
 		// check if we have a record of the media in our database
 		mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
