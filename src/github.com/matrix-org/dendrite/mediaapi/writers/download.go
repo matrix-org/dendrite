@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -431,7 +430,7 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, *util.JSONRespo
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
-	url := "https://" + strings.Trim(dnsResult.SRVRecords[0].Target, ".") + ":" + strconv.Itoa(int(dnsResult.SRVRecords[0].Port))
+	url := "https://" + dnsResult.Addrs[0]
 
 	r.Logger.WithField("URL", url).Info("Connecting to remote")
 
