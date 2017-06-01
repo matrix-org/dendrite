@@ -118,7 +118,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	return nil
 }
 
-// QueryEventsByID implemented api.RoomserverQueryAPI
+// QueryEventsByID implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryEventsByID(
 	request *api.QueryEventsByIDRequest,
 	response *api.QueryEventsByIDResponse,
