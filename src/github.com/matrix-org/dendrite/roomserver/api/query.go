@@ -41,6 +41,7 @@ type QueryLatestEventsAndStateResponse struct {
 	// The latest events in the room.
 	LatestEvents []gomatrixserverlib.EventReference
 	// The state events requested.
+	// This list will be in an arbitrary order.
 	StateEvents []gomatrixserverlib.Event
 }
 
@@ -65,6 +66,7 @@ type QueryStateAfterEventsResponse struct {
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool
 	// The state events requested.
+	// This list will be in an arbitrary order.
 	StateEvents []gomatrixserverlib.Event
 }
 
@@ -84,6 +86,7 @@ type QueryEventsByIDResponse struct {
 	// If the roomserver thinks it has a copy of the event, but
 	// fails to read it from the database then it will fail
 	// the entire request.
+	// This list will be in an arbitrary order.
 	Events []gomatrixserverlib.Event
 }
 
