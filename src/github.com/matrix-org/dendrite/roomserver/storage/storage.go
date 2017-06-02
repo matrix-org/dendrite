@@ -170,6 +170,11 @@ func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]types.
 	return d.statements.bulkSelectEventStateKeyNID(eventStateKeys)
 }
 
+// EventNIDs implements query.RoomQueryDatabase
+func (d *Database) EventNIDs(eventIDs []string) (map[string]types.EventNID, error) {
+	return d.statements.bulkSelectEventNID(eventIDs)
+}
+
 // Events implements input.EventDatabase
 func (d *Database) Events(eventNIDs []types.EventNID) ([]types.Event, error) {
 	eventJSONs, err := d.statements.bulkSelectEventJSON(eventNIDs)
