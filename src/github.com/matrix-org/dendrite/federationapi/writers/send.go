@@ -23,25 +23,31 @@ func Send(
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
+	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	request, errResp := gomatrixserverlib.VerifyHTTPRequest(req, now, cfg.ServerName, keys)
 	if request == nil {
 		return errResp
 	}
 
-	var content gomatrixserverlib.Transaction
-	if err := json.Unmarshal(request.Content(), &content); err != nil {
+	t := txnReq{
+		query:      query,
+		producer:   producer,
+		keys:       keys,
+		federation: federation,
+	}
+	if err := json.Unmarshal(request.Content(), &t); err != nil {
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 
-	content.Origin = request.Origin()
-	content.TransactionID = txnID
-	content.Destination = cfg.ServerName
+	t.Origin = request.Origin()
+	t.TransactionID = txnID
+	t.Destination = cfg.ServerName
 
-	resp, err := processTransaction(content, query, producer, keys)
+	resp, err := t.processTransaction()
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -52,21 +58,24 @@ func Send(
 	}
 }
 
-func processTransaction(
-	t gomatrixserverlib.Transaction,
-	query api.RoomserverQueryAPI,
-	producer *producers.RoomserverProducer,
-	keys gomatrixserverlib.KeyRing,
-) (*gomatrixserverlib.RespSend, error) {
+type txnReq struct {
+	gomatrixserverlib.Transaction
+	query      api.RoomserverQueryAPI
+	producer   *producers.RoomserverProducer
+	keys       gomatrixserverlib.KeyRing
+	federation *gomatrixserverlib.FederationClient
+}
+
+func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	// Check the event signatures
-	if err := gomatrixserverlib.VerifyEventSignatures(t.PDUs, keys); err != nil {
+	if err := gomatrixserverlib.VerifyEventSignatures(t.PDUs, t.keys); err != nil {
 		return nil, err
 	}
 
 	// Process the events.
 	results := map[string]gomatrixserverlib.PDUResult{}
 	for _, e := range t.PDUs {
-		err := processEvent(e, query, producer)
+		err := t.processEvent(e)
 		if err != nil {
 			// If the error is due to the event itself being bad then we skip
 			// it and move onto the next event. We report an error so that the
@@ -106,11 +115,7 @@ type unknownRoomError string
 
 func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e) }
 
-func processEvent(
-	e gomatrixserverlib.Event,
-	query api.RoomserverQueryAPI,
-	producer *producers.RoomserverProducer,
-) error {
+func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	refs := e.PrevEvents()
 	prevEventIDs := make([]string, len(refs))
 	for i := range refs {
@@ -125,7 +130,7 @@ func processEvent(
 		StateToFetch: needed.Tuples(),
 	}
 	var stateResp api.QueryStateAfterEventsResponse
-	if err := query.QueryStateAfterEvents(&stateReq, &stateResp); err != nil {
+	if err := t.query.QueryStateAfterEvents(&stateReq, &stateResp); err != nil {
 		return err
 	}
 
@@ -140,33 +145,11 @@ func processEvent(
 	}
 
 	if !stateResp.PrevEventsExist {
-		// We are missing the previous events for this events.
-		// This means that there is a gap in our view of the history of the
-		// room. There two ways that we can handle such a gap:
-		//   1) We can fill in the gap using /get_missing_events
-		//   2) We can leave the gap and request the state of the room at
-		//      this event from the remote server using either /state_ids
-		//      or /state.
-		// Synapse will attempt to do 1 and if that fails or if the gap is
-		// too large then it will attempt 2.
-		// Synapse will use /state_ids if possible since ususally the state
-		// is largely unchanged and it is more efficient to fetch a list of
-		// event ids and then use /event to fetch the individual events.
-		// However not all version of synapse support /state_ids so you may
-		// need to fallback to /state.
-		// TODO: Attempt to fill in the gap using /get_missing_events
-		// TODO: Attempt to fetch the state using /state_ids and /events
-		// TODO: Attempt to fetch the state using /state
-		panic(fmt.Errorf("Receiving events with missing prev_events is no implemented"))
+		return t.processEventWithMissingState(e)
 	}
 
 	// Check that the event is allowed by the state at the event.
-	authUsingState := gomatrixserverlib.NewAuthEvents(nil)
-	for i := range stateResp.StateEvents {
-		authUsingState.AddEvent(&stateResp.StateEvents[i])
-	}
-	err := gomatrixserverlib.Allowed(e, &authUsingState)
-	if err != nil {
+	if err := checkAllowedByState(e, stateResp.StateEvents); err != nil {
 		return err
 	}
 
@@ -174,9 +157,53 @@ func processEvent(
 	// TODO: Check that the event is allowed by its auth_events.
 
 	// pass the event to the roomserver
-	if err := producer.SendEvents([]gomatrixserverlib.Event{e}); err != nil {
+	if err := t.producer.SendEvents([]gomatrixserverlib.Event{e}); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserverlib.Event) error {
+	authUsingState := gomatrixserverlib.NewAuthEvents(nil)
+	for i := range stateEvents {
+		authUsingState.AddEvent(&stateEvents[i])
+	}
+	return gomatrixserverlib.Allowed(e, &authUsingState)
+}
+
+func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
+	// We are missing the previous events for this events.
+	// This means that there is a gap in our view of the history of the
+	// room. There two ways that we can handle such a gap:
+	//   1) We can fill in the gap using /get_missing_events
+	//   2) We can leave the gap and request the state of the room at
+	//      this event from the remote server using either /state_ids
+	//      or /state.
+	// Synapse will attempt to do 1 and if that fails or if the gap is
+	// too large then it will attempt 2.
+	// Synapse will use /state_ids if possible since ususally the state
+	// is largely unchanged and it is more efficient to fetch a list of
+	// event ids and then use /event to fetch the individual events.
+	// However not all version of synapse support /state_ids so you may
+	// need to fallback to /state.
+	// TODO: Attempt to fill in the gap using /get_missing_events
+	// TODO: Attempt to fetch the state using /state_ids and /events
+	state, err := t.federation.LookupState(t.Origin, e.RoomID(), e.EventID())
+	if err != nil {
+		return err
+	}
+	// Check that the returned state is valid.
+	if err := state.Check(t.keys); err != nil {
+		return err
+	}
+	// Check that the event is allowed by the state.
+	if err := checkAllowedByState(e, state.StateEvents); err != nil {
+		return err
+	}
+	// pass the event along with the state to the roomserver
+	if err := t.producer.SendEventWithState(state, e); err != nil {
+		return err
+	}
 	return nil
 }

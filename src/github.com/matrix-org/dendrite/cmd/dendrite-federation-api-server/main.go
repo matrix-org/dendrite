@@ -109,7 +109,7 @@ func main() {
 		log.Panicf("Failed to setup kafka producers(%s): %s", kafkaURIs, err)
 	}
 
-	routing.Setup(http.DefaultServeMux, cfg, queryAPI, roomserverProducer, keyRing)
+	routing.Setup(http.DefaultServeMux, cfg, queryAPI, roomserverProducer, keyRing, federation)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
 }
 

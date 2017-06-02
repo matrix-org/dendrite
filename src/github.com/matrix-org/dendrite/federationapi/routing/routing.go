@@ -40,6 +40,7 @@ func Setup(
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
+	federation *gomatrixserverlib.FederationClient,
 ) {
 	apiMux := mux.NewRouter()
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
@@ -62,7 +63,7 @@ func Setup(
 			return writers.Send(
 				req, gomatrixserverlib.TransactionID(vars["txnID"]),
 				time.Now(),
-				cfg, query, producer, keys,
+				cfg, query, producer, keys, federation,
 			)
 		},
 	))

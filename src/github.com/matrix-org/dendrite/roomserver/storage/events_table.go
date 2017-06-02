@@ -194,7 +194,9 @@ func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.S
 		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
 		// If this turns out to be impossible and we do need the debug information here, it would be better
 		// to do it as a separate query rather than slowing down/complicating the common case.
-		return nil, fmt.Errorf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs))
+		return nil, types.MissingEventError(
+			fmt.Sprintf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs)),
+		)
 	}
 	return results, err
 }
@@ -218,11 +220,15 @@ func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types
 			return nil, err
 		}
 		if result.BeforeStateSnapshotNID == 0 {
-			return nil, fmt.Errorf("storage: missing state for event NID %d", result.EventNID)
+			return nil, types.MissingEventError(
+				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
+			)
 		}
 	}
 	if i != len(eventIDs) {
-		return nil, fmt.Errorf("storage: event IDs missing from the database (%d != %d)", i, len(eventIDs))
+		return nil, types.MissingEventError(
+			fmt.Sprintf("storage: event IDs missing from the database (%d != %d)", i, len(eventIDs)),
+		)
 	}
 	return results, err
 }

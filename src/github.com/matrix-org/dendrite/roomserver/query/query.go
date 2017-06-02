@@ -97,9 +97,12 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 
 	prevStates, err := r.DB.StateAtEventIDs(request.PrevEventIDs)
 	if err != nil {
-		// TODO: Check if the error was because we are missing events from the
-		// database or are missing state at events from the database.
-		return err
+		switch err.(type) {
+		case types.MissingEventError:
+			return nil
+		default:
+			return err
+		}
 	}
 	response.PrevEventsExist = true
 
