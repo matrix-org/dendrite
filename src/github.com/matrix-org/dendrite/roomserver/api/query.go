@@ -78,9 +78,12 @@ type QueryEventsByIDRequest struct {
 type QueryEventsByIDResponse struct {
 	// Copy of the request for debugging.
 	QueryEventsByIDRequest
-	// A list of events with the request IDs.
+	// A list of events with the requested IDs.
 	// If the roomserver does not have a copy of a requested event
 	// then it will omit that event from the list.
+	// If the roomserver thinks it has a copy of the event, but
+	// fails to read it from the database then it will fail
+	// the entire request.
 	Events []gomatrixserverlib.Event
 }
 
