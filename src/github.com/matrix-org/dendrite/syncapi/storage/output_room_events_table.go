@@ -95,13 +95,15 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-// StateBetween returns the state events between the two given stream positions, exclusive of oldPos, inclusive of newPos.
+// selectStateInRange returns the state events between the two given stream positions, exclusive of oldPos, inclusive of newPos.
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
-func (s *outputRoomEventsStatements) StateBetween(txn *sql.Tx, oldPos, newPos types.StreamPosition) (map[string][]streamEvent, error) {
+func (s *outputRoomEventsStatements) selectStateInRange(
+	txn *sql.Tx, oldPos, newPos types.StreamPosition,
+) (map[string]map[string]bool, map[string]streamEvent, error) {
 	rows, err := txn.Stmt(s.selectStateInRangeStmt).Query(oldPos, newPos)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// Fetch all the state change events for all rooms between the two positions then loop each event and:
 	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
@@ -121,7 +123,7 @@ func (s *outputRoomEventsStatements) StateBetween(txn *sql.Tx, oldPos, newPos ty
 			delIDs     pq.StringArray
 		)
 		if err := rows.Scan(&streamPos, &eventBytes, &addIDs, &delIDs); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		// Sanity check for deleted state and whine if we see it. We don't need to do anything
 		// since it'll just mark the event as not being needed.
@@ -137,7 +139,7 @@ func (s *outputRoomEventsStatements) StateBetween(txn *sql.Tx, oldPos, newPos ty
 		// TODO: Handle redacted events
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		needSet := stateNeeded[ev.RoomID()]
 		if needSet == nil { // make set if required
@@ -154,56 +156,13 @@ func (s *outputRoomEventsStatements) StateBetween(txn *sql.Tx, oldPos, newPos ty
 		eventIDToEvent[ev.EventID()] = streamEvent{ev, types.StreamPosition(streamPos)}
 	}
 
-	return s.fetchStateEvents(txn, stateNeeded, eventIDToEvent)
-}
-
-// fetchStateEvents converts the set of event IDs into a set of events. It will fetch any which are missing from the database.
-// Returns a map of room ID to list of events.
-func (s *outputRoomEventsStatements) fetchStateEvents(txn *sql.Tx, roomIDToEventIDSet map[string]map[string]bool, eventIDToEvent map[string]streamEvent) (map[string][]streamEvent, error) {
-	stateBetween := make(map[string][]streamEvent)
-	missingEvents := make(map[string][]string)
-	for roomID, ids := range roomIDToEventIDSet {
-		events := stateBetween[roomID]
-		for id, need := range ids {
-			if !need {
-				continue // deleted state
-			}
-			e, ok := eventIDToEvent[id]
-			if ok {
-				events = append(events, e)
-			} else {
-				m := missingEvents[roomID]
-				m = append(m, id)
-				missingEvents[roomID] = m
-			}
-		}
-		stateBetween[roomID] = events
-	}
-
-	if len(missingEvents) > 0 {
-		// This happens when add_state_ids has an event ID which is not in the provided range.
-		// We need to explicitly fetch them.
-		allMissingEventIDs := []string{}
-		for _, missingEvIDs := range missingEvents {
-			allMissingEventIDs = append(allMissingEventIDs, missingEvIDs...)
-		}
-		evs, err := s.Events(txn, allMissingEventIDs)
-		if err != nil {
-			return nil, err
-		}
-		// we know we got them all otherwise an error would've been returned, so just loop the events
-		for _, ev := range evs {
-			roomID := ev.RoomID()
-			stateBetween[roomID] = append(stateBetween[roomID], ev)
-		}
-	}
-	return stateBetween, nil
+	return stateNeeded, eventIDToEvent, nil
 }
 
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
 // then this function should only ever be used at startup, as it will race with inserting events if it is
 // done afterwards. If there are no inserted events, 0 is returned.
-func (s *outputRoomEventsStatements) MaxID(txn *sql.Tx) (id int64, err error) {
+func (s *outputRoomEventsStatements) selectMaxID(txn *sql.Tx) (id int64, err error) {
 	stmt := s.selectMaxIDStmt
 	if txn != nil {
 		stmt = txn.Stmt(stmt)
@@ -218,7 +177,7 @@ func (s *outputRoomEventsStatements) MaxID(txn *sql.Tx) (id int64, err error) {
 
 // InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs. Returns the position
 // of the inserted event.
-func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) (streamPos int64, err error) {
+func (s *outputRoomEventsStatements) insertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) (streamPos int64, err error) {
 	err = txn.Stmt(s.insertEventStmt).QueryRow(
 		event.RoomID(), event.EventID(), event.JSON(), pq.StringArray(addState), pq.StringArray(removeState),
 	).Scan(&streamPos)
@@ -226,7 +185,9 @@ func (s *outputRoomEventsStatements) InsertEvent(txn *sql.Tx, event *gomatrixser
 }
 
 // RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
-func (s *outputRoomEventsStatements) RecentEventsInRoom(txn *sql.Tx, roomID string, fromPos, toPos types.StreamPosition, limit int) ([]streamEvent, error) {
+func (s *outputRoomEventsStatements) selectRecentEvents(
+	txn *sql.Tx, roomID string, fromPos, toPos types.StreamPosition, limit int,
+) ([]streamEvent, error) {
 	rows, err := s.selectRecentEventsStmt.Query(roomID, fromPos, toPos, limit)
 	if err != nil {
 		return nil, err
@@ -243,7 +204,7 @@ func (s *outputRoomEventsStatements) RecentEventsInRoom(txn *sql.Tx, roomID stri
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
 // from the database.
-func (s *outputRoomEventsStatements) Events(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
+func (s *outputRoomEventsStatements) selectEvents(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
 	rows, err := txn.Stmt(s.selectEventsStmt).Query(pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
