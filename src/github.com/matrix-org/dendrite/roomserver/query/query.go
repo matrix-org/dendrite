@@ -35,6 +35,9 @@ type RoomserverQueryAPIDatabase interface {
 	// Lookup event references for the latest events in the room and the current state snapshot.
 	// Returns an error if there was a problem talking to the database.
 	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, error)
+	// Lookup the numeric IDs for a list of events.
+	// Returns an error if there was a problem talking to the database.
+	EventNIDs(eventIDs []string) (map[string]types.EventNID, error)
 }
 
 // RoomserverQueryAPI is an implementation of RoomserverQueryAPI
@@ -46,7 +49,7 @@ type RoomserverQueryAPI struct {
 func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
-) (err error) {
+) error {
 	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNID(request.RoomID)
 	if err != nil {
@@ -81,7 +84,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
-) (err error) {
+) error {
 	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNID(request.RoomID)
 	if err != nil {
@@ -115,12 +118,41 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	return nil
 }
 
+// QueryEventsByID implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryEventsByID(
+	request *api.QueryEventsByIDRequest,
+	response *api.QueryEventsByIDResponse,
+) error {
+	response.QueryEventsByIDRequest = *request
+
+	eventNIDMap, err := r.DB.EventNIDs(request.EventIDs)
+	if err != nil {
+		return err
+	}
+
+	var eventNIDs []types.EventNID
+	for _, nid := range eventNIDMap {
+		eventNIDs = append(eventNIDs, nid)
+	}
+
+	events, err := r.loadEvents(eventNIDs)
+	if err != nil {
+		return err
+	}
+
+	response.Events = events
+	return nil
+}
+
 func (r *RoomserverQueryAPI) loadStateEvents(stateEntries []types.StateEntry) ([]gomatrixserverlib.Event, error) {
 	eventNIDs := make([]types.EventNID, len(stateEntries))
 	for i := range stateEntries {
 		eventNIDs[i] = stateEntries[i].EventNID
 	}
+	return r.loadEvents(eventNIDs)
+}
 
+func (r *RoomserverQueryAPI) loadEvents(eventNIDs []types.EventNID) ([]gomatrixserverlib.Event, error) {
 	stateEvents, err := r.DB.Events(eventNIDs)
 	if err != nil {
 		return nil, err
@@ -158,6 +190,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryStateAfterEvents(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryEventsByIDPath,
+		common.MakeAPI("query_events_by_id", func(req *http.Request) util.JSONResponse {
+			var request api.QueryEventsByIDRequest
+			var response api.QueryEventsByIDResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryEventsByID(&request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
