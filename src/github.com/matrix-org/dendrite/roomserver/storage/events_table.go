@@ -104,9 +104,6 @@ const bulkSelectEventReferenceSQL = "" +
 const bulkSelectEventIDSQL = "" +
 	"SELECT event_nid, event_id FROM events WHERE event_nid = ANY($1)"
 
-const bulkSelectEventNIDSQL = "" +
-	"SELECT event_id, event_nid FROM events WHERE event_id = ANY($1)"
-
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
@@ -119,7 +116,6 @@ type eventStatements struct {
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
-	bulkSelectEventNIDStmt                 *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -140,7 +136,6 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
-		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 	}.prepare(db)
 }
 
@@ -322,26 +317,6 @@ func (s *eventStatements) bulkSelectEventID(eventNIDs []types.EventNID) (map[typ
 	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
-	}
-	return results, nil
-}
-
-// bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
-// If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) bulkSelectEventNID(eventIDs []string) (map[string]types.EventNID, error) {
-	rows, err := s.bulkSelectEventNIDStmt.Query(pq.StringArray(eventIDs))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	results := make(map[string]types.EventNID, len(eventIDs))
-	for rows.Next() {
-		var eventID string
-		var eventNID int64
-		if err = rows.Scan(&eventID, &eventNID); err != nil {
-			return nil, err
-		}
-		results[eventID] = types.EventNID(eventNID)
 	}
 	return results, nil
 }
