@@ -50,6 +50,10 @@ var (
 	testDatabaseName = defaulting(os.Getenv("DATABASE_NAME"), "syncserver_test")
 	// The postgres connection config for connecting to the test database.
 	testDatabase = defaulting(os.Getenv("DATABASE"), fmt.Sprintf("dbname=%s sslmode=disable binary_parameters=yes", testDatabaseName))
+	// The name of the test account database to create.
+	testAccountDatabaseName = defaulting(os.Getenv("ACCOUNT_DATABASE_NAME"), "account_test")
+	// The postgres connection config for connecting to the test account database.
+	testAccountDatabase = defaulting(os.Getenv("ACCOUNT_DATABASE"), fmt.Sprintf("dbname=%s sslmode=disable binary_parameters=yes", testDatabaseName))
 )
 
 const inputTopic = "syncserverInput"
@@ -83,6 +87,7 @@ func getLastRequestError() error {
 var syncServerConfigFileContents = (`consumer_uris: ["` + kafkaURI + `"]
 roomserver_topic: "` + inputTopic + `"
 database: "` + testDatabase + `"
+account_database: "` + testAccountDatabase + `"
 server_name: "localhost"
 `)
 
@@ -229,6 +234,9 @@ func syncRequestUntilSuccess(done chan error, userID, since, want string) {
 // which will have any termination errors sent down it, followed immediately by the channel being closed.
 func startSyncServer() (*exec.Cmd, chan error) {
 	if err := createDatabase(testDatabaseName); err != nil {
+		panic(err)
+	}
+	if err := createDatabase(testAccountDatabaseName); err != nil {
 		panic(err)
 	}
 
