@@ -26,6 +26,8 @@ type Sync struct {
 	KafkaConsumerURIs []string `yaml:"consumer_uris"`
 	// The postgres connection config for connecting to the database e.g a postgres:// URI
 	DataSource string `yaml:"database"`
+	// The postgres connection config for connecting to the account database e.g a postgres:// URI
+	AccountDataSource string `yaml:"account_database"`
 	// The server_name of the running process e.g "localhost"
 	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 }
