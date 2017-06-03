@@ -245,7 +245,7 @@ func (r *downloadRequest) getRemoteFile(cfg *config.MediaAPI, db *storage.Databa
 
 		if mediaMetadata == nil {
 			// If we do not have a record, we need to fetch the remote file first and then respond from the local file
-			resErr := r.fetchRemoteFileAndStoreMetadata(cfg.AbsBasePath, cfg.MaxFileSizeBytes, db)
+			resErr := r.fetchRemoteFileAndStoreMetadata(cfg.AbsBasePath, *cfg.MaxFileSizeBytes, db)
 			if resErr != nil {
 				return resErr
 			}

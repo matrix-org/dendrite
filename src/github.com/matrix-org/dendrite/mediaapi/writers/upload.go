@@ -89,7 +89,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.ServerName),
 	}
 
-	if resErr := r.Validate(cfg.MaxFileSizeBytes); resErr != nil {
+	if resErr := r.Validate(*cfg.MaxFileSizeBytes); resErr != nil {
 		return nil, resErr
 	}
 
@@ -107,10 +107,10 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	// Data is truncated to maxFileSizeBytes. Content-Length was reported as 0 < Content-Length <= maxFileSizeBytes so this is OK.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(reqReader, cfg.MaxFileSizeBytes, cfg.AbsBasePath)
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(reqReader, *cfg.MaxFileSizeBytes, cfg.AbsBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
-			"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
+			"MaxFileSizeBytes": *cfg.MaxFileSizeBytes,
 		}).Warn("Error while transferring file")
 		fileutils.RemoveDir(tmpDir, r.Logger)
 		return &util.JSONResponse{
