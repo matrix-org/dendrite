@@ -19,13 +19,17 @@ import (
 )
 
 type statements struct {
-	mediaStatements
+	media     mediaStatements
+	thumbnail thumbnailStatements
 }
 
 func (s *statements) prepare(db *sql.DB) error {
 	var err error
 
-	if err = s.mediaStatements.prepare(db); err != nil {
+	if err = s.media.prepare(db); err != nil {
+		return err
+	}
+	if err = s.thumbnail.prepare(db); err != nil {
 		return err
 	}
 

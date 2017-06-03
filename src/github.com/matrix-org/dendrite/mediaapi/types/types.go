@@ -89,3 +89,25 @@ type ThumbnailSize struct {
 	// scale scales to fit the requested dimensions and one dimension may be smaller than requested.
 	ResizeMethod string `yaml:"method,omitempty"`
 }
+
+// ThumbnailMetadata contains the metadata about an individual thumbnail
+type ThumbnailMetadata struct {
+	MediaMetadata *MediaMetadata
+	ThumbnailSize ThumbnailSize
+}
+
+// ThumbnailGenerationResult is used for broadcasting the result of thumbnail generation to routines waiting on the condition
+type ThumbnailGenerationResult struct {
+	// Condition used for the generator to signal the result to all other routines waiting on this condition
+	Cond *sync.Cond
+	// Resulting error from the generation attempt
+	Err error
+}
+
+// ActiveThumbnailGeneration is a lockable map of file paths being thumbnailed
+// It is used to ensure thumbnails are only generated once.
+type ActiveThumbnailGeneration struct {
+	sync.Mutex
+	// The string key is a thumbnail file path
+	PathToResult map[string]*ThumbnailGenerationResult
+}

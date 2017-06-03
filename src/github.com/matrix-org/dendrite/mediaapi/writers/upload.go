@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/config"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
+	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/util"
 )
@@ -50,13 +51,13 @@ type uploadResponse struct {
 // This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
 // Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
 // TODO: We should time out requests if they have not received any data within a configured timeout period.
-func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database) util.JSONResponse {
+func Upload(req *http.Request, cfg *config.MediaAPI, db *storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) util.JSONResponse {
 	r, resErr := parseAndValidateRequest(req, cfg)
 	if resErr != nil {
 		return *resErr
 	}
 
-	if resErr = r.doUpload(req.Body, cfg, db); resErr != nil {
+	if resErr = r.doUpload(req.Body, cfg, db, activeThumbnailGeneration); resErr != nil {
 		return *resErr
 	}
 
@@ -96,7 +97,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 	return r, nil
 }
 
-func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *storage.Database) *util.JSONResponse {
+func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) *util.JSONResponse {
 	r.Logger.WithFields(log.Fields{
 		"UploadName":    r.MediaMetadata.UploadName,
 		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
@@ -151,9 +152,7 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *
 		}
 	}
 
-	// TODO: generate thumbnails
-
-	if resErr := r.storeFileAndMetadata(tmpDir, cfg.AbsBasePath, db); resErr != nil {
+	if resErr := r.storeFileAndMetadata(tmpDir, cfg.AbsBasePath, db, cfg.ThumbnailSizes, activeThumbnailGeneration); resErr != nil {
 		return resErr
 	}
 
@@ -216,7 +215,7 @@ func (r *uploadRequest) Validate(maxFileSizeBytes types.FileSizeBytes) *util.JSO
 // The order of operations is important as it avoids metadata entering the database before the file
 // is ready, and if we fail to move the file, it never gets added to the database.
 // Returns a util.JSONResponse error and cleans up directories in case of error.
-func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, db *storage.Database) *util.JSONResponse {
+func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, db *storage.Database, thumbnailSizes []types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration) *util.JSONResponse {
 	finalPath, duplicate, err := fileutils.MoveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to move file.")
@@ -242,6 +241,13 @@ func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath type
 			JSON: jsonerror.Unknown("Failed to upload"),
 		}
 	}
+
+	go func() {
+		err := thumbnailer.GenerateThumbnails(finalPath, thumbnailSizes, r.MediaMetadata, activeThumbnailGeneration, db, r.Logger)
+		if err != nil {
+			r.Logger.WithError(err).Warn("Error generating thumbnails")
+		}
+	}()
 
 	return nil
 }
