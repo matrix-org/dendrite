@@ -8,6 +8,11 @@ sudo: false
 dist: trusty
 
 addons:
+  apt:
+    sources:
+      - ppa:dhor/myway
+    packages:
+      - libvips-dev
   postgresql: "9.5"
 
 services:
