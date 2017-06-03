@@ -13,6 +13,8 @@ addons:
 services:
   - postgresql
 
+sudo: required
+
 before_install:
  - sudo add-apt-repository ppa:dhor/myway -y
  - sudo apt-get update -q
