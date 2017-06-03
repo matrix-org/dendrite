@@ -180,6 +180,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/tj/go-debug",
+			"repository": "https://github.com/tj/go-debug",
+			"revision": "ff4a55a20a86994118644bbddc6a216da193cc13",
+			"branch": "master"
+		},
+		{
 			"importpath": "golang.org/x/crypto/bcrypt",
 			"repository": "https://go.googlesource.com/crypto",
 			"revision": "0fe963104e9d1877082f8fb38f816fcd97eb1d10",
@@ -223,6 +229,12 @@
 			"importpath": "gopkg.in/gemnasium/logrus-airbrake-hook.v2",
 			"repository": "https://gopkg.in/gemnasium/logrus-airbrake-hook.v2",
 			"revision": "bfee1239d796830ca346767650cce5ba90d58c57",
+			"branch": "master"
+		},
+		{
+			"importpath": "gopkg.in/h2non/bimg.v1",
+			"repository": "https://gopkg.in/h2non/bimg.v1",
+			"revision": "45f8993550e71ee7b8001d40c681c6c9fa822357",
 			"branch": "master"
 		},
 		{
