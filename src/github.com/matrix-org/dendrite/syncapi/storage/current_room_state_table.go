@@ -16,9 +16,6 @@ package storage
 
 import (
 	"database/sql"
-	"encoding/json"
-
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -96,7 +93,7 @@ func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
 }
 
 // JoinedMemberLists returns a map of room ID to a list of joined user IDs.
-func (s *currentRoomStateStatements) JoinedMemberLists() (map[string][]string, error) {
+func (s *currentRoomStateStatements) selectJoinedUsers() (map[string][]string, error) {
 	rows, err := s.selectJoinedUsersStmt.Query()
 	if err != nil {
 		return nil, err
@@ -118,7 +115,7 @@ func (s *currentRoomStateStatements) JoinedMemberLists() (map[string][]string, e
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
-func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(txn *sql.Tx, userID, membership string) ([]string, error) {
+func (s *currentRoomStateStatements) selectRoomIDsWithMembership(txn *sql.Tx, userID, membership string) ([]string, error) {
 	rows, err := txn.Stmt(s.selectRoomIDsWithMembershipStmt).Query(userID, membership)
 	if err != nil {
 		return nil, err
@@ -137,7 +134,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(txn *sql.Tx, us
 }
 
 // CurrentState returns all the current state events for the given room.
-func (s *currentRoomStateStatements) CurrentState(txn *sql.Tx, roomID string) ([]gomatrixserverlib.Event, error) {
+func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID string) ([]gomatrixserverlib.Event, error) {
 	rows, err := txn.Stmt(s.selectCurrentStateStmt).Query(roomID)
 	if err != nil {
 		return nil, err
@@ -160,34 +157,14 @@ func (s *currentRoomStateStatements) CurrentState(txn *sql.Tx, roomID string) ([
 	return result, nil
 }
 
-func (s *currentRoomStateStatements) UpdateRoomState(txn *sql.Tx, added []gomatrixserverlib.Event, removedEventIDs []string) error {
-	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
-	for _, eventID := range removedEventIDs {
-		_, err := txn.Stmt(s.deleteRoomStateByEventIDStmt).Exec(eventID)
-		if err != nil {
-			return err
-		}
-	}
+func (s *currentRoomStateStatements) deleteRoomStateByEventID(txn *sql.Tx, eventID string) error {
+	_, err := txn.Stmt(s.deleteRoomStateByEventIDStmt).Exec(eventID)
+	return err
+}
 
-	for _, event := range added {
-		if event.StateKey() == nil {
-			// ignore non state events
-			continue
-		}
-		var membership *string
-		if event.Type() == "m.room.member" {
-			var memberContent events.MemberContent
-			if err := json.Unmarshal(event.Content(), &memberContent); err != nil {
-				return err
-			}
-			membership = &memberContent.Membership
-		}
-		_, err := txn.Stmt(s.upsertRoomStateStmt).Exec(
-			event.RoomID(), event.EventID(), event.Type(), *event.StateKey(), event.JSON(), membership,
-		)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func (s *currentRoomStateStatements) upsertRoomState(txn *sql.Tx, event gomatrixserverlib.Event, membership *string) error {
+	_, err := txn.Stmt(s.upsertRoomStateStmt).Exec(
+		event.RoomID(), event.EventID(), event.Type(), *event.StateKey(), event.JSON(), membership,
+	)
+	return err
 }
