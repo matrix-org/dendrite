@@ -310,8 +310,8 @@ func resize(dst types.Path, buffer []byte, w, h int, crop bool, logger *log.Entr
 func newThumbnailFitness() thumbnailFitness {
 	return thumbnailFitness{
 		isSmaller:      1,
-		aspect:         float64(16384 * 16384),
-		size:           float64(16384 * 16384),
+		aspect:         math.Inf(1),
+		size:           math.Inf(1),
 		methodMismatch: 0,
 		fileSize:       types.FileSizeBytes(math.MaxInt64),
 	}
