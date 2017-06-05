@@ -35,6 +35,8 @@ type MediaAPI struct {
 	DataSource string `yaml:"database"`
 	// Whether to dynamically generate thumbnails on-the-fly if the requested resolution is not already generated
 	DynamicThumbnails bool `yaml:"dynamic_thumbnails"`
+	// The maximum number of simultaneous thumbnail generators. default: 10
+	MaxThumbnailGenerators int `yaml:"max_thumbnail_generators"`
 	// A list of thumbnail sizes to be pre-generated for downloaded remote / uploaded content
 	ThumbnailSizes []types.ThumbnailSize `yaml:"thumbnail_sizes"`
 }

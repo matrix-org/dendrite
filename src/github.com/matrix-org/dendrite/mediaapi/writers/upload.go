@@ -152,7 +152,7 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.MediaAPI, db *
 		}
 	}
 
-	if resErr := r.storeFileAndMetadata(tmpDir, cfg.AbsBasePath, db, cfg.ThumbnailSizes, activeThumbnailGeneration); resErr != nil {
+	if resErr := r.storeFileAndMetadata(tmpDir, cfg.AbsBasePath, db, cfg.ThumbnailSizes, activeThumbnailGeneration, cfg.MaxThumbnailGenerators); resErr != nil {
 		return resErr
 	}
 
@@ -215,7 +215,7 @@ func (r *uploadRequest) Validate(maxFileSizeBytes types.FileSizeBytes) *util.JSO
 // The order of operations is important as it avoids metadata entering the database before the file
 // is ready, and if we fail to move the file, it never gets added to the database.
 // Returns a util.JSONResponse error and cleans up directories in case of error.
-func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, db *storage.Database, thumbnailSizes []types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration) *util.JSONResponse {
+func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath types.Path, db *storage.Database, thumbnailSizes []types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int) *util.JSONResponse {
 	finalPath, duplicate, err := fileutils.MoveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to move file.")
@@ -243,9 +243,12 @@ func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath type
 	}
 
 	go func() {
-		err := thumbnailer.GenerateThumbnails(finalPath, thumbnailSizes, r.MediaMetadata, activeThumbnailGeneration, db, r.Logger)
+		busy, err := thumbnailer.GenerateThumbnails(finalPath, thumbnailSizes, r.MediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger)
 		if err != nil {
 			r.Logger.WithError(err).Warn("Error generating thumbnails")
+		}
+		if busy {
+			r.Logger.Warn("Maximum number of active thumbnail generators reached. Skipping pre-generation.")
 		}
 	}()
 

@@ -70,15 +70,16 @@ func main() {
 	}
 
 	log.WithFields(log.Fields{
-		"BIND_ADDRESS":      bindAddr,
-		"LOG_DIR":           logDir,
-		"CONFIG_PATH":       configPath,
-		"ServerName":        cfg.ServerName,
-		"AbsBasePath":       cfg.AbsBasePath,
-		"MaxFileSizeBytes":  *cfg.MaxFileSizeBytes,
-		"DataSource":        cfg.DataSource,
-		"DynamicThumbnails": cfg.DynamicThumbnails,
-		"ThumbnailSizes":    cfg.ThumbnailSizes,
+		"BIND_ADDRESS":           bindAddr,
+		"LOG_DIR":                logDir,
+		"CONFIG_PATH":            configPath,
+		"ServerName":             cfg.ServerName,
+		"AbsBasePath":            cfg.AbsBasePath,
+		"MaxFileSizeBytes":       *cfg.MaxFileSizeBytes,
+		"DataSource":             cfg.DataSource,
+		"DynamicThumbnails":      cfg.DynamicThumbnails,
+		"MaxThumbnailGenerators": cfg.MaxThumbnailGenerators,
+		"ThumbnailSizes":         cfg.ThumbnailSizes,
 	}).Info("Starting mediaapi server with configuration")
 
 	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, db)
@@ -166,6 +167,13 @@ func applyOverrides(cfg *config.MediaAPI) {
 			}).Info("Overriding database from config file with environment variable")
 		}
 		cfg.DataSource = dataSource
+	}
+
+	if cfg.MaxThumbnailGenerators == 0 {
+		log.WithField(
+			"max_thumbnail_generators", cfg.MaxThumbnailGenerators,
+		).Info("Using default max_thumbnail_generators")
+		cfg.MaxThumbnailGenerators = 10
 	}
 }
 

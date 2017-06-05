@@ -40,39 +40,47 @@ type thumbnailFitness struct {
 const thumbnailTemplate = "thumbnail-%vx%v-%v"
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file
-func GenerateThumbnails(src types.Path, configs []types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, db *storage.Database, logger *log.Entry) error {
+func GenerateThumbnails(src types.Path, configs []types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {
 		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
-		return err
+		return false, err
 	}
 	for _, config := range configs {
 		// Note: createThumbnail does locking based on activeThumbnailGeneration
-		if err = createThumbnail(src, buffer, config, mediaMetadata, activeThumbnailGeneration, db, logger); err != nil {
+		busy, err = createThumbnail(src, buffer, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
+		if err != nil {
 			logger.WithError(err).WithField("src", src).Error("Failed to generate thumbnails")
-			return err
+			return false, err
+		}
+		if busy {
+			return true, nil
 		}
 	}
-	return nil
+	return false, nil
 }
 
 // GenerateThumbnail generates the configured thumbnail size for the source file
-func GenerateThumbnail(src types.Path, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, db *storage.Database, logger *log.Entry) error {
+func GenerateThumbnail(src types.Path, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {
 		logger.WithError(err).WithFields(log.Fields{
 			"src": src,
 		}).Error("Failed to read src file")
-		return err
+		return false, err
 	}
 	// Note: createThumbnail does locking based on activeThumbnailGeneration
-	if err = createThumbnail(src, buffer, config, mediaMetadata, activeThumbnailGeneration, db, logger); err != nil {
+	busy, err = createThumbnail(src, buffer, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
+	if err != nil {
 		logger.WithError(err).WithFields(log.Fields{
 			"src": src,
 		}).Error("Failed to generate thumbnails")
-		return err
+		return false, err
 	}
-	return nil
+	if busy {
+		return true, nil
+	}
+	return false, nil
 }
 
 // GetThumbnailPath returns the path to a thumbnail given the absolute src path and thumbnail size configuration
@@ -130,7 +138,7 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 
 // createThumbnail checks if the thumbnail exists, and if not, generates it
 // Thumbnail generation is only done once for each non-existing thumbnail.
-func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, db *storage.Database, logger *log.Entry) (errorReturn error) {
+func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
 	logger = logger.WithFields(log.Fields{
 		"Width":        config.Width,
 		"Height":       config.Height,
@@ -140,9 +148,12 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 	dst := GetThumbnailPath(src, config)
 
 	// Note: getActiveThumbnailGeneration uses mutexes and conditions from activeThumbnailGeneration
-	isActive, err := getActiveThumbnailGeneration(dst, config, activeThumbnailGeneration, logger)
+	isActive, busy, err := getActiveThumbnailGeneration(dst, config, activeThumbnailGeneration, maxThumbnailGenerators, logger)
 	if err != nil {
-		return err
+		return false, err
+	}
+	if busy {
+		return true, nil
 	}
 
 	if isActive {
@@ -162,28 +173,28 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 	thumbnailMetadata, err := db.GetThumbnail(mediaMetadata.MediaID, mediaMetadata.Origin, config.Width, config.Height, config.ResizeMethod)
 	if err != nil {
 		logger.Error("Failed to query database for thumbnail.")
-		return err
+		return false, err
 	}
 	if thumbnailMetadata != nil {
-		return nil
+		return false, nil
 	}
 	// Note: The double-negative is intentional as os.IsExist(err) != !os.IsNotExist(err).
 	// The functions are error checkers to be used in different cases.
 	if _, err = os.Stat(string(dst)); !os.IsNotExist(err) {
 		// Thumbnail exists
-		return nil
+		return false, nil
 	}
 
 	if isActive == false {
 		// Note: This should not happen, but we check just in case.
 		logger.Error("Failed to stat file but this is not the active thumbnail generator. This should not happen.")
-		return fmt.Errorf("Not active thumbnail generator. Stat error: %q", err)
+		return false, fmt.Errorf("Not active thumbnail generator. Stat error: %q", err)
 	}
 
 	start := time.Now()
 	width, height, err := resize(dst, buffer, config.Width, config.Height, config.ResizeMethod == "crop", logger)
 	if err != nil {
-		return err
+		return false, err
 	}
 	logger.WithFields(log.Fields{
 		"ActualWidth":  width,
@@ -193,7 +204,7 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 
 	stat, err := os.Stat(string(dst))
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	thumbnailMetadata = &types.ThumbnailMetadata{
@@ -217,14 +228,14 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 			"ActualWidth":  width,
 			"ActualHeight": height,
 		}).Error("Failed to store thumbnail metadata in database.")
-		return err
+		return false, err
 	}
 
-	return nil
+	return false, nil
 }
 
 // getActiveThumbnailGeneration checks for active thumbnail generation
-func getActiveThumbnailGeneration(dst types.Path, config types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, logger *log.Entry) (bool, error) {
+func getActiveThumbnailGeneration(dst types.Path, config types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, logger *log.Entry) (isActive bool, busy bool, errorReturn error) {
 	// Check if there is active thumbnail generation.
 	activeThumbnailGeneration.Lock()
 	defer activeThumbnailGeneration.Unlock()
@@ -234,7 +245,14 @@ func getActiveThumbnailGeneration(dst types.Path, config types.ThumbnailSize, ac
 		// NOTE: Wait unlocks and locks again internally. There is still a deferred Unlock() that will unlock this.
 		activeThumbnailGenerationResult.Cond.Wait()
 		// Note: either there is an error or it is nil, either way returning it is correct
-		return false, activeThumbnailGenerationResult.Err
+		return false, false, activeThumbnailGenerationResult.Err
+	}
+
+	// Only allow thumbnail generation up to a maximum configured number. Above this we fall back to serving the
+	// original. Or in the case of pre-generation, they maybe get generated on the first request for a thumbnail if
+	// load has subsided.
+	if len(activeThumbnailGeneration.PathToResult) >= maxThumbnailGenerators {
+		return false, true, nil
 	}
 
 	// No active thumbnail generation so create one
@@ -242,7 +260,7 @@ func getActiveThumbnailGeneration(dst types.Path, config types.ThumbnailSize, ac
 		Cond: &sync.Cond{L: activeThumbnailGeneration},
 	}
 
-	return true, nil
+	return true, false, nil
 }
 
 // broadcastGeneration broadcasts that thumbnail generation completed and the error to all waiting goroutines
@@ -252,7 +270,7 @@ func broadcastGeneration(dst types.Path, activeThumbnailGeneration *types.Active
 	defer activeThumbnailGeneration.Unlock()
 	if activeThumbnailGenerationResult, ok := activeThumbnailGeneration.PathToResult[string(dst)]; ok {
 		logger.Info("Signalling other goroutines waiting for this goroutine to generate the thumbnail.")
-		// Note: retErr is a named return value error that is signalled from here to waiting goroutines
+		// Note: errorReturn is a named return value error that is signalled from here to waiting goroutines
 		activeThumbnailGenerationResult.Err = errorReturn
 		activeThumbnailGenerationResult.Cond.Broadcast()
 	}
