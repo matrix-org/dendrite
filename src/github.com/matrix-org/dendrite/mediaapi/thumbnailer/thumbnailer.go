@@ -28,7 +28,7 @@ import (
 	"gopkg.in/h2non/bimg.v1"
 )
 
-type thumbnailMetrics struct {
+type thumbnailFitness struct {
 	isSmaller      int
 	aspect         float64
 	size           float64
@@ -97,15 +97,15 @@ func GetThumbnailPath(src types.Path, config types.ThumbnailSize) types.Path {
 func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailMetadata, thumbnailSizes []types.ThumbnailSize) (*types.ThumbnailMetadata, *types.ThumbnailSize) {
 	var chosenThumbnail *types.ThumbnailMetadata
 	var chosenThumbnailSize *types.ThumbnailSize
-	chosenMetrics := newThumbnailMetrics()
+	bestFit := newThumbnailFitness()
 
 	for _, thumbnail := range thumbnails {
 		if desired.ResizeMethod == "scale" && thumbnail.ThumbnailSize.ResizeMethod != "scale" {
 			continue
 		}
-		metrics := calcThumbnailMetrics(thumbnail.ThumbnailSize, thumbnail.MediaMetadata, desired)
-		if isBetter := metrics.betterThan(chosenMetrics, desired.ResizeMethod == "crop"); isBetter {
-			chosenMetrics = metrics
+		fitness := calcThumbnailFitness(thumbnail.ThumbnailSize, thumbnail.MediaMetadata, desired)
+		if isBetter := fitness.betterThan(bestFit, desired.ResizeMethod == "crop"); isBetter {
+			bestFit = fitness
 			chosenThumbnail = thumbnail
 		}
 	}
@@ -114,9 +114,9 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 		if desired.ResizeMethod == "scale" && thumbnailSize.ResizeMethod != "scale" {
 			continue
 		}
-		metrics := calcThumbnailMetrics(thumbnailSize, nil, desired)
-		if isBetter := metrics.betterThan(chosenMetrics, desired.ResizeMethod == "crop"); isBetter {
-			chosenMetrics = metrics
+		fitness := calcThumbnailFitness(thumbnailSize, nil, desired)
+		if isBetter := fitness.betterThan(bestFit, desired.ResizeMethod == "crop"); isBetter {
+			bestFit = fitness
 			chosenThumbnailSize = &types.ThumbnailSize{
 				Width:        thumbnailSize.Width,
 				Height:       thumbnailSize.Height,
@@ -307,8 +307,8 @@ func resize(dst types.Path, buffer []byte, w, h int, crop bool, logger *log.Entr
 }
 
 // init with worst values
-func newThumbnailMetrics() thumbnailMetrics {
-	return thumbnailMetrics{
+func newThumbnailFitness() thumbnailFitness {
+	return thumbnailFitness{
 		isSmaller:      1,
 		aspect:         float64(16384 * 16384),
 		size:           float64(16384 * 16384),
@@ -317,28 +317,28 @@ func newThumbnailMetrics() thumbnailMetrics {
 	}
 }
 
-func calcThumbnailMetrics(size types.ThumbnailSize, metadata *types.MediaMetadata, desired types.ThumbnailSize) thumbnailMetrics {
+func calcThumbnailFitness(size types.ThumbnailSize, metadata *types.MediaMetadata, desired types.ThumbnailSize) thumbnailFitness {
 	dW := desired.Width
 	dH := desired.Height
 	tW := size.Width
 	tH := size.Height
 
-	metrics := newThumbnailMetrics()
+	fitness := newThumbnailFitness()
 	// In all cases, a larger metric value is a worse fit.
 	// compare size: thumbnail smaller is true and gives 1, larger is false and gives 0
-	metrics.isSmaller = boolToInt(tW < dW || tH < dH)
+	fitness.isSmaller = boolToInt(tW < dW || tH < dH)
 	// comparison of aspect ratios only makes sense for a request for desired cropped
-	metrics.aspect = math.Abs(float64(dW*tH - dH*tW))
+	fitness.aspect = math.Abs(float64(dW*tH - dH*tW))
 	// compare sizes
-	metrics.size = math.Abs(float64((dW - tW) * (dH - tH)))
+	fitness.size = math.Abs(float64((dW - tW) * (dH - tH)))
 	// compare resize method
-	metrics.methodMismatch = boolToInt(size.ResizeMethod != desired.ResizeMethod)
+	fitness.methodMismatch = boolToInt(size.ResizeMethod != desired.ResizeMethod)
 	if metadata != nil {
 		// file size
-		metrics.fileSize = metadata.FileSizeBytes
+		fitness.fileSize = metadata.FileSizeBytes
 	}
 
-	return metrics
+	return fitness
 }
 
 func boolToInt(b bool) int {
@@ -348,7 +348,7 @@ func boolToInt(b bool) int {
 	return 0
 }
 
-func (a thumbnailMetrics) betterThan(b thumbnailMetrics, desiredCrop bool) bool {
+func (a thumbnailFitness) betterThan(b thumbnailFitness, desiredCrop bool) bool {
 	// preference means returning -1
 
 	// prefer images that are not smaller
