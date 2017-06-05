@@ -104,9 +104,7 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 			continue
 		}
 		metrics := calcThumbnailMetrics(thumbnail.ThumbnailSize, thumbnail.MediaMetadata, desired)
-		// Note: the result will be -1 for better than, 0 for the same as and 1 for worse than. Take better results only.
-		result := compareThumbnailMetrics(metrics, chosenMetrics, desired.ResizeMethod == "crop")
-		if result == -1 {
+		if isBetter := metrics.betterThan(chosenMetrics, desired.ResizeMethod == "crop"); isBetter {
 			chosenMetrics = metrics
 			chosenThumbnail = thumbnail
 		}
@@ -117,9 +115,7 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 			continue
 		}
 		metrics := calcThumbnailMetrics(thumbnailSize, nil, desired)
-		// Note: the result will be -1 for better than, 0 for the same as and 1 for worse than. Take better results only.
-		result := compareThumbnailMetrics(metrics, chosenMetrics, desired.ResizeMethod == "crop")
-		if result == -1 {
+		if isBetter := metrics.betterThan(chosenMetrics, desired.ResizeMethod == "crop"); isBetter {
 			chosenMetrics = metrics
 			chosenThumbnailSize = &types.ThumbnailSize{
 				Width:        thumbnailSize.Width,
@@ -368,15 +364,15 @@ func boolToInt(b bool) int {
 	return 0
 }
 
-func compareThumbnailMetrics(a thumbnailMetrics, b thumbnailMetrics, desiredCrop bool) int {
+func (a thumbnailMetrics) betterThan(b thumbnailMetrics, desiredCrop bool) bool {
 	// preference means returning -1
 
 	// prefer images that are not smaller
 	// e.g. isSmallerDiff > 0 means b is smaller than desired and a is not smaller
 	if a.isSmaller > b.isSmaller {
-		return 1
+		return false
 	} else if a.isSmaller < b.isSmaller {
-		return -1
+		return true
 	}
 
 	// prefer aspect ratios closer to desired only if desired cropped
@@ -384,33 +380,33 @@ func compareThumbnailMetrics(a thumbnailMetrics, b thumbnailMetrics, desiredCrop
 	// desired scaled only accepts scaled images
 	if desiredCrop {
 		if a.aspect > b.aspect {
-			return 1
+			return false
 		} else if a.aspect < b.aspect {
-			return -1
+			return true
 		}
 	}
 
 	// prefer closer in size
 	if a.size > b.size {
-		return 1
+		return false
 	} else if a.size < b.size {
-		return -1
+		return true
 	}
 
 	// prefer images using the same method
 	// e.g. methodMismatchDiff > 0 means b's method is different from desired and a's matches the desired method
 	if a.methodMismatch > b.methodMismatch {
-		return 1
+		return false
 	} else if a.methodMismatch < b.methodMismatch {
-		return -1
+		return true
 	}
 
 	// prefer smaller files
 	if a.fileSize > b.fileSize {
-		return 1
+		return false
 	} else if a.fileSize < b.fileSize {
-		return -1
+		return true
 	}
 
-	return 0
+	return false
 }
