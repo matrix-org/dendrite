@@ -131,6 +131,12 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 // createThumbnail checks if the thumbnail exists, and if not, generates it
 // Thumbnail generation is only done once for each non-existing thumbnail.
 func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, db *storage.Database, logger *log.Entry) (errorReturn error) {
+	logger = logger.WithFields(log.Fields{
+		"Width":        config.Width,
+		"Height":       config.Height,
+		"ResizeMethod": config.ResizeMethod,
+	})
+
 	dst := GetThumbnailPath(src, config)
 
 	// Note: getActiveThumbnailGeneration uses mutexes and conditions from activeThumbnailGeneration
@@ -155,11 +161,7 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 	// Check if the thumbnail exists.
 	thumbnailMetadata, err := db.GetThumbnail(mediaMetadata.MediaID, mediaMetadata.Origin, config.Width, config.Height, config.ResizeMethod)
 	if err != nil {
-		logger.WithFields(log.Fields{
-			"Width":        config.Width,
-			"Height":       config.Height,
-			"ResizeMethod": config.ResizeMethod,
-		}).Error("Failed to query database for thumbnail.")
+		logger.Error("Failed to query database for thumbnail.")
 		return err
 	}
 	if thumbnailMetadata != nil {
@@ -174,11 +176,7 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 
 	if isActive == false {
 		// Note: This should not happen, but we check just in case.
-		logger.WithFields(log.Fields{
-			"Width":        config.Width,
-			"Height":       config.Height,
-			"ResizeMethod": config.ResizeMethod,
-		}).Error("Failed to stat file but this is not the active thumbnail generator. This should not happen.")
+		logger.Error("Failed to stat file but this is not the active thumbnail generator. This should not happen.")
 		return fmt.Errorf("Not active thumbnail generator. Stat error: %q", err)
 	}
 
@@ -188,11 +186,8 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 		return err
 	}
 	logger.WithFields(log.Fields{
-		"Width":        config.Width,
-		"Height":       config.Height,
 		"ActualWidth":  width,
 		"ActualHeight": height,
-		"ResizeMethod": config.ResizeMethod,
 		"processTime":  time.Now().Sub(start),
 	}).Info("Generated thumbnail")
 
@@ -219,11 +214,8 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 	err = db.StoreThumbnail(thumbnailMetadata)
 	if err != nil {
 		logger.WithError(err).WithFields(log.Fields{
-			"Width":        config.Width,
-			"Height":       config.Height,
 			"ActualWidth":  width,
 			"ActualHeight": height,
-			"ResizeMethod": config.ResizeMethod,
 		}).Error("Failed to store thumbnail metadata in database.")
 		return err
 	}
@@ -237,11 +229,7 @@ func getActiveThumbnailGeneration(dst types.Path, config types.ThumbnailSize, ac
 	activeThumbnailGeneration.Lock()
 	defer activeThumbnailGeneration.Unlock()
 	if activeThumbnailGenerationResult, ok := activeThumbnailGeneration.PathToResult[string(dst)]; ok {
-		logger.WithFields(log.Fields{
-			"Width":        config.Width,
-			"Height":       config.Height,
-			"ResizeMethod": config.ResizeMethod,
-		}).Info("Waiting for another goroutine to generate the thumbnail.")
+		logger.Info("Waiting for another goroutine to generate the thumbnail.")
 
 		// NOTE: Wait unlocks and locks again internally. There is still a deferred Unlock() that will unlock this.
 		activeThumbnailGenerationResult.Cond.Wait()
@@ -263,11 +251,7 @@ func broadcastGeneration(dst types.Path, activeThumbnailGeneration *types.Active
 	activeThumbnailGeneration.Lock()
 	defer activeThumbnailGeneration.Unlock()
 	if activeThumbnailGenerationResult, ok := activeThumbnailGeneration.PathToResult[string(dst)]; ok {
-		logger.WithFields(log.Fields{
-			"Width":        config.Width,
-			"Height":       config.Height,
-			"ResizeMethod": config.ResizeMethod,
-		}).Info("Signalling other goroutines waiting for this goroutine to generate the thumbnail.")
+		logger.Info("Signalling other goroutines waiting for this goroutine to generate the thumbnail.")
 		// Note: retErr is a named return value error that is signalled from here to waiting goroutines
 		activeThumbnailGenerationResult.Err = errorReturn
 		activeThumbnailGenerationResult.Cond.Broadcast()

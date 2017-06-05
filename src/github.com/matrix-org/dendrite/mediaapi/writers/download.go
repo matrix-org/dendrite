@@ -86,6 +86,11 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 			Height:       height,
 			ResizeMethod: strings.ToLower(req.FormValue("method")),
 		}
+		r.Logger.WithFields(log.Fields{
+			"RequestedWidth":        r.ThumbnailSize.Width,
+			"RequestedHeight":       r.ThumbnailSize.Height,
+			"RequestedResizeMethod": r.ThumbnailSize.ResizeMethod,
+		})
 	}
 
 	// request validation
@@ -242,13 +247,7 @@ func (r *downloadRequest) respondFromLocalFile(w http.ResponseWriter, absBasePat
 			responseFile = file
 			responseMetadata = r.MediaMetadata
 		} else {
-			r.Logger.WithFields(log.Fields{
-				"Width":         thumbMetadata.ThumbnailSize.Width,
-				"Height":        thumbMetadata.ThumbnailSize.Height,
-				"ResizeMethod":  thumbMetadata.ThumbnailSize.ResizeMethod,
-				"FileSizeBytes": thumbMetadata.MediaMetadata.FileSizeBytes,
-				"ContentType":   thumbMetadata.MediaMetadata.ContentType,
-			}).Info("Responding with thumbnail")
+			r.Logger.Info("Responding with thumbnail")
 			responseFile = thumbFile
 			responseMetadata = thumbMetadata.MediaMetadata
 		}
@@ -297,11 +296,7 @@ func (r *downloadRequest) getThumbnailFile(filePath types.Path, activeThumbnailG
 	} else {
 		thumbnails, err := db.GetThumbnails(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 		if err != nil {
-			r.Logger.WithError(err).WithFields(log.Fields{
-				"Width":        r.ThumbnailSize.Width,
-				"Height":       r.ThumbnailSize.Height,
-				"ResizeMethod": r.ThumbnailSize.ResizeMethod,
-			}).Error("Error looking up thumbnails")
+			r.Logger.WithError(err).Error("Error looking up thumbnails")
 			resErr := jsonerror.InternalServerError()
 			return nil, nil, &resErr
 		}
@@ -325,6 +320,13 @@ func (r *downloadRequest) getThumbnailFile(filePath types.Path, activeThumbnailG
 	if thumbnail == nil {
 		return nil, nil, nil
 	}
+	r.Logger = r.Logger.WithFields(log.Fields{
+		"Width":         thumbnail.ThumbnailSize.Width,
+		"Height":        thumbnail.ThumbnailSize.Height,
+		"ResizeMethod":  thumbnail.ThumbnailSize.ResizeMethod,
+		"FileSizeBytes": thumbnail.MediaMetadata.FileSizeBytes,
+		"ContentType":   thumbnail.MediaMetadata.ContentType,
+	})
 	thumbPath := string(thumbnailer.GetThumbnailPath(types.Path(filePath), thumbnail.ThumbnailSize))
 	thumbFile, err := os.Open(string(thumbPath))
 	if err != nil {
@@ -347,24 +349,21 @@ func (r *downloadRequest) getThumbnailFile(filePath types.Path, activeThumbnailG
 }
 
 func (r *downloadRequest) generateThumbnail(filePath types.Path, thumbnailSize types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, db *storage.Database) (*types.ThumbnailMetadata, *util.JSONResponse) {
+	logger := r.Logger.WithFields(log.Fields{
+		"Width":        thumbnailSize.Width,
+		"Height":       thumbnailSize.Height,
+		"ResizeMethod": thumbnailSize.ResizeMethod,
+	})
 	var err error
-	if err = thumbnailer.GenerateThumbnail(filePath, thumbnailSize, r.MediaMetadata, activeThumbnailGeneration, db, r.Logger); err != nil {
-		r.Logger.WithError(err).WithFields(log.Fields{
-			"Width":        thumbnailSize.Width,
-			"Height":       thumbnailSize.Height,
-			"ResizeMethod": thumbnailSize.ResizeMethod,
-		}).Error("Error creating thumbnail")
+	if err = thumbnailer.GenerateThumbnail(filePath, thumbnailSize, r.MediaMetadata, activeThumbnailGeneration, db, logger); err != nil {
+		logger.WithError(err).Error("Error creating thumbnail")
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
 	var thumbnail *types.ThumbnailMetadata
 	thumbnail, err = db.GetThumbnail(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, thumbnailSize.Width, thumbnailSize.Height, thumbnailSize.ResizeMethod)
 	if err != nil {
-		r.Logger.WithError(err).WithFields(log.Fields{
-			"Width":        thumbnailSize.Width,
-			"Height":       thumbnailSize.Height,
-			"ResizeMethod": thumbnailSize.ResizeMethod,
-		}).Error("Error looking up thumbnails")
+		logger.WithError(err).Error("Error looking up thumbnails")
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
