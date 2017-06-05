@@ -116,23 +116,30 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	return nil
 }
 
+// addsStateEvents looks up the state events that are added by a new event.
 func (s *OutputRoomEvent) addsStateEvents(
 	addsStateEventIDs []string, event gomatrixserverlib.Event,
 ) ([]gomatrixserverlib.Event, error) {
+	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
 		return nil, nil
 	}
 
+	// Fast path if the only state event added is the event itself.
 	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
 		return []gomatrixserverlib.Event{event}, nil
 	}
 
+	// Check if this is re-adding a state events that we previously processed
+	// If we have previously received a state event it may still be in
+	// our event database.
 	result, err := s.db.Events(addsStateEventIDs)
 	if err != nil {
 		return nil, err
 	}
 	missing := missingEventsFrom(result, addsStateEventIDs)
 
+	// Check if event itself is being added.
 	for _, eventID := range missing {
 		if eventID == event.EventID() {
 			result = append(result, event)
@@ -145,6 +152,9 @@ func (s *OutputRoomEvent) addsStateEvents(
 		return result, nil
 	}
 
+	// At this point the missing events are neither the event itself nor are
+	// they present in our local database. Our only option is to fetch them
+	// from the roomserver using the query API.
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
 	var eventResp api.QueryEventsByIDResponse
 	if err := s.query.QueryEventsByID(&eventReq, &eventResp); err != nil {
