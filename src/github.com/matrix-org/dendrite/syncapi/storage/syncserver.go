@@ -315,6 +315,7 @@ func (d *SyncServerDatabase) fetchStateEvents(txn *sql.Tx, roomIDToEventIDSet ma
 		if err != nil {
 			return nil, err
 		}
+		// we know we got them all otherwise an error would've been returned, so just loop the events
 		for _, ev := range evs {
 			roomID := ev.RoomID()
 			stateBetween[roomID] = append(stateBetween[roomID], ev)
