@@ -20,6 +20,8 @@ import (
 
 // Sync contains the config information necessary to spin up a sync-server process.
 type Sync struct {
+	// Where the room server is listening for queries.
+	RoomserverURL string `yaml:"roomserver_url"`
 	// The topic for events which are written by the room server output log.
 	RoomserverOutputTopic string `yaml:"roomserver_topic"`
 	// A list of URIs to consume events from. These kafka logs should be produced by a Room Server.

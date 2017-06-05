@@ -16,6 +16,7 @@ package consumers
 
 import (
 	"encoding/json"
+	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
@@ -33,6 +34,7 @@ type OutputRoomEvent struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.SyncServerDatabase
 	notifier           *sync.Notifier
+	query              api.RoomserverQueryAPI
 }
 
 // NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
@@ -51,6 +53,7 @@ func NewOutputRoomEvent(cfg *config.Sync, n *sync.Notifier, store *storage.SyncS
 		roomServerConsumer: &consumer,
 		db:                 store,
 		notifier:           n,
+		query:              api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil),
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -84,7 +87,19 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		"room_id":  ev.RoomID(),
 	}).Info("received event from roomserver")
 
-	syncStreamPos, err := s.db.WriteEvent(&ev, output.AddsStateEventIDs, output.RemovesStateEventIDs)
+	addsStateEvents, err := s.addsStateEvents(output.AddsStateEventIDs, ev)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"event":      string(ev.JSON()),
+			log.ErrorKey: err,
+			"add":        output.AddsStateEventIDs,
+			"del":        output.RemovesStateEventIDs,
+		}).Panicf("roomserver output log: state event lookup failure")
+	}
+
+	syncStreamPos, err := s.db.WriteEvent(
+		&ev, addsStateEvents, output.AddsStateEventIDs, output.RemovesStateEventIDs,
+	)
 
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -99,4 +114,65 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	s.notifier.OnNewEvent(&ev, types.StreamPosition(syncStreamPos))
 
 	return nil
+}
+
+func (s *OutputRoomEvent) addsStateEvents(
+	addsStateEventIDs []string, event gomatrixserverlib.Event,
+) ([]gomatrixserverlib.Event, error) {
+	if len(addsStateEventIDs) == 0 {
+		return nil, nil
+	}
+
+	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
+		return []gomatrixserverlib.Event{event}, nil
+	}
+
+	result, err := s.db.Events(addsStateEventIDs)
+	if err != nil {
+		return nil, err
+	}
+	missing := missingEventsFrom(result, addsStateEventIDs)
+
+	for _, eventID := range missing {
+		if eventID == event.EventID() {
+			result = append(result, event)
+			break
+		}
+	}
+	missing = missingEventsFrom(result, addsStateEventIDs)
+
+	if len(missing) == 0 {
+		return result, nil
+	}
+
+	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
+	var eventResp api.QueryEventsByIDResponse
+	if err := s.query.QueryEventsByID(&eventReq, &eventResp); err != nil {
+		return nil, err
+	}
+
+	result = append(result, eventResp.Events...)
+	missing = missingEventsFrom(result, addsStateEventIDs)
+
+	if len(missing) != 0 {
+		return nil, fmt.Errorf(
+			"missing %d state events IDs at event %q", len(missing), event.EventID(),
+		)
+	}
+
+	return result, nil
+}
+
+func missingEventsFrom(events []gomatrixserverlib.Event, required []string) []string {
+	have := map[string]bool{}
+	for _, event := range events {
+		have[event.EventID()] = true
+	}
+	var missing []string
+	for _, eventID := range required {
+		if !have[eventID] {
+			missing = append(missing, eventID)
+		}
+	}
+	return missing
 }

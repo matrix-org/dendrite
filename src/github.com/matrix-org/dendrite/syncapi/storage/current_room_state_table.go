@@ -16,6 +16,7 @@ package storage
 
 import (
 	"database/sql"
+	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -61,12 +62,16 @@ const selectCurrentStateSQL = "" +
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
+const selectEventsWithEventIDsSQL = "" +
+	"SELECT event_json FROM current_room_state WHERE event_id = ANY($1)"
+
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
 	selectCurrentStateStmt          *sql.Stmt
 	selectJoinedUsersStmt           *sql.Stmt
+	selectEventsWithEventIDsStmt    *sql.Stmt
 }
 
 func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
@@ -87,6 +92,9 @@ func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
+		return
+	}
+	if s.selectEventsWithEventIDsStmt, err = db.Prepare(selectEventsWithEventIDsSQL); err != nil {
 		return
 	}
 	return
@@ -141,6 +149,31 @@ func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID stri
 	}
 	defer rows.Close()
 
+	return rowsToEvents(rows)
+}
+
+func (s *currentRoomStateStatements) deleteRoomStateByEventID(txn *sql.Tx, eventID string) error {
+	_, err := txn.Stmt(s.deleteRoomStateByEventIDStmt).Exec(eventID)
+	return err
+}
+
+func (s *currentRoomStateStatements) upsertRoomState(txn *sql.Tx, event gomatrixserverlib.Event, membership *string) error {
+	_, err := txn.Stmt(s.upsertRoomStateStmt).Exec(
+		event.RoomID(), event.EventID(), event.Type(), *event.StateKey(), event.JSON(), membership,
+	)
+	return err
+}
+
+func (s *currentRoomStateStatements) selectEventsWithEventIDs(txn *sql.Tx, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+	rows, err := txn.Stmt(s.selectEventsWithEventIDsStmt).Query(pq.StringArray(eventIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return rowsToEvents(rows)
+}
+
+func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 	var result []gomatrixserverlib.Event
 	for rows.Next() {
 		var eventBytes []byte
@@ -155,16 +188,4 @@ func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID stri
 		result = append(result, ev)
 	}
 	return result, nil
-}
-
-func (s *currentRoomStateStatements) deleteRoomStateByEventID(txn *sql.Tx, eventID string) error {
-	_, err := txn.Stmt(s.deleteRoomStateByEventIDStmt).Exec(eventID)
-	return err
-}
-
-func (s *currentRoomStateStatements) upsertRoomState(txn *sql.Tx, event gomatrixserverlib.Event, membership *string) error {
-	_, err := txn.Stmt(s.upsertRoomStateStmt).Exec(
-		event.RoomID(), event.EventID(), event.Type(), *event.StateKey(), event.JSON(), membership,
-	)
-	return err
 }
