@@ -317,7 +317,7 @@ func (d *SyncServerDatabase) fetchStateEvents(txn *sql.Tx, roomIDToEventIDSet ma
 		}
 		for _, ev := range evs {
 			roomID := ev.RoomID()
-			stateBetween[roomID] = append(stateBetween[roomID])
+			stateBetween[roomID] = append(stateBetween[roomID], ev)
 		}
 	}
 	return stateBetween, nil
