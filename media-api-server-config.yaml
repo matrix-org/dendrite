@@ -1,0 +1,38 @@
+# The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
+server_name: "example.com"
+
+# The base path to where the media files will be stored. May be relative or absolute.
+base_path: /var/dendrite/media
+
+# The maximum file size in bytes that is allowed to be stored on this server.
+# Note: if max_file_size_bytes is set to 0, the size is unlimited.
+# Note: if max_file_size_bytes is not set, it will default to 10485760 (10MB)
+max_file_size_bytes: 10485760
+
+# The postgres connection config for connecting to the database e.g a postgres:// URI
+database: "postgres://dendrite:itsasecret@localhost/mediaapi?sslmode=disable"
+
+# Whether to dynamically generate thumbnails on-the-fly if the requested resolution is not already generated
+# NOTE: This is a possible denial-of-service attack vector - use at your own risk
+dynamic_thumbnails: false
+
+# A list of thumbnail sizes to be pre-generated for downloaded remote / uploaded content
+# method is one of crop or scale. If omitted, it will default to scale.
+# crop scales to fill the requested dimensions and crops the excess.
+# scale scales to fit the requested dimensions and one dimension may be smaller than requested.
+thumbnail_sizes:
+- width: 32
+  height: 32
+  method: crop
+- width: 96
+  height: 96
+  method: crop
+- width: 320
+  height: 240
+  method: scale
+- width: 640
+  height: 480
+  method: scale
+- width: 800
+  height: 600
+  method: scale
