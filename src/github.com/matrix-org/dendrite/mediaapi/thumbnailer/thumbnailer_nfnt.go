@@ -12,31 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build bimg
+// +build !bimg
 
 package thumbnailer
 
 import (
 	"fmt"
+	"image"
+	"image/draw"
+	// Imported for gif codec
+	_ "image/gif"
+	"image/jpeg"
+	// Imported for png codec
+	_ "image/png"
 	"os"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
-	"gopkg.in/h2non/bimg.v1"
+	"github.com/nfnt/resize"
 )
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file
 func GenerateThumbnails(src types.Path, configs []types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
-	buffer, err := bimg.Read(string(src))
+	img, err := readFile(string(src))
 	if err != nil {
 		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
 		return false, err
 	}
 	for _, config := range configs {
 		// Note: createThumbnail does locking based on activeThumbnailGeneration
-		busy, err = createThumbnail(src, buffer, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
+		busy, err = createThumbnail(src, img, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
 		if err != nil {
 			logger.WithError(err).WithField("src", src).Error("Failed to generate thumbnails")
 			return false, err
@@ -50,7 +57,7 @@ func GenerateThumbnails(src types.Path, configs []types.ThumbnailSize, mediaMeta
 
 // GenerateThumbnail generates the configured thumbnail size for the source file
 func GenerateThumbnail(src types.Path, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
-	buffer, err := bimg.Read(string(src))
+	img, err := readFile(string(src))
 	if err != nil {
 		logger.WithError(err).WithFields(log.Fields{
 			"src": src,
@@ -58,7 +65,7 @@ func GenerateThumbnail(src types.Path, config types.ThumbnailSize, mediaMetadata
 		return false, err
 	}
 	// Note: createThumbnail does locking based on activeThumbnailGeneration
-	busy, err = createThumbnail(src, buffer, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
+	busy, err = createThumbnail(src, img, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
 	if err != nil {
 		logger.WithError(err).WithFields(log.Fields{
 			"src": src,
@@ -71,9 +78,36 @@ func GenerateThumbnail(src types.Path, config types.ThumbnailSize, mediaMetadata
 	return false, nil
 }
 
+func readFile(src string) (image.Image, error) {
+	file, err := os.Open(src)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return img, nil
+}
+
+func writeFile(img image.Image, dst string) error {
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	return jpeg.Encode(out, img, &jpeg.Options{
+		Quality: 85,
+	})
+}
+
 // createThumbnail checks if the thumbnail exists, and if not, generates it
 // Thumbnail generation is only done once for each non-existing thumbnail.
-func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
+func createThumbnail(src types.Path, img image.Image, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
 	logger = logger.WithFields(log.Fields{
 		"Width":        config.Width,
 		"Height":       config.Height,
@@ -96,10 +130,10 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 		// Note: broadcastGeneration uses mutexes and conditions from activeThumbnailGeneration
 		defer func() {
 			// Note: errorReturn is the named return variable so we wrap this in a closure to re-evaluate the arguments at defer-time
-			if err := recover(); err != nil {
-				broadcastGeneration(dst, activeThumbnailGeneration, config, err.(error), logger)
-				panic(err)
-			}
+			// if err := recover(); err != nil {
+			// 	broadcastGeneration(dst, activeThumbnailGeneration, config, err.(error), logger)
+			// 	panic(err)
+			// }
 			broadcastGeneration(dst, activeThumbnailGeneration, config, errorReturn, logger)
 		}()
 	}
@@ -127,7 +161,7 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 	}
 
 	start := time.Now()
-	width, height, err := resize(dst, buffer, config.Width, config.Height, config.ResizeMethod == "crop", logger)
+	width, height, err := adjustSize(dst, img, config.Width, config.Height, config.ResizeMethod == "crop", logger)
 	if err != nil {
 		return false, err
 	}
@@ -169,49 +203,47 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 	return false, nil
 }
 
-// resize scales an image to fit within the provided width and height
+// adjustSize scales an image to fit within the provided width and height
 // If the source aspect ratio is different to the target dimensions, one edge will be smaller than requested
 // If crop is set to true, the image will be scaled to fill the width and height with any excess being cropped off
-func resize(dst types.Path, buffer []byte, w, h int, crop bool, logger *log.Entry) (int, int, error) {
-	inImage := bimg.NewImage(buffer)
-
-	inSize, err := inImage.Size()
-	if err != nil {
-		return -1, -1, err
-	}
-
-	options := bimg.Options{
-		Type:    bimg.JPEG,
-		Quality: 85,
-	}
+func adjustSize(dst types.Path, img image.Image, w, h int, crop bool, logger *log.Entry) (int, int, error) {
+	var out image.Image
+	var err error
 	if crop {
-		options.Width = w
-		options.Height = h
-		options.Crop = true
-	} else {
-		inAR := float64(inSize.Width) / float64(inSize.Height)
+		inAR := float64(img.Bounds().Dx()) / float64(img.Bounds().Dy())
 		outAR := float64(w) / float64(h)
 
+		var scaleW, scaleH uint
 		if inAR > outAR {
-			// input has wider AR than requested output so use requested width and calculate height to match input AR
-			options.Width = w
-			options.Height = int(float64(w) / inAR)
+			// input has shorter AR than requested output so use requested height and calculate width to match input AR
+			scaleW = uint(float64(h) * inAR)
+			scaleH = uint(h)
 		} else {
-			// input has narrower AR than requested output so use requested height and calculate width to match input AR
-			options.Width = int(float64(h) * inAR)
-			options.Height = h
+			// input has taller AR than requested output so use requested width and calculate height to match input AR
+			scaleW = uint(w)
+			scaleH = uint(float64(w) / inAR)
+		}
+
+		scaled := resize.Resize(scaleW, scaleH, img, resize.Lanczos3)
+
+		xoff := (scaled.Bounds().Dx() - w) / 2
+		yoff := (scaled.Bounds().Dy() - h) / 2
+
+		tr := image.Rect(0, 0, w, h)
+		target := image.NewRGBA(tr)
+		draw.Draw(target, tr, scaled, image.Pt(xoff, yoff), draw.Src)
+		out = target
+	} else {
+		out = resize.Thumbnail(uint(w), uint(h), img, resize.Lanczos3)
+		if err != nil {
+			return -1, -1, err
 		}
 	}
 
-	newImage, err := inImage.Process(options)
-	if err != nil {
+	if err = writeFile(out, string(dst)); err != nil {
+		logger.WithError(err).Error("Failed to encode and write image")
 		return -1, -1, err
 	}
 
-	if err = bimg.Write(string(dst), newImage); err != nil {
-		logger.WithError(err).Error("Failed to resize image")
-		return -1, -1, err
-	}
-
-	return options.Width, options.Height, nil
+	return out.Bounds().Max.X, out.Bounds().Max.Y, nil
 }
