@@ -87,7 +87,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		"room_id":  ev.RoomID(),
 	}).Info("received event from roomserver")
 
-	addsStateEvents, err := s.addsStateEvents(output.AddsStateEventIDs, ev)
+	addsStateEvents, err := s.lookupStateEvents(output.AddsStateEventIDs, ev)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
@@ -116,8 +116,8 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	return nil
 }
 
-// addsStateEvents looks up the state events that are added by a new event.
-func (s *OutputRoomEvent) addsStateEvents(
+// lookupStateEvents looks up the state events that are added by a new event.
+func (s *OutputRoomEvent) lookupStateEvents(
 	addsStateEventIDs []string, event gomatrixserverlib.Event,
 ) ([]gomatrixserverlib.Event, error) {
 	// Fast path if there aren't any new state events.
