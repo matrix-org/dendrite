@@ -111,9 +111,11 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
-type unknownRoomError string
+type unknownRoomError struct {
+	roomID string
+}
 
-func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e) }
+func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e.roomID) }
 
 func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	refs := e.PrevEvents()
@@ -141,7 +143,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 		// that this server is unaware of.
 		// However generally speaking we should reject events for rooms we
 		// aren't a member of.
-		return unknownRoomError(e.RoomID())
+		return unknownRoomError{e.RoomID()}
 	}
 
 	if !stateResp.PrevEventsExist {
