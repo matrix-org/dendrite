@@ -49,7 +49,7 @@ Arguments:
 var (
 	federationAPIURL = flag.String("federation-api-url", "", "The base URL of the listening 'dendrite-federation-api-server' process. E.g. 'http://localhost:4200'")
 	bindAddress      = flag.String("bind-address", ":8448", "The listening port for the proxy.")
-	certFile         = flag.String("tls-cert", "server.crt", "The X509 certificate to use for TLS")
+	certFile         = flag.String("tls-cert", "server.crt", "The PEM formatted X509 certificate to use for TLS")
 	keyFile          = flag.String("tls-key", "server.key", "The PEM private key to use for TLS")
 )
 

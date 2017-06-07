@@ -136,7 +136,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 
 	if !stateResp.RoomExists {
 		// TODO: When synapse receives a message for a room it is not in it
-		// asked the remote server for the state of the room so that it can
+		// asks the remote server for the state of the room so that it can
 		// check if the remote server knows of a join "m.room.member" event
 		// that this server is unaware of.
 		// However generally speaking we should reject events for rooms we

@@ -166,6 +166,8 @@ func (s *eventStatements) selectEvent(eventID string) (types.EventNID, types.Sta
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
+// bulkSelectStateEventByID lookups a list of state events by event ID.
+// If any of the requested events are missing from the database it returns a types.MissingEventError
 func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateEntry, error) {
 	rows, err := s.bulkSelectStateEventByIDStmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
@@ -201,6 +203,9 @@ func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.S
 	return results, err
 }
 
+// bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
+// If any of the requested events are missing from the database it returns a types.MissingEventError.
+// If we do not have the state for any of the requested events it returns a types.MissingEventError.
 func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types.StateAtEvent, error) {
 	rows, err := s.bulkSelectStateAtEventByIDStmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
