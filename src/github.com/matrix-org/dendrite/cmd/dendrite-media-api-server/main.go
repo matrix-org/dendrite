@@ -15,6 +15,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -36,27 +37,29 @@ import (
 )
 
 var (
-	bindAddr   = os.Getenv("BIND_ADDRESS")
+	bindAddr   = flag.String("listen", "", "The port to listen on.")
 	dataSource = os.Getenv("DATABASE")
 	logDir     = os.Getenv("LOG_DIR")
 	serverName = os.Getenv("SERVER_NAME")
 	basePath   = os.Getenv("BASE_PATH")
 	// Note: if the MAX_FILE_SIZE_BYTES is set to 0, it will be unlimited
 	maxFileSizeBytesString = os.Getenv("MAX_FILE_SIZE_BYTES")
-	configPath             = os.Getenv("CONFIG_PATH")
+	configPath             = flag.String("config", "", "The path to the config file. For more information, see the config file in this repository.")
 )
 
 func main() {
 	common.SetupLogging(logDir)
 
+	flag.Parse()
+
 	log.WithFields(log.Fields{
-		"BIND_ADDRESS":        bindAddr,
+		"listen":              *bindAddr,
 		"DATABASE":            dataSource,
 		"LOG_DIR":             logDir,
 		"SERVER_NAME":         serverName,
 		"BASE_PATH":           basePath,
 		"MAX_FILE_SIZE_BYTES": maxFileSizeBytesString,
-		"CONFIG_PATH":         configPath,
+		"config":              *configPath,
 	}).Info("Loading configuration based on config file and environment variables")
 
 	cfg, err := configureServer()
@@ -64,15 +67,10 @@ func main() {
 		log.WithError(err).Fatal("Invalid configuration")
 	}
 
-	db, err := storage.Open(cfg.DataSource)
-	if err != nil {
-		log.WithError(err).Panic("Failed to open database")
-	}
-
 	log.WithFields(log.Fields{
-		"BIND_ADDRESS":           bindAddr,
+		"listen":                 *bindAddr,
 		"LOG_DIR":                logDir,
-		"CONFIG_PATH":            configPath,
+		"CONFIG_PATH":            *configPath,
 		"ServerName":             cfg.ServerName,
 		"AbsBasePath":            cfg.AbsBasePath,
 		"MaxFileSizeBytes":       *cfg.MaxFileSizeBytes,
@@ -82,13 +80,21 @@ func main() {
 		"ThumbnailSizes":         cfg.ThumbnailSizes,
 	}).Info("Starting mediaapi server with configuration")
 
+	db, err := storage.Open(cfg.DataSource)
+	if err != nil {
+		log.WithError(err).Panic("Failed to open database")
+	}
+
 	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, db)
-	log.Fatal(http.ListenAndServe(bindAddr, nil))
+	log.Fatal(http.ListenAndServe(*bindAddr, nil))
 }
 
 // configureServer loads configuration from a yaml file and overrides with environment variables
 func configureServer() (*config.MediaAPI, error) {
-	cfg, err := loadConfig(configPath)
+	if *configPath == "" {
+		log.Fatal("--config must be supplied")
+	}
+	cfg, err := loadConfig(*configPath)
 	if err != nil {
 		log.WithError(err).Fatal("Invalid config file")
 	}
@@ -172,14 +178,14 @@ func applyOverrides(cfg *config.MediaAPI) {
 	if cfg.MaxThumbnailGenerators == 0 {
 		log.WithField(
 			"max_thumbnail_generators", cfg.MaxThumbnailGenerators,
-		).Info("Using default max_thumbnail_generators")
+		).Info("Using default max_thumbnail_generators value of 10")
 		cfg.MaxThumbnailGenerators = 10
 	}
 }
 
 func validateConfig(cfg *config.MediaAPI) error {
-	if bindAddr == "" {
-		return fmt.Errorf("no BIND_ADDRESS environment variable found")
+	if *bindAddr == "" {
+		log.Fatal("--listen must be supplied")
 	}
 
 	absBasePath, err := getAbsolutePath(cfg.BasePath)
