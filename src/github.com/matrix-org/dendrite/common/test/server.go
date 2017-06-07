@@ -48,7 +48,7 @@ func CreateDatabase(command string, args []string, database string) error {
 // CreateBackgroundCommand creates an executable command
 // The Cmd being executed is returned. A channel is also returned,
 // which will have any termination errors sent down it, followed immediately by the channel being closed.
-func CreateBackgroundCommand(command string, args []string, suffix string) (*exec.Cmd, chan error) {
+func CreateBackgroundCommand(command string, args []string) (*exec.Cmd, chan error) {
 	cmd := exec.Command(command, args...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stderr
@@ -96,6 +96,5 @@ func StartServer(serverType string, serverArgs []string, suffix, configFilename,
 	return CreateBackgroundCommand(
 		filepath.Join(filepath.Dir(os.Args[0]), "dendrite-"+serverType+"-server"),
 		serverArgs,
-		suffix,
 	)
 }
