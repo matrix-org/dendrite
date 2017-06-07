@@ -10,6 +10,7 @@ gb build github.com/matrix-org/dendrite/cmd/syncserver-integration-tests
 gb build github.com/matrix-org/dendrite/cmd/create-account
 gb build github.com/matrix-org/dendrite/cmd/dendrite-media-api-server
 gb build github.com/matrix-org/dendrite/cmd/mediaapi-integration-tests
+gb build github.com/matrix-org/dendrite/cmd/client-api-proxy
 
 # Run the pre commit hooks
 ./hooks/pre-commit
