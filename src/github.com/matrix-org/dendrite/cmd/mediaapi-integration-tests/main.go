@@ -136,12 +136,12 @@ func main() {
 	// create server1 with only pre-generated thumbnails allowed
 	server1Cmd, server1CmdChan, server1Dir := startMediaAPI("1", false)
 	defer cleanUpServer(server1Cmd, server1Dir)
-	testDownload("1", "localhost:17771", "doesnotexist", "", 404, server1CmdChan)
+	testDownload("localhost:17771", "localhost:17771", "doesnotexist", "", 404, server1CmdChan)
 
 	// create server2 with dynamic thumbnail generation
 	server2Cmd, server2CmdChan, server2Dir := startMediaAPI("2", true)
 	defer cleanUpServer(server2Cmd, server2Dir)
-	testDownload("2", "localhost:17772", "doesnotexist", "", 404, server2CmdChan)
+	testDownload("localhost:17772", "localhost:17772", "doesnotexist", "", 404, server2CmdChan)
 }
 
 func getMediaURI(scheme, host, endpoint string, components []string) string {
@@ -150,10 +150,10 @@ func getMediaURI(scheme, host, endpoint string, components []string) string {
 	return scheme + path.Join(pathComponents...)
 }
 
-func testDownload(suffix, origin, mediaID, wantedBody string, wantedStatusCode int, serverCmdChan chan error) {
+func testDownload(host, origin, mediaID, wantedBody string, wantedStatusCode int, serverCmdChan chan error) {
 	req, err := http.NewRequest(
 		"GET",
-		getMediaURI("http://", "localhost:1777"+suffix, "download", []string{
+		getMediaURI("http://", host, "download", []string{
 			origin,
 			mediaID,
 		}),
