@@ -145,14 +145,7 @@ func main() {
 }
 
 func getMediaURI(scheme, host, endpoint string, components []string) string {
-	pathComponents := []string{
-		host,
-		"api",
-		"_matrix",
-		"media",
-		"v1",
-		endpoint,
-	}
+	pathComponents := []string{host, "api/_matrix/media/v1", endpoint}
 	pathComponents = append(pathComponents, components...)
 	return scheme + path.Join(pathComponents...)
 }
