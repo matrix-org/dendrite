@@ -65,16 +65,18 @@ var testDatabaseTemplate = "dbname=%s sslmode=disable binary_parameters=yes"
 
 var timeout time.Duration
 
-func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error, string, string) {
+func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error, string, *exec.Cmd, chan error, string, string) {
 	dir, err := ioutil.TempDir("", serverType+"-server-test"+suffix)
 	if err != nil {
 		panic(err)
 	}
 
-	configFilename := serverType + "-server-test-config" + suffix + ".yaml"
-	configFileContents := makeConfig(suffix, dir, dynamicThumbnails)
+	serverAddr := "localhost:177" + suffix + "9"
+	proxyAddr := "localhost:1800" + suffix
 
-	serverAddr := "localhost:1777" + suffix
+	configFilename := serverType + "-server-test-config" + suffix + ".yaml"
+	configFileContents := makeConfig(proxyAddr, suffix, dir, dynamicThumbnails)
+
 	serverArgs := []string{
 		"--config", configFilename,
 		"--listen", serverAddr,
@@ -83,6 +85,13 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 	databases := []string{
 		testDatabaseName + suffix,
 	}
+
+	proxyCmd, proxyCmdChan := test.StartProxy(
+		proxyAddr,
+		"http://localhost:177"+suffix+"6",
+		"http://localhost:177"+suffix+"8",
+		"http://"+serverAddr,
+	)
 
 	cmd, cmdChan := test.StartServer(
 		serverType,
@@ -94,10 +103,10 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 		postgresContainerName,
 		databases,
 	)
-	return cmd, cmdChan, serverAddr, dir
+	return cmd, cmdChan, serverAddr, proxyCmd, proxyCmdChan, proxyAddr, dir
 }
 
-func makeConfig(suffix, basePath string, dynamicThumbnails bool) string {
+func makeConfig(serverAddr, suffix, basePath string, dynamicThumbnails bool) string {
 	return fmt.Sprintf(
 		`
 server_name: "%s"
@@ -106,7 +115,7 @@ max_file_size_bytes: %s
 database: "%s"
 dynamic_thumbnails: %s
 %s`,
-		"localhost:1777"+suffix,
+		serverAddr,
 		basePath,
 		"10485760",
 		fmt.Sprintf(testDatabaseTemplate, testDatabaseName+suffix),
@@ -135,18 +144,20 @@ func main() {
 	}
 
 	// create server1 with only pre-generated thumbnails allowed
-	server1Cmd, server1CmdChan, server1Addr, server1Dir := startMediaAPI("1", false)
+	server1Cmd, server1CmdChan, _, server1ProxyCmd, _, server1ProxyAddr, server1Dir := startMediaAPI("1", false)
 	defer cleanUpServer(server1Cmd, server1Dir)
-	testDownload(server1Addr, server1Addr, "doesnotexist", "", 404, server1CmdChan)
+	defer server1ProxyCmd.Process.Kill()
+	testDownload(server1ProxyAddr, server1ProxyAddr, "doesnotexist", "", 404, server1CmdChan)
 
 	// create server2 with dynamic thumbnail generation
-	server2Cmd, server2CmdChan, server2Addr, server2Dir := startMediaAPI("2", true)
+	server2Cmd, server2CmdChan, _, server2ProxyCmd, _, server2ProxyAddr, server2Dir := startMediaAPI("2", true)
 	defer cleanUpServer(server2Cmd, server2Dir)
-	testDownload(server2Addr, server2Addr, "doesnotexist", "", 404, server2CmdChan)
+	defer server2ProxyCmd.Process.Kill()
+	testDownload(server2ProxyAddr, server2ProxyAddr, "doesnotexist", "", 404, server2CmdChan)
 }
 
 func getMediaURI(scheme, host, endpoint string, components []string) string {
-	pathComponents := []string{host, "api/_matrix/media/v1", endpoint}
+	pathComponents := []string{host, "_matrix/media/v1", endpoint}
 	pathComponents = append(pathComponents, components...)
 	return scheme + path.Join(pathComponents...)
 }
