@@ -101,6 +101,7 @@ func (r *Request) Do() error {
 // DoUntilSuccess blocks and repeats the same request until the response returns the desired status code and body.
 // It then closes the given channel and returns.
 func (r *Request) DoUntilSuccess(done chan error) {
+	r.LastErr = &LastRequestErr{}
 	for {
 		if err := r.Do(); err != nil {
 			r.LastErr.Set(err)
