@@ -168,3 +168,9 @@ type RoomRecentEventsUpdater interface {
 	// Rollback the transaction.
 	Rollback() error
 }
+
+// A MissingEventError is an error that happened because the roomserver was
+// missing requested events from its database.
+type MissingEventError string
+
+func (e MissingEventError) Error() string { return string(e) }
