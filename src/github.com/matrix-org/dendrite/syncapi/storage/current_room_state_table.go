@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS current_room_state (
     -- The 'content.membership' value if this event is an m.room.member event. For other
     -- events, this will be NULL.
     membership TEXT,
-	-- The serial ID of the output_room_events table when this event became
-	-- part of the current state of the room.
-	added_at BIGINT,
+    -- The serial ID of the output_room_events table when this event became
+    -- part of the current state of the room.
+    added_at BIGINT,
     -- Clobber based on 3-uple of room_id, type and state_key
     CONSTRAINT room_state_unique UNIQUE (room_id, type, state_key)
 );
@@ -49,10 +49,10 @@ CREATE INDEX IF NOT EXISTS membership_idx ON current_room_state(type, state_key,
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO current_room_state (room_id, event_id, type, state_key, event_json, membership, added_at_id)" +
+	"INSERT INTO current_room_state (room_id, event_id, type, state_key, event_json, membership, added_at)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" ON CONFLICT ON CONSTRAINT room_state_unique" +
-	" DO UPDATE SET event_id = $2, event_json = $5, membership = $6, added_at_id = $7"
+	" DO UPDATE SET event_id = $2, event_json = $5, membership = $6, added_at = $7"
 
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM current_room_state WHERE event_id = $1"
