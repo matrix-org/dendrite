@@ -107,12 +107,14 @@ func (d *SyncServerDatabase) WriteEvent(
 			return nil
 		}
 
-		return d.updateRoomState(txn, removeStateEventIDs, addStateEvents)
+		return d.updateRoomState(txn, removeStateEventIDs, addStateEvents, streamPos)
 	})
 	return
 }
 
-func (d *SyncServerDatabase) updateRoomState(txn *sql.Tx, removedEventIDs []string, addedEvents []gomatrixserverlib.Event) error {
+func (d *SyncServerDatabase) updateRoomState(
+	txn *sql.Tx, removedEventIDs []string, addedEvents []gomatrixserverlib.Event, streamPos types.StreamPosition,
+) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 	for _, eventID := range removedEventIDs {
 		if err := d.roomstate.deleteRoomStateByEventID(txn, eventID); err != nil {
@@ -133,7 +135,7 @@ func (d *SyncServerDatabase) updateRoomState(txn *sql.Tx, removedEventIDs []stri
 			}
 			membership = &memberContent.Membership
 		}
-		if err := d.roomstate.upsertRoomState(txn, event, membership); err != nil {
+		if err := d.roomstate.upsertRoomState(txn, event, membership, int64(streamPos)); err != nil {
 			return err
 		}
 	}
@@ -362,7 +364,7 @@ func (d *SyncServerDatabase) fetchMissingStateEvents(txn *sql.Tx, eventIDs []str
 		// stream so probably happened before it.
 		// TOOD: What happens if we receive a state event from outside the
 		// timeline associated with an event in the middle of the timeline?
-		events = append(events, streamEvent{e, 0})
+		events = append(events, e)
 	}
 	return events, nil
 }
