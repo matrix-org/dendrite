@@ -65,7 +65,7 @@ var testDatabaseTemplate = "dbname=%s sslmode=disable binary_parameters=yes"
 
 var timeout time.Duration
 
-func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error, string) {
+func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error, string, string) {
 	dir, err := ioutil.TempDir("", serverType+"-server-test"+suffix)
 	if err != nil {
 		panic(err)
@@ -74,9 +74,10 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 	configFilename := serverType + "-server-test-config" + suffix + ".yaml"
 	configFileContents := makeConfig(suffix, dir, dynamicThumbnails)
 
+	serverAddr := "localhost:1777" + suffix
 	serverArgs := []string{
 		"--config", configFilename,
-		"--listen", "localhost:1777" + suffix,
+		"--listen", serverAddr,
 	}
 
 	databases := []string{
@@ -93,7 +94,7 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 		postgresContainerName,
 		databases,
 	)
-	return cmd, cmdChan, dir
+	return cmd, cmdChan, serverAddr, dir
 }
 
 func makeConfig(suffix, basePath string, dynamicThumbnails bool) string {
@@ -134,14 +135,14 @@ func main() {
 	}
 
 	// create server1 with only pre-generated thumbnails allowed
-	server1Cmd, server1CmdChan, server1Dir := startMediaAPI("1", false)
+	server1Cmd, server1CmdChan, server1Addr, server1Dir := startMediaAPI("1", false)
 	defer cleanUpServer(server1Cmd, server1Dir)
-	testDownload("localhost:17771", "localhost:17771", "doesnotexist", "", 404, server1CmdChan)
+	testDownload(server1Addr, server1Addr, "doesnotexist", "", 404, server1CmdChan)
 
 	// create server2 with dynamic thumbnail generation
-	server2Cmd, server2CmdChan, server2Dir := startMediaAPI("2", true)
+	server2Cmd, server2CmdChan, server2Addr, server2Dir := startMediaAPI("2", true)
 	defer cleanUpServer(server2Cmd, server2Dir)
-	testDownload("localhost:17772", "localhost:17772", "doesnotexist", "", 404, server2CmdChan)
+	testDownload(server2Addr, server2Addr, "doesnotexist", "", 404, server2CmdChan)
 }
 
 func getMediaURI(scheme, host, endpoint string, components []string) string {
