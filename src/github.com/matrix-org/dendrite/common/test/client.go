@@ -71,7 +71,6 @@ func (r *Request) Do() error {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	fmt.Println("Attempting request", r.Req)
 	res, err := client.Do(r.Req)
 	if err != nil {
 		return err
