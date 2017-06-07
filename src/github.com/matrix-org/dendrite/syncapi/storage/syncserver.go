@@ -360,10 +360,6 @@ func (d *SyncServerDatabase) fetchMissingStateEvents(txn *sql.Tx, eventIDs []str
 		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
 	}
 	for _, e := range stateEvents {
-		// Set the stream position to 0 since these events occurred outside the
-		// stream so probably happened before it.
-		// TOOD: What happens if we receive a state event from outside the
-		// timeline associated with an event in the middle of the timeline?
 		events = append(events, e)
 	}
 	return events, nil
