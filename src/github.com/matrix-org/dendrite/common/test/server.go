@@ -98,3 +98,17 @@ func StartServer(serverType string, serverArgs []string, suffix, configFilename,
 		serverArgs,
 	)
 }
+
+// StartProxy creates a reverse proxy
+func StartProxy(bindAddr, syncAddr, clientAddr, mediaAddr string) (*exec.Cmd, chan error) {
+	proxyArgs := []string{
+		"--bind-address", bindAddr,
+		"--sync-api-server-url", syncAddr,
+		"--client-api-server-url", clientAddr,
+		"--media-api-server-url", mediaAddr,
+	}
+	return CreateBackgroundCommand(
+		filepath.Join(filepath.Dir(os.Args[0]), "client-api-proxy"),
+		proxyArgs,
+	)
+}
