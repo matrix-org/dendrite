@@ -16,6 +16,7 @@ package test
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"sync"
@@ -58,7 +59,7 @@ func (r *LastRequestErr) Get() error {
 func CanonicalJSONInput(jsonData []string) []string {
 	for i := range jsonData {
 		jsonBytes, err := gomatrixserverlib.CanonicalJSON([]byte(jsonData[i]))
-		if err != nil {
+		if err != nil && err != io.EOF {
 			panic(err)
 		}
 		jsonData[i] = string(jsonBytes)
