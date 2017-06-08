@@ -171,11 +171,11 @@ func main() {
 	defer server2ProxyCmd.Process.Kill()
 	testDownload(server2ProxyAddr, server2ProxyAddr, "doesnotexist", "", 404, server2CmdChan)
 
-	// download that JPEG file via server2
-	testDownload(server2ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server2CmdChan)
-
 	// pre-generated thumbnail that JPEG file via server2
 	testThumbnail(800, 600, "scale", server2ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server2CmdChan)
+
+	// download that JPEG file via server2
+	testDownload(server2ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server2CmdChan)
 
 	// dynamic thumbnail that JPEG file via server2
 	testThumbnail(1920, 1080, "scale", server2ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server2CmdChan)
