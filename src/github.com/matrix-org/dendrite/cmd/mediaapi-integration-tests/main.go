@@ -265,5 +265,5 @@ func testThumbnail(width, height int, resizeMethod, host, origin, mediaID, wante
 		WantedStatusCode: wantedStatusCode,
 		WantedBody:       test.CanonicalJSONInput([]string{wantedBody})[0],
 	}
-	testReq.Run(fmt.Sprintf("thumbnail mxc://%v/%v from %v", origin, mediaID, host), timeout, serverCmdChan)
+	testReq.Run(fmt.Sprintf("thumbnail mxc://%v/%v%v from %v", origin, mediaID, query, host), timeout, serverCmdChan)
 }
