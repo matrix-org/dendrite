@@ -17,7 +17,6 @@
 package thumbnailer
 
 import (
-	"fmt"
 	"image"
 	"image/draw"
 	// Imported for gif codec
@@ -138,26 +137,9 @@ func createThumbnail(src types.Path, img image.Image, config types.ThumbnailSize
 		}()
 	}
 
-	// Check if the thumbnail exists.
-	thumbnailMetadata, err := db.GetThumbnail(mediaMetadata.MediaID, mediaMetadata.Origin, config.Width, config.Height, config.ResizeMethod)
-	if err != nil {
-		logger.Error("Failed to query database for thumbnail.")
+	exists, err := isThumbnailExists(dst, config, mediaMetadata, db, logger)
+	if err != nil || exists {
 		return false, err
-	}
-	if thumbnailMetadata != nil {
-		return false, nil
-	}
-	// Note: The double-negative is intentional as os.IsExist(err) != !os.IsNotExist(err).
-	// The functions are error checkers to be used in different cases.
-	if _, err = os.Stat(string(dst)); !os.IsNotExist(err) {
-		// Thumbnail exists
-		return false, nil
-	}
-
-	if isActive == false {
-		// Note: This should not happen, but we check just in case.
-		logger.Error("Failed to stat file but this is not the active thumbnail generator. This should not happen.")
-		return false, fmt.Errorf("Not active thumbnail generator. Stat error: %q", err)
 	}
 
 	start := time.Now()
@@ -176,7 +158,7 @@ func createThumbnail(src types.Path, img image.Image, config types.ThumbnailSize
 		return false, err
 	}
 
-	thumbnailMetadata = &types.ThumbnailMetadata{
+	thumbnailMetadata := &types.ThumbnailMetadata{
 		MediaMetadata: &types.MediaMetadata{
 			MediaID: mediaMetadata.MediaID,
 			Origin:  mediaMetadata.Origin,

@@ -17,10 +17,12 @@ package thumbnailer
 import (
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 )
 
@@ -129,6 +131,24 @@ func broadcastGeneration(dst types.Path, activeThumbnailGeneration *types.Active
 		activeThumbnailGenerationResult.Cond.Broadcast()
 	}
 	delete(activeThumbnailGeneration.PathToResult, string(dst))
+}
+
+func isThumbnailExists(dst types.Path, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, db *storage.Database, logger *log.Entry) (bool, error) {
+	thumbnailMetadata, err := db.GetThumbnail(mediaMetadata.MediaID, mediaMetadata.Origin, config.Width, config.Height, config.ResizeMethod)
+	if err != nil {
+		logger.Error("Failed to query database for thumbnail.")
+		return false, err
+	}
+	if thumbnailMetadata != nil {
+		return true, nil
+	}
+	// Note: The double-negative is intentional as os.IsExist(err) != !os.IsNotExist(err).
+	// The functions are error checkers to be used in different cases.
+	if _, err = os.Stat(string(dst)); !os.IsNotExist(err) {
+		// Thumbnail exists
+		return true, nil
+	}
+	return false, nil
 }
 
 // init with worst values
