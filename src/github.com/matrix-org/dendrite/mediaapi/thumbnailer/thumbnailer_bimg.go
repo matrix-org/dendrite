@@ -81,6 +81,11 @@ func createThumbnail(src types.Path, img *bimg.Image, config types.ThumbnailSize
 		"ResizeMethod": config.ResizeMethod,
 	})
 
+	// Check if request is larger than original
+	if isLargerThanOriginal(config, img) {
+		return false, nil
+	}
+
 	dst := GetThumbnailPath(src, config)
 
 	// Note: getActiveThumbnailGeneration uses mutexes and conditions from activeThumbnailGeneration
@@ -151,6 +156,14 @@ func createThumbnail(src types.Path, img *bimg.Image, config types.ThumbnailSize
 	}
 
 	return false, nil
+}
+
+func isLargerThanOriginal(config types.ThumbnailSize, img *bimg.Image) bool {
+	imgSize, err := img.Size()
+	if err == nil && config.Width >= imgSize.Width && config.Height >= imgSize.Height {
+		return true
+	}
+	return false
 }
 
 // resize scales an image to fit within the provided width and height

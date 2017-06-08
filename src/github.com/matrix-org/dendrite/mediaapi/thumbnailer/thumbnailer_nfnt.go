@@ -113,6 +113,11 @@ func createThumbnail(src types.Path, img image.Image, config types.ThumbnailSize
 		"ResizeMethod": config.ResizeMethod,
 	})
 
+	// Check if request is larger than original
+	if config.Width >= img.Bounds().Dx() && config.Height >= img.Bounds().Dy() {
+		return false, nil
+	}
+
 	dst := GetThumbnailPath(src, config)
 
 	// Note: getActiveThumbnailGeneration uses mutexes and conditions from activeThumbnailGeneration
