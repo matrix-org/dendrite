@@ -1,6 +1,38 @@
+# Media API Tests
+
+## Implemented
+
 * functional
     * upload
         * normal case
+    * download
+        * local file
+            * existing
+            * non-existing
+        * remote file
+            * existing
+    * thumbnail
+        * original file formats
+            * JPEG
+        * local file
+            * existing
+        * remote file
+            * existing
+        * cache
+            * cold
+            * hot
+        * pre-generation according to configuration
+            * scale
+            * crop
+        * dynamic generation
+            * cold cache
+            * larger than original
+            * scale
+
+## TODO
+
+* functional
+    * upload
         * file too large
         * 0-byte file?
         * invalid filename
@@ -8,38 +40,25 @@
     * download
         * invalid origin
         * invalid media id
-        * local file
-            * existing
-            * non-existing
-        * remote file
-            * existing
-            * non-existing
     * thumbnail
         * original file formats
-            * JPEG
             * GIF
             * PNG
             * BMP
             * SVG
             * PDF
+            * TIFF
+            * WEBP
         * local file
-            * existing
             * non-existing
         * remote file
-            * existing
             * non-existing
-        * cache
-            * cold
-            * hot
         * pre-generation according to configuration
             * manual verification + hash check for regressions?
         * dynamic generation
-            * cold cache
             * hot cache
-            * larger than original
             * limit on dimensions?
             * 0x0
-            * scale
             * crop
 * load
     * 100 parallel requests
