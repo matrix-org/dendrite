@@ -17,7 +17,6 @@
 package thumbnailer
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -34,9 +33,10 @@ func GenerateThumbnails(src types.Path, configs []types.ThumbnailSize, mediaMeta
 		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
 		return false, err
 	}
+	img := bimg.NewImage(buffer)
 	for _, config := range configs {
 		// Note: createThumbnail does locking based on activeThumbnailGeneration
-		busy, err = createThumbnail(src, buffer, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
+		busy, err = createThumbnail(src, img, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
 		if err != nil {
 			logger.WithError(err).WithField("src", src).Error("Failed to generate thumbnails")
 			return false, err
@@ -57,8 +57,9 @@ func GenerateThumbnail(src types.Path, config types.ThumbnailSize, mediaMetadata
 		}).Error("Failed to read src file")
 		return false, err
 	}
+	img := bimg.NewImage(buffer)
 	// Note: createThumbnail does locking based on activeThumbnailGeneration
-	busy, err = createThumbnail(src, buffer, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
+	busy, err = createThumbnail(src, img, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
 	if err != nil {
 		logger.WithError(err).WithFields(log.Fields{
 			"src": src,
@@ -73,12 +74,17 @@ func GenerateThumbnail(src types.Path, config types.ThumbnailSize, mediaMetadata
 
 // createThumbnail checks if the thumbnail exists, and if not, generates it
 // Thumbnail generation is only done once for each non-existing thumbnail.
-func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
+func createThumbnail(src types.Path, img *bimg.Image, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
 	logger = logger.WithFields(log.Fields{
 		"Width":        config.Width,
 		"Height":       config.Height,
 		"ResizeMethod": config.ResizeMethod,
 	})
+
+	// Check if request is larger than original
+	if isLargerThanOriginal(config, img) {
+		return false, nil
+	}
 
 	dst := GetThumbnailPath(src, config)
 
@@ -104,30 +110,13 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 		}()
 	}
 
-	// Check if the thumbnail exists.
-	thumbnailMetadata, err := db.GetThumbnail(mediaMetadata.MediaID, mediaMetadata.Origin, config.Width, config.Height, config.ResizeMethod)
-	if err != nil {
-		logger.Error("Failed to query database for thumbnail.")
+	exists, err := isThumbnailExists(dst, config, mediaMetadata, db, logger)
+	if err != nil || exists {
 		return false, err
-	}
-	if thumbnailMetadata != nil {
-		return false, nil
-	}
-	// Note: The double-negative is intentional as os.IsExist(err) != !os.IsNotExist(err).
-	// The functions are error checkers to be used in different cases.
-	if _, err = os.Stat(string(dst)); !os.IsNotExist(err) {
-		// Thumbnail exists
-		return false, nil
-	}
-
-	if isActive == false {
-		// Note: This should not happen, but we check just in case.
-		logger.Error("Failed to stat file but this is not the active thumbnail generator. This should not happen.")
-		return false, fmt.Errorf("Not active thumbnail generator. Stat error: %q", err)
 	}
 
 	start := time.Now()
-	width, height, err := resize(dst, buffer, config.Width, config.Height, config.ResizeMethod == "crop", logger)
+	width, height, err := resize(dst, img, config.Width, config.Height, config.ResizeMethod == "crop", logger)
 	if err != nil {
 		return false, err
 	}
@@ -142,7 +131,7 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 		return false, err
 	}
 
-	thumbnailMetadata = &types.ThumbnailMetadata{
+	thumbnailMetadata := &types.ThumbnailMetadata{
 		MediaMetadata: &types.MediaMetadata{
 			MediaID: mediaMetadata.MediaID,
 			Origin:  mediaMetadata.Origin,
@@ -151,8 +140,8 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 			FileSizeBytes: types.FileSizeBytes(stat.Size()),
 		},
 		ThumbnailSize: types.ThumbnailSize{
-			Width:        width,
-			Height:       height,
+			Width:        config.Width,
+			Height:       config.Height,
 			ResizeMethod: config.ResizeMethod,
 		},
 	}
@@ -169,12 +158,18 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 	return false, nil
 }
 
+func isLargerThanOriginal(config types.ThumbnailSize, img *bimg.Image) bool {
+	imgSize, err := img.Size()
+	if err == nil && config.Width >= imgSize.Width && config.Height >= imgSize.Height {
+		return true
+	}
+	return false
+}
+
 // resize scales an image to fit within the provided width and height
 // If the source aspect ratio is different to the target dimensions, one edge will be smaller than requested
 // If crop is set to true, the image will be scaled to fill the width and height with any excess being cropped off
-func resize(dst types.Path, buffer []byte, w, h int, crop bool, logger *log.Entry) (int, int, error) {
-	inImage := bimg.NewImage(buffer)
-
+func resize(dst types.Path, inImage *bimg.Image, w, h int, crop bool, logger *log.Entry) (int, int, error) {
 	inSize, err := inImage.Size()
 	if err != nil {
 		return -1, -1, err

@@ -8,6 +8,9 @@ sudo: false
 dist: trusty
 
 addons:
+  apt:
+    packages:
+    - openssl
   postgresql: "9.5"
 
 services:
@@ -17,6 +20,10 @@ install:
  - go get github.com/constabulary/gb/...
  - go get github.com/golang/lint/golint
  - go get github.com/fzipp/gocyclo
+
+# Generate a self-signed X.509 certificate for TLS.
+before_script:
+ - openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
 
 script:
  - ./travis-install-kafka.sh
@@ -29,4 +36,3 @@ notifications:
         on_success: change  # always|never|change
         on_failure: always
         on_start: never
-
