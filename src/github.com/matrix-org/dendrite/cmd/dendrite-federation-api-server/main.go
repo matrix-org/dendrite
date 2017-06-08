@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/federationapi/config"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -47,6 +48,7 @@ var (
 	kafkaURIs            = strings.Split(os.Getenv("KAFKA_URIS"), ",")
 	roomserverURL        = os.Getenv("ROOMSERVER_URL")
 	roomserverInputTopic = os.Getenv("TOPIC_INPUT_ROOM_EVENT")
+	keyDataSource        = os.Getenv("KEY_DATABASE")
 )
 
 func main() {
@@ -95,12 +97,17 @@ func main() {
 
 	federation := gomatrixserverlib.NewFederationClient(cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
 
+	keyDB, err := keydb.NewDatabase(keyDataSource)
+	if err != nil {
+		log.Panicf("Failed to setup key database(%q): %s", keyDataSource, err.Error())
+	}
+
 	keyRing := gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
 			// TODO: Use perspective key fetchers for production.
 			&gomatrixserverlib.DirectKeyFetcher{federation.Client},
 		},
-		KeyDatabase: &dummyKeyDatabase{},
+		KeyDatabase: keyDB,
 	}
 	queryAPI := api.NewRoomserverQueryAPIHTTP(roomserverURL, nil)
 
@@ -111,19 +118,4 @@ func main() {
 
 	routing.Setup(http.DefaultServeMux, cfg, queryAPI, roomserverProducer, keyRing, federation)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
-}
-
-// TODO: Implement a proper key database.
-type dummyKeyDatabase struct{}
-
-func (d *dummyKeyDatabase) FetchKeys(
-	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
-) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys, error) {
-	return nil, nil
-}
-
-func (d *dummyKeyDatabase) StoreKeys(
-	map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys,
-) error {
-	return nil
 }
