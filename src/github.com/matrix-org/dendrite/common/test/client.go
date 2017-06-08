@@ -15,6 +15,7 @@
 package test
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -71,6 +72,11 @@ func CanonicalJSONInput(jsonData []string) []string {
 func (r *Request) Do() error {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
 	}
 	res, err := client.Do(r.Req)
 	if err != nil {
