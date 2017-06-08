@@ -204,7 +204,7 @@ func testUpload(host, filePath, contentType, wantedBody string, wantedStatusCode
 
 	req, err := http.NewRequest(
 		"POST",
-		getMediaURI("http://", host, "upload", "?filename="+filename, nil),
+		getMediaURI("https://", host, "upload", "?filename="+filename, nil),
 		file,
 	)
 	if err != nil {
@@ -227,7 +227,7 @@ func testUpload(host, filePath, contentType, wantedBody string, wantedStatusCode
 func testDownload(host, origin, mediaID, wantedBody string, wantedStatusCode int, serverCmdChan chan error) {
 	req, err := http.NewRequest(
 		"GET",
-		getMediaURI("http://", host, "download", "", []string{
+		getMediaURI("https://", host, "download", "", []string{
 			origin,
 			mediaID,
 		}),
@@ -251,7 +251,7 @@ func testThumbnail(width, height int, resizeMethod, host, origin, mediaID, wante
 	}
 	req, err := http.NewRequest(
 		"GET",
-		getMediaURI("http://", host, "thumbnail", query, []string{
+		getMediaURI("https://", host, "thumbnail", query, []string{
 			origin,
 			mediaID,
 		}),
