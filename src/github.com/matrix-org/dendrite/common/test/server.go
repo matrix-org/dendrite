@@ -67,6 +67,8 @@ func CreateBackgroundCommand(command string, args []string) (*exec.Cmd, chan err
 // StartServer creates the database and config file needed for the server to run and
 // then starts the server. The Cmd being executed is returned. A channel is also returned,
 // which will have any termination errors sent down it, followed immediately by the channel being closed.
+// If postgresContainerName is not an empty string, psql will be run from inside that container. If it is
+// an empty string, psql will be assumed to be in PATH.
 func StartServer(serverType string, serverArgs []string, suffix, configFilename, configFileContents, postgresDatabase, postgresContainerName string, databases []string) (*exec.Cmd, chan error) {
 	if len(databases) > 0 {
 		var dbCmd string

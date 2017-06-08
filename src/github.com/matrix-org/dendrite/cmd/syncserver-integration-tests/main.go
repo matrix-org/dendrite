@@ -43,7 +43,7 @@ var (
 	timeoutString = test.Defaulting(os.Getenv("TIMEOUT"), "10s")
 	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = test.Defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
-	// Postgres docker container name (for running psql)
+	// Postgres docker container name (for running psql). If not set, psql must be in PATH.
 	postgresContainerName = os.Getenv("POSTGRES_CONTAINER")
 	// The name of the test database to create.
 	testDatabaseName = test.Defaulting(os.Getenv("DATABASE_NAME"), "syncserver_test")

@@ -37,7 +37,7 @@ var (
 	postgresDatabase = test.Defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
 	// The name of the test database to create.
 	testDatabaseName = test.Defaulting(os.Getenv("DATABASE_NAME"), "mediaapi_test")
-	// Postgres docker container name (for running psql)
+	// Postgres docker container name (for running psql). If not set, psql must be in PATH.
 	postgresContainerName = os.Getenv("POSTGRES_CONTAINER")
 	// Test image to be uploaded/downloaded
 	testJPEG = test.Defaulting(os.Getenv("TEST_JPEG_PATH"), "src/github.com/matrix-org/dendrite/cmd/mediaapi-integration-tests/totem.jpg")
