@@ -16,6 +16,7 @@ package storage
 
 import (
 	"database/sql"
+	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -35,6 +36,9 @@ CREATE TABLE IF NOT EXISTS current_room_state (
     -- The 'content.membership' value if this event is an m.room.member event. For other
     -- events, this will be NULL.
     membership TEXT,
+    -- The serial ID of the output_room_events table when this event became
+    -- part of the current state of the room.
+    added_at BIGINT,
     -- Clobber based on 3-uple of room_id, type and state_key
     CONSTRAINT room_state_unique UNIQUE (room_id, type, state_key)
 );
@@ -45,9 +49,10 @@ CREATE INDEX IF NOT EXISTS membership_idx ON current_room_state(type, state_key,
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO current_room_state (room_id, event_id, type, state_key, event_json, membership) VALUES ($1, $2, $3, $4, $5, $6)" +
+	"INSERT INTO current_room_state (room_id, event_id, type, state_key, event_json, membership, added_at)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" ON CONFLICT ON CONSTRAINT room_state_unique" +
-	" DO UPDATE SET event_id = $2, event_json = $5, membership = $6"
+	" DO UPDATE SET event_id = $2, event_json = $5, membership = $6, added_at = $7"
 
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM current_room_state WHERE event_id = $1"
@@ -61,12 +66,16 @@ const selectCurrentStateSQL = "" +
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
+const selectEventsWithEventIDsSQL = "" +
+	"SELECT added_at, event_json FROM current_room_state WHERE event_id = ANY($1)"
+
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
 	selectCurrentStateStmt          *sql.Stmt
 	selectJoinedUsersStmt           *sql.Stmt
+	selectEventsWithEventIDsStmt    *sql.Stmt
 }
 
 func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
@@ -87,6 +96,9 @@ func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
+		return
+	}
+	if s.selectEventsWithEventIDsStmt, err = db.Prepare(selectEventsWithEventIDsSQL); err != nil {
 		return
 	}
 	return
@@ -141,6 +153,33 @@ func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID stri
 	}
 	defer rows.Close()
 
+	return rowsToEvents(rows)
+}
+
+func (s *currentRoomStateStatements) deleteRoomStateByEventID(txn *sql.Tx, eventID string) error {
+	_, err := txn.Stmt(s.deleteRoomStateByEventIDStmt).Exec(eventID)
+	return err
+}
+
+func (s *currentRoomStateStatements) upsertRoomState(
+	txn *sql.Tx, event gomatrixserverlib.Event, membership *string, addedAt int64,
+) error {
+	_, err := txn.Stmt(s.upsertRoomStateStmt).Exec(
+		event.RoomID(), event.EventID(), event.Type(), *event.StateKey(), event.JSON(), membership, addedAt,
+	)
+	return err
+}
+
+func (s *currentRoomStateStatements) selectEventsWithEventIDs(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
+	rows, err := txn.Stmt(s.selectEventsWithEventIDsStmt).Query(pq.StringArray(eventIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return rowsToStreamEvents(rows)
+}
+
+func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 	var result []gomatrixserverlib.Event
 	for rows.Next() {
 		var eventBytes []byte
@@ -155,16 +194,4 @@ func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID stri
 		result = append(result, ev)
 	}
 	return result, nil
-}
-
-func (s *currentRoomStateStatements) deleteRoomStateByEventID(txn *sql.Tx, eventID string) error {
-	_, err := txn.Stmt(s.deleteRoomStateByEventIDStmt).Exec(eventID)
-	return err
-}
-
-func (s *currentRoomStateStatements) upsertRoomState(txn *sql.Tx, event gomatrixserverlib.Event, membership *string) error {
-	_, err := txn.Stmt(s.upsertRoomStateStmt).Exec(
-		event.RoomID(), event.EventID(), event.Type(), *event.StateKey(), event.JSON(), membership,
-	)
-	return err
 }

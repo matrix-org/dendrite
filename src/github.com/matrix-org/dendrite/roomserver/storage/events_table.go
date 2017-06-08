@@ -166,6 +166,8 @@ func (s *eventStatements) selectEvent(eventID string) (types.EventNID, types.Sta
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
+// bulkSelectStateEventByID lookups a list of state events by event ID.
+// If any of the requested events are missing from the database it returns a types.MissingEventError
 func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateEntry, error) {
 	rows, err := s.bulkSelectStateEventByIDStmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
@@ -194,11 +196,16 @@ func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.S
 		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
 		// If this turns out to be impossible and we do need the debug information here, it would be better
 		// to do it as a separate query rather than slowing down/complicating the common case.
-		return nil, fmt.Errorf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs))
+		return nil, types.MissingEventError(
+			fmt.Sprintf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs)),
+		)
 	}
 	return results, err
 }
 
+// bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
+// If any of the requested events are missing from the database it returns a types.MissingEventError.
+// If we do not have the state for any of the requested events it returns a types.MissingEventError.
 func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types.StateAtEvent, error) {
 	rows, err := s.bulkSelectStateAtEventByIDStmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
@@ -218,11 +225,15 @@ func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types
 			return nil, err
 		}
 		if result.BeforeStateSnapshotNID == 0 {
-			return nil, fmt.Errorf("storage: missing state for event NID %d", result.EventNID)
+			return nil, types.MissingEventError(
+				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
+			)
 		}
 	}
 	if i != len(eventIDs) {
-		return nil, fmt.Errorf("storage: event IDs missing from the database (%d != %d)", i, len(eventIDs))
+		return nil, types.MissingEventError(
+			fmt.Sprintf("storage: event IDs missing from the database (%d != %d)", i, len(eventIDs)),
+		)
 	}
 	return results, err
 }

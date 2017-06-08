@@ -17,6 +17,7 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/clientapi/events"
@@ -75,10 +76,24 @@ func (d *SyncServerDatabase) AllJoinedUsersInRooms() (map[string][]string, error
 	return d.roomstate.selectJoinedUsers()
 }
 
+// Events lookups a list of event by their event ID.
+// Returns a list of events matching the requested IDs found in the database.
+// If an event is not found in the database then it will be omitted from the list.
+// Returns an error if there was a problem talking with the database
+func (d *SyncServerDatabase) Events(eventIDs []string) ([]gomatrixserverlib.Event, error) {
+	streamEvents, err := d.events.selectEvents(nil, eventIDs)
+	if err != nil {
+		return nil, err
+	}
+	return streamEventsToEvents(streamEvents), nil
+}
+
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 // when generating the stream position for this event. Returns the sync stream position for the inserted event.
 // Returns an error if there was a problem inserting this event.
-func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string) (streamPos types.StreamPosition, returnErr error) {
+func (d *SyncServerDatabase) WriteEvent(
+	ev *gomatrixserverlib.Event, addStateEvents []gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string,
+) (streamPos types.StreamPosition, returnErr error) {
 	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.events.insertEvent(txn, ev, addStateEventIDs, removeStateEventIDs)
@@ -87,31 +102,19 @@ func (d *SyncServerDatabase) WriteEvent(ev *gomatrixserverlib.Event, addStateEve
 		}
 		streamPos = types.StreamPosition(pos)
 
-		if len(addStateEventIDs) == 0 && len(removeStateEventIDs) == 0 {
+		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
 			// Nothing to do, the event may have just been a message event.
 			return nil
 		}
 
-		// Update the current room state based on the added/removed state event IDs.
-		// In the common case there is a single added event ID which is the state event itself, assuming `ev` is a state event.
-		// However, conflict resolution may result in there being different events being added, or even some removed.
-		if len(removeStateEventIDs) == 0 && len(addStateEventIDs) == 1 && addStateEventIDs[0] == ev.EventID() {
-			// common case
-			return d.updateRoomState(txn, nil, []gomatrixserverlib.Event{*ev})
-		}
-
-		// uncommon case: we need to fetch the full event for each event ID mentioned, then update room state
-		added, err := d.events.selectEvents(txn, addStateEventIDs)
-		if err != nil {
-			return err
-		}
-
-		return d.updateRoomState(txn, removeStateEventIDs, streamEventsToEvents(added))
+		return d.updateRoomState(txn, removeStateEventIDs, addStateEvents, streamPos)
 	})
 	return
 }
 
-func (d *SyncServerDatabase) updateRoomState(txn *sql.Tx, removedEventIDs []string, addedEvents []gomatrixserverlib.Event) error {
+func (d *SyncServerDatabase) updateRoomState(
+	txn *sql.Tx, removedEventIDs []string, addedEvents []gomatrixserverlib.Event, streamPos types.StreamPosition,
+) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 	for _, eventID := range removedEventIDs {
 		if err := d.roomstate.deleteRoomStateByEventID(txn, eventID); err != nil {
@@ -132,7 +135,7 @@ func (d *SyncServerDatabase) updateRoomState(txn *sql.Tx, removedEventIDs []stri
 			}
 			membership = &memberContent.Membership
 		}
-		if err := d.roomstate.upsertRoomState(txn, event, membership); err != nil {
+		if err := d.roomstate.upsertRoomState(txn, event, membership, int64(streamPos)); err != nil {
 			return err
 		}
 	}
@@ -310,7 +313,7 @@ func (d *SyncServerDatabase) fetchStateEvents(txn *sql.Tx, roomIDToEventIDSet ma
 		for _, missingEvIDs := range missingEvents {
 			allMissingEventIDs = append(allMissingEventIDs, missingEvIDs...)
 		}
-		evs, err := d.events.selectEvents(txn, allMissingEventIDs)
+		evs, err := d.fetchMissingStateEvents(txn, allMissingEventIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -321,6 +324,45 @@ func (d *SyncServerDatabase) fetchStateEvents(txn *sql.Tx, roomIDToEventIDSet ma
 		}
 	}
 	return stateBetween, nil
+}
+
+func (d *SyncServerDatabase) fetchMissingStateEvents(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
+	// Fetch from the events table first so we pick up the stream ID for the
+	// event.
+	events, err := d.events.selectEvents(txn, eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	have := map[string]bool{}
+	for _, event := range events {
+		have[event.EventID()] = true
+	}
+	var missing []string
+	for _, eventID := range eventIDs {
+		if !have[eventID] {
+			missing = append(missing, eventID)
+		}
+	}
+	if len(missing) == 0 {
+		return events, nil
+	}
+
+	// If they are missing from the events table then they should be state
+	// events that we received from outside the main event stream.
+	// These should be in the room state table.
+	stateEvents, err := d.roomstate.selectEventsWithEventIDs(txn, missing)
+
+	if err != nil {
+		return nil, err
+	}
+	if len(stateEvents) != len(missing) {
+		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
+	}
+	for _, e := range stateEvents {
+		events = append(events, e)
+	}
+	return events, nil
 }
 
 func (d *SyncServerDatabase) getStateDeltas(txn *sql.Tx, fromPos, toPos types.StreamPosition, userID string) ([]stateDelta, error) {

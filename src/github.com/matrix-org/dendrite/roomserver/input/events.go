@@ -28,7 +28,7 @@ type RoomEventDatabase interface {
 	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
 	// Lookup the state entries for a list of string event IDs
 	// Returns an error if the there is an error talking to the database
-	// or if the event IDs aren't in the database.
+	// Returns a types.MissingEventError if the event IDs aren't in the database.
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
 	// Set the state at an event.
 	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error

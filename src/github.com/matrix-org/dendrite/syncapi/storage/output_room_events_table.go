@@ -16,7 +16,6 @@ package storage
 
 import (
 	"database/sql"
-	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/lib/pq"
@@ -193,7 +192,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 		return nil, err
 	}
 	defer rows.Close()
-	events, err := rowsToEvents(rows)
+	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
 	}
@@ -205,23 +204,19 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
 // from the database.
 func (s *outputRoomEventsStatements) selectEvents(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
-	rows, err := txn.Stmt(s.selectEventsStmt).Query(pq.StringArray(eventIDs))
+	stmt := s.selectEventsStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
+	rows, err := stmt.Query(pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	result, err := rowsToEvents(rows)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(result) != len(eventIDs) {
-		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(result), len(eventIDs))
-	}
-	return result, nil
+	return rowsToStreamEvents(rows)
 }
 
-func rowsToEvents(rows *sql.Rows) ([]streamEvent, error) {
+func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 	var result []streamEvent
 	for rows.Next() {
 		var (

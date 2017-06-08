@@ -32,7 +32,7 @@ type RoomStateDatabase interface {
 	AddState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
 	// Lookup the state of a room at each event for a list of string event IDs.
 	// Returns an error if there is an error talking to the database
-	// or if the room state for the event IDs aren't in the database
+	// Returns a types.MissingEventError if the room state for the event IDs aren't in the database
 	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
 	// Lookup the numeric IDs for a list of string event types.
 	// Returns a map from string event type to numeric ID for the event type.
