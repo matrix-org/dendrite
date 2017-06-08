@@ -151,8 +151,8 @@ func createThumbnail(src types.Path, buffer []byte, config types.ThumbnailSize, 
 			FileSizeBytes: types.FileSizeBytes(stat.Size()),
 		},
 		ThumbnailSize: types.ThumbnailSize{
-			Width:        width,
-			Height:       height,
+			Width:        config.Width,
+			Height:       config.Height,
 			ResizeMethod: config.ResizeMethod,
 		},
 	}
