@@ -32,6 +32,12 @@ type KeyFetcher interface {
 type KeyDatabase interface {
 	KeyFetcher
 	// Add a block of public keys to the database.
+	// Returns an error if there was a problem storing the keys.
+	// A database is not required to rollback storing the all keys if some of
+	// the keys aren't stored, and an in-progess store may be partially visible
+	// to a concurrent FetchKeys(). This is acceptable since the database is
+	// only used as a cache for the keys, so if a FetchKeys() races with a
+	// StoreKeys() and some of the keys are missing they will be just be refetched.
 	StoreKeys(map[PublicKeyRequest]ServerKeys) error
 }
 

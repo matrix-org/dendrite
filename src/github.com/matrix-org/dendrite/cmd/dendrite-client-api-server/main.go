@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -41,6 +42,7 @@ var (
 	serverName           = gomatrixserverlib.ServerName(os.Getenv("SERVER_NAME"))
 	serverKey            = os.Getenv("SERVER_KEY")
 	accountDataSource    = os.Getenv("ACCOUNT_DATABASE")
+	keyDataSource        = os.Getenv("KEY_DATABASE")
 )
 
 func main() {
@@ -79,7 +81,7 @@ func main() {
 
 	roomserverProducer, err := producers.NewRoomserverProducer(cfg.KafkaProducerURIs, cfg.ClientAPIOutputTopic)
 	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.KafkaProducerURIs, err)
+		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.KafkaProducerURIs, err)
 	}
 
 	federation := gomatrixserverlib.NewFederationClient(cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
@@ -87,11 +89,15 @@ func main() {
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
 	accountDB, err := accounts.NewDatabase(accountDataSource, serverName)
 	if err != nil {
-		log.Panicf("Failed to setup account database(%s): %s", accountDataSource, err.Error())
+		log.Panicf("Failed to setup account database(%q): %s", accountDataSource, err.Error())
 	}
 	deviceDB, err := devices.NewDatabase(accountDataSource, serverName)
 	if err != nil {
-		log.Panicf("Failed to setup device database(%s): %s", accountDataSource, err.Error())
+		log.Panicf("Failed to setup device database(%q): %s", accountDataSource, err.Error())
+	}
+	keyDB, err := keydb.NewDatabase(keyDataSource)
+	if err != nil {
+		log.Panicf("Failed to setup key database(%q): %s", keyDataSource, err.Error())
 	}
 
 	keyRing := gomatrixserverlib.KeyRing{
@@ -99,7 +105,7 @@ func main() {
 			// TODO: Use perspective key fetchers for production.
 			&gomatrixserverlib.DirectKeyFetcher{federation.Client},
 		},
-		KeyDatabase: &dummyKeyDatabase{},
+		KeyDatabase: keyDB,
 	}
 
 	routing.Setup(
@@ -107,19 +113,4 @@ func main() {
 		queryAPI, accountDB, deviceDB, federation, keyRing,
 	)
 	log.Fatal(http.ListenAndServe(bindAddr, nil))
-}
-
-// TODO: Implement a proper key database.
-type dummyKeyDatabase struct{}
-
-func (d *dummyKeyDatabase) FetchKeys(
-	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
-) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys, error) {
-	return nil, nil
-}
-
-func (d *dummyKeyDatabase) StoreKeys(
-	map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys,
-) error {
-	return nil
 }
