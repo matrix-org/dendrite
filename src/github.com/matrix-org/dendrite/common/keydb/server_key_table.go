@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS server_keys (
 	-- Combined server name and key ID separated by the ASCII unit separator
 	-- to make it easier to run bulk queries.
 	server_name_and_key_id TEXT NOT NULL,
-	-- When the keys are valid until.
+	-- When the keys are valid until as a millisecond timestamp.
 	valid_until_ts BIGINT NOT NULL,
 	-- The raw JSON for the server key.
 	server_key_json TEXT NOT NULL,

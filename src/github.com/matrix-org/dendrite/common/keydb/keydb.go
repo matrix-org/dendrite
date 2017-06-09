@@ -20,7 +20,7 @@ import (
 )
 
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store
-// the public keys downloaded for other matrix servers.
+// the public keys for other matrix servers.
 type Database struct {
 	statements serverKeyStatements
 }
