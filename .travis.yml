@@ -21,6 +21,7 @@ install:
  - go get github.com/golang/lint/golint
  - go get github.com/fzipp/gocyclo
  - go get github.com/client9/misspell/...
+ - go get github.com/gordonklaus/ineffassign
 
 # Generate a self-signed X.509 certificate for TLS.
 before_script:
