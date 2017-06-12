@@ -163,7 +163,7 @@ choke-point to implement ratelimiting and backoff correctly.
 
  * Reads the current state of the rooms from the logs to track the intersection
    of room membership between users.
- * Reads updates to presence from the logs writen by the FS and the CPS.
+ * Reads updates to presence from the logs written by the FS and the CPS.
  * Reads when clients sync from the logs from the Client Sync.
  * Tracks any timers for users.
  * Writes the changes to presence state to the logs.

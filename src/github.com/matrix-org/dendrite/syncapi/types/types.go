@@ -50,7 +50,7 @@ func NewResponse(pos StreamPosition) *Response {
 	// Make sure we send the next_batch as a string. We don't want to confuse clients by sending this
 	// as an integer even though (at the moment) it is.
 	res.NextBatch = pos.String()
-	// Pre-initalise the maps. Synapse will return {} even if there are no rooms under a specific section,
+	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
 	res.Rooms.Join = make(map[string]JoinResponse)
 	res.Rooms.Invite = make(map[string]InviteResponse)

@@ -104,7 +104,7 @@ func TestImmediateNotification(t *testing.T) {
 func TestNewEventAndJoinedToRoom(t *testing.T) {
 	n := NewNotifier(streamPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
-		roomID: []string{alice, bob},
+		roomID: {alice, bob},
 	})
 
 	var wg sync.WaitGroup
@@ -132,7 +132,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 func TestNewInviteEventForUser(t *testing.T) {
 	n := NewNotifier(streamPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
-		roomID: []string{alice, bob},
+		roomID: {alice, bob},
 	})
 
 	var wg sync.WaitGroup
@@ -160,7 +160,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 func TestMultipleRequestWakeup(t *testing.T) {
 	n := NewNotifier(streamPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
-		roomID: []string{alice, bob},
+		roomID: {alice, bob},
 	})
 
 	var wg sync.WaitGroup
@@ -198,7 +198,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	// Make sure alice gets woken up only and not bob as well.
 	n := NewNotifier(streamPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
-		roomID: []string{alice, bob},
+		roomID: {alice, bob},
 	})
 
 	var leaveWG sync.WaitGroup
