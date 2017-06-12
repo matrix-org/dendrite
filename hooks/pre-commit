@@ -3,7 +3,21 @@
 set -eu
 
 golint src/...
-go fmt ./src/...
+misspell -error src *.md
+
+# gofmt doesn't exit with an error code if the files don't match the expected
+# format. So we have to run it and see if it outputs anything.
+if gofmt -l -s ./src/ 2>&1 | read
+then
+    echo "Error: not all code had been formatted with gofmt."
+    echo "Fixing the following files"
+    gofmt -s -w -l ./src/
+    echo
+    echo "Please add them to the commit"
+    git status --short
+    exit 1
+fi
+
 go tool vet --all --shadow ./src
 gocyclo -over 12 src/
 gb test

@@ -26,7 +26,7 @@ const (
 // Registration parameters vary depending on the request, and will need to remembered across
 // sessions. If no parameters are supplied, the server should use the parameters previously
 // remembered. If ANY parameters are supplied, the server should REPLACE all knowledge of
-// previous paramters with the ones supplied. This mean you cannot "build up" request params.
+// previous parameters with the ones supplied. This mean you cannot "build up" request params.
 type registerRequest struct {
 	// registration parameters.
 	Password string `json:"password"`

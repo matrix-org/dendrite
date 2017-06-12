@@ -184,7 +184,7 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 	//      or /state.
 	// Synapse will attempt to do 1 and if that fails or if the gap is
 	// too large then it will attempt 2.
-	// Synapse will use /state_ids if possible since ususally the state
+	// Synapse will use /state_ids if possible since usually the state
 	// is largely unchanged and it is more efficient to fetch a list of
 	// event ids and then use /event to fetch the individual events.
 	// However not all version of synapse support /state_ids so you may

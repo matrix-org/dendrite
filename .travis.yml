@@ -20,6 +20,7 @@ install:
  - go get github.com/constabulary/gb/...
  - go get github.com/golang/lint/golint
  - go get github.com/fzipp/gocyclo
+ - go get github.com/client9/misspell/...
 
 # Generate a self-signed X.509 certificate for TLS.
 before_script:

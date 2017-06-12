@@ -43,7 +43,7 @@ func localKeys(cfg config.FederationAPI, validUntil time.Time) (*gomatrixserverl
 	publicKey := cfg.PrivateKey.Public().(ed25519.PublicKey)
 
 	keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
-		cfg.KeyID: gomatrixserverlib.VerifyKey{
+		cfg.KeyID: {
 			gomatrixserverlib.Base64String(publicKey),
 		},
 	}
