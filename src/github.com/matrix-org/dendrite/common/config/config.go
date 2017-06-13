@@ -17,13 +17,11 @@ package config
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v2"
-	"io"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -32,7 +30,7 @@ import (
 
 // Version is the current version of the config format.
 // This will change whenever we make breaking changes to the config format.
-const Version = "0"
+const Version = "v0"
 
 // Dendrite contains all the config used by a dendrite process.
 type Dendrite struct {
@@ -104,11 +102,11 @@ type Dendrite struct {
 
 	// Postgres Config
 	Database struct {
-		Media      DataSource `yaml:"media"`
-		Account    DataSource `yaml:"account"`
-		ServerKeys DataSource `yaml:"server_keys"`
-		Sync       DataSource `yaml:"sync"`
-		Roomserver DataSource `yaml:"roomserver"`
+		MediaServer DataSource `yaml:"media_server"`
+		Account     DataSource `yaml:"account"`
+		ServerKeys  DataSource `yaml:"server_keys"`
+		SyncServer  DataSource `yaml:"sync_server"`
+		RoomServer  DataSource `yaml:"room_server"`
 	} `yaml:"database"`
 
 	// The internal addresses the components will listen on.
@@ -118,7 +116,7 @@ type Dendrite struct {
 		ClientAPI     Address `yaml:"client_api"`
 		FederationAPI Address `yaml:"federation_api"`
 		SyncAPI       Address `yaml:"sync_api"`
-		Roomserver    Address `yaml:"roomserver"`
+		RoomServer    Address `yaml:"room_server"`
 	} `yaml:"listen"`
 }
 
@@ -189,18 +187,19 @@ func loadConfig(
 		return nil, err
 	}
 
-	if config.Matrix.KeyID, config.Matrix.PrivateKey, err = readKey(string(privateKeyData)); err != nil {
+	if config.Matrix.KeyID, config.Matrix.PrivateKey, err = readKeyPEM(privateKeyPath, privateKeyData); err != nil {
 		return nil, err
 	}
 
 	for _, certPath := range config.Matrix.FederationCertificatePaths {
-		pemData, err := readFile(absPath(configDirPath, certPath))
+		absCertPath := absPath(configDirPath, certPath)
+		pemData, err := readFile(absCertPath)
 		if err != nil {
 			return nil, err
 		}
 		fingerprint := fingerprintPEM(pemData)
 		if fingerprint == nil {
-			return nil, fmt.Errorf("no certificate PEM data in %q", certPath)
+			return nil, fmt.Errorf("no certificate PEM data in %q", absCertPath)
 		}
 		config.Matrix.TLSFingerPrints = append(config.Matrix.TLSFingerPrints, *fingerprint)
 	}
@@ -261,16 +260,16 @@ func (config *Dendrite) check() error {
 	checkNotEmpty("media.base_path", string(config.Media.BasePath))
 	checkNotEmpty("kafka.topics.input_room_event", string(config.Kafka.Topics.InputRoomEvent))
 	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.InputRoomEvent))
-	checkNotEmpty("database.media", string(config.Database.Media))
+	checkNotEmpty("database.media_server", string(config.Database.MediaServer))
 	checkNotEmpty("database.account", string(config.Database.Account))
 	checkNotEmpty("database.server_keys", string(config.Database.ServerKeys))
-	checkNotEmpty("database.sync", string(config.Database.Sync))
-	checkNotEmpty("database.roomserver", string(config.Database.Roomserver))
+	checkNotEmpty("database.sync_server", string(config.Database.SyncServer))
+	checkNotEmpty("database.room_server", string(config.Database.RoomServer))
 	checkNotEmpty("listen.media_api", string(config.Listen.MediaAPI))
 	checkNotEmpty("listen.client_api", string(config.Listen.ClientAPI))
 	checkNotEmpty("listen.federation_api", string(config.Listen.FederationAPI))
 	checkNotEmpty("listen.sync_api", string(config.Listen.SyncAPI))
-	checkNotEmpty("listen.roomserver", string(config.Listen.Roomserver))
+	checkNotEmpty("listen.room_server", string(config.Listen.RoomServer))
 
 	if problems != nil {
 		return Error{problems}
@@ -286,38 +285,28 @@ func absPath(dir string, path Path) string {
 	return filepath.Join(dir, string(path))
 }
 
-func loadPrivateKey(path string) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
-	keyData, err := ioutil.ReadFile(path)
-	if err != nil {
-		return "", nil, err
+func readKeyPEM(path string, data []byte) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
+	for {
+		var keyBlock *pem.Block
+		keyBlock, data = pem.Decode(data)
+		if data == nil {
+			return "", nil, fmt.Errorf("no matrix private key PEM data in %q", path)
+		}
+		if keyBlock.Type == "MATRIX PRIVATE KEY" {
+			keyID := keyBlock.Headers["Key-ID"]
+			if keyID == "" {
+				return "", nil, fmt.Errorf("missing key ID in PEM data in %q", path)
+			}
+			if !strings.HasPrefix(keyID, "ed25519:") {
+				return "", nil, fmt.Errorf("key ID %q doesn't start with \"ed25519:\" in %q", keyID, path)
+			}
+			_, privKey, err := ed25519.GenerateKey(bytes.NewReader(keyBlock.Bytes))
+			if err != nil {
+				return "", nil, err
+			}
+			return gomatrixserverlib.KeyID(keyID), privKey, nil
+		}
 	}
-	return readKey(string(keyData))
-}
-
-// readKey reads a server's private ed25519 key.
-// Otherwise the key is the key ID and the base64 encoded private key
-// separated by a single space character.
-// E.g "ed25519:abcd ABCDEFGHIJKLMNOPabcdefghijklmnop01234567890"
-func readKey(key string) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
-	var keyID gomatrixserverlib.KeyID
-	var seed io.Reader
-	// TODO: We should be reading this from a PEM formatted file instead of
-	// our own custom format.
-	parts := strings.SplitN(strings.TrimRight(key, "\n"), " ", 2)
-	keyID = gomatrixserverlib.KeyID(parts[0])
-	if len(parts) != 2 {
-		return "", nil, fmt.Errorf("Invalid server key: %q", key)
-	}
-	seedBytes, err := base64.RawStdEncoding.DecodeString(parts[1])
-	if err != nil {
-		return "", nil, err
-	}
-	seed = bytes.NewReader(seedBytes)
-	_, privKey, err := ed25519.GenerateKey(seed)
-	if err != nil {
-		return "", nil, err
-	}
-	return keyID, privKey, nil
 }
 
 func fingerprintPEM(data []byte) *gomatrixserverlib.TLSFingerprint {
