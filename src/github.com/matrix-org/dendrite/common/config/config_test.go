@@ -43,11 +43,12 @@ kafka:
   addresses: ["localhost:9092"]
   topics:
     input_room_event: input.room
-  output_room_event: output.room
+    output_room_event: output.room
 database:
   media_server: "postgresql:///media_server"
   account: "postgresql:///account"
-  server_keys: "postgresql:///server_keys"
+  device: "postgresql:///device"
+  server_key: "postgresql:///server_keys"
   sync_server: "postgresql:///sync_server"
   room_server: "postgresql:///room_server"
 listen:

@@ -20,8 +20,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/syncapi/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -38,14 +38,15 @@ type OutputRoomEvent struct {
 }
 
 // NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
-func NewOutputRoomEvent(cfg *config.Sync, n *sync.Notifier, store *storage.SyncServerDatabase) (*OutputRoomEvent, error) {
-	kafkaConsumer, err := sarama.NewConsumer(cfg.KafkaConsumerURIs, nil)
+func NewOutputRoomEvent(cfg *config.Dendrite, n *sync.Notifier, store *storage.SyncServerDatabase) (*OutputRoomEvent, error) {
+	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
 	if err != nil {
 		return nil, err
 	}
+	roomserverURL := "http://" + string(cfg.Listen.RoomServer)
 
 	consumer := common.ContinualConsumer{
-		Topic:          cfg.RoomserverOutputTopic,
+		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
@@ -53,7 +54,7 @@ func NewOutputRoomEvent(cfg *config.Sync, n *sync.Notifier, store *storage.SyncS
 		roomServerConsumer: &consumer,
 		db:                 store,
 		notifier:           n,
-		query:              api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil),
+		query:              api.NewRoomserverQueryAPIHTTP(roomserverURL, nil),
 	}
 	consumer.ProcessMessage = s.onMessage
 

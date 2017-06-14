@@ -90,13 +90,13 @@ type Dendrite struct {
 	// The configuration for talking to kafka.
 	Kafka struct {
 		// A list of kafka addresses to connect to.
-		Addresses []Address `yaml:"addresses"`
+		Addresses []string `yaml:"addresses"`
 		// The names of the topics to use when reading and writing from kafka.
 		Topics struct {
 			// Topic for roomserver/api.InputRoomEvent events.
 			InputRoomEvent Topic `yaml:"input_room_event"`
 			// Topic for roomserver/api.OutputRoomEvent events.
-			OuputRoomEvent Topic `yaml:"output_room_event"`
+			OutputRoomEvent Topic `yaml:"output_room_event"`
 		}
 	} `yaml:"kafka"`
 
@@ -104,7 +104,8 @@ type Dendrite struct {
 	Database struct {
 		MediaServer DataSource `yaml:"media_server"`
 		Account     DataSource `yaml:"account"`
-		ServerKeys  DataSource `yaml:"server_keys"`
+		Device      DataSource `yaml:"device"`
+		ServerKey   DataSource `yaml:"server_key"`
 		SyncServer  DataSource `yaml:"sync_server"`
 		RoomServer  DataSource `yaml:"room_server"`
 	} `yaml:"database"`
@@ -258,11 +259,13 @@ func (config *Dendrite) check() error {
 	checkNotEmpty("matrix.private_key", string(config.Matrix.PrivateKeyPath))
 	checkNotZero("matrix.federation_certificates", len(config.Matrix.FederationCertificatePaths))
 	checkNotEmpty("media.base_path", string(config.Media.BasePath))
+	checkNotZero("kafka.addresses", len(config.Kafka.Addresses))
 	checkNotEmpty("kafka.topics.input_room_event", string(config.Kafka.Topics.InputRoomEvent))
-	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.InputRoomEvent))
+	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
 	checkNotEmpty("database.media_server", string(config.Database.MediaServer))
 	checkNotEmpty("database.account", string(config.Database.Account))
-	checkNotEmpty("database.server_keys", string(config.Database.ServerKeys))
+	checkNotEmpty("database.device", string(config.Database.Device))
+	checkNotEmpty("database.server_key", string(config.Database.ServerKey))
 	checkNotEmpty("database.sync_server", string(config.Database.SyncServer))
 	checkNotEmpty("database.room_server", string(config.Database.RoomServer))
 	checkNotEmpty("listen.media_api", string(config.Listen.MediaAPI))
