@@ -178,6 +178,8 @@ func loadConfig(
 		return nil, err
 	}
 
+	config.setDefaults()
+
 	if err = config.check(); err != nil {
 		return nil, err
 	}
@@ -249,17 +251,31 @@ func (config *Dendrite) check() error {
 		}
 	}
 
-	checkNotZero := func(key string, value int) {
+	checkNotZero := func(key string, value int64) {
 		if value == 0 {
 			problems = append(problems, fmt.Sprintf("missing config key %q", key))
 		}
 	}
 
+	checkPositive := func(key string, value int64) {
+		if value < 0 {
+			problems = append(problems, fmt.Sprintf("invalid value for config key %q: %d", key, value))
+		}
+	}
+
 	checkNotEmpty("matrix.server_name", string(config.Matrix.ServerName))
 	checkNotEmpty("matrix.private_key", string(config.Matrix.PrivateKeyPath))
-	checkNotZero("matrix.federation_certificates", len(config.Matrix.FederationCertificatePaths))
+	checkNotZero("matrix.federation_certificates", int64(len(config.Matrix.FederationCertificatePaths)))
+
 	checkNotEmpty("media.base_path", string(config.Media.BasePath))
-	checkNotZero("kafka.addresses", len(config.Kafka.Addresses))
+	checkPositive("media.max_file_size_bytes", int64(*config.Media.MaxFileSizeBytes))
+	checkPositive("media.max_thumbnail_generators", int64(config.Media.MaxThumbnailGenerators))
+	for i, size := range config.Media.ThumbnailSizes {
+		checkPositive(fmt.Sprintf("media.thumbnail_sizes[%d].width", i), int64(size.Width))
+		checkPositive(fmt.Sprintf("media.thumbnail_sizes[%d].height", i), int64(size.Height))
+	}
+
+	checkNotZero("kafka.addresses", int64(len(config.Kafka.Addresses)))
 	checkNotEmpty("kafka.topics.input_room_event", string(config.Kafka.Topics.InputRoomEvent))
 	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
 	checkNotEmpty("database.media_server", string(config.Database.MediaServer))
