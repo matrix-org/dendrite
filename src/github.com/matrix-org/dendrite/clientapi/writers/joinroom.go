@@ -17,10 +17,10 @@ package writers
 import (
 	"fmt"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -36,7 +36,7 @@ func JoinRoomByIDOrAlias(
 	req *http.Request,
 	device *authtypes.Device,
 	roomIDOrAlias string,
-	cfg config.ClientAPI,
+	cfg config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
 	queryAPI api.RoomserverQueryAPI,
@@ -67,7 +67,7 @@ type joinRoomReq struct {
 	req        *http.Request
 	content    map[string]interface{}
 	userID     string
-	cfg        config.ClientAPI
+	cfg        config.Dendrite
 	federation *gomatrixserverlib.FederationClient
 	producer   *producers.RoomserverProducer
 	queryAPI   api.RoomserverQueryAPI
@@ -95,7 +95,7 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
-	if domain == r.cfg.ServerName {
+	if domain == r.cfg.Matrix.ServerName {
 		// TODO: Implement joining local room aliases.
 		panic(fmt.Errorf("Joining local room aliases is not implemented"))
 	} else {
@@ -212,9 +212,9 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	r.writeToBuilder(&respMakeJoin.JoinEvent, roomID)
 
 	now := time.Now()
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.ServerName)
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
 	event, err := respMakeJoin.JoinEvent.Build(
-		eventID, now, r.cfg.ServerName, r.cfg.KeyID, r.cfg.PrivateKey,
+		eventID, now, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
 	)
 	if err != nil {
 		res := httputil.LogThenError(r.req, err)

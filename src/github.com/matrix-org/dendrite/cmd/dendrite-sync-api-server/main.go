@@ -32,7 +32,6 @@ import (
 )
 
 var configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
-var bindAddr = flag.String("listen", ":4200", "The port to listen on.")
 
 func main() {
 	common.SetupLogging(os.Getenv("LOG_DIR"))
@@ -47,11 +46,7 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	if *bindAddr == "" {
-		log.Fatal("--listen must be supplied")
-	}
-
-	log.Info("sync server config: ", cfg)
+	log.Info("config: ", cfg)
 
 	db, err := storage.NewSyncServerDatabase(string(cfg.Database.SyncServer))
 	if err != nil {
@@ -80,7 +75,7 @@ func main() {
 		log.Panicf("startup: failed to start room server consumer")
 	}
 
-	log.Info("Starting sync server on ", *bindAddr)
+	log.Info("Starting sync server on ", cfg.Listen.SyncAPI)
 	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, sync.NewRequestPool(db, n), deviceDB)
-	log.Fatal(http.ListenAndServe(*bindAddr, nil))
+	log.Fatal(http.ListenAndServe(string(cfg.Listen.SyncAPI), nil))
 }

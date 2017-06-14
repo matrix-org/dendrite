@@ -21,9 +21,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -56,7 +56,10 @@ func passwordLogin() loginFlows {
 }
 
 // Login implements GET and POST /login
-func Login(req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database, cfg config.ClientAPI) util.JSONResponse {
+func Login(
+	req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database,
+	cfg config.Dendrite,
+) util.JSONResponse {
 	if req.Method == "GET" { // TODO: support other forms of login other than password, depending on config options
 		return util.JSONResponse{
 			Code: 200,
@@ -109,7 +112,7 @@ func Login(req *http.Request, accountDB *accounts.Database, deviceDB *devices.Da
 			JSON: loginResponse{
 				UserID:      dev.UserID,
 				AccessToken: dev.AccessToken,
-				HomeServer:  cfg.ServerName,
+				HomeServer:  cfg.Matrix.ServerName,
 			},
 		}
 	}

@@ -15,16 +15,16 @@
 package main
 
 import (
+	"flag"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
@@ -34,70 +34,45 @@ import (
 )
 
 var (
-	kafkaURIs            = strings.Split(os.Getenv("KAFKA_URIS"), ",")
-	bindAddr             = os.Getenv("BIND_ADDRESS")
-	logDir               = os.Getenv("LOG_DIR")
-	roomserverURL        = os.Getenv("ROOMSERVER_URL")
-	clientAPIOutputTopic = os.Getenv("CLIENTAPI_OUTPUT_TOPIC")
-	serverName           = gomatrixserverlib.ServerName(os.Getenv("SERVER_NAME"))
-	serverKey            = os.Getenv("SERVER_KEY")
-	accountDataSource    = os.Getenv("ACCOUNT_DATABASE")
-	keyDataSource        = os.Getenv("KEY_DATABASE")
+	logDir     = os.Getenv("LOG_DIR")
+	configPath = flag.String("config", "dendrite.yaml", "The path to the config file, For more information see the config file in this repository")
 )
 
 func main() {
 	common.SetupLogging(logDir)
-	if bindAddr == "" {
-		log.Panic("No BIND_ADDRESS environment variable found.")
-	}
-	if len(kafkaURIs) == 0 {
-		// the kafka default is :9092
-		kafkaURIs = []string{"localhost:9092"}
-	}
-	if roomserverURL == "" {
-		log.Panic("No ROOMSERVER_URL environment variable found.")
-	}
-	if clientAPIOutputTopic == "" {
-		log.Panic("No CLIENTAPI_OUTPUT_TOPIC environment variable found. This should match the roomserver input topic.")
-	}
-	if serverName == "" {
-		serverName = "localhost"
-	}
 
-	cfg := config.ClientAPI{
-		ServerName:           serverName,
-		KafkaProducerURIs:    kafkaURIs,
-		ClientAPIOutputTopic: clientAPIOutputTopic,
-		RoomserverURL:        roomserverURL,
-	}
+	flag.Parse()
 
-	var err error
-	cfg.KeyID, cfg.PrivateKey, err = common.ReadKey(serverKey)
+	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Panicf("Failed to load private key: %s", err)
+		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	log.Info("Starting clientapi")
+	log.Info("config: ", cfg)
 
-	roomserverProducer, err := producers.NewRoomserverProducer(cfg.KafkaProducerURIs, cfg.ClientAPIOutputTopic)
+	roomserverProducer, err := producers.NewRoomserverProducer(
+		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.InputRoomEvent),
+	)
 	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.KafkaProducerURIs, err)
+		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.Kafka.Addresses, err)
 	}
 
-	federation := gomatrixserverlib.NewFederationClient(cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
+	federation := gomatrixserverlib.NewFederationClient(
+		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+	)
 
-	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomserverURL, nil)
-	accountDB, err := accounts.NewDatabase(accountDataSource, serverName)
+	queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), nil)
+	accountDB, err := accounts.NewDatabase(string(cfg.Database.Account), cfg.Matrix.ServerName)
 	if err != nil {
-		log.Panicf("Failed to setup account database(%q): %s", accountDataSource, err.Error())
+		log.Panicf("Failed to setup account database(%q): %s", cfg.Database.Account, err.Error())
 	}
-	deviceDB, err := devices.NewDatabase(accountDataSource, serverName)
+	deviceDB, err := devices.NewDatabase(string(cfg.Database.Device), cfg.Matrix.ServerName)
 	if err != nil {
-		log.Panicf("Failed to setup device database(%q): %s", accountDataSource, err.Error())
+		log.Panicf("Failed to setup device database(%q): %s", cfg.Database.Device, err.Error())
 	}
-	keyDB, err := keydb.NewDatabase(keyDataSource)
+	keyDB, err := keydb.NewDatabase(string(cfg.Database.ServerKey))
 	if err != nil {
-		log.Panicf("Failed to setup key database(%q): %s", keyDataSource, err.Error())
+		log.Panicf("Failed to setup key database(%q): %s", cfg.Database.ServerKey, err.Error())
 	}
 
 	keyRing := gomatrixserverlib.KeyRing{
@@ -108,9 +83,10 @@ func main() {
 		KeyDatabase: keyDB,
 	}
 
+	log.Info("Starting client API server on ", cfg.Listen.ClientAPI)
 	routing.Setup(
-		http.DefaultServeMux, http.DefaultClient, cfg, roomserverProducer,
+		http.DefaultServeMux, http.DefaultClient, *cfg, roomserverProducer,
 		queryAPI, accountDB, deviceDB, federation, keyRing,
 	)
-	log.Fatal(http.ListenAndServe(bindAddr, nil))
+	log.Fatal(http.ListenAndServe(string(cfg.Listen.ClientAPI), nil))
 }

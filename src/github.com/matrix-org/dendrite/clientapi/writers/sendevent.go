@@ -21,10 +21,10 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -39,7 +39,14 @@ type sendEventResponse struct {
 // SendEvent implements:
 //   /rooms/{roomID}/send/{eventType}/{txnID}
 //   /rooms/{roomID}/state/{eventType}/{stateKey}
-func SendEvent(req *http.Request, device *authtypes.Device, roomID, eventType, txnID string, stateKey *string, cfg config.ClientAPI, queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer) util.JSONResponse {
+func SendEvent(
+	req *http.Request,
+	device *authtypes.Device,
+	roomID, eventType, txnID string, stateKey *string,
+	cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+	producer *producers.RoomserverProducer,
+) util.JSONResponse {
 	// parse the incoming http request
 	userID := device.UserID
 	var r map[string]interface{} // must be a JSON object
@@ -86,8 +93,10 @@ func SendEvent(req *http.Request, device *authtypes.Device, roomID, eventType, t
 		refs = append(refs, e.EventReference())
 	}
 	builder.AuthEvents = refs
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.ServerName)
-	e, err := builder.Build(eventID, time.Now(), cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	e, err := builder.Build(
+		eventID, time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+	)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
