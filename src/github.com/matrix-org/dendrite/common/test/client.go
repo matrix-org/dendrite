@@ -136,12 +136,8 @@ func (r *Request) Run(label string, timeout time.Duration, serverCmdChan chan er
 	// - the server to exit with an error (error sent on serverCmdChan)
 	// - our test timeout to expire
 	// We don't need to clean up since the main() function handles that in the event we panic
-	var testPassed bool
 	select {
 	case <-time.After(timeout):
-		if testPassed {
-			break
-		}
 		fmt.Printf("==TESTING== %v TIMEOUT\n", label)
 		if reqErr := r.LastErr.Get(); reqErr != nil {
 			fmt.Println("Last /sync request error:")
@@ -157,7 +153,6 @@ func (r *Request) Run(label string, timeout time.Duration, serverCmdChan chan er
 			panic(err)
 		}
 	case <-done:
-		testPassed = true
 		fmt.Printf("==TESTING== %v PASSED\n", label)
 	}
 }

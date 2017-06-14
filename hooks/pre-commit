@@ -18,6 +18,7 @@ then
     exit 1
 fi
 
+ineffassign ./src/
 go tool vet --all --shadow ./src
 gocyclo -over 12 src/
 gb test
