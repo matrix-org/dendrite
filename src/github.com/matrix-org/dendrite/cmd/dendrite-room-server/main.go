@@ -41,6 +41,8 @@ var (
 func main() {
 	common.SetupLogging(logDir)
 
+	flag.Parse()
+
 	if *configPath == "" {
 		log.Fatal("--config must be supplied")
 	}

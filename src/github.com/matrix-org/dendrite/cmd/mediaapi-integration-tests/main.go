@@ -22,10 +22,11 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/test"
+	"github.com/matrix-org/gomatrixserverlib"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -41,10 +42,10 @@ var (
 	postgresContainerName = os.Getenv("POSTGRES_CONTAINER")
 	// Test image to be uploaded/downloaded
 	testJPEG = test.Defaulting(os.Getenv("TEST_JPEG_PATH"), "src/github.com/matrix-org/dendrite/cmd/mediaapi-integration-tests/totem.jpg")
+	kafkaURI = test.Defaulting(os.Getenv("KAFKA_URIS"), "localhost:9092")
 )
 
-var thumbnailPregenerationConfig = (`
-thumbnail_sizes:
+var thumbnailSizes = (`
 - width: 32
   height: 32
   method: crop
@@ -68,65 +69,51 @@ var testDatabaseTemplate = "dbname=%s sslmode=disable binary_parameters=yes"
 
 var timeout time.Duration
 
+var port = 10000
+
 func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error, string, *exec.Cmd, chan error, string, string) {
 	dir, err := ioutil.TempDir("", serverType+"-server-test"+suffix)
 	if err != nil {
 		panic(err)
 	}
 
-	serverAddr := "localhost:177" + suffix + "9"
 	proxyAddr := "localhost:1800" + suffix
 
-	configFilename := serverType + "-server-test-config" + suffix + ".yaml"
-	configFileContents := makeConfig(proxyAddr, suffix, dir, dynamicThumbnails)
+	database := fmt.Sprintf(testDatabaseTemplate, testDatabaseName+suffix)
+	cfg, nextPort, err := test.MakeConfig(dir, kafkaURI, database, "localhost", port)
+	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(proxyAddr)
+	if err != nil {
+		panic(err)
+	}
+	if err = yaml.Unmarshal([]byte(thumbnailSizes), &cfg.Media.ThumbnailSizes); err != nil {
+		panic(err)
+	}
+
+	port = nextPort
+	if err = test.WriteConfig(cfg, dir); err != nil {
+		panic(err)
+	}
 
 	serverArgs := []string{
-		"--config", configFilename,
-		"--listen", serverAddr,
+		"--config", filepath.Join(dir, test.ConfigFile),
 	}
 
 	databases := []string{
 		testDatabaseName + suffix,
 	}
 
-	proxyCmd, proxyCmdChan := test.StartProxy(
-		proxyAddr,
-		"http://localhost:177"+suffix+"6",
-		"http://localhost:177"+suffix+"8",
-		"http://"+serverAddr,
-	)
+	proxyCmd, proxyCmdChan := test.StartProxy(proxyAddr, cfg)
 
 	cmd, cmdChan := test.StartServer(
 		serverType,
 		serverArgs,
-		suffix,
-		configFilename,
-		configFileContents,
 		postgresDatabase,
 		postgresContainerName,
 		databases,
 	)
 
-	fmt.Printf("==TESTSERVER== STARTED %v -> %v : %v\n", proxyAddr, serverAddr, dir)
-	return cmd, cmdChan, serverAddr, proxyCmd, proxyCmdChan, proxyAddr, dir
-}
-
-func makeConfig(serverAddr, suffix, basePath string, dynamicThumbnails bool) string {
-	return fmt.Sprintf(
-		`
-server_name: "%s"
-base_path: %s
-max_file_size_bytes: %s
-database: "%s"
-dynamic_thumbnails: %s
-%s`,
-		serverAddr,
-		basePath,
-		"10485760",
-		fmt.Sprintf(testDatabaseTemplate, testDatabaseName+suffix),
-		strconv.FormatBool(dynamicThumbnails),
-		thumbnailPregenerationConfig,
-	)
+	fmt.Printf("==TESTSERVER== STARTED %v -> %v : %v\n", proxyAddr, cfg.Listen.MediaAPI, dir)
+	return cmd, cmdChan, string(cfg.Listen.MediaAPI), proxyCmd, proxyCmdChan, proxyAddr, dir
 }
 
 func cleanUpServer(cmd *exec.Cmd, dir string) {

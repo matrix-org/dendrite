@@ -16,6 +16,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,8 +35,6 @@ var (
 	zookeeperURI = defaulting(os.Getenv("ZOOKEEPER_URI"), "localhost:2181")
 	// The URI the kafka server is listening on.
 	kafkaURI = defaulting(os.Getenv("KAFKA_URIS"), "localhost:9092")
-	// The address the roomserver should listen on.
-	roomserverAddr = defaulting(os.Getenv("ROOMSERVER_URI"), "localhost:9876")
 	// How long to wait for the roomserver to write the expected output messages.
 	// This needs to be high enough to account for the time it takes to create
 	// the postgres database tables which can take a while on travis.
@@ -164,10 +163,22 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int, checkQueryAP
 // a api.RoomserverQueryAPI client. The caller can use this function to check the
 // behaviour of the query API.
 func testRoomserver(input []string, wantOutput []string, checkQueries func(api.RoomserverQueryAPI)) {
-	const (
-		inputTopic  = "roomserverInput"
-		outputTopic = "roomserverOutput"
-	)
+	dir, err := ioutil.TempDir("", "room-server-test")
+	if err != nil {
+		panic(err)
+	}
+
+	cfg, _, err := test.MakeConfig(dir, kafkaURI, testDatabase, "localhost", 10000)
+	if err != nil {
+		panic(err)
+	}
+	if err := test.WriteConfig(cfg, dir); err != nil {
+		panic(err)
+	}
+
+	inputTopic := string(cfg.Kafka.Topics.InputRoomEvent)
+	outputTopic := string(cfg.Kafka.Topics.OutputRoomEvent)
+
 	exe.DeleteTopic(inputTopic)
 	if err := exe.CreateTopic(inputTopic); err != nil {
 		panic(err)
@@ -181,7 +192,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		panic(err)
 	}
 
-	if err := createDatabase(testDatabaseName); err != nil {
+	if err = createDatabase(testDatabaseName); err != nil {
 		panic(err)
 	}
 
@@ -191,18 +202,11 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	// We append to the environment rather than replacing so that any additional
 	// postgres and golang environment variables such as PGHOST are passed to
 	// the roomserver process.
-	cmd.Env = append(
-		os.Environ(),
-		fmt.Sprintf("DATABASE=%s", testDatabase),
-		fmt.Sprintf("KAFKA_URIS=%s", kafkaURI),
-		fmt.Sprintf("TOPIC_INPUT_ROOM_EVENT=%s", inputTopic),
-		fmt.Sprintf("TOPIC_OUTPUT_ROOM_EVENT=%s", outputTopic),
-		fmt.Sprintf("BIND_ADDRESS=%s", roomserverAddr),
-	)
 	cmd.Stderr = os.Stderr
+	cmd.Args = []string{"dendrite-room-server", "--config", filepath.Join(dir, test.ConfigFile)}
 
 	gotOutput, err := runAndReadFromTopic(cmd, outputTopic, len(wantOutput), func() {
-		queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+roomserverAddr, nil)
+		queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), nil)
 		checkQueries(queryAPI)
 	})
 	if err != nil {
