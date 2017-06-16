@@ -36,6 +36,11 @@ const Version = "v0"
 // Relative paths are resolved relative to the current working directory
 type Dendrite struct {
 	// The version of the configuration file.
+	// If the version in a file doesn't match the current dendrite config
+	// version then we can give a clear error message telling the user
+	// to update their config file to the current version.
+	// The version of the file should only be different if there has
+	// been a breaking change to the config file format.
 	Version string `yaml:"version"`
 
 	// The configuration required for a matrix server.
