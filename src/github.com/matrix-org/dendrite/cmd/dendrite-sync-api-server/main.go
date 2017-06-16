@@ -48,9 +48,9 @@ func main() {
 
 	log.Info("config: ", cfg)
 
-	db, err := storage.NewSyncServerDatabase(string(cfg.Database.SyncServer))
+	db, err := storage.NewSyncServerDatabase(string(cfg.Database.SyncAPI))
 	if err != nil {
-		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.Database.SyncServer, err)
+		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.Database.SyncAPI, err)
 	}
 
 	deviceDB, err := devices.NewDatabase(string(cfg.Database.Device), cfg.Matrix.ServerName)

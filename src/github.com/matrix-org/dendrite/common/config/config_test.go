@@ -45,11 +45,11 @@ kafka:
     input_room_event: input.room
     output_room_event: output.room
 database:
-  media_server: "postgresql:///media_server"
+  media_api: "postgresql:///media_api"
   account: "postgresql:///account"
   device: "postgresql:///device"
   server_key: "postgresql:///server_keys"
-  sync_server: "postgresql:///sync_server"
+  sync_api: "postgresql:///syn_api"
   room_server: "postgresql:///room_server"
 listen:
   room_server: "localhost:7770"
@@ -74,15 +74,17 @@ func TestReadKey(t *testing.T) {
 	if err != nil {
 		t.Error("failed to load private key:", err)
 	}
-	wantKeyID := "ed25519:c8NsuQ"
+	wantKeyID := testKeyID
 	if wantKeyID != string(keyID) {
 		t.Errorf("wanted key ID to be %q, got %q", wantKeyID, keyID)
 	}
 }
 
+const testKeyID = "ed25519:c8NsuQ"
+
 const testKey = `
 -----BEGIN MATRIX PRIVATE KEY-----
-Key-ID: ed25519:c8NsuQ
+Key-ID: ` + testKeyID + `
 7KRZiZ2sTyRR8uqqUjRwczuwRXXkUMYIUHq4Mc3t4bE=
 -----END MATRIX PRIVATE KEY-----
 `

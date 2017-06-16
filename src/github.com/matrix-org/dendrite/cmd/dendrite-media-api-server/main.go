@@ -45,7 +45,7 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	db, err := storage.Open(string(cfg.Database.MediaServer))
+	db, err := storage.Open(string(cfg.Database.MediaAPI))
 	if err != nil {
 		log.WithError(err).Panic("Failed to open database")
 	}

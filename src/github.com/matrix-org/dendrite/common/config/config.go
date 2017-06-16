@@ -33,8 +33,14 @@ import (
 const Version = "v0"
 
 // Dendrite contains all the config used by a dendrite process.
+// Relative paths are resolved relative to the current working directory
 type Dendrite struct {
 	// The version of the configuration file.
+	// If the version in a file doesn't match the current dendrite config
+	// version then we can give a clear error message telling the user
+	// to update their config file to the current version.
+	// The version of the file should only be different if there has
+	// been a breaking change to the config file format.
 	Version string `yaml:"version"`
 
 	// The configuration required for a matrix server.
@@ -42,22 +48,18 @@ type Dendrite struct {
 		// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
 		ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 		// Path to the private key which will be used to sign requests and events.
-		// The path may be relative or absolute.
-		// Relative paths are resolved relative to the directory containing the config file.
 		PrivateKeyPath Path `yaml:"private_key"`
-		// List of paths to X509 certificates used by the external federation listeners.
-		// These are used to calculate the TLS fingerprints to publish for this server.
-		// Other matrix servers talking to this server will expect the x509 certificate
-		// to match one of these certificates.
-		// The certificates should be in PEM format.
-		// The path may be relative or absolute.
-		// Relative paths are resolved relative to the directory containing the config file.
-		FederationCertificatePaths []Path `yaml:"federation_certificates"`
 		// The private key which will be used to sign requests and events.
 		PrivateKey ed25519.PrivateKey `yaml:"-"`
 		// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
 		// prefix "ed25519:".
 		KeyID gomatrixserverlib.KeyID `yaml:"-"`
+		// List of paths to X509 certificates used by the external federation listeners.
+		// These are used to calculate the TLS fingerprints to publish for this server.
+		// Other matrix servers talking to this server will expect the x509 certificate
+		// to match one of these certificates.
+		// The certificates should be in PEM format.
+		FederationCertificatePaths []Path `yaml:"federation_certificates"`
 		// A list of SHA256 TLS fingerprints for the X509 certificates used by the
 		// federation listener for this server.
 		TLSFingerPrints []gomatrixserverlib.TLSFingerprint `yaml:"-"`
@@ -65,13 +67,13 @@ type Dendrite struct {
 		// Increasing this number will reduce the number of requests made by remote servers
 		// for our key, but increases the period a compromised key will be considered valid
 		// by remote servers.
+		// Defaults to 24 hours.
 		KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.
 	Media struct {
 		// The base path to where the media files will be stored. May be relative or absolute.
-		// Relative paths are resolved relative to the directory containing the config file.
 		BasePath Path `yaml:"base_path"`
 		// The absolute base path to where media files will be stored.
 		AbsBasePath Path `yaml:"-"`
@@ -102,12 +104,24 @@ type Dendrite struct {
 
 	// Postgres Config
 	Database struct {
-		MediaServer DataSource `yaml:"media_server"`
-		Account     DataSource `yaml:"account"`
-		Device      DataSource `yaml:"device"`
-		ServerKey   DataSource `yaml:"server_key"`
-		SyncServer  DataSource `yaml:"sync_server"`
-		RoomServer  DataSource `yaml:"room_server"`
+		// The Account database stores the login details and account information
+		// for local users. It is accessed by the ClientAPI.
+		Account DataSource `yaml:"account"`
+		// The Device database stores session information for the devices of logged
+		// in local users. It is accessed by the ClientAPI, the MediaAPI and the SyncAPI.
+		Device DataSource `yaml:"device"`
+		// The MediaAPI database stores information about files uploaded and downloaded
+		// by local users. It is only accessed by the MediaAPI.
+		MediaAPI DataSource `yaml:"media_api"`
+		// The ServerKey database caches the public keys of remote servers.
+		// It may be accessed by the FederationAPI, the ClientAPI, and the MediaAPI.
+		ServerKey DataSource `yaml:"server_key"`
+		// The SyncAPI stores information used by the SyncAPI server.
+		// It is only accessed by the SyncAPI server.
+		SyncAPI DataSource `yaml:"sync_api"`
+		// The RoomServer database stores information about matrix rooms.
+		// It is only accessed by the RoomServer.
+		RoomServer DataSource `yaml:"room_server"`
 	} `yaml:"database"`
 
 	// The internal addresses the components will listen on.
@@ -154,11 +168,13 @@ func Load(configPath string) (*Dendrite, error) {
 	if err != nil {
 		return nil, err
 	}
-	configDirPath, err := filepath.Abs(filepath.Dir(configPath))
+	basePath, err := filepath.Abs(".")
 	if err != nil {
 		return nil, err
 	}
-	return loadConfig(configDirPath, configData, ioutil.ReadFile)
+	// Pass the current working directory and ioutil.ReadFile so that they can
+	// be mocked in the tests
+	return loadConfig(basePath, configData, ioutil.ReadFile)
 }
 
 // An Error indicates a problem parsing the config.
@@ -168,7 +184,7 @@ type Error struct {
 }
 
 func loadConfig(
-	configDirPath string,
+	basePath string,
 	configData []byte,
 	readFile func(string) ([]byte, error),
 ) (*Dendrite, error) {
@@ -184,7 +200,7 @@ func loadConfig(
 		return nil, err
 	}
 
-	privateKeyPath := absPath(configDirPath, config.Matrix.PrivateKeyPath)
+	privateKeyPath := absPath(basePath, config.Matrix.PrivateKeyPath)
 	privateKeyData, err := readFile(privateKeyPath)
 	if err != nil {
 		return nil, err
@@ -195,7 +211,7 @@ func loadConfig(
 	}
 
 	for _, certPath := range config.Matrix.FederationCertificatePaths {
-		absCertPath := absPath(configDirPath, certPath)
+		absCertPath := absPath(basePath, certPath)
 		pemData, err := readFile(absCertPath)
 		if err != nil {
 			return nil, err
@@ -207,7 +223,7 @@ func loadConfig(
 		config.Matrix.TLSFingerPrints = append(config.Matrix.TLSFingerPrints, *fingerprint)
 	}
 
-	config.Media.AbsBasePath = Path(absPath(configDirPath, config.Media.BasePath))
+	config.Media.AbsBasePath = Path(absPath(basePath, config.Media.BasePath))
 
 	return &config, nil
 }
@@ -278,11 +294,11 @@ func (config *Dendrite) check() error {
 	checkNotZero("kafka.addresses", int64(len(config.Kafka.Addresses)))
 	checkNotEmpty("kafka.topics.input_room_event", string(config.Kafka.Topics.InputRoomEvent))
 	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
-	checkNotEmpty("database.media_server", string(config.Database.MediaServer))
 	checkNotEmpty("database.account", string(config.Database.Account))
 	checkNotEmpty("database.device", string(config.Database.Device))
 	checkNotEmpty("database.server_key", string(config.Database.ServerKey))
-	checkNotEmpty("database.sync_server", string(config.Database.SyncServer))
+	checkNotEmpty("database.media_api", string(config.Database.MediaAPI))
+	checkNotEmpty("database.sync_api", string(config.Database.SyncAPI))
 	checkNotEmpty("database.room_server", string(config.Database.RoomServer))
 	checkNotEmpty("listen.media_api", string(config.Listen.MediaAPI))
 	checkNotEmpty("listen.client_api", string(config.Listen.ClientAPI))
@@ -299,6 +315,7 @@ func (config *Dendrite) check() error {
 
 func absPath(dir string, path Path) string {
 	if filepath.IsAbs(string(path)) {
+		// filepath.Join cleans the path so we should clean the absolute paths as well for consistency.
 		return filepath.Clean(string(path))
 	}
 	return filepath.Join(dir, string(path))
