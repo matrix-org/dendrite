@@ -33,6 +33,7 @@ import (
 const Version = "v0"
 
 // Dendrite contains all the config used by a dendrite process.
+// Relative paths are resolved relative to the current working directory
 type Dendrite struct {
 	// The version of the configuration file.
 	Version string `yaml:"version"`
@@ -42,16 +43,12 @@ type Dendrite struct {
 		// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
 		ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 		// Path to the private key which will be used to sign requests and events.
-		// The path may be relative or absolute.
-		// Relative paths are resolved relative to the directory containing the config file.
 		PrivateKeyPath Path `yaml:"private_key"`
 		// List of paths to X509 certificates used by the external federation listeners.
 		// These are used to calculate the TLS fingerprints to publish for this server.
 		// Other matrix servers talking to this server will expect the x509 certificate
 		// to match one of these certificates.
 		// The certificates should be in PEM format.
-		// The path may be relative or absolute.
-		// Relative paths are resolved relative to the directory containing the config file.
 		FederationCertificatePaths []Path `yaml:"federation_certificates"`
 		// The private key which will be used to sign requests and events.
 		PrivateKey ed25519.PrivateKey `yaml:"-"`
@@ -71,7 +68,6 @@ type Dendrite struct {
 	// The configuration specific to the media repostitory.
 	Media struct {
 		// The base path to where the media files will be stored. May be relative or absolute.
-		// Relative paths are resolved relative to the directory containing the config file.
 		BasePath Path `yaml:"base_path"`
 		// The absolute base path to where media files will be stored.
 		AbsBasePath Path `yaml:"-"`
@@ -154,7 +150,7 @@ func Load(configPath string) (*Dendrite, error) {
 	if err != nil {
 		return nil, err
 	}
-	configDirPath, err := filepath.Abs(filepath.Dir(configPath))
+	configDirPath, err := filepath.Abs(".")
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +164,7 @@ type Error struct {
 }
 
 func loadConfig(
-	configDirPath string,
+	basePath string,
 	configData []byte,
 	readFile func(string) ([]byte, error),
 ) (*Dendrite, error) {
@@ -184,7 +180,7 @@ func loadConfig(
 		return nil, err
 	}
 
-	privateKeyPath := absPath(configDirPath, config.Matrix.PrivateKeyPath)
+	privateKeyPath := absPath(basePath, config.Matrix.PrivateKeyPath)
 	privateKeyData, err := readFile(privateKeyPath)
 	if err != nil {
 		return nil, err
@@ -195,7 +191,7 @@ func loadConfig(
 	}
 
 	for _, certPath := range config.Matrix.FederationCertificatePaths {
-		absCertPath := absPath(configDirPath, certPath)
+		absCertPath := absPath(basePath, certPath)
 		pemData, err := readFile(absCertPath)
 		if err != nil {
 			return nil, err
@@ -207,7 +203,7 @@ func loadConfig(
 		config.Matrix.TLSFingerPrints = append(config.Matrix.TLSFingerPrints, *fingerprint)
 	}
 
-	config.Media.AbsBasePath = Path(absPath(configDirPath, config.Media.BasePath))
+	config.Media.AbsBasePath = Path(absPath(basePath, config.Media.BasePath))
 
 	return &config, nil
 }
