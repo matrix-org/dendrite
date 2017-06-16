@@ -74,15 +74,17 @@ func TestReadKey(t *testing.T) {
 	if err != nil {
 		t.Error("failed to load private key:", err)
 	}
-	wantKeyID := "ed25519:c8NsuQ"
+	wantKeyID := testKeyID
 	if wantKeyID != string(keyID) {
 		t.Errorf("wanted key ID to be %q, got %q", wantKeyID, keyID)
 	}
 }
 
+const testKeyID = "ed25519:c8NsuQ"
+
 const testKey = `
 -----BEGIN MATRIX PRIVATE KEY-----
-Key-ID: ed25519:c8NsuQ
+Key-ID: ` + testKeyID + `
 7KRZiZ2sTyRR8uqqUjRwczuwRXXkUMYIUHq4Mc3t4bE=
 -----END MATRIX PRIVATE KEY-----
 `

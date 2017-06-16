@@ -310,6 +310,7 @@ func (config *Dendrite) check() error {
 
 func absPath(dir string, path Path) string {
 	if filepath.IsAbs(string(path)) {
+		// filepath.Join cleans the path so we should clean the absolute paths as well for consistency.
 		return filepath.Clean(string(path))
 	}
 	return filepath.Join(dir, string(path))
