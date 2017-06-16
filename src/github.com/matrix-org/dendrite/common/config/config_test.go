@@ -45,11 +45,11 @@ kafka:
     input_room_event: input.room
     output_room_event: output.room
 database:
-  media_server: "postgresql:///media_server"
+  media_api: "postgresql:///media_api"
   account: "postgresql:///account"
   device: "postgresql:///device"
   server_key: "postgresql:///server_keys"
-  sync_server: "postgresql:///sync_server"
+  sync_api: "postgresql:///syn_api"
   room_server: "postgresql:///room_server"
 listen:
   room_server: "localhost:7770"
