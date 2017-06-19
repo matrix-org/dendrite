@@ -62,6 +62,11 @@ func main() {
 		},
 		KeyDatabase: keyDB,
 	}
+
+	// Hard code the roomserver to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
 	queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), nil)
 
 	roomserverProducer, err := producers.NewRoomserverProducer(
