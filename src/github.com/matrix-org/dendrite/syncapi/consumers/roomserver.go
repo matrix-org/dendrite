@@ -43,7 +43,7 @@ func NewOutputRoomEvent(cfg *config.Dendrite, n *sync.Notifier, store *storage.S
 	if err != nil {
 		return nil, err
 	}
-	roomserverURL := "http://" + string(cfg.Listen.RoomServer)
+	roomServerURL := cfg.RoomServerURL()
 
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
@@ -54,7 +54,7 @@ func NewOutputRoomEvent(cfg *config.Dendrite, n *sync.Notifier, store *storage.S
 		roomServerConsumer: &consumer,
 		db:                 store,
 		notifier:           n,
-		query:              api.NewRoomserverQueryAPIHTTP(roomserverURL, nil),
+		query:              api.NewRoomserverQueryAPIHTTP(roomServerURL, nil),
 	}
 	consumer.ProcessMessage = s.onMessage
 
