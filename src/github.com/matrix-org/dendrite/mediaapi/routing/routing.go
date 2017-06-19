@@ -19,7 +19,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/mediaapi/config"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/mediaapi/writers"
@@ -32,7 +32,7 @@ const pathPrefixR0 = "/_matrix/media/v1"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI, db *storage.Database) {
+func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.Dendrite, db *storage.Database) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
@@ -59,7 +59,7 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.MediaAPI
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
 
-func makeDownloadAPI(name string, cfg *config.MediaAPI, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests, activeThumbnailGeneration *types.ActiveThumbnailGeneration) http.HandlerFunc {
+func makeDownloadAPI(name string, cfg *config.Dendrite, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests, activeThumbnailGeneration *types.ActiveThumbnailGeneration) http.HandlerFunc {
 	return prometheus.InstrumentHandler(name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		req = util.RequestWithLogging(req)
 

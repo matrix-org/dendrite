@@ -17,6 +17,7 @@ package types
 import (
 	"sync"
 
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -79,16 +80,7 @@ type ActiveRemoteRequests struct {
 }
 
 // ThumbnailSize contains a single thumbnail size configuration
-type ThumbnailSize struct {
-	// Maximum width of the thumbnail image
-	Width int `yaml:"width"`
-	// Maximum height of the thumbnail image
-	Height int `yaml:"height"`
-	// ResizeMethod is one of crop or scale.
-	// crop scales to fill the requested dimensions and crops the excess.
-	// scale scales to fit the requested dimensions and one dimension may be smaller than requested.
-	ResizeMethod string `yaml:"method,omitempty"`
-}
+type ThumbnailSize config.ThumbnailSize
 
 // ThumbnailMetadata contains the metadata about an individual thumbnail
 type ThumbnailMetadata struct {

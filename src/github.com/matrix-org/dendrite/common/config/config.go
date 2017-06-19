@@ -358,3 +358,12 @@ func fingerprintPEM(data []byte) *gomatrixserverlib.TLSFingerprint {
 		}
 	}
 }
+
+// RoomServerURL returns an HTTP URL for where the roomserver is listening.
+func (config *Dendrite) RoomServerURL() string {
+	// Hard code the roomserver to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.RoomServer)
+}

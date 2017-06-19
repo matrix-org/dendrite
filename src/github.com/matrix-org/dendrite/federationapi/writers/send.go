@@ -6,7 +6,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/federationapi/config"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -19,13 +19,13 @@ func Send(
 	req *http.Request,
 	txnID gomatrixserverlib.TransactionID,
 	now time.Time,
-	cfg config.FederationAPI,
+	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	request, errResp := gomatrixserverlib.VerifyHTTPRequest(req, now, cfg.ServerName, keys)
+	request, errResp := gomatrixserverlib.VerifyHTTPRequest(req, now, cfg.Matrix.ServerName, keys)
 	if request == nil {
 		return errResp
 	}
@@ -45,7 +45,7 @@ func Send(
 
 	t.Origin = request.Origin()
 	t.TransactionID = txnID
-	t.Destination = cfg.ServerName
+	t.Destination = cfg.Matrix.ServerName
 
 	resp, err := t.processTransaction()
 	if err != nil {
