@@ -58,7 +58,6 @@ func (ore *OutputRoomEvent) UnmarshalJSON(data []byte) error {
 	// being base64 encoded which is the default for []byte.
 	var content struct {
 		Event                      *json.RawMessage
-		VisibilityEventIDs         []string
 		LatestEventIDs             []string
 		AddsStateEventIDs          []string
 		RemovesStateEventIDs       []string
@@ -90,7 +89,6 @@ func (ore OutputRoomEvent) MarshalJSON() ([]byte, error) {
 	event := json.RawMessage(ore.Event)
 	content := struct {
 		Event                      *json.RawMessage
-		VisibilityEventIDs         []string
 		LatestEventIDs             []string
 		AddsStateEventIDs          []string
 		RemovesStateEventIDs       []string
