@@ -102,7 +102,7 @@ func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.
 	}
 
 	// Update the extremities of the event graph for the room
-	if err := updateLatestEvents(db, ow, roomNID, stateAtEvent, event); err != nil {
+	if err := updateLatestEvents(db, ow, roomNID, stateAtEvent, event, input.SendAsServer); err != nil {
 		return err
 	}
 

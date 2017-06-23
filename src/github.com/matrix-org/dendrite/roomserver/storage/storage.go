@@ -87,6 +87,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []typ
 		event.EventID(),
 		event.EventReference().EventSHA256,
 		authEventNIDs,
+		event.Depth(),
 	); err != nil {
 		if err == sql.ErrNoRows {
 			// We've already inserted the event so select the numeric event ID
@@ -349,16 +350,20 @@ func (d *Database) RoomNID(roomID string) (types.RoomNID, error) {
 }
 
 // LatestEventIDs implements query.RoomserverQueryAPIDB
-func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, error) {
+func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error) {
 	eventNIDs, currentStateSnapshotNID, err := d.statements.selectLatestEventNIDs(roomNID)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	references, err := d.statements.bulkSelectEventReference(eventNIDs)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
-	return references, currentStateSnapshotNID, nil
+	depth, err := d.statements.selectMaxEventDepth(eventNIDs)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return references, currentStateSnapshotNID, depth, nil
 }
 
 // StateEntriesForTuples implements state.RoomStateDatabase

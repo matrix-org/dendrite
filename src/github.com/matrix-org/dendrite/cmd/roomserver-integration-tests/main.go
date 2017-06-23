@@ -340,7 +340,8 @@ func main() {
 				"state_key":"@richvdh:matrix.org",
 				"type":"m.room.member"
 			},
-			"VisibilityEventIDs":null,
+			"StateBeforeRemovesEventIDs":["$1463671339126270PnVwC:matrix.org"],
+			"StateBeforeAddsEventIDs":null,
 			"LatestEventIDs":["$1463671339126270PnVwC:matrix.org"],
 			"AddsStateEventIDs":["$1463671337126266wrSBX:matrix.org", "$1463671339126270PnVwC:matrix.org"],
 			"RemovesStateEventIDs":null,

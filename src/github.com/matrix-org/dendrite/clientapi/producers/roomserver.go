@@ -42,7 +42,7 @@ func NewRoomserverProducer(kafkaURIs []string, topic string) (*RoomserverProduce
 }
 
 // SendEvents writes the given events to the roomserver input log. The events are written with KindNew.
-func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event) error {
+func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event, sendAsServer gomatrixserverlib.ServerName) error {
 	eventIDs := make([]string, len(events))
 	ires := make([]api.InputRoomEvent, len(events))
 	for i, event := range events {
@@ -50,6 +50,7 @@ func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event) error 
 			Kind:         api.KindNew,
 			Event:        event.JSON(),
 			AuthEventIDs: authEventIDs(event),
+			SendAsServer: string(sendAsServer),
 		}
 		eventIDs[i] = event.EventID()
 	}

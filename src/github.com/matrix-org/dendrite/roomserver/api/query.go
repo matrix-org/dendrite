@@ -43,6 +43,9 @@ type QueryLatestEventsAndStateResponse struct {
 	// The state events requested.
 	// This list will be in an arbitrary order.
 	StateEvents []gomatrixserverlib.Event
+	// The depth of the latest events.
+	// This is one greater than the depths of the latest events.
+	Depth int64
 }
 
 // QueryStateAfterEventsRequest is a request to QueryStateAfterEvents

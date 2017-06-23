@@ -159,7 +159,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	// TODO: Check that the event is allowed by its auth_events.
 
 	// pass the event to the roomserver
-	if err := t.producer.SendEvents([]gomatrixserverlib.Event{e}); err != nil {
+	if err := t.producer.SendEvents([]gomatrixserverlib.Event{e}, ""); err != nil {
 		return err
 	}
 

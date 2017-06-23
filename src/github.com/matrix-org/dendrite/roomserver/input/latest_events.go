@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
@@ -39,7 +40,12 @@ import (
 //      7 <----- latest
 //
 func updateLatestEvents(
-	db RoomEventDatabase, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	db RoomEventDatabase,
+	ow OutputRoomEventWriter,
+	roomNID types.RoomNID,
+	stateAtEvent types.StateAtEvent,
+	event gomatrixserverlib.Event,
+	sendAsServer string,
 ) (err error) {
 	updater, err := db.GetLatestEventsForUpdate(roomNID)
 	if err != nil {
@@ -59,12 +65,18 @@ func updateLatestEvents(
 		}
 	}()
 
-	err = doUpdateLatestEvents(db, updater, ow, roomNID, stateAtEvent, event)
+	err = doUpdateLatestEvents(db, updater, ow, roomNID, stateAtEvent, event, sendAsServer)
 	return
 }
 
 func doUpdateLatestEvents(
-	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	db RoomEventDatabase,
+	updater types.RoomRecentEventsUpdater,
+	ow OutputRoomEventWriter,
+	roomNID types.RoomNID,
+	stateAtEvent types.StateAtEvent,
+	event gomatrixserverlib.Event,
+	sendAsServer string,
 ) error {
 	var err error
 	var prevEvents []gomatrixserverlib.EventReference
@@ -110,6 +122,13 @@ func doUpdateLatestEvents(
 		return err
 	}
 
+	stateBeforeEventRemoves, stateBeforeEventAdds, err := state.DifferenceBetweeenStateSnapshots(
+		db, newStateNID, stateAtEvent.BeforeStateSnapshotNID,
+	)
+	if err != nil {
+		return err
+	}
+
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
 	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
@@ -118,7 +137,10 @@ func doUpdateLatestEvents(
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = writeEvent(db, ow, lastEventIDSent, event, newLatest, removed, added); err != nil {
+	if err = writeEvent(
+		db, ow, lastEventIDSent, event, newLatest, removed, added,
+		stateBeforeEventRemoves, stateBeforeEventAdds, sendAsServer,
+	); err != nil {
 		return err
 	}
 
@@ -170,6 +192,8 @@ func writeEvent(
 	db RoomEventDatabase, ow OutputRoomEventWriter, lastEventIDSent string,
 	event gomatrixserverlib.Event, latest []types.StateAtEventAndReference,
 	removed, added []types.StateEntry,
+	stateBeforeEventRemoves, stateBeforeEventAdds []types.StateEntry,
+	sendAsServer string,
 ) error {
 
 	latestEventIDs := make([]string, len(latest))
@@ -190,6 +214,13 @@ func writeEvent(
 	for _, entry := range removed {
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
+	for _, entry := range stateBeforeEventRemoves {
+		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
+	}
+	for _, entry := range stateBeforeEventAdds {
+		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
+	}
+	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
 	eventIDMap, err := db.EventIDs(stateEventNIDs)
 	if err != nil {
 		return err
@@ -200,7 +231,19 @@ func writeEvent(
 	for _, entry := range removed {
 		ore.RemovesStateEventIDs = append(ore.RemovesStateEventIDs, eventIDMap[entry.EventNID])
 	}
-
+	for _, entry := range stateBeforeEventRemoves {
+		ore.StateBeforeRemovesEventIDs = append(ore.StateBeforeRemovesEventIDs, eventIDMap[entry.EventNID])
+	}
+	for _, entry := range stateBeforeEventAdds {
+		ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
+	}
+	ore.SendAsServer = sendAsServer
 	// TODO: Fill out VisibilityStateIDs
 	return ow.WriteOutputRoomEvent(ore)
 }
+
+type eventNIDSorter []types.EventNID
+
+func (s eventNIDSorter) Len() int           { return len(s) }
+func (s eventNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
+func (s eventNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }

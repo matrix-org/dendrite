@@ -34,7 +34,7 @@ type RoomserverQueryAPIDatabase interface {
 	RoomNID(roomID string) (types.RoomNID, error)
 	// Lookup event references for the latest events in the room and the current state snapshot.
 	// Returns an error if there was a problem talking to the database.
-	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, error)
+	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error)
 	// Lookup the numeric IDs for a list of events.
 	// Returns an error if there was a problem talking to the database.
 	EventNIDs(eventIDs []string) (map[string]types.EventNID, error)
@@ -60,7 +60,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	}
 	response.RoomExists = true
 	var currentStateSnapshotNID types.StateSnapshotNID
-	response.LatestEvents, currentStateSnapshotNID, err = r.DB.LatestEventIDs(roomNID)
+	response.LatestEvents, currentStateSnapshotNID, response.Depth, err = r.DB.LatestEventIDs(roomNID)
 	if err != nil {
 		return err
 	}
