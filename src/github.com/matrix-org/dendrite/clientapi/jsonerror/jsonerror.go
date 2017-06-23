@@ -85,6 +85,12 @@ func WeakPassword(msg string) *MatrixError {
 	return &MatrixError{"M_WEAK_PASSWORD", msg}
 }
 
+// GuestAccessForbidden is an error which is returned when the client is
+// forbidden from accessing a resource as a guest.
+func GuestAccessForbidden(msg string) *MatrixError {
+	return &MatrixError{"M_GUEST_ACCESS_FORBIDDEN", msg}
+}
+
 // LimitExceededError is a rate-limiting error.
 type LimitExceededError struct {
 	MatrixError
