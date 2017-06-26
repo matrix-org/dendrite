@@ -30,6 +30,12 @@ Note: `COMPOSE_PROJECT_NAME` is set to `dendrite` in the `.env` file in this dir
 
 ## Running
 
+### Data directories
+
+The `docker-compose.yaml` mounts `$HOME/dendrite/media` into the media-api-server and `$HOME/dendrite/postgres` into the postgres container to persist the data on the host. Adjust this as you please.
+
+### Go time - run the command!
+
 From this directory, run `POSTGRES_PASSWORD=YOURSECRET docker-compose up -d`. The client-api-proxy will be exposed on `https://0.0.0.0:8443` and the federation-api-proxy on `https://0.0.0.0:8449`.
 
 ## Create accounts
