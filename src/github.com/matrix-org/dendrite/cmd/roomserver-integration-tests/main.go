@@ -345,7 +345,8 @@ func main() {
 			"LatestEventIDs":["$1463671339126270PnVwC:matrix.org"],
 			"AddsStateEventIDs":["$1463671337126266wrSBX:matrix.org", "$1463671339126270PnVwC:matrix.org"],
 			"RemovesStateEventIDs":null,
-			"LastSentEventID":""
+			"LastSentEventID":"",
+			"SendAsServer":""
 		}`,
 	}
 
