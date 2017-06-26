@@ -16,7 +16,7 @@ package readers
 
 import (
 	"encoding/json"
-	"github.com/matrix-org/dendrite/federationapi/config"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/ed25519"
@@ -26,29 +26,29 @@ import (
 
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
-func LocalKeys(req *http.Request, cfg config.FederationAPI) util.JSONResponse {
-	keys, err := localKeys(cfg, time.Now().Add(cfg.ValidityPeriod))
+func LocalKeys(req *http.Request, cfg config.Dendrite) util.JSONResponse {
+	keys, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{Code: 200, JSON: keys}
 }
 
-func localKeys(cfg config.FederationAPI, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
+func localKeys(cfg config.Dendrite, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
 
-	keys.ServerName = cfg.ServerName
-	keys.FromServer = cfg.ServerName
+	keys.ServerName = cfg.Matrix.ServerName
+	keys.FromServer = cfg.Matrix.ServerName
 
-	publicKey := cfg.PrivateKey.Public().(ed25519.PublicKey)
+	publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 
 	keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
-		cfg.KeyID: {
+		cfg.Matrix.KeyID: {
 			gomatrixserverlib.Base64String(publicKey),
 		},
 	}
 
-	keys.TLSFingerprints = cfg.TLSFingerPrints
+	keys.TLSFingerprints = cfg.Matrix.TLSFingerPrints
 	keys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
 	keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(validUntil)
 
@@ -57,7 +57,9 @@ func localKeys(cfg config.FederationAPI, validUntil time.Time) (*gomatrixserverl
 		return nil, err
 	}
 
-	keys.Raw, err = gomatrixserverlib.SignJSON(string(cfg.ServerName), cfg.KeyID, cfg.PrivateKey, toSign)
+	keys.Raw, err = gomatrixserverlib.SignJSON(
+		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, toSign,
+	)
 	if err != nil {
 		return nil, err
 	}

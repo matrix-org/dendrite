@@ -15,16 +15,14 @@
 package main
 
 import (
-	"encoding/base64"
+	"flag"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/federationapi/config"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,73 +31,30 @@ import (
 )
 
 var (
-	bindAddr   = os.Getenv("BIND_ADDRESS")
 	logDir     = os.Getenv("LOG_DIR")
-	serverName = gomatrixserverlib.ServerName(os.Getenv("SERVER_NAME"))
-	serverKey  = os.Getenv("SERVER_KEY")
-	// Base64 encoded SHA256 TLS fingerprint of the X509 certificate used by
-	// the public federation listener for this server.
-	// Can be generated from a PEM certificate called "server.crt" using:
-	//
-	//  openssl x509 -noout -fingerprint -sha256 -inform pem -in server.crt |\
-	//     python -c 'print raw_input()[19:].replace(":","").decode("hex").encode("base64").rstrip("=\n")'
-	//
-	tlsFingerprint       = os.Getenv("TLS_FINGERPRINT")
-	kafkaURIs            = strings.Split(os.Getenv("KAFKA_URIS"), ",")
-	roomserverURL        = os.Getenv("ROOMSERVER_URL")
-	roomserverInputTopic = os.Getenv("TOPIC_INPUT_ROOM_EVENT")
-	keyDataSource        = os.Getenv("KEY_DATABASE")
+	configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 )
 
 func main() {
 	common.SetupLogging(logDir)
-	if bindAddr == "" {
-		log.Panic("No BIND_ADDRESS environment variable found.")
-	}
 
-	if serverName == "" {
-		serverName = "localhost"
-	}
+	flag.Parse()
 
-	if tlsFingerprint == "" {
-		log.Panic("No TLS_FINGERPRINT environment variable found.")
+	if *configPath == "" {
+		log.Fatal("--config must be supplied")
 	}
-
-	if len(kafkaURIs) == 0 {
-		// the kafka default is :9092
-		kafkaURIs = []string{"localhost:9092"}
-	}
-
-	if roomserverURL == "" {
-		log.Panic("No ROOMSERVER_URL environment variable found.")
-	}
-
-	if roomserverInputTopic == "" {
-		log.Panic("No TOPIC_INPUT_ROOM_EVENT environment variable found. This should match the roomserver input topic.")
-	}
-	cfg := config.FederationAPI{
-		ServerName: serverName,
-		// TODO: make the validity period configurable.
-		ValidityPeriod: 24 * time.Hour,
-	}
-
-	var err error
-	cfg.KeyID, cfg.PrivateKey, err = common.ReadKey(serverKey)
+	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Panicf("Failed to load private key: %s", err)
+		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	var fingerprintSHA256 []byte
-	if fingerprintSHA256, err = base64.RawStdEncoding.DecodeString(tlsFingerprint); err != nil {
-		log.Panicf("Failed to load TLS fingerprint: %s", err)
-	}
-	cfg.TLSFingerPrints = []gomatrixserverlib.TLSFingerprint{{fingerprintSHA256}}
+	federation := gomatrixserverlib.NewFederationClient(
+		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+	)
 
-	federation := gomatrixserverlib.NewFederationClient(cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
-
-	keyDB, err := keydb.NewDatabase(keyDataSource)
+	keyDB, err := keydb.NewDatabase(string(cfg.Database.ServerKey))
 	if err != nil {
-		log.Panicf("Failed to setup key database(%q): %s", keyDataSource, err.Error())
+		log.Panicf("Failed to setup key database(%q): %s", cfg.Database.ServerKey, err.Error())
 	}
 
 	keyRing := gomatrixserverlib.KeyRing{
@@ -109,13 +64,19 @@ func main() {
 		},
 		KeyDatabase: keyDB,
 	}
-	queryAPI := api.NewRoomserverQueryAPIHTTP(roomserverURL, nil)
 
-	roomserverProducer, err := producers.NewRoomserverProducer(kafkaURIs, roomserverInputTopic)
+	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
+
+	roomserverProducer, err := producers.NewRoomserverProducer(
+		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.InputRoomEvent),
+	)
+
 	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%s): %s", kafkaURIs, err)
+		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.Kafka.Addresses, err)
 	}
 
-	routing.Setup(http.DefaultServeMux, cfg, queryAPI, roomserverProducer, keyRing, federation)
-	log.Fatal(http.ListenAndServe(bindAddr, nil))
+	log.Info("Starting federation API server on ", cfg.Listen.FederationAPI)
+
+	routing.Setup(http.DefaultServeMux, *cfg, queryAPI, roomserverProducer, keyRing, federation)
+	log.Fatal(http.ListenAndServe(string(cfg.Listen.FederationAPI), nil))
 }

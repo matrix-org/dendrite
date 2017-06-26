@@ -16,11 +16,12 @@ package test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/matrix-org/dendrite/common/config"
 )
 
 // Defaulting allows assignment of string variables with a fallback default value
@@ -69,7 +70,7 @@ func CreateBackgroundCommand(command string, args []string) (*exec.Cmd, chan err
 // which will have any termination errors sent down it, followed immediately by the channel being closed.
 // If postgresContainerName is not an empty string, psql will be run from inside that container. If it is
 // an empty string, psql will be assumed to be in PATH.
-func StartServer(serverType string, serverArgs []string, suffix, configFilename, configFileContents, postgresDatabase, postgresContainerName string, databases []string) (*exec.Cmd, chan error) {
+func StartServer(serverType string, serverArgs []string, postgresDatabase, postgresContainerName string, databases []string) (*exec.Cmd, chan error) {
 	if len(databases) > 0 {
 		var dbCmd string
 		var dbArgs []string
@@ -89,12 +90,6 @@ func StartServer(serverType string, serverArgs []string, suffix, configFilename,
 		}
 	}
 
-	if configFilename != "" {
-		if err := ioutil.WriteFile(configFilename, []byte(configFileContents), 0644); err != nil {
-			panic(err)
-		}
-	}
-
 	return CreateBackgroundCommand(
 		filepath.Join(filepath.Dir(os.Args[0]), "dendrite-"+serverType+"-server"),
 		serverArgs,
@@ -102,12 +97,12 @@ func StartServer(serverType string, serverArgs []string, suffix, configFilename,
 }
 
 // StartProxy creates a reverse proxy
-func StartProxy(bindAddr, syncAddr, clientAddr, mediaAddr string) (*exec.Cmd, chan error) {
+func StartProxy(bindAddr string, cfg *config.Dendrite) (*exec.Cmd, chan error) {
 	proxyArgs := []string{
 		"--bind-address", bindAddr,
-		"--sync-api-server-url", syncAddr,
-		"--client-api-server-url", clientAddr,
-		"--media-api-server-url", mediaAddr,
+		"--sync-api-server-url", "http://" + string(cfg.Listen.SyncAPI),
+		"--client-api-server-url", "http://" + string(cfg.Listen.ClientAPI),
+		"--media-api-server-url", "http://" + string(cfg.Listen.MediaAPI),
 	}
 	return CreateBackgroundCommand(
 		filepath.Join(filepath.Dir(os.Args[0]), "client-api-proxy"),

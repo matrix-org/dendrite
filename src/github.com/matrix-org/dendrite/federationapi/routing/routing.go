@@ -17,7 +17,7 @@ package routing
 import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/federationapi/config"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationapi/readers"
 	"github.com/matrix-org/dendrite/federationapi/writers"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -36,7 +36,7 @@ const (
 // Setup registers HTTP handlers with the given ServeMux.
 func Setup(
 	servMux *http.ServeMux,
-	cfg config.FederationAPI,
+	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,

@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 )
@@ -56,7 +57,7 @@ func GetThumbnailPath(src types.Path, config types.ThumbnailSize) types.Path {
 // * has a small file size
 // If a pre-generated thumbnail size is the best match, but it has not been generated yet, the caller can use the returned size to generate it.
 // Returns nil if no thumbnail matches the criteria
-func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailMetadata, thumbnailSizes []types.ThumbnailSize) (*types.ThumbnailMetadata, *types.ThumbnailSize) {
+func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailMetadata, thumbnailSizes []config.ThumbnailSize) (*types.ThumbnailMetadata, *types.ThumbnailSize) {
 	var chosenThumbnail *types.ThumbnailMetadata
 	var chosenThumbnailSize *types.ThumbnailSize
 	bestFit := newThumbnailFitness()
@@ -76,7 +77,7 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 		if desired.ResizeMethod == "scale" && thumbnailSize.ResizeMethod != "scale" {
 			continue
 		}
-		fitness := calcThumbnailFitness(thumbnailSize, nil, desired)
+		fitness := calcThumbnailFitness(types.ThumbnailSize(thumbnailSize), nil, desired)
 		if isBetter := fitness.betterThan(bestFit, desired.ResizeMethod == "crop"); isBetter {
 			bestFit = fitness
 			chosenThumbnailSize = &types.ThumbnailSize{

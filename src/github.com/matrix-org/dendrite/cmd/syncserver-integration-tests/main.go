@@ -17,12 +17,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
 
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -61,12 +63,6 @@ var exe = test.KafkaExecutor{
 	// the kafka process.
 	OutputWriter: os.Stderr,
 }
-
-var syncServerConfigFileContents = (`consumer_uris: ["` + kafkaURI + `"]
-roomserver_topic: "` + inputTopic + `"
-database: "` + testDatabase + `"
-server_name: "localhost"
-`)
 
 var timeout time.Duration
 var clientEventTestData []string
@@ -126,11 +122,27 @@ func clientEventJSONForOutputRoomEvent(outputRoomEvent string) string {
 // then starts the sync server. The Cmd being executed is returned. A channel is also returned,
 // which will have any termination errors sent down it, followed immediately by the channel being closed.
 func startSyncServer() (*exec.Cmd, chan error) {
-	const configFilename = "sync-api-server-config-test.yaml"
+
+	dir, err := ioutil.TempDir("", "syncapi-server-test")
+	if err != nil {
+		panic(err)
+	}
+
+	cfg, _, err := test.MakeConfig(dir, kafkaURI, testDatabase, "localhost", 10000)
+	if err != nil {
+		panic(err)
+	}
+	// TODO use the address assigned by the config generator rather than clobbering.
+	cfg.Matrix.ServerName = "localhost"
+	cfg.Listen.SyncAPI = config.Address(syncserverAddr)
+	cfg.Kafka.Topics.OutputRoomEvent = config.Topic(inputTopic)
+
+	if err := test.WriteConfig(cfg, dir); err != nil {
+		panic(err)
+	}
 
 	serverArgs := []string{
-		"--config", configFilename,
-		"--listen", syncserverAddr,
+		"--config", filepath.Join(dir, test.ConfigFile),
 	}
 
 	databases := []string{
@@ -140,9 +152,6 @@ func startSyncServer() (*exec.Cmd, chan error) {
 	cmd, cmdChan := test.StartServer(
 		"sync-api",
 		serverArgs,
-		"",
-		configFilename,
-		syncServerConfigFileContents,
 		postgresDatabase,
 		postgresContainerName,
 		databases,

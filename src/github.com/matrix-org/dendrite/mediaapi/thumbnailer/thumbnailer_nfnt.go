@@ -28,13 +28,14 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/nfnt/resize"
 )
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file
-func GenerateThumbnails(src types.Path, configs []types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
+func GenerateThumbnails(src types.Path, configs []config.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
 	img, err := readFile(string(src))
 	if err != nil {
 		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
@@ -42,7 +43,7 @@ func GenerateThumbnails(src types.Path, configs []types.ThumbnailSize, mediaMeta
 	}
 	for _, config := range configs {
 		// Note: createThumbnail does locking based on activeThumbnailGeneration
-		busy, err = createThumbnail(src, img, config, mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
+		busy, err = createThumbnail(src, img, types.ThumbnailSize(config), mediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, logger)
 		if err != nil {
 			logger.WithError(err).WithField("src", src).Error("Failed to generate thumbnails")
 			return false, err

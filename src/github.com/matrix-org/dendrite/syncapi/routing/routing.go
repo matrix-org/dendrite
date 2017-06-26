@@ -21,7 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/syncapi/config"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,7 +29,7 @@ import (
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // SetupSyncServerListeners configures the given mux with sync-server listeners
-func SetupSyncServerListeners(servMux *http.ServeMux, httpClient *http.Client, cfg config.Sync, srp *sync.RequestPool, deviceDB *devices.Database) {
+func SetupSyncServerListeners(servMux *http.ServeMux, httpClient *http.Client, srp *sync.RequestPool, deviceDB *devices.Database) {
 	apiMux := mux.NewRouter()
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {

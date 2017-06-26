@@ -21,13 +21,14 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"gopkg.in/h2non/bimg.v1"
 )
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file
-func GenerateThumbnails(src types.Path, configs []types.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
+func GenerateThumbnails(src types.Path, configs []config.ThumbnailSize, mediaMetadata *types.MediaMetadata, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, db *storage.Database, logger *log.Entry) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {
 		logger.WithError(err).WithField("src", src).Error("Failed to read src file")

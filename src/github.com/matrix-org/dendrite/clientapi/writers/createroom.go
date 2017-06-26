@@ -23,11 +23,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/config"
 	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -91,15 +91,15 @@ type fledglingEvent struct {
 }
 
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request, device *authtypes.Device, cfg config.ClientAPI, producer *producers.RoomserverProducer) util.JSONResponse {
+func CreateRoom(req *http.Request, device *authtypes.Device, cfg config.Dendrite, producer *producers.RoomserverProducer) util.JSONResponse {
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.ServerName)
+	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	return createRoom(req, device, cfg, roomID, producer)
 }
 
 // createRoom implements /createRoom
-func createRoom(req *http.Request, device *authtypes.Device, cfg config.ClientAPI, roomID string, producer *producers.RoomserverProducer) util.JSONResponse {
+func createRoom(req *http.Request, device *authtypes.Device, cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
 	var r createRoomRequest
@@ -201,7 +201,7 @@ func createRoom(req *http.Request, device *authtypes.Device, cfg config.ClientAP
 // buildEvent fills out auth_events for the builder then builds the event
 func buildEvent(builder *gomatrixserverlib.EventBuilder,
 	provider gomatrixserverlib.AuthEventProvider,
-	cfg config.ClientAPI) (*gomatrixserverlib.Event, error) {
+	cfg config.Dendrite) (*gomatrixserverlib.Event, error) {
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -212,9 +212,9 @@ func buildEvent(builder *gomatrixserverlib.EventBuilder,
 		return nil, err
 	}
 	builder.AuthEvents = refs
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.ServerName)
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	now := time.Now()
-	event, err := builder.Build(eventID, now, cfg.ServerName, cfg.KeyID, cfg.PrivateKey)
+	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
 	}

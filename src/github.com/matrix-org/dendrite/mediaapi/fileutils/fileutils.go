@@ -26,13 +26,14 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 )
 
 // GetPathFromBase64Hash evaluates the path to a media file from its Base64Hash
 // 3 subdirectories are created for more manageable browsing and use the remainder as the file name.
 // For example, if Base64Hash is 'qwerty', the path will be 'q/w/erty/file'.
-func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath types.Path) (string, error) {
+func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath config.Path) (string, error) {
 	if len(base64Hash) < 3 {
 		return "", fmt.Errorf("Invalid filePath (Base64Hash too short - min 3 characters): %q", base64Hash)
 	}
@@ -66,7 +67,7 @@ func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath types.Path) 
 // If the final path exists and the file size matches, the file does not need to be moved.
 // In error cases where the file is not a duplicate, the caller may decide to remove the final path.
 // Returns the final path of the file, whether it is a duplicate and an error.
-func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata, absBasePath types.Path, logger *log.Entry) (types.Path, bool, error) {
+func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata, absBasePath config.Path, logger *log.Entry) (types.Path, bool, error) {
 	// Note: in all error and success cases, we need to remove the temporary directory
 	defer RemoveDir(tmpDir, logger)
 	duplicate := false
@@ -104,7 +105,7 @@ func RemoveDir(dir types.Path, logger *log.Entry) {
 }
 
 // WriteTempFile writes to a new temporary file
-func WriteTempFile(reqReader io.Reader, maxFileSizeBytes types.FileSizeBytes, absBasePath types.Path) (types.Base64Hash, types.FileSizeBytes, types.Path, error) {
+func WriteTempFile(reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, absBasePath config.Path) (types.Base64Hash, types.FileSizeBytes, types.Path, error) {
 	tmpFileWriter, tmpFile, tmpDir, err := createTempFileWriter(absBasePath)
 	if err != nil {
 		return "", -1, "", err
@@ -144,7 +145,7 @@ func moveFile(src types.Path, dst types.Path) error {
 	return nil
 }
 
-func createTempFileWriter(absBasePath types.Path) (*bufio.Writer, *os.File, types.Path, error) {
+func createTempFileWriter(absBasePath config.Path) (*bufio.Writer, *os.File, types.Path, error) {
 	tmpDir, err := createTempDir(absBasePath)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("Failed to create temp dir: %q", err)
@@ -157,7 +158,7 @@ func createTempFileWriter(absBasePath types.Path) (*bufio.Writer, *os.File, type
 }
 
 // createTempDir creates a tmp/<random string> directory within baseDirectory and returns its path
-func createTempDir(baseDirectory types.Path) (types.Path, error) {
+func createTempDir(baseDirectory config.Path) (types.Path, error) {
 	baseTmpDir := filepath.Join(string(baseDirectory), "tmp")
 	if err := os.MkdirAll(baseTmpDir, 0770); err != nil {
 		return "", fmt.Errorf("Failed to create base temp dir: %v", err)
