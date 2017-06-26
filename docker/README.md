@@ -31,3 +31,7 @@ Note: `COMPOSE_PROJECT_NAME` is set to `dendrite` in the `.env` file in this dir
 ## Running
 
 From this directory, run `POSTGRES_PASSWORD=YOURSECRET docker-compose up -d`. The client-api-proxy will be exposed on `https://0.0.0.0:8443` and the federation-api-proxy on `https://0.0.0.0:8449`.
+
+## Create accounts
+
+Use the `create-account` tool and point it at `postgres://postgres:$POSTGRES_PASSWORD@localhost/dendrite_account?sslmode=disable` to create accounts.
