@@ -160,6 +160,9 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputRoomEvent, ev gomatrixser
 func (s *OutputRoomEvent) joinedHostsAtEvent(
 	ore api.OutputRoomEvent, ev gomatrixserverlib.Event, oldJoinedHosts []types.JoinedHost,
 ) ([]gomatrixserverlib.ServerName, error) {
+	// Combine the delta into a single delta so that the adds and removes can
+	// cancel each other out. This should reduce the number of times we need
+	// to fetch a state event from the room server.
 	combinedAdds, combinedRemoves := combineDeltas(
 		ore.AddsStateEventIDs, ore.RemovesStateEventIDs,
 		ore.StateBeforeAddsEventIDs, ore.StateBeforeRemovesEventIDs,
