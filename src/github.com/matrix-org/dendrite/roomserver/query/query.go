@@ -33,6 +33,7 @@ type RoomserverQueryAPIDatabase interface {
 	// Returns an error if there was a problem talking to the database.
 	RoomNID(roomID string) (types.RoomNID, error)
 	// Lookup event references for the latest events in the room and the current state snapshot.
+	// Returns the latest events, the current state and the maximum depth of the latest events plus 1.
 	// Returns an error if there was a problem talking to the database.
 	LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error)
 	// Lookup the numeric IDs for a list of events.
