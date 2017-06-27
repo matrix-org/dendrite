@@ -32,6 +32,8 @@ type QueryLatestEventsAndStateRequest struct {
 }
 
 // QueryLatestEventsAndStateResponse is a response to QueryLatestEventsAndState
+// This is used when sending events to set the prev_events, auth_events and depth.
+// It is also used to tell whether the event is allowed by the event auth rules.
 type QueryLatestEventsAndStateResponse struct {
 	// Copy of the request for debugging.
 	QueryLatestEventsAndStateRequest
@@ -39,12 +41,16 @@ type QueryLatestEventsAndStateResponse struct {
 	// If the room doesn't exist this will be false and LatestEvents will be empty.
 	RoomExists bool
 	// The latest events in the room.
+	// These are used to set the prev_events when sending an event.
 	LatestEvents []gomatrixserverlib.EventReference
 	// The state events requested.
 	// This list will be in an arbitrary order.
+	// These are used to set the auth_events when sending an event.
+	// These are used to check whether the event is allowed.
 	StateEvents []gomatrixserverlib.Event
 	// The depth of the latest events.
-	// This is one greater than the depths of the latest events.
+	// This is one greater than the maximum depth of the latest events.
+	// This is used to set the depth when sending an event.
 	Depth int64
 }
 
