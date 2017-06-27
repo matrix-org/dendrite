@@ -70,14 +70,14 @@ type OutputRoomEvent struct {
 	// Or empty if this event shouldn't be pushed to other servers.
 	//
 	// This is used by the federation sender component. We need to tell it what
-	// event is needs to send because it can't tell on its own. Normally we
-	// if an event was created on this server then we are responsible for
-	// sending. However there are a couple of exceptions. The first is that
-	// when the server joins a remote room through another matrix server, it
-	// is the job of the other matrix server to send the event over federation.
-	// The second is the reverse of the first, that is when a remote server
-	// joins a room that we are in over federation using our server it is our
-	// responsibility to send the join event to other matrix server.
+	// event is needs to send because it can't tell on its own. Normally if an
+	// event was created on this server then we are responsible for sending it.
+	// However there are a couple of exceptions. The first is that when the
+	// server joins a remote room through another matrix server, it is the job
+	// of the other matrix server to send the event over federation. The second
+	// is the reverse of the first, that is when a remote server joins a room
+	// that we are in over federation using our server it is our responsibility
+	// to send the join event to other matrix servers.
 	//
 	// We encode the server name that the event should be sent using here to
 	// future proof the API for virtual hosting.

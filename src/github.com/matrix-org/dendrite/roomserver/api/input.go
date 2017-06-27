@@ -40,6 +40,10 @@ const (
 	KindBackfill = 4
 )
 
+// DoNotSendToOtherServers tells us not to send the event to other matrix
+// servers.
+const DoNotSendToOtherServers = ""
+
 // InputRoomEvent is a matrix room event to add to the room server database.
 // TODO: Implement UnmarshalJSON/MarshalJSON in a way that does something sensible with the event JSON.
 type InputRoomEvent struct {
