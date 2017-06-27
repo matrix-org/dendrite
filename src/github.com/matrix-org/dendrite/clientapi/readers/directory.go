@@ -44,7 +44,7 @@ func DirectoryRoom(
 	}
 
 	if domain == cfg.Matrix.ServerName {
-		// TODO: Implement joining local room aliases.
+		// TODO: Implement lookup up local room aliases.
 		panic(fmt.Errorf("Looking up local room aliases is not implemented"))
 	} else {
 		resp, err := federation.LookupRoomAlias(domain, roomAlias)
@@ -58,6 +58,8 @@ func DirectoryRoom(
 					}
 				}
 			}
+			// TODO: Return 502 if the remote server errored.
+			// TODO: Return 504 if the remote server timed out.
 			return httputil.LogThenError(req, err)
 		}
 

@@ -107,7 +107,6 @@ func Setup(
 
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			// TODO: Return the result of looking up the room in the room directory
 			vars := mux.Vars(req)
 			return readers.DirectoryRoom(req, device, vars["roomAlias"], federation, &cfg)
 		}),
