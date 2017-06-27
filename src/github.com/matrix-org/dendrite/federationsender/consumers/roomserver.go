@@ -128,7 +128,7 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputRoomEvent, ev gomatrixser
 		return err
 	}
 
-	if ore.SendAsServer == "" {
+	if ore.SendAsServer == api.DoNotSendToOtherServers {
 		// Ignore event that we don't need to send anywhere.
 		return nil
 	}
