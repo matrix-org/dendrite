@@ -19,6 +19,14 @@ import (
 )
 
 // An OutputRoomEvent is written when the roomserver receives a new event.
+// It contains the full matrix room event and enough information for a
+// consumer to construct the current state of the room and the state before the
+// event.
+//
+// When we talk about state in a matrix room we are talking about the state
+// after a list of events. The current state is the state after the latest
+// event IDs in the room. The state before an event is the state after its
+// prev_events.
 type OutputRoomEvent struct {
 	// The JSON bytes of the event.
 	Event []byte
@@ -37,13 +45,23 @@ type OutputRoomEvent struct {
 	// This is used by consumers to check if they can safely update their
 	// current state using the delta supplied in AddsStateEventIDs and
 	// RemovesStateEventIDs.
+	//
 	// If the LastSentEventID doesn't match what they were expecting it to be
 	// they can use the LatestEventIDs to request the full current state.
 	LastSentEventID string
 	// The state event IDs that are part of the state at the event, but not
 	// part of the current state. Together with the StateBeforeRemovesEventIDs
 	// this can be used to construct the state before the event from the
-	// current state.
+	// current state. The StateBeforeAddsEventIDs and StateBeforeRemovesEventIDs
+	// delta is applied after the AddsStateEventIDs and RemovesStateEventIDs.
+	//
+	// Consumers need to know the state at each event in order to determine
+	// which users and servers are allowed to see the event. This information
+	// is needed to apply the history visibility rules and to tell which
+	// servers we need to push events to over federation.
+	//
+	// The state is given as a delta against the current state because they are
+	// usually either the same state, or differ by just a couple of events.
 	StateBeforeAddsEventIDs []string
 	// The state event IDs that are part of the current state, but not part
 	// of the state at the event.
