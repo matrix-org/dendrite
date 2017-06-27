@@ -2,6 +2,8 @@
 
 set -e
 
+test -d certs || mkdir -p certs
+
 # generate self-signed SSL cert (unlike synapse, dendrite doesn't autogen yet)
 # N.B. to specify the right CN if needed
 test -f certs/server.key || openssl req -x509 -newkey rsa:4096 -keyout certs/server.key -out certs/server.crt -days 3650 -nodes -subj /CN=$(hostname)
