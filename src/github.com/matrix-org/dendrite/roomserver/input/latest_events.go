@@ -238,7 +238,6 @@ func writeEvent(
 		ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
 	}
 	ore.SendAsServer = sendAsServer
-	// TODO: Fill out VisibilityStateIDs
 	return ow.WriteOutputRoomEvent(ore)
 }
 

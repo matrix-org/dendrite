@@ -19,6 +19,14 @@ import (
 )
 
 // An OutputRoomEvent is written when the roomserver receives a new event.
+// It contains the full matrix room event and enough information for a
+// consumer to construct the current state of the room and the state before the
+// event.
+//
+// When we talk about state in a matrix room we are talking about the state
+// after a list of events. The current state is the state after the latest
+// event IDs in the room. The state before an event is the state after its
+// prev_events.
 type OutputRoomEvent struct {
 	// The JSON bytes of the event.
 	Event []byte
@@ -37,19 +45,42 @@ type OutputRoomEvent struct {
 	// This is used by consumers to check if they can safely update their
 	// current state using the delta supplied in AddsStateEventIDs and
 	// RemovesStateEventIDs.
+	//
 	// If the LastSentEventID doesn't match what they were expecting it to be
 	// they can use the LatestEventIDs to request the full current state.
 	LastSentEventID string
 	// The state event IDs that are part of the state at the event, but not
 	// part of the current state. Together with the StateBeforeRemovesEventIDs
 	// this can be used to construct the state before the event from the
-	// current state.
+	// current state. The StateBeforeAddsEventIDs and StateBeforeRemovesEventIDs
+	// delta is applied after the AddsStateEventIDs and RemovesStateEventIDs.
+	//
+	// Consumers need to know the state at each event in order to determine
+	// which users and servers are allowed to see the event. This information
+	// is needed to apply the history visibility rules and to tell which
+	// servers we need to push events to over federation.
+	//
+	// The state is given as a delta against the current state because they are
+	// usually either the same state, or differ by just a couple of events.
 	StateBeforeAddsEventIDs []string
 	// The state event IDs that are part of the current state, but not part
 	// of the state at the event.
 	StateBeforeRemovesEventIDs []string
 	// The server name to use to push this event to other servers.
 	// Or empty if this event shouldn't be pushed to other servers.
+	//
+	// This is used by the federation sender component. We need to tell it what
+	// event is needs to send because it can't tell on its own. Normally we
+	// if an event was created on this server then we are responsible for
+	// sending. However there are a couple of exceptions. The first is that
+	// when the server joins a remote room through another matrix server, it
+	// is the job of the other matrix server to send the event over federation.
+	// The second is the reverse of the first, that is when a remote server
+	// joins a room that we are in over federation using our server it is our
+	// responsibility to send the join event to other matrix server.
+	//
+	// We encode the server name that the event should be sent using here to
+	// future proof the API for virtual hosting.
 	SendAsServer string
 }
 

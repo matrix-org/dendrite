@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/readers"
 	"github.com/matrix-org/dendrite/clientapi/writers"
@@ -34,6 +35,7 @@ import (
 )
 
 const pathPrefixR0 = "/_matrix/client/r0"
+const pathPrefixUnstable = "/_matrix/client/unstable"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -46,7 +48,25 @@ func Setup(
 	keyRing gomatrixserverlib.KeyRing,
 ) {
 	apiMux := mux.NewRouter()
+
+	apiMux.Handle("/_matrix/client/versions",
+		common.MakeAPI("versions", func(req *http.Request) util.JSONResponse {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct {
+					Versions []string `json:"versions"`
+				}{[]string{
+					"r0.0.1",
+					"r0.1.0",
+					"r0.2.0",
+				}},
+			}
+		}),
+	)
+
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	unstableMux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
+
 	r0mux.Handle("/createRoom",
 		common.MakeAuthAPI("createRoom", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return writers.CreateRoom(req, device, cfg, producer)
@@ -84,6 +104,13 @@ func Setup(
 	r0mux.Handle("/register", common.MakeAPI("register", func(req *http.Request) util.JSONResponse {
 		return writers.Register(req, accountDB, deviceDB)
 	}))
+
+	r0mux.Handle("/directory/room/{roomAlias}",
+		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.DirectoryRoom(req, device, vars["roomAlias"], federation, &cfg)
+		}),
+	)
 
 	// Stub endpoints required by Riot
 
@@ -163,6 +190,78 @@ func Setup(
 				Code: 200,
 				JSON: struct{}{},
 			}
+		}),
+	)
+
+	r0mux.Handle("/voip/turnServer",
+		common.MakeAPI("turn_server", func(req *http.Request) util.JSONResponse {
+			// TODO: Return credentials for a turn server if one is configured.
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct{}{},
+			}
+		}),
+	)
+
+	r0mux.Handle("/publicRooms",
+		common.MakeAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+			// TODO: Return a list of public rooms
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct {
+					Chunk []struct{} `json:"chunk"`
+					Start string     `json:"start"`
+					End   string     `json:"end"`
+				}{[]struct{}{}, "", ""},
+			}
+		}),
+	)
+
+	unstableMux.Handle("/thirdparty/protocols",
+		common.MakeAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
+			// TODO: Return the third party protcols
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct{}{},
+			}
+		}),
+	)
+
+	r0mux.Handle("/rooms/{roomID}/initialSync",
+		common.MakeAPI("rooms_initial_sync", func(req *http.Request) util.JSONResponse {
+			// TODO: Allow people to peek into rooms.
+			return util.JSONResponse{
+				Code: 403,
+				JSON: jsonerror.GuestAccessForbidden("Guest access not implemented"),
+			}
+		}),
+	)
+
+	r0mux.Handle("/profile/{userID}/displayname",
+		common.MakeAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
+			// TODO: Set and get the displayname
+			return util.JSONResponse{Code: 200, JSON: struct{}{}}
+		}),
+	)
+
+	r0mux.Handle("/user/{userID}/account_data/{type}",
+		common.MakeAPI("user_account_data", func(req *http.Request) util.JSONResponse {
+			// TODO: Set and get the account_data
+			return util.JSONResponse{Code: 200, JSON: struct{}{}}
+		}),
+	)
+
+	r0mux.Handle("/rooms/{roomID}/read_markers",
+		common.MakeAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
+			// TODO: return the read_markers.
+			return util.JSONResponse{Code: 200, JSON: struct{}{}}
+		}),
+	)
+
+	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
+		common.MakeAPI("rooms_typing", func(req *http.Request) util.JSONResponse {
+			// TODO: handling typing
+			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
 	)
 

@@ -106,7 +106,7 @@ func main() {
 
 	if *syncServerURL == "" {
 		flag.Usage()
-		fmt.Fprintln(os.Stderr, "no --sync-server-url specified.")
+		fmt.Fprintln(os.Stderr, "no --sync-api-server-url specified.")
 		os.Exit(1)
 	}
 
