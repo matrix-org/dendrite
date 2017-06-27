@@ -70,7 +70,7 @@ type OutputRoomEvent struct {
 	// Or empty if this event shouldn't be pushed to other servers.
 	//
 	// This is used by the federation sender component. We need to tell it what
-	// event is needs to send because it can't tell on its own. Normally if an
+	// event it needs to send because it can't tell on its own. Normally if an
 	// event was created on this server then we are responsible for sending it.
 	// However there are a couple of exceptions. The first is that when the
 	// server joins a remote room through another matrix server, it is the job
