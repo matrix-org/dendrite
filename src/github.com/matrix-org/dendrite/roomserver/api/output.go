@@ -66,6 +66,22 @@ type OutputRoomEvent struct {
 	// The state event IDs that are part of the current state, but not part
 	// of the state at the event.
 	StateBeforeRemovesEventIDs []string
+	// The server name to use to push this event to other servers.
+	// Or empty if this event shouldn't be pushed to other servers.
+	//
+	// This is used by the federation sender component. We need to tell it what
+	// event it needs to send because it can't tell on its own. Normally if an
+	// event was created on this server then we are responsible for sending it.
+	// However there are a couple of exceptions. The first is that when the
+	// server joins a remote room through another matrix server, it is the job
+	// of the other matrix server to send the event over federation. The second
+	// is the reverse of the first, that is when a remote server joins a room
+	// that we are in over federation using our server it is our responsibility
+	// to send the join event to other matrix servers.
+	//
+	// We encode the server name that the event should be sent using here to
+	// future proof the API for virtual hosting.
+	SendAsServer string
 }
 
 // UnmarshalJSON implements json.Unmarshaller
@@ -82,6 +98,7 @@ func (ore *OutputRoomEvent) UnmarshalJSON(data []byte) error {
 		LastSentEventID            string
 		StateBeforeAddsEventIDs    []string
 		StateBeforeRemovesEventIDs []string
+		SendAsServer               string
 	}
 	if err := json.Unmarshal(data, &content); err != nil {
 		return err
@@ -95,6 +112,7 @@ func (ore *OutputRoomEvent) UnmarshalJSON(data []byte) error {
 	ore.LastSentEventID = content.LastSentEventID
 	ore.StateBeforeAddsEventIDs = content.StateBeforeAddsEventIDs
 	ore.StateBeforeRemovesEventIDs = content.StateBeforeRemovesEventIDs
+	ore.SendAsServer = content.SendAsServer
 	return nil
 }
 
@@ -113,6 +131,7 @@ func (ore OutputRoomEvent) MarshalJSON() ([]byte, error) {
 		LastSentEventID            string
 		StateBeforeAddsEventIDs    []string
 		StateBeforeRemovesEventIDs []string
+		SendAsServer               string
 	}{
 		Event:                      &event,
 		LatestEventIDs:             ore.LatestEventIDs,
@@ -121,6 +140,7 @@ func (ore OutputRoomEvent) MarshalJSON() ([]byte, error) {
 		LastSentEventID:            ore.LastSentEventID,
 		StateBeforeAddsEventIDs:    ore.StateBeforeAddsEventIDs,
 		StateBeforeRemovesEventIDs: ore.StateBeforeRemovesEventIDs,
+		SendAsServer:               ore.SendAsServer,
 	}
 	return json.Marshal(&content)
 }

@@ -40,6 +40,10 @@ const (
 	KindBackfill = 4
 )
 
+// DoNotSendToOtherServers tells us not to send the event to other matrix
+// servers.
+const DoNotSendToOtherServers = ""
+
 // InputRoomEvent is a matrix room event to add to the room server database.
 // TODO: Implement UnmarshalJSON/MarshalJSON in a way that does something sensible with the event JSON.
 type InputRoomEvent struct {
@@ -62,6 +66,9 @@ type InputRoomEvent struct {
 	// These are only used if HasState is true.
 	// The list can be empty, for example when storing the first event in a room.
 	StateEventIDs []string
+	// The server name to use to push this event to other servers.
+	// Or empty if this event shouldn't be pushed to other servers.
+	SendAsServer string
 }
 
 // UnmarshalJSON implements json.Unmarshaller
@@ -76,6 +83,7 @@ func (ire *InputRoomEvent) UnmarshalJSON(data []byte) error {
 		AuthEventIDs  []string
 		StateEventIDs []string
 		HasState      bool
+		SendAsServer  string
 	}
 	if err := json.Unmarshal(data, &content); err != nil {
 		return err
@@ -84,6 +92,7 @@ func (ire *InputRoomEvent) UnmarshalJSON(data []byte) error {
 	ire.AuthEventIDs = content.AuthEventIDs
 	ire.StateEventIDs = content.StateEventIDs
 	ire.HasState = content.HasState
+	ire.SendAsServer = content.SendAsServer
 	if content.Event != nil {
 		ire.Event = []byte(*content.Event)
 	}
@@ -103,12 +112,14 @@ func (ire InputRoomEvent) MarshalJSON() ([]byte, error) {
 		AuthEventIDs  []string
 		StateEventIDs []string
 		HasState      bool
+		SendAsServer  string
 	}{
 		Kind:          ire.Kind,
 		AuthEventIDs:  ire.AuthEventIDs,
 		StateEventIDs: ire.StateEventIDs,
 		Event:         &event,
 		HasState:      ire.HasState,
+		SendAsServer:  ire.SendAsServer,
 	}
 	return json.Marshal(&content)
 }

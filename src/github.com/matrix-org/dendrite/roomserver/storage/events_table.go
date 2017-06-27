@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS events (
     -- part of the event graph
     -- Since many different events can have the same state we store the
     -- state into a separate state table and refer to it by numeric ID.
-    state_snapshot_nid bigint NOT NULL DEFAULT 0,
+    state_snapshot_nid BIGINT NOT NULL DEFAULT 0,
+    -- Depth of the event in the event graph.
+    depth BIGINT NOT NULL,
     -- The textual event id.
     -- Used to lookup the numeric ID when processing requests.
     -- Needed for state resolution.
@@ -61,8 +63,8 @@ CREATE TABLE IF NOT EXISTS events (
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)" +
+	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" ON CONFLICT ON CONSTRAINT event_id_unique" +
 	" DO NOTHING" +
 	" RETURNING event_nid, state_snapshot_nid"
@@ -107,6 +109,9 @@ const bulkSelectEventIDSQL = "" +
 const bulkSelectEventNIDSQL = "" +
 	"SELECT event_id, event_nid FROM events WHERE event_id = ANY($1)"
 
+const selectMaxEventDepthSQL = "" +
+	"SELECT COALESCE(MAX(depth) + 1, 0) FROM events WHERE event_nid = ANY($1)"
+
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
@@ -120,6 +125,7 @@ type eventStatements struct {
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
 	bulkSelectEventNIDStmt                 *sql.Stmt
+	selectMaxEventDepthStmt                *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -141,6 +147,7 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
+		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 	}.prepare(db)
 }
 
@@ -149,12 +156,13 @@ func (s *eventStatements) insertEvent(
 	eventID string,
 	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
+	depth int64,
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
 	err := s.insertEventStmt.QueryRow(
 		int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, referenceSHA256,
-		eventNIDsAsArray(authEventNIDs),
+		eventNIDsAsArray(authEventNIDs), depth,
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -355,6 +363,15 @@ func (s *eventStatements) bulkSelectEventNID(eventIDs []string) (map[string]type
 		results[eventID] = types.EventNID(eventNID)
 	}
 	return results, nil
+}
+
+func (s *eventStatements) selectMaxEventDepth(eventNIDs []types.EventNID) (int64, error) {
+	var result int64
+	err := s.selectMaxEventDepthStmt.QueryRow(eventNIDsAsArray(eventNIDs)).Scan(&result)
+	if err != nil {
+		return 0, err
+	}
+	return result, nil
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {

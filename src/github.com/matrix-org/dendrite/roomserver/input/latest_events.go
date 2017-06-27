@@ -40,7 +40,12 @@ import (
 //      7 <----- latest
 //
 func updateLatestEvents(
-	db RoomEventDatabase, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	db RoomEventDatabase,
+	ow OutputRoomEventWriter,
+	roomNID types.RoomNID,
+	stateAtEvent types.StateAtEvent,
+	event gomatrixserverlib.Event,
+	sendAsServer string,
 ) (err error) {
 	updater, err := db.GetLatestEventsForUpdate(roomNID)
 	if err != nil {
@@ -60,12 +65,18 @@ func updateLatestEvents(
 		}
 	}()
 
-	err = doUpdateLatestEvents(db, updater, ow, roomNID, stateAtEvent, event)
+	err = doUpdateLatestEvents(db, updater, ow, roomNID, stateAtEvent, event, sendAsServer)
 	return
 }
 
 func doUpdateLatestEvents(
-	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, ow OutputRoomEventWriter, roomNID types.RoomNID, stateAtEvent types.StateAtEvent, event gomatrixserverlib.Event,
+	db RoomEventDatabase,
+	updater types.RoomRecentEventsUpdater,
+	ow OutputRoomEventWriter,
+	roomNID types.RoomNID,
+	stateAtEvent types.StateAtEvent,
+	event gomatrixserverlib.Event,
+	sendAsServer string,
 ) error {
 	var err error
 	var prevEvents []gomatrixserverlib.EventReference
@@ -128,7 +139,7 @@ func doUpdateLatestEvents(
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
 	if err = writeEvent(
 		db, ow, lastEventIDSent, event, newLatest, removed, added,
-		stateBeforeEventRemoves, stateBeforeEventAdds,
+		stateBeforeEventRemoves, stateBeforeEventAdds, sendAsServer,
 	); err != nil {
 		return err
 	}
@@ -182,6 +193,7 @@ func writeEvent(
 	event gomatrixserverlib.Event, latest []types.StateAtEventAndReference,
 	removed, added []types.StateEntry,
 	stateBeforeEventRemoves, stateBeforeEventAdds []types.StateEntry,
+	sendAsServer string,
 ) error {
 
 	latestEventIDs := make([]string, len(latest))
@@ -225,6 +237,7 @@ func writeEvent(
 	for _, entry := range stateBeforeEventAdds {
 		ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
 	}
+	ore.SendAsServer = sendAsServer
 	return ow.WriteOutputRoomEvent(ore)
 }
 

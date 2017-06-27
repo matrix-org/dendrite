@@ -93,6 +93,7 @@ func SendEvent(
 		refs = append(refs, e.EventReference())
 	}
 	builder.AuthEvents = refs
+	builder.Depth = queryRes.Depth
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	e, err := builder.Build(
 		eventID, time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
@@ -115,7 +116,7 @@ func SendEvent(
 	}
 
 	// pass the new event to the roomserver
-	if err := producer.SendEvents([]gomatrixserverlib.Event{e}); err != nil {
+	if err := producer.SendEvents([]gomatrixserverlib.Event{e}, cfg.Matrix.ServerName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
