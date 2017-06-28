@@ -28,10 +28,12 @@ import (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
+	client      *gomatrixserverlib.FederationClient
+	origin      gomatrixserverlib.ServerName
+	destination gomatrixserverlib.ServerName
+	// The running mutex protects running, sentCounter, lastTransactionIDs and
+	// pendingEvents.
 	runningMutex       sync.Mutex
-	client             *gomatrixserverlib.FederationClient
-	origin             gomatrixserverlib.ServerName
-	destination        gomatrixserverlib.ServerName
 	running            bool
 	sentCounter        int
 	lastTransactionIDs []gomatrixserverlib.TransactionID

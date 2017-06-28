@@ -25,8 +25,9 @@ import (
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
-	origin      gomatrixserverlib.ServerName
-	client      *gomatrixserverlib.FederationClient
+	origin gomatrixserverlib.ServerName
+	client *gomatrixserverlib.FederationClient
+	// The queuesMutex protects queues
 	queuesMutex sync.Mutex
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
