@@ -22,14 +22,14 @@ import (
 
 // A JoinedHost is a server that is joined to a matrix room.
 type JoinedHost struct {
-	// The EventID of a m.room.member join event.
-	EventID string
+	// The MemberEventID of a m.room.member join event.
+	MemberEventID string
 	// The domain part of the state key of the m.room.member join event
 	ServerName gomatrixserverlib.ServerName
 }
 
 // A EventIDMismatchError indicates that we have got out of sync with the
-// rooms erver.
+// rooms server.
 type EventIDMismatchError struct {
 	// The event ID we have stored in our local database.
 	DatabaseID string
@@ -37,9 +37,9 @@ type EventIDMismatchError struct {
 	RoomServerID string
 }
 
-func (l EventIDMismatchError) Error() string {
+func (e EventIDMismatchError) Error() string {
 	return fmt.Sprintf(
 		"mismatched last sent event ID: had %q in database got %q from room server",
-		l.DatabaseID, l.RoomServerID,
+		e.DatabaseID, e.RoomServerID,
 	)
 }

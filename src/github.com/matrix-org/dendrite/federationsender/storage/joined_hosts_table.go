@@ -16,6 +16,7 @@ package storage
 
 import (
 	"database/sql"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -101,8 +102,8 @@ func (s *joinedHostsStatements) selectJoinedHosts(txn *sql.Tx, roomID string,
 			return nil, err
 		}
 		result = append(result, types.JoinedHost{
-			EventID:    eventID,
-			ServerName: gomatrixserverlib.ServerName(serverName),
+			MemberEventID: eventID,
+			ServerName:    gomatrixserverlib.ServerName(serverName),
 		})
 	}
 	return result, nil

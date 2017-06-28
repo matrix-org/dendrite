@@ -16,6 +16,7 @@ package storage
 
 import (
 	"database/sql"
+
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/types"
 )
@@ -91,7 +92,7 @@ func (d *Database) UpdateRoom(
 			return err
 		}
 		for _, add := range addHosts {
-			err = d.insertJoinedHosts(txn, roomID, add.EventID, add.ServerName)
+			err = d.insertJoinedHosts(txn, roomID, add.MemberEventID, add.ServerName)
 			if err != nil {
 				return err
 			}

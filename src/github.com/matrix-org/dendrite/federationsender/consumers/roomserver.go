@@ -185,7 +185,7 @@ func (s *OutputRoomEvent) joinedHostsAtEvent(
 
 	joined := map[gomatrixserverlib.ServerName]bool{}
 	for _, joinedHost := range oldJoinedHosts {
-		if removed[joinedHost.EventID] {
+		if removed[joinedHost.MemberEventID] {
 			// This m.room.member event is part of the current state of the
 			// room, but not part of the state at the event we are processing
 			// Therefore we can't use it to tell whether the server was in
@@ -233,7 +233,7 @@ func joinedHostsFromEvents(evs []gomatrixserverlib.Event) ([]types.JoinedHost, e
 			return nil, err
 		}
 		joinedHosts = append(joinedHosts, types.JoinedHost{
-			EventID: ev.EventID(), ServerName: serverName,
+			MemberEventID: ev.EventID(), ServerName: serverName,
 		})
 	}
 	return joinedHosts, nil
