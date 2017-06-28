@@ -372,3 +372,41 @@ func (d *Database) StateEntriesForTuples(
 ) ([]types.StateEntryList, error) {
 	return d.statements.bulkSelectFilteredStateBlockEntries(stateBlockNIDs, stateKeyTuples)
 }
+
+// StoreInvite implements input.EventDatabase
+func (d *Database) StoreInvite(
+	roomNID types.RoomNID, inviteEventNID types.EventNID,
+	targetNID types.EventStateKeyNID, senderID string,
+) (replacedByNID types.EventNID, sentInviteToOutput bool, err error) {
+	var senderNID types.EventStateKeyNID
+	if senderNID, err = d.assignStateKeyNID(senderID); err != nil {
+		return
+	}
+
+	if err = d.statements.upsertInviteEvent(inviteEventNID, roomNID, targetNID, senderNID); err != nil {
+		return
+	}
+
+	if replacedByNID, sentInviteToOutput, _, err = d.statements.selectInvite(inviteEventNID); err != nil {
+		return
+	}
+
+	return
+}
+
+// MarkInviteAsSent implements input.EventDatabase
+func (d *Database) MarkInviteAsSent(inviteEventNID types.EventNID) error {
+	return d.statements.updateInviteSentInviteToOutput(inviteEventNID)
+}
+
+// MarkInviteReplacedAsSent implements input.EventDatabase
+func (d *Database) MarkInviteReplacedAsSent(inviteEventNID types.EventNID) error {
+	return d.statements.updateInviteSentReplacedToOutput(inviteEventNID)
+}
+
+// LookupInviteForUserInRoom implements query.RoomserverQueryAPIDB
+func (d *Database) LookupInviteForUserInRoom(
+	roomNID types.RoomNID, targetNID types.EventStateKeyNID,
+) (eventNID types.EventNID, senderNID types.EventStateKeyNID, err error) {
+	return d.statements.selectActiveInviteForUserInRoom(targetNID, roomNID)
+}

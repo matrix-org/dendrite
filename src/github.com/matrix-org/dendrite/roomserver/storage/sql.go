@@ -30,45 +30,27 @@ type statements struct {
 	stateSnapshotStatements
 	stateBlockStatements
 	previousEventStatements
+	inviteStatements
 }
 
 func (s *statements) prepare(db *sql.DB) error {
 	var err error
 
-	if err = s.PartitionOffsetStatements.Prepare(db); err != nil {
-		return err
-	}
-
-	if err = s.eventTypeStatements.prepare(db); err != nil {
-		return err
-	}
-
-	if err = s.eventStateKeyStatements.prepare(db); err != nil {
-		return err
-	}
-
-	if err = s.roomStatements.prepare(db); err != nil {
-		return err
-	}
-
-	if err = s.eventStatements.prepare(db); err != nil {
-		return err
-	}
-
-	if err = s.eventJSONStatements.prepare(db); err != nil {
-		return err
-	}
-
-	if err = s.stateSnapshotStatements.prepare(db); err != nil {
-		return err
-	}
-
-	if err = s.stateBlockStatements.prepare(db); err != nil {
-		return err
-	}
-
-	if err = s.previousEventStatements.prepare(db); err != nil {
-		return err
+	for _, prepare := range []func(db *sql.DB) error{
+		s.PartitionOffsetStatements.Prepare,
+		s.eventTypeStatements.prepare,
+		s.eventStateKeyStatements.prepare,
+		s.roomStatements.prepare,
+		s.eventStatements.prepare,
+		s.eventJSONStatements.prepare,
+		s.stateSnapshotStatements.prepare,
+		s.stateBlockStatements.prepare,
+		s.previousEventStatements.prepare,
+		s.inviteStatements.prepare,
+	} {
+		if err = prepare(db); err != nil {
+			return err
+		}
 	}
 
 	return nil
