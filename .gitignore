@@ -1,11 +1,18 @@
 .*.swp
 
+# Hidden files
+.*
+
+# Downloads
+kafka.tgz
+
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
 *.a
 *.so
 
 # Folders
+kafka
 bin
 pkg
 _obj
