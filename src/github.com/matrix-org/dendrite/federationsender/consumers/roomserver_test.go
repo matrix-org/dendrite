@@ -50,5 +50,4 @@ func TestCombineDedup(t *testing.T) {
 	if len(gotDel) != 1 || gotDel[0] != "b" {
 		t.Errorf("wanted combined removes to be %#v, got %#v", []string{"b"}, gotDel)
 	}
-
 }
