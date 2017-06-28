@@ -70,7 +70,8 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 	return d.UpsertPartitionOffset(topic, partition, offset)
 }
 
-// UpdateRoom updates the joined hosts for a room.
+// UpdateRoom updates the joined hosts for a room and returns what the joined
+// hosts were before the update.
 func (d *Database) UpdateRoom(
 	roomID, oldEventID, newEventID string,
 	addHosts []types.JoinedHost,

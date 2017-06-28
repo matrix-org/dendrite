@@ -25,10 +25,10 @@ import (
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
-	mutex  sync.Mutex
-	queues map[gomatrixserverlib.ServerName]*destinationQueue
-	origin gomatrixserverlib.ServerName
-	client *gomatrixserverlib.FederationClient
+	origin      gomatrixserverlib.ServerName
+	client      *gomatrixserverlib.FederationClient
+	queuesMutex sync.Mutex
+	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
 // NewOutgoingQueues makes a new OutgoingQueues
@@ -63,8 +63,8 @@ func (oqs *OutgoingQueues) SendEvent(
 		"destinations": destinations, "event": ev.EventID(),
 	}).Info("Sending event")
 
-	oqs.mutex.Lock()
-	defer oqs.mutex.Unlock()
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
 	for _, destination := range destinations {
 		oq := oqs.queues[destination]
 		if oq == nil {

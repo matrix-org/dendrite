@@ -28,7 +28,7 @@ import (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
-	mutex              sync.Mutex
+	runningMutex       sync.Mutex
 	client             *gomatrixserverlib.FederationClient
 	origin             gomatrixserverlib.ServerName
 	destination        gomatrixserverlib.ServerName
@@ -42,10 +42,11 @@ type destinationQueue struct {
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
 func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.Event) {
-	oq.mutex.Lock()
-	defer oq.mutex.Unlock()
+	oq.runningMutex.Lock()
+	defer oq.runningMutex.Unlock()
 	oq.pendingEvents = append(oq.pendingEvents, ev)
 	if !oq.running {
+		oq.running = true
 		go oq.backgroundSend()
 	}
 }
@@ -76,8 +77,8 @@ func (oq *destinationQueue) backgroundSend() {
 // and flushes the queue.
 // Returns nil if the queue was empty.
 func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
-	oq.mutex.Lock()
-	defer oq.mutex.Unlock()
+	oq.runningMutex.Lock()
+	defer oq.runningMutex.Unlock()
 	if len(oq.pendingEvents) == 0 {
 		oq.running = false
 		return nil
