@@ -16,14 +16,15 @@ package types
 
 import (
 	"fmt"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A JoinedHost is a server that is joined to a matrix room.
 type JoinedHost struct {
-	// THe EventID of a m.room.member event that joins a server to a room.
+	// The EventID of a m.room.member join event.
 	EventID string
-	// The
+	// The domain part of the state key of the m.room.member join event
 	ServerName gomatrixserverlib.ServerName
 }
 

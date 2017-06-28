@@ -91,9 +91,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		"send_as_server": output.SendAsServer,
 	}).Info("received event from roomserver")
 
-	err = s.processMessage(output, ev)
-
-	if err != nil {
+	if err = s.processMessage(output, ev); err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
@@ -107,6 +105,8 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	return nil
 }
 
+// processMessage updates the list of currently joined hosts in the room
+// and then sends the event to the hosts that were joined before the event.
 func (s *OutputRoomEvent) processMessage(ore api.OutputRoomEvent, ev gomatrixserverlib.Event) error {
 	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ev)
 	if err != nil {
@@ -240,39 +240,40 @@ func joinedHostsFromEvents(evs []gomatrixserverlib.Event) ([]types.JoinedHost, e
 }
 
 // combineDeltas combines two deltas into a single delta.
+// Assumes that the order of operations is add(1), remove(1), add(2), remove(2).
+// Removes duplicate entries and redundant operations from each delta.
 func combineDeltas(adds1, removes1, adds2, removes2 []string) (adds, removes []string) {
 	addSet := map[string]bool{}
 	removeSet := map[string]bool{}
-	var ok bool
-	for _, value := range adds1 {
-		addSet[value] = true
-	}
-	for _, value := range removes1 {
-		removeSet[value] = true
-	}
-	for _, value := range adds2 {
-		if _, ok = removeSet[value]; ok {
-			removeSet[value] = false
-		} else {
-			addSet[value] = true
+
+	// combine processes each unique value in a list.
+	// If the value is in the removeFrom set then it is removed from that set.
+	// Otherwise it is added to the addTo set.
+	combine := func(values []string, removeFrom, addTo map[string]bool) {
+		processed := map[string]bool{}
+		for _, value := range values {
+			if processed[value] {
+				continue
+			}
+			processed[value] = true
+			if removeFrom[value] {
+				delete(removeFrom, value)
+			} else {
+				addTo[value] = true
+			}
 		}
 	}
-	for _, value := range removes2 {
-		if _, ok = addSet[value]; ok {
-			addSet[value] = false
-		} else {
-			removeSet[value] = true
-		}
+
+	combine(adds1, nil, addSet)
+	combine(removes1, addSet, removeSet)
+	combine(adds2, removeSet, addSet)
+	combine(removes2, addSet, removeSet)
+
+	for value := range addSet {
+		adds = append(adds, value)
 	}
-	for value, include := range addSet {
-		if include {
-			adds = append(adds, value)
-		}
-	}
-	for value, include := range removeSet {
-		if include {
-			removes = append(removes, value)
-		}
+	for value := range removeSet {
+		removes = append(removes, value)
 	}
 	return
 }
