@@ -134,18 +134,19 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputRoomEvent, ev gomatrixser
 		return nil
 	}
 
-	joinedHosts, err := s.joinedHostsAtEvent(ore, ev, oldJoinedHosts)
+	// Work out which hosts were joined at the event itself.
+	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, ev, oldJoinedHosts)
 	if err != nil {
 		return err
 	}
 
+	// Send the event.
 	if err = s.queues.SendEvent(
-		&ev, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHosts,
+		&ev, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	); err != nil {
 		return err
 	}
 
-	// TODO: Add the event to the transaction queue
 	return nil
 }
 
