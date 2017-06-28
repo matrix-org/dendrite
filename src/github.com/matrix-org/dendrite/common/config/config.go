@@ -122,16 +122,20 @@ type Dendrite struct {
 		// The RoomServer database stores information about matrix rooms.
 		// It is only accessed by the RoomServer.
 		RoomServer DataSource `yaml:"room_server"`
+		// The FederationSender database stores information used by the FederationSender
+		// It is only accessed by the FederationSender.
+		FederationSender DataSource `yaml:"federation_sender"`
 	} `yaml:"database"`
 
 	// The internal addresses the components will listen on.
 	// These should not be exposed externally as they expose metrics and debugging APIs.
 	Listen struct {
-		MediaAPI      Address `yaml:"media_api"`
-		ClientAPI     Address `yaml:"client_api"`
-		FederationAPI Address `yaml:"federation_api"`
-		SyncAPI       Address `yaml:"sync_api"`
-		RoomServer    Address `yaml:"room_server"`
+		MediaAPI         Address `yaml:"media_api"`
+		ClientAPI        Address `yaml:"client_api"`
+		FederationAPI    Address `yaml:"federation_api"`
+		SyncAPI          Address `yaml:"sync_api"`
+		RoomServer       Address `yaml:"room_server"`
+		FederationSender Address `yaml:"federation_sender"`
 	} `yaml:"listen"`
 }
 
