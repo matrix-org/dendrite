@@ -29,7 +29,7 @@ type JoinedHost struct {
 }
 
 // A EventIDMismatchError indicates that we have got out of sync with the
-// rooms server.
+// room server.
 type EventIDMismatchError struct {
 	// The event ID we have stored in our local database.
 	DatabaseID string
