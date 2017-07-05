@@ -16,6 +16,8 @@ package storage
 
 import (
 	"database/sql"
+	"fmt"
+
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -340,6 +342,10 @@ func (u *roomRecentEventsUpdater) Rollback() error {
 	return u.txn.Rollback()
 }
 
+func (u *roomRecentEventsUpdater) MembershipUpdater(targetNID types.EventStateKeyNID) (types.MembershipUpdater, error) {
+	panic(fmt.Errorf("Not implemented"))
+}
+
 // RoomNID implements query.RoomserverQueryAPIDB
 func (d *Database) RoomNID(roomID string) (types.RoomNID, error) {
 	roomNID, err := d.statements.selectRoomNID(roomID)
@@ -371,42 +377,4 @@ func (d *Database) StateEntriesForTuples(
 	stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
 	return d.statements.bulkSelectFilteredStateBlockEntries(stateBlockNIDs, stateKeyTuples)
-}
-
-// StoreInvite implements input.EventDatabase
-func (d *Database) StoreInvite(
-	roomNID types.RoomNID, inviteEventNID types.EventNID,
-	targetNID types.EventStateKeyNID, senderID string,
-) (replacedByNID types.EventNID, sentInviteToOutput bool, err error) {
-	var senderNID types.EventStateKeyNID
-	if senderNID, err = d.assignStateKeyNID(senderID); err != nil {
-		return
-	}
-
-	if err = d.statements.upsertInviteEvent(inviteEventNID, roomNID, targetNID, senderNID); err != nil {
-		return
-	}
-
-	if replacedByNID, sentInviteToOutput, _, err = d.statements.selectInvite(inviteEventNID); err != nil {
-		return
-	}
-
-	return
-}
-
-// MarkInviteAsSent implements input.EventDatabase
-func (d *Database) MarkInviteAsSent(inviteEventNID types.EventNID) error {
-	return d.statements.updateInviteSentInviteToOutput(inviteEventNID)
-}
-
-// MarkInviteReplacedAsSent implements input.EventDatabase
-func (d *Database) MarkInviteReplacedAsSent(inviteEventNID types.EventNID) error {
-	return d.statements.updateInviteSentReplacedToOutput(inviteEventNID)
-}
-
-// LookupInviteForUserInRoom implements query.RoomserverQueryAPIDB
-func (d *Database) LookupInviteForUserInRoom(
-	roomNID types.RoomNID, targetNID types.EventStateKeyNID,
-) (eventNID types.EventNID, senderNID types.EventStateKeyNID, err error) {
-	return d.statements.selectActiveInviteForUserInRoom(targetNID, roomNID)
 }

@@ -22,73 +22,88 @@ import (
 
 const inviteSchema = `
 CREATE TABLE invites (
-	-- The numeric ID of the invite event itself.
-	invite_event_nid BIGINT NOT NULL CONSTRAINT invite_event_nid_unique UNIQUE,
+	-- The string ID of the invite event itself.
+	-- We can't use a numeric event ID here because we don't always have
+	-- enough information to store an invite in the event table.
+	-- In particular we don't always have a chain of auth_events for invites
+	-- received over federation.
+	invite_event_id TEXT PRIMARY KEY,
 	-- The numeric ID of the room the invite m.room.member event is in.
 	room_nid BIGINT NOT NULL,
 	-- The numeric ID for the state key of the invite m.room.member event.
 	-- This tells us who the invite is for.
 	-- This is used to query the active invites for a user.
-	target_state_key_nid BIGINT NOT NULL,
+	target_nid BIGINT NOT NULL,
 	-- The numeric ID for the sender of the invite m.room.member event.
 	-- This tells us who sent the invite.
 	-- This is used to work out which matrix server we should talk to when
 	-- we try to join the room.
-	sender_state_key_nid BIGINT NOT NULL DEFAULT 0,
-	-- The numeric ID of the join or leave event that replaced the invite event.
+	sender_nid BIGINT NOT NULL DEFAULT 0,
 	-- This is used to track whether the invite is still active.
-	-- This is set implicitly when processing a KIND_NEW events and explici
-	-- is set 
-	replaced_by_event_nid BIGINT NOT NULL DEFAULT 0,
+	-- This is set implicitly when processing KIND_NEW events and explicitly
+	-- when rejecting events over federation.
+	retired BOOLEAN NOT NULL DEFAULT FALSE,
 	-- Whether the invite has been sent to the output stream.
 	-- We maintain a separate output stream of invite events since they don't
 	-- always occur within a room we have state for.
 	sent_invite_to_output BOOLEAN NOT NULL DEFAULT FALSE,
-	-- Whether the replacement has been sent to the output stream.
-	sent_replaced_to_output BOOLEAN NOT NULL DEFAULT FALSE,
+	-- Whether the retirement has been sent to the output stream.
+	sent_retired_to_output BOOLEAN NOT NULL DEFAULT FALSE,
+	-- The invite event JSON.
+	invite_event_json TEXT NOT NULL
 );
 
 CREATE INDEX invites_active_idx ON invites (target_state_key_nid, room_nid)
-	WHERE replaced_by_event_nid == 0;
+	WHERE NOT retired;
+
+CREATE INDEX invites_unsent_retired_idx ON invites (target_state_key_nid, room_nid)
+	WHERE retired AND NOT sent_retired_to_output;
 `
 
-const upsertInviteEventSQL = "" +
-	"INSERT INTO invites (invite_event_nid, room_nid, target_state_key_nid," +
-	" sender_state_key_nid) VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT ON invite_event_nid_unique" +
-	" DO UPDATE SET sender_state_key_nid = $4"
-
-const upsertInviteReplacedBySQL = "" +
-	"INSERT INTO invites (invite_event_nid, room_nid, target_state_key_nid," +
-	" replaced_by_event_nid) VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT ON invite_event_nid_unique" +
-	" DO UPDATE SET replaced_by_event_nid = $4"
+const insertInviteEventSQL = "" +
+	"INSERT INTO invites (invite_event_id, room_nid, target_state_key_nid," +
+	" sender_state_key_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
+	" ON CONFLICT DO NOTHING"
 
 const selectInviteSQL = "" +
-	"SELECT replaced_by_event_nid, sent_invite_to_output," +
-	" sent_replaced_to_output FROM invites" +
-	" WHERE invite_event_nid = $1"
-
-const selectActiveInviteForUserInRoomSQL = "" +
-	"SELECT invite_event_nid, sender_state_key_nid FROM invites" +
-	" WHERE target_state_key_nid = $1 AND room_nid = $2" +
-	" AND replaced_by_event_nid = 0"
+	"SELECT retired, sent_invite_to_output FROM invites" +
+	" WHERE invite_event_id = $1"
 
 const updateInviteSentInviteToOutputSQL = "" +
 	"UPDATE invites SET sent_invite_to_output = TRUE" +
-	" WHERE invite_event_nid = $1"
+	" WHERE invite_event_id = $1"
 
-const updateInviteSentReplacedToOutputSQL = "" +
-	"UPDATE invites SET sent_replaced_to_output = TRUE" +
-	" WHERE invite_event_nid = $1"
+const selectInviteActiveForUserInRoomSQL = "" +
+	"SELECT invite_event_id, sender_state_key_nid FROM invites" +
+	" WHERE target_state_key_id = $1 AND room_nid = $2" +
+	" AND NOT retired"
+
+// Retire every active invite.
+// Ideally we'd know which invite events were retired by a given update so we
+// wouldn't need to remove every active invite.
+// However the matrix protocol doesn't give us a way to reliably identify the
+// invites that were retired, so we are forced to retire all of them.
+const updateInviteRetiredSQL = "" +
+	"UPDATE invites SET retired_by_event_nid = TRUE" +
+	" WHERE room_nid = $1 AND target_state_key_nid = $2 AND NOT retired"
+
+const selectInviteUnsentRetiredSQL = "" +
+	"SELECT invite_event_id FROM invites" +
+	" WHERE target_state_key_id = $1 AND room_nid = $2" +
+	" AND retired AND NOT sent_retired_to_output"
+
+const updateInviteSentRetiredToOutputSQL = "" +
+	"UPDATE invites SET sent_retired_to_output = TRUE" +
+	" WHERE invite_event_id = $1"
 
 type inviteStatements struct {
-	upsertInviteEventStmt                *sql.Stmt
-	upsertInviteReplacedByStmt           *sql.Stmt
-	selectInviteStmt                     *sql.Stmt
-	selectActiveInviteForUserInRoomStmt  *sql.Stmt
-	updateInviteSentInviteToOutputStmt   *sql.Stmt
-	updateInviteSentReplacedToOutputStmt *sql.Stmt
+	insertInviteEventStmt               *sql.Stmt
+	selectInviteStmt                    *sql.Stmt
+	selectInviteActiveForUserInRoomStmt *sql.Stmt
+	updateInviteRetiredStmt             *sql.Stmt
+	selectInviteUnsentRetiredStmt       *sql.Stmt
+	updateInviteSentInviteToOutputStmt  *sql.Stmt
+	updateInviteSentRetiredToOutputStmt *sql.Stmt
 }
 
 func (s *inviteStatements) prepare(db *sql.DB) (err error) {
@@ -98,52 +113,63 @@ func (s *inviteStatements) prepare(db *sql.DB) (err error) {
 	}
 
 	return statementList{
-		{&s.upsertInviteEventStmt, upsertInviteEventSQL},
-		{&s.upsertInviteReplacedByStmt, upsertInviteReplacedBySQL},
+		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteStmt, selectInviteSQL},
-		{&s.selectActiveInviteForUserInRoomStmt, selectActiveInviteForUserInRoomSQL},
 		{&s.updateInviteSentInviteToOutputStmt, updateInviteSentInviteToOutputSQL},
-		{&s.updateInviteSentReplacedToOutputStmt, updateInviteSentReplacedToOutputSQL},
+		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
+		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
+
+		{&s.updateInviteSentRetiredToOutputStmt, updateInviteSentRetiredToOutputSQL},
 	}.prepare(db)
 }
 
-func (s *inviteStatements) upsertInviteEvent(
-	inviteEventNID types.EventNID, roomNID types.RoomNID,
-	targetStateKeyNID, senderStateKeyNID types.EventStateKeyNID,
+func (s *inviteStatements) insertInviteEvent(
+	txn *sql.Tx, inviteEventNID types.EventNID, roomNID types.RoomNID,
+	targetNID, senderNID types.EventStateKeyNID,
+	inviteEventJSON []byte,
 ) error {
-	_, err := s.upsertInviteEventStmt.Exec(
-		inviteEventNID, roomNID, targetStateKeyNID, senderStateKeyNID,
+	_, err := txn.Stmt(s.insertInviteEventStmt).Exec(
+		inviteEventNID, roomNID, targetNID, senderNID, inviteEventJSON,
 	)
 	return err
 }
 
-func (s *inviteStatements) upsertInviteReplacedBy(
-	inviteEventNID types.EventNID, roomNID types.RoomNID,
-	targetStateKeyNID types.EventStateKeyNID,
-	replacedByEventNID types.EventNID,
+func (s *inviteStatements) updateInviteRetired(
+	txn *sql.Tx, roomNID types.RoomNID, targetNID types.EventStateKeyNID,
 ) error {
-	_, err := s.upsertInviteReplacedByStmt.Exec(
-		inviteEventNID, roomNID, targetStateKeyNID, replacedByEventNID,
-	)
+	_, err := txn.Stmt(s.updateInviteRetiredStmt).Exec(roomNID, targetNID)
 	return err
 }
 
 func (s *inviteStatements) selectInvite(
-	inviteEventNID types.EventNID,
-) (replacedByNID types.EventNID, sentInviteToOutput, sentReplacedToOutput bool, err error) {
-	err = s.selectInviteStmt.QueryRow(inviteEventNID).Scan(
-		&replacedByNID, &sentInviteToOutput, &sentReplacedToOutput,
+	txn *sql.Tx, inviteEventNID types.EventNID,
+) (RetiredByNID types.EventNID, sentInviteToOutput, sentRetiredToOutput bool, err error) {
+	err = txn.Stmt(s.selectInviteStmt).QueryRow(inviteEventNID).Scan(
+		&RetiredByNID, &sentInviteToOutput, &sentRetiredToOutput,
 	)
 	return
 }
 
-func (s *inviteStatements) selectActiveInviteForUserInRoom(
-	targetStateKeyNID types.EventStateKeyNID, roomNID types.RoomNID,
-) (inviteEventNID types.EventNID, senderStateKeyNID types.EventStateKeyNID, err error) {
-	err = s.selectActiveInviteForUserInRoomStmt.QueryRow(
-		targetStateKeyNID, roomNID,
-	).Scan(&inviteEventNID, &senderStateKeyNID)
-	return
+// selectInviteActiveForUserInRoom returns a list of sender state key NIDs
+func (s *inviteStatements) selectInviteActiveForUserInRoom(
+	targetNID types.EventStateKeyNID, roomNID types.RoomNID,
+) ([]types.EventStateKeyNID, error) {
+	rows, err := s.selectInviteActiveForUserInRoomStmt.Query(
+		targetNID, roomNID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []types.EventStateKeyNID
+	for rows.Next() {
+		var senderNID int64
+		if err := rows.Scan(&senderNID); err != nil {
+			return nil, err
+		}
+		result = append(result, types.EventStateKeyNID(senderNID))
+	}
+	return result, nil
 }
 
 func (s *inviteStatements) updateInviteSentInviteToOutput(
@@ -153,9 +179,9 @@ func (s *inviteStatements) updateInviteSentInviteToOutput(
 	return err
 }
 
-func (s *inviteStatements) updateInviteSentReplacedToOutput(
+func (s *inviteStatements) updateInviteSentRetiredToOutput(
 	inviteEventNID types.EventNID,
 ) error {
-	_, err := s.updateInviteSentReplacedToOutputStmt.Exec(inviteEventNID)
+	_, err := s.updateInviteSentRetiredToOutputStmt.Exec(inviteEventNID)
 	return err
 }

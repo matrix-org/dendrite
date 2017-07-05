@@ -135,9 +135,17 @@ type StateEntryList struct {
 	StateEntries  []StateEntry
 }
 
+// A Transaction is something that can be committed or rolledback.
+type Transaction interface {
+	// Commit the transaction
+	Commit() error
+	// Rollback the transaction.
+	Rollback() error
+}
+
 // A RoomRecentEventsUpdater is used to update the recent events in a room.
 // (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
-//  lock on the row holding the latest events for the room.)
+//  lock on the row in the rooms table holding the latest events for the room.)
 type RoomRecentEventsUpdater interface {
 	// The latest event IDs and state in the room.
 	LatestEvents() []StateAtEventAndReference
@@ -163,10 +171,35 @@ type RoomRecentEventsUpdater interface {
 	HasEventBeenSent(eventNID EventNID) (bool, error)
 	// Mark the event as having been sent to the output logs.
 	MarkEventAsSent(eventNID EventNID) error
-	// Commit the transaction
-	Commit() error
-	// Rollback the transaction.
-	Rollback() error
+	// Build a membership updater for the target user in this room.
+	// It will share the same transaction as this updater.
+	MembershipUpdater(targetNID EventStateKeyNID) (MembershipUpdater, error)
+	// Implements Transaction so it can be committed or rolledback
+	Transaction
+}
+
+// A MembershipUpdater is used to update the membership of a user in a room.
+// (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
+//  lock on the row in the membership table for this user in the room)
+type MembershipUpdater interface {
+	// True if the target user is invited to the room.
+	IsInvite() bool
+	// True if the target user is joined to the room.
+	IsJoin() bool
+	// Set the state to invite.
+	// Returns whether this invite needs to be sent
+	SetToInviteFrom(senderID string, event gomatrixserverlib.Event) (needsSending bool, err error)
+	// Set the state to join.
+	SetToJoinFrom(senderID string) (inviteIDs []string, err error)
+	// Set the state to leave.
+	// Returns a list of invite event IDs that this state change retired.
+	SetToLeaveFrom(senderID string) (inviteIDs []string, err error)
+	// Mark the invite as sent.
+	MarkInviteAsSent(inviteID string) error
+	// Mark the invite retirement as sent.
+	MarkInviteRetirementAsSent(inviteIDs []string) error
+	// Implements Transaction so it can be committed or rolledback.
+	Transaction
 }
 
 // A MissingEventError is an error that happened because the roomserver was
