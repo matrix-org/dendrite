@@ -192,9 +192,13 @@ func createRoom(req *http.Request, device *authtypes.Device, cfg config.Dendrite
 		return httputil.LogThenError(req, err)
 	}
 
+	response := createRoomResponse{
+		RoomID: roomID,
+	}
+
 	return util.JSONResponse{
 		Code: 200,
-		JSON: builtEvents,
+		JSON: response,
 	}
 }
 
