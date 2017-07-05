@@ -95,7 +95,7 @@ func (s *membershipStatements) selectMembershipForUpdate(
 	return
 }
 
-func (s *membershipStatements) updateMembershipSQL(
+func (s *membershipStatements) updateMembership(
 	txn *sql.Tx, roomNID types.RoomNID, targetNID types.EventStateKeyNID,
 	senderNID types.EventStateKeyNID, membership membershipState,
 ) error {
