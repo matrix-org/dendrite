@@ -30,7 +30,7 @@ import (
 
 // Version is the current version of the config format.
 // This will change whenever we make breaking changes to the config format.
-const Version = "v0"
+const Version = 0
 
 // Dendrite contains all the config used by a dendrite process.
 // Relative paths are resolved relative to the current working directory
@@ -41,7 +41,7 @@ type Dendrite struct {
 	// to update their config file to the current version.
 	// The version of the file should only be different if there has
 	// been a breaking change to the config file format.
-	Version string `yaml:"version"`
+	Version int `yaml:"version"`
 
 	// The configuration required for a matrix server.
 	Matrix struct {

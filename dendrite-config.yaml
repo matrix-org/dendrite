@@ -1,5 +1,8 @@
-# The config file version format
-version: v0
+# The config file format version
+# This is used by dendrite to tell if it understands the config format.
+# This will change if the structure of the config file changes or if the meaning
+# of an existing config key changes.
+version: 0
 
 # The matrix specific config
 matrix:
