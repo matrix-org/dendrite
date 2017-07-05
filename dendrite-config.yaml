@@ -6,9 +6,9 @@ matrix:
     # The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
     server_name: "example.com"
     # The path to the PEM formatted matrix private key.
-    private_key: "/var/dendrite/matrix_key.pem"
+    private_key: "/etc/dendrite/matrix_key.pem"
     # The x509 certificates used by the federation listeners for this server
-    federation_certificates: ["/var/dendrite/federation_tls.pem"]
+    federation_certificates: ["/etc/dendrite/federation_tls.pem"]
 
 # The media repository config
 media:
@@ -56,12 +56,12 @@ kafka:
 
 # The postgres connection configs for connecting to the databases e.g a postgres:// URI
 database:
-    account: "postgres://dendrite:itsasecret@localhost/account?sslmode=disable"
-    device: "postgres://dendrite:itsasecret@localhost/device?sslmode=disable"
-    media_api: "postgres://dendrite:itsasecret@localhost/media_api?sslmode=disable"
-    sync_api: "postgres://dendrite:itsasecret@localhost/sync_api?sslmode=disable"
-    room_server: "postgres://dendrite:itsasecret@localhost/room_server?sslmode=disable"
-    server_key: "postgres://dendrite:itsasecret@localhost/server_key?sslmode=disable"
+    account: "postgres://dendrite:itsasecret@localhost/dendrite_account?sslmode=disable"
+    device: "postgres://dendrite:itsasecret@localhost/dendrite_device?sslmode=disable"
+    media_api: "postgres://dendrite:itsasecret@localhost/dendrite_mediaapi?sslmode=disable"
+    sync_api: "postgres://dendrite:itsasecret@localhost/dendrite_syncapi?sslmode=disable"
+    room_server: "postgres://dendrite:itsasecret@localhost/dendrite_roomserver?sslmode=disable"
+    server_key: "postgres://dendrite:itsasecret@localhost/dendrite_serverkey?sslmode=disable"
 
 # The TCP host:port pairs to bind the internal HTTP APIs to.
 # These shouldn't be exposed to the public internet.
