@@ -14,17 +14,9 @@
 
 package authtypes
 
-import (
-	"github.com/matrix-org/gomatrixserverlib"
-)
-
-// Account represents a Matrix account on this home server.
-type Account struct {
-	UserID     string
-	Localpart  string
-	ServerName gomatrixserverlib.ServerName
-	Profile    *Profile
-	// TODO: Other flags like IsAdmin, IsGuest
-	// TODO: Devices
-	// TODO: Associations (e.g. with application services)
+// Profile represents the profile for a Matrix account on this home server.
+type Profile struct {
+	Localpart   string
+	DisplayName string
+	AvatarURL   string
 }

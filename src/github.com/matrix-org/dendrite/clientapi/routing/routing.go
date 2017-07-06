@@ -164,10 +164,8 @@ func Setup(
 	r0mux.Handle("/profile/{userID}",
 		common.MakeAPI("profile", func(req *http.Request) util.JSONResponse {
 			// TODO: Get profile data for user ID
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct{}{},
-			}
+			vars := mux.Vars(req)
+			return readers.Profile(req, accountDB, vars["userID"])
 		}),
 	)
 
@@ -234,13 +232,6 @@ func Setup(
 				Code: 403,
 				JSON: jsonerror.GuestAccessForbidden("Guest access not implemented"),
 			}
-		}),
-	)
-
-	r0mux.Handle("/profile/{userID}/displayname",
-		common.MakeAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
-			// TODO: Set and get the displayname
-			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
 	)
 

@@ -28,6 +28,7 @@ import (
 type Database struct {
 	db       *sql.DB
 	accounts accountsStatements
+	profiles profilesStatements
 }
 
 // NewDatabase creates a new accounts database
@@ -41,7 +42,11 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = a.prepare(db, serverName); err != nil {
 		return nil, err
 	}
-	return &Database{db, a}, nil
+	p := profilesStatements{}
+	if err = p.prepare(db); err != nil {
+		return nil, err
+	}
+	return &Database{db, a, p}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -57,11 +62,18 @@ func (d *Database) GetAccountByPassword(localpart, plaintextPassword string) (*a
 	return d.accounts.selectAccountByLocalpart(localpart)
 }
 
+func (d *Database) GetProfileByLocalpart(localpart string) (*authtypes.Profile, error) {
+	return d.profiles.selectProfileByLocalpart(localpart)
+}
+
 // CreateAccount makes a new account with the given login name and password. If no password is supplied,
 // the account will be a passwordless account.
 func (d *Database) CreateAccount(localpart, plaintextPassword string) (*authtypes.Account, error) {
 	hash, err := hashPassword(plaintextPassword)
 	if err != nil {
+		return nil, err
+	}
+	if err := d.profiles.insertProfile(localpart); err != nil {
 		return nil, err
 	}
 	return d.accounts.insertAccount(localpart, hash)
