@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -29,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -193,14 +193,7 @@ func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JS
 		//       It should be a struct (with pointers into a single string to avoid copying) and
 		//       we should update all refs to use UserID types rather than strings.
 		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
-		if len(r.MediaMetadata.UserID) == 0 || r.MediaMetadata.UserID[0] != '@' {
-			return &util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.Unknown("user id must start with '@'"),
-			}
-		}
-		parts := strings.SplitN(string(r.MediaMetadata.UserID[1:]), ":", 2)
-		if len(parts) != 2 {
+		if _, _, err := gomatrixserverlib.ParseID('@', string(r.MediaMetadata.UserID)); err != nil {
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),

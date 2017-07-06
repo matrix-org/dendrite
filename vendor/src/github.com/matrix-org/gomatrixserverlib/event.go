@@ -18,8 +18,10 @@ package gomatrixserverlib
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/ed25519"
+	"strings"
 	"time"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 // A StateKeyTuple is the combination of an event type and an event state key.
@@ -54,7 +56,7 @@ type EventBuilder struct {
 	Type string `json:"type"`
 	// The state_key of the event if the event is a state event or nil if the event is not a state event.
 	StateKey *string `json:"state_key,omitempty"`
-	// The events that immediately preceeded this event in the room history.
+	// The events that immediately preceded this event in the room history.
 	PrevEvents []EventReference `json:"prev_events"`
 	// The events needed to authenticate this event.
 	AuthEvents []EventReference `json:"auth_events"`
@@ -112,7 +114,7 @@ var emptyEventReferenceList = []EventReference{}
 // Build a new Event.
 // This is used when a local event is created on this server.
 // Call this after filling out the necessary fields.
-// This can be called mutliple times on the same builder.
+// This can be called multiple times on the same builder.
 // A different event ID must be supplied each time this is called.
 func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, keyID KeyID, privateKey ed25519.PrivateKey) (result Event, err error) {
 	var event struct {
@@ -467,9 +469,42 @@ func (e Event) PrevEvents() []EventReference {
 	return e.fields.PrevEvents
 }
 
+// PrevEventIDs returns the event IDs of the direct ancestors of the event.
+func (e Event) PrevEventIDs() []string {
+	result := make([]string, len(e.fields.PrevEvents))
+	for i := range e.fields.PrevEvents {
+		result[i] = e.fields.PrevEvents[i].EventID
+	}
+	return result
+}
+
+// Membership returns the value of the content.membership field if this event
+// is an "m.room.member" event.
+// Returns an error if the event is not a m.room.member event or if the content
+// is not valid m.room.member content.
+func (e Event) Membership() (*string, error) {
+	if e.fields.Type != MRoomMember {
+		return nil, fmt.Errorf("gomatrixserverlib: not an m.room.member event")
+	}
+	var content memberContent
+	if err := json.Unmarshal(e.fields.Content, &content); err != nil {
+		return nil, err
+	}
+	return &content.Membership, nil
+}
+
 // AuthEvents returns references to the events needed to auth the event.
 func (e Event) AuthEvents() []EventReference {
 	return e.fields.AuthEvents
+}
+
+// AuthEventIDs returns the event IDs of the events needed to auth the event.
+func (e Event) AuthEventIDs() []string {
+	result := make([]string, len(e.fields.PrevEvents))
+	for i := range e.fields.PrevEvents {
+		result[i] = e.fields.PrevEvents[i].EventID
+	}
+	return result
 }
 
 // Redacts returns the event ID of the event this event redacts.
@@ -533,4 +568,20 @@ func (er EventReference) MarshalJSON() ([]byte, error) {
 	tuple := []interface{}{er.EventID, hashes}
 
 	return json.Marshal(&tuple)
+}
+
+// ParseID splits a matrix ID into a local part and a server name.
+func ParseID(sigil byte, id string) (local string, domain ServerName, err error) {
+	// IDs have the format: SIGIL LOCALPART ":" DOMAIN
+	// Split on the first ":" character since the domain can contain ":"
+	// characters.
+	if len(id) == 0 || id[0] != sigil {
+		return "", "", fmt.Errorf("gomatriserverlib: invalid ID %q doesn't start with %q", id, sigil)
+	}
+	parts := strings.SplitN(id, ":", 2)
+	if len(parts) != 2 {
+		// The ID must have a ":" character.
+		return "", "", fmt.Errorf("gomatrixserverlib: invalid ID %q missing ':'", id)
+	}
+	return parts[0][1:], ServerName(parts[1]), nil
 }
