@@ -66,6 +66,10 @@ func (d *Database) GetProfileByLocalpart(localpart string) (*authtypes.Profile, 
 	return d.profiles.selectProfileByLocalpart(localpart)
 }
 
+func (d *Database) SetAvatarURL(localpart string, avatarUrl string) error {
+	return d.profiles.setAvatarURL(localpart, avatarUrl)
+}
+
 // CreateAccount makes a new account with the given login name and password. If no password is supplied,
 // the account will be a passwordless account.
 func (d *Database) CreateAccount(localpart, plaintextPassword string) (*authtypes.Account, error) {

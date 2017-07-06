@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	// "github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	// "github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -31,7 +31,11 @@ type profileResponse struct {
 	DisplayName string `json:"displayname"`
 }
 
-func Profile(
+type avatarURLRequest struct {
+	AvatarURL string `json:"avatar_url"`
+}
+
+func GetProfile(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
 	if req.Method == "GET" {
@@ -50,6 +54,39 @@ func Profile(
 		return util.JSONResponse{
 			Code: 500,
 			JSON: jsonerror.Unknown("Failed to load user profile"),
+		}
+	}
+	return util.JSONResponse{
+		Code: 405,
+		JSON: jsonerror.NotFound("Bad method"),
+	}
+}
+
+func AvatarURL(
+	req *http.Request, accountDB *accounts.Database, userID string,
+) util.JSONResponse {
+	if req.Method == "PUT" {
+		var r avatarURLRequest
+		if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
+			return *resErr
+		}
+		if r.AvatarURL == "" {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.BadJSON("'avatar_url' must be supplied."),
+			}
+		}
+
+		localpart := getLocalPart(userID)
+		if err := accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
+			return util.JSONResponse{
+				Code: 500,
+				JSON: jsonerror.Unknown("Failed to set avatar URL"),
+			}
+		}
+		return util.JSONResponse{
+			Code: 200,
+			JSON: struct{}{},
 		}
 	}
 	return util.JSONResponse{

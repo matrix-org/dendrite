@@ -163,9 +163,23 @@ func Setup(
 
 	r0mux.Handle("/profile/{userID}",
 		common.MakeAPI("profile", func(req *http.Request) util.JSONResponse {
-			// TODO: Get profile data for user ID
 			vars := mux.Vars(req)
-			return readers.Profile(req, accountDB, vars["userID"])
+			return readers.GetProfile(req, accountDB, vars["userID"])
+		}),
+	)
+
+	r0mux.Handle("/profile/{userID}/avatar_url",
+		common.MakeAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
+			// TODO: Set the avatar URL
+			vars := mux.Vars(req)
+			return readers.AvatarURL(req, accountDB, vars["userID"])
+		}),
+	)
+
+	r0mux.Handle("/profile/{userID}/displayname",
+		common.MakeAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
+			// TODO: Set and get the displayname
+			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
 	)
 
