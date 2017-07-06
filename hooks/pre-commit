@@ -20,7 +20,7 @@ fi
 
 ineffassign ./src/
 go tool vet --all --shadow ./src
-gocyclo -over 12 src/
+gocyclo -over 16 src/
 gb test
 
 # Check that all the packages can build.

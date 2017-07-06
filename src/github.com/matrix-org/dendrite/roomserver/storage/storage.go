@@ -454,6 +454,7 @@ func (u *membershipUpdater) SetToJoin(senderID string) ([]string, error) {
 	return inviteEventIDs, nil
 }
 
+// SetToLeave implements types.MembershipUpdater
 func (u *membershipUpdater) SetToLeave(senderID string) ([]string, error) {
 	// TODO: assign the state key inside the transaction.
 	senderNID, err := u.d.assignStateKeyNID(senderID)
