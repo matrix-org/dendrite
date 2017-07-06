@@ -60,14 +60,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		//       It should be a struct (with pointers into a single string to avoid copying) and
 		//       we should update all refs to use UserID types rather than strings.
 		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
-		if len(userID) == 0 || userID[0] != '@' {
-			return &util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.BadJSON("user id must start with '@'"),
-			}
-		}
-		parts := strings.SplitN(userID[1:], ":", 2)
-		if len(parts) != 2 {
+		if _, _, err := gomatrixserverlib.ParseID('@', userID); err != nil {
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),
@@ -192,9 +185,13 @@ func createRoom(req *http.Request, device *authtypes.Device, cfg config.Dendrite
 		return httputil.LogThenError(req, err)
 	}
 
+	response := createRoomResponse{
+		RoomID: roomID,
+	}
+
 	return util.JSONResponse{
 		Code: 200,
-		JSON: builtEvents,
+		JSON: response,
 	}
 }
 

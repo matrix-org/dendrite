@@ -32,7 +32,7 @@ func TestLoadConfigRelative(t *testing.T) {
 }
 
 const testConfig = `
-version: v0
+version: 0
 matrix:
   server_name: localhost
   private_key: matrix_key.pem

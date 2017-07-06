@@ -30,7 +30,7 @@ import (
 
 // Version is the current version of the config format.
 // This will change whenever we make breaking changes to the config format.
-const Version = "v0"
+const Version = 0
 
 // Dendrite contains all the config used by a dendrite process.
 // Relative paths are resolved relative to the current working directory
@@ -41,7 +41,7 @@ type Dendrite struct {
 	// to update their config file to the current version.
 	// The version of the file should only be different if there has
 	// been a breaking change to the config file format.
-	Version string `yaml:"version"`
+	Version int `yaml:"version"`
 
 	// The configuration required for a matrix server.
 	Matrix struct {
@@ -122,16 +122,20 @@ type Dendrite struct {
 		// The RoomServer database stores information about matrix rooms.
 		// It is only accessed by the RoomServer.
 		RoomServer DataSource `yaml:"room_server"`
+		// The FederationSender database stores information used by the FederationSender
+		// It is only accessed by the FederationSender.
+		FederationSender DataSource `yaml:"federation_sender"`
 	} `yaml:"database"`
 
 	// The internal addresses the components will listen on.
 	// These should not be exposed externally as they expose metrics and debugging APIs.
 	Listen struct {
-		MediaAPI      Address `yaml:"media_api"`
-		ClientAPI     Address `yaml:"client_api"`
-		FederationAPI Address `yaml:"federation_api"`
-		SyncAPI       Address `yaml:"sync_api"`
-		RoomServer    Address `yaml:"room_server"`
+		MediaAPI         Address `yaml:"media_api"`
+		ClientAPI        Address `yaml:"client_api"`
+		FederationAPI    Address `yaml:"federation_api"`
+		SyncAPI          Address `yaml:"sync_api"`
+		RoomServer       Address `yaml:"room_server"`
+		FederationSender Address `yaml:"federation_sender"`
 	} `yaml:"listen"`
 }
 
