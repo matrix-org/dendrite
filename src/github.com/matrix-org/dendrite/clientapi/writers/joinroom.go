@@ -89,7 +89,7 @@ func (r joinRoomReq) joinRoomByID() util.JSONResponse {
 
 // joinRoomByAlias joins a room using a room alias.
 func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
-	_, domain, err := gomatrixserverlib.ParseID('#', roomAlias)
+	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,

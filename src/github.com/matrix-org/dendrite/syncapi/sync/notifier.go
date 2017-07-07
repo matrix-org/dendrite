@@ -73,7 +73,7 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, pos types.StreamPosit
 			)
 		} else {
 			// Keep the joined user map up-to-date
-			switch *membership {
+			switch membership {
 			case "invite":
 				userIDs = append(userIDs, userID)
 			case "join":

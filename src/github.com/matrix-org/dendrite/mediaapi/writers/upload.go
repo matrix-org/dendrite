@@ -193,7 +193,7 @@ func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JS
 		//       It should be a struct (with pointers into a single string to avoid copying) and
 		//       we should update all refs to use UserID types rather than strings.
 		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
-		if _, _, err := gomatrixserverlib.ParseID('@', string(r.MediaMetadata.UserID)); err != nil {
+		if _, _, err := gomatrixserverlib.SplitID('@', string(r.MediaMetadata.UserID)); err != nil {
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),

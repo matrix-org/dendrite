@@ -223,10 +223,10 @@ func joinedHostsFromEvents(evs []gomatrixserverlib.Event) ([]types.JoinedHost, e
 		if err != nil {
 			return nil, err
 		}
-		if *membership != "join" {
+		if membership != "join" {
 			continue
 		}
-		_, serverName, err := gomatrixserverlib.ParseID('@', *ev.StateKey())
+		_, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
 		if err != nil {
 			return nil, err
 		}
