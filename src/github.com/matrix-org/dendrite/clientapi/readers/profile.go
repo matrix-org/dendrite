@@ -35,6 +35,10 @@ type avatarURLRequest struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
+type displayNameRequest struct {
+	DisplayName string `json:"displayname"`
+}
+
 func GetProfile(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
@@ -82,6 +86,39 @@ func AvatarURL(
 			return util.JSONResponse{
 				Code: 500,
 				JSON: jsonerror.Unknown("Failed to set avatar URL"),
+			}
+		}
+		return util.JSONResponse{
+			Code: 200,
+			JSON: struct{}{},
+		}
+	}
+	return util.JSONResponse{
+		Code: 405,
+		JSON: jsonerror.NotFound("Bad method"),
+	}
+}
+
+func DisplayName(
+	req *http.Request, accountDB *accounts.Database, userID string,
+) util.JSONResponse {
+	if req.Method == "PUT" {
+		var r displayNameRequest
+		if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
+			return *resErr
+		}
+		if r.DisplayName == "" {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.BadJSON("'displayname' must be supplied."),
+			}
+		}
+
+		localpart := getLocalPart(userID)
+		if err := accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
+			return util.JSONResponse{
+				Code: 500,
+				JSON: jsonerror.Unknown("Failed to set display name"),
 			}
 		}
 		return util.JSONResponse{

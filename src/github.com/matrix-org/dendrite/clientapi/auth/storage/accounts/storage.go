@@ -66,8 +66,12 @@ func (d *Database) GetProfileByLocalpart(localpart string) (*authtypes.Profile, 
 	return d.profiles.selectProfileByLocalpart(localpart)
 }
 
-func (d *Database) SetAvatarURL(localpart string, avatarUrl string) error {
-	return d.profiles.setAvatarURL(localpart, avatarUrl)
+func (d *Database) SetAvatarURL(localpart string, avatarURL string) error {
+	return d.profiles.setAvatarURL(localpart, avatarURL)
+}
+
+func (d *Database) SetDisplayName(localpart string, displayName string) error {
+	return d.profiles.setDisplayName(localpart, displayName)
 }
 
 // CreateAccount makes a new account with the given login name and password. If no password is supplied,

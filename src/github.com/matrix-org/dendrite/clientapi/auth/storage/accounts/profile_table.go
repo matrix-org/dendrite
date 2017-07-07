@@ -41,10 +41,14 @@ const selectProfileByLocalpartSQL = "" +
 const setAvatarURLSQL = "" +
 	"UPDATE profiles SET avatar_url = $1 WHERE localpart = $2"
 
+const setDisplayNameSQL = "" +
+	"UPDATE profiles SET display_name = $1 WHERE localpart = $2"
+
 type profilesStatements struct {
 	insertProfileStmt            *sql.Stmt
 	selectProfileByLocalpartStmt *sql.Stmt
 	setAvatarURLStmt             *sql.Stmt
+	setDisplayNameStmt           *sql.Stmt
 }
 
 func (s *profilesStatements) prepare(db *sql.DB) (err error) {
@@ -59,6 +63,9 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.setAvatarURLStmt, err = db.Prepare(setAvatarURLSQL); err != nil {
+		return
+	}
+	if s.setDisplayNameStmt, err = db.Prepare(setDisplayNameSQL); err != nil {
 		return
 	}
 	return
@@ -77,5 +84,10 @@ func (s *profilesStatements) selectProfileByLocalpart(localpart string) (*authty
 
 func (s *profilesStatements) setAvatarURL(localpart string, avatarURL string) (err error) {
 	_, err = s.setAvatarURLStmt.Exec(avatarURL, localpart)
+	return
+}
+
+func (s *profilesStatements) setDisplayName(localpart string, displayName string) (err error) {
+	_, err = s.setDisplayNameStmt.Exec(displayName, localpart)
 	return
 }
