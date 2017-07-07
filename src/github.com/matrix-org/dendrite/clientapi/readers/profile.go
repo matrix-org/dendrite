@@ -39,6 +39,7 @@ type displayName struct {
 	DisplayName string `json:"displayname"`
 }
 
+// GetProfile implements GET /profile/{userID}
 func GetProfile(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
@@ -66,6 +67,7 @@ func GetProfile(
 	}
 }
 
+// AvatarURL implements GET and PUT /profile/{userID}/avatar_url
 func AvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
@@ -115,6 +117,7 @@ func AvatarURL(
 	}
 }
 
+// DisplayName implements GET and PUT /profile/{userID}/displayname
 func DisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
