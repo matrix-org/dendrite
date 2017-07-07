@@ -407,6 +407,11 @@ func (u *membershipUpdater) IsJoin() bool {
 	return u.membership == membershipStateJoin
 }
 
+// IsLeave implements types.MembershipUpdater
+func (u *membershipUpdater) IsLeave() bool {
+	return u.membership == membershipStateLeaveOrBan
+}
+
 // SetToInvite implements types.MembershipUpdater
 func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
 	// TODO: assign the state key inside the transaction.

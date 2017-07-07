@@ -19,6 +19,96 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+func updateMemberships(
+	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, removed, added []types.StateEntry,
+) error {
+	changes := membershipChanges(removed, added)
+	var eventNIDs []types.EventNID
+	for _, change := range changes {
+		if change.added.EventNID != 0 {
+			eventNIDs = append(eventNIDs, change.added.EventNID)
+		}
+		if change.removed.EventNID != 0 {
+			eventNIDs = append(eventNIDs, change.removed.EventNID)
+		}
+	}
+	events, err := db.Events(eventNIDs)
+	if err != nil {
+		return err
+	}
+
+	for _, change := range changes {
+		var ae *gomatrixserverlib.Event
+		var re *gomatrixserverlib.Event
+		var targetNID types.EventStateKeyNID
+		if change.removed.EventNID != 0 {
+			ev, _ := eventMap(events).lookup(change.removed.EventNID)
+			if ev != nil {
+				re = &ev.Event
+			}
+			targetNID = change.removed.EventStateKeyNID
+		}
+		if change.added.EventNID != 0 {
+			ev, _ := eventMap(events).lookup(change.added.EventNID)
+			if ae != nil {
+				ae = &ev.Event
+			}
+			targetNID = change.added.EventStateKeyNID
+		}
+		if err := updateMembership(updater, targetNID, re, ae); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func updateMembership(
+	updater types.RoomRecentEventsUpdater, targetNID types.EventStateKeyNID, remove *gomatrixserverlib.Event, add *gomatrixserverlib.Event,
+) error {
+	old := "leave"
+	new := "leave"
+
+	if remove != nil {
+		membership, err := remove.Membership()
+		if err != nil {
+			return err
+		}
+		old = *membership
+	}
+	if add != nil {
+		membership, err := add.Membership()
+		if err != nil {
+			return err
+		}
+		new = *membership
+	}
+	if old == new {
+		return nil
+	}
+
+	mu, err := updater.MembershipUpdater(targetNID)
+	if err != nil {
+		return err
+	}
+
+	switch new {
+	case "invite":
+		_, err := mu.SetToInvite(*add)
+		if err != nil {
+			return err
+		}
+	case "join":
+		if !mu.IsJoin() {
+			mu.SetToJoin(add.Sender())
+		}
+	case "leave":
+		if !mu.IsLeave() {
+			mu.SetToLeave(add.Sender())
+		}
+	}
+	return nil
+}
+
 type stateChange struct {
 	removed types.StateEntry
 	added   types.StateEntry
@@ -63,46 +153,4 @@ func membershipChanges(removed, added []types.StateEntry) []stateChange {
 			ri++
 		}
 	}
-}
-
-func updateMemberships(
-	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, removed, added []types.StateEntry,
-) error {
-	changes := membershipChanges(removed, added)
-	var eventNIDs []types.EventNID
-	for _, change := range changes {
-		if change.added.EventNID != 0 {
-			eventNIDs = append(eventNIDs, change.added.EventNID)
-		}
-		if change.removed.EventNID != 0 {
-			eventNIDs = append(eventNIDs, change.removed.EventNID)
-		}
-	}
-	events, err := db.Events(eventNIDs)
-	if err != nil {
-		return err
-	}
-
-	for _, change := range changes {
-		var ae *gomatrixserverlib.Event
-		var re *gomatrixserverlib.Event
-		if change.removed.EventNID != 0 {
-			ev, _ := eventMap(events).lookup(change.removed.EventNID)
-			if ev != nil {
-				re = &ev.Event
-			}
-		}
-		if change.added.EventNID != 0 {
-			ev, _ := eventMap(events).lookup(change.added.EventNID)
-			if ae != nil {
-				ae = &ev.Event
-			}
-		}
-		updateMembership(re, ae)
-	}
-	return nil
-}
-
-func updateMembership(remove *gomatrixserverlib.Event, add *gomatrixserverlib.Event) {
-
 }

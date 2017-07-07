@@ -186,6 +186,8 @@ type MembershipUpdater interface {
 	IsInvite() bool
 	// True if the target user is joined to the room.
 	IsJoin() bool
+	// True if the target user is not invited or joined to the room.
+	IsLeave() bool
 	// Set the state to invite.
 	// Returns whether this invite needs to be sent
 	SetToInvite(event gomatrixserverlib.Event) (needsSending bool, err error)
