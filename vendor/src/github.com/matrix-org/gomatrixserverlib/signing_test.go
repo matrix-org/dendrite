@@ -179,7 +179,7 @@ func TestSignJSONTestVectors(t *testing.T) {
 type MyMessage struct {
 	Unsigned   *json.RawMessage `json:"unsigned"`
 	Content    *json.RawMessage `json:"content"`
-	Signatures *json.RawMessage `json:"signature,omitempty"`
+	Signatures *json.RawMessage `json:"signatures,omitempty"`
 }
 
 func TestSignJSONWithUnsigned(t *testing.T) {
@@ -215,7 +215,7 @@ func TestSignJSONWithUnsigned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = VerifyJSON(entityName, keyID, publicKey, signed)
+	err = VerifyJSON(entityName, keyID, publicKey, input)
 	if err != nil {
 		t.Errorf("VerifyJSON(%q)", signed)
 		t.Fatal(err)

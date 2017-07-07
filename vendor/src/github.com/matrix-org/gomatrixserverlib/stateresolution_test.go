@@ -12,15 +12,15 @@ const (
 
 func TestConflictEventSorter(t *testing.T) {
 	input := []Event{
-		Event{fields: eventFields{Depth: 1, EventID: "@1:a"}},
-		Event{fields: eventFields{Depth: 2, EventID: "@2:a"}},
-		Event{fields: eventFields{Depth: 2, EventID: "@3:b"}},
+		{fields: eventFields{Depth: 1, EventID: "@1:a"}},
+		{fields: eventFields{Depth: 2, EventID: "@2:a"}},
+		{fields: eventFields{Depth: 2, EventID: "@3:b"}},
 	}
 	got := sortConflictedEventsByDepthAndSHA1(input)
 	want := []conflictedEvent{
-		conflictedEvent{depth: 1, event: &input[0]},
-		conflictedEvent{depth: 2, event: &input[2]},
-		conflictedEvent{depth: 2, event: &input[1]},
+		{depth: 1, event: &input[0]},
+		{depth: 2, event: &input[2]},
+		{depth: 2, event: &input[1]},
 	}
 	copy(want[0].eventIDSHA1[:], sha1OfEventID1A)
 	copy(want[1].eventIDSHA1[:], sha1OfEventID3B)

@@ -15,11 +15,9 @@
 package sync
 
 import (
-	"encoding/json"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -68,14 +66,14 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, pos types.StreamPosit
 	// If this is an invite, also add in the invitee to this list.
 	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 		userID := *ev.StateKey()
-		var memberContent events.MemberContent
-		if err := json.Unmarshal(ev.Content(), &memberContent); err != nil {
+		membership, err := ev.Membership()
+		if err != nil {
 			log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
 				"Notifier.OnNewEvent: Failed to unmarshal member event",
 			)
 		} else {
 			// Keep the joined user map up-to-date
-			switch memberContent.Membership {
+			switch membership {
 			case "invite":
 				userIDs = append(userIDs, userID)
 			case "join":

@@ -213,7 +213,7 @@ type respSendJoinFields struct {
 	AuthEvents  []Event `json:"auth_chain"`
 }
 
-// Check that a reponse to /send_join is valid.
+// Check that a response to /send_join is valid.
 // This checks that it would be valid as a response to /state
 // This also checks that the join event is allowed by the state.
 func (r RespSendJoin) Check(keyRing KeyRing, joinEvent Event) error {
