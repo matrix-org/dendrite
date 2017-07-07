@@ -500,9 +500,9 @@ func (e Event) AuthEvents() []EventReference {
 
 // AuthEventIDs returns the event IDs of the events needed to auth the event.
 func (e Event) AuthEventIDs() []string {
-	result := make([]string, len(e.fields.PrevEvents))
-	for i := range e.fields.PrevEvents {
-		result[i] = e.fields.PrevEvents[i].EventID
+	result := make([]string, len(e.fields.AuthEvents))
+	for i := range e.fields.AuthEvents {
+		result[i] = e.fields.AuthEvents[i].EventID
 	}
 	return result
 }

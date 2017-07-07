@@ -268,7 +268,7 @@ func readHTTPRequest(req *http.Request) (*FederationRequest, error) {
 		}
 		result.fields.Origin = origin
 		if result.fields.Signatures == nil {
-			result.fields.Signatures = map[ServerName]map[KeyID]string{origin: map[KeyID]string{key: sig}}
+			result.fields.Signatures = map[ServerName]map[KeyID]string{origin: {key: sig}}
 		} else {
 			result.fields.Signatures[origin][key] = sig
 		}

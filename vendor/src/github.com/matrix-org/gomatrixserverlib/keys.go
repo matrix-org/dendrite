@@ -167,7 +167,7 @@ type KeyChecks struct {
 	AllEd25519ChecksOK        *bool                   // All the Ed25519 checks are ok. or null if there weren't any to check.
 	Ed25519Checks             map[KeyID]Ed25519Checks // Checks for Ed25519 keys.
 	HasTLSFingerprint         bool                    // The server has at least one fingerprint.
-	AllTLSFingerprintChecksOK *bool                   // All the fingerpint checks are ok.
+	AllTLSFingerprintChecksOK *bool                   // All the fingerprint checks are ok.
 	TLSFingerprintChecks      []TLSFingerprintChecks  // Checks for TLS fingerprints.
 	MatchingTLSFingerprint    *bool                   // The TLS fingerprint for the connection matches one of the listed fingerprints.
 }
