@@ -31,11 +31,11 @@ type profileResponse struct {
 	DisplayName string `json:"displayname"`
 }
 
-type avatarURLRequest struct {
+type avatarURL struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-type displayNameRequest struct {
+type displayName struct {
 	DisplayName string `json:"displayname"`
 }
 
@@ -69,8 +69,24 @@ func GetProfile(
 func AvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method == "PUT" {
-		var r avatarURLRequest
+	if req.Method == "GET" {
+		localpart := getLocalPart(userID)
+		profile, err := accountDB.GetProfileByLocalpart(localpart)
+		if err == nil {
+			res := avatarURL{
+				AvatarURL: profile.AvatarURL,
+			}
+			return util.JSONResponse{
+				Code: 200,
+				JSON: res,
+			}
+		}
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Failed to load avatar URL"),
+		}
+	} else if req.Method == "PUT" {
+		var r avatarURL
 		if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 			return *resErr
 		}
@@ -102,8 +118,24 @@ func AvatarURL(
 func DisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method == "PUT" {
-		var r displayNameRequest
+	if req.Method == "GET" {
+		localpart := getLocalPart(userID)
+		profile, err := accountDB.GetProfileByLocalpart(localpart)
+		if err == nil {
+			res := displayName{
+				DisplayName: profile.DisplayName,
+			}
+			return util.JSONResponse{
+				Code: 200,
+				JSON: res,
+			}
+		}
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Failed to load display name"),
+		}
+	} else if req.Method == "PUT" {
+		var r displayName
 		if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 			return *resErr
 		}
