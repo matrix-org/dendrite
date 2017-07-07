@@ -60,7 +60,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		//       It should be a struct (with pointers into a single string to avoid copying) and
 		//       we should update all refs to use UserID types rather than strings.
 		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
-		if _, _, err := gomatrixserverlib.ParseID('@', userID); err != nil {
+		if _, _, err := gomatrixserverlib.SplitID('@', userID); err != nil {
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),

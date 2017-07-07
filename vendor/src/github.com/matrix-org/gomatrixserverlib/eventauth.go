@@ -379,6 +379,9 @@ func aliasEventAllowed(event Event, authEvents AuthEventProvider) error {
 	// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L143-L160
 
 	create, err := newCreateContentFromAuthEvents(authEvents)
+	if err != nil {
+		return err
+	}
 
 	senderDomain, err := domainFromID(event.Sender())
 	if err != nil {

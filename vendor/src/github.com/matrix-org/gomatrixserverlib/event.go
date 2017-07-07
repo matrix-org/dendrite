@@ -482,15 +482,15 @@ func (e Event) PrevEventIDs() []string {
 // is an "m.room.member" event.
 // Returns an error if the event is not a m.room.member event or if the content
 // is not valid m.room.member content.
-func (e Event) Membership() (*string, error) {
+func (e Event) Membership() (string, error) {
 	if e.fields.Type != MRoomMember {
-		return nil, fmt.Errorf("gomatrixserverlib: not an m.room.member event")
+		return "", fmt.Errorf("gomatrixserverlib: not an m.room.member event")
 	}
 	var content memberContent
 	if err := json.Unmarshal(e.fields.Content, &content); err != nil {
-		return nil, err
+		return "", err
 	}
-	return &content.Membership, nil
+	return content.Membership, nil
 }
 
 // AuthEvents returns references to the events needed to auth the event.
@@ -500,9 +500,9 @@ func (e Event) AuthEvents() []EventReference {
 
 // AuthEventIDs returns the event IDs of the events needed to auth the event.
 func (e Event) AuthEventIDs() []string {
-	result := make([]string, len(e.fields.PrevEvents))
-	for i := range e.fields.PrevEvents {
-		result[i] = e.fields.PrevEvents[i].EventID
+	result := make([]string, len(e.fields.AuthEvents))
+	for i := range e.fields.AuthEvents {
+		result[i] = e.fields.AuthEvents[i].EventID
 	}
 	return result
 }
@@ -570,8 +570,8 @@ func (er EventReference) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&tuple)
 }
 
-// ParseID splits a matrix ID into a local part and a server name.
-func ParseID(sigil byte, id string) (local string, domain ServerName, err error) {
+// SplitID splits a matrix ID into a local part and a server name.
+func SplitID(sigil byte, id string) (local string, domain ServerName, err error) {
 	// IDs have the format: SIGIL LOCALPART ":" DOMAIN
 	// Split on the first ":" character since the domain can contain ":"
 	// characters.

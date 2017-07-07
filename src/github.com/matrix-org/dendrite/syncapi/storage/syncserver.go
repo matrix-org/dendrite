@@ -125,15 +125,13 @@ func (d *SyncServerDatabase) updateRoomState(
 			// ignore non state events
 			continue
 		}
-		var (
-			membership *string
-			err        error
-		)
+		var membership *string
 		if event.Type() == "m.room.member" {
-			membership, err = event.Membership()
+			value, err := event.Membership()
 			if err != nil {
 				return err
 			}
+			membership = &value
 		}
 		if err := d.roomstate.upsertRoomState(txn, event, membership, int64(streamPos)); err != nil {
 			return err
@@ -477,7 +475,7 @@ func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) string {
 		if err != nil {
 			return ""
 		}
-		return *membership
+		return membership
 	}
 	return ""
 }
