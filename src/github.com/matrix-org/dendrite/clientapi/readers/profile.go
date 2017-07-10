@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	// "github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/util"
 )
 
@@ -70,6 +70,7 @@ func GetProfile(
 // AvatarURL implements GET and PUT /profile/{userID}/avatar_url
 func AvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
+	userUpdatesProducer *producers.RoomserverProducer,
 ) util.JSONResponse {
 	if req.Method == "GET" {
 		localpart := getLocalPart(userID)
@@ -120,6 +121,7 @@ func AvatarURL(
 // DisplayName implements GET and PUT /profile/{userID}/displayname
 func DisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
+	userUpdatesProducer *producers.RoomserverProducer,
 ) util.JSONResponse {
 	if req.Method == "GET" {
 		localpart := getLocalPart(userID)

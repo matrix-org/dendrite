@@ -99,6 +99,8 @@ type Dendrite struct {
 			InputRoomEvent Topic `yaml:"input_room_event"`
 			// Topic for roomserver/api.OutputRoomEvent events.
 			OutputRoomEvent Topic `yaml:"output_room_event"`
+			// Topic for user updates (profile, presence)
+			UserUpdates Topic `yaml:"user_updates"`
 		}
 	} `yaml:"kafka"`
 
