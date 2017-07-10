@@ -28,9 +28,10 @@ import (
 type Database struct {
 	db       *sql.DB
 	accounts accountsStatements
+	profiles profilesStatements
 }
 
-// NewDatabase creates a new accounts database
+// NewDatabase creates a new accounts and profiles database
 func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
@@ -41,7 +42,11 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = a.prepare(db, serverName); err != nil {
 		return nil, err
 	}
-	return &Database{db, a}, nil
+	p := profilesStatements{}
+	if err = p.prepare(db); err != nil {
+		return nil, err
+	}
+	return &Database{db, a, p}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -57,11 +62,32 @@ func (d *Database) GetAccountByPassword(localpart, plaintextPassword string) (*a
 	return d.accounts.selectAccountByLocalpart(localpart)
 }
 
-// CreateAccount makes a new account with the given login name and password. If no password is supplied,
-// the account will be a passwordless account.
+// GetProfileByLocalpart returns the profile associated with the given localpart.
+// Returns sql.ErrNoRows if no profile exists which matches the given localpart.
+func (d *Database) GetProfileByLocalpart(localpart string) (*authtypes.Profile, error) {
+	return d.profiles.selectProfileByLocalpart(localpart)
+}
+
+// SetAvatarURL updates the avatar URL of the profile associated with the given
+// localpart. Returns an error if something went wrong with the SQL query
+func (d *Database) SetAvatarURL(localpart string, avatarURL string) error {
+	return d.profiles.setAvatarURL(localpart, avatarURL)
+}
+
+// SetDisplayName updates the display name of the profile associated with the given
+// localpart. Returns an error if something went wrong with the SQL query
+func (d *Database) SetDisplayName(localpart string, displayName string) error {
+	return d.profiles.setDisplayName(localpart, displayName)
+}
+
+// CreateAccount makes a new account with the given login name and password, and creates an empty profile
+// for this account. If no password is supplied, the account will be a passwordless account.
 func (d *Database) CreateAccount(localpart, plaintextPassword string) (*authtypes.Account, error) {
 	hash, err := hashPassword(plaintextPassword)
 	if err != nil {
+		return nil, err
+	}
+	if err := d.profiles.insertProfile(localpart); err != nil {
 		return nil, err
 	}
 	return d.accounts.insertAccount(localpart, hash)
