@@ -57,7 +57,7 @@ func LookupServer(serverName ServerName) (*DNSResult, error) {
 					return nil, err
 				}
 				// If there isn't a SRV record in DNS then fallback to "serverName:8448".
-				hosts[string(serverName)] = []net.SRV{net.SRV{
+				hosts[string(serverName)] = []net.SRV{{
 					Target: string(serverName),
 					Port:   8448,
 				}}
@@ -80,7 +80,7 @@ func LookupServer(serverName ServerName) (*DNSResult, error) {
 		if err != nil {
 			return nil, err
 		}
-		hosts[host] = []net.SRV{net.SRV{
+		hosts[host] = []net.SRV{{
 			Target: host,
 			Port:   uint16(port),
 		}}

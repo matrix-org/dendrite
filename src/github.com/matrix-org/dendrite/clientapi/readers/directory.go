@@ -16,6 +16,8 @@ package readers
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -23,8 +25,6 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"net/http"
-	"strings"
 )
 
 // DirectoryRoom looks up a room alias
@@ -35,7 +35,7 @@ func DirectoryRoom(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-	domain, err := domainFromID(roomAlias)
+	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
@@ -68,20 +68,4 @@ func DirectoryRoom(
 			JSON: resp,
 		}
 	}
-}
-
-// domainFromID returns everything after the first ":" character to extract
-// the domain part of a matrix ID.
-// TODO: duplicated from gomatrixserverlib.
-func domainFromID(id string) (gomatrixserverlib.ServerName, error) {
-	// IDs have the format: SIGIL LOCALPART ":" DOMAIN
-	// Split on the first ":" character since the domain can contain ":"
-	// characters.
-	parts := strings.SplitN(id, ":", 2)
-	if len(parts) != 2 {
-		// The ID must have a ":" character.
-		return "", fmt.Errorf("invalid ID: %q", id)
-	}
-	// Return everything after the first ":" character.
-	return gomatrixserverlib.ServerName(parts[1]), nil
 }

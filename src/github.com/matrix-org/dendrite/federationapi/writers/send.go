@@ -118,11 +118,7 @@ type unknownRoomError struct {
 func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e.roomID) }
 
 func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
-	refs := e.PrevEvents()
-	prevEventIDs := make([]string, len(refs))
-	for i := range refs {
-		prevEventIDs[i] = refs[i].EventID
-	}
+	prevEventIDs := e.PrevEventIDs()
 
 	// Fetch the state needed to authenticate the event.
 	needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{e})

@@ -16,11 +16,9 @@ package storage
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -129,11 +127,11 @@ func (d *SyncServerDatabase) updateRoomState(
 		}
 		var membership *string
 		if event.Type() == "m.room.member" {
-			var memberContent events.MemberContent
-			if err := json.Unmarshal(event.Content(), &memberContent); err != nil {
+			value, err := event.Membership()
+			if err != nil {
 				return err
 			}
-			membership = &memberContent.Membership
+			membership = &value
 		}
 		if err := d.roomstate.upsertRoomState(txn, event, membership, int64(streamPos)); err != nil {
 			return err
@@ -473,11 +471,11 @@ func removeDuplicates(stateEvents, recentEvents []gomatrixserverlib.Event) []gom
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
 func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) string {
 	if ev.Type() == "m.room.member" && ev.StateKeyEquals(userID) {
-		var memberContent events.MemberContent
-		if err := json.Unmarshal(ev.Content(), &memberContent); err != nil {
+		membership, err := ev.Membership()
+		if err != nil {
 			return ""
 		}
-		return memberContent.Membership
+		return membership
 	}
 	return ""
 }

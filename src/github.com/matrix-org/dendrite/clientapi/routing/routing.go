@@ -172,16 +172,34 @@ func Setup(
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		common.MakeAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.AvatarURL(req, accountDB, vars["userID"], userUpdatesProducer)
+			return readers.GetAvatarURL(req, accountDB, vars["userID"])
 		}),
-	)
+	).Methods("GET")
+
+	r0mux.Handle("/profile/{userID}/avatar_url",
+		common.MakeAuthAPI("profile_avatar_url", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.SetAvatarURL(req, accountDB, vars["userID"])
+		}),
+	).Methods("PUT", "OPTIONS")
+	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
+	// PUT requests, so we need to allow this method
 
 	r0mux.Handle("/profile/{userID}/displayname",
 		common.MakeAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.DisplayName(req, accountDB, vars["userID"], userUpdatesProducer)
+			return readers.GetDisplayName(req, accountDB, vars["userID"])
 		}),
-	)
+	).Methods("GET")
+
+	r0mux.Handle("/profile/{userID}/displayname",
+		common.MakeAuthAPI("profile_displayname", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.SetDisplayName(req, accountDB, vars["userID"])
+		}),
+	).Methods("PUT", "OPTIONS")
+	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
+	// PUT requests, so we need to allow this method
 
 	r0mux.Handle("/account/3pid",
 		common.MakeAPI("account_3pid", func(req *http.Request) util.JSONResponse {

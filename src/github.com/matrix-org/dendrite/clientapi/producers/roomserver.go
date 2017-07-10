@@ -49,7 +49,7 @@ func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event, sendAs
 		ires[i] = api.InputRoomEvent{
 			Kind:         api.KindNew,
 			Event:        event.JSON(),
-			AuthEventIDs: authEventIDs(event),
+			AuthEventIDs: event.AuthEventIDs(),
 			SendAsServer: string(sendAsServer),
 		}
 		eventIDs[i] = event.EventID()
@@ -71,7 +71,7 @@ func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespStat
 		ires[i] = api.InputRoomEvent{
 			Kind:         api.KindOutlier,
 			Event:        outlier.JSON(),
-			AuthEventIDs: authEventIDs(outlier),
+			AuthEventIDs: outlier.AuthEventIDs(),
 		}
 		eventIDs[i] = outlier.EventID()
 	}
@@ -84,21 +84,13 @@ func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespStat
 	ires[len(outliers)] = api.InputRoomEvent{
 		Kind:          api.KindNew,
 		Event:         event.JSON(),
-		AuthEventIDs:  authEventIDs(event),
+		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateEventIDs,
 	}
 	eventIDs[len(outliers)] = event.EventID()
 
 	return c.SendInputRoomEvents(ires, eventIDs)
-}
-
-// TODO Make this a method on gomatrixserverlib.Event
-func authEventIDs(event gomatrixserverlib.Event) (ids []string) {
-	for _, ref := range event.AuthEvents() {
-		ids = append(ids, ref.EventID)
-	}
-	return
 }
 
 // SendInputRoomEvents writes the given input room events to the roomserver input log. The length of both

@@ -17,7 +17,6 @@ package consumers
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
@@ -220,16 +219,14 @@ func joinedHostsFromEvents(evs []gomatrixserverlib.Event) ([]types.JoinedHost, e
 		if ev.Type() != "m.room.member" || ev.StateKey() == nil {
 			continue
 		}
-		var content struct {
-			Membership string `json:"membership"`
-		}
-		if err := json.Unmarshal(ev.Content(), &content); err != nil {
+		membership, err := ev.Membership()
+		if err != nil {
 			return nil, err
 		}
-		if content.Membership != "join" {
+		if membership != "join" {
 			continue
 		}
-		serverName, err := domainFromID(*ev.StateKey())
+		_, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
 		if err != nil {
 			return nil, err
 		}
@@ -342,20 +339,4 @@ func missingEventsFrom(events []gomatrixserverlib.Event, required []string) []st
 		}
 	}
 	return missing
-}
-
-// domainFromID returns everything after the first ":" character to extract
-// the domain part of a matrix ID.
-// TODO: duplicated from gomatrixserverlib.
-func domainFromID(id string) (gomatrixserverlib.ServerName, error) {
-	// IDs have the format: SIGIL LOCALPART ":" DOMAIN
-	// Split on the first ":" character since the domain can contain ":"
-	// characters.
-	parts := strings.SplitN(id, ":", 2)
-	if len(parts) != 2 {
-		// The ID must have a ":" character.
-		return "", fmt.Errorf("invalid ID: %q", id)
-	}
-	// Return everything after the first ":" character.
-	return gomatrixserverlib.ServerName(parts[1]), nil
 }

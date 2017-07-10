@@ -16,6 +16,10 @@ package writers
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -25,9 +29,6 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"net/http"
-	"strings"
-	"time"
 )
 
 // JoinRoomByIDOrAlias implements the "/join/{roomIDOrAlias}" API.
@@ -88,7 +89,7 @@ func (r joinRoomReq) joinRoomByID() util.JSONResponse {
 
 // joinRoomByAlias joins a room using a room alias.
 func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
-	domain, err := domainFromID(roomAlias)
+	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
@@ -244,20 +245,4 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 			RoomID string `json:"room_id"`
 		}{roomID},
 	}, nil
-}
-
-// domainFromID returns everything after the first ":" character to extract
-// the domain part of a matrix ID.
-// TODO: duplicated from gomatrixserverlib.
-func domainFromID(id string) (gomatrixserverlib.ServerName, error) {
-	// IDs have the format: SIGIL LOCALPART ":" DOMAIN
-	// Split on the first ":" character since the domain can contain ":"
-	// characters.
-	parts := strings.SplitN(id, ":", 2)
-	if len(parts) != 2 {
-		// The ID must have a ":" character.
-		return "", fmt.Errorf("invalid ID: %q", id)
-	}
-	// Return everything after the first ":" character.
-	return gomatrixserverlib.ServerName(parts[1]), nil
 }

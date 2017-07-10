@@ -23,7 +23,7 @@ import (
 	"unicode/utf8"
 )
 
-// CanonicalJSON re-encodes the JSON in a cannonical encoding. The encoding is
+// CanonicalJSON re-encodes the JSON in a canonical encoding. The encoding is
 // the shortest possible encoding using integer values with sorted object keys.
 // https://matrix.org/docs/spec/server_server/unstable.html#canonical-json
 func CanonicalJSON(input []byte) ([]byte, error) {
@@ -223,7 +223,7 @@ func compactUnicodeEscape(input, output []byte, index int) ([]byte, int) {
 // Taken from https://github.com/NegativeMjark/indolentjson-rust/blob/8b959791fe2656a88f189c5d60d153be05fe3deb/src/readhex.rs#L21
 func readHexDigits(input []byte) uint32 {
 	hex := binary.BigEndian.Uint32(input)
-	// substract '0'
+	// subtract '0'
 	hex -= 0x30303030
 	// strip the higher bits, maps 'a' => 'A'
 	hex &= 0x1F1F1F1F
