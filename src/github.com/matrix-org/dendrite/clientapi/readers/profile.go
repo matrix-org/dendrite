@@ -67,12 +67,6 @@ func GetProfile(
 func GetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method != "GET" {
-		return util.JSONResponse{
-			Code: 405,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	localpart := getLocalPart(userID)
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
@@ -91,12 +85,6 @@ func GetAvatarURL(
 func SetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method != "PUT" {
-		return util.JSONResponse{
-			Code: 405,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	var r avatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
@@ -122,12 +110,6 @@ func SetAvatarURL(
 func GetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method != "GET" {
-		return util.JSONResponse{
-			Code: 405,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	localpart := getLocalPart(userID)
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
@@ -146,12 +128,6 @@ func GetDisplayName(
 func SetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method != "PUT" {
-		return util.JSONResponse{
-			Code: 405,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	var r displayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
