@@ -65,103 +65,123 @@ func GetProfile(
 	}
 }
 
-// AvatarURL implements GET and PUT /profile/{userID}/avatar_url
-func AvatarURL(
+// GetAvatarURL implements GET /profile/{userID}/avatar_url
+func GetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method == "GET" {
-		localpart := getLocalPart(userID)
-		profile, err := accountDB.GetProfileByLocalpart(localpart)
-		if err == nil {
-			res := avatarURL{
-				AvatarURL: profile.AvatarURL,
-			}
-			return util.JSONResponse{
-				Code: 200,
-				JSON: res,
-			}
-		}
+	if req.Method != "GET" {
 		return util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.Unknown("Failed to load avatar URL"),
+			Code: 405,
+			JSON: jsonerror.NotFound("Bad method"),
 		}
-	} else if req.Method == "PUT" {
-		var r avatarURL
-		if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
-			return *resErr
-		}
-		if r.AvatarURL == "" {
-			return util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.BadJSON("'avatar_url' must be supplied."),
-			}
-		}
-
-		localpart := getLocalPart(userID)
-		if err := accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
-			return util.JSONResponse{
-				Code: 500,
-				JSON: jsonerror.Unknown("Failed to set avatar URL"),
-			}
+	}
+	localpart := getLocalPart(userID)
+	if profile, err := accountDB.GetProfileByLocalpart(localpart); err == nil {
+		res := avatarURL{
+			AvatarURL: profile.AvatarURL,
 		}
 		return util.JSONResponse{
 			Code: 200,
-			JSON: struct{}{},
+			JSON: res,
 		}
 	}
 	return util.JSONResponse{
-		Code: 405,
-		JSON: jsonerror.NotFound("Bad method"),
+		Code: 500,
+		JSON: jsonerror.Unknown("Failed to load avatar URL"),
 	}
 }
 
-// DisplayName implements GET and PUT /profile/{userID}/displayname
-func DisplayName(
+// SetAvatarURL implements PUT /profile/{userID}/avatar_url
+func SetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method == "GET" {
-		localpart := getLocalPart(userID)
-		profile, err := accountDB.GetProfileByLocalpart(localpart)
-		if err == nil {
-			res := displayName{
-				DisplayName: profile.DisplayName,
-			}
-			return util.JSONResponse{
-				Code: 200,
-				JSON: res,
-			}
+	if req.Method != "PUT" {
+		return util.JSONResponse{
+			Code: 405,
+			JSON: jsonerror.NotFound("Bad method"),
 		}
+	}
+	var r avatarURL
+	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
+		return *resErr
+	}
+	if r.AvatarURL == "" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("'avatar_url' must be supplied."),
+		}
+	}
+
+	localpart := getLocalPart(userID)
+	if err := accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
 		return util.JSONResponse{
 			Code: 500,
-			JSON: jsonerror.Unknown("Failed to load display name"),
-		}
-	} else if req.Method == "PUT" {
-		var r displayName
-		if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
-			return *resErr
-		}
-		if r.DisplayName == "" {
-			return util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.BadJSON("'displayname' must be supplied."),
-			}
-		}
-
-		localpart := getLocalPart(userID)
-		if err := accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
-			return util.JSONResponse{
-				Code: 500,
-				JSON: jsonerror.Unknown("Failed to set display name"),
-			}
-		}
-		return util.JSONResponse{
-			Code: 200,
-			JSON: struct{}{},
+			JSON: jsonerror.Unknown("Failed to set avatar URL"),
 		}
 	}
 	return util.JSONResponse{
-		Code: 405,
-		JSON: jsonerror.NotFound("Bad method"),
+		Code: 200,
+		JSON: struct{}{},
+	}
+}
+
+// SetDisplayName implements GET /profile/{userID}/displayname
+func GetDisplayName(
+	req *http.Request, accountDB *accounts.Database, userID string,
+) util.JSONResponse {
+	if req.Method != "GET" {
+		return util.JSONResponse{
+			Code: 405,
+			JSON: jsonerror.NotFound("Bad method"),
+		}
+	}
+	localpart := getLocalPart(userID)
+	if profile, err := accountDB.GetProfileByLocalpart(localpart); err == nil {
+		res := displayName{
+			DisplayName: profile.DisplayName,
+		}
+		return util.JSONResponse{
+			Code: 200,
+			JSON: res,
+		}
+	}
+	return util.JSONResponse{
+		Code: 500,
+		JSON: jsonerror.Unknown("Failed to load display name"),
+	}
+}
+
+// SetDisplayName implements PUT /profile/{userID}/displayname
+func SetDisplayName(
+	req *http.Request, accountDB *accounts.Database, userID string,
+) util.JSONResponse {
+	if req.Method != "PUT" {
+		return util.JSONResponse{
+			Code: 405,
+			JSON: jsonerror.NotFound("Bad method"),
+		}
+	}
+	var r displayName
+	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
+		return *resErr
+	}
+	if r.DisplayName == "" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("'displayname' must be supplied."),
+		}
+	}
+
+	localpart := getLocalPart(userID)
+	if err := accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Failed to set display name"),
+		}
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
 	}
 }
 
