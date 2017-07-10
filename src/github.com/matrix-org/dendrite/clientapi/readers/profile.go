@@ -180,6 +180,8 @@ func getLocalPart(userID string) string {
 	return strings.Split(username, "@")[1]
 }
 
+// Send an update using kafka to notify the roomserver of the profile update
+// Returns an error if the update failed to send
 func sendUpdate(userID string, newAvatarURL string, newDisplayName string,
 	accountDB *accounts.Database, cfg config.Dendrite,
 ) error {
