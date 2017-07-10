@@ -76,18 +76,16 @@ func GetAvatarURL(
 		}
 	}
 	localpart := getLocalPart(userID)
-	if profile, err := accountDB.GetProfileByLocalpart(localpart); err == nil {
-		res := avatarURL{
-			AvatarURL: profile.AvatarURL,
-		}
-		return util.JSONResponse{
-			Code: 200,
-			JSON: res,
-		}
+	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+	res := avatarURL{
+		AvatarURL: profile.AvatarURL,
 	}
 	return util.JSONResponse{
-		Code: 500,
-		JSON: jsonerror.Unknown("Failed to load avatar URL"),
+		Code: 200,
+		JSON: res,
 	}
 }
 
@@ -125,7 +123,7 @@ func SetAvatarURL(
 	}
 }
 
-// SetDisplayName implements GET /profile/{userID}/displayname
+// GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
@@ -136,18 +134,16 @@ func GetDisplayName(
 		}
 	}
 	localpart := getLocalPart(userID)
-	if profile, err := accountDB.GetProfileByLocalpart(localpart); err == nil {
-		res := displayName{
-			DisplayName: profile.DisplayName,
-		}
-		return util.JSONResponse{
-			Code: 200,
-			JSON: res,
-		}
+	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+	res := displayName{
+		DisplayName: profile.DisplayName,
 	}
 	return util.JSONResponse{
-		Code: 500,
-		JSON: jsonerror.Unknown("Failed to load display name"),
+		Code: 200,
+		JSON: res,
 	}
 }
 
