@@ -15,6 +15,7 @@
 package readers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -22,8 +23,10 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	// "github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
+
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 type profileResponse struct {
@@ -37,6 +40,12 @@ type avatarURL struct {
 
 type displayName struct {
 	DisplayName string `json:"displayname"`
+}
+
+type profileUpdate struct {
+	Updated  string `json:"updated"`
+	OldValue string `json:"old_value"`
+	NewValue string `json:"new_value"`
 }
 
 // GetProfile implements GET /profile/{userID}
@@ -85,6 +94,7 @@ func GetAvatarURL(
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
+	cfg config.Dendrite,
 ) util.JSONResponse {
 	var r avatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
@@ -95,6 +105,10 @@ func SetAvatarURL(
 			Code: 400,
 			JSON: jsonerror.BadJSON("'avatar_url' must be supplied."),
 		}
+	}
+
+	if err := sendUpdate(userID, r.AvatarURL, "", accountDB, cfg); err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
 	localpart := getLocalPart(userID)
@@ -128,6 +142,7 @@ func GetDisplayName(
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
+	cfg config.Dendrite,
 ) util.JSONResponse {
 	var r displayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
@@ -138,6 +153,10 @@ func SetDisplayName(
 			Code: 400,
 			JSON: jsonerror.BadJSON("'displayname' must be supplied."),
 		}
+	}
+
+	if err := sendUpdate(userID, "", r.DisplayName, accountDB, cfg); err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
 	localpart := getLocalPart(userID)
@@ -159,4 +178,54 @@ func getLocalPart(userID string) string {
 	username := strings.Split(userID, ":")[0]
 	// Return the part after the "@"
 	return strings.Split(username, "@")[1]
+}
+
+func sendUpdate(userID string, newAvatarURL string, newDisplayName string,
+	accountDB *accounts.Database, cfg config.Dendrite,
+) error {
+	var update profileUpdate
+	var m sarama.ProducerMessage
+
+	m.Topic = string(cfg.Kafka.Topics.UserUpdates)
+	m.Key = sarama.StringEncoder(userID)
+
+	localpart := getLocalPart(userID)
+	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return err
+	}
+
+	// Determining if the changed value is the avatar URL or the display name
+	if len(newAvatarURL) > 0 {
+		update = profileUpdate{
+			Updated:  "avatar_url",
+			OldValue: profile.AvatarURL,
+			NewValue: newAvatarURL,
+		}
+	} else if len(newDisplayName) > 0 {
+		update = profileUpdate{
+			Updated:  "displayname",
+			OldValue: profile.DisplayName,
+			NewValue: newDisplayName,
+		}
+	} else {
+		panic(fmt.Errorf("No update to send"))
+	}
+
+	value, err := json.Marshal(update)
+	if err != nil {
+		return err
+	}
+	m.Value = sarama.ByteEncoder(value)
+
+	producer, err := sarama.NewSyncProducer(cfg.Kafka.Addresses, nil)
+	if err != nil {
+		return err
+	}
+
+	if _, _, err := producer.SendMessage(&m); err != nil {
+		return err
+	}
+
+	return nil
 }

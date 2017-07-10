@@ -46,7 +46,6 @@ func Setup(
 	deviceDB *devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.KeyRing,
-	userUpdatesProducer *producers.RoomserverProducer,
 ) {
 	apiMux := mux.NewRouter()
 
@@ -179,7 +178,7 @@ func Setup(
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		common.MakeAuthAPI("profile_avatar_url", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.SetAvatarURL(req, accountDB, vars["userID"])
+			return readers.SetAvatarURL(req, accountDB, vars["userID"], cfg)
 		}),
 	).Methods("PUT", "OPTIONS")
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -195,7 +194,7 @@ func Setup(
 	r0mux.Handle("/profile/{userID}/displayname",
 		common.MakeAuthAPI("profile_displayname", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.SetDisplayName(req, accountDB, vars["userID"])
+			return readers.SetDisplayName(req, accountDB, vars["userID"], cfg)
 		}),
 	).Methods("PUT", "OPTIONS")
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows

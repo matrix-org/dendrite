@@ -53,9 +53,6 @@ func main() {
 	roomserverProducer, err := producers.NewRoomserverProducer(
 		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.InputRoomEvent),
 	)
-	userUpdatesProducer, err := producers.NewRoomserverProducer(
-		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.UserUpdates),
-	)
 	if err != nil {
 		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.Kafka.Addresses, err)
 	}
@@ -89,7 +86,7 @@ func main() {
 	log.Info("Starting client API server on ", cfg.Listen.ClientAPI)
 	routing.Setup(
 		http.DefaultServeMux, http.DefaultClient, *cfg, roomserverProducer,
-		queryAPI, accountDB, deviceDB, federation, keyRing, userUpdatesProducer,
+		queryAPI, accountDB, deviceDB, federation, keyRing,
 	)
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.ClientAPI), nil))
 }
