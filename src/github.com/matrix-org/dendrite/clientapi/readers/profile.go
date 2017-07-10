@@ -42,27 +42,26 @@ type displayName struct {
 func GetProfile(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method == "GET" {
-		localpart := getLocalPart(userID)
-		profile, err := accountDB.GetProfileByLocalpart(localpart)
-		if err == nil {
-			res := profileResponse{
-				AvatarURL:   profile.AvatarURL,
-				DisplayName: profile.DisplayName,
-			}
-			return util.JSONResponse{
-				Code: 200,
-				JSON: res,
-			}
+	if req.Method != "GET" {
+		return util.JSONResponse{
+			Code: 405,
+			JSON: jsonerror.NotFound("Bad method"),
+		}
+	}
+	localpart := getLocalPart(userID)
+	if profile, err := accountDB.GetProfileByLocalpart(localpart); err == nil {
+		res := profileResponse{
+			AvatarURL:   profile.AvatarURL,
+			DisplayName: profile.DisplayName,
 		}
 		return util.JSONResponse{
-			Code: 500,
-			JSON: jsonerror.Unknown("Failed to load user profile"),
+			Code: 200,
+			JSON: res,
 		}
 	}
 	return util.JSONResponse{
-		Code: 405,
-		JSON: jsonerror.NotFound("Bad method"),
+		Code: 500,
+		JSON: jsonerror.Unknown("Failed to load user profile"),
 	}
 }
 
