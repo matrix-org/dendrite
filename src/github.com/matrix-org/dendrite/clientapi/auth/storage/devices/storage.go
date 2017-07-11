@@ -69,6 +69,19 @@ func (d *Database) CreateDevice(localpart, deviceID, accessToken string) (dev *a
 	return
 }
 
+// RemoveDevice revokes a device by deleting the entry in the database
+// matching with the given device ID and user ID localpart
+// If the device doesn't exist, it will not return an error
+// If something went wrong during the deletion, it will return the SQL error
+func (d *Database) RemoveDevice(deviceID string, localpart string) error {
+	return runTransaction(d.db, func(txn *sql.Tx) error {
+		if err := d.devices.deleteDevice(txn, deviceID, localpart); err != sql.ErrNoRows {
+			return err
+		}
+		return nil
+	})
+}
+
 // TODO: factor out to common
 func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 	txn, err := db.Begin()
