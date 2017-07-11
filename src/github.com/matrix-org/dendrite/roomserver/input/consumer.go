@@ -63,9 +63,13 @@ type Consumer struct {
 }
 
 // WriteOutputRoomEvent implements OutputRoomEventWriter
-func (c *Consumer) WriteOutputRoomEvent(output api.OutputRoomEvent) error {
+func (c *Consumer) WriteOutputRoomEvent(output api.OutputNewRoomEvent) error {
 	var m sarama.ProducerMessage
-	value, err := json.Marshal(output)
+	oe := api.OutputEvent{
+		Type:         api.OutputTypeNewRoomEvent,
+		NewRoomEvent: &output,
+	}
+	value, err := json.Marshal(oe)
 	if err != nil {
 		return err
 	}
