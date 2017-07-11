@@ -121,7 +121,7 @@ func SetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := sendUpdate(userID, oldProfile, r.AvatarURL, "", accountDB, cfg); err != nil {
+	if err := sendUpdate(userID, oldProfile, r.AvatarURL, "", cfg); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -176,7 +176,7 @@ func SetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := sendUpdate(userID, oldProfile, "", r.DisplayName, accountDB, cfg); err != nil {
+	if err := sendUpdate(userID, oldProfile, "", r.DisplayName, cfg); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -200,7 +200,7 @@ func getLocalPart(userID string) string {
 // Send an update using kafka to notify the roomserver of the profile update
 // Returns an error if the update failed to send
 func sendUpdate(userID string, oldProfile *authtypes.Profile, newAvatarURL string,
-	newDisplayName string, accountDB *accounts.Database, cfg config.Dendrite,
+	newDisplayName string, cfg config.Dendrite,
 ) error {
 	var update profileUpdate
 	var m sarama.ProducerMessage
