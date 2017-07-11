@@ -15,19 +15,16 @@
 package readers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/util"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 
-	sarama "gopkg.in/Shopify/sarama.v1"
+	"github.com/matrix-org/util"
 )
 
 type profileResponse struct {
@@ -41,14 +38,6 @@ type avatarURL struct {
 
 type displayName struct {
 	DisplayName string `json:"displayname"`
-}
-
-// TODO: Move this struct to `common` so the components that consume the topic
-// can use it when parsing incoming messages
-type profileUpdate struct {
-	Updated  string `json:"updated"`   // Which attribute is updated (can be either `avatar_url` or `displayname`)
-	OldValue string `json:"old_value"` // The attribute's value before the update
-	NewValue string `json:"new_value"` // The attribute's value after the update
 }
 
 // GetProfile implements GET /profile/{userID}
@@ -97,7 +86,7 @@ func GetAvatarURL(
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
-	cfg config.Dendrite,
+	producer *producers.UserUpdateProducer,
 ) util.JSONResponse {
 	var r avatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
@@ -121,7 +110,7 @@ func SetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := sendUpdate(userID, oldProfile, r.AvatarURL, "", cfg); err != nil {
+	if err := producer.SendUpdate(userID, "avatar_url", oldProfile.AvatarURL, r.AvatarURL); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -152,7 +141,7 @@ func GetDisplayName(
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
-	cfg config.Dendrite,
+	producer *producers.UserUpdateProducer,
 ) util.JSONResponse {
 	var r displayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
@@ -176,7 +165,7 @@ func SetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := sendUpdate(userID, oldProfile, "", r.DisplayName, cfg); err != nil {
+	if err := producer.SendUpdate(userID, "displayname", oldProfile.DisplayName, r.DisplayName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -195,50 +184,4 @@ func getLocalPart(userID string) string {
 	username := strings.Split(userID, ":")[0]
 	// Return the part after the "@"
 	return strings.Split(username, "@")[1]
-}
-
-// Send an update using kafka to notify the roomserver of the profile update
-// Returns an error if the update failed to send
-func sendUpdate(userID string, oldProfile *authtypes.Profile, newAvatarURL string,
-	newDisplayName string, cfg config.Dendrite,
-) error {
-	var update profileUpdate
-	var m sarama.ProducerMessage
-
-	m.Topic = string(cfg.Kafka.Topics.UserUpdates)
-	m.Key = sarama.StringEncoder(userID)
-
-	// Determining if the changed value is the avatar URL or the display name
-	if len(newAvatarURL) > 0 {
-		update = profileUpdate{
-			Updated:  "avatar_url",
-			OldValue: oldProfile.AvatarURL,
-			NewValue: newAvatarURL,
-		}
-	} else if len(newDisplayName) > 0 {
-		update = profileUpdate{
-			Updated:  "displayname",
-			OldValue: oldProfile.DisplayName,
-			NewValue: newDisplayName,
-		}
-	} else {
-		panic(fmt.Errorf("No update to send"))
-	}
-
-	value, err := json.Marshal(update)
-	if err != nil {
-		return err
-	}
-	m.Value = sarama.ByteEncoder(value)
-
-	producer, err := sarama.NewSyncProducer(cfg.Kafka.Addresses, nil)
-	if err != nil {
-		return err
-	}
-
-	if _, _, err := producer.SendMessage(&m); err != nil {
-		return err
-	}
-
-	return nil
 }
