@@ -113,6 +113,12 @@ func Setup(
 		}),
 	)
 
+	r0mux.Handle("/logout",
+		common.MakeAuthAPI("logout", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return readers.Logout(req, deviceDB, device)
+		}),
+	)
+
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
