@@ -43,10 +43,12 @@ type displayName struct {
 	DisplayName string `json:"displayname"`
 }
 
+// TODO: Move this struct to `common` so the components that consume the topic
+// can use it when parsing incoming messages
 type profileUpdate struct {
-	Updated  string `json:"updated"`
-	OldValue string `json:"old_value"`
-	NewValue string `json:"new_value"`
+	Updated  string `json:"updated"`   // Which attribute is updated (can be either `avatar_url` or `displayname`)
+	OldValue string `json:"old_value"` // The attribute's value before the update
+	NewValue string `json:"new_value"` // The attribute's value after the update
 }
 
 // GetProfile implements GET /profile/{userID}
