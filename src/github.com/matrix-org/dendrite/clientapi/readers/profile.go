@@ -22,6 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/producers"
+
 	"github.com/matrix-org/util"
 )
 
@@ -84,6 +86,7 @@ func GetAvatarURL(
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
+	producer *producers.UserUpdateProducer,
 ) util.JSONResponse {
 	var r avatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
@@ -97,9 +100,20 @@ func SetAvatarURL(
 	}
 
 	localpart := getLocalPart(userID)
+
+	oldProfile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	if err := accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
 		return httputil.LogThenError(req, err)
 	}
+
+	if err := producer.SendUpdate(userID, "avatar_url", oldProfile.AvatarURL, r.AvatarURL); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct{}{},
@@ -127,6 +141,7 @@ func GetDisplayName(
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
+	producer *producers.UserUpdateProducer,
 ) util.JSONResponse {
 	var r displayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
@@ -140,9 +155,20 @@ func SetDisplayName(
 	}
 
 	localpart := getLocalPart(userID)
+
+	oldProfile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	if err := accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
+
+	if err := producer.SendUpdate(userID, "displayname", oldProfile.DisplayName, r.DisplayName); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct{}{},
