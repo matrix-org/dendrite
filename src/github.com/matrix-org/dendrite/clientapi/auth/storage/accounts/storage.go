@@ -18,6 +18,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	// Import the postgres database driver.
@@ -26,9 +27,11 @@ import (
 
 // Database represents an account database
 type Database struct {
-	db       *sql.DB
-	accounts accountsStatements
-	profiles profilesStatements
+	db          *sql.DB
+	partitions  common.PartitionOffsetStatements
+	accounts    accountsStatements
+	profiles    profilesStatements
+	memberships membershipStatements
 }
 
 // NewDatabase creates a new accounts and profiles database
@@ -36,6 +39,10 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	var db *sql.DB
 	var err error
 	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+		return nil, err
+	}
+	partitions := common.PartitionOffsetStatements{}
+	if err = partitions.Prepare(db); err != nil {
 		return nil, err
 	}
 	a := accountsStatements{}
@@ -46,7 +53,11 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = p.prepare(db); err != nil {
 		return nil, err
 	}
-	return &Database{db, a, p}, nil
+	m := membershipStatements{}
+	if err = m.prepare(db); err != nil {
+		return nil, err
+	}
+	return &Database{db, partitions, a, p, m}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -91,6 +102,30 @@ func (d *Database) CreateAccount(localpart, plaintextPassword string) (*authtype
 		return nil, err
 	}
 	return d.accounts.insertAccount(localpart, hash)
+}
+
+// PartitionOffsets implements common.PartitionStorer
+func (d *Database) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
+	return d.partitions.SelectPartitionOffsets(topic)
+}
+
+// SetPartitionOffset implements common.PartitionStorer
+func (d *Database) SetPartitionOffset(topic string, partition int32, offset int64) error {
+	return d.partitions.UpsertPartitionOffset(topic, partition, offset)
+}
+
+// SaveMembership saves the user matching a given localpart as a member of a given
+// room. If a membership already exists between the user and the room, or of the
+// insert fails, returns the SQL error
+func (d *Database) SaveMembership(localpart string, roomID string) error {
+	return d.memberships.insertMembership(localpart, roomID)
+}
+
+// RemoveMembership removes the membership of the user mathing a given localpart
+// from a given room.
+// If the removal fails, or if there is no membership to remove, returns an error
+func (d *Database) RemoveMembership(localpart string, roomID string) error {
+	return d.memberships.deleteMembership(localpart, roomID)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {

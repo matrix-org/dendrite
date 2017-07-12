@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/common"
@@ -84,6 +85,14 @@ func main() {
 			&gomatrixserverlib.DirectKeyFetcher{federation.Client},
 		},
 		KeyDatabase: keyDB,
+	}
+
+	consumer, err := consumers.NewOutputRoomEvent(cfg, accountDB)
+	if err != nil {
+		log.Panicf("startup: failed to create room server consumer: %s", err)
+	}
+	if err = consumer.Start(); err != nil {
+		log.Panicf("startup: failed to start room server consumer")
 	}
 
 	log.Info("Starting client API server on ", cfg.Listen.ClientAPI)
