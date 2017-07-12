@@ -27,11 +27,9 @@ CREATE TABLE IF NOT EXISTS memberships (
     -- The room this user is a member of
     room_id TEXT NOT NULL,
 
+	-- A user can only be member of a room once
 	PRIMARY KEY (localpart, room_id)
 );
-
--- A user can only be member of a room once
-CREATE UNIQUE INDEX IF NOT EXISTS localpart_id_idx ON memberships(localpart, room_id);
 `
 
 const insertMembershipSQL = "" +
