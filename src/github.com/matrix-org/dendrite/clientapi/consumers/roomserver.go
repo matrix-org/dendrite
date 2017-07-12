@@ -89,8 +89,20 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 		localpart := getLocalPart(*ev.StateKey())
 		roomID := ev.RoomID()
-		if err := s.db.SaveMembership(localpart, roomID); err != nil {
+		membership, err := ev.Membership()
+		if err != nil {
 			return err
+		}
+		switch membership {
+		case "join":
+			if err := s.db.SaveMembership(localpart, roomID); err != nil {
+				return err
+			}
+		case "leave":
+		case "ban":
+			if err := s.db.RemoveMembership(localpart, roomID); err != nil {
+				return err
+			}
 		}
 	}
 
