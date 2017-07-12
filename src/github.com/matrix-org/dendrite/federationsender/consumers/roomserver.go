@@ -80,7 +80,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 	if output.Type != api.OutputTypeNewRoomEvent {
 		log.WithField("type", output.Type).Debug(
-			"roomserver output logignoring unknown output type",
+			"roomserver output log: ignoring unknown output type",
 		)
 		return nil
 	}
