@@ -16,6 +16,7 @@ package input
 
 import (
 	"bytes"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -201,8 +202,8 @@ func writeEvent(
 		latestEventIDs[i] = latest[i].EventID
 	}
 
-	ore := api.OutputRoomEvent{
-		Event:           event.JSON(),
+	ore := api.OutputNewRoomEvent{
+		Event:           event,
 		LastSentEventID: lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 	}

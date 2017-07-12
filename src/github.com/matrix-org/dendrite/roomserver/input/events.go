@@ -44,7 +44,7 @@ type RoomEventDatabase interface {
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
 type OutputRoomEventWriter interface {
 	// Write an event.
-	WriteOutputRoomEvent(output api.OutputRoomEvent) error
+	WriteOutputRoomEvent(output api.OutputNewRoomEvent) error
 }
 
 func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.InputRoomEvent) error {
