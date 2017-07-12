@@ -16,7 +16,6 @@ package accounts
 
 import (
 	"database/sql"
-	"fmt"
 )
 
 const membershipSchema = `
@@ -72,9 +71,7 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *membershipStatements) insertMembership(localpart string, roomID string) (err error) {
-	fmt.Printf("Inserting membership for user %s and room %s\n", localpart, roomID)
 	_, err = s.insertMembershipStmt.Exec(localpart, roomID)
-	fmt.Println(err)
 	return
 }
 
