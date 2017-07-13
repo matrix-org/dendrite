@@ -19,7 +19,7 @@ import (
 )
 
 const membershipSchema = `
--- Stores data about accounts profiles.
+-- Stores data about users memberships to rooms.
 CREATE TABLE IF NOT EXISTS memberships (
     -- The Matrix user ID localpart for the member
     localpart TEXT NOT NULL,
