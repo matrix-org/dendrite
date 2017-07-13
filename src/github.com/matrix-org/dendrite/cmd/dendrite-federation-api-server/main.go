@@ -67,9 +67,7 @@ func main() {
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 
-	roomserverProducer, err := producers.NewRoomserverProducer(
-		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.InputRoomEvent),
-	)
+	roomserverProducer := producers.NewRoomserverProducer(cfg.RoomServerURL())
 
 	if err != nil {
 		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.Kafka.Addresses, err)
