@@ -89,6 +89,75 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		"type":     ev.Type(),
 	}).Info("received event from roomserver")
 
+	events, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
+	if err != nil {
+		return err
+	}
+
+	for _, event := range events {
+		if err := s.updateMembership(event); err != nil {
+			return err
+		}
+	}
+
+	for _, id := range output.NewRoomEvent.RemovesStateEventIDs {
+		if err := s.db.RemoveMembership(id); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// lookupStateEvents looks up the state events that are added by a new event.
+func (s *OutputRoomEvent) lookupStateEvents(
+	addsStateEventIDs []string, event gomatrixserverlib.Event,
+) ([]gomatrixserverlib.Event, error) {
+	// Fast path if there aren't any new state events.
+	if len(addsStateEventIDs) == 0 {
+		return nil, nil
+	}
+
+	// Fast path if the only state event added is the event itself.
+	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
+		return []gomatrixserverlib.Event{event}, nil
+	}
+
+	result := []gomatrixserverlib.Event{}
+	missing := []string{}
+	for _, id := range addsStateEventIDs {
+		// Check if the event is already known
+		localpart, server, err := s.db.GetMembershipByEventID(id)
+		if err != nil {
+			return nil, err
+		}
+
+		// Append the ID to the list to request so if it isn't in the database
+		if len(localpart) == 0 && len(server) == 0 {
+			missing = append(missing, id)
+		}
+
+		// Append the current event in the results if its ID is in the events list
+		if id == event.EventID() {
+			result = append(result, event)
+		}
+	}
+
+	// At this point the missing events are neither the event itself nor are
+	// they present in our local database. Our only option is to fetch them
+	// from the roomserver using the query API.
+	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
+	var eventResp api.QueryEventsByIDResponse
+	if err := s.query.QueryEventsByID(&eventReq, &eventResp); err != nil {
+		return nil, err
+	}
+
+	result = append(result, eventResp.Events...)
+
+	return result, nil
+}
+
+func (s *OutputRoomEvent) updateMembership(ev gomatrixserverlib.Event) error {
 	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 		localpart, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
 		if err != nil {
@@ -100,6 +169,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 			return nil
 		}
 
+		eventID := ev.EventID()
 		roomID := ev.RoomID()
 		membership, err := ev.Membership()
 		if err != nil {
@@ -108,16 +178,15 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 
 		switch membership {
 		case "join":
-			if err := s.db.SaveMembership(localpart, roomID); err != nil {
+			if err := s.db.SaveMembership(localpart, roomID, eventID); err != nil {
 				return err
 			}
 		case "leave":
 		case "ban":
-			if err := s.db.RemoveMembership(localpart, roomID); err != nil {
+			if err := s.db.RemoveMembership(eventID); err != nil {
 				return err
 			}
 		}
 	}
-
 	return nil
 }

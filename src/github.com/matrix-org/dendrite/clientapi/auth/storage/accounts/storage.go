@@ -115,17 +115,26 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
-// room. If a membership already exists between the user and the room, or of the
+// room. It also stores the ID of the `join` membership event.
+// If a membership already exists between the user and the room, or of the
 // insert fails, returns the SQL error
-func (d *Database) SaveMembership(localpart string, roomID string) error {
-	return d.memberships.insertMembership(localpart, roomID)
+func (d *Database) SaveMembership(localpart string, roomID string, eventID string) error {
+	return d.memberships.insertMembership(localpart, roomID, eventID)
 }
 
-// RemoveMembership removes the membership of the user mathing a given localpart
-// from a given room.
+// RemoveMembership removes the membership of which the `join` membership event
+// ID matches with the given event ID.
 // If the removal fails, or if there is no membership to remove, returns an error
-func (d *Database) RemoveMembership(localpart string, roomID string) error {
-	return d.memberships.deleteMembership(localpart, roomID)
+func (d *Database) RemoveMembership(eventID string) error {
+	return d.memberships.deleteMembershipByEventID(eventID)
+}
+
+// GetMembershipByEventID returns the membership (as a user localpart and a room ID)
+// for which the `join` membership event ID matches a given event ID
+// If no membership match this event ID, the localpart and room ID will be empty strings
+// If an error happens during the retrieval, returns the SQL error
+func (d *Database) GetMembershipByEventID(eventID string) (string, string, error) {
+	return d.memberships.selectMembershipByEventID(eventID)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {
