@@ -252,9 +252,9 @@ func main() {
 
 	input := []string{
 		`{
-			"AuthEventIDs": [],
-			"Kind": 1,
-			"Event": {
+			"auth_event_ids": [],
+			"kind": 1,
+			"event": {
 				"origin": "matrix.org",
 				"signatures": {
 					"matrix.org": {
@@ -274,10 +274,10 @@ func main() {
 				"hashes": {"sha256": "Q05VLC8nztN2tguy+KnHxxhitI95wK9NelnsDaXRqeo"},
 				"type": "m.room.create"}
 		}`, `{
-			"AuthEventIDs": ["$1463671337126266wrSBX:matrix.org"],
-			"Kind": 2,
-			"StateEventIDs": ["$1463671337126266wrSBX:matrix.org"],
-			"Event": {
+			"auth_event_ids": ["$1463671337126266wrSBX:matrix.org"],
+			"kind": 2,
+			"state_event_ids": ["$1463671337126266wrSBX:matrix.org"],
+			"event": {
 				"origin": "matrix.org",
 				"signatures": {
 					"matrix.org": {
@@ -305,7 +305,7 @@ func main() {
 				]],
 				"hashes": {"sha256": "t9t3sZV1Eu0P9Jyrs7pge6UTa1zuTbRdVxeUHnrQVH0"},
 				"type": "m.room.member"},
-			"HasState": true
+			"has_state": true
 		}`,
 	}
 

@@ -136,12 +136,12 @@ func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client) Ro
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &httpRoomserverQueryAPI{roomserverURL, *httpClient}
+	return &httpRoomserverQueryAPI{roomserverURL, httpClient}
 }
 
 type httpRoomserverQueryAPI struct {
 	roomserverURL string
-	httpClient    http.Client
+	httpClient    *http.Client
 }
 
 // QueryLatestEventsAndState implements RoomserverQueryAPI
@@ -171,7 +171,7 @@ func (h *httpRoomserverQueryAPI) QueryEventsByID(
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 
-func postJSON(httpClient http.Client, apiURL string, request, response interface{}) error {
+func postJSON(httpClient *http.Client, apiURL string, request, response interface{}) error {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {
 		return err

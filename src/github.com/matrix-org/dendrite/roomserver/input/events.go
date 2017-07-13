@@ -49,10 +49,7 @@ type OutputRoomEventWriter interface {
 
 func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.InputRoomEvent) error {
 	// Parse and validate the event JSON
-	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(input.Event)
-	if err != nil {
-		return err
-	}
+	event := input.Event
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(db, event, input.AuthEventIDs)
@@ -79,8 +76,8 @@ func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.
 		if input.HasState {
 			// We've been told what the state at the event is so we don't need to calculate it.
 			// Check that those state events are in the database and store the state.
-			entries, err := db.StateEntriesForEventIDs(input.StateEventIDs)
-			if err != nil {
+			var entries []types.StateEntry
+			if entries, err = db.StateEntriesForEventIDs(input.StateEventIDs); err != nil {
 				return err
 			}
 
