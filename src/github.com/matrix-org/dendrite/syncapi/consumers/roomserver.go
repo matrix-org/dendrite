@@ -71,35 +71,38 @@ func (s *OutputRoomEvent) Start() error {
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
-	var output api.OutputRoomEvent
+	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
 		return nil
 	}
 
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(output.Event, false)
-	if err != nil {
-		log.WithError(err).Errorf("roomserver output log: event parse failure")
+	if output.Type != api.OutputTypeNewRoomEvent {
+		log.WithField("type", output.Type).Debug(
+			"roomserver output log: ignoring unknown output type",
+		)
 		return nil
 	}
+
+	ev := output.NewRoomEvent.Event
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),
 	}).Info("received event from roomserver")
 
-	addsStateEvents, err := s.lookupStateEvents(output.AddsStateEventIDs, ev)
+	addsStateEvents, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
-			"add":        output.AddsStateEventIDs,
-			"del":        output.RemovesStateEventIDs,
+			"add":        output.NewRoomEvent.AddsStateEventIDs,
+			"del":        output.NewRoomEvent.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: state event lookup failure")
 	}
 
 	syncStreamPos, err := s.db.WriteEvent(
-		&ev, addsStateEvents, output.AddsStateEventIDs, output.RemovesStateEventIDs,
+		&ev, addsStateEvents, output.NewRoomEvent.AddsStateEventIDs, output.NewRoomEvent.RemovesStateEventIDs,
 	)
 
 	if err != nil {
@@ -107,8 +110,8 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
-			"add":        output.AddsStateEventIDs,
-			"del":        output.RemovesStateEventIDs,
+			"add":        output.NewRoomEvent.AddsStateEventIDs,
+			"del":        output.NewRoomEvent.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}

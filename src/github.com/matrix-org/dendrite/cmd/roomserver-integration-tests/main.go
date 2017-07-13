@@ -310,8 +310,8 @@ func main() {
 	}
 
 	want := []string{
-		`{
-			"Event":{
+		`{"type":"new_room_event","new_room_event":{
+			"event":{
 				"auth_events":[[
 					"$1463671337126266wrSBX:matrix.org",{"sha256":"h/VS07u8KlMwT3Ee8JhpkC7sa1WUs0Srgs+l3iBv6c0"}
 				]],
@@ -340,14 +340,14 @@ func main() {
 				"state_key":"@richvdh:matrix.org",
 				"type":"m.room.member"
 			},
-			"StateBeforeRemovesEventIDs":["$1463671339126270PnVwC:matrix.org"],
-			"StateBeforeAddsEventIDs":null,
-			"LatestEventIDs":["$1463671339126270PnVwC:matrix.org"],
-			"AddsStateEventIDs":["$1463671337126266wrSBX:matrix.org", "$1463671339126270PnVwC:matrix.org"],
-			"RemovesStateEventIDs":null,
-			"LastSentEventID":"",
-			"SendAsServer":""
-		}`,
+			"state_before_removes_event_ids":["$1463671339126270PnVwC:matrix.org"],
+			"state_before_adds_event_ids":null,
+			"latest_event_ids":["$1463671339126270PnVwC:matrix.org"],
+			"adds_state_event_ids":["$1463671337126266wrSBX:matrix.org", "$1463671339126270PnVwC:matrix.org"],
+			"removes_state_event_ids":null,
+			"last_sent_event_id":"",
+			"send_as_server":""
+		}}`,
 	}
 
 	testRoomserver(input, want, func(q api.RoomserverQueryAPI) {

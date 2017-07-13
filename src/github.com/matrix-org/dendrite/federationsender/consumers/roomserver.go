@@ -72,31 +72,32 @@ func (s *OutputRoomEvent) Start() error {
 // realises that it cannot update the room state using the deltas.
 func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
-	var output api.OutputRoomEvent
+	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
 		return nil
 	}
-
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(output.Event, false)
-	if err != nil {
-		log.WithError(err).Errorf("roomserver output log: event parse failure")
+	if output.Type != api.OutputTypeNewRoomEvent {
+		log.WithField("type", output.Type).Debug(
+			"roomserver output log: ignoring unknown output type",
+		)
 		return nil
 	}
+	ev := &output.NewRoomEvent.Event
 	log.WithFields(log.Fields{
 		"event_id":       ev.EventID(),
 		"room_id":        ev.RoomID(),
-		"send_as_server": output.SendAsServer,
+		"send_as_server": output.NewRoomEvent.SendAsServer,
 	}).Info("received event from roomserver")
 
-	if err = s.processMessage(output, ev); err != nil {
+	if err := s.processMessage(*output.NewRoomEvent); err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
-			"add":        output.AddsStateEventIDs,
-			"del":        output.RemovesStateEventIDs,
+			"add":        output.NewRoomEvent.AddsStateEventIDs,
+			"del":        output.NewRoomEvent.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
@@ -106,8 +107,8 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
-func (s *OutputRoomEvent) processMessage(ore api.OutputRoomEvent, ev gomatrixserverlib.Event) error {
-	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ev)
+func (s *OutputRoomEvent) processMessage(ore api.OutputNewRoomEvent) error {
+	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ore.Event)
 	if err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputRoomEvent, ev gomatrixser
 	// TODO: handle EventIDMismatchError and recover the current state by talking
 	// to the roomserver
 	oldJoinedHosts, err := s.db.UpdateRoom(
-		ev.RoomID(), ore.LastSentEventID, ev.EventID(),
+		ore.Event.RoomID(), ore.LastSentEventID, ore.Event.EventID(),
 		addsJoinedHosts, ore.RemovesStateEventIDs,
 	)
 	if err != nil {
@@ -134,14 +135,14 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputRoomEvent, ev gomatrixser
 	}
 
 	// Work out which hosts were joined at the event itself.
-	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, ev, oldJoinedHosts)
+	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, oldJoinedHosts)
 	if err != nil {
 		return err
 	}
 
 	// Send the event.
 	if err = s.queues.SendEvent(
-		&ev, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
+		&ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	); err != nil {
 		return err
 	}
@@ -159,7 +160,7 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputRoomEvent, ev gomatrixser
 // events from the room server.
 // Returns an error if there was a problem talking to the room server.
 func (s *OutputRoomEvent) joinedHostsAtEvent(
-	ore api.OutputRoomEvent, ev gomatrixserverlib.Event, oldJoinedHosts []types.JoinedHost,
+	ore api.OutputNewRoomEvent, oldJoinedHosts []types.JoinedHost,
 ) ([]gomatrixserverlib.ServerName, error) {
 	// Combine the delta into a single delta so that the adds and removes can
 	// cancel each other out. This should reduce the number of times we need
@@ -168,7 +169,7 @@ func (s *OutputRoomEvent) joinedHostsAtEvent(
 		ore.AddsStateEventIDs, ore.RemovesStateEventIDs,
 		ore.StateBeforeAddsEventIDs, ore.StateBeforeRemovesEventIDs,
 	)
-	combinedAddsEvents, err := s.lookupStateEvents(combinedAdds, ev)
+	combinedAddsEvents, err := s.lookupStateEvents(combinedAdds, ore.Event)
 	if err != nil {
 		return nil, err
 	}

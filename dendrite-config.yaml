@@ -66,6 +66,7 @@ database:
     sync_api: "postgres://dendrite:itsasecret@localhost/dendrite_syncapi?sslmode=disable"
     room_server: "postgres://dendrite:itsasecret@localhost/dendrite_roomserver?sslmode=disable"
     server_key: "postgres://dendrite:itsasecret@localhost/dendrite_serverkey?sslmode=disable"
+    federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
 
 # The TCP host:port pairs to bind the internal HTTP APIs to.
 # These shouldn't be exposed to the public internet.
