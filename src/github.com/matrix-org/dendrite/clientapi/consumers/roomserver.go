@@ -101,7 +101,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	for _, id := range output.NewRoomEvent.RemovesStateEventIDs {
-		if err := s.db.RemoveMembership(id); err != nil {
+		if err := s.db.RemoveMembershipByEventID(id); err != nil {
 			return err
 		}
 	}
@@ -183,7 +183,7 @@ func (s *OutputRoomEvent) updateMembership(ev gomatrixserverlib.Event) error {
 			}
 		case "leave":
 		case "ban":
-			if err := s.db.RemoveMembership(eventID); err != nil {
+			if err := s.db.RemoveMembership(localpart, roomID); err != nil {
 				return err
 			}
 		}
