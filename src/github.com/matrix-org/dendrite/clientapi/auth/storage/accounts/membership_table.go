@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS memberships (
     localpart TEXT NOT NULL,
     -- The room this user is a member of
     room_id TEXT NOT NULL,
-	-- The ID of the join membership event
-	event_id TEXT NOT NULL,
+    -- The ID of the join membership event
+    event_id TEXT NOT NULL,
 
-	-- A user can only be member of a room once
-	PRIMARY KEY (localpart, room_id)
+    -- A user can only be member of a room once
+    PRIMARY KEY (localpart, room_id)
 );
 `
 
