@@ -15,7 +15,6 @@
 package consumers
 
 import (
-	"database/sql"
 	"encoding/json"
 
 	log "github.com/Sirupsen/logrus"
@@ -95,25 +94,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
-	txn, err := s.db.StartTransaction()
-	if err != nil {
-		return err
-	}
-
-	if err := s.db.RemoveMembershipsByEventIDs(output.NewRoomEvent.RemovesStateEventIDs, txn); err != nil {
-		if e := s.db.EndTransation(txn, err); e != nil {
-			return e
-		}
-		return err
-	}
-
-	for _, event := range events {
-		if err := s.updateMembership(event, txn); err != nil {
-			return err
-		}
-	}
-
-	if err := s.db.EndTransation(txn, nil); err != nil {
+	if err := s.db.UpdateMemberships(events, output.NewRoomEvent.RemovesStateEventIDs); err != nil {
 		return err
 	}
 
@@ -157,35 +138,4 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	result = append(result, eventResp.Events...)
 
 	return result, nil
-}
-
-func (s *OutputRoomEvent) updateMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error {
-	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
-		localpart, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
-		if err != nil {
-			return err
-		}
-
-		// we only want state events from local users
-		if string(serverName) != s.serverName {
-			return nil
-		}
-
-		eventID := ev.EventID()
-		roomID := ev.RoomID()
-		membership, err := ev.Membership()
-		if err != nil {
-			return err
-		}
-
-		if membership == "join" {
-			if err := s.db.SaveMembership(localpart, roomID, eventID, txn); err != nil {
-				if e := s.db.EndTransation(txn, err); e != nil {
-					return e
-				}
-				return err
-			}
-		}
-	}
-	return nil
 }
