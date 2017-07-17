@@ -104,12 +104,15 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 
 	proxyCmd, proxyCmdChan := test.StartProxy(proxyAddr, cfg)
 
-	cmd, cmdChan := test.StartServer(
-		serverType,
-		serverArgs,
+	test.InitDatabase(
 		postgresDatabase,
 		postgresContainerName,
 		databases,
+	)
+
+	cmd, cmdChan := test.CreateBackgroundCommand(
+		filepath.Join(filepath.Dir(os.Args[0]), "dendrite-"+serverType+"-server"),
+		serverArgs,
 	)
 
 	fmt.Printf("==TESTSERVER== STARTED %v -> %v : %v\n", proxyAddr, cfg.Listen.MediaAPI, dir)

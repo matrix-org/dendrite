@@ -147,9 +147,7 @@ func startSyncServer() (*exec.Cmd, chan error) {
 		testDatabaseName,
 	}
 
-	cmd, cmdChan := test.StartServer(
-		"sync-api",
-		serverArgs,
+	test.InitDatabase(
 		postgresDatabase,
 		postgresContainerName,
 		databases,
@@ -164,6 +162,11 @@ func startSyncServer() (*exec.Cmd, chan error) {
 	if err := createTestUser(testDatabase, "charlie", "@charlie:localhost"); err != nil {
 		panic(err)
 	}
+
+	cmd, cmdChan := test.CreateBackgroundCommand(
+		filepath.Join(filepath.Dir(os.Args[0]), "dendrite-sync-api-server"),
+		serverArgs,
+	)
 
 	return cmd, cmdChan
 }
