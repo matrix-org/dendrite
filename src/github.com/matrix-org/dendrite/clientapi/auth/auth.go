@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
 )
@@ -40,10 +39,16 @@ var UnknownDeviceID = "unknown-device"
 // 32 bytes => 256 bits
 var tokenByteLength = 32
 
+// DeviceDatabase represents a device database.
+type DeviceDatabase interface {
+	// Lookup the device matching the given access token.
+	GetDeviceByAccessToken(token string) (*authtypes.Device, error)
+}
+
 // VerifyAccessToken verifies that an access token was supplied in the given HTTP request
 // and returns the device it corresponds to. Returns resErr (an error response which can be
 // sent to the client) if the token is invalid or there was a problem querying the database.
-func VerifyAccessToken(req *http.Request, deviceDB *devices.Database) (device *authtypes.Device, resErr *util.JSONResponse) {
+func VerifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *authtypes.Device, resErr *util.JSONResponse) {
 	token, err := extractAccessToken(req)
 	if err != nil {
 		resErr = &util.JSONResponse{

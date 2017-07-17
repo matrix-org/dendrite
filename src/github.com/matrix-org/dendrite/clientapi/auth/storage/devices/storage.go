@@ -18,6 +18,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -53,7 +54,7 @@ func (d *Database) GetDeviceByAccessToken(token string) (*authtypes.Device, erro
 // an error will be returned.
 // Returns the device on success.
 func (d *Database) CreateDevice(localpart, deviceID, accessToken string) (dev *authtypes.Device, returnErr error) {
-	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
+	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
 		// Revoke existing token for this device
 		if err = d.devices.deleteDevice(txn, deviceID, localpart); err != nil {
@@ -74,30 +75,10 @@ func (d *Database) CreateDevice(localpart, deviceID, accessToken string) (dev *a
 // If the device doesn't exist, it will not return an error
 // If something went wrong during the deletion, it will return the SQL error
 func (d *Database) RemoveDevice(deviceID string, localpart string) error {
-	return runTransaction(d.db, func(txn *sql.Tx) error {
+	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if err := d.devices.deleteDevice(txn, deviceID, localpart); err != sql.ErrNoRows {
 			return err
 		}
 		return nil
 	})
-}
-
-// TODO: factor out to common
-func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
-	txn, err := db.Begin()
-	if err != nil {
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			txn.Rollback()
-			panic(r)
-		} else if err != nil {
-			txn.Rollback()
-		} else {
-			err = txn.Commit()
-		}
-	}()
-	err = fn(txn)
-	return
 }
