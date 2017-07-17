@@ -18,17 +18,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/matrix-org/gomatrixserverlib"
 	"net/http"
+
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
 type QueryLatestEventsAndStateRequest struct {
 	// The room ID to query the latest events for.
-	RoomID string
+	RoomID string `json:"room_id"`
 	// The state key tuples to fetch from the room current state.
 	// If this list is empty or nil then no state events are returned.
-	StateToFetch []gomatrixserverlib.StateKeyTuple
+	StateToFetch []gomatrixserverlib.StateKeyTuple `json:"state_to_fetch"`
 }
 
 // QueryLatestEventsAndStateResponse is a response to QueryLatestEventsAndState
@@ -39,29 +40,29 @@ type QueryLatestEventsAndStateResponse struct {
 	QueryLatestEventsAndStateRequest
 	// Does the room exist?
 	// If the room doesn't exist this will be false and LatestEvents will be empty.
-	RoomExists bool
+	RoomExists bool `json:"room_exists"`
 	// The latest events in the room.
 	// These are used to set the prev_events when sending an event.
-	LatestEvents []gomatrixserverlib.EventReference
+	LatestEvents []gomatrixserverlib.EventReference `json:"latest_events"`
 	// The state events requested.
 	// This list will be in an arbitrary order.
 	// These are used to set the auth_events when sending an event.
 	// These are used to check whether the event is allowed.
-	StateEvents []gomatrixserverlib.Event
+	StateEvents []gomatrixserverlib.Event `json:"state_events"`
 	// The depth of the latest events.
 	// This is one greater than the maximum depth of the latest events.
 	// This is used to set the depth when sending an event.
-	Depth int64
+	Depth int64 `json:"depth"`
 }
 
 // QueryStateAfterEventsRequest is a request to QueryStateAfterEvents
 type QueryStateAfterEventsRequest struct {
 	// The room ID to query the state in.
-	RoomID string
+	RoomID string `json:"room_id"`
 	// The list of previous events to return the events after.
-	PrevEventIDs []string
+	PrevEventIDs []string `json:"prev_event_ids"`
 	// The state key tuples to fetch from the state
-	StateToFetch []gomatrixserverlib.StateKeyTuple
+	StateToFetch []gomatrixserverlib.StateKeyTuple `json:"state_to_fetch"`
 }
 
 // QueryStateAfterEventsResponse is a response to QueryStateAfterEvents
@@ -70,19 +71,19 @@ type QueryStateAfterEventsResponse struct {
 	QueryStateAfterEventsRequest
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
-	RoomExists bool
+	RoomExists bool `json:"room_exists"`
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
-	PrevEventsExist bool
+	PrevEventsExist bool `json:"prev_events_exist"`
 	// The state events requested.
 	// This list will be in an arbitrary order.
-	StateEvents []gomatrixserverlib.Event
+	StateEvents []gomatrixserverlib.Event `json:"state_events"`
 }
 
 // QueryEventsByIDRequest is a request to QueryEventsByID
 type QueryEventsByIDRequest struct {
 	// The event IDs to look up.
-	EventIDs []string
+	EventIDs []string `json:"event_ids"`
 }
 
 // QueryEventsByIDResponse is a response to QueryEventsByID
@@ -96,7 +97,7 @@ type QueryEventsByIDResponse struct {
 	// fails to read it from the database then it will fail
 	// the entire request.
 	// This list will be in an arbitrary order.
-	Events []gomatrixserverlib.Event
+	Events []gomatrixserverlib.Event `json:"events"`
 }
 
 // RoomserverQueryAPI is used to query information from the room server.
@@ -121,13 +122,13 @@ type RoomserverQueryAPI interface {
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
-const RoomserverQueryLatestEventsAndStatePath = "/api/roomserver/QueryLatestEventsAndState"
+const RoomserverQueryLatestEventsAndStatePath = "/api/roomserver/queryLatestEventsAndState"
 
 // RoomserverQueryStateAfterEventsPath is the HTTP path for the QueryStateAfterEvents API.
-const RoomserverQueryStateAfterEventsPath = "/api/roomserver/QueryStateAfterEvents"
+const RoomserverQueryStateAfterEventsPath = "/api/roomserver/queryStateAfterEvents"
 
 // RoomserverQueryEventsByIDPath is the HTTP path for the QueryEventsByID API.
-const RoomserverQueryEventsByIDPath = "/api/roomserver/QueryEventsByID"
+const RoomserverQueryEventsByIDPath = "/api/roomserver/queryEventsByID"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -135,12 +136,12 @@ func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client) Ro
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &httpRoomserverQueryAPI{roomserverURL, *httpClient}
+	return &httpRoomserverQueryAPI{roomserverURL, httpClient}
 }
 
 type httpRoomserverQueryAPI struct {
 	roomserverURL string
-	httpClient    http.Client
+	httpClient    *http.Client
 }
 
 // QueryLatestEventsAndState implements RoomserverQueryAPI
@@ -170,7 +171,7 @@ func (h *httpRoomserverQueryAPI) QueryEventsByID(
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 
-func postJSON(httpClient http.Client, apiURL string, request, response interface{}) error {
+func postJSON(httpClient *http.Client, apiURL string, request, response interface{}) error {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {
 		return err

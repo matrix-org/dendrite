@@ -16,12 +16,9 @@ package storage
 
 import (
 	"database/sql"
-
-	"github.com/matrix-org/dendrite/common"
 )
 
 type statements struct {
-	common.PartitionOffsetStatements
 	eventTypeStatements
 	eventStateKeyStatements
 	roomStatements
@@ -38,7 +35,6 @@ func (s *statements) prepare(db *sql.DB) error {
 	var err error
 
 	for _, prepare := range []func(db *sql.DB) error{
-		s.PartitionOffsetStatements.Prepare,
 		s.eventTypeStatements.prepare,
 		s.eventStateKeyStatements.prepare,
 		s.roomStatements.prepare,

@@ -50,8 +50,11 @@ func main() {
 
 	log.Info("config: ", cfg)
 
-	roomserverProducer, err := producers.NewRoomserverProducer(
-		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.InputRoomEvent),
+	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
+
+	roomserverProducer := producers.NewRoomserverProducer(cfg.RoomServerURL())
+	userUpdateProducer, err := producers.NewUserUpdateProducer(
+		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.UserUpdates),
 	)
 	if err != nil {
 		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.Kafka.Addresses, err)
@@ -61,7 +64,6 @@ func main() {
 		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
-	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	accountDB, err := accounts.NewDatabase(string(cfg.Database.Account), cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("Failed to setup account database(%q): %s", cfg.Database.Account, err.Error())
@@ -86,7 +88,7 @@ func main() {
 	log.Info("Starting client API server on ", cfg.Listen.ClientAPI)
 	routing.Setup(
 		http.DefaultServeMux, http.DefaultClient, *cfg, roomserverProducer,
-		queryAPI, accountDB, deviceDB, federation, keyRing,
+		queryAPI, accountDB, deviceDB, federation, keyRing, userUpdateProducer,
 	)
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.ClientAPI), nil))
 }

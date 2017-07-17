@@ -21,12 +21,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/crypto/ed25519"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/ed25519"
 )
 
 const usage = `Usage: %s
@@ -131,7 +132,7 @@ func writeEvent(event gomatrixserverlib.Event) {
 	if *format == "InputRoomEvent" {
 		var ire api.InputRoomEvent
 		ire.Kind = api.KindNew
-		ire.Event = event.JSON()
+		ire.Event = event
 		authEventIDs := []string{}
 		for _, ref := range b.AuthEvents {
 			authEventIDs = append(authEventIDs, ref.EventID)

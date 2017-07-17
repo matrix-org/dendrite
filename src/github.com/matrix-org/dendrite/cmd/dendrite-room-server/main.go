@@ -16,11 +16,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"strconv"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
@@ -33,9 +31,8 @@ import (
 )
 
 var (
-	logDir              = os.Getenv("LOG_DIR")
-	configPath          = flag.String("config", "", "The path to the config file. For more information, see the config file in this repository.")
-	stopProcessingAfter = os.Getenv("STOP_AFTER")
+	logDir     = os.Getenv("LOG_DIR")
+	configPath = flag.String("config", "", "The path to the config file. For more information, see the config file in this repository.")
 )
 
 func main() {
@@ -56,40 +53,8 @@ func main() {
 		panic(err)
 	}
 
-	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
-	if err != nil {
-		panic(err)
-	}
-
 	kafkaProducer, err := sarama.NewSyncProducer(cfg.Kafka.Addresses, nil)
 	if err != nil {
-		panic(err)
-	}
-
-	consumer := input.Consumer{
-		ContinualConsumer: common.ContinualConsumer{
-			Topic:          string(cfg.Kafka.Topics.InputRoomEvent),
-			Consumer:       kafkaConsumer,
-			PartitionStore: db,
-		},
-		DB:                   db,
-		Producer:             kafkaProducer,
-		OutputRoomEventTopic: string(cfg.Kafka.Topics.OutputRoomEvent),
-	}
-
-	if stopProcessingAfter != "" {
-		count, err := strconv.ParseInt(stopProcessingAfter, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		consumer.StopProcessingAfter = &count
-		consumer.ShutdownCallback = func(message string) {
-			fmt.Println("Stopping roomserver", message)
-			os.Exit(0)
-		}
-	}
-
-	if err = consumer.Start(); err != nil {
 		panic(err)
 	}
 
@@ -98,6 +63,14 @@ func main() {
 	}
 
 	queryAPI.SetupHTTP(http.DefaultServeMux)
+
+	inputAPI := input.RoomserverInputAPI{
+		DB:                   db,
+		Producer:             kafkaProducer,
+		OutputRoomEventTopic: string(cfg.Kafka.Topics.OutputRoomEvent),
+	}
+
+	inputAPI.SetupHTTP(http.DefaultServeMux)
 
 	http.DefaultServeMux.Handle("/metrics", prometheus.Handler())
 

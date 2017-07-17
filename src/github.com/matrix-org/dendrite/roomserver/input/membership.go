@@ -65,22 +65,21 @@ func updateMemberships(
 func updateMembership(
 	updater types.RoomRecentEventsUpdater, targetNID types.EventStateKeyNID, remove *gomatrixserverlib.Event, add *gomatrixserverlib.Event,
 ) error {
+	var err error
 	old := "leave"
 	new := "leave"
 
 	if remove != nil {
-		membership, err := remove.Membership()
+		old, err = remove.Membership()
 		if err != nil {
 			return err
 		}
-		old = *membership
 	}
 	if add != nil {
-		membership, err := add.Membership()
+		new, err = add.Membership()
 		if err != nil {
 			return err
 		}
-		new = *membership
 	}
 	if old == new {
 		return nil

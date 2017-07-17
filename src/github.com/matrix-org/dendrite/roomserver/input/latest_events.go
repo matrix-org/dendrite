@@ -202,8 +202,8 @@ func writeEvent(
 		latestEventIDs[i] = latest[i].EventID
 	}
 
-	ore := api.OutputRoomEvent{
-		Event:           event.JSON(),
+	ore := api.OutputNewRoomEvent{
+		Event:           event,
 		LastSentEventID: lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 	}

@@ -98,15 +98,13 @@ func createTestUser(database, username, token string) error {
 // trimmed to the client format and then canonicalised and returned as a string.
 // Panics if there are any problems.
 func clientEventJSONForOutputRoomEvent(outputRoomEvent string) string {
-	var out api.OutputRoomEvent
+	var out api.OutputEvent
 	if err := json.Unmarshal([]byte(outputRoomEvent), &out); err != nil {
 		panic("failed to unmarshal output room event: " + err.Error())
 	}
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(out.Event, false)
-	if err != nil {
-		panic("failed to convert event field in output room event to Event: " + err.Error())
-	}
-	clientEvs := gomatrixserverlib.ToClientEvents([]gomatrixserverlib.Event{ev}, gomatrixserverlib.FormatSync)
+	clientEvs := gomatrixserverlib.ToClientEvents([]gomatrixserverlib.Event{
+		out.NewRoomEvent.Event,
+	}, gomatrixserverlib.FormatSync)
 	b, err := json.Marshal(clientEvs[0])
 	if err != nil {
 		panic("failed to marshal client event as json: " + err.Error())
