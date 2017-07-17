@@ -15,6 +15,7 @@
 package consumers
 
 import (
+	"database/sql"
 	"encoding/json"
 
 	log "github.com/Sirupsen/logrus"
@@ -94,16 +95,26 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
+	txn, err := s.db.StartTransaction()
+	if err != nil {
+		return err
+	}
+
+	if err := s.db.RemoveMembershipsByEventIDs(output.NewRoomEvent.RemovesStateEventIDs, txn); err != nil {
+		if e := s.db.EndTransation(txn, err); e != nil {
+			return e
+		}
+		return err
+	}
+
 	for _, event := range events {
-		if err := s.updateMembership(event); err != nil {
+		if err := s.updateMembership(event, txn); err != nil {
 			return err
 		}
 	}
 
-	for _, id := range output.NewRoomEvent.RemovesStateEventIDs {
-		if err := s.db.RemoveMembershipByEventID(id); err != nil {
-			return err
-		}
+	if err := s.db.EndTransation(txn, nil); err != nil {
+		return err
 	}
 
 	return nil
@@ -157,7 +168,7 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	return result, nil
 }
 
-func (s *OutputRoomEvent) updateMembership(ev gomatrixserverlib.Event) error {
+func (s *OutputRoomEvent) updateMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error {
 	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 		localpart, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
 		if err != nil {
@@ -176,14 +187,11 @@ func (s *OutputRoomEvent) updateMembership(ev gomatrixserverlib.Event) error {
 			return err
 		}
 
-		switch membership {
-		case "join":
-			if err := s.db.SaveMembership(localpart, roomID, eventID); err != nil {
-				return err
-			}
-		case "leave":
-		case "ban":
-			if err := s.db.RemoveMembership(localpart, roomID); err != nil {
+		if membership == "join" {
+			if err := s.db.SaveMembership(localpart, roomID, eventID, txn); err != nil {
+				if e := s.db.EndTransation(txn, err); e != nil {
+					return e
+				}
 				return err
 			}
 		}

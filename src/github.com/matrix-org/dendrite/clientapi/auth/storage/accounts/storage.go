@@ -118,22 +118,39 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 // room. It also stores the ID of the `join` membership event.
 // If a membership already exists between the user and the room, or of the
 // insert fails, returns the SQL error
-func (d *Database) SaveMembership(localpart string, roomID string, eventID string) error {
-	return d.memberships.insertMembership(localpart, roomID, eventID)
+func (d *Database) SaveMembership(localpart string, roomID string, eventID string, txn *sql.Tx) error {
+	return d.memberships.insertMembership(localpart, roomID, eventID, txn)
 }
 
 // RemoveMembership removes the membership linking the user matching a given
 // localpart and the room matching a given room ID.
 // If the removal fails, or if there is no membership to remove, returns an error
-func (d *Database) RemoveMembership(localpart string, roomID string) error {
-	return d.memberships.deleteMembership(localpart, roomID)
+func (d *Database) RemoveMembership(localpart string, roomID string, txn *sql.Tx) error {
+	return d.memberships.deleteMembership(localpart, roomID, txn)
 }
 
-// RemoveMembershipByEventID removes the membership of which the `join` membership
-// event ID matches a given event ID
+// RemoveMembershipsByEventIDs removes the memberships of which the `join` membership
+// event ID is included in a given array of events IDs
 // If the removal fails, or if there is no membership to remove, returns an error
-func (d *Database) RemoveMembershipByEventID(eventID string) error {
-	return d.memberships.deleteMembershipByEventID(eventID)
+func (d *Database) RemoveMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) error {
+	return d.memberships.deleteMembershipsByEventIDs(eventIDs, txn)
+}
+
+// StartTransaction begins a new SQL transaction and returns it
+// If there was an error during the transaction initialisation, returns it
+func (d *Database) StartTransaction() (*sql.Tx, error) {
+	return d.db.Begin()
+}
+
+// EndTransation is called at the end of a transaction started with StartTransaction
+// If called with an error, the transaction will rollback, if called with nil the
+// transaction will commit
+// If there was an error during either rollback or commit, returns it
+func (d *Database) EndTransation(txn *sql.Tx, err error) error {
+	if err != nil {
+		return txn.Rollback()
+	}
+	return txn.Commit()
 }
 
 // GetMembershipByEventID returns the membership (as a user localpart and a room ID)
