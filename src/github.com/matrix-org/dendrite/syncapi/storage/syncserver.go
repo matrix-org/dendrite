@@ -92,7 +92,7 @@ func (d *SyncServerDatabase) Events(eventIDs []string) ([]gomatrixserverlib.Even
 func (d *SyncServerDatabase) WriteEvent(
 	ev *gomatrixserverlib.Event, addStateEvents []gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string,
 ) (streamPos types.StreamPosition, returnErr error) {
-	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
+	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.events.insertEvent(txn, ev, addStateEventIDs, removeStateEventIDs)
 		if err != nil {
@@ -162,7 +162,7 @@ func (d *SyncServerDatabase) SyncStreamPosition() (types.StreamPosition, error) 
 
 // IncrementalSync returns all the data needed in order to create an incremental sync response.
 func (d *SyncServerDatabase) IncrementalSync(userID string, fromPos, toPos types.StreamPosition, numRecentEventsPerRoom int) (res *types.Response, returnErr error) {
-	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
+	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		// Work out which rooms to return in the response. This is done by getting not only the currently
 		// joined rooms, but also which rooms have membership transitions for this user between the 2 stream positions.
 		// This works out what the 'state' key should be for each room as well as which membership block
@@ -223,7 +223,7 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 	// a consistent view of the database throughout. This includes extracting the sync stream position.
 	// This does have the unfortunate side-effect that all the matrixy logic resides in this function,
 	// but it's better to not hide the fact that this is being done in a transaction.
-	returnErr = runTransaction(d.db, func(txn *sql.Tx) error {
+	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		// Get the current stream position which we will base the sync response on.
 		id, err := d.events.selectMaxID(txn)
 		if err != nil {
@@ -478,23 +478,4 @@ func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) string {
 		return membership
 	}
 	return ""
-}
-
-func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
-	txn, err := db.Begin()
-	if err != nil {
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			txn.Rollback()
-			panic(r)
-		} else if err != nil {
-			txn.Rollback()
-		} else {
-			err = txn.Commit()
-		}
-	}()
-	err = fn(txn)
-	return
 }

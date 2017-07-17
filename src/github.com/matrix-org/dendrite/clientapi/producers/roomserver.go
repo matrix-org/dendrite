@@ -48,7 +48,7 @@ func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event, sendAs
 	for i, event := range events {
 		ires[i] = api.InputRoomEvent{
 			Kind:         api.KindNew,
-			Event:        event.JSON(),
+			Event:        event,
 			AuthEventIDs: event.AuthEventIDs(),
 			SendAsServer: string(sendAsServer),
 		}
@@ -70,7 +70,7 @@ func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespStat
 	for i, outlier := range outliers {
 		ires[i] = api.InputRoomEvent{
 			Kind:         api.KindOutlier,
-			Event:        outlier.JSON(),
+			Event:        outlier,
 			AuthEventIDs: outlier.AuthEventIDs(),
 		}
 		eventIDs[i] = outlier.EventID()
@@ -83,7 +83,7 @@ func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespStat
 
 	ires[len(outliers)] = api.InputRoomEvent{
 		Kind:          api.KindNew,
-		Event:         event.JSON(),
+		Event:         event,
 		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateEventIDs,

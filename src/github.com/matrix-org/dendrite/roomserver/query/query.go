@@ -16,13 +16,14 @@ package query
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"net/http"
 )
 
 // RoomserverQueryAPIDatabase has the storage APIs needed to implement the query API.
@@ -173,7 +174,7 @@ func (r *RoomserverQueryAPI) loadEvents(eventNIDs []types.EventNID) ([]gomatrixs
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,
-		common.MakeAPI("query_latest_events_and_state", func(req *http.Request) util.JSONResponse {
+		common.MakeAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
 			var request api.QueryLatestEventsAndStateRequest
 			var response api.QueryLatestEventsAndStateResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -187,7 +188,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryStateAfterEventsPath,
-		common.MakeAPI("query_state_after_events", func(req *http.Request) util.JSONResponse {
+		common.MakeAPI("queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAfterEventsRequest
 			var response api.QueryStateAfterEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -201,7 +202,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryEventsByIDPath,
-		common.MakeAPI("query_events_by_id", func(req *http.Request) util.JSONResponse {
+		common.MakeAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
 			var request api.QueryEventsByIDRequest
 			var response api.QueryEventsByIDResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
