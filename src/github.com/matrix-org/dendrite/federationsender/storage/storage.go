@@ -77,7 +77,7 @@ func (d *Database) UpdateRoom(
 	addHosts []types.JoinedHost,
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {
-	err = runTransaction(d.db, func(txn *sql.Tx) error {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if err = d.insertRoom(txn, roomID); err != nil {
 			return err
 		}
@@ -103,24 +103,5 @@ func (d *Database) UpdateRoom(
 		}
 		return d.updateRoom(txn, roomID, newEventID)
 	})
-	return
-}
-
-func runTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
-	txn, err := db.Begin()
-	if err != nil {
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			txn.Rollback()
-			panic(r)
-		} else if err != nil {
-			txn.Rollback()
-		} else {
-			err = txn.Commit()
-		}
-	}()
-	err = fn(txn)
 	return
 }
