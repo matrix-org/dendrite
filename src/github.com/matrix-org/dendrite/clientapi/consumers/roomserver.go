@@ -137,26 +137,17 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	result := []gomatrixserverlib.Event{}
 	missing := []string{}
 	for _, id := range addsStateEventIDs {
-		// Check if the event is already known
-		localpart, server, err := s.db.GetMembershipByEventID(id)
-		if err != nil {
-			return nil, err
-		}
-
-		// Append the ID to the list to request so if it isn't in the database
-		if len(localpart) == 0 && len(server) == 0 {
-			missing = append(missing, id)
-		}
-
 		// Append the current event in the results if its ID is in the events list
 		if id == event.EventID() {
 			result = append(result, event)
+		} else {
+			// If the event isn't the current one, add it to the list of events
+			// to retrieve from the roomserver
+			missing = append(missing, id)
 		}
 	}
 
-	// At this point the missing events are neither the event itself nor are
-	// they present in our local database. Our only option is to fetch them
-	// from the roomserver using the query API.
+	// Request the missing events from the roomserver
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
 	var eventResp api.QueryEventsByIDResponse
 	if err := s.query.QueryEventsByID(&eventReq, &eventResp); err != nil {

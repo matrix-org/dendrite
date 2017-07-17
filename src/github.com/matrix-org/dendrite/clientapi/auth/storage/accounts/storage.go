@@ -122,13 +122,6 @@ func (d *Database) SaveMembership(localpart string, roomID string, eventID strin
 	return d.memberships.insertMembership(localpart, roomID, eventID, txn)
 }
 
-// RemoveMembership removes the membership linking the user matching a given
-// localpart and the room matching a given room ID.
-// If the removal fails, or if there is no membership to remove, returns an error
-func (d *Database) RemoveMembership(localpart string, roomID string, txn *sql.Tx) error {
-	return d.memberships.deleteMembership(localpart, roomID, txn)
-}
-
 // RemoveMembershipsByEventIDs removes the memberships of which the `join` membership
 // event ID is included in a given array of events IDs
 // If the removal fails, or if there is no membership to remove, returns an error

@@ -50,15 +50,11 @@ const selectMembershipByEventIDSQL = "" +
 const selectMembershipsByLocalpartSQL = "" +
 	"SELECT room_id FROM memberships WHERE localpart = $1"
 
-const deleteMembershipSQL = "" +
-	"DELETE FROM memberships WHERE localpart = $1 AND room_id = $2"
-
 const deleteMembershipsByEventIDsSQL = "" +
 	"DELETE FROM memberships WHERE event_id = ANY($1)"
 
 type membershipStatements struct {
 	deleteMembershipsByEventIDsStmt  *sql.Stmt
-	deleteMembershipStmt             *sql.Stmt
 	insertMembershipStmt             *sql.Stmt
 	selectMembershipByEventIDStmt    *sql.Stmt
 	selectMembershipsByLocalpartStmt *sql.Stmt
@@ -71,9 +67,6 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.deleteMembershipsByEventIDsStmt, err = db.Prepare(deleteMembershipsByEventIDsSQL); err != nil {
-		return
-	}
-	if s.deleteMembershipStmt, err = db.Prepare(deleteMembershipSQL); err != nil {
 		return
 	}
 	if s.insertMembershipStmt, err = db.Prepare(insertMembershipSQL); err != nil {
@@ -93,11 +86,6 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 
 func (s *membershipStatements) insertMembership(localpart string, roomID string, eventID string, txn *sql.Tx) (err error) {
 	_, err = txn.Stmt(s.insertMembershipStmt).Exec(localpart, roomID, eventID)
-	return
-}
-
-func (s *membershipStatements) deleteMembership(localpart string, roomID string, txn *sql.Tx) (err error) {
-	_, err = txn.Stmt(s.deleteMembershipStmt).Exec(localpart, roomID)
 	return
 }
 
