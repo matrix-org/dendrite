@@ -136,35 +136,19 @@ func (d *Database) removeMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) e
 // insertion and deletion has been successfully processed.
 // Returns a SQL error if there was an issue with any part of the process
 func (d *Database) UpdateMemberships(eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error {
-	txn, err := d.db.Begin()
-	if err != nil {
-		if e := txn.Rollback(); e != nil {
-			return e
-		}
-		return err
-	}
-
-	if err := d.removeMembershipsByEventIDs(idsToRemove, txn); err != nil {
-		if e := txn.Rollback(); e != nil {
-			return e
-		}
-		return err
-	}
-
-	for _, event := range eventsToAdd {
-		if err := d.newMembership(event, txn); err != nil {
-			if e := txn.Rollback(); e != nil {
-				return e
-			}
+	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if err := d.removeMembershipsByEventIDs(idsToRemove, txn); err != nil {
 			return err
 		}
-	}
 
-	if err := txn.Commit(); err != nil {
-		return err
-	}
+		for _, event := range eventsToAdd {
+			if err := d.newMembership(event, txn); err != nil {
+				return err
+			}
+		}
 
-	return nil
+		return nil
+	})
 }
 
 // newMembership will save a new membership in the database if the given state
