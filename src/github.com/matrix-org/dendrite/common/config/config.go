@@ -19,13 +19,14 @@ import (
 	"crypto/sha256"
 	"encoding/pem"
 	"fmt"
-	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/crypto/ed25519"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/ed25519"
+	"gopkg.in/yaml.v2"
 )
 
 // Version is the current version of the config format.
@@ -95,8 +96,6 @@ type Dendrite struct {
 		Addresses []string `yaml:"addresses"`
 		// The names of the topics to use when reading and writing from kafka.
 		Topics struct {
-			// Topic for roomserver/api.InputRoomEvent events.
-			InputRoomEvent Topic `yaml:"input_room_event"`
 			// Topic for roomserver/api.OutputRoomEvent events.
 			OutputRoomEvent Topic `yaml:"output_room_event"`
 			// Topic for user updates (profile, presence)
@@ -298,7 +297,6 @@ func (config *Dendrite) check() error {
 	}
 
 	checkNotZero("kafka.addresses", int64(len(config.Kafka.Addresses)))
-	checkNotEmpty("kafka.topics.input_room_event", string(config.Kafka.Topics.InputRoomEvent))
 	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
 	checkNotEmpty("database.account", string(config.Database.Account))
 	checkNotEmpty("database.device", string(config.Database.Device))

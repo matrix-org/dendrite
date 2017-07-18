@@ -51,9 +51,9 @@ func main() {
 
 	log.Info("config: ", cfg)
 
-	roomserverProducer, err := producers.NewRoomserverProducer(
-		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.InputRoomEvent),
-	)
+	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
+
+	roomserverProducer := producers.NewRoomserverProducer(cfg.RoomServerURL())
 	userUpdateProducer, err := producers.NewUserUpdateProducer(
 		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.UserUpdates),
 	)
@@ -65,7 +65,6 @@ func main() {
 		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
-	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	accountDB, err := accounts.NewDatabase(string(cfg.Database.Account), cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("Failed to setup account database(%q): %s", cfg.Database.Account, err.Error())

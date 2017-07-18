@@ -21,14 +21,15 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/gomatrixserverlib"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -80,7 +81,6 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Kafka.Addresses = []string{kafkaURI}
 	// TODO: Different servers should be using different topics.
 	// Make this configurable somehow?
-	cfg.Kafka.Topics.InputRoomEvent = "test.room.input"
 	cfg.Kafka.Topics.OutputRoomEvent = "test.room.output"
 
 	// TODO: Use different databases for the different schemas.

@@ -23,6 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"encoding/json"
+
+	"net/http"
+
 	"github.com/matrix-org/dendrite/common/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -90,7 +94,7 @@ func createDatabase(database string) error {
 // messages is reached or after a timeout. It kills the command before it returns.
 // It returns a list of the messages read from the command on success or an error
 // on failure.
-func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int, checkQueryAPI func()) ([]string, error) {
+func runAndReadFromTopic(runCmd *exec.Cmd, readyURL string, doInput func(), topic string, count int, checkQueryAPI func()) ([]string, error) {
 	type result struct {
 		// data holds all of stdout on success.
 		data []byte
@@ -107,6 +111,11 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int, checkQueryAP
 	)
 	// Send stderr to our stderr so the user can see any error messages.
 	readCmd.Stderr = os.Stderr
+
+	// Kill both processes before we exit.
+	defer func() { runCmd.Process.Kill() }()
+	defer func() { readCmd.Process.Kill() }()
+
 	// Run the command, read the messages and wait for a timeout in parallel.
 	go func() {
 		// Read all of stdout.
@@ -131,13 +140,39 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int, checkQueryAP
 		time.Sleep(timeout)
 		done <- result{nil, fmt.Errorf("Timeout reading %d messages from topic %q", count, topic)}
 	}()
+
+	// Poll the HTTP listener of the process waiting for it to be ready to receive requests.
+	ready := make(chan struct{})
+	go func() {
+		delay := 10 * time.Millisecond
+		for {
+			time.Sleep(delay)
+			if delay < 100*time.Millisecond {
+				delay *= 2
+			}
+			resp, err := http.Get(readyURL)
+			if err != nil {
+				continue
+			}
+			if resp.StatusCode == 200 {
+				break
+			}
+		}
+		ready <- struct{}{}
+	}()
+
+	// Wait for the roomserver to be ready to receive input or for it to crash.
+	select {
+	case <-ready:
+	case r := <-done:
+		return nil, r.err
+	}
+
+	// Write the input now that the server is running.
+	doInput()
+
 	// Wait for one of the tasks to finsh.
 	r := <-done
-
-	// Kill both processes. We don't check if the processes are running and
-	// we ignore failures since we are just trying to clean up before returning.
-	runCmd.Process.Kill()
-	readCmd.Process.Kill()
 
 	if r.err != nil {
 		return nil, r.err
@@ -151,6 +186,20 @@ func runAndReadFromTopic(runCmd *exec.Cmd, topic string, count int, checkQueryAP
 		lines = lines[:len(lines)-1]
 	}
 	return lines, nil
+}
+
+func writeToRoomServer(input []string, roomserverURL string) error {
+	var request api.InputRoomEventsRequest
+	var response api.InputRoomEventsResponse
+	var err error
+	request.InputRoomEvents = make([]api.InputRoomEvent, len(input))
+	for i := range input {
+		if err = json.Unmarshal([]byte(input[i]), &request.InputRoomEvents[i]); err != nil {
+			return err
+		}
+	}
+	x := api.NewRoomserverInputAPIHTTP(roomserverURL, nil)
+	return x.InputRoomEvents(&request, &response)
 }
 
 // testRoomserver is used to run integration tests against a single roomserver.
@@ -176,24 +225,22 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		panic(err)
 	}
 
-	inputTopic := string(cfg.Kafka.Topics.InputRoomEvent)
 	outputTopic := string(cfg.Kafka.Topics.OutputRoomEvent)
 
-	exe.DeleteTopic(inputTopic)
-	if err := exe.CreateTopic(inputTopic); err != nil {
-		panic(err)
-	}
 	exe.DeleteTopic(outputTopic)
 	if err := exe.CreateTopic(outputTopic); err != nil {
 		panic(err)
 	}
 
-	if err := exe.WriteToTopic(inputTopic, canonicalJSONInput(input)); err != nil {
+	if err = createDatabase(testDatabaseName); err != nil {
 		panic(err)
 	}
 
-	if err = createDatabase(testDatabaseName); err != nil {
-		panic(err)
+	doInput := func() {
+		fmt.Printf("Roomserver is ready to receive input, sending %d events\n", len(input))
+		if err = writeToRoomServer(input, cfg.RoomServerURL()); err != nil {
+			panic(err)
+		}
 	}
 
 	cmd := exec.Command(filepath.Join(filepath.Dir(os.Args[0]), "dendrite-room-server"))
@@ -205,7 +252,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	cmd.Stderr = os.Stderr
 	cmd.Args = []string{"dendrite-room-server", "--config", filepath.Join(dir, test.ConfigFile)}
 
-	gotOutput, err := runAndReadFromTopic(cmd, outputTopic, len(wantOutput), func() {
+	gotOutput, err := runAndReadFromTopic(cmd, cfg.RoomServerURL()+"/metrics", doInput, outputTopic, len(wantOutput), func() {
 		queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), nil)
 		checkQueries(queryAPI)
 	})
