@@ -141,8 +141,8 @@ func runAndReadFromTopic(runCmd *exec.Cmd, readyURL string, doInput func(), topi
 		done <- result{nil, fmt.Errorf("Timeout reading %d messages from topic %q", count, topic)}
 	}()
 
+	// Poll the HTTP listener of the process waiting for it to be ready to receive requests.
 	ready := make(chan struct{})
-
 	go func() {
 		delay := 10 * time.Millisecond
 		for {
@@ -150,7 +150,6 @@ func runAndReadFromTopic(runCmd *exec.Cmd, readyURL string, doInput func(), topi
 			if delay < 100*time.Millisecond {
 				delay *= 2
 			}
-			fmt.Printf("Checking %s\n", readyURL)
 			resp, err := http.Get(readyURL)
 			if err != nil {
 				continue
@@ -162,8 +161,7 @@ func runAndReadFromTopic(runCmd *exec.Cmd, readyURL string, doInput func(), topi
 		ready <- struct{}{}
 	}()
 
-	// Wait for the roomserver to either be read to receive input or for it to
-	// crash.
+	// Wait for the roomserver to be ready to receive input or for it to crash.
 	select {
 	case <-ready:
 	case r := <-done:
@@ -239,6 +237,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	}
 
 	doInput := func() {
+		fmt.Printf("Roomserver is ready to receive input, sending %d events\n", len(input))
 		if err = writeToRoomServer(input, cfg.RoomServerURL()); err != nil {
 			panic(err)
 		}
