@@ -15,14 +15,13 @@
 package readers
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
 )
@@ -50,7 +49,11 @@ func GetProfile(
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -69,7 +72,11 @@ func GetProfile(
 func GetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -99,7 +106,10 @@ func SetAvatarURL(
 		}
 	}
 
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	oldProfile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
@@ -124,7 +134,11 @@ func SetAvatarURL(
 func GetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -154,7 +168,10 @@ func SetDisplayName(
 		}
 	}
 
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	oldProfile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
@@ -173,15 +190,4 @@ func SetDisplayName(
 		Code: 200,
 		JSON: struct{}{},
 	}
-}
-
-func getLocalPart(userID string) string {
-	if !strings.HasPrefix(userID, "@") {
-		panic(fmt.Errorf("Invalid user ID"))
-	}
-
-	// Get the part before ":"
-	username := strings.Split(userID, ":")[0]
-	// Return the part after the "@"
-	return strings.Split(username, "@")[1]
 }
