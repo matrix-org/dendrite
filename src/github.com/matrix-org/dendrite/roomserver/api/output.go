@@ -98,3 +98,28 @@ type OutputNewRoomEvent struct {
 	// future proof the API for virtual hosting.
 	SendAsServer string `json:"send_as_server"`
 }
+
+// An OutputNewInviteEvent is written whenever an invite becomes active.
+// Invite events can be received outside of an existing room so have to be
+// tracked separately from the room events themselves.
+type OutputNewInviteEvent struct {
+	// The "m.room.member" invite event.
+	Event gomatrixserverlib.Event `json:"event"`
+}
+
+// An OutputRetireInviteEvent is written whenever an existing invite is no longer
+// active. An invite stops being active if the user joins the room or if the
+// invite is rejected by the user.
+type OutputRetireInviteEvent struct {
+	// The room ID of the "m.room.member" invite event.
+	RoomID string
+	// The ID of the "m.room.member" invite event.
+	EventID string
+	// Optional event ID of the event that replaced the invite.
+	// This can be empty if the invite was rejected locally and we were unable
+	// to reach the server that originally sent the invite.
+	ReplacedByEventID string
+	// The "membership" of the user after retiring the invite. One of "join"
+	// "leave" or "ban".
+	Membership string
+}

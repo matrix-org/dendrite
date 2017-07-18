@@ -50,7 +50,7 @@ func updateMemberships(
 		}
 		if change.added.EventNID != 0 {
 			ev, _ := eventMap(events).lookup(change.added.EventNID)
-			if ae != nil {
+			if ev != nil {
 				ae = &ev.Event
 			}
 			targetNID = change.added.EventStateKeyNID
