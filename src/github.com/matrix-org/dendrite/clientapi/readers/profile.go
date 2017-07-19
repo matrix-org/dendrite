@@ -15,12 +15,18 @@
 package readers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
@@ -37,6 +43,12 @@ type avatarURL struct {
 
 type displayName struct {
 	DisplayName string `json:"displayname"`
+}
+
+type prevMembership struct {
+	PrevContent events.MemberContent `json:"prev_content"`
+	PrevID      string               `json:"replaces_state"`
+	UserID      string               `json:"prev_sender"`
 }
 
 // GetProfile implements GET /profile/{userID}
@@ -93,8 +105,11 @@ func GetAvatarURL(
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
-	producer *producers.UserUpdateProducer,
+	producer *producers.UserUpdateProducer, cfg *config.Dendrite,
+	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
+	changedKey := "avatar_url"
+
 	var r avatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
@@ -116,11 +131,25 @@ func SetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
+	if err = accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := producer.SendUpdate(userID, "avatar_url", oldProfile.AvatarURL, r.AvatarURL); err != nil {
+	memberships, err := accountDB.GetMembershipsByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	events, err := buildMembershipEvents(memberships, accountDB, oldProfile, changedKey, r.AvatarURL, userID, cfg, queryAPI)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := rsProducer.SendEvents(events, cfg.Matrix.ServerName); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := producer.SendUpdate(userID, changedKey, oldProfile.AvatarURL, r.AvatarURL); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -155,8 +184,11 @@ func GetDisplayName(
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
-	producer *producers.UserUpdateProducer,
+	producer *producers.UserUpdateProducer, cfg *config.Dendrite,
+	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
+	changedKey := "displayname"
+
 	var r displayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
@@ -178,11 +210,25 @@ func SetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
+	if err = accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := producer.SendUpdate(userID, "displayname", oldProfile.DisplayName, r.DisplayName); err != nil {
+	memberships, err := accountDB.GetMembershipsByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	events, err := buildMembershipEvents(memberships, accountDB, oldProfile, changedKey, r.DisplayName, userID, cfg, queryAPI)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := rsProducer.SendEvents(events, cfg.Matrix.ServerName); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := producer.SendUpdate(userID, changedKey, oldProfile.DisplayName, r.DisplayName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -190,4 +236,98 @@ func SetDisplayName(
 		Code: 200,
 		JSON: struct{}{},
 	}
+}
+
+func buildMembershipEvents(
+	memberships []authtypes.Membership, db *accounts.Database,
+	oldProfile *authtypes.Profile, changedKey string, newValue string,
+	userID string, cfg *config.Dendrite, queryAPI api.RoomserverQueryAPI,
+) ([]gomatrixserverlib.Event, error) {
+	ev := []gomatrixserverlib.Event{}
+
+	for _, membership := range memberships {
+		prevContent := events.MemberContent{
+			Membership:  "join",
+			DisplayName: oldProfile.DisplayName,
+			AvatarURL:   oldProfile.AvatarURL,
+		}
+
+		prev := prevMembership{
+			UserID:      userID,
+			PrevID:      membership.EventID,
+			PrevContent: prevContent,
+		}
+
+		builder := gomatrixserverlib.EventBuilder{
+			Sender:   userID,
+			RoomID:   membership.RoomID,
+			Type:     "m.room.member",
+			StateKey: &userID,
+		}
+
+		if err := builder.SetUnsigned(prev); err != nil {
+			return nil, err
+		}
+
+		content := events.MemberContent{
+			Membership: "join",
+		}
+
+		if changedKey == "displayname" {
+			content.DisplayName = newValue
+			content.AvatarURL = oldProfile.AvatarURL
+		} else if changedKey == "avatar_url" {
+			content.DisplayName = oldProfile.DisplayName
+			content.AvatarURL = newValue
+		}
+
+		if err := builder.SetContent(content); err != nil {
+			return nil, err
+		}
+
+		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
+		if err != nil {
+			return nil, err
+		}
+
+		// Ask the roomserver for information about this room
+		queryReq := api.QueryLatestEventsAndStateRequest{
+			RoomID:       membership.RoomID,
+			StateToFetch: eventsNeeded.Tuples(),
+		}
+		var queryRes api.QueryLatestEventsAndStateResponse
+		if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); queryErr != nil {
+			return nil, err
+		}
+
+		authEvents := gomatrixserverlib.NewAuthEvents(nil)
+
+		// Iterating the old way because range seems to mess things up. Might be
+		// worth investigating.
+		for i := 0; i < len(queryRes.StateEvents); i++ {
+			authEvents.AddEvent(&queryRes.StateEvents[i])
+		}
+
+		refs, err := eventsNeeded.AuthEventReferences(&authEvents)
+		if err != nil {
+			return nil, err
+		}
+		builder.AuthEvents = refs
+
+		// Generate a new event ID and set it in the database
+		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+		if err = db.UpdateMembership(membership.EventID, eventID); err != nil {
+			return nil, err
+		}
+
+		now := time.Now()
+		event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+		if err != nil {
+			return nil, err
+		}
+
+		ev = append(ev, event)
+	}
+
+	return ev, nil
 }

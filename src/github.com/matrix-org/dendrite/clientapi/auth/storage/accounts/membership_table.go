@@ -18,6 +18,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 const membershipSchema = `
@@ -45,16 +46,20 @@ const selectMembershipSQL = "" +
 	"SELECT * from memberships WHERE localpart = $1 AND room_id = $2"
 
 const selectMembershipsByLocalpartSQL = "" +
-	"SELECT room_id FROM memberships WHERE localpart = $1"
+	"SELECT room_id, event_id FROM memberships WHERE localpart = $1"
 
 const deleteMembershipsByEventIDsSQL = "" +
 	"DELETE FROM memberships WHERE event_id = ANY($1)"
+
+const updateMembershipByEventIDSQL = "" +
+	"UPDATE memberships SET event_id = $2 WHERE event_id = $1"
 
 type membershipStatements struct {
 	deleteMembershipsByEventIDsStmt  *sql.Stmt
 	insertMembershipStmt             *sql.Stmt
 	selectMembershipByEventIDStmt    *sql.Stmt
 	selectMembershipsByLocalpartStmt *sql.Stmt
+	updateMembershipByEventIDStmt    *sql.Stmt
 }
 
 func (s *membershipStatements) prepare(db *sql.DB) (err error) {
@@ -71,6 +76,9 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 	if s.selectMembershipsByLocalpartStmt, err = db.Prepare(selectMembershipsByLocalpartSQL); err != nil {
 		return
 	}
+	if s.updateMembershipByEventIDStmt, err = db.Prepare(updateMembershipByEventIDSQL); err != nil {
+		return
+	}
 	return
 }
 
@@ -81,5 +89,31 @@ func (s *membershipStatements) insertMembership(localpart string, roomID string,
 
 func (s *membershipStatements) deleteMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) (err error) {
 	_, err = txn.Stmt(s.deleteMembershipsByEventIDsStmt).Exec(pq.StringArray(eventIDs))
+	return
+}
+
+func (s *membershipStatements) selectMembershipsByLocalpart(localpart string) (memberships []authtypes.Membership, err error) {
+	rows, err := s.selectMembershipsByLocalpartStmt.Query(localpart)
+	if err != nil {
+		return
+	}
+
+	memberships = []authtypes.Membership{}
+
+	defer rows.Close()
+	for rows.Next() {
+		var m authtypes.Membership
+		m.Localpart = localpart
+		if err := rows.Scan(&m.RoomID, &m.EventID); err != nil {
+			return nil, err
+		}
+		memberships = append(memberships, m)
+	}
+
+	return
+}
+
+func (s *membershipStatements) updateMembershipByEventID(oldEventID string, newEventID string) (err error) {
+	_, err = s.updateMembershipByEventIDStmt.Exec(oldEventID, newEventID)
 	return
 }
