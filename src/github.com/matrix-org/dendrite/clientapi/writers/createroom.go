@@ -23,6 +23,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -84,15 +85,21 @@ type fledglingEvent struct {
 }
 
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request, device *authtypes.Device, cfg config.Dendrite, producer *producers.RoomserverProducer) util.JSONResponse {
+func CreateRoom(req *http.Request, device *authtypes.Device,
+	cfg config.Dendrite, producer *producers.RoomserverProducer,
+	accountDB *accounts.Database,
+) util.JSONResponse {
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	return createRoom(req, device, cfg, roomID, producer)
+	return createRoom(req, device, cfg, roomID, producer, accountDB)
 }
 
 // createRoom implements /createRoom
-func createRoom(req *http.Request, device *authtypes.Device, cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer) util.JSONResponse {
+func createRoom(req *http.Request, device *authtypes.Device,
+	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
+	accountDB *accounts.Database,
+) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
 	var r createRoomRequest
@@ -114,6 +121,22 @@ func createRoom(req *http.Request, device *authtypes.Device, cfg config.Dendrite
 		"userID": userID,
 		"roomID": roomID,
 	}).Info("Creating new room")
+
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	membershipContent := events.MemberContent{
+		Membership:  "join",
+		DisplayName: profile.DisplayName,
+		AvatarURL:   profile.AvatarURL,
+	}
 
 	var builtEvents []gomatrixserverlib.Event
 
@@ -137,7 +160,7 @@ func createRoom(req *http.Request, device *authtypes.Device, cfg config.Dendrite
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
 	eventsToMake := []fledglingEvent{
 		{"m.room.create", "", events.CreateContent{Creator: userID}},
-		{"m.room.member", userID, events.MemberContent{Membership: "join"}}, // TODO: Set avatar_url / displayname
+		{"m.room.member", userID, membershipContent},
 		{"m.room.power_levels", "", events.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
 		{"m.room.join_rules", "", events.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
