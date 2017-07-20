@@ -39,8 +39,10 @@ CREATE TABLE IF NOT EXISTS memberships (
 CREATE UNIQUE INDEX IF NOT EXISTS membership_event_id ON memberships(event_id);
 `
 
-const insertMembershipSQL = "" +
-	"INSERT INTO memberships(localpart, room_id, event_id) VALUES ($1, $2, $3)"
+const insertMembershipSQL = `
+	INSERT INTO memberships(localpart, room_id, event_id) VALUES ($1, $2, $3)
+	ON CONFLICT (localpart, room_id) DO UPDATE SET event_id = EXCLUDED.event_id
+`
 
 const selectMembershipSQL = "" +
 	"SELECT * from memberships WHERE localpart = $1 AND room_id = $2"

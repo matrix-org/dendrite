@@ -314,12 +314,7 @@ func buildMembershipEvents(
 		}
 		builder.AuthEvents = refs
 
-		// Generate a new event ID and set it in the database
 		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-		if err = db.UpdateMembership(membership.EventID, eventID); err != nil {
-			return nil, err
-		}
-
 		now := time.Now()
 		event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 		if err != nil {
