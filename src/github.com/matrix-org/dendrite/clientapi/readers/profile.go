@@ -302,9 +302,7 @@ func buildMembershipEvents(
 
 		authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
-		// Iterating the old way because range seems to mess things up. Might be
-		// worth investigating.
-		for i := 0; i < len(queryRes.StateEvents); i++ {
+		for i := range queryRes.StateEvents {
 			authEvents.AddEvent(&queryRes.StateEvents[i])
 		}
 
