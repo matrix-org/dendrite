@@ -243,7 +243,7 @@ func buildMembershipEvents(
 	oldProfile *authtypes.Profile, changedKey string, newValue string,
 	userID string, cfg *config.Dendrite, queryAPI api.RoomserverQueryAPI,
 ) ([]gomatrixserverlib.Event, error) {
-	ev := []gomatrixserverlib.Event{}
+	evs := []gomatrixserverlib.Event{}
 
 	for _, membership := range memberships {
 		prevContent := events.MemberContent{
@@ -326,8 +326,8 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		ev = append(ev, event)
+		evs = append(evs, event)
 	}
 
-	return ev, nil
+	return evs, nil
 }
