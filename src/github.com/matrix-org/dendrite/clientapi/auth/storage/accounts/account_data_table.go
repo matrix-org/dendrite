@@ -19,7 +19,7 @@ import (
 )
 
 const accountDataSchema = `
--- Stores data about accounts profiles.
+-- Stores data about accounts data.
 CREATE TABLE IF NOT EXISTS account_data (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL,
@@ -28,18 +28,15 @@ CREATE TABLE IF NOT EXISTS account_data (
     -- The account data type
     type TEXT NOT NULL,
     -- The account data content
-    content TEXT NOT NULL
+    content TEXT NOT NULL,
 
     PRIMARY KEY(localpart, room_id, type)
 );
-
--- Create index we can reference in the upsert request
-CREATE UNIQUE INDEX IF NOT EXISTS ac_user_room_type ON account_data(localpart, room_id, type);
 `
 
 const insertAccountDataSQL = `
 	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
-	ON CONFLICT (ac_user_room_type) DO UPDATE SET content = EXCLUDED.content
+	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = EXCLUDED.content
 `
 
 const selectAccountDataByLocalPartSQL = "" +
@@ -54,7 +51,7 @@ type accountDataStatements struct {
 }
 
 func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(accountsSchema)
+	_, err = db.Exec(accountDataSchema)
 	if err != nil {
 		return
 	}
