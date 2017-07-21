@@ -45,12 +45,6 @@ type displayName struct {
 	DisplayName string `json:"displayname"`
 }
 
-type prevMembership struct {
-	PrevContent events.MemberContent `json:"prev_content"`
-	PrevID      string               `json:"replaces_state"`
-	UserID      string               `json:"prev_sender"`
-}
-
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
 	req *http.Request, accountDB *accounts.Database, userID string,
@@ -246,27 +240,11 @@ func buildMembershipEvents(
 	evs := []gomatrixserverlib.Event{}
 
 	for _, membership := range memberships {
-		prevContent := events.MemberContent{
-			Membership:  "join",
-			DisplayName: oldProfile.DisplayName,
-			AvatarURL:   oldProfile.AvatarURL,
-		}
-
-		prev := prevMembership{
-			UserID:      userID,
-			PrevID:      membership.EventID,
-			PrevContent: prevContent,
-		}
-
 		builder := gomatrixserverlib.EventBuilder{
 			Sender:   userID,
 			RoomID:   membership.RoomID,
 			Type:     "m.room.member",
 			StateKey: &userID,
-		}
-
-		if err := builder.SetUnsigned(prev); err != nil {
-			return nil, err
 		}
 
 		content := events.MemberContent{

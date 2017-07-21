@@ -100,9 +100,18 @@ func (d *SyncServerDatabase) WriteEvent(
 		}
 		streamPos = types.StreamPosition(pos)
 
-		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
-			// Nothing to do, the event may have just been a message event.
-			return nil
+		fmt.Println(len(addStateEvents))
+
+		if len(addStateEvents) == 0 {
+			// If the event is a m.room.member event, and has unsigned content,
+			// we need to save it as it is very likely to be a membership update
+			// (e.g. if a user updates their profile)
+			if ev.Type() == "m.room.member" && len(ev.Unsigned()) > 0 {
+				addStateEvents = append(addStateEvents, *ev)
+			} else if len(removeStateEventIDs) == 0 {
+				// Nothing to do, the event may have just been a message event.
+				return nil
+			}
 		}
 
 		return d.updateRoomState(txn, removeStateEventIDs, addStateEvents, streamPos)
@@ -139,6 +148,11 @@ func (d *SyncServerDatabase) updateRoomState(
 	}
 
 	return nil
+}
+
+// GetMembershipEvent returns the Matrix join event for a given user into a given room
+func (d *SyncServerDatabase) GetMembershipEvent(roomID string, userID string) (*gomatrixserverlib.Event, error) {
+	return d.roomstate.selectJoinEventForUser(roomID, userID)
 }
 
 // PartitionOffsets implements common.PartitionStorer

@@ -66,6 +66,9 @@ const selectCurrentStateSQL = "" +
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
+const selectJoinEventForUserSQL = "" +
+	"SELECT event_json FROM current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id = $1 AND state_key = $2"
+
 const selectEventsWithEventIDsSQL = "" +
 	"SELECT added_at, event_json FROM current_room_state WHERE event_id = ANY($1)"
 
@@ -76,6 +79,7 @@ type currentRoomStateStatements struct {
 	selectCurrentStateStmt          *sql.Stmt
 	selectJoinedUsersStmt           *sql.Stmt
 	selectEventsWithEventIDsStmt    *sql.Stmt
+	selectJoinEventForUserStmt      *sql.Stmt
 }
 
 func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
@@ -99,6 +103,9 @@ func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectEventsWithEventIDsStmt, err = db.Prepare(selectEventsWithEventIDsSQL); err != nil {
+		return
+	}
+	if s.selectJoinEventForUserStmt, err = db.Prepare(selectJoinEventForUserSQL); err != nil {
 		return
 	}
 	return
@@ -194,4 +201,13 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 		result = append(result, ev)
 	}
 	return result, nil
+}
+
+func (s *currentRoomStateStatements) selectJoinEventForUser(roomID string, userID string) (*gomatrixserverlib.Event, error) {
+	var res []byte
+	if err := s.selectJoinEventForUserStmt.QueryRow(roomID, userID).Scan(&res); err == sql.ErrNoRows {
+		return nil, nil
+	}
+	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(res, false)
+	return &ev, err
 }

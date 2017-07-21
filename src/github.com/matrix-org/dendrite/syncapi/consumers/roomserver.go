@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -35,6 +36,15 @@ type OutputRoomEvent struct {
 	db                 *storage.SyncServerDatabase
 	notifier           *sync.Notifier
 	query              api.RoomserverQueryAPI
+	serverName         gomatrixserverlib.ServerName
+	keyID              gomatrixserverlib.KeyID
+	privateKey         []byte
+}
+
+type prevMembership struct {
+	PrevContent events.MemberContent `json:"prev_content"`
+	PrevID      string               `json:"replaces_state"`
+	UserID      string               `json:"prev_sender"`
 }
 
 // NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
@@ -55,6 +65,9 @@ func NewOutputRoomEvent(cfg *config.Dendrite, n *sync.Notifier, store *storage.S
 		db:                 store,
 		notifier:           n,
 		query:              api.NewRoomserverQueryAPIHTTP(roomServerURL, nil),
+		serverName:         cfg.Matrix.ServerName,
+		keyID:              cfg.Matrix.KeyID,
+		privateKey:         cfg.Matrix.PrivateKey,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -99,6 +112,18 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 			"add":        output.NewRoomEvent.AddsStateEventIDs,
 			"del":        output.NewRoomEvent.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: state event lookup failure")
+	}
+
+	ev, err = s.updateMemberEvent(ev, s.keyID, s.privateKey)
+	if err != nil {
+		return err
+	}
+
+	for i := range addsStateEvents {
+		addsStateEvents[i], err = s.updateMemberEvent(addsStateEvents[i], s.keyID, s.privateKey)
+		if err != nil {
+			return err
+		}
 	}
 
 	syncStreamPos, err := s.db.WriteEvent(
@@ -175,6 +200,63 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	}
 
 	return result, nil
+}
+
+func (s *OutputRoomEvent) updateMemberEvent(
+	event gomatrixserverlib.Event, keyID gomatrixserverlib.KeyID,
+	privateKey []byte,
+) (gomatrixserverlib.Event, error) {
+	if event.Type() != "m.room.member" {
+		return event, nil
+	}
+	membership, err := event.Membership()
+	if err != nil {
+		return event, err
+	}
+	if membership != "join" {
+		return event, nil
+	}
+
+	prevEvent, err := s.db.GetMembershipEvent(event.RoomID(), *event.StateKey())
+	if err != nil {
+		return event, err
+	}
+
+	if prevEvent == nil {
+		return event, nil
+	}
+
+	builder := gomatrixserverlib.EventBuilder{
+		Sender:     event.Sender(),
+		RoomID:     event.RoomID(),
+		Type:       event.Type(),
+		StateKey:   event.StateKey(),
+		PrevEvents: event.PrevEvents(),
+		AuthEvents: event.AuthEvents(),
+		Redacts:    event.Redacts(),
+		Depth:      event.Depth(),
+		Content:    event.Content(),
+	}
+
+	var content events.MemberContent
+	if err := json.Unmarshal(prevEvent.Content(), &content); err != nil {
+		return event, err
+	}
+
+	prev := prevMembership{
+		PrevContent: content,
+		PrevID:      prevEvent.EventID(),
+		UserID:      prevEvent.Sender(),
+	}
+
+	if err = builder.SetUnsigned(prev); err != nil {
+		return event, err
+	}
+
+	ts := event.OriginServerTS().Time()
+	ev, err := builder.Build(event.EventID(), ts, event.Origin(), keyID, privateKey)
+
+	return ev, err
 }
 
 func missingEventsFrom(events []gomatrixserverlib.Event, required []string) []string {
