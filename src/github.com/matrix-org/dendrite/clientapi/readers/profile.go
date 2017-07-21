@@ -134,7 +134,13 @@ func SetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
-	events, err := buildMembershipEvents(memberships, accountDB, oldProfile, changedKey, r.AvatarURL, userID, cfg, queryAPI)
+	newProfile := authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: oldProfile.DisplayName,
+		AvatarURL:   r.AvatarURL,
+	}
+
+	events, err := buildMembershipEvents(memberships, accountDB, newProfile, userID, cfg, queryAPI)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -213,7 +219,13 @@ func SetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
-	events, err := buildMembershipEvents(memberships, accountDB, oldProfile, changedKey, r.DisplayName, userID, cfg, queryAPI)
+	newProfile := authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: r.DisplayName,
+		AvatarURL:   oldProfile.AvatarURL,
+	}
+
+	events, err := buildMembershipEvents(memberships, accountDB, newProfile, userID, cfg, queryAPI)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -234,8 +246,8 @@ func SetDisplayName(
 
 func buildMembershipEvents(
 	memberships []authtypes.Membership, db *accounts.Database,
-	oldProfile *authtypes.Profile, changedKey string, newValue string,
-	userID string, cfg *config.Dendrite, queryAPI api.RoomserverQueryAPI,
+	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
 ) ([]gomatrixserverlib.Event, error) {
 	evs := []gomatrixserverlib.Event{}
 
@@ -251,13 +263,8 @@ func buildMembershipEvents(
 			Membership: "join",
 		}
 
-		if changedKey == "displayname" {
-			content.DisplayName = newValue
-			content.AvatarURL = oldProfile.AvatarURL
-		} else if changedKey == "avatar_url" {
-			content.DisplayName = oldProfile.DisplayName
-			content.AvatarURL = newValue
-		}
+		content.DisplayName = newProfile.DisplayName
+		content.AvatarURL = newProfile.AvatarURL
 
 		if err := builder.SetContent(content); err != nil {
 			return nil, err
