@@ -98,10 +98,17 @@ func GetAvatarURL(
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
-	req *http.Request, accountDB *accounts.Database, userID string,
-	producer *producers.UserUpdateProducer, cfg *config.Dendrite,
+	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
 	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
+	if userID != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("userID does not match the current user"),
+		}
+	}
+
 	changedKey := "avatar_url"
 
 	var r avatarURL
@@ -183,10 +190,17 @@ func GetDisplayName(
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
-	req *http.Request, accountDB *accounts.Database, userID string,
-	producer *producers.UserUpdateProducer, cfg *config.Dendrite,
+	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
 	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
+	if userID != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("userID does not match the current user"),
+		}
+	}
+
 	changedKey := "displayname"
 
 	var r displayName
