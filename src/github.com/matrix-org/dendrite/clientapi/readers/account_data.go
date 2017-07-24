@@ -30,7 +30,7 @@ import (
 // SaveAccountData implements PUT /user/{userId}/[rooms/{roomId}/]account_data/{type}
 func SaveAccountData(
 	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
-	userID string, dataType string, roomID string,
+	userID string, roomID string, dataType string,
 ) util.JSONResponse {
 	if req.Method != "PUT" {
 		return util.JSONResponse{

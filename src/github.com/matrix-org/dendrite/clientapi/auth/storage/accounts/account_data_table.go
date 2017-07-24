@@ -16,6 +16,7 @@ package accounts
 
 import (
 	"database/sql"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 const accountDataSchema = `
@@ -39,15 +40,19 @@ const insertAccountDataSQL = `
 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = EXCLUDED.content
 `
 
-const selectAccountDataByLocalPartSQL = "" +
-	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
+const selectGlobalAccountDataSQL = "" +
+	"SELECT type, content FROM account_data WHERE localpart = $1 AND room_id = ''"
+
+const selectRoomAccountDataSQL = "" +
+	"SELECT type, content FROM account_data WHERE localpart = $1 AND room_id = $2"
 
 const deleteAccountDataSQL = "" +
 	"DELETE FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
 
 type accountDataStatements struct {
-	insertAccountDataStmt            *sql.Stmt
-	selectAccountDataByLocalPartStmt *sql.Stmt
+	insertAccountDataStmt       *sql.Stmt
+	selectGlobalAccountDataStmt *sql.Stmt
+	selectRoomAccountDataStmt   *sql.Stmt
 }
 
 func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
@@ -58,7 +63,10 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
 		return
 	}
-	if s.selectAccountDataByLocalPartStmt, err = db.Prepare(selectAccountDataByLocalPartSQL); err != nil {
+	if s.selectGlobalAccountDataStmt, err = db.Prepare(selectGlobalAccountDataSQL); err != nil {
+		return
+	}
+	if s.selectRoomAccountDataStmt, err = db.Prepare(selectRoomAccountDataSQL); err != nil {
 		return
 	}
 	return
@@ -67,4 +75,58 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 func (s *accountDataStatements) insertAccountData(localpart string, roomID string, dataType string, content string) (err error) {
 	_, err = s.insertAccountDataStmt.Exec(localpart, roomID, dataType, content)
 	return
+}
+
+func (s *accountDataStatements) selectGlobalAccountData(localpart string) ([]authtypes.AccountData, error) {
+	var data []authtypes.AccountData
+
+	rows, err := s.selectGlobalAccountDataStmt.Query(localpart)
+	if err != nil {
+		return data, err
+	}
+
+	for rows.Next() {
+		var dataType string
+		var content string
+
+		if err := rows.Scan(&dataType, &content); err != nil && err != sql.ErrNoRows {
+			return data, err
+		}
+
+		ac := authtypes.AccountData{
+			Localpart: localpart,
+			Type:      dataType,
+			Content:   content,
+		}
+		data = append(data, ac)
+	}
+
+	return data, nil
+}
+
+func (s *accountDataStatements) selectRoomAccountData(localpart string, roomID string) ([]authtypes.AccountData, error) {
+	var data []authtypes.AccountData
+
+	rows, err := s.selectRoomAccountDataStmt.Query(localpart)
+	if err != nil {
+		return data, err
+	}
+
+	for rows.Next() {
+		var dataType string
+		var content string
+
+		if err := rows.Scan(&dataType, &content); err != nil && err != sql.ErrNoRows {
+			return data, err
+		}
+
+		ac := authtypes.AccountData{
+			Localpart: localpart,
+			Type:      dataType,
+			Content:   content,
+		}
+		data = append(data, ac)
+	}
+
+	return data, nil
 }
