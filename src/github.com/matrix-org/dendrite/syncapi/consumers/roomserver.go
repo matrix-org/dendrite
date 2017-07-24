@@ -226,18 +226,6 @@ func (s *OutputRoomEvent) updateMemberEvent(
 		return event, nil
 	}
 
-	builder := gomatrixserverlib.EventBuilder{
-		Sender:     event.Sender(),
-		RoomID:     event.RoomID(),
-		Type:       event.Type(),
-		StateKey:   event.StateKey(),
-		PrevEvents: event.PrevEvents(),
-		AuthEvents: event.AuthEvents(),
-		Redacts:    event.Redacts(),
-		Depth:      event.Depth(),
-		Content:    event.Content(),
-	}
-
 	var content events.MemberContent
 	if err := json.Unmarshal(prevEvent.Content(), &content); err != nil {
 		return event, err
@@ -249,14 +237,7 @@ func (s *OutputRoomEvent) updateMemberEvent(
 		UserID:      prevEvent.Sender(),
 	}
 
-	if err = builder.SetUnsigned(prev); err != nil {
-		return event, err
-	}
-
-	ts := event.OriginServerTS().Time()
-	ev, err := builder.Build(event.EventID(), ts, event.Origin(), keyID, privateKey)
-
-	return ev, err
+	return event.SetUnsigned(prev)
 }
 
 func missingEventsFrom(events []gomatrixserverlib.Event, required []string) []string {
