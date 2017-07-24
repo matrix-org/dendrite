@@ -46,22 +46,21 @@ type RoomserverInputAPI struct {
 	processed int64
 }
 
-// WriteOutputRoomEvent implements OutputRoomEventWriter
-func (r *RoomserverInputAPI) WriteOutputRoomEvent(output api.OutputNewRoomEvent) error {
-	var m sarama.ProducerMessage
-	oe := api.OutputEvent{
-		Type:         api.OutputTypeNewRoomEvent,
-		NewRoomEvent: &output,
+// WriteOutputEvents implements OutputRoomEventWriter
+func (r *RoomserverInputAPI) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
+	messages := make([]*sarama.ProducerMessage, len(updates))
+	for i := range updates {
+		value, err := json.Marshal(updates[i])
+		if err != nil {
+			return err
+		}
+		messages[i] = &sarama.ProducerMessage{
+			Topic: r.OutputRoomEventTopic,
+			Key:   sarama.StringEncoder(roomID),
+			Value: sarama.ByteEncoder(value),
+		}
 	}
-	value, err := json.Marshal(oe)
-	if err != nil {
-		return err
-	}
-	m.Topic = r.OutputRoomEventTopic
-	m.Key = sarama.StringEncoder("")
-	m.Value = sarama.ByteEncoder(value)
-	_, _, err = r.Producer.SendMessage(&m)
-	return err
+	return r.Producer.SendMessages(messages)
 }
 
 // InputRoomEvents implements api.RoomserverInputAPI

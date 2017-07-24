@@ -15,13 +15,16 @@
 package input
 
 import (
+	"fmt"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func updateMemberships(
 	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, removed, added []types.StateEntry,
-) error {
+) ([]api.OutputEvent, error) {
 	changes := membershipChanges(removed, added)
 	var eventNIDs []types.EventNID
 	for _, change := range changes {
@@ -34,8 +37,10 @@ func updateMemberships(
 	}
 	events, err := db.Events(eventNIDs)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	var updates []api.OutputEvent
 
 	for _, change := range changes {
 		var ae *gomatrixserverlib.Event
@@ -55,16 +60,18 @@ func updateMemberships(
 			}
 			targetNID = change.added.EventStateKeyNID
 		}
-		if err := updateMembership(updater, targetNID, re, ae); err != nil {
-			return err
+		if updates, err = updateMembership(updater, targetNID, re, ae, updates); err != nil {
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func updateMembership(
-	updater types.RoomRecentEventsUpdater, targetNID types.EventStateKeyNID, remove *gomatrixserverlib.Event, add *gomatrixserverlib.Event,
-) error {
+	updater types.RoomRecentEventsUpdater, targetNID types.EventStateKeyNID,
+	remove *gomatrixserverlib.Event, add *gomatrixserverlib.Event,
+	updates []api.OutputEvent,
+) ([]api.OutputEvent, error) {
 	var err error
 	old := "leave"
 	new := "leave"
@@ -72,40 +79,95 @@ func updateMembership(
 	if remove != nil {
 		old, err = remove.Membership()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if add != nil {
 		new, err = add.Membership()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if old == new {
-		return nil
+		return updates, nil
 	}
 
 	mu, err := updater.MembershipUpdater(targetNID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	switch new {
+	return updateWithNewMembership(mu, new, add, updates)
+}
+
+func updateWithNewMembership(
+	mu types.MembershipUpdater, newMembership string, add *gomatrixserverlib.Event,
+	updates []api.OutputEvent,
+) ([]api.OutputEvent, error) {
+	switch newMembership {
 	case "invite":
-		_, err := mu.SetToInvite(*add)
+		needsSending, err := mu.SetToInvite(*add)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		if needsSending {
+			updates = appendInviteUpdate(updates, add)
+		}
+		return updates, nil
 	case "join":
-		if !mu.IsJoin() {
-			mu.SetToJoin(add.Sender())
+		if mu.IsJoin() {
+			return updates, nil
 		}
-	case "leave":
-		if !mu.IsLeave() {
+		retired, err := mu.SetToJoin(add.Sender())
+		if err != nil {
+			return nil, err
+		}
+		return appendRetireUpdates(updates, add, newMembership, retired), nil
+	case "leave", "ban":
+		if mu.IsLeave() {
+			return updates, nil
+		}
+		retired, err := mu.SetToLeave(add.Sender())
+		if err != nil {
 			mu.SetToLeave(add.Sender())
 		}
+		return appendRetireUpdates(updates, add, newMembership, retired), nil
+	default:
+		panic(fmt.Errorf(
+			"input: membership %q is not one of the allowed values", newMembership,
+		))
 	}
-	return nil
+}
+
+func appendInviteUpdate(
+	updates []api.OutputEvent, add *gomatrixserverlib.Event,
+) []api.OutputEvent {
+	onie := api.OutputNewInviteEvent{
+		Event: *add,
+	}
+	return append(updates, api.OutputEvent{
+		Type:           api.OutputTypeNewInviteEvent,
+		NewInviteEvent: &onie,
+	})
+}
+
+func appendRetireUpdates(
+	updates []api.OutputEvent, add *gomatrixserverlib.Event, membership string, retired []string,
+) []api.OutputEvent {
+	for _, eventID := range retired {
+		orie := api.OutputRetireInviteEvent{
+			EventID:    eventID,
+			Membership: membership,
+		}
+		if add != nil {
+			orie.RetiredByEventID = add.EventID()
+		}
+		updates = append(updates, api.OutputEvent{
+			Type:              api.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &orie,
+		})
+	}
+	return updates
 }
 
 type stateChange struct {
