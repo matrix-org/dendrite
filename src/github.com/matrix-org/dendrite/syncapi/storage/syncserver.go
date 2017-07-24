@@ -100,18 +100,6 @@ func (d *SyncServerDatabase) WriteEvent(
 		}
 		streamPos = types.StreamPosition(pos)
 
-		if len(addStateEvents) == 0 {
-			// If the event is a m.room.member event, and has unsigned content,
-			// we need to save it as it is very likely to be a membership update
-			// (e.g. if a user updates their profile)
-			if ev.Type() == "m.room.member" && len(ev.Unsigned()) > 0 {
-				addStateEvents = append(addStateEvents, *ev)
-			} else if len(removeStateEventIDs) == 0 {
-				// Nothing to do, the event may have just been a message event.
-				return nil
-			}
-		}
-
 		return d.updateRoomState(txn, removeStateEventIDs, addStateEvents, streamPos)
 	})
 	return

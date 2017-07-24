@@ -299,6 +299,9 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
+		builder.Depth = queryRes.Depth
+		builder.PrevEvents = queryRes.LatestEvents
+
 		authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 		for i := range queryRes.StateEvents {
