@@ -175,7 +175,7 @@ type stateChange struct {
 	added   types.StateEntry
 }
 
-func membershipChanges(removed, added []types.StateEntry) []stateChange {
+func pairUpChanges(removed, added []types.StateEntry) []stateChange {
 	var ai int
 	var ri int
 	var result []stateChange
@@ -183,22 +183,14 @@ func membershipChanges(removed, added []types.StateEntry) []stateChange {
 		switch {
 		case ai == len(added):
 			for _, s := range removed[ri:] {
-				if s.EventTypeNID == types.MRoomMemberNID {
-					result = append(result, stateChange{removed: s})
-				}
+				result = append(result, stateChange{removed: s})
 			}
 			return result
 		case ri == len(removed):
-			for _, s := range removed[ai:] {
-				if s.EventTypeNID == types.MRoomMemberNID {
-					result = append(result, stateChange{added: s})
-				}
+			for _, s := range added[ai:] {
+				result = append(result, stateChange{added: s})
 			}
 			return result
-		case added[ai].EventTypeNID != types.MRoomMemberNID:
-			ai++
-		case removed[ri].EventTypeNID != types.MRoomMemberNID:
-			ri++
 		case added[ai].StateKeyTuple == removed[ri].StateKeyTuple:
 			result = append(result, stateChange{
 				removed: removed[ri],
@@ -214,4 +206,18 @@ func membershipChanges(removed, added []types.StateEntry) []stateChange {
 			ri++
 		}
 	}
+}
+
+// membershipChanges pairs up the membership state changes from a sorted list
+// of state removed and a sorted list of state added.
+func membershipChanges(removed, added []types.StateEntry) []stateChange {
+	changes := pairUpChanges(removed, added)
+	var result []stateChange
+	for _, c := range changes {
+		if c.added.EventTypeNID == types.MRoomMemberNID ||
+			c.removed.EventTypeNID == types.MRoomMemberNID {
+			result = append(result, c)
+		}
+	}
+	return result
 }
