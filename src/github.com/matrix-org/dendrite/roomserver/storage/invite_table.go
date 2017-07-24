@@ -21,7 +21,7 @@ import (
 )
 
 const inviteSchema = `
-CREATE TABLE invites (
+CREATE TABLE IF NOT EXISTS invites (
 	-- The string ID of the invite event itself.
 	-- We can't use a numeric event ID here because we don't always have
 	-- enough information to store an invite in the event table.
@@ -47,17 +47,17 @@ CREATE TABLE invites (
 	invite_event_json TEXT NOT NULL
 );
 
-CREATE INDEX invites_active_idx ON invites (target_state_key_nid, room_nid)
+CREATE INDEX IF NOT EXISTS invites_active_idx ON invites (target_nid, room_nid)
 	WHERE NOT retired;
 `
 const insertInviteEventSQL = "" +
-	"INSERT INTO invites (invite_event_id, room_nid, target_state_key_nid," +
-	" sender_state_key_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
+	"INSERT INTO invites (invite_event_id, room_nid, target_nid," +
+	" sender_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
 	" ON CONFLICT DO NOTHING"
 
 const selectInviteActiveForUserInRoomSQL = "" +
-	"SELECT invite_event_id, sender_state_key_nid FROM invites" +
-	" WHERE target_state_key_id = $1 AND room_nid = $2" +
+	"SELECT invite_event_id, sender_nid FROM invites" +
+	" WHERE target_nid = $1 AND room_nid = $2" +
 	" AND NOT retired"
 
 // Retire every active invite.
@@ -67,7 +67,7 @@ const selectInviteActiveForUserInRoomSQL = "" +
 // invites that were retired, so we are forced to retire all of them.
 const updateInviteRetiredSQL = "" +
 	"UPDATE invites SET retired = TRUE" +
-	" WHERE room_nid = $1 AND target_state_key_nid = $2 AND NOT retired" +
+	" WHERE room_nid = $1 AND target_nid = $2 AND NOT retired" +
 	" RETURNING invite_event_id"
 
 type inviteStatements struct {
