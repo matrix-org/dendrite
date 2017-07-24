@@ -252,10 +252,41 @@ func (e Event) Redact() Event {
 		// This is unreachable for events created with EventBuilder.Build or NewEventFromUntrustedJSON
 		panic(fmt.Errorf("gomatrixserverlib: invalid event %v", err))
 	}
-	return Event{
+	result := Event{
 		redacted:  true,
 		eventJSON: eventJSON,
 	}
+	if err = json.Unmarshal(eventJSON, &result.fields); err != nil {
+		// This is unreachable for events created with EventBuilder.Build or NewEventFromUntrustedJSON
+		panic(fmt.Errorf("gomatrixserverlib: invalid event %v", err))
+	}
+	return result
+}
+
+// SetUnsigned sets the unsigned key of the event.
+// Returns a copy of the event with the "unsigned" key set.
+func (e Event) SetUnsigned(unsigned interface{}) (Event, error) {
+	var eventAsMap map[string]rawJSON
+	var err error
+	if err = json.Unmarshal(e.eventJSON, &eventAsMap); err != nil {
+		return Event{}, err
+	}
+	unsignedJSON, err := json.Marshal(unsigned)
+	if err != nil {
+		return Event{}, err
+	}
+	eventAsMap["unsigned"] = unsignedJSON
+	eventJSON, err := json.Marshal(eventAsMap)
+	if err != nil {
+		return Event{}, err
+	}
+	if eventJSON, err = CanonicalJSON(eventJSON); err != nil {
+		return Event{}, err
+	}
+	result := e
+	result.eventJSON = eventJSON
+	result.fields.Unsigned = unsignedJSON
+	return result, nil
 }
 
 // EventReference returns an EventReference for the event.
