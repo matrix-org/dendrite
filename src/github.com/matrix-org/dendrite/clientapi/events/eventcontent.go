@@ -28,6 +28,21 @@ type MemberContent struct {
 	// TODO: ThirdPartyInvite string `json:"third_party_invite,omitempty"`
 }
 
+// NameContent is the event content for https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-name
+type NameContent struct {
+	Name string `json:"name"`
+}
+
+// TopicContent is the event content for https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-topic
+type TopicContent struct {
+	Topic string `json:"topic"`
+}
+
+// GuestAccessContent is the event content for https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-guest-access
+type GuestAccessContent struct {
+	GuestAccess string `json:"guest_access"`
+}
+
 // JoinRulesContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-join-rules
 type JoinRulesContent struct {
 	JoinRule string `json:"join_rule"`

@@ -147,7 +147,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	//  4- m.room.canonical_alias (opt) TODO
 	//  5- m.room.join_rules
 	//  6- m.room.history_visibility
-	//  7- m.room.guest_access (opt) TODO
+	//  7- m.room.guest_access (opt)
 	//  8- other initial state items TODO
 	//  9- m.room.name (opt)
 	//  10- m.room.topic (opt)
@@ -165,13 +165,13 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		// TODO: m.room.canonical_alias
 		{"m.room.join_rules", "", events.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
 		{"m.room.history_visibility", "", events.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
-		// TODO: m.room.guest_access
+		{"m.room.guest_access", "", events.GuestAccessContent{"can_join"}},           // FIXME: Allow this to be changed
 		// TODO: Other initial state items
-		// TODO: m.room.name
-		// TODO: m.room.topic
+		{"m.room.name", "", events.NameContent{r.Name}}, // FIXME: Only send the name event if a name is supplied, to avoid sending a false room name removal event
+		{"m.room.topic", "", events.TopicContent{r.Topic}},
 		// TODO: invite events
 		// TODO: 3pid invite events
-		// TODO m.room.aliases
+		// TODO: m.room.aliases
 	}
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
