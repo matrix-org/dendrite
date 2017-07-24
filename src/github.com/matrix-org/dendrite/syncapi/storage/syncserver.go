@@ -100,6 +100,11 @@ func (d *SyncServerDatabase) WriteEvent(
 		}
 		streamPos = types.StreamPosition(pos)
 
+		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
+			// Nothing to do, the event may have just been a message event.
+			return nil
+		}
+
 		return d.updateRoomState(txn, removeStateEventIDs, addStateEvents, streamPos)
 	})
 	return
