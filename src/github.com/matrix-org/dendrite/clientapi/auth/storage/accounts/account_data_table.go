@@ -79,7 +79,7 @@ func (s *accountDataStatements) insertAccountData(localpart string, roomID strin
 }
 
 func (s *accountDataStatements) selectGlobalAccountData(localpart string) ([]gomatrixserverlib.ClientEvent, error) {
-	var events []gomatrixserverlib.ClientEvent
+	events := []gomatrixserverlib.ClientEvent{}
 
 	rows, err := s.selectGlobalAccountDataStmt.Query(localpart)
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *accountDataStatements) selectGlobalAccountData(localpart string) ([]gom
 }
 
 func (s *accountDataStatements) selectRoomAccountData(localpart string, roomID string) ([]gomatrixserverlib.ClientEvent, error) {
-	var events []gomatrixserverlib.ClientEvent
+	events := []gomatrixserverlib.ClientEvent{}
 
 	rows, err := s.selectRoomAccountDataStmt.Query(localpart, roomID)
 	if err != nil {
