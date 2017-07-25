@@ -42,7 +42,7 @@ const insertAccountDataSQL = `
 `
 
 const selectAccountDataSQL = "" +
-	"SELECT type, content FROM account_data WHERE localpart = $1 AND room_id = $2"
+	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
 
 const deleteAccountDataSQL = "" +
 	"DELETE FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
@@ -71,28 +71,38 @@ func (s *accountDataStatements) insertAccountData(localpart string, roomID strin
 	return
 }
 
-func (s *accountDataStatements) selectAccountData(localpart string, roomID string) ([]gomatrixserverlib.ClientEvent, error) {
-	events := []gomatrixserverlib.ClientEvent{}
-
-	rows, err := s.selectAccountDataStmt.Query(localpart, roomID)
+func (s *accountDataStatements) selectAccountData(localpart string) (
+	global []gomatrixserverlib.ClientEvent,
+	rooms map[string][]gomatrixserverlib.ClientEvent,
+	err error,
+) {
+	rows, err := s.selectAccountDataStmt.Query(localpart)
 	if err != nil {
-		return events, err
+		return
 	}
 
+	rooms = make(map[string][]gomatrixserverlib.ClientEvent)
+
 	for rows.Next() {
+		var roomID string
 		var dataType string
 		var content []byte
 
-		if err := rows.Scan(&dataType, &content); err != nil && err != sql.ErrNoRows {
-			return events, err
+		if err = rows.Scan(&roomID, &dataType, &content); err != nil && err != sql.ErrNoRows {
+			return
 		}
 
 		ac := gomatrixserverlib.ClientEvent{
 			Type:    dataType,
 			Content: content,
 		}
-		events = append(events, ac)
+
+		if len(roomID) > 0 {
+			rooms[roomID] = append(rooms[roomID], ac)
+		} else {
+			global = append(global, ac)
+		}
 	}
 
-	return events, nil
+	return
 }

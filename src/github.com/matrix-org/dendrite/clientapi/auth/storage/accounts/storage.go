@@ -199,14 +199,14 @@ func (d *Database) SaveAccountData(localpart string, roomID string, dataType str
 }
 
 // GetAccountData returns account data related to a given localpart
-// If a non-empty string is provided as the room ID, returns all account data
-// related to the room
-// If an empty string is provided as the room ID, returns all account data that
-// aren't related to any room
 // If no account data could be found, returns an empty arrays
 // Returns an error if there was an issue with the retrieval
-func (d *Database) GetAccountData(localpart string, roomID string) ([]gomatrixserverlib.ClientEvent, error) {
-	return d.accountDatas.selectAccountData(localpart, roomID)
+func (d *Database) GetAccountData(localpart string) (
+	global []gomatrixserverlib.ClientEvent,
+	rooms map[string][]gomatrixserverlib.ClientEvent,
+	err error,
+) {
+	return d.accountDatas.selectAccountData(localpart)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {

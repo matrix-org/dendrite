@@ -114,24 +114,24 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.Stre
 }
 
 func (rp *RequestPool) appendAccountData(data *types.Response, userID string) (*types.Response, error) {
+	// TODO: We currently send all account data on every sync response, we should instead send data
+	// that has changed on incremental sync responses
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return nil, err
 	}
 
-	events, err := rp.accountDB.GetAccountData(localpart, "")
+	global, rooms, err := rp.accountDB.GetAccountData(localpart)
 	if err != nil {
 		return nil, err
 	}
-	data.AccountData.Events = events
+	data.AccountData.Events = global
 
 	for r, j := range data.Rooms.Join {
-		events, err := rp.accountDB.GetAccountData(localpart, r)
-		if err != nil {
-			return nil, err
+		if len(rooms[r]) > 0 {
+			j.AccountData.Events = rooms[r]
+			data.Rooms.Join[r] = j
 		}
-		j.AccountData.Events = events
-		data.Rooms.Join[r] = j
 	}
 
 	return data, nil
