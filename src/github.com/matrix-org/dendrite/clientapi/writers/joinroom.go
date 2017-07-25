@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -42,13 +43,26 @@ func JoinRoomByIDOrAlias(
 	producer *producers.RoomserverProducer,
 	queryAPI api.RoomserverQueryAPI,
 	keyRing gomatrixserverlib.KeyRing,
+	accountDB *accounts.Database,
 ) util.JSONResponse {
 	var content map[string]interface{} // must be a JSON object
 	if resErr := httputil.UnmarshalJSONRequest(req, &content); resErr != nil {
 		return *resErr
 	}
 
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	content["membership"] = "join"
+	content["displayname"] = profile.DisplayName
+	content["avatar_url"] = profile.AvatarURL
 
 	r := joinRoomReq{req, content, device.UserID, cfg, federation, producer, queryAPI, keyRing}
 

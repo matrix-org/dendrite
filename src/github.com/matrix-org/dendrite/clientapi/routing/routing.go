@@ -70,14 +70,14 @@ func Setup(
 
 	r0mux.Handle("/createRoom",
 		common.MakeAuthAPI("createRoom", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return writers.CreateRoom(req, device, cfg, producer)
+			return writers.CreateRoom(req, device, cfg, producer, accountDB)
 		}),
 	)
 	r0mux.Handle("/join/{roomIDOrAlias}",
 		common.MakeAuthAPI("join", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return writers.JoinRoomByIDOrAlias(
-				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, keyRing,
+				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, keyRing, accountDB,
 			)
 		}),
 	)
@@ -185,7 +185,7 @@ func Setup(
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		common.MakeAuthAPI("profile_avatar_url", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.SetAvatarURL(req, accountDB, vars["userID"], userUpdateProducer)
+			return readers.SetAvatarURL(req, accountDB, device, vars["userID"], userUpdateProducer, &cfg, producer, queryAPI)
 		}),
 	).Methods("PUT", "OPTIONS")
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -201,7 +201,7 @@ func Setup(
 	r0mux.Handle("/profile/{userID}/displayname",
 		common.MakeAuthAPI("profile_displayname", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.SetDisplayName(req, accountDB, vars["userID"], userUpdateProducer)
+			return readers.SetDisplayName(req, accountDB, device, vars["userID"], userUpdateProducer, &cfg, producer, queryAPI)
 		}),
 	).Methods("PUT", "OPTIONS")
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows

@@ -107,6 +107,11 @@ func (s *OutputRoomEvent) lookupStateEvents(
 ) ([]gomatrixserverlib.Event, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
+		// If the event is a membership update (e.g. for a profile update), it won't
+		// show up in AddsStateEventIDs, so we need to add it manually
+		if event.Type() == "m.room.member" {
+			return []gomatrixserverlib.Event{event}, nil
+		}
 		return nil, nil
 	}
 

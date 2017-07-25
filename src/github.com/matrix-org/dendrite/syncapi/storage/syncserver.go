@@ -141,6 +141,13 @@ func (d *SyncServerDatabase) updateRoomState(
 	return nil
 }
 
+// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
+// If no event could be found, returns nil
+// If there was an issue during the retrieval, returns an error
+func (d *SyncServerDatabase) GetStateEvent(evType string, roomID string, stateKey string) (*gomatrixserverlib.Event, error) {
+	return d.roomstate.selectStateEvent(evType, roomID, stateKey)
+}
+
 // PartitionOffsets implements common.PartitionStorer
 func (d *SyncServerDatabase) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
 	return d.partitions.SelectPartitionOffsets(topic)
