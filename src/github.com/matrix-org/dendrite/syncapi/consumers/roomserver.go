@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -42,9 +41,9 @@ type OutputRoomEvent struct {
 }
 
 type prevMembership struct {
-	PrevContent events.MemberContent `json:"prev_content"`
-	PrevID      string               `json:"replaces_state"`
-	UserID      string               `json:"prev_sender"`
+	PrevContent json.RawMessage `json:"prev_content"`
+	PrevID      string          `json:"replaces_state"`
+	UserID      string          `json:"prev_sender"`
 }
 
 // NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
@@ -114,13 +113,13 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: state event lookup failure")
 	}
 
-	ev, err = s.updateMemberEvent(ev, s.keyID, s.privateKey)
+	ev, err = s.updateStateEvent(ev, s.keyID, s.privateKey)
 	if err != nil {
 		return err
 	}
 
 	for i := range addsStateEvents {
-		addsStateEvents[i], err = s.updateMemberEvent(addsStateEvents[i], s.keyID, s.privateKey)
+		addsStateEvents[i], err = s.updateStateEvent(addsStateEvents[i], s.keyID, s.privateKey)
 		if err != nil {
 			return err
 		}
@@ -202,22 +201,11 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	return result, nil
 }
 
-func (s *OutputRoomEvent) updateMemberEvent(
+func (s *OutputRoomEvent) updateStateEvent(
 	event gomatrixserverlib.Event, keyID gomatrixserverlib.KeyID,
 	privateKey []byte,
 ) (gomatrixserverlib.Event, error) {
-	if event.Type() != "m.room.member" {
-		return event, nil
-	}
-	membership, err := event.Membership()
-	if err != nil {
-		return event, err
-	}
-	if membership != "join" {
-		return event, nil
-	}
-
-	prevEvent, err := s.db.GetMembershipEvent(event.RoomID(), *event.StateKey())
+	prevEvent, err := s.db.GetStateEvent(event.Type(), event.RoomID(), *event.StateKey())
 	if err != nil {
 		return event, err
 	}
@@ -226,13 +214,8 @@ func (s *OutputRoomEvent) updateMemberEvent(
 		return event, nil
 	}
 
-	var content events.MemberContent
-	if err := json.Unmarshal(prevEvent.Content(), &content); err != nil {
-		return event, err
-	}
-
 	prev := prevMembership{
-		PrevContent: content,
+		PrevContent: prevEvent.Content(),
 		PrevID:      prevEvent.EventID(),
 		UserID:      prevEvent.Sender(),
 	}

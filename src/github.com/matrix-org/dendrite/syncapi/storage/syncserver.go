@@ -141,9 +141,11 @@ func (d *SyncServerDatabase) updateRoomState(
 	return nil
 }
 
-// GetMembershipEvent returns the Matrix join event for a given user into a given room
-func (d *SyncServerDatabase) GetMembershipEvent(roomID string, userID string) (*gomatrixserverlib.Event, error) {
-	return d.roomstate.selectJoinEventForUser(roomID, userID)
+// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
+// If no event could be found, returns nil
+// If there was an issue during the retrieval, returns an error
+func (d *SyncServerDatabase) GetStateEvent(evType string, roomID string, stateKey string) (*gomatrixserverlib.Event, error) {
+	return d.roomstate.selectStateEvent(evType, roomID, stateKey)
 }
 
 // PartitionOffsets implements common.PartitionStorer
