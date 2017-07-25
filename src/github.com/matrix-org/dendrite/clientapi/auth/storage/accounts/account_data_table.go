@@ -16,7 +16,8 @@ package accounts
 
 import (
 	"database/sql"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const accountDataSchema = `
@@ -77,56 +78,54 @@ func (s *accountDataStatements) insertAccountData(localpart string, roomID strin
 	return
 }
 
-func (s *accountDataStatements) selectGlobalAccountData(localpart string) ([]authtypes.AccountData, error) {
-	var data []authtypes.AccountData
+func (s *accountDataStatements) selectGlobalAccountData(localpart string) ([]gomatrixserverlib.ClientEvent, error) {
+	var events []gomatrixserverlib.ClientEvent
 
 	rows, err := s.selectGlobalAccountDataStmt.Query(localpart)
 	if err != nil {
-		return data, err
+		return events, err
 	}
 
 	for rows.Next() {
 		var dataType string
-		var content string
+		var content []byte
 
 		if err := rows.Scan(&dataType, &content); err != nil && err != sql.ErrNoRows {
-			return data, err
+			return events, err
 		}
 
-		ac := authtypes.AccountData{
-			Localpart: localpart,
-			Type:      dataType,
-			Content:   content,
+		ac := gomatrixserverlib.ClientEvent{
+			Type:    dataType,
+			Content: content,
 		}
-		data = append(data, ac)
+		events = append(events, ac)
 	}
 
-	return data, nil
+	return events, nil
 }
 
-func (s *accountDataStatements) selectRoomAccountData(localpart string, roomID string) ([]authtypes.AccountData, error) {
-	var data []authtypes.AccountData
+func (s *accountDataStatements) selectRoomAccountData(localpart string, roomID string) ([]gomatrixserverlib.ClientEvent, error) {
+	var events []gomatrixserverlib.ClientEvent
 
-	rows, err := s.selectRoomAccountDataStmt.Query(localpart)
+	rows, err := s.selectRoomAccountDataStmt.Query(localpart, roomID)
 	if err != nil {
-		return data, err
+		return events, err
 	}
 
 	for rows.Next() {
 		var dataType string
-		var content string
+		var content []byte
 
 		if err := rows.Scan(&dataType, &content); err != nil && err != sql.ErrNoRows {
-			return data, err
+			return events, err
 		}
 
-		ac := authtypes.AccountData{
-			Localpart: localpart,
-			Type:      dataType,
-			Content:   content,
+		ac := gomatrixserverlib.ClientEvent{
+			Type:    dataType,
+			Content: content,
 		}
-		data = append(data, ac)
+		events = append(events, ac)
 	}
 
-	return data, nil
+	return events, nil
 }
