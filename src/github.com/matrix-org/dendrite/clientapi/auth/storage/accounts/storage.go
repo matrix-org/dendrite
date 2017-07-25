@@ -206,10 +206,7 @@ func (d *Database) SaveAccountData(localpart string, roomID string, dataType str
 // If no account data could be found, returns an empty arrays
 // Returns an error if there was an issue with the retrieval
 func (d *Database) GetAccountData(localpart string, roomID string) ([]gomatrixserverlib.ClientEvent, error) {
-	if len(roomID) > 0 {
-		return d.accountDatas.selectRoomAccountData(localpart, roomID)
-	}
-	return d.accountDatas.selectGlobalAccountData(localpart)
+	return d.accountDatas.selectAccountData(localpart, roomID)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {

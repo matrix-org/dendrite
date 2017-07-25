@@ -41,19 +41,15 @@ const insertAccountDataSQL = `
 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = EXCLUDED.content
 `
 
-const selectGlobalAccountDataSQL = "" +
-	"SELECT type, content FROM account_data WHERE localpart = $1 AND room_id = ''"
-
-const selectRoomAccountDataSQL = "" +
+const selectAccountDataSQL = "" +
 	"SELECT type, content FROM account_data WHERE localpart = $1 AND room_id = $2"
 
 const deleteAccountDataSQL = "" +
 	"DELETE FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
 
 type accountDataStatements struct {
-	insertAccountDataStmt       *sql.Stmt
-	selectGlobalAccountDataStmt *sql.Stmt
-	selectRoomAccountDataStmt   *sql.Stmt
+	insertAccountDataStmt *sql.Stmt
+	selectAccountDataStmt *sql.Stmt
 }
 
 func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
@@ -64,10 +60,7 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
 		return
 	}
-	if s.selectGlobalAccountDataStmt, err = db.Prepare(selectGlobalAccountDataSQL); err != nil {
-		return
-	}
-	if s.selectRoomAccountDataStmt, err = db.Prepare(selectRoomAccountDataSQL); err != nil {
+	if s.selectAccountDataStmt, err = db.Prepare(selectAccountDataSQL); err != nil {
 		return
 	}
 	return
@@ -78,36 +71,10 @@ func (s *accountDataStatements) insertAccountData(localpart string, roomID strin
 	return
 }
 
-func (s *accountDataStatements) selectGlobalAccountData(localpart string) ([]gomatrixserverlib.ClientEvent, error) {
+func (s *accountDataStatements) selectAccountData(localpart string, roomID string) ([]gomatrixserverlib.ClientEvent, error) {
 	events := []gomatrixserverlib.ClientEvent{}
 
-	rows, err := s.selectGlobalAccountDataStmt.Query(localpart)
-	if err != nil {
-		return events, err
-	}
-
-	for rows.Next() {
-		var dataType string
-		var content []byte
-
-		if err := rows.Scan(&dataType, &content); err != nil && err != sql.ErrNoRows {
-			return events, err
-		}
-
-		ac := gomatrixserverlib.ClientEvent{
-			Type:    dataType,
-			Content: content,
-		}
-		events = append(events, ac)
-	}
-
-	return events, nil
-}
-
-func (s *accountDataStatements) selectRoomAccountData(localpart string, roomID string) ([]gomatrixserverlib.ClientEvent, error) {
-	events := []gomatrixserverlib.ClientEvent{}
-
-	rows, err := s.selectRoomAccountDataStmt.Query(localpart, roomID)
+	rows, err := s.selectAccountDataStmt.Query(localpart, roomID)
 	if err != nil {
 		return events, err
 	}
