@@ -205,7 +205,14 @@ func (s *OutputRoomEvent) updateStateEvent(
 	event gomatrixserverlib.Event, keyID gomatrixserverlib.KeyID,
 	privateKey []byte,
 ) (gomatrixserverlib.Event, error) {
-	prevEvent, err := s.db.GetStateEvent(event.Type(), event.RoomID(), *event.StateKey())
+	var stateKey string
+	if event.StateKey() == nil {
+		stateKey = ""
+	} else {
+		stateKey = *event.StateKey()
+	}
+
+	prevEvent, err := s.db.GetStateEvent(event.Type(), event.RoomID(), stateKey)
 	if err != nil {
 		return event, err
 	}
