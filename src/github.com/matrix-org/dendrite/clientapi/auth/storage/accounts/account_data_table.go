@@ -81,6 +81,7 @@ func (s *accountDataStatements) selectAccountData(localpart string) (
 		return
 	}
 
+	global = []gomatrixserverlib.ClientEvent{}
 	rooms = make(map[string][]gomatrixserverlib.ClientEvent)
 
 	for rows.Next() {
