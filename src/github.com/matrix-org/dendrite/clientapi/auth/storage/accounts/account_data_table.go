@@ -25,7 +25,7 @@ const accountDataSchema = `
 CREATE TABLE IF NOT EXISTS account_data (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL,
-    -- The room ID for this data (null if not specific to a room)
+    -- The room ID for this data (empty string if not specific to a room)
     room_id TEXT,
     -- The account data type
     type TEXT NOT NULL,
