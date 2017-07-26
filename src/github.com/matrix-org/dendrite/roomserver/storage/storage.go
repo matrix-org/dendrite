@@ -355,6 +355,26 @@ func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.Ev
 	return references, currentStateSnapshotNID, depth, nil
 }
 
+// SetRoomAlias implements query.RoomserverQueryAPIDB
+func (d *Database) SetRoomAlias(alias string, roomID string) error {
+	return d.statements.insertRoomAlias(alias, roomID)
+}
+
+// GetRoomIDFromAlias implements query.RoomserverQueryAPIDB
+func (d *Database) GetRoomIDFromAlias(alias string) (string, error) {
+	return d.statements.selectRoomIDFromAlias(alias)
+}
+
+// GetAliasesFromRoomID implements query.RoomserverQueryAPIDB
+func (d *Database) GetAliasesFromRoomID(roomID string) ([]string, error) {
+	return d.statements.selectAliasesFromRoomID(roomID)
+}
+
+// RemoveRoomAlias implements query.RoomserverQueryAPIDB
+func (d *Database) RemoveRoomAlias(alias string) error {
+	return d.statements.deleteRoomAlias(alias)
+}
+
 // StateEntriesForTuples implements state.RoomStateDatabase
 func (d *Database) StateEntriesForTuples(
 	stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple,
