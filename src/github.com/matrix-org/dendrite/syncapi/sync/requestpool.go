@@ -20,22 +20,25 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db       *storage.SyncServerDatabase
-	notifier *Notifier
+	db        *storage.SyncServerDatabase
+	accountDB *accounts.Database
+	notifier  *Notifier
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db *storage.SyncServerDatabase, n *Notifier) *RequestPool {
-	return &RequestPool{db, n}
+func NewRequestPool(db *storage.SyncServerDatabase, n *Notifier, adb *accounts.Database) *RequestPool {
+	return &RequestPool{db, adb, n}
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -77,9 +80,14 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		if err != nil {
 			res = httputil.LogThenError(req, err)
 		} else {
-			res = util.JSONResponse{
-				Code: 200,
-				JSON: syncData,
+			syncData, err = rp.appendAccountData(syncData, device.UserID)
+			if err != nil {
+				res = httputil.LogThenError(req, err)
+			} else {
+				res = util.JSONResponse{
+					Code: 200,
+					JSON: syncData,
+				}
 			}
 		}
 		done <- res
@@ -103,4 +111,28 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.Stre
 		return rp.db.CompleteSync(req.userID, req.limit)
 	}
 	return rp.db.IncrementalSync(req.userID, req.since, currentPos, req.limit)
+}
+
+func (rp *RequestPool) appendAccountData(data *types.Response, userID string) (*types.Response, error) {
+	// TODO: We currently send all account data on every sync response, we should instead send data
+	// that has changed on incremental sync responses
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return nil, err
+	}
+
+	global, rooms, err := rp.accountDB.GetAccountData(localpart)
+	if err != nil {
+		return nil, err
+	}
+	data.AccountData.Events = global
+
+	for r, j := range data.Rooms.Join {
+		if len(rooms[r]) > 0 {
+			j.AccountData.Events = rooms[r]
+			data.Rooms.Join[r] = j
+		}
+	}
+
+	return data, nil
 }

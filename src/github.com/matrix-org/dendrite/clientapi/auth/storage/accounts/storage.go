@@ -27,12 +27,13 @@ import (
 
 // Database represents an account database
 type Database struct {
-	db          *sql.DB
-	partitions  common.PartitionOffsetStatements
-	accounts    accountsStatements
-	profiles    profilesStatements
-	memberships membershipStatements
-	serverName  gomatrixserverlib.ServerName
+	db           *sql.DB
+	partitions   common.PartitionOffsetStatements
+	accounts     accountsStatements
+	profiles     profilesStatements
+	memberships  membershipStatements
+	accountDatas accountDataStatements
+	serverName   gomatrixserverlib.ServerName
 }
 
 // NewDatabase creates a new accounts and profiles database
@@ -58,7 +59,11 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = m.prepare(db); err != nil {
 		return nil, err
 	}
-	return &Database{db, partitions, a, p, m, serverName}, nil
+	ac := accountDataStatements{}
+	if err = ac.prepare(db); err != nil {
+		return nil, err
+	}
+	return &Database{db, partitions, a, p, m, ac, serverName}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -197,6 +202,26 @@ func (d *Database) newMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error 
 		}
 	}
 	return nil
+}
+
+// SaveAccountData saves new account data for a given user and a given room.
+// If the account data is not specific to a room, the room ID should be an empty string
+// If an account data already exists for a given set (user, room, data type), it will
+// update the corresponding row with the new content
+// Returns a SQL error if there was an issue with the insertion/update
+func (d *Database) SaveAccountData(localpart string, roomID string, dataType string, content string) error {
+	return d.accountDatas.insertAccountData(localpart, roomID, dataType, content)
+}
+
+// GetAccountData returns account data related to a given localpart
+// If no account data could be found, returns an empty arrays
+// Returns an error if there was an issue with the retrieval
+func (d *Database) GetAccountData(localpart string) (
+	global []gomatrixserverlib.ClientEvent,
+	rooms map[string][]gomatrixserverlib.ClientEvent,
+	err error,
+) {
+	return d.accountDatas.selectAccountData(localpart)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {

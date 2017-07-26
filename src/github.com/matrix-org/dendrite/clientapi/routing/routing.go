@@ -274,9 +274,16 @@ func Setup(
 	)
 
 	r0mux.Handle("/user/{userID}/account_data/{type}",
-		common.MakeAPI("user_account_data", func(req *http.Request) util.JSONResponse {
-			// TODO: Set and get the account_data
-			return util.JSONResponse{Code: 200, JSON: struct{}{}}
+		common.MakeAuthAPI("user_account_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.SaveAccountData(req, accountDB, device, vars["userID"], "", vars["type"])
+		}),
+	)
+
+	r0mux.Handle("/user/{userID}/rooms/{roomID}/account_data/{type}",
+		common.MakeAuthAPI("user_account_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.SaveAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"])
 		}),
 	)
 
