@@ -100,6 +100,19 @@ type QueryEventsByIDResponse struct {
 	Events []gomatrixserverlib.Event `json:"events"`
 }
 
+// SetRoomAliasRequest is a request to SetRoomAlias
+type SetRoomAliasRequest struct {
+	// ID of the user setting the alias
+	UserID string `json:"user_id"`
+	// New alias for the room
+	Alias string `json:"alias"`
+	// The room ID the alias is referring to
+	RoomID string `json:"room_id"`
+}
+
+// SetRoomAliasResponse is a response to SetRoomAlias
+type SetRoomAliasResponse struct{}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -119,6 +132,12 @@ type RoomserverQueryAPI interface {
 		request *QueryEventsByIDRequest,
 		response *QueryEventsByIDResponse,
 	) error
+
+	// Set a room alias
+	SetRoomAlias(
+		request *SetRoomAliasRequest,
+		response *SetRoomAliasResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -129,6 +148,9 @@ const RoomserverQueryStateAfterEventsPath = "/api/roomserver/queryStateAfterEven
 
 // RoomserverQueryEventsByIDPath is the HTTP path for the QueryEventsByID API.
 const RoomserverQueryEventsByIDPath = "/api/roomserver/queryEventsByID"
+
+// RoomserverSetRoomAliasPath is the HTTP path for the SetRoomAlias API.
+const RoomserverSetRoomAliasPath = "/api/roomserver/setRoomAlias"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -168,6 +190,15 @@ func (h *httpRoomserverQueryAPI) QueryEventsByID(
 	response *QueryEventsByIDResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
+	return postJSON(h.httpClient, apiURL, request, response)
+}
+
+// SetRoomAlias implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) SetRoomAlias(
+	request *SetRoomAliasRequest,
+	response *SetRoomAliasResponse,
+) error {
+	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 

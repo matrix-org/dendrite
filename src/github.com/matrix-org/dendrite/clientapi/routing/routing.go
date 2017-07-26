@@ -111,7 +111,14 @@ func Setup(
 			vars := mux.Vars(req)
 			return readers.DirectoryRoom(req, device, vars["roomAlias"], federation, &cfg)
 		}),
-	)
+	).Methods("GET")
+
+	r0mux.Handle("/directory/room/{roomAlias}",
+		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.SetLocalAlias(req, device, vars["roomAlias"], &cfg, queryAPI)
+		}),
+	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/logout",
 		common.MakeAuthAPI("logout", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {

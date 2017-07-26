@@ -22,10 +22,15 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
+
+type roomID struct {
+	RoomID string `json:"room_id"`
+}
 
 // DirectoryRoom looks up a room alias
 func DirectoryRoom(
@@ -67,5 +72,49 @@ func DirectoryRoom(
 			Code: 200,
 			JSON: resp,
 		}
+	}
+}
+
+// SetLocalAlias implements PUT /directory/room/{roomAlias}
+func SetLocalAlias(
+	req *http.Request,
+	device *authtypes.Device,
+	alias string,
+	cfg *config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+) util.JSONResponse {
+	_, domain, err := gomatrixserverlib.SplitID('#', alias)
+	if err != nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
+		}
+	}
+
+	if domain != cfg.Matrix.ServerName {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("Alias must be on local homeserver"),
+		}
+	}
+
+	var r roomID
+	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
+		return *resErr
+	}
+
+	queryReq := api.SetRoomAliasRequest{
+		UserID: device.UserID,
+		RoomID: r.RoomID,
+		Alias:  alias,
+	}
+	var queryRes api.SetRoomAliasResponse
+	if err := queryAPI.SetRoomAlias(&queryReq, &queryRes); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
 	}
 }

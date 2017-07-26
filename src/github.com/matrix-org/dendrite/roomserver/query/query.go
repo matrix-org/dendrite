@@ -16,10 +16,14 @@ package query
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/input"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -40,11 +44,25 @@ type RoomserverQueryAPIDatabase interface {
 	// Lookup the numeric IDs for a list of events.
 	// Returns an error if there was a problem talking to the database.
 	EventNIDs(eventIDs []string) (map[string]types.EventNID, error)
+	// Save a given room alias with the room ID it refers to.
+	// Returns an error if there was a problem talking to the database.
+	SetRoomAlias(alias string, roomID string) error
+	// Lookup the room ID a given alias refers to.
+	// Returns an error if there was a problem talking to the database.
+	GetRoomIDFromAlias(alias string) (string, error)
+	// Lookup all aliases referring to a given room ID.
+	// Returns an error if there was a problem talking to the database.
+	GetAliasesFromRoomID(roomID string) ([]string, error)
+	// Remove a given room alias.
+	// Returns an error if there was a problem talking to the database.
+	RemoveRoomAlias(alias string) error
 }
 
-// RoomserverQueryAPI is an implementation of RoomserverQueryAPI
+// RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
 type RoomserverQueryAPI struct {
-	DB RoomserverQueryAPIDatabase
+	DB       RoomserverQueryAPIDatabase
+	Cfg      *config.Dendrite
+	InputAPI input.RoomserverInputAPI
 }
 
 // QueryLatestEventsAndState implements api.RoomserverQueryAPI
@@ -149,6 +167,113 @@ func (r *RoomserverQueryAPI) QueryEventsByID(
 	return nil
 }
 
+// SetRoomAlias implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) SetRoomAlias(
+	request *api.SetRoomAliasRequest,
+	response *api.SetRoomAliasResponse,
+) error {
+	// Save the new alias
+	// TODO: Check if alias already exists
+	if err := r.DB.SetRoomAlias(request.Alias, request.RoomID); err != nil {
+		return err
+	}
+
+	// Send a m.room.aliases event with the updated list of aliases for this room
+	if err := r.sendUpdatedAliasesEvent(request.UserID, request.RoomID); err != nil {
+		return err
+	}
+
+	// We don't need to return anything in the response, so we don't edit it
+	return nil
+}
+
+type roomAliasesContent struct {
+	Aliases []string `json:"aliases"`
+}
+
+// Build the updated m.room.aliases event to send to the room after addition or
+// removal of an alias
+func (r *RoomserverQueryAPI) sendUpdatedAliasesEvent(userID string, roomID string) error {
+	serverName := string(r.Cfg.Matrix.ServerName)
+
+	builder := gomatrixserverlib.EventBuilder{
+		Sender:   userID,
+		RoomID:   roomID,
+		Type:     "m.room.aliases",
+		StateKey: &serverName,
+	}
+
+	// Retrieve the updated list of aliases, marhal it and set it as the
+	// event's content
+	aliases, err := r.DB.GetAliasesFromRoomID(roomID)
+	if err != nil {
+		return err
+	}
+	content := roomAliasesContent{Aliases: aliases}
+	rawContent, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+	err = builder.SetContent(json.RawMessage(rawContent))
+	if err != nil {
+		return err
+	}
+
+	// Get needed state events and depth
+	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
+	if err != nil {
+		return err
+	}
+	req := api.QueryLatestEventsAndStateRequest{
+		RoomID:       roomID,
+		StateToFetch: eventsNeeded.Tuples(),
+	}
+	var res api.QueryLatestEventsAndStateResponse
+	if err = r.QueryLatestEventsAndState(&req, &res); err != nil {
+		return err
+	}
+	builder.Depth = res.Depth
+	builder.PrevEvents = res.LatestEvents
+
+	// Add auth events
+	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	for i := range res.StateEvents {
+		authEvents.AddEvent(&res.StateEvents[i])
+	}
+	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
+	if err != nil {
+		return err
+	}
+	builder.AuthEvents = refs
+
+	// Build the event
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
+	now := time.Now()
+	event, err := builder.Build(eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	// Create the request
+	ire := api.InputRoomEvent{
+		Kind:         api.KindNew,
+		Event:        event,
+		AuthEventIDs: event.AuthEventIDs(),
+		SendAsServer: serverName,
+	}
+	inputReq := api.InputRoomEventsRequest{
+		InputRoomEvents: []api.InputRoomEvent{ire},
+	}
+	var inputRes api.InputRoomEventsResponse
+
+	// Send the request
+	if err := r.InputAPI.InputRoomEvents(&inputReq, &inputRes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *RoomserverQueryAPI) loadStateEvents(stateEntries []types.StateEntry) ([]gomatrixserverlib.Event, error) {
 	eventNIDs := make([]types.EventNID, len(stateEntries))
 	for i := range stateEntries {
@@ -209,6 +334,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryEventsByID(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverSetRoomAliasPath,
+		common.MakeAPI("setRoomAlias", func(req *http.Request) util.JSONResponse {
+			var request api.SetRoomAliasRequest
+			var response api.SetRoomAliasResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.SetRoomAlias(&request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}

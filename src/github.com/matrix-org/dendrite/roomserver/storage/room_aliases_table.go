@@ -72,7 +72,7 @@ func (s *roomAliasesStatements) selectRoomIDFromAlias(alias string) (roomID stri
 
 func (s *roomAliasesStatements) selectAliasesFromRoomID(roomID string) (aliases []string, err error) {
 	aliases = []string{}
-	rows, err := s.selectRoomIDFromAliasStmt.Query(roomID)
+	rows, err := s.selectAliasesFromRoomIDStmt.Query(roomID)
 	if err != nil {
 		return
 	}

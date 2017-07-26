@@ -58,12 +58,6 @@ func main() {
 		panic(err)
 	}
 
-	queryAPI := query.RoomserverQueryAPI{
-		DB: db,
-	}
-
-	queryAPI.SetupHTTP(http.DefaultServeMux)
-
 	inputAPI := input.RoomserverInputAPI{
 		DB:                   db,
 		Producer:             kafkaProducer,
@@ -71,6 +65,14 @@ func main() {
 	}
 
 	inputAPI.SetupHTTP(http.DefaultServeMux)
+
+	queryAPI := query.RoomserverQueryAPI{
+		DB:       db,
+		Cfg:      cfg,
+		InputAPI: inputAPI,
+	}
+
+	queryAPI.SetupHTTP(http.DefaultServeMux)
 
 	http.DefaultServeMux.Handle("/metrics", prometheus.Handler())
 
