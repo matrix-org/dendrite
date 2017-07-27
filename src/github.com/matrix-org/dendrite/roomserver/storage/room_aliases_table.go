@@ -67,6 +67,9 @@ func (s *roomAliasesStatements) insertRoomAlias(alias string, roomID string) (er
 
 func (s *roomAliasesStatements) selectRoomIDFromAlias(alias string) (roomID string, err error) {
 	err = s.selectRoomIDFromAliasStmt.QueryRow(alias).Scan(&roomID)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
 	return
 }
 
