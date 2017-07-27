@@ -113,6 +113,13 @@ func SetLocalAlias(
 		return httputil.LogThenError(req, err)
 	}
 
+	if queryRes.AliasExists {
+		return util.JSONResponse{
+			Code: 409,
+			JSON: jsonerror.Unknown("The alias " + alias + " already exists."),
+		}
+	}
+
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct{}{},

@@ -172,8 +172,19 @@ func (r *RoomserverQueryAPI) SetRoomAlias(
 	request *api.SetRoomAliasRequest,
 	response *api.SetRoomAliasResponse,
 ) error {
+	// Check if the alias isn't already referring to a room
+	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	if err != nil {
+		return err
+	}
+	if len(roomID) > 0 {
+		// If the alias already exists, stop the process
+		response.AliasExists = true
+		return nil
+	}
+	response.AliasExists = false
+
 	// Save the new alias
-	// TODO: Check if alias already exists
 	if err := r.DB.SetRoomAlias(request.Alias, request.RoomID); err != nil {
 		return err
 	}
@@ -183,7 +194,6 @@ func (r *RoomserverQueryAPI) SetRoomAlias(
 		return err
 	}
 
-	// We don't need to return anything in the response, so we don't edit it
 	return nil
 }
 

@@ -111,7 +111,10 @@ type SetRoomAliasRequest struct {
 }
 
 // SetRoomAliasResponse is a response to SetRoomAlias
-type SetRoomAliasResponse struct{}
+type SetRoomAliasResponse struct {
+	// Does the alias already refer to a room?
+	AliasExists bool `json:"alias_exists"`
+}
 
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
