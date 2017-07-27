@@ -128,6 +128,17 @@ type GetAliasRoomIDResponse struct {
 	RoomID string `json:"room_id"`
 }
 
+// RemoveRoomAliasRequest is a request to RemoveRoomAlias
+type RemoveRoomAliasRequest struct {
+	// ID of the user removing the alias
+	UserID string `json:"user_id"`
+	// The room alias to remove
+	Alias string `json:"alias"`
+}
+
+// RemoveRoomAliasResponse is a response to RemoveRoomAlias
+type RemoveRoomAliasResponse struct{}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -159,6 +170,12 @@ type RoomserverQueryAPI interface {
 		request *GetAliasRoomIDRequest,
 		response *GetAliasRoomIDResponse,
 	) error
+
+	// Remove a room alias
+	RemoveRoomAlias(
+		request *RemoveRoomAliasRequest,
+		response *RemoveRoomAliasResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -175,6 +192,9 @@ const RoomserverSetRoomAliasPath = "/api/roomserver/setRoomAlias"
 
 // RoomserverGetAliasRoomIDPath is the HTTP path for the GetAliasRoomID API.
 const RoomserverGetAliasRoomIDPath = "/api/roomserver/getAliasRoomID"
+
+// RoomserverRemoveRoomAliasPath is the HTTP path for the RemoveRoomAlias API.
+const RoomserverRemoveRoomAliasPath = "/api/roomserver/removeRoomAlias"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -232,6 +252,15 @@ func (h *httpRoomserverQueryAPI) GetAliasRoomID(
 	response *GetAliasRoomIDResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverGetAliasRoomIDPath
+	return postJSON(h.httpClient, apiURL, request, response)
+}
+
+// RemoveRoomAlias implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) RemoveRoomAlias(
+	request *RemoveRoomAliasRequest,
+	response *RemoveRoomAliasResponse,
+) error {
+	apiURL := h.roomserverURL + RoomserverRemoveRoomAliasPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 

@@ -120,6 +120,13 @@ func Setup(
 		}),
 	).Methods("PUT", "OPTIONS")
 
+	r0mux.Handle("/directory/room/{roomAlias}",
+		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.RemoveLocalAlias(req, device, vars["roomAlias"], &cfg, queryAPI)
+		}),
+	).Methods("DELETE")
+
 	r0mux.Handle("/logout",
 		common.MakeAuthAPI("logout", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return readers.Logout(req, deviceDB, device)

@@ -212,6 +212,30 @@ func (r *RoomserverQueryAPI) GetAliasRoomID(
 	return nil
 }
 
+// RemoveRoomAlias implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) RemoveRoomAlias(
+	request *api.RemoveRoomAliasRequest,
+	response *api.RemoveRoomAliasResponse,
+) error {
+	// Lookup the room ID in the database
+	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	if err != nil {
+		return err
+	}
+
+	// Remove the dalias from the database
+	if err := r.DB.RemoveRoomAlias(request.Alias); err != nil {
+		return err
+	}
+
+	// Send an updated m.room.aliases event
+	if err := r.sendUpdatedAliasesEvent(request.UserID, roomID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type roomAliasesContent struct {
 	Aliases []string `json:"aliases"`
 }
@@ -387,6 +411,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.GetAliasRoomID(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverRemoveRoomAliasPath,
+		common.MakeAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
+			var request api.RemoveRoomAliasRequest
+			var response api.RemoveRoomAliasResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.RemoveRoomAlias(&request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}

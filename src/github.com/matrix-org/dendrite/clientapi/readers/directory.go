@@ -95,6 +95,7 @@ func DirectoryRoom(
 }
 
 // SetLocalAlias implements PUT /directory/room/{roomAlias}
+// TODO: Check if the user has the power level to set an alias
 func SetLocalAlias(
 	req *http.Request,
 	device *authtypes.Device,
@@ -137,6 +138,30 @@ func SetLocalAlias(
 			Code: 409,
 			JSON: jsonerror.Unknown("The alias " + alias + " already exists."),
 		}
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
+	}
+}
+
+// RemoveLocalAlias implements DELETE /directory/room/{roomAlias}
+// TODO: Check if the user has the power level to remove an alias
+func RemoveLocalAlias(
+	req *http.Request,
+	device *authtypes.Device,
+	alias string,
+	cfg *config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+) util.JSONResponse {
+	queryReq := api.RemoveRoomAliasRequest{
+		Alias:  alias,
+		UserID: device.UserID,
+	}
+	var queryRes api.RemoveRoomAliasResponse
+	if err := queryAPI.RemoveRoomAlias(&queryReq, &queryRes); err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
