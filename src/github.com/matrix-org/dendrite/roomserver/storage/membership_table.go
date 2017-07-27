@@ -57,7 +57,7 @@ const selectMembershipForUpdateSQL = "" +
 	" WHERE room_nid = $1 AND target_nid = $2 FOR UPDATE"
 
 const updateMembershipSQL = "" +
-	"UPDATE membership SET membership_nid = $3, sender_nid = $4" +
+	"UPDATE membership SET sender_nid = $3, membership_nid = $4" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 type membershipStatements struct {
