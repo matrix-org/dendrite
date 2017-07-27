@@ -197,6 +197,21 @@ func (r *RoomserverQueryAPI) SetRoomAlias(
 	return nil
 }
 
+// GetAliasRoomID implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) GetAliasRoomID(
+	request *api.GetAliasRoomIDRequest,
+	response *api.GetAliasRoomIDResponse,
+) error {
+	// Lookup the room ID in the database
+	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	if err != nil {
+		return err
+	}
+
+	response.RoomID = roomID
+	return nil
+}
+
 type roomAliasesContent struct {
 	Aliases []string `json:"aliases"`
 }
@@ -358,6 +373,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.SetRoomAlias(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverGetAliasRoomIDPath,
+		common.MakeAPI("getAliasRoomID", func(req *http.Request) util.JSONResponse {
+			var request api.GetAliasRoomIDRequest
+			var response api.GetAliasRoomIDResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.GetAliasRoomID(&request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}

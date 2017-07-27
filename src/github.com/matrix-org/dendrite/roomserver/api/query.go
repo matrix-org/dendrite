@@ -116,6 +116,18 @@ type SetRoomAliasResponse struct {
 	AliasExists bool `json:"alias_exists"`
 }
 
+// GetAliasRoomIDRequest is a request to GetAliasRoomID
+type GetAliasRoomIDRequest struct {
+	// Alias we want to lookup
+	Alias string `json:"alias"`
+}
+
+// GetAliasRoomIDResponse is a response to GetAliasRoomID
+type GetAliasRoomIDResponse struct {
+	// The room ID the alias refers to
+	RoomID string `json:"room_id"`
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -141,6 +153,12 @@ type RoomserverQueryAPI interface {
 		request *SetRoomAliasRequest,
 		response *SetRoomAliasResponse,
 	) error
+
+	// Get the room ID for an alias
+	GetAliasRoomID(
+		request *GetAliasRoomIDRequest,
+		response *GetAliasRoomIDResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -154,6 +172,9 @@ const RoomserverQueryEventsByIDPath = "/api/roomserver/queryEventsByID"
 
 // RoomserverSetRoomAliasPath is the HTTP path for the SetRoomAlias API.
 const RoomserverSetRoomAliasPath = "/api/roomserver/setRoomAlias"
+
+// RoomserverGetAliasRoomIDPath is the HTTP path for the GetAliasRoomID API.
+const RoomserverGetAliasRoomIDPath = "/api/roomserver/getAliasRoomID"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -202,6 +223,15 @@ func (h *httpRoomserverQueryAPI) SetRoomAlias(
 	response *SetRoomAliasResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
+	return postJSON(h.httpClient, apiURL, request, response)
+}
+
+// GetAliasRoomID implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) GetAliasRoomID(
+	request *GetAliasRoomIDRequest,
+	response *GetAliasRoomIDResponse,
+) error {
+	apiURL := h.roomserverURL + RoomserverGetAliasRoomIDPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 

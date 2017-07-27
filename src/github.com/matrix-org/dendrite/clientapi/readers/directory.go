@@ -15,7 +15,6 @@
 package readers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -39,6 +38,7 @@ func DirectoryRoom(
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
@@ -48,11 +48,30 @@ func DirectoryRoom(
 		}
 	}
 
+	var resp gomatrixserverlib.RespDirectory
+
 	if domain == cfg.Matrix.ServerName {
-		// TODO: Implement lookup up local room aliases.
-		panic(fmt.Errorf("Looking up local room aliases is not implemented"))
+		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
+		var queryRes api.GetAliasRoomIDResponse
+		if err = queryAPI.GetAliasRoomID(&queryReq, &queryRes); err != nil {
+			return httputil.LogThenError(req, err)
+		}
+
+		if len(queryRes.RoomID) > 0 {
+			// TODO: List servers that are aware of this room alias
+			resp = gomatrixserverlib.RespDirectory{
+				RoomID:  queryRes.RoomID,
+				Servers: []gomatrixserverlib.ServerName{},
+			}
+		} else {
+			// If the response doesn't contain a non-empty string, return an error
+			return util.JSONResponse{
+				Code: 404,
+				JSON: jsonerror.NotFound("Room alias " + roomAlias + " not found."),
+			}
+		}
 	} else {
-		resp, err := federation.LookupRoomAlias(domain, roomAlias)
+		resp, err = federation.LookupRoomAlias(domain, roomAlias)
 		if err != nil {
 			switch x := err.(type) {
 			case gomatrix.HTTPError:
@@ -67,11 +86,11 @@ func DirectoryRoom(
 			// TODO: Return 504 if the remote server timed out.
 			return httputil.LogThenError(req, err)
 		}
+	}
 
-		return util.JSONResponse{
-			Code: 200,
-			JSON: resp,
-		}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: resp,
 	}
 }
 
