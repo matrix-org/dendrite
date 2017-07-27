@@ -52,6 +52,7 @@ func main() {
 	log.Info("config: ", cfg)
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
+	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
 
 	roomserverProducer := producers.NewRoomserverProducer(cfg.RoomServerURL())
 	userUpdateProducer, err := producers.NewUserUpdateProducer(
@@ -97,7 +98,8 @@ func main() {
 	log.Info("Starting client API server on ", cfg.Listen.ClientAPI)
 	routing.Setup(
 		http.DefaultServeMux, http.DefaultClient, *cfg, roomserverProducer,
-		queryAPI, accountDB, deviceDB, federation, keyRing, userUpdateProducer,
+		queryAPI, aliasAPI, accountDB, deviceDB, federation, keyRing,
+		userUpdateProducer,
 	)
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.ClientAPI), nil))
 }

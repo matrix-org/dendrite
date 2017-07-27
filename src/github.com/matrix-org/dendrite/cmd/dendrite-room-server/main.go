@@ -23,6 +23,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/alias"
 	"github.com/matrix-org/dendrite/roomserver/input"
 	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -66,13 +67,18 @@ func main() {
 
 	inputAPI.SetupHTTP(http.DefaultServeMux)
 
-	queryAPI := query.RoomserverQueryAPI{
+	queryAPI := query.RoomserverQueryAPI{db}
+
+	queryAPI.SetupHTTP(http.DefaultServeMux)
+
+	aliasAPI := alias.RoomserverAliasAPI{
 		DB:       db,
 		Cfg:      cfg,
 		InputAPI: inputAPI,
+		QueryAPI: queryAPI,
 	}
 
-	queryAPI.SetupHTTP(http.DefaultServeMux)
+	aliasAPI.SetupHTTP(http.DefaultServeMux)
 
 	http.DefaultServeMux.Handle("/metrics", prometheus.Handler())
 

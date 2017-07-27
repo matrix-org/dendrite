@@ -38,7 +38,7 @@ func DirectoryRoom(
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
@@ -53,7 +53,7 @@ func DirectoryRoom(
 	if domain == cfg.Matrix.ServerName {
 		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
 		var queryRes api.GetAliasRoomIDResponse
-		if err = queryAPI.GetAliasRoomID(&queryReq, &queryRes); err != nil {
+		if err = aliasAPI.GetAliasRoomID(&queryReq, &queryRes); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 
@@ -101,7 +101,7 @@ func SetLocalAlias(
 	device *authtypes.Device,
 	alias string,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', alias)
 	if err != nil {
@@ -129,7 +129,7 @@ func SetLocalAlias(
 		Alias:  alias,
 	}
 	var queryRes api.SetRoomAliasResponse
-	if err := queryAPI.SetRoomAlias(&queryReq, &queryRes); err != nil {
+	if err := aliasAPI.SetRoomAlias(&queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -153,14 +153,14 @@ func RemoveLocalAlias(
 	device *authtypes.Device,
 	alias string,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
 	queryReq := api.RemoveRoomAliasRequest{
 		Alias:  alias,
 		UserID: device.UserID,
 	}
 	var queryRes api.RemoveRoomAliasResponse
-	if err := queryAPI.RemoveRoomAlias(&queryReq, &queryRes); err != nil {
+	if err := aliasAPI.RemoveRoomAlias(&queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

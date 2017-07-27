@@ -100,45 +100,6 @@ type QueryEventsByIDResponse struct {
 	Events []gomatrixserverlib.Event `json:"events"`
 }
 
-// SetRoomAliasRequest is a request to SetRoomAlias
-type SetRoomAliasRequest struct {
-	// ID of the user setting the alias
-	UserID string `json:"user_id"`
-	// New alias for the room
-	Alias string `json:"alias"`
-	// The room ID the alias is referring to
-	RoomID string `json:"room_id"`
-}
-
-// SetRoomAliasResponse is a response to SetRoomAlias
-type SetRoomAliasResponse struct {
-	// Does the alias already refer to a room?
-	AliasExists bool `json:"alias_exists"`
-}
-
-// GetAliasRoomIDRequest is a request to GetAliasRoomID
-type GetAliasRoomIDRequest struct {
-	// Alias we want to lookup
-	Alias string `json:"alias"`
-}
-
-// GetAliasRoomIDResponse is a response to GetAliasRoomID
-type GetAliasRoomIDResponse struct {
-	// The room ID the alias refers to
-	RoomID string `json:"room_id"`
-}
-
-// RemoveRoomAliasRequest is a request to RemoveRoomAlias
-type RemoveRoomAliasRequest struct {
-	// ID of the user removing the alias
-	UserID string `json:"user_id"`
-	// The room alias to remove
-	Alias string `json:"alias"`
-}
-
-// RemoveRoomAliasResponse is a response to RemoveRoomAlias
-type RemoveRoomAliasResponse struct{}
-
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -158,24 +119,6 @@ type RoomserverQueryAPI interface {
 		request *QueryEventsByIDRequest,
 		response *QueryEventsByIDResponse,
 	) error
-
-	// Set a room alias
-	SetRoomAlias(
-		request *SetRoomAliasRequest,
-		response *SetRoomAliasResponse,
-	) error
-
-	// Get the room ID for an alias
-	GetAliasRoomID(
-		request *GetAliasRoomIDRequest,
-		response *GetAliasRoomIDResponse,
-	) error
-
-	// Remove a room alias
-	RemoveRoomAlias(
-		request *RemoveRoomAliasRequest,
-		response *RemoveRoomAliasResponse,
-	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -186,15 +129,6 @@ const RoomserverQueryStateAfterEventsPath = "/api/roomserver/queryStateAfterEven
 
 // RoomserverQueryEventsByIDPath is the HTTP path for the QueryEventsByID API.
 const RoomserverQueryEventsByIDPath = "/api/roomserver/queryEventsByID"
-
-// RoomserverSetRoomAliasPath is the HTTP path for the SetRoomAlias API.
-const RoomserverSetRoomAliasPath = "/api/roomserver/setRoomAlias"
-
-// RoomserverGetAliasRoomIDPath is the HTTP path for the GetAliasRoomID API.
-const RoomserverGetAliasRoomIDPath = "/api/roomserver/getAliasRoomID"
-
-// RoomserverRemoveRoomAliasPath is the HTTP path for the RemoveRoomAlias API.
-const RoomserverRemoveRoomAliasPath = "/api/roomserver/removeRoomAlias"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -234,33 +168,6 @@ func (h *httpRoomserverQueryAPI) QueryEventsByID(
 	response *QueryEventsByIDResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
-	return postJSON(h.httpClient, apiURL, request, response)
-}
-
-// SetRoomAlias implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) SetRoomAlias(
-	request *SetRoomAliasRequest,
-	response *SetRoomAliasResponse,
-) error {
-	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
-	return postJSON(h.httpClient, apiURL, request, response)
-}
-
-// GetAliasRoomID implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) GetAliasRoomID(
-	request *GetAliasRoomIDRequest,
-	response *GetAliasRoomIDResponse,
-) error {
-	apiURL := h.roomserverURL + RoomserverGetAliasRoomIDPath
-	return postJSON(h.httpClient, apiURL, request, response)
-}
-
-// RemoveRoomAlias implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) RemoveRoomAlias(
-	request *RemoveRoomAliasRequest,
-	response *RemoveRoomAliasResponse,
-) error {
-	apiURL := h.roomserverURL + RoomserverRemoveRoomAliasPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 
