@@ -32,7 +32,7 @@ import (
 
 var (
 	logDir     = os.Getenv("LOG_DIR")
-	configPath = flag.String("config", "", "The path to the config file. For more information, see the config file in this repository.")
+	configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 )
 
 func main() {
