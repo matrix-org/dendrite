@@ -186,8 +186,8 @@ func (r joinRoomReq) joinRoomUsingServers(
 	if queryRes.RoomExists {
 		// The room exists in the local database, so we just have to send a join
 		// membership event and return the room ID
-		// TODO: Check if the user is allowed in the room (hasn't been banned,
-		// or has been invited if the room is invite-only)
+		// TODO: Check if the user is allowed in the room (has been invited if
+		// the room is invite-only)
 		eb.Depth = queryRes.Depth
 		eb.PrevEvents = queryRes.LatestEvents
 
