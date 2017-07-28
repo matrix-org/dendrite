@@ -27,10 +27,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-type roomID struct {
-	RoomID string `json:"room_id"`
-}
-
 // DirectoryRoom looks up a room alias
 func DirectoryRoom(
 	req *http.Request,
@@ -118,7 +114,9 @@ func SetLocalAlias(
 		}
 	}
 
-	var r roomID
+	var r struct {
+		RoomID string `json:"room_id"`
+	}
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
