@@ -15,13 +15,13 @@
 package readers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -34,6 +34,7 @@ func DirectoryRoom(
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
+	aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
@@ -43,11 +44,30 @@ func DirectoryRoom(
 		}
 	}
 
+	var resp gomatrixserverlib.RespDirectory
+
 	if domain == cfg.Matrix.ServerName {
-		// TODO: Implement lookup up local room aliases.
-		panic(fmt.Errorf("Looking up local room aliases is not implemented"))
+		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
+		var queryRes api.GetAliasRoomIDResponse
+		if err = aliasAPI.GetAliasRoomID(&queryReq, &queryRes); err != nil {
+			return httputil.LogThenError(req, err)
+		}
+
+		if len(queryRes.RoomID) > 0 {
+			// TODO: List servers that are aware of this room alias
+			resp = gomatrixserverlib.RespDirectory{
+				RoomID:  queryRes.RoomID,
+				Servers: []gomatrixserverlib.ServerName{},
+			}
+		} else {
+			// If the response doesn't contain a non-empty string, return an error
+			return util.JSONResponse{
+				Code: 404,
+				JSON: jsonerror.NotFound("Room alias " + roomAlias + " not found."),
+			}
+		}
 	} else {
-		resp, err := federation.LookupRoomAlias(domain, roomAlias)
+		resp, err = federation.LookupRoomAlias(domain, roomAlias)
 		if err != nil {
 			switch x := err.(type) {
 			case gomatrix.HTTPError:
@@ -62,10 +82,88 @@ func DirectoryRoom(
 			// TODO: Return 504 if the remote server timed out.
 			return httputil.LogThenError(req, err)
 		}
+	}
 
+	return util.JSONResponse{
+		Code: 200,
+		JSON: resp,
+	}
+}
+
+// SetLocalAlias implements PUT /directory/room/{roomAlias}
+// TODO: Check if the user has the power level to set an alias
+func SetLocalAlias(
+	req *http.Request,
+	device *authtypes.Device,
+	alias string,
+	cfg *config.Dendrite,
+	aliasAPI api.RoomserverAliasAPI,
+) util.JSONResponse {
+	_, domain, err := gomatrixserverlib.SplitID('#', alias)
+	if err != nil {
 		return util.JSONResponse{
-			Code: 200,
-			JSON: resp,
+			Code: 400,
+			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
+	}
+
+	if domain != cfg.Matrix.ServerName {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("Alias must be on local homeserver"),
+		}
+	}
+
+	var r struct {
+		RoomID string `json:"room_id"`
+	}
+	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
+		return *resErr
+	}
+
+	queryReq := api.SetRoomAliasRequest{
+		UserID: device.UserID,
+		RoomID: r.RoomID,
+		Alias:  alias,
+	}
+	var queryRes api.SetRoomAliasResponse
+	if err := aliasAPI.SetRoomAlias(&queryReq, &queryRes); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if queryRes.AliasExists {
+		return util.JSONResponse{
+			Code: 409,
+			JSON: jsonerror.Unknown("The alias " + alias + " already exists."),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
+	}
+}
+
+// RemoveLocalAlias implements DELETE /directory/room/{roomAlias}
+// TODO: Check if the user has the power level to remove an alias
+func RemoveLocalAlias(
+	req *http.Request,
+	device *authtypes.Device,
+	alias string,
+	cfg *config.Dendrite,
+	aliasAPI api.RoomserverAliasAPI,
+) util.JSONResponse {
+	queryReq := api.RemoveRoomAliasRequest{
+		Alias:  alias,
+		UserID: device.UserID,
+	}
+	var queryRes api.RemoveRoomAliasResponse
+	if err := aliasAPI.RemoveRoomAlias(&queryReq, &queryRes); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
 	}
 }

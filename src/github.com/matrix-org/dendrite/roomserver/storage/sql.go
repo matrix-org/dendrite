@@ -27,6 +27,7 @@ type statements struct {
 	stateSnapshotStatements
 	stateBlockStatements
 	previousEventStatements
+	roomAliasesStatements
 }
 
 func (s *statements) prepare(db *sql.DB) error {
@@ -61,6 +62,10 @@ func (s *statements) prepare(db *sql.DB) error {
 	}
 
 	if err = s.previousEventStatements.prepare(db); err != nil {
+		return err
+	}
+
+	if err = s.roomAliasesStatements.prepare(db); err != nil {
 		return err
 	}
 
