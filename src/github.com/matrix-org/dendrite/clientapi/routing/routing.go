@@ -78,7 +78,7 @@ func Setup(
 		common.MakeAuthAPI("join", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return writers.JoinRoomByIDOrAlias(
-				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, keyRing, accountDB,
+				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, aliasAPI, keyRing, accountDB,
 			)
 		}),
 	)
