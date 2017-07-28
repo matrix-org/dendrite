@@ -42,6 +42,7 @@ func JoinRoomByIDOrAlias(
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
 	queryAPI api.RoomserverQueryAPI,
+	aliasAPI api.RoomserverAliasAPI,
 	keyRing gomatrixserverlib.KeyRing,
 	accountDB *accounts.Database,
 ) util.JSONResponse {
@@ -64,7 +65,7 @@ func JoinRoomByIDOrAlias(
 	content["displayname"] = profile.DisplayName
 	content["avatar_url"] = profile.AvatarURL
 
-	r := joinRoomReq{req, content, device.UserID, cfg, federation, producer, queryAPI, keyRing}
+	r := joinRoomReq{req, content, device.UserID, cfg, federation, producer, queryAPI, aliasAPI, keyRing}
 
 	if strings.HasPrefix(roomIDOrAlias, "!") {
 		return r.joinRoomByID()
@@ -86,6 +87,7 @@ type joinRoomReq struct {
 	federation *gomatrixserverlib.FederationClient
 	producer   *producers.RoomserverProducer
 	queryAPI   api.RoomserverQueryAPI
+	aliasAPI   api.RoomserverAliasAPI
 	keyRing    gomatrixserverlib.KeyRing
 }
 
@@ -111,11 +113,23 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 		}
 	}
 	if domain == r.cfg.Matrix.ServerName {
-		// TODO: Implement joining local room aliases.
-		panic(fmt.Errorf("Joining local room aliases is not implemented"))
-	} else {
-		return r.joinRoomByRemoteAlias(domain, roomAlias)
+		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
+		var queryRes api.GetAliasRoomIDResponse
+		if err = r.aliasAPI.GetAliasRoomID(&queryReq, &queryRes); err != nil {
+			return httputil.LogThenError(r.req, err)
+		}
+
+		if len(queryRes.RoomID) > 0 {
+			return r.joinRoomUsingServers(queryRes.RoomID, []gomatrixserverlib.ServerName{r.cfg.Matrix.ServerName})
+		}
+		// If the response doesn't contain a non-empty string, return an error
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("Room alias " + roomAlias + " not found."),
+		}
 	}
+	// If the room isn't local, use federation to join
+	return r.joinRoomByRemoteAlias(domain, roomAlias)
 }
 
 func (r joinRoomReq) joinRoomByRemoteAlias(
@@ -140,7 +154,7 @@ func (r joinRoomReq) joinRoomByRemoteAlias(
 
 func (r joinRoomReq) writeToBuilder(eb *gomatrixserverlib.EventBuilder, roomID string) {
 	eb.Type = "m.room.member"
-	eb.SetContent(r.content) // TODO: Set avatar_url / displayname
+	eb.SetContent(r.content)
 	eb.SetUnsigned(struct{}{})
 	eb.Sender = r.userID
 	eb.StateKey = &r.userID
@@ -170,9 +184,44 @@ func (r joinRoomReq) joinRoomUsingServers(
 	}
 
 	if queryRes.RoomExists {
-		// TODO: Implement joining rooms that already the server is already in.
-		// This should just fall through to the usual event sending code.
-		panic(fmt.Errorf("Joining rooms that the server already in is not implemented"))
+		// The room exists in the local database, so we just have to send a join
+		// membership event and return the room ID
+		// TODO: Check if the user is allowed in the room (hasn't been banned,
+		// or has been invited if the room is invite-only)
+		eb.Depth = queryRes.Depth
+		eb.PrevEvents = queryRes.LatestEvents
+
+		authEvents := gomatrixserverlib.NewAuthEvents(nil)
+
+		for i := range queryRes.StateEvents {
+			authEvents.AddEvent(&queryRes.StateEvents[i])
+		}
+
+		refs, err := needed.AuthEventReferences(&authEvents)
+		if err != nil {
+			return httputil.LogThenError(r.req, err)
+		}
+		eb.AuthEvents = refs
+
+		now := time.Now()
+		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
+		event, err := eb.Build(
+			eventID, now, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
+		)
+		if err != nil {
+			return httputil.LogThenError(r.req, err)
+		}
+
+		if err := r.producer.SendEvents([]gomatrixserverlib.Event{event}, r.cfg.Matrix.ServerName); err != nil {
+			return httputil.LogThenError(r.req, err)
+		}
+
+		return util.JSONResponse{
+			Code: 200,
+			JSON: struct {
+				RoomID string `json:"room_id"`
+			}{roomID},
+		}
 	}
 
 	if len(servers) == 0 {
