@@ -78,14 +78,14 @@ func main() {
 		log.Panicf("startup: failed to create room server consumer: %s", err)
 	}
 	if err = roomConsumer.Start(); err != nil {
-		log.Panicf("startup: failed to start room server consumer")
+		log.Panicf("startup: failed to start room server consumer: %s", err)
 	}
 	clientConsumer, err := consumers.NewOutputClientData(cfg, n, db)
 	if err != nil {
 		log.Panicf("startup: failed to create client API server consumer: %s", err)
 	}
 	if err = clientConsumer.Start(); err != nil {
-		log.Panicf("startup: failed to start client API server consumer")
+		log.Panicf("startup: failed to start client API server consumer: %s", err)
 	}
 
 	log.Info("Starting sync server on ", cfg.Listen.SyncAPI)
