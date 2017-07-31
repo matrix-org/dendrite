@@ -300,6 +300,7 @@ func (config *Dendrite) check() error {
 
 	checkNotZero("kafka.addresses", int64(len(config.Kafka.Addresses)))
 	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
+	checkNotEmpty("kafka.topics.output_client_data", string(config.Kafka.Topics.OutputClientData))
 	checkNotEmpty("database.account", string(config.Database.Account))
 	checkNotEmpty("database.device", string(config.Database.Device))
 	checkNotEmpty("database.server_key", string(config.Database.ServerKey))
