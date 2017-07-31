@@ -54,7 +54,7 @@ var (
 )
 
 const inputTopic = "syncserverInput"
-const clientTopic = "clientapiOutput"
+const clientTopic = "clientapiserverOutput"
 
 var exe = test.KafkaExecutor{
 	ZookeeperURI:   zookeeperURI,
