@@ -123,14 +123,15 @@ func (rp *RequestPool) appendAccountData(
 		return nil, err
 	}
 
-	global, rooms, err := rp.accountDB.GetAccountData(localpart)
-	if err != nil {
-		return nil, err
-	}
-
 	if req.since == types.StreamPosition(0) {
 		// If this is the initial sync, we don't need to check if a data has
-		// already been sent
+		// already been sent. Instead, we send the whole batch.
+		var global []gomatrixserverlib.ClientEvent
+		var rooms map[string][]gomatrixserverlib.ClientEvent
+		global, rooms, err = rp.accountDB.GetAccountData(localpart)
+		if err != nil {
+			return nil, err
+		}
 		data.AccountData.Events = global
 
 		for r, j := range data.Rooms.Join {
