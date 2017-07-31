@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS account_data_type (
     -- We don't want two entries of the same type for the same user
     CONSTRAINT account_data_unique UNIQUE (user_id, room_id, type)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS account_data_id_idx ON account_data(id);
 `
 
 const insertAccountDataSQL = "" +
