@@ -61,6 +61,12 @@ func main() {
 	if err != nil {
 		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.Kafka.Addresses, err)
 	}
+	syncProducer, err := producers.NewSyncAPIProducer(
+		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.OutputClientData),
+	)
+	if err != nil {
+		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.Kafka.Addresses, err)
+	}
 
 	federation := gomatrixserverlib.NewFederationClient(
 		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
@@ -99,7 +105,7 @@ func main() {
 	routing.Setup(
 		http.DefaultServeMux, http.DefaultClient, *cfg, roomserverProducer,
 		queryAPI, aliasAPI, accountDB, deviceDB, federation, keyRing,
-		userUpdateProducer,
+		userUpdateProducer, syncProducer,
 	)
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.ClientAPI), nil))
 }

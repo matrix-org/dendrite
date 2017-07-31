@@ -224,6 +224,14 @@ func (d *Database) GetAccountData(localpart string) (
 	return d.accountDatas.selectAccountData(localpart)
 }
 
+// GetAccountDataByType returns account data matching a given
+// localpart, room ID and type.
+// If no account data could be found, returns an empty array
+// Returns an error if there was an issue with the retrieval
+func (d *Database) GetAccountDataByType(localpart string, roomID string, dataType string) (data []gomatrixserverlib.ClientEvent, err error) {
+	return d.accountDatas.selectAccountDataByType(localpart, roomID, dataType)
+}
+
 func hashPassword(plaintext string) (hash string, err error) {
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcrypt.DefaultCost)
 	return string(hashBytes), err

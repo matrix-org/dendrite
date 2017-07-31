@@ -123,7 +123,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	stream := n.fetchUserStream(bob, true)
 	waitForBlocking(stream, 1)
 
-	n.OnNewEvent(&randomMessageEvent, streamPositionAfter)
+	n.OnNewEvent(&randomMessageEvent, "", streamPositionAfter)
 
 	wg.Wait()
 }
@@ -151,7 +151,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 	stream := n.fetchUserStream(bob, true)
 	waitForBlocking(stream, 1)
 
-	n.OnNewEvent(&aliceInviteBobEvent, streamPositionAfter)
+	n.OnNewEvent(&aliceInviteBobEvent, "", streamPositionAfter)
 
 	wg.Wait()
 }
@@ -182,7 +182,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	stream := n.fetchUserStream(bob, true)
 	waitForBlocking(stream, 3)
 
-	n.OnNewEvent(&randomMessageEvent, streamPositionAfter)
+	n.OnNewEvent(&randomMessageEvent, "", streamPositionAfter)
 
 	wg.Wait()
 
@@ -217,7 +217,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	}()
 	bobStream := n.fetchUserStream(bob, true)
 	waitForBlocking(bobStream, 1)
-	n.OnNewEvent(&bobLeaveEvent, streamPositionAfter)
+	n.OnNewEvent(&bobLeaveEvent, "", streamPositionAfter)
 	leaveWG.Wait()
 
 	// send an event into the room. Make sure alice gets it. Bob should not.
@@ -246,7 +246,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	waitForBlocking(aliceStream, 1)
 	waitForBlocking(bobStream, 1)
 
-	n.OnNewEvent(&randomMessageEvent, streamPositionAfter2)
+	n.OnNewEvent(&randomMessageEvent, "", streamPositionAfter2)
 	aliceWG.Wait()
 
 	// it's possible that at this point alice has been informed and bob is about to be informed, so wait

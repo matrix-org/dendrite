@@ -44,12 +44,16 @@ const insertAccountDataSQL = `
 const selectAccountDataSQL = "" +
 	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
 
+const selectAccountDataByTypeSQL = "" +
+	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
+
 const deleteAccountDataSQL = "" +
 	"DELETE FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
 
 type accountDataStatements struct {
-	insertAccountDataStmt *sql.Stmt
-	selectAccountDataStmt *sql.Stmt
+	insertAccountDataStmt       *sql.Stmt
+	selectAccountDataStmt       *sql.Stmt
+	selectAccountDataByTypeStmt *sql.Stmt
 }
 
 func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
@@ -61,6 +65,9 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectAccountDataStmt, err = db.Prepare(selectAccountDataSQL); err != nil {
+		return
+	}
+	if s.selectAccountDataByTypeStmt, err = db.Prepare(selectAccountDataByTypeSQL); err != nil {
 		return
 	}
 	return
@@ -103,6 +110,34 @@ func (s *accountDataStatements) selectAccountData(localpart string) (
 		} else {
 			global = append(global, ac)
 		}
+	}
+
+	return
+}
+
+func (s *accountDataStatements) selectAccountDataByType(
+	localpart string, roomID string, dataType string,
+) (data []gomatrixserverlib.ClientEvent, err error) {
+	data = []gomatrixserverlib.ClientEvent{}
+
+	rows, err := s.selectAccountDataByTypeStmt.Query(localpart, roomID, dataType)
+	if err != nil {
+		return
+	}
+
+	for rows.Next() {
+		var content []byte
+
+		if err = rows.Scan(&content); err != nil {
+			return
+		}
+
+		ac := gomatrixserverlib.ClientEvent{
+			Type:    dataType,
+			Content: content,
+		}
+
+		data = append(data, ac)
 	}
 
 	return

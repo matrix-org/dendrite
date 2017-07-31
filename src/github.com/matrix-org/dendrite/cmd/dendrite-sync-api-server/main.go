@@ -73,12 +73,19 @@ func main() {
 	if err = n.Load(db); err != nil {
 		log.Panicf("startup: failed to set up notifier: %s", err)
 	}
-	consumer, err := consumers.NewOutputRoomEvent(cfg, n, db)
+	roomConsumer, err := consumers.NewOutputRoomEvent(cfg, n, db)
 	if err != nil {
 		log.Panicf("startup: failed to create room server consumer: %s", err)
 	}
-	if err = consumer.Start(); err != nil {
+	if err = roomConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer")
+	}
+	clientConsumer, err := consumers.NewOutputClientData(cfg, n, db)
+	if err != nil {
+		log.Panicf("startup: failed to create client API server consumer: %s", err)
+	}
+	if err = clientConsumer.Start(); err != nil {
+		log.Panicf("startup: failed to start client API server consumer")
 	}
 
 	log.Info("Starting sync server on ", cfg.Listen.SyncAPI)

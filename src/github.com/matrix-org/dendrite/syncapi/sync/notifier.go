@@ -54,39 +54,44 @@ func NewNotifier(pos types.StreamPosition) *Notifier {
 // OnNewEvent is called when a new event is received from the room server. Must only be
 // called from a single goroutine, to avoid races between updates which could set the
 // current position in the stream incorrectly.
-func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, pos types.StreamPosition) {
+// Can be called either with a *gomatrixserverlib.Event, or with an user ID
+func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos types.StreamPosition) {
 	// update the current position then notify relevant /sync streams.
 	// This needs to be done PRIOR to waking up users as they will read this value.
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 	n.currPos = pos
 
-	// Map this event's room_id to a list of joined users, and wake them up.
-	userIDs := n.joinedUsers(ev.RoomID())
-	// If this is an invite, also add in the invitee to this list.
-	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
-		userID := *ev.StateKey()
-		membership, err := ev.Membership()
-		if err != nil {
-			log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
-				"Notifier.OnNewEvent: Failed to unmarshal member event",
-			)
-		} else {
-			// Keep the joined user map up-to-date
-			switch membership {
-			case "invite":
-				userIDs = append(userIDs, userID)
-			case "join":
-				n.addJoinedUser(ev.RoomID(), userID)
-			case "leave":
-				fallthrough
-			case "ban":
-				n.removeJoinedUser(ev.RoomID(), userID)
+	if ev != nil {
+		// Map this event's room_id to a list of joined users, and wake them up.
+		userIDs := n.joinedUsers(ev.RoomID())
+		// If this is an invite, also add in the invitee to this list.
+		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
+			userID := *ev.StateKey()
+			membership, err := ev.Membership()
+			if err != nil {
+				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+					"Notifier.OnNewEvent: Failed to unmarshal member event",
+				)
+			} else {
+				// Keep the joined user map up-to-date
+				switch membership {
+				case "invite":
+					userIDs = append(userIDs, userID)
+				case "join":
+					n.addJoinedUser(ev.RoomID(), userID)
+				case "leave":
+					fallthrough
+				case "ban":
+					n.removeJoinedUser(ev.RoomID(), userID)
+				}
 			}
 		}
-	}
 
-	for _, userID := range userIDs {
+		for _, userID := range userIDs {
+			n.wakeupUser(userID, pos)
+		}
+	} else if len(userID) > 0 {
 		n.wakeupUser(userID, pos)
 	}
 }

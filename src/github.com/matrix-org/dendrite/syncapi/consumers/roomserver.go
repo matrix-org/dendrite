@@ -133,7 +133,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&ev, types.StreamPosition(syncStreamPos))
+	s.notifier.OnNewEvent(&ev, "", types.StreamPosition(syncStreamPos))
 
 	return nil
 }

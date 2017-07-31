@@ -98,6 +98,8 @@ type Dendrite struct {
 		Topics struct {
 			// Topic for roomserver/api.OutputRoomEvent events.
 			OutputRoomEvent Topic `yaml:"output_room_event"`
+			// Topic for sending account data from client API to sync API
+			OutputClientData Topic `yaml:"output_client_data"`
 			// Topic for user updates (profile, presence)
 			UserUpdates Topic `yaml:"user_updates"`
 		}
