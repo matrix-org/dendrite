@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS account_data_type (
     CONSTRAINT account_data_unique UNIQUE (user_id, room_id, type)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS account_data_id_idx ON account_data(id);
+CREATE UNIQUE INDEX IF NOT EXISTS account_data_id_idx ON account_data_type(id);
 `
 
 const insertAccountDataSQL = "" +
