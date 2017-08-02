@@ -27,12 +27,12 @@ CREATE TABLE IF NOT EXISTS account_data_type (
     id BIGINT,
     -- ID of the user the data belongs to
     user_id TEXT NOT NULL,
-	-- ID of the room the data is related to (empty string if not related to a specific room)
-	room_id TEXT NOT NULL,
+    -- ID of the room the data is related to (empty string if not related to a specific room)
+    room_id TEXT NOT NULL,
     -- Type of the data
     type TEXT NOT NULL,
 
-	PRIMARY KEY(user_id, room_id, type),
+    PRIMARY KEY(user_id, room_id, type),
 
     -- We don't want two entries of the same type for the same user
     CONSTRAINT account_data_unique UNIQUE (user_id, room_id, type)
