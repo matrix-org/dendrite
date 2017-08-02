@@ -15,9 +15,7 @@
 package readers
 
 import (
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -284,18 +282,12 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		if err := events.FillBuilder(&builder, queryAPI, nil); err != nil {
-			return nil, err
-		}
-
-		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-		now := time.Now()
-		event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+		event, err := events.BuildEvent(&builder, *cfg, queryAPI, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		evs = append(evs, event)
+		evs = append(evs, *event)
 	}
 
 	return evs, nil

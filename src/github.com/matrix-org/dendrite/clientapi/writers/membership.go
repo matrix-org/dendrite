@@ -15,9 +15,7 @@
 package writers
 
 import (
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -77,7 +75,8 @@ func SendMembership(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err = events.FillBuilder(&builder, queryAPI, nil); err == events.ErrRoomNoExists {
+	event, err := events.BuildEvent(&builder, cfg, queryAPI, nil)
+	if err == events.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(err.Error()),
@@ -86,14 +85,7 @@ func SendMembership(
 		return httputil.LogThenError(req, err)
 	}
 
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	now := time.Now()
-	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	if err := producer.SendEvents([]gomatrixserverlib.Event{event}, cfg.Matrix.ServerName); err != nil {
+	if err := producer.SendEvents([]gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

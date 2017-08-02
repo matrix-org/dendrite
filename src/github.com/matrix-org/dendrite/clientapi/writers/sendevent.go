@@ -17,9 +17,6 @@ package writers
 import (
 	"net/http"
 
-	"fmt"
-	"time"
-
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -66,20 +63,13 @@ func SendEvent(
 	builder.SetContent(r)
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	if err := events.FillBuilder(&builder, queryAPI, &queryRes); err == events.ErrRoomNoExists {
+	e, err := events.BuildEvent(&builder, cfg, queryAPI, &queryRes)
+	if err == events.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	e, err := builder.Build(
-		eventID, time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
-	)
-	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -89,7 +79,7 @@ func SendEvent(
 		stateEvents[i] = &queryRes.StateEvents[i]
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(e, &provider); err != nil {
+	if err = gomatrixserverlib.Allowed(*e, &provider); err != nil {
 		return util.JSONResponse{
 			Code: 403,
 			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
@@ -97,7 +87,7 @@ func SendEvent(
 	}
 
 	// pass the new event to the roomserver
-	if err := producer.SendEvents([]gomatrixserverlib.Event{e}, cfg.Matrix.ServerName); err != nil {
+	if err := producer.SendEvents([]gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

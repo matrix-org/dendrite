@@ -16,28 +16,33 @@ package events
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
 // doesn't exist
 var ErrRoomNoExists = errors.New("Room does not exist")
 
-// FillBuilder fills the PrevEvents, AuthEvents and Depth fields of an event builder
-// using the roomserver query API client provided. Also fills roomserver query API
-// response (if provided) in case the function calling FillBuilder needs to use it.
+// BuildEvent builds a Matrix event using the event builder and roomserver query
+// API client provided. If also fills roomserver query API response (if provided)
+// in case the function calling FillBuilder needs to use it.
 // Returns ErrRoomNoExists if the state of the room could not be retrieved because
 // the room doesn't exist
 // Returns an error if something else went wrong
-func FillBuilder(
-	builder *gomatrixserverlib.EventBuilder, queryAPI api.RoomserverQueryAPI,
-	queryRes *api.QueryLatestEventsAndStateResponse,
-) error {
+func BuildEvent(
+	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
+) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Ask the roomserver for information about this room
@@ -49,11 +54,11 @@ func FillBuilder(
 		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
 	if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, queryRes); queryErr != nil {
-		return err
+		return nil, err
 	}
 
 	if !queryRes.RoomExists {
-		return ErrRoomNoExists
+		return nil, ErrRoomNoExists
 	}
 
 	builder.Depth = queryRes.Depth
@@ -67,9 +72,16 @@ func FillBuilder(
 
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	builder.AuthEvents = refs
 
-	return nil
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	now := time.Now()
+	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
 }
