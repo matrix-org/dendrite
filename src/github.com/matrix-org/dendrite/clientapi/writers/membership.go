@@ -68,7 +68,7 @@ func SendMembership(
 
 	content := events.MemberContent{
 		Membership:  membership,
-		DisplayName: profile.AvatarURL,
+		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
 		Reason:      reason,
 	}
