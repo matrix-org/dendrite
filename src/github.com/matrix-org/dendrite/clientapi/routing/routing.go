@@ -48,6 +48,7 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.KeyRing,
 	userUpdateProducer *producers.UserUpdateProducer,
+	syncProducer *producers.SyncAPIProducer,
 ) {
 	apiMux := mux.NewRouter()
 
@@ -291,14 +292,14 @@ func Setup(
 	r0mux.Handle("/user/{userID}/account_data/{type}",
 		common.MakeAuthAPI("user_account_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.SaveAccountData(req, accountDB, device, vars["userID"], "", vars["type"])
+			return readers.SaveAccountData(req, accountDB, device, vars["userID"], "", vars["type"], syncProducer)
 		}),
 	)
 
 	r0mux.Handle("/user/{userID}/rooms/{roomID}/account_data/{type}",
 		common.MakeAuthAPI("user_account_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.SaveAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"])
+			return readers.SaveAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
 		}),
 	)
 

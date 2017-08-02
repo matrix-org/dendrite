@@ -80,7 +80,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		if err != nil {
 			res = httputil.LogThenError(req, err)
 		} else {
-			syncData, err = rp.appendAccountData(syncData, device.UserID)
+			syncData, err = rp.appendAccountData(syncData, device.UserID, *syncReq, currentPos)
 			if err != nil {
 				res = httputil.LogThenError(req, err)
 			} else {
@@ -113,7 +113,9 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.Stre
 	return rp.db.IncrementalSync(req.userID, req.since, currentPos, req.limit)
 }
 
-func (rp *RequestPool) appendAccountData(data *types.Response, userID string) (*types.Response, error) {
+func (rp *RequestPool) appendAccountData(
+	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
+) (*types.Response, error) {
 	// TODO: We currently send all account data on every sync response, we should instead send data
 	// that has changed on incremental sync responses
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
@@ -121,16 +123,56 @@ func (rp *RequestPool) appendAccountData(data *types.Response, userID string) (*
 		return nil, err
 	}
 
-	global, rooms, err := rp.accountDB.GetAccountData(localpart)
+	if req.since == types.StreamPosition(0) {
+		// If this is the initial sync, we don't need to check if a data has
+		// already been sent. Instead, we send the whole batch.
+		var global []gomatrixserverlib.ClientEvent
+		var rooms map[string][]gomatrixserverlib.ClientEvent
+		global, rooms, err = rp.accountDB.GetAccountData(localpart)
+		if err != nil {
+			return nil, err
+		}
+		data.AccountData.Events = global
+
+		for r, j := range data.Rooms.Join {
+			if len(rooms[r]) > 0 {
+				j.AccountData.Events = rooms[r]
+				data.Rooms.Join[r] = j
+			}
+		}
+
+		return data, nil
+	}
+
+	// Sync is not initial, get all account data since the latest sync
+	dataTypes, err := rp.db.GetAccountDataInRange(userID, req.since, currentPos)
 	if err != nil {
 		return nil, err
 	}
-	data.AccountData.Events = global
 
-	for r, j := range data.Rooms.Join {
-		if len(rooms[r]) > 0 {
-			j.AccountData.Events = rooms[r]
-			data.Rooms.Join[r] = j
+	if len(dataTypes) == 0 {
+		return data, nil
+	}
+
+	// Iterate over the rooms
+	for roomID, dataTypes := range dataTypes {
+		events := []gomatrixserverlib.ClientEvent{}
+		// Request the missing data from the database
+		for _, dataType := range dataTypes {
+			evs, err := rp.accountDB.GetAccountDataByType(localpart, roomID, dataType)
+			if err != nil {
+				return nil, err
+			}
+			events = append(events, evs...)
+		}
+
+		// Append the data to the response
+		if len(roomID) > 0 {
+			jr := data.Rooms.Join[roomID]
+			jr.AccountData.Events = events
+			data.Rooms.Join[roomID] = jr
+		} else {
+			data.AccountData.Events = events
 		}
 	}
 
