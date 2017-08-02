@@ -106,7 +106,7 @@ func SendMembership(
 func getMembershipStateKey(
 	req *http.Request, device *authtypes.Device, membership string,
 ) (stateKey string, reason string, response *util.JSONResponse) {
-	if membership == "ban" || membership == "unban" || membership == "kick" {
+	if membership == "ban" || membership == "unban" || membership == "kick" || membership == "invite" {
 		// If we're in this case, the state key is contained in the request body,
 		// possibly along with a reason (for "kick" and "ban") so we need to parse
 		// it
