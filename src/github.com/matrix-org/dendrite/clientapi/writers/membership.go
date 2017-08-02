@@ -95,6 +95,11 @@ func SendMembership(
 	}
 }
 
+// getMembershipStateKey extracts the target user ID of a membership change.
+// For "join" and "leave" this will be the ID of the user making the change.
+// For "ban", "unban", "kick" and "invite" the target user ID will be in the JSON request body.
+// In the latter case, if there was an issue retrieving the user ID from the request body,
+// returns a JSONResponse with a corresponding error code and message.
 func getMembershipStateKey(
 	req *http.Request, device *authtypes.Device, membership string,
 ) (stateKey string, reason string, response *util.JSONResponse) {
