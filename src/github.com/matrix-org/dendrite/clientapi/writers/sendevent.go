@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -64,36 +65,16 @@ func SendEvent(
 	}
 	builder.SetContent(r)
 
-	// work out what will be required in order to send this event
-	needed, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	// Ask the roomserver for information about this room
-	queryReq := api.QueryLatestEventsAndStateRequest{
-		RoomID:       roomID,
-		StateToFetch: needed.Tuples(),
-	}
 	var queryRes api.QueryLatestEventsAndStateResponse
-	if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); queryErr != nil {
-		return httputil.LogThenError(req, queryErr)
-	}
-	if !queryRes.RoomExists {
+	if err := events.FillBuilder(&builder, queryAPI, &queryRes); err == events.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
+	} else if err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
-	// set the fields we previously couldn't do and build the event
-	builder.PrevEvents = queryRes.LatestEvents // the current events will be the prev events of the new event
-	var refs []gomatrixserverlib.EventReference
-	for _, e := range queryRes.StateEvents {
-		refs = append(refs, e.EventReference())
-	}
-	builder.AuthEvents = refs
-	builder.Depth = queryRes.Depth
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	e, err := builder.Build(
 		eventID, time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,

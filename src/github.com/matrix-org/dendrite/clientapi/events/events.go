@@ -26,12 +26,14 @@ import (
 var ErrRoomNoExists = errors.New("Room does not exist")
 
 // FillBuilder fills the PrevEvents, AuthEvents and Depth fields of an event builder
-// using the roomserver query API client provided
+// using the roomserver query API client provided. Also fills roomserver query API
+// response (if provided) in case the function calling FillBuilder needs to use it.
 // Returns ErrRoomNoExists if the state of the room could not be retrieved because
 // the room doesn't exist
 // Returns an error if something else went wrong
 func FillBuilder(
 	builder *gomatrixserverlib.EventBuilder, queryAPI api.RoomserverQueryAPI,
+	queryRes *api.QueryLatestEventsAndStateResponse,
 ) error {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -43,8 +45,10 @@ func FillBuilder(
 		RoomID:       builder.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),
 	}
-	var queryRes api.QueryLatestEventsAndStateResponse
-	if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); queryErr != nil {
+	if queryRes == nil {
+		queryRes = &api.QueryLatestEventsAndStateResponse{}
+	}
+	if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, queryRes); queryErr != nil {
 		return err
 	}
 

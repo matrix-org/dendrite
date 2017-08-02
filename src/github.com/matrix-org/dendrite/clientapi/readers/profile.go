@@ -284,35 +284,9 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
-		if err != nil {
+		if err := events.FillBuilder(&builder, queryAPI, nil); err != nil {
 			return nil, err
 		}
-
-		// Ask the roomserver for information about this room
-		queryReq := api.QueryLatestEventsAndStateRequest{
-			RoomID:       membership.RoomID,
-			StateToFetch: eventsNeeded.Tuples(),
-		}
-		var queryRes api.QueryLatestEventsAndStateResponse
-		if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); queryErr != nil {
-			return nil, err
-		}
-
-		builder.Depth = queryRes.Depth
-		builder.PrevEvents = queryRes.LatestEvents
-
-		authEvents := gomatrixserverlib.NewAuthEvents(nil)
-
-		for i := range queryRes.StateEvents {
-			authEvents.AddEvent(&queryRes.StateEvents[i])
-		}
-
-		refs, err := eventsNeeded.AuthEventReferences(&authEvents)
-		if err != nil {
-			return nil, err
-		}
-		builder.AuthEvents = refs
 
 		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 		now := time.Now()

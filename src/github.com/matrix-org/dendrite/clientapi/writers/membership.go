@@ -77,7 +77,7 @@ func SendMembership(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err = events.FillBuilder(&builder, queryAPI); err == events.ErrRoomNoExists {
+	if err = events.FillBuilder(&builder, queryAPI, nil); err == events.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(err.Error()),
