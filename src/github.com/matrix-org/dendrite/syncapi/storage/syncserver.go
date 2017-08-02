@@ -41,10 +41,11 @@ type streamEvent struct {
 
 // SyncServerDatabase represents a sync server database
 type SyncServerDatabase struct {
-	db         *sql.DB
-	partitions common.PartitionOffsetStatements
-	events     outputRoomEventsStatements
-	roomstate  currentRoomStateStatements
+	db          *sql.DB
+	partitions  common.PartitionOffsetStatements
+	accountData accountDataStatements
+	events      outputRoomEventsStatements
+	roomstate   currentRoomStateStatements
 }
 
 // NewSyncServerDatabase creates a new sync server database
@@ -58,6 +59,10 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 	if err = partitions.Prepare(db); err != nil {
 		return nil, err
 	}
+	accountData := accountDataStatements{}
+	if err = accountData.prepare(db); err != nil {
+		return nil, err
+	}
 	events := outputRoomEventsStatements{}
 	if err = events.prepare(db); err != nil {
 		return nil, err
@@ -66,7 +71,7 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 	if err := state.prepare(db); err != nil {
 		return nil, err
 	}
-	return &SyncServerDatabase{db, partitions, events, state}, nil
+	return &SyncServerDatabase{db, partitions, accountData, events, state}, nil
 }
 
 // AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
@@ -139,6 +144,13 @@ func (d *SyncServerDatabase) updateRoomState(
 	}
 
 	return nil
+}
+
+// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
+// If no event could be found, returns nil
+// If there was an issue during the retrieval, returns an error
+func (d *SyncServerDatabase) GetStateEvent(evType string, roomID string, stateKey string) (*gomatrixserverlib.Event, error) {
+	return d.roomstate.selectStateEvent(evType, roomID, stateKey)
 }
 
 // PartitionOffsets implements common.PartitionStorer
@@ -265,6 +277,33 @@ func (d *SyncServerDatabase) CompleteSync(userID string, numRecentEventsPerRoom 
 		return d.addInvitesToResponse(txn, userID, res)
 	})
 	return
+}
+
+// GetAccountDataInRange returns all account data for a given user inserted or
+// updated between two given positions
+// Returns a map following the format data[roomID] = []dataTypes
+// If no data is retrieved, returns an empty map
+// If there was an issue with the retrieval, returns an error
+func (d *SyncServerDatabase) GetAccountDataInRange(
+	userID string, oldPos types.StreamPosition, newPos types.StreamPosition,
+) (map[string][]string, error) {
+	return d.accountData.selectAccountDataInRange(userID, oldPos, newPos)
+}
+
+// UpsertAccountData keeps track of new or updated account data, by saving the type
+// of the new/updated data, and the user ID and room ID the data is related to (empty)
+// room ID means the data isn't specific to any room)
+// If no data with the given type, user ID and room ID exists in the database,
+// creates a new row, else update the existing one
+// Returns an error if there was an issue with the upsert
+func (d *SyncServerDatabase) UpsertAccountData(userID string, roomID string, dataType string) (types.StreamPosition, error) {
+	pos, err := d.SyncStreamPosition()
+	if err != nil {
+		return pos, err
+	}
+
+	err = d.accountData.insertAccountData(pos, userID, roomID, dataType)
+	return pos, err
 }
 
 func (d *SyncServerDatabase) addInvitesToResponse(txn *sql.Tx, userID string, res *types.Response) error {

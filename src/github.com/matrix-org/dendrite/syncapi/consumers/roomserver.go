@@ -37,6 +37,12 @@ type OutputRoomEvent struct {
 	query              api.RoomserverQueryAPI
 }
 
+type prevEventRef struct {
+	PrevContent json.RawMessage `json:"prev_content"`
+	PrevID      string          `json:"replaces_state"`
+	UserID      string          `json:"prev_sender"`
+}
+
 // NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEvent(cfg *config.Dendrite, n *sync.Notifier, store *storage.SyncServerDatabase) (*OutputRoomEvent, error) {
 	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
@@ -101,6 +107,18 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: state event lookup failure")
 	}
 
+	ev, err = s.updateStateEvent(ev)
+	if err != nil {
+		return err
+	}
+
+	for i := range addsStateEvents {
+		addsStateEvents[i], err = s.updateStateEvent(addsStateEvents[i])
+		if err != nil {
+			return err
+		}
+	}
+
 	syncStreamPos, err := s.db.WriteEvent(
 		&ev, addsStateEvents, output.NewRoomEvent.AddsStateEventIDs, output.NewRoomEvent.RemovesStateEventIDs,
 	)
@@ -115,7 +133,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&ev, types.StreamPosition(syncStreamPos))
+	s.notifier.OnNewEvent(&ev, "", types.StreamPosition(syncStreamPos))
 
 	return nil
 }
@@ -175,6 +193,32 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	}
 
 	return result, nil
+}
+
+func (s *OutputRoomEvent) updateStateEvent(event gomatrixserverlib.Event) (gomatrixserverlib.Event, error) {
+	var stateKey string
+	if event.StateKey() == nil {
+		stateKey = ""
+	} else {
+		stateKey = *event.StateKey()
+	}
+
+	prevEvent, err := s.db.GetStateEvent(event.Type(), event.RoomID(), stateKey)
+	if err != nil {
+		return event, err
+	}
+
+	if prevEvent == nil {
+		return event, nil
+	}
+
+	prev := prevEventRef{
+		PrevContent: prevEvent.Content(),
+		PrevID:      prevEvent.EventID(),
+		UserID:      prevEvent.Sender(),
+	}
+
+	return event.SetUnsigned(prev)
 }
 
 func missingEventsFrom(events []gomatrixserverlib.Event, required []string) []string {

@@ -98,6 +98,8 @@ type Dendrite struct {
 		Topics struct {
 			// Topic for roomserver/api.OutputRoomEvent events.
 			OutputRoomEvent Topic `yaml:"output_room_event"`
+			// Topic for sending account data from client API to sync API
+			OutputClientData Topic `yaml:"output_client_data"`
 			// Topic for user updates (profile, presence)
 			UserUpdates Topic `yaml:"user_updates"`
 		}
@@ -298,6 +300,7 @@ func (config *Dendrite) check() error {
 
 	checkNotZero("kafka.addresses", int64(len(config.Kafka.Addresses)))
 	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
+	checkNotEmpty("kafka.topics.output_client_data", string(config.Kafka.Topics.OutputClientData))
 	checkNotEmpty("database.account", string(config.Database.Account))
 	checkNotEmpty("database.device", string(config.Database.Device))
 	checkNotEmpty("database.server_key", string(config.Database.ServerKey))

@@ -44,6 +44,7 @@ kafka:
   topics:
     input_room_event: input.room
     output_room_event: output.room
+    output_client_data: output.client
 database:
   media_api: "postgresql:///media_api"
   account: "postgresql:///account"

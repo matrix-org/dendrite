@@ -17,12 +17,17 @@ package readers
 import (
 	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
 )
@@ -50,7 +55,11 @@ func GetProfile(
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -69,7 +78,11 @@ func GetProfile(
 func GetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -85,9 +98,19 @@ func GetAvatarURL(
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
-	req *http.Request, accountDB *accounts.Database, userID string,
-	producer *producers.UserUpdateProducer,
+	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
+	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
+	if userID != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("userID does not match the current user"),
+		}
+	}
+
+	changedKey := "avatar_url"
+
 	var r avatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
@@ -99,18 +122,41 @@ func SetAvatarURL(
 		}
 	}
 
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	oldProfile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
+	if err = accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := producer.SendUpdate(userID, "avatar_url", oldProfile.AvatarURL, r.AvatarURL); err != nil {
+	memberships, err := accountDB.GetMembershipsByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	newProfile := authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: oldProfile.DisplayName,
+		AvatarURL:   r.AvatarURL,
+	}
+
+	events, err := buildMembershipEvents(memberships, accountDB, newProfile, userID, cfg, queryAPI)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := rsProducer.SendEvents(events, cfg.Matrix.ServerName); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := producer.SendUpdate(userID, changedKey, oldProfile.AvatarURL, r.AvatarURL); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -124,7 +170,11 @@ func SetAvatarURL(
 func GetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -140,9 +190,19 @@ func GetDisplayName(
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
-	req *http.Request, accountDB *accounts.Database, userID string,
-	producer *producers.UserUpdateProducer,
+	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
+	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
+	if userID != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("userID does not match the current user"),
+		}
+	}
+
+	changedKey := "displayname"
+
 	var r displayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
@@ -154,18 +214,41 @@ func SetDisplayName(
 		}
 	}
 
-	localpart := getLocalPart(userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	oldProfile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
+	if err = accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := producer.SendUpdate(userID, "displayname", oldProfile.DisplayName, r.DisplayName); err != nil {
+	memberships, err := accountDB.GetMembershipsByLocalpart(localpart)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	newProfile := authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: r.DisplayName,
+		AvatarURL:   oldProfile.AvatarURL,
+	}
+
+	events, err := buildMembershipEvents(memberships, accountDB, newProfile, userID, cfg, queryAPI)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := rsProducer.SendEvents(events, cfg.Matrix.ServerName); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := producer.SendUpdate(userID, changedKey, oldProfile.DisplayName, r.DisplayName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -175,13 +258,71 @@ func SetDisplayName(
 	}
 }
 
-func getLocalPart(userID string) string {
-	if !strings.HasPrefix(userID, "@") {
-		panic(fmt.Errorf("Invalid user ID"))
+func buildMembershipEvents(
+	memberships []authtypes.Membership, db *accounts.Database,
+	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+) ([]gomatrixserverlib.Event, error) {
+	evs := []gomatrixserverlib.Event{}
+
+	for _, membership := range memberships {
+		builder := gomatrixserverlib.EventBuilder{
+			Sender:   userID,
+			RoomID:   membership.RoomID,
+			Type:     "m.room.member",
+			StateKey: &userID,
+		}
+
+		content := events.MemberContent{
+			Membership: "join",
+		}
+
+		content.DisplayName = newProfile.DisplayName
+		content.AvatarURL = newProfile.AvatarURL
+
+		if err := builder.SetContent(content); err != nil {
+			return nil, err
+		}
+
+		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
+		if err != nil {
+			return nil, err
+		}
+
+		// Ask the roomserver for information about this room
+		queryReq := api.QueryLatestEventsAndStateRequest{
+			RoomID:       membership.RoomID,
+			StateToFetch: eventsNeeded.Tuples(),
+		}
+		var queryRes api.QueryLatestEventsAndStateResponse
+		if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); queryErr != nil {
+			return nil, err
+		}
+
+		builder.Depth = queryRes.Depth
+		builder.PrevEvents = queryRes.LatestEvents
+
+		authEvents := gomatrixserverlib.NewAuthEvents(nil)
+
+		for i := range queryRes.StateEvents {
+			authEvents.AddEvent(&queryRes.StateEvents[i])
+		}
+
+		refs, err := eventsNeeded.AuthEventReferences(&authEvents)
+		if err != nil {
+			return nil, err
+		}
+		builder.AuthEvents = refs
+
+		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+		now := time.Now()
+		event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+		if err != nil {
+			return nil, err
+		}
+
+		evs = append(evs, event)
 	}
 
-	// Get the part before ":"
-	username := strings.Split(userID, ":")[0]
-	// Return the part after the "@"
-	return strings.Split(username, "@")[1]
+	return evs, nil
 }

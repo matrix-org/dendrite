@@ -40,9 +40,21 @@ type RoomserverQueryAPIDatabase interface {
 	// Lookup the numeric IDs for a list of events.
 	// Returns an error if there was a problem talking to the database.
 	EventNIDs(eventIDs []string) (map[string]types.EventNID, error)
+	// Save a given room alias with the room ID it refers to.
+	// Returns an error if there was a problem talking to the database.
+	SetRoomAlias(alias string, roomID string) error
+	// Lookup the room ID a given alias refers to.
+	// Returns an error if there was a problem talking to the database.
+	GetRoomIDFromAlias(alias string) (string, error)
+	// Lookup all aliases referring to a given room ID.
+	// Returns an error if there was a problem talking to the database.
+	GetAliasesFromRoomID(roomID string) ([]string, error)
+	// Remove a given room alias.
+	// Returns an error if there was a problem talking to the database.
+	RemoveRoomAlias(alias string) error
 }
 
-// RoomserverQueryAPI is an implementation of RoomserverQueryAPI
+// RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
 type RoomserverQueryAPI struct {
 	DB RoomserverQueryAPIDatabase
 }

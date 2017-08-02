@@ -54,6 +54,7 @@ var (
 )
 
 const inputTopic = "syncserverInput"
+const clientTopic = "clientapiserverOutput"
 
 var exe = test.KafkaExecutor{
 	ZookeeperURI:   zookeeperURI,
@@ -134,6 +135,7 @@ func startSyncServer() (*exec.Cmd, chan error) {
 	cfg.Matrix.ServerName = "localhost"
 	cfg.Listen.SyncAPI = config.Address(syncserverAddr)
 	cfg.Kafka.Topics.OutputRoomEvent = config.Topic(inputTopic)
+	cfg.Kafka.Topics.OutputClientData = config.Topic(clientTopic)
 
 	if err := test.WriteConfig(cfg, dir); err != nil {
 		panic(err)
@@ -175,6 +177,10 @@ func startSyncServer() (*exec.Cmd, chan error) {
 func prepareKafka() {
 	exe.DeleteTopic(inputTopic)
 	if err := exe.CreateTopic(inputTopic); err != nil {
+		panic(err)
+	}
+	exe.DeleteTopic(clientTopic)
+	if err := exe.CreateTopic(clientTopic); err != nil {
 		panic(err)
 	}
 }

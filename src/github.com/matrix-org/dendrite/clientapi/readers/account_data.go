@@ -15,33 +15,55 @@
 package readers
 
 import (
+	"io/ioutil"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/util"
 )
 
-// Logout handles POST /logout
-func Logout(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+// SaveAccountData implements PUT /user/{userId}/[rooms/{roomId}/]account_data/{type}
+func SaveAccountData(
+	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	userID string, roomID string, dataType string, syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
-	if req.Method != "POST" {
+	if req.Method != "PUT" {
 		return util.JSONResponse{
 			Code: 405,
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if userID != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("userID does not match the current user"),
+		}
+	}
+
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := deviceDB.RemoveDevice(device.ID, localpart); err != nil {
+	defer req.Body.Close()
+
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := accountDB.SaveAccountData(localpart, roomID, dataType, string(body)); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := syncProducer.SendData(userID, roomID, dataType); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
