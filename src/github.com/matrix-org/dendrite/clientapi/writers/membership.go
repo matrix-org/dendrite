@@ -39,7 +39,12 @@ func SendMembership(
 	roomID string, membership string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	stateKey, reason, reqErr := getMembershipStateKey(req, device, membership)
+	if reqErr != nil {
+		return *reqErr
+	}
+
+	localpart, _, err := gomatrixserverlib.SplitID('@', stateKey)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -47,11 +52,6 @@ func SendMembership(
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
-	}
-
-	stateKey, reason, reqErr := getMembershipStateKey(req, device, membership)
-	if reqErr != nil {
-		return *reqErr
 	}
 
 	builder := gomatrixserverlib.EventBuilder{
