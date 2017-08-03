@@ -42,14 +42,19 @@ func SendMembership(
 		return *reqErr
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', stateKey)
+	localpart, serverName, err := gomatrixserverlib.SplitID('@', stateKey)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(localpart)
-	if err != nil {
-		return httputil.LogThenError(req, err)
+	var profile *authtypes.Profile
+	if serverName == cfg.Matrix.ServerName {
+		profile, err = accountDB.GetProfileByLocalpart(localpart)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+	} else {
+		profile = &authtypes.Profile{}
 	}
 
 	builder := gomatrixserverlib.EventBuilder{
