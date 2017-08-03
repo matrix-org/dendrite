@@ -52,7 +52,7 @@ const insertMembershipSQL = `
 `
 
 const selectMembershipSQL = "" +
-	"SELECT * from memberships WHERE localpart = $1 AND room_id = $2"
+	"SELECT event_id, still_in_room from memberships WHERE localpart = $1 AND room_id = $2"
 
 const selectMembershipsByLocalpartSQL = "" +
 	"SELECT room_id, event_id FROM memberships WHERE localpart = $1 AND still_in_room = true"
@@ -69,6 +69,7 @@ const updateMembershipByEventIDSQL = "" +
 type membershipStatements struct {
 	deleteMembershipsByEventIDsStmt  *sql.Stmt
 	insertMembershipStmt             *sql.Stmt
+	selectMembershipStmt             *sql.Stmt
 	selectMembershipByEventIDStmt    *sql.Stmt
 	selectMembershipsByLocalpartStmt *sql.Stmt
 	selectMembershipsByRoomIDStmt    *sql.Stmt
@@ -84,6 +85,9 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.insertMembershipStmt, err = db.Prepare(insertMembershipSQL); err != nil {
+		return
+	}
+	if s.selectMembershipStmt, err = db.Prepare(selectMembershipSQL); err != nil {
 		return
 	}
 	if s.selectMembershipsByLocalpartStmt, err = db.Prepare(selectMembershipsByLocalpartSQL); err != nil {
@@ -106,6 +110,18 @@ func (s *membershipStatements) insertMembership(localpart string, roomID string,
 func (s *membershipStatements) deleteMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) (err error) {
 	_, err = txn.Stmt(s.deleteMembershipsByEventIDsStmt).Exec(pq.StringArray(eventIDs))
 	return
+}
+
+func (s *membershipStatements) selectMembership(localpart string, roomID string) (*authtypes.Membership, error) {
+	m := authtypes.Membership{
+		Localpart: localpart,
+		RoomID:    roomID,
+	}
+	err := s.selectMembershipStmt.QueryRow(localpart, roomID).Scan(&m.EventID, &m.StillInRoom)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &m, err
 }
 
 func (s *membershipStatements) selectMembershipsByLocalpart(localpart string) (memberships []authtypes.Membership, err error) {

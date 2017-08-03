@@ -157,6 +157,13 @@ func (d *Database) UpdateMemberships(eventsToAdd []gomatrixserverlib.Event, idsT
 	})
 }
 
+// GetMembership returns the membership for the given localpart and room ID
+// If no membership match the given localpart, returns nil
+// If there was an issue during the retrieval, returns the SQL error
+func (d *Database) GetMembership(localpart string, roomID string) (*authtypes.Membership, error) {
+	return d.memberships.selectMembership(localpart, roomID)
+}
+
 // GetMembershipsByLocalpart returns an array containing the memberships for all
 // the rooms a user matching a given localpart is a member of
 // If no membership match the given localpart, returns an empty array
