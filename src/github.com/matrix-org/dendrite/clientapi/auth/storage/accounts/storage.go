@@ -121,11 +121,12 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
-// room. It also stores the ID of the `join` membership event.
+// room. It also stores the ID of the membership event and a flag on whether the user
+// is still in the room.
 // If a membership already exists between the user and the room, or of the
 // insert fails, returns the SQL error
-func (d *Database) SaveMembership(localpart string, roomID string, eventID string, txn *sql.Tx) error {
-	return d.memberships.insertMembership(localpart, roomID, eventID, txn)
+func (d *Database) SaveMembership(localpart string, roomID string, eventID string, stillInRoom bool, txn *sql.Tx) error {
+	return d.memberships.insertMembership(localpart, roomID, eventID, stillInRoom, txn)
 }
 
 // removeMembershipsByEventIDs removes the memberships of which the `join` membership
@@ -135,9 +136,9 @@ func (d *Database) removeMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) e
 	return d.memberships.deleteMembershipsByEventIDs(eventIDs, txn)
 }
 
-// UpdateMemberships adds the "join" membership events included in a given state
-// events array, and removes those which ID is included in a given array of events
-// IDs. All of the process is run in a transaction, which commits only once/if every
+// UpdateMemberships saves the membership events included in a given state events
+// array, and removes those which ID is included in a given array of events IDs.
+// All of the process is run in a transaction, which commits only once/if every
 // insertion and deletion has been successfully processed.
 // Returns a SQL error if there was an issue with any part of the process
 func (d *Database) UpdateMemberships(eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error {
@@ -179,8 +180,11 @@ func (d *Database) UpdateMembership(oldEventID string, newEventID string) error 
 	return d.memberships.updateMembershipByEventID(oldEventID, newEventID)
 }
 
-// newMembership will save a new membership in the database if the given state
-// event is a "join" membership event
+// newMembership will save a new membership in the database, with a flag on whether
+// the user is still in the room. This flag is set to true if the given state
+// event is a "join" membership event and false if the event is a "leave" or "ban"
+// membership. If the event isn't a m.room.member event with one of these three
+// values, does nothing.
 // If the event isn't a "join" membership event, does nothing
 // If an error occurred, returns it
 func (d *Database) newMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error {
@@ -204,7 +208,13 @@ func (d *Database) newMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error 
 
 		// Only "join" membership events can be considered as new memberships
 		if membership == "join" {
-			if err := d.SaveMembership(localpart, roomID, eventID, txn); err != nil {
+			if err := d.SaveMembership(localpart, roomID, eventID, true, txn); err != nil {
+				return err
+			}
+		} else if membership == "leave" || membership == "ban" {
+			// If the user left the room, save the new event ID and mark them as
+			// not in the room anymore
+			if err := d.SaveMembership(localpart, roomID, eventID, false, txn); err != nil {
 				return err
 			}
 		}

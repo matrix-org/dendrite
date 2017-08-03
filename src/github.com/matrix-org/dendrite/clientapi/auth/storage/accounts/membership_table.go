@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS memberships (
     room_id TEXT NOT NULL,
     -- The ID of the join membership event
     event_id TEXT NOT NULL,
+	-- Is the user still in the room? We use a boolean instead of just deleting
+	-- the row to know if the user has been in the room at some point
+	-- If set to false, event_id would be the event ID of the leave/kick/ban
+	-- membership event
+	still_in_room BOOLEAN NOT NULL,
 
     -- A user can only be member of a room once
     PRIMARY KEY (localpart, room_id)
@@ -40,24 +45,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS membership_event_id ON memberships(event_id);
 `
 
 const insertMembershipSQL = `
-	INSERT INTO memberships(localpart, room_id, event_id) VALUES ($1, $2, $3)
-	ON CONFLICT (localpart, room_id) DO UPDATE SET event_id = EXCLUDED.event_id
+	INSERT INTO memberships(localpart, room_id, event_id, still_in_room)
+	VALUES ($1, $2, $3, $4)
+	ON CONFLICT (localpart, room_id) DO
+	UPDATE SET event_id = EXCLUDED.event_id, still_in_room = EXCLUDED.still_in_room
 `
 
 const selectMembershipSQL = "" +
 	"SELECT * from memberships WHERE localpart = $1 AND room_id = $2"
 
 const selectMembershipsByLocalpartSQL = "" +
-	"SELECT room_id, event_id FROM memberships WHERE localpart = $1"
+	"SELECT room_id, event_id FROM memberships WHERE localpart = $1 AND still_in_room = true"
 
 const selectMembershipsByRoomIDSQL = "" +
-	"SELECT localpart, event_id FROM memberships WHERE room_id = $1"
+	"SELECT localpart, event_id FROM memberships WHERE room_id = $1 AND still_in_room = true"
 
 const deleteMembershipsByEventIDsSQL = "" +
 	"DELETE FROM memberships WHERE event_id = ANY($1)"
 
 const updateMembershipByEventIDSQL = "" +
-	"UPDATE memberships SET event_id = $2 WHERE event_id = $1"
+	"UPDATE memberships SET event_id = $2, still_in_room = $3 WHERE event_id = $1"
 
 type membershipStatements struct {
 	deleteMembershipsByEventIDsStmt  *sql.Stmt
@@ -91,8 +98,8 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *membershipStatements) insertMembership(localpart string, roomID string, eventID string, txn *sql.Tx) (err error) {
-	_, err = txn.Stmt(s.insertMembershipStmt).Exec(localpart, roomID, eventID)
+func (s *membershipStatements) insertMembership(localpart string, roomID string, eventID string, stillInRoom bool, txn *sql.Tx) (err error) {
+	_, err = txn.Stmt(s.insertMembershipStmt).Exec(localpart, roomID, eventID, stillInRoom)
 	return
 }
 

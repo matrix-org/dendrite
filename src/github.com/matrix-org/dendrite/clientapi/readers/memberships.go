@@ -29,9 +29,8 @@ func GetMemberships(
 	req *http.Request, roomID string, accountDB *accounts.Database,
 	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
-	// TODO: Check if the user is or has been in the room, and respond with
-	// M_FORBIDDEN if not. If the user has been in the room before but isn't
-	// anymore, send the members list as it was before they left.
+	// TODO: If the user has been in the room before but isn't
+	// anymore, only send the members list as it was before they left.
 
 	memberships, err := accountDB.GetMembershipsByRoomID(roomID)
 	if err != nil {
