@@ -304,7 +304,7 @@ func Setup(
 	r0mux.Handle("/rooms/{roomID}/members",
 		common.MakeAuthAPI("rooms_members", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.GetMemberships(req, vars["roomID"], accountDB, queryAPI)
+			return readers.GetMemberships(req, device, vars["roomID"], accountDB, cfg, queryAPI)
 		}),
 	)
 
