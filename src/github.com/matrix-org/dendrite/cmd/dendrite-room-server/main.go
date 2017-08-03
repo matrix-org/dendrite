@@ -67,15 +67,15 @@ func main() {
 
 	inputAPI.SetupHTTP(http.DefaultServeMux)
 
-	queryAPI := query.RoomserverQueryAPI{db}
+	queryAPI := query.RoomserverQueryAPI{DB: db}
 
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 
 	aliasAPI := alias.RoomserverAliasAPI{
 		DB:       db,
 		Cfg:      cfg,
-		InputAPI: inputAPI,
-		QueryAPI: queryAPI,
+		InputAPI: &inputAPI,
+		QueryAPI: &queryAPI,
 	}
 
 	aliasAPI.SetupHTTP(http.DefaultServeMux)
