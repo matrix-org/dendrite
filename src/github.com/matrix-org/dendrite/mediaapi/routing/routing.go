@@ -30,10 +30,8 @@ import (
 
 const pathPrefixR0 = "/_matrix/media/v1"
 
-// Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
-// to clients which need to make outbound HTTP requests.
-func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.Dendrite, db *storage.Database) {
-	apiMux := mux.NewRouter()
+// Setup registers the media API HTTP handlers
+func Setup(apiMux *mux.Router, httpClient *http.Client, cfg *config.Dendrite, db *storage.Database) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
@@ -54,9 +52,6 @@ func Setup(servMux *http.ServeMux, httpClient *http.Client, cfg *config.Dendrite
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", cfg, db, activeRemoteRequests, activeThumbnailGeneration),
 	)
-
-	servMux.Handle("/metrics", prometheus.Handler())
-	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
 
 func makeDownloadAPI(name string, cfg *config.Dendrite, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests, activeThumbnailGeneration *types.ActiveThumbnailGeneration) http.HandlerFunc {

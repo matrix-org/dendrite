@@ -19,13 +19,13 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/prometheus/client_golang/prometheus"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -66,7 +66,8 @@ func main() {
 		log.WithError(err).Panicf("startup: failed to start room server consumer")
 	}
 
-	http.DefaultServeMux.Handle("/metrics", prometheus.Handler())
+	api := mux.NewRouter()
+	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
 	if err := http.ListenAndServe(string(cfg.Listen.FederationSender), nil); err != nil {
 		panic(err)

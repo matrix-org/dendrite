@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const pathPrefixR0 = "/_matrix/client/r0"
@@ -40,7 +39,7 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
 func Setup(
-	servMux *http.ServeMux, httpClient *http.Client, cfg config.Dendrite,
+	apiMux *mux.Router, httpClient *http.Client, cfg config.Dendrite,
 	producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 	aliasAPI api.RoomserverAliasAPI,
 	accountDB *accounts.Database,
@@ -50,7 +49,6 @@ func Setup(
 	userUpdateProducer *producers.UserUpdateProducer,
 	syncProducer *producers.SyncAPIProducer,
 ) {
-	apiMux := mux.NewRouter()
 
 	apiMux.Handle("/_matrix/client/versions",
 		common.MakeAPI("versions", func(req *http.Request) util.JSONResponse {
@@ -323,7 +321,4 @@ func Setup(
 			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
 	)
-
-	servMux.Handle("/metrics", prometheus.Handler())
-	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
