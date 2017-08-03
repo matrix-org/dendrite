@@ -3,6 +3,7 @@ package common
 import (
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/util"
@@ -25,4 +26,11 @@ func MakeAuthAPI(metricsName string, deviceDB auth.DeviceDatabase, f func(*http.
 func MakeAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.NewJSONRequestHandler(f)
 	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
+}
+
+// SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
+// listener.
+func SetupHTTPAPI(servMux *http.ServeMux, apiMux *mux.Router) {
+	servMux.Handle("/metrics", prometheus.Handler())
+	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }

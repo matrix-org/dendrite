@@ -15,6 +15,9 @@
 package routing
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
@@ -24,8 +27,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"net/http"
-	"time"
 )
 
 const (
@@ -35,14 +36,13 @@ const (
 
 // Setup registers HTTP handlers with the given ServeMux.
 func Setup(
-	servMux *http.ServeMux,
+	apiMux *mux.Router,
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 ) {
-	apiMux := mux.NewRouter()
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
 
@@ -67,9 +67,6 @@ func Setup(
 			)
 		},
 	))
-
-	servMux.Handle("/metrics", prometheus.Handler())
-	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
 
 func makeAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {

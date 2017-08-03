@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
@@ -89,6 +90,10 @@ func main() {
 	}
 
 	log.Info("Starting sync server on ", cfg.Listen.SyncAPI)
-	routing.SetupSyncServerListeners(http.DefaultServeMux, http.DefaultClient, sync.NewRequestPool(db, n, adb), deviceDB)
+
+	api := mux.NewRouter()
+	routing.Setup(api, sync.NewRequestPool(db, n, adb), deviceDB)
+	common.SetupHTTPAPI(http.DefaultServeMux, api)
+
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.SyncAPI), nil))
 }

@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
@@ -52,6 +53,9 @@ func main() {
 
 	log.Info("Starting media API server on ", cfg.Listen.MediaAPI)
 
-	routing.Setup(http.DefaultServeMux, http.DefaultClient, cfg, db)
+	api := mux.NewRouter()
+	routing.Setup(api, http.DefaultClient, cfg, db)
+	common.SetupHTTPAPI(http.DefaultServeMux, api)
+
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.MediaAPI), nil))
 }
