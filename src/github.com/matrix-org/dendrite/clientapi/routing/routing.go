@@ -303,6 +303,13 @@ func Setup(
 		}),
 	)
 
+	r0mux.Handle("/rooms/{roomID}/members",
+		common.MakeAuthAPI("rooms_members", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.GetMemberships(req, vars["roomID"], accountDB, queryAPI)
+		}),
+	)
+
 	r0mux.Handle("/rooms/{roomID}/read_markers",
 		common.MakeAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
 			// TODO: return the read_markers.
