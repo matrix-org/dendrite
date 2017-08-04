@@ -15,9 +15,7 @@
 package readers
 
 import (
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -284,44 +282,12 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
+		event, err := events.BuildEvent(&builder, *cfg, queryAPI, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		// Ask the roomserver for information about this room
-		queryReq := api.QueryLatestEventsAndStateRequest{
-			RoomID:       membership.RoomID,
-			StateToFetch: eventsNeeded.Tuples(),
-		}
-		var queryRes api.QueryLatestEventsAndStateResponse
-		if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); queryErr != nil {
-			return nil, err
-		}
-
-		builder.Depth = queryRes.Depth
-		builder.PrevEvents = queryRes.LatestEvents
-
-		authEvents := gomatrixserverlib.NewAuthEvents(nil)
-
-		for i := range queryRes.StateEvents {
-			authEvents.AddEvent(&queryRes.StateEvents[i])
-		}
-
-		refs, err := eventsNeeded.AuthEventReferences(&authEvents)
-		if err != nil {
-			return nil, err
-		}
-		builder.AuthEvents = refs
-
-		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-		now := time.Now()
-		event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
-		if err != nil {
-			return nil, err
-		}
-
-		evs = append(evs, event)
+		evs = append(evs, *event)
 	}
 
 	return evs, nil

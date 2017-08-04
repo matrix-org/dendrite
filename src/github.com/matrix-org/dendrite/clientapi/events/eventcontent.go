@@ -25,6 +25,7 @@ type MemberContent struct {
 	Membership  string `json:"membership"`
 	DisplayName string `json:"displayname,omitempty"`
 	AvatarURL   string `json:"avatar_url,omitempty"`
+	Reason      string `json:"reason,omitempty"`
 	// TODO: ThirdPartyInvite string `json:"third_party_invite,omitempty"`
 }
 
