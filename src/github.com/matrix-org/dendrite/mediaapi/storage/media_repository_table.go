@@ -25,7 +25,7 @@ import (
 const mediaSchema = `
 -- The media_repository table holds metadata for each media file stored and accessible to the local server,
 -- the actual file is stored separately.
-CREATE TABLE IF NOT EXISTS media_repository (
+CREATE TABLE IF NOT EXISTS mediaapi_media_repository (
     -- The id used to refer to the media.
     -- For uploads to this server this is a base64-encoded sha256 hash of the file data
     -- For media from remote servers, this can be any unique identifier string
@@ -45,16 +45,16 @@ CREATE TABLE IF NOT EXISTS media_repository (
     -- The user who uploaded the file. Should be a Matrix user ID.
     user_id TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS media_repository_index ON media_repository (media_id, media_origin);
+CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
 `
 
 const insertMediaSQL = `
-INSERT INTO media_repository (media_id, media_origin, content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
+INSERT INTO mediaapi_media_repository (media_id, media_origin, content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 const selectMediaSQL = `
-SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM media_repository WHERE media_id = $1 AND media_origin = $2
+SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM mediaapi_media_repository WHERE media_id = $1 AND media_origin = $2
 `
 
 type mediaStatements struct {

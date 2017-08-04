@@ -25,7 +25,7 @@ import (
 
 const outputRoomEventsSchema = `
 -- Stores output room events received from the roomserver.
-CREATE TABLE IF NOT EXISTS output_room_events (
+CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     -- An incrementing ID which denotes the position in the log that this event resides at.
     -- NB: 'serial' makes no guarantees to increment by 1 every time, only that it increments.
     --     This isn't a problem for us since we just want to order by this field.
@@ -42,24 +42,29 @@ CREATE TABLE IF NOT EXISTS output_room_events (
     remove_state_ids TEXT[]
 );
 -- for event selection
-CREATE UNIQUE INDEX IF NOT EXISTS event_id_idx ON output_room_events(event_id);
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(event_id);
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO output_room_events (room_id, event_id, event_json, add_state_ids, remove_state_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id"
+	"INSERT INTO syncapi_output_room_events (" +
+	" room_id, event_id, event_json, add_state_ids, remove_state_ids" +
+	") VALUES ($1, $2, $3, $4, $5) RETURNING id"
 
 const selectEventsSQL = "" +
-	"SELECT id, event_json FROM output_room_events WHERE event_id = ANY($1)"
+	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectRecentEventsSQL = "" +
-	"SELECT id, event_json FROM output_room_events WHERE room_id = $1 AND id > $2 AND id <= $3 ORDER BY id DESC LIMIT $4"
+	"SELECT id, event_json FROM syncapi_output_room_events" +
+	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
+	" ORDER BY id DESC LIMIT $4"
 
 const selectMaxIDSQL = "" +
-	"SELECT MAX(id) FROM output_room_events"
+	"SELECT MAX(id) FROM syncapi_output_room_events"
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 const selectStateInRangeSQL = "" +
-	"SELECT id, event_json, add_state_ids, remove_state_ids FROM output_room_events" +
+	"SELECT id, event_json, add_state_ids, remove_state_ids" +
+	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
 	" ORDER BY id ASC"
 

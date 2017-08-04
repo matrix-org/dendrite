@@ -16,17 +16,18 @@ package storage
 
 import (
 	"database/sql"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 const roomsSchema = `
-CREATE SEQUENCE IF NOT EXISTS room_nid_seq;
-CREATE TABLE IF NOT EXISTS rooms (
+CREATE SEQUENCE IF NOT EXISTS roomserver_room_nid_seq;
+CREATE TABLE IF NOT EXISTS roomserver_rooms (
     -- Local numeric ID for the room.
-    room_nid BIGINT PRIMARY KEY DEFAULT nextval('room_nid_seq'),
+    room_nid BIGINT PRIMARY KEY DEFAULT nextval('roomserver_room_nid_seq'),
     -- Textual ID for the room.
-    room_id TEXT NOT NULL CONSTRAINT room_id_unique UNIQUE,
+    room_id TEXT NOT NULL CONSTRAINT roomserver_room_id_unique UNIQUE,
     -- The most recent events in the room that aren't referenced by another event.
     -- This list may empty if the server hasn't joined the room yet.
     -- (The server will be in that state while it stores the events for the initial state of the room)
@@ -41,21 +42,21 @@ CREATE TABLE IF NOT EXISTS rooms (
 
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = "" +
-	"INSERT INTO rooms (room_id) VALUES ($1)" +
-	" ON CONFLICT ON CONSTRAINT room_id_unique" +
+	"INSERT INTO roomserver_rooms (room_id) VALUES ($1)" +
+	" ON CONFLICT ON CONSTRAINT roomserver_room_id_unique" +
 	" DO NOTHING RETURNING (room_nid)"
 
 const selectRoomNIDSQL = "" +
-	"SELECT room_nid FROM rooms WHERE room_id = $1"
+	"SELECT room_nid FROM roomserver_rooms WHERE room_id = $1"
 
 const selectLatestEventNIDsSQL = "" +
-	"SELECT latest_event_nids, state_snapshot_nid FROM rooms WHERE room_nid = $1"
+	"SELECT latest_event_nids, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1"
 
 const selectLatestEventNIDsForUpdateSQL = "" +
-	"SELECT latest_event_nids, last_event_sent_nid, state_snapshot_nid FROM rooms WHERE room_nid = $1 FOR UPDATE"
+	"SELECT latest_event_nids, last_event_sent_nid, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1 FOR UPDATE"
 
 const updateLatestEventNIDsSQL = "" +
-	"UPDATE rooms SET latest_event_nids = $2, last_event_sent_nid = $3, state_snapshot_nid = $4 WHERE room_nid = $1"
+	"UPDATE roomserver_rooms SET latest_event_nids = $2, last_event_sent_nid = $3, state_snapshot_nid = $4 WHERE room_nid = $1"
 
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt

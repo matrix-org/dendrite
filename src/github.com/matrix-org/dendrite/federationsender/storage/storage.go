@@ -53,7 +53,7 @@ func (d *Database) prepare() error {
 		return err
 	}
 
-	if err = d.PartitionOffsetStatements.Prepare(d.db); err != nil {
+	if err = d.PartitionOffsetStatements.Prepare(d.db, "federationsender"); err != nil {
 		return err
 	}
 

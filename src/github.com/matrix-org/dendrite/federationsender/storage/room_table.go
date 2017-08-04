@@ -19,7 +19,7 @@ import (
 )
 
 const roomSchema = `
-CREATE TABLE IF NOT EXISTS rooms (
+CREATE TABLE IF NOT EXISTS federationsender_rooms (
     -- The string ID of the room
     room_id TEXT PRIMARY KEY,
     -- The most recent event state by the room server.
@@ -29,14 +29,14 @@ CREATE TABLE IF NOT EXISTS rooms (
 );`
 
 const insertRoomSQL = "" +
-	"INSERT INTO rooms (room_id, last_event_id) VALUES ($1, '')" +
+	"INSERT INTO federationsender_rooms (room_id, last_event_id) VALUES ($1, '')" +
 	" ON CONFLICT DO NOTHING"
 
 const selectRoomForUpdateSQL = "" +
-	"SELECT last_event_id FROM rooms WHERE room_id = $1 FOR UPDATE"
+	"SELECT last_event_id FROM federationsender_rooms WHERE room_id = $1 FOR UPDATE"
 
 const updateRoomSQL = "" +
-	"UPDATE rooms SET last_event_id = $2 WHERE room_id = $1"
+	"UPDATE federationsender_rooms SET last_event_id = $2 WHERE room_id = $1"
 
 type roomStatements struct {
 	insertRoomStmt          *sql.Stmt

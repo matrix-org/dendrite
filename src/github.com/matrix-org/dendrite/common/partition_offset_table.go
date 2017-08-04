@@ -15,26 +15,27 @@
 package common
 
 import "database/sql"
+import "strings"
 
 const partitionOffsetsSchema = `
 -- The offsets that the server has processed up to.
-CREATE TABLE IF NOT EXISTS partition_offsets (
+CREATE TABLE IF NOT EXISTS ${prefix}_partition_offsets (
     -- The name of the topic.
     topic TEXT NOT NULL,
     -- The 32-bit partition ID
     partition INTEGER NOT NULL,
     -- The 64-bit offset.
     partition_offset BIGINT NOT NULL,
-    CONSTRAINT topic_partition_unique UNIQUE (topic, partition)
+    CONSTRAINT ${prefix}_topic_partition_unique UNIQUE (topic, partition)
 );
 `
 
 const selectPartitionOffsetsSQL = "" +
-	"SELECT partition, partition_offset FROM partition_offsets WHERE topic = $1"
+	"SELECT partition, partition_offset FROM ${prefix}_partition_offsets WHERE topic = $1"
 
 const upsertPartitionOffsetsSQL = "" +
-	"INSERT INTO partition_offsets (topic, partition, partition_offset) VALUES ($1, $2, $3)" +
-	" ON CONFLICT ON CONSTRAINT topic_partition_unique" +
+	"INSERT INTO ${prefix}_partition_offsets (topic, partition, partition_offset) VALUES ($1, $2, $3)" +
+	" ON CONFLICT ON CONSTRAINT ${prefix}_topic_partition_unique" +
 	" DO UPDATE SET partition_offset = $3"
 
 // PartitionOffsetStatements represents a set of statements that can be run on a partition_offsets table.
@@ -44,15 +45,19 @@ type PartitionOffsetStatements struct {
 }
 
 // Prepare converts the raw SQL statements into prepared statements.
-func (s *PartitionOffsetStatements) Prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(partitionOffsetsSchema)
+func (s *PartitionOffsetStatements) Prepare(db *sql.DB, prefix string) (err error) {
+	_, err = db.Exec(strings.Replace(partitionOffsetsSchema, "${prefix}", prefix, -1))
 	if err != nil {
 		return
 	}
-	if s.selectPartitionOffsetsStmt, err = db.Prepare(selectPartitionOffsetsSQL); err != nil {
+	if s.selectPartitionOffsetsStmt, err = db.Prepare(
+		strings.Replace(selectPartitionOffsetsSQL, "${prefix}", prefix, -1),
+	); err != nil {
 		return
 	}
-	if s.upsertPartitionOffsetStmt, err = db.Prepare(upsertPartitionOffsetsSQL); err != nil {
+	if s.upsertPartitionOffsetStmt, err = db.Prepare(
+		strings.Replace(upsertPartitionOffsetsSQL, "${prefix}", prefix, -1),
+	); err != nil {
 		return
 	}
 	return

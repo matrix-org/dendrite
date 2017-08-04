@@ -25,7 +25,7 @@ import (
 
 const accountsSchema = `
 -- Stores data about accounts.
-CREATE TABLE IF NOT EXISTS accounts (
+CREATE TABLE IF NOT EXISTS account_accounts (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL PRIMARY KEY,
     -- When this account was first created, as a unix timestamp (ms resolution).
@@ -38,13 +38,13 @@ CREATE TABLE IF NOT EXISTS accounts (
 `
 
 const insertAccountSQL = "" +
-	"INSERT INTO accounts(localpart, created_ts, password_hash) VALUES ($1, $2, $3)"
+	"INSERT INTO account_accounts(localpart, created_ts, password_hash) VALUES ($1, $2, $3)"
 
 const selectAccountByLocalpartSQL = "" +
-	"SELECT localpart FROM accounts WHERE localpart = $1"
+	"SELECT localpart FROM account_accounts WHERE localpart = $1"
 
 const selectPasswordHashSQL = "" +
-	"SELECT password_hash FROM accounts WHERE localpart = $1"
+	"SELECT password_hash FROM account_accounts WHERE localpart = $1"
 
 // TODO: Update password
 
