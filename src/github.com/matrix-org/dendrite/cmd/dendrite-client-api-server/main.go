@@ -54,8 +54,9 @@ func main() {
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
+	inputAPI := api.NewRoomserverInputAPIHTTP(cfg.RoomServerURL(), nil)
 
-	roomserverProducer := producers.NewRoomserverProducer(cfg.RoomServerURL())
+	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 	userUpdateProducer, err := producers.NewUserUpdateProducer(
 		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.UserUpdates),
 	)
