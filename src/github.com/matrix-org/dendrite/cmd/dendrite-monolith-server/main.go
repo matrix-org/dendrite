@@ -214,8 +214,8 @@ func (m *monolith) setupNotifiers() {
 		log.Panicf("startup: failed to get latest sync stream position : %s", err)
 	}
 
-	n := syncapi_sync.NewNotifier(syncapi_types.StreamPosition(pos))
-	if err = n.Load(m.syncAPIDB); err != nil {
+	m.syncAPINotifier = syncapi_sync.NewNotifier(syncapi_types.StreamPosition(pos))
+	if err = m.syncAPINotifier.Load(m.syncAPIDB); err != nil {
 		log.Panicf("startup: failed to set up notifier: %s", err)
 	}
 }
