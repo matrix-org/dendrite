@@ -45,6 +45,8 @@ type PartitionOffsetStatements struct {
 }
 
 // Prepare converts the raw SQL statements into prepared statements.
+// Takes a prefix to prepend to the table name used to store the partition offsets.
+// This allows multiple components to share the same database schema.
 func (s *PartitionOffsetStatements) Prepare(db *sql.DB, prefix string) (err error) {
 	_, err = db.Exec(strings.Replace(partitionOffsetsSchema, "${prefix}", prefix, -1))
 	if err != nil {
