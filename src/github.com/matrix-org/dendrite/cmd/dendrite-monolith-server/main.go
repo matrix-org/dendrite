@@ -84,9 +84,8 @@ func main() {
 	m.setupConsumers()
 	m.setupAPIs()
 
-	common.SetupHTTPAPI(http.DefaultServeMux, m.api)
-
-	log.Fatal(http.ListenAndServe(*httpBindAddr, nil))
+	// Expose the matrix APIs directly rather than putting them under a /api path.
+	log.Fatal(http.ListenAndServe(*httpBindAddr, m.api))
 }
 
 // A monolith contains all the dendrite components.
