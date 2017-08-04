@@ -75,11 +75,11 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	m := monolith{cfg: cfg, api: mux.NewRouter()}
+	m := newMonolith(cfg)
 	m.setupDatabases()
+	m.setupFederation()
 	m.setupRoomServer()
 	m.setupProducers()
-	m.setupFederation()
 	m.setupNotifiers()
 	m.setupConsumers()
 	m.setupAPIs()
@@ -89,16 +89,12 @@ func main() {
 	log.Fatal(http.ListenAndServe(*httpBindAddr, nil))
 }
 
+// A monolith contains all the dendrite components.
+// Some of the setup functions depend on previous setup functions, so they must
+// be called in the same order as they are defined in the file.
 type monolith struct {
 	cfg *config.Dendrite
-
-	inputAPI *roomserver_input.RoomserverInputAPI
-	queryAPI *roomserver_query.RoomserverQueryAPI
-	aliasAPI *roomserver_alias.RoomserverAliasAPI
-
-	roomServerProducer *producers.RoomserverProducer
-	userUpdateProducer *producers.UserUpdateProducer
-	syncProducer       *producers.SyncAPIProducer
+	api *mux.Router
 
 	roomServerDB       *roomserver_storage.Database
 	accountDB          *accounts.Database
@@ -111,9 +107,19 @@ type monolith struct {
 	federation *gomatrixserverlib.FederationClient
 	keyRing    gomatrixserverlib.KeyRing
 
-	syncAPINotifier *syncapi_sync.Notifier
+	inputAPI *roomserver_input.RoomserverInputAPI
+	queryAPI *roomserver_query.RoomserverQueryAPI
+	aliasAPI *roomserver_alias.RoomserverAliasAPI
 
-	api *mux.Router
+	roomServerProducer *producers.RoomserverProducer
+	userUpdateProducer *producers.UserUpdateProducer
+	syncProducer       *producers.SyncAPIProducer
+
+	syncAPINotifier *syncapi_sync.Notifier
+}
+
+func newMonolith(cfg *config.Dendrite) *monolith {
+	return &monolith{cfg: cfg, api: mux.NewRouter()}
 }
 
 func (m *monolith) setupDatabases() {
