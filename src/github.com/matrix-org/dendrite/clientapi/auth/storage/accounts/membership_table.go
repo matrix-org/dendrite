@@ -23,7 +23,7 @@ import (
 
 const membershipSchema = `
 -- Stores data about users memberships to rooms.
-CREATE TABLE IF NOT EXISTS memberships (
+CREATE TABLE IF NOT EXISTS account_memberships (
     -- The Matrix user ID localpart for the member
     localpart TEXT NOT NULL,
     -- The room this user is a member of
@@ -36,25 +36,25 @@ CREATE TABLE IF NOT EXISTS memberships (
 );
 
 -- Use index to process deletion by ID more efficiently
-CREATE UNIQUE INDEX IF NOT EXISTS membership_event_id ON memberships(event_id);
+CREATE UNIQUE INDEX IF NOT EXISTS account_membership_event_id ON account_memberships(event_id);
 `
 
 const insertMembershipSQL = `
-	INSERT INTO memberships(localpart, room_id, event_id) VALUES ($1, $2, $3)
+	INSERT INTO account_memberships(localpart, room_id, event_id) VALUES ($1, $2, $3)
 	ON CONFLICT (localpart, room_id) DO UPDATE SET event_id = EXCLUDED.event_id
 `
 
 const selectMembershipSQL = "" +
-	"SELECT * from memberships WHERE localpart = $1 AND room_id = $2"
+	"SELECT * from account_memberships WHERE localpart = $1 AND room_id = $2"
 
 const selectMembershipsByLocalpartSQL = "" +
-	"SELECT room_id, event_id FROM memberships WHERE localpart = $1"
+	"SELECT room_id, event_id FROM account_memberships WHERE localpart = $1"
 
 const deleteMembershipsByEventIDsSQL = "" +
-	"DELETE FROM memberships WHERE event_id = ANY($1)"
+	"DELETE FROM account_memberships WHERE event_id = ANY($1)"
 
 const updateMembershipByEventIDSQL = "" +
-	"UPDATE memberships SET event_id = $2 WHERE event_id = $1"
+	"UPDATE account_memberships SET event_id = $2 WHERE event_id = $1"
 
 type membershipStatements struct {
 	deleteMembershipsByEventIDsStmt  *sql.Stmt

@@ -23,9 +23,9 @@ import (
 )
 
 const thumbnailSchema = `
--- The thumbnail table holds metadata for each thumbnail file stored and accessible to the local server,
+-- The mediaapi_thumbnail table holds metadata for each thumbnail file stored and accessible to the local server,
 -- the actual file is stored separately.
-CREATE TABLE IF NOT EXISTS thumbnail (
+CREATE TABLE IF NOT EXISTS mediaapi_thumbnail (
     -- The id used to refer to the media.
     -- For uploads to this server this is a base64-encoded sha256 hash of the file data
     -- For media from remote servers, this can be any unique identifier string
@@ -45,22 +45,22 @@ CREATE TABLE IF NOT EXISTS thumbnail (
     -- The resize method used to generate the thumbnail. Can be crop or scale.
     resize_method TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS thumbnail_index ON thumbnail (media_id, media_origin, width, height, resize_method);
+CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
 `
 
 const insertThumbnailSQL = `
-INSERT INTO thumbnail (media_id, media_origin, content_type, file_size_bytes, creation_ts, width, height, resize_method)
+INSERT INTO mediaapi_thumbnail (media_id, media_origin, content_type, file_size_bytes, creation_ts, width, height, resize_method)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 // Note: this selects one specific thumbnail
 const selectThumbnailSQL = `
-SELECT content_type, file_size_bytes, creation_ts FROM thumbnail WHERE media_id = $1 AND media_origin = $2 AND width = $3 AND height = $4 AND resize_method = $5
+SELECT content_type, file_size_bytes, creation_ts FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2 AND width = $3 AND height = $4 AND resize_method = $5
 `
 
 // Note: this selects all thumbnails for a media_origin and media_id
 const selectThumbnailsSQL = `
-SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method FROM thumbnail WHERE media_id = $1 AND media_origin = $2
+SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2
 `
 
 type thumbnailStatements struct {

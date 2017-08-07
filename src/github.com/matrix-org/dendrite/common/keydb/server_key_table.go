@@ -17,13 +17,14 @@ package keydb
 import (
 	"database/sql"
 	"encoding/json"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const serverKeysSchema = `
 -- A cache of server keys downloaded from remote servers.
-CREATE TABLE IF NOT EXISTS server_keys (
+CREATE TABLE IF NOT EXISTS keydb_server_keys (
 	-- The name of the matrix server the key is for.
 	server_name TEXT NOT NULL,
 	-- The ID of the server key.
@@ -35,21 +36,21 @@ CREATE TABLE IF NOT EXISTS server_keys (
 	valid_until_ts BIGINT NOT NULL,
 	-- The raw JSON for the server key.
 	server_key_json TEXT NOT NULL,
-	CONSTRAINT server_keys_unique UNIQUE (server_name, server_key_id)
+	CONSTRAINT keydb_server_keys_unique UNIQUE (server_name, server_key_id)
 );
 
-CREATE INDEX IF NOT EXISTS server_name_and_key_id ON server_keys (server_name_and_key_id);
+CREATE INDEX IF NOT EXISTS keydb_server_name_and_key_id ON keydb_server_keys (server_name_and_key_id);
 `
 
 const bulkSelectServerKeysSQL = "" +
-	"SELECT server_name, server_key_id, server_key_json FROM server_keys" +
+	"SELECT server_name, server_key_id, server_key_json FROM keydb_server_keys" +
 	" WHERE server_name_and_key_id = ANY($1)"
 
 const upsertServerKeysSQL = "" +
-	"INSERT INTO server_keys (server_name, server_key_id," +
+	"INSERT INTO keydb_server_keys (server_name, server_key_id," +
 	" server_name_and_key_id, valid_until_ts, server_key_json)" +
 	" VALUES ($1, $2, $3, $4, $5)" +
-	" ON CONFLICT ON CONSTRAINT server_keys_unique" +
+	" ON CONFLICT ON CONSTRAINT keydb_server_keys_unique" +
 	" DO UPDATE SET valid_until_ts = $4, server_key_json = $5"
 
 type serverKeyStatements struct {
