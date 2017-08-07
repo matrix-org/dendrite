@@ -184,11 +184,11 @@ type RoomRecentEventsUpdater interface {
 // The caller should call one of SetToInvite, SetToJoin or SetToLeave once to
 // make the update, or none of them if no update is required.
 type MembershipUpdater interface {
-	// True if the target user is invited to the room.
+	// True if the target user is invited to the room before updating.
 	IsInvite() bool
-	// True if the target user is joined to the room.
+	// True if the target user is joined to the room before updating.
 	IsJoin() bool
-	// True if the target user is not invited or joined to the room.
+	// True if the target user is not invited or joined to the room before updating.
 	IsLeave() bool
 	// Set the state to invite.
 	// Returns whether this invite needs to be sent
