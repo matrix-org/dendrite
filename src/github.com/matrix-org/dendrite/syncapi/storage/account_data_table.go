@@ -22,7 +22,7 @@ import (
 
 const accountDataSchema = `
 -- Stores the users account data
-CREATE TABLE IF NOT EXISTS account_data_type (
+CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
     -- The highest numeric ID from the output_room_events at the time of saving the data
     id BIGINT,
     -- ID of the user the data belongs to
@@ -35,19 +35,19 @@ CREATE TABLE IF NOT EXISTS account_data_type (
     PRIMARY KEY(user_id, room_id, type),
 
     -- We don't want two entries of the same type for the same user
-    CONSTRAINT account_data_unique UNIQUE (user_id, room_id, type)
+    CONSTRAINT syncapi_account_data_unique UNIQUE (user_id, room_id, type)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS account_data_id_idx ON account_data_type(id);
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id);
 `
 
 const insertAccountDataSQL = "" +
-	"INSERT INTO account_data_type (id, user_id, room_id, type) VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT ON CONSTRAINT account_data_unique" +
+	"INSERT INTO syncapi_account_data_type (id, user_id, room_id, type) VALUES ($1, $2, $3, $4)" +
+	" ON CONFLICT ON CONSTRAINT syncapi_account_data_unique" +
 	" DO UPDATE SET id = EXCLUDED.id"
 
 const selectAccountDataInRangeSQL = "" +
-	"SELECT room_id, type FROM account_data_type" +
+	"SELECT room_id, type FROM syncapi_account_data_type" +
 	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id ASC"
 

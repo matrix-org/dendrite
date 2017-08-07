@@ -17,10 +17,11 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"sort"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
-	"sort"
 )
 
 const stateDataSchema = `
@@ -33,8 +34,8 @@ const stateDataSchema = `
 -- lookup a specific (type, state_key) pair for an event. It also makes it easy
 -- to read the state for a given state_block_nid ordered by (type, state_key)
 -- which in turn makes it easier to merge state data blocks.
-CREATE SEQUENCE IF NOT EXISTS state_block_nid_seq;
-CREATE TABLE IF NOT EXISTS state_block (
+CREATE SEQUENCE IF NOT EXISTS roomserver_state_block_nid_seq;
+CREATE TABLE IF NOT EXISTS roomserver_state_block (
     -- Local numeric ID for this state data.
     state_block_nid bigint NOT NULL,
     event_type_nid bigint NOT NULL,
@@ -45,11 +46,11 @@ CREATE TABLE IF NOT EXISTS state_block (
 `
 
 const insertStateDataSQL = "" +
-	"INSERT INTO state_block (state_block_nid, event_type_nid, event_state_key_nid, event_nid)" +
+	"INSERT INTO roomserver_state_block (state_block_nid, event_type_nid, event_state_key_nid, event_nid)" +
 	" VALUES ($1, $2, $3, $4)"
 
 const selectNextStateBlockNIDSQL = "" +
-	"SELECT nextval('state_block_nid_seq')"
+	"SELECT nextval('roomserver_state_block_nid_seq')"
 
 // Bulk state lookup by numeric state block ID.
 // Sort by the state_block_nid, event_type_nid, event_state_key_nid
@@ -59,7 +60,7 @@ const selectNextStateBlockNIDSQL = "" +
 // state data blocks together.
 const bulkSelectStateBlockEntriesSQL = "" +
 	"SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
-	" FROM state_block WHERE state_block_nid = ANY($1)" +
+	" FROM roomserver_state_block WHERE state_block_nid = ANY($1)" +
 	" ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
 
 // Bulk state lookup by numeric state block ID.
@@ -71,7 +72,7 @@ const bulkSelectStateBlockEntriesSQL = "" +
 // actually wanted.
 const bulkSelectFilteredStateBlockEntriesSQL = "" +
 	"SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
-	" FROM state_block WHERE state_block_nid = ANY($1)" +
+	" FROM roomserver_state_block WHERE state_block_nid = ANY($1)" +
 	" AND event_type_nid = ANY($2) AND event_state_key_nid = ANY($3)" +
 	" ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
 

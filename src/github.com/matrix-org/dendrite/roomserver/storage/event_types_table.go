@@ -16,6 +16,7 @@ package storage
 
 import (
 	"database/sql"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -43,14 +44,14 @@ const eventTypesSchema = `
 -- Other event types are automatically assigned numeric IDs starting from 2**16.
 -- This leaves room to add more pre-assigned numeric IDs and clearly separates
 -- the automatically assigned IDs from the pre-assigned IDs.
-CREATE SEQUENCE IF NOT EXISTS event_type_nid_seq START 65536;
-CREATE TABLE IF NOT EXISTS event_types (
+CREATE SEQUENCE IF NOT EXISTS roomserver_event_type_nid_seq START 65536;
+CREATE TABLE IF NOT EXISTS roomserver_event_types (
     -- Local numeric ID for the event type.
-    event_type_nid BIGINT PRIMARY KEY DEFAULT nextval('event_type_nid_seq'),
+    event_type_nid BIGINT PRIMARY KEY DEFAULT nextval('roomserver_event_type_nid_seq'),
     -- The string event_type.
-    event_type TEXT NOT NULL CONSTRAINT event_type_unique UNIQUE
+    event_type TEXT NOT NULL CONSTRAINT roomserver_event_type_unique UNIQUE
 );
-INSERT INTO event_types (event_type_nid, event_type) VALUES
+INSERT INTO roomserver_event_types (event_type_nid, event_type) VALUES
     (1, 'm.room.create'),
     (2, 'm.room.power_levels'),
     (3, 'm.room.join_rules'),
@@ -74,17 +75,17 @@ INSERT INTO event_types (event_type_nid, event_type) VALUES
 // row even though the data doesn't change resulting in unncesssary modifications
 // to the indexes.
 const insertEventTypeNIDSQL = "" +
-	"INSERT INTO event_types (event_type) VALUES ($1)" +
-	" ON CONFLICT ON CONSTRAINT event_type_unique" +
+	"INSERT INTO roomserver_event_types (event_type) VALUES ($1)" +
+	" ON CONFLICT ON CONSTRAINT roomserver_event_type_unique" +
 	" DO NOTHING RETURNING (event_type_nid)"
 
 const selectEventTypeNIDSQL = "" +
-	"SELECT event_type_nid FROM event_types WHERE event_type = $1"
+	"SELECT event_type_nid FROM roomserver_event_types WHERE event_type = $1"
 
 // Bulk lookup from string event type to numeric ID for that event type.
 // Takes an array of strings as the query parameter.
 const bulkSelectEventTypeNIDSQL = "" +
-	"SELECT event_type, event_type_nid FROM event_types" +
+	"SELECT event_type, event_type_nid FROM roomserver_event_types" +
 	" WHERE event_type = ANY($1)"
 
 type eventTypeStatements struct {

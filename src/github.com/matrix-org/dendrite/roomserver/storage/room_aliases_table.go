@@ -20,27 +20,27 @@ import (
 
 const roomAliasesSchema = `
 -- Stores room aliases and room IDs they refer to
-CREATE TABLE IF NOT EXISTS room_aliases (
+CREATE TABLE IF NOT EXISTS roomserver_room_aliases (
     -- Alias of the room
     alias TEXT NOT NULL PRIMARY KEY,
     -- Room ID the alias refers to
     room_id TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS room_id_idx ON room_aliases(room_id);
+CREATE UNIQUE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_room_aliases(room_id);
 `
 
 const insertRoomAliasSQL = "" +
-	"INSERT INTO room_aliases (alias, room_id) VALUES ($1, $2)"
+	"INSERT INTO roomserver_room_aliases (alias, room_id) VALUES ($1, $2)"
 
 const selectRoomIDFromAliasSQL = "" +
-	"SELECT room_id FROM room_aliases WHERE alias = $1"
+	"SELECT room_id FROM roomserver_room_aliases WHERE alias = $1"
 
 const selectAliasesFromRoomIDSQL = "" +
-	"SELECT alias FROM room_aliases WHERE room_id = $1"
+	"SELECT alias FROM roomserver_room_aliases WHERE room_id = $1"
 
 const deleteRoomAliasSQL = "" +
-	"DELETE FROM room_aliases WHERE alias = $1"
+	"DELETE FROM roomserver_room_aliases WHERE alias = $1"
 
 type roomAliasesStatements struct {
 	insertRoomAliasStmt         *sql.Stmt

@@ -25,7 +25,7 @@ import (
 
 const devicesSchema = `
 -- Stores data about devices.
-CREATE TABLE IF NOT EXISTS devices (
+CREATE TABLE IF NOT EXISTS device_devices (
     -- The access token granted to this device. This has to be the primary key
     -- so we can distinguish which device is making a given request.
     access_token TEXT NOT NULL PRIMARY KEY,
@@ -42,17 +42,17 @@ CREATE TABLE IF NOT EXISTS devices (
 );
 
 -- Device IDs must be unique for a given user.
-CREATE UNIQUE INDEX IF NOT EXISTS localpart_id_idx ON devices(localpart, device_id);
+CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(localpart, device_id);
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO devices(device_id, localpart, access_token, created_ts) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts) VALUES ($1, $2, $3, $4)"
 
 const selectDeviceByTokenSQL = "" +
-	"SELECT device_id, localpart FROM devices WHERE access_token = $1"
+	"SELECT device_id, localpart FROM device_devices WHERE access_token = $1"
 
 const deleteDeviceSQL = "" +
-	"DELETE FROM devices WHERE device_id = $1 AND localpart = $2"
+	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
 
 // TODO: List devices?
 

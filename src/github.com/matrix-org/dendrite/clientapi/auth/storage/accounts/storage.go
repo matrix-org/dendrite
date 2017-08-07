@@ -44,7 +44,7 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 		return nil, err
 	}
 	partitions := common.PartitionOffsetStatements{}
-	if err = partitions.Prepare(db); err != nil {
+	if err = partitions.Prepare(db, "account"); err != nil {
 		return nil, err
 	}
 	a := accountsStatements{}

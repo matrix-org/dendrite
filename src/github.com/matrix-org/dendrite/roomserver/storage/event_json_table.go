@@ -16,13 +16,14 @@ package storage
 
 import (
 	"database/sql"
+
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 const eventJSONSchema = `
 -- Stores the JSON for each event. This kept separate from the main events
 -- table to keep the rows in the main events table small.
-CREATE TABLE IF NOT EXISTS event_json (
+CREATE TABLE IF NOT EXISTS roomserver_event_json (
     -- Local numeric ID for the event.
     event_nid BIGINT NOT NULL PRIMARY KEY,
     -- The JSON for the event.
@@ -37,14 +38,14 @@ CREATE TABLE IF NOT EXISTS event_json (
 `
 
 const insertEventJSONSQL = "" +
-	"INSERT INTO event_json (event_nid, event_json) VALUES ($1, $2)" +
+	"INSERT INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)" +
 	" ON CONFLICT DO NOTHING"
 
 // Bulk event JSON lookup by numeric event ID.
 // Sort by the numeric event ID.
 // This means that we can use binary search to lookup by numeric event ID.
 const bulkSelectEventJSONSQL = "" +
-	"SELECT event_nid, event_json FROM event_json" +
+	"SELECT event_nid, event_json FROM roomserver_event_json" +
 	" WHERE event_nid = ANY($1)" +
 	" ORDER BY event_nid ASC"
 

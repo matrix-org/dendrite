@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/consumers"
@@ -53,8 +54,9 @@ func main() {
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
+	inputAPI := api.NewRoomserverInputAPIHTTP(cfg.RoomServerURL(), nil)
 
-	roomserverProducer := producers.NewRoomserverProducer(cfg.RoomServerURL())
+	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 	userUpdateProducer, err := producers.NewUserUpdateProducer(
 		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.UserUpdates),
 	)
@@ -102,10 +104,14 @@ func main() {
 	}
 
 	log.Info("Starting client API server on ", cfg.Listen.ClientAPI)
+
+	api := mux.NewRouter()
 	routing.Setup(
-		http.DefaultServeMux, http.DefaultClient, *cfg, roomserverProducer,
+		api, http.DefaultClient, *cfg, roomserverProducer,
 		queryAPI, aliasAPI, accountDB, deviceDB, federation, keyRing,
 		userUpdateProducer, syncProducer,
 	)
+	common.SetupHTTPAPI(http.DefaultServeMux, api)
+
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.ClientAPI), nil))
 }

@@ -17,6 +17,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -25,10 +26,10 @@ import (
 const eventsSchema = `
 -- The events table holds metadata for each event, the actual JSON is stored
 -- separately to keep the size of the rows small.
-CREATE SEQUENCE IF NOT EXISTS event_nid_seq;
-CREATE TABLE IF NOT EXISTS events (
+CREATE SEQUENCE IF NOT EXISTS roomserver_event_nid_seq;
+CREATE TABLE IF NOT EXISTS roomserver_events (
     -- Local numeric ID for the event.
-    event_nid BIGINT PRIMARY KEY DEFAULT nextval('event_nid_seq'),
+    event_nid BIGINT PRIMARY KEY DEFAULT nextval('roomserver_event_nid_seq'),
     -- Local numeric ID for the room the event is in.
     -- This is never 0.
     room_nid BIGINT NOT NULL,
@@ -53,7 +54,7 @@ CREATE TABLE IF NOT EXISTS events (
     -- Used to lookup the numeric ID when processing requests.
     -- Needed for state resolution.
     -- An event may only appear in this table once.
-    event_id TEXT NOT NULL CONSTRAINT event_id_unique UNIQUE,
+    event_id TEXT NOT NULL CONSTRAINT roomserver_event_id_unique UNIQUE,
     -- The sha256 reference hash for the event.
     -- Needed for setting reference hashes when sending new events.
     reference_sha256 BYTEA NOT NULL,
@@ -63,54 +64,54 @@ CREATE TABLE IF NOT EXISTS events (
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth)" +
+	"INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
-	" ON CONFLICT ON CONSTRAINT event_id_unique" +
+	" ON CONFLICT ON CONSTRAINT roomserver_event_id_unique" +
 	" DO NOTHING" +
 	" RETURNING event_nid, state_snapshot_nid"
 
 const selectEventSQL = "" +
-	"SELECT event_nid, state_snapshot_nid FROM events WHERE event_id = $1"
+	"SELECT event_nid, state_snapshot_nid FROM roomserver_events WHERE event_id = $1"
 
 // Bulk lookup of events by string ID.
 // Sort by the numeric IDs for event type and state key.
 // This means we can use binary search to lookup entries by type and state key.
 const bulkSelectStateEventByIDSQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid FROM events" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
 	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 const bulkSelectStateAtEventByIDSQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid FROM events" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid FROM roomserver_events" +
 	" WHERE event_id = ANY($1)"
 
 const updateEventStateSQL = "" +
-	"UPDATE events SET state_snapshot_nid = $2 WHERE event_nid = $1"
+	"UPDATE roomserver_events SET state_snapshot_nid = $2 WHERE event_nid = $1"
 
 const selectEventSentToOutputSQL = "" +
-	"SELECT sent_to_output FROM events WHERE event_nid = $1"
+	"SELECT sent_to_output FROM roomserver_events WHERE event_nid = $1"
 
 const updateEventSentToOutputSQL = "" +
-	"UPDATE events SET sent_to_output = TRUE WHERE event_nid = $1"
+	"UPDATE roomserver_events SET sent_to_output = TRUE WHERE event_nid = $1"
 
 const selectEventIDSQL = "" +
-	"SELECT event_id FROM events WHERE event_nid = $1"
+	"SELECT event_id FROM roomserver_events WHERE event_nid = $1"
 
 const bulkSelectStateAtEventAndReferenceSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
-	" FROM events WHERE event_nid = ANY($1)"
+	" FROM roomserver_events WHERE event_nid = ANY($1)"
 
 const bulkSelectEventReferenceSQL = "" +
-	"SELECT event_id, reference_sha256 FROM events WHERE event_nid = ANY($1)"
+	"SELECT event_id, reference_sha256 FROM roomserver_events WHERE event_nid = ANY($1)"
 
 const bulkSelectEventIDSQL = "" +
-	"SELECT event_nid, event_id FROM events WHERE event_nid = ANY($1)"
+	"SELECT event_nid, event_id FROM roomserver_events WHERE event_nid = ANY($1)"
 
 const bulkSelectEventNIDSQL = "" +
-	"SELECT event_id, event_nid FROM events WHERE event_id = ANY($1)"
+	"SELECT event_id, event_nid FROM roomserver_events WHERE event_id = ANY($1)"
 
 const selectMaxEventDepthSQL = "" +
-	"SELECT COALESCE(MAX(depth) + 1, 0) FROM events WHERE event_nid = ANY($1)"
+	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid = ANY($1)"
 
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt

@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -66,8 +67,9 @@ func main() {
 	}
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
+	inputAPI := api.NewRoomserverInputAPIHTTP(cfg.RoomServerURL(), nil)
 
-	roomserverProducer := producers.NewRoomserverProducer(cfg.RoomServerURL())
+	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 
 	if err != nil {
 		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.Kafka.Addresses, err)
@@ -75,6 +77,9 @@ func main() {
 
 	log.Info("Starting federation API server on ", cfg.Listen.FederationAPI)
 
-	routing.Setup(http.DefaultServeMux, *cfg, queryAPI, roomserverProducer, keyRing, federation)
+	api := mux.NewRouter()
+	routing.Setup(api, *cfg, queryAPI, roomserverProducer, keyRing, federation)
+	common.SetupHTTPAPI(http.DefaultServeMux, api)
+
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.FederationAPI), nil))
 }

@@ -25,9 +25,9 @@ type RoomserverProducer struct {
 }
 
 // NewRoomserverProducer creates a new RoomserverProducer
-func NewRoomserverProducer(roomserverURI string) *RoomserverProducer {
+func NewRoomserverProducer(inputAPI api.RoomserverInputAPI) *RoomserverProducer {
 	return &RoomserverProducer{
-		InputAPI: api.NewRoomserverInputAPIHTTP(roomserverURI, nil),
+		InputAPI: inputAPI,
 	}
 }
 

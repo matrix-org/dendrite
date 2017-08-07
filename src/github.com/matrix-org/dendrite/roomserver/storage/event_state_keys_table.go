@@ -16,6 +16,7 @@ package storage
 
 import (
 	"database/sql"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -31,29 +32,30 @@ const eventStateKeysSchema = `
 -- Other state keys are automatically assigned numeric IDs starting from 2**16.
 -- This leaves room to add more pre-assigned numeric IDs and clearly separates
 -- the automatically assigned IDs from the pre-assigned IDs.
-CREATE SEQUENCE IF NOT EXISTS event_state_key_nid_seq START 65536;
-CREATE TABLE IF NOT EXISTS event_state_keys (
+CREATE SEQUENCE IF NOT EXISTS roomserver_event_state_key_nid_seq START 65536;
+CREATE TABLE IF NOT EXISTS roomserver_event_state_keys (
     -- Local numeric ID for the state key.
-    event_state_key_nid BIGINT PRIMARY KEY DEFAULT nextval('event_state_key_nid_seq'),
-    event_state_key TEXT NOT NULL CONSTRAINT event_state_key_unique UNIQUE
+    event_state_key_nid BIGINT PRIMARY KEY DEFAULT nextval('roomserver_event_state_key_nid_seq'),
+    event_state_key TEXT NOT NULL CONSTRAINT roomserver_event_state_key_unique UNIQUE
 );
-INSERT INTO event_state_keys (event_state_key_nid, event_state_key) VALUES
+INSERT INTO roomserver_event_state_keys (event_state_key_nid, event_state_key) VALUES
     (1, '') ON CONFLICT DO NOTHING;
 `
 
 // Same as insertEventTypeNIDSQL
 const insertEventStateKeyNIDSQL = "" +
-	"INSERT INTO event_state_keys (event_state_key) VALUES ($1)" +
-	" ON CONFLICT ON CONSTRAINT event_state_key_unique" +
+	"INSERT INTO roomserver_event_state_keys (event_state_key) VALUES ($1)" +
+	" ON CONFLICT ON CONSTRAINT roomserver_event_state_key_unique" +
 	" DO NOTHING RETURNING (event_state_key_nid)"
 
 const selectEventStateKeyNIDSQL = "" +
-	"SELECT event_state_key_nid FROM event_state_keys WHERE event_state_key = $1"
+	"SELECT event_state_key_nid FROM roomserver_event_state_keys" +
+	" WHERE event_state_key = $1"
 
 // Bulk lookup from string state key to numeric ID for that state key.
 // Takes an array of strings as the query parameter.
 const bulkSelectEventStateKeyNIDSQL = "" +
-	"SELECT event_state_key, event_state_key_nid FROM event_state_keys" +
+	"SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys" +
 	" WHERE event_state_key = ANY($1)"
 
 type eventStateKeyStatements struct {
