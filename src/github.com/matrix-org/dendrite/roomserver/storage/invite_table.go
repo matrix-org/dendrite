@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS roomserver_invites (
 	invite_event_json TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS roomserver_invites_active_idx ON invites (target_nid, room_nid)
+CREATE INDEX IF NOT EXISTS roomserver_invites_active_idx ON roomserver_invites (target_nid, room_nid)
 	WHERE NOT retired;
 `
 const insertInviteEventSQL = "" +
