@@ -35,7 +35,7 @@ const membershipSchema = `
 --   1) The membership of a user changes within the current state of the room.
 --   2) An invite is received outside of a room over federation. 
 --   3) An invite is rejected outside of a room over federation.
-CREATE TABLE IF NOT EXISTS membership (
+CREATE TABLE IF NOT EXISTS roomserver_membership (
 	room_nid BIGINT NOT NULL,
 	-- Numeric state key ID for the user ID this state is for.
 	target_nid BIGINT NOT NULL,
@@ -48,16 +48,16 @@ CREATE TABLE IF NOT EXISTS membership (
 `
 
 const insertMembershipSQL = "" +
-	"INSERT INTO membership (room_nid, target_nid)" +
+	"INSERT INTO roomserver_membership (room_nid, target_nid)" +
 	" VALUES ($1, $2)" +
 	" ON CONFLICT DO NOTHING"
 
 const selectMembershipForUpdateSQL = "" +
-	"SELECT membership_nid FROM membership" +
+	"SELECT membership_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1 AND target_nid = $2 FOR UPDATE"
 
 const updateMembershipSQL = "" +
-	"UPDATE membership SET sender_nid = $3, membership_nid = $4" +
+	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 type membershipStatements struct {

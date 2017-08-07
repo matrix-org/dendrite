@@ -21,7 +21,7 @@ import (
 )
 
 const inviteSchema = `
-CREATE TABLE IF NOT EXISTS invites (
+CREATE TABLE IF NOT EXISTS roomserver_invites (
 	-- The string ID of the invite event itself.
 	-- We can't use a numeric event ID here because we don't always have
 	-- enough information to store an invite in the event table.
@@ -47,16 +47,16 @@ CREATE TABLE IF NOT EXISTS invites (
 	invite_event_json TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS invites_active_idx ON invites (target_nid, room_nid)
+CREATE INDEX IF NOT EXISTS roomserver_invites_active_idx ON invites (target_nid, room_nid)
 	WHERE NOT retired;
 `
 const insertInviteEventSQL = "" +
-	"INSERT INTO invites (invite_event_id, room_nid, target_nid," +
+	"INSERT INTO roomserver_invites (invite_event_id, room_nid, target_nid," +
 	" sender_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
 	" ON CONFLICT DO NOTHING"
 
 const selectInviteActiveForUserInRoomSQL = "" +
-	"SELECT invite_event_id, sender_nid FROM invites" +
+	"SELECT invite_event_id, sender_nid FROM roomserver_invites" +
 	" WHERE target_nid = $1 AND room_nid = $2" +
 	" AND NOT retired"
 
@@ -66,7 +66,7 @@ const selectInviteActiveForUserInRoomSQL = "" +
 // However the matrix protocol doesn't give us a way to reliably identify the
 // invites that were retired, so we are forced to retire all of them.
 const updateInviteRetiredSQL = "" +
-	"UPDATE invites SET retired = TRUE" +
+	"UPDATE roomserver_invites SET retired = TRUE" +
 	" WHERE room_nid = $1 AND target_nid = $2 AND NOT retired" +
 	" RETURNING invite_event_id"
 
