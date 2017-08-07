@@ -60,6 +60,8 @@ var (
 	configPath    = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
 	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
+	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
+	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
 )
 
 func main() {
@@ -85,7 +87,20 @@ func main() {
 	m.setupAPIs()
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
-	log.Fatal(http.ListenAndServe(*httpBindAddr, m.api))
+	go func() {
+		log.Info("Listening on ", *httpBindAddr)
+		log.Fatal(http.ListenAndServe(*httpBindAddr, m.api))
+	}()
+	// Handle HTTPS if certificate and key are provided
+	go func() {
+		if *certFile != "" && *keyFile != "" {
+			log.Info("Listening on ", *httpsBindAddr)
+			log.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, m.api))
+		}
+	}()
+
+	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
+	select {}
 }
 
 // A monolith contains all the dendrite components.
