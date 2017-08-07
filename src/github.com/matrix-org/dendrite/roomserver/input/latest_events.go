@@ -73,6 +73,10 @@ func updateLatestEvents(
 	return u.doUpdateLatestEvents()
 }
 
+// latestEventsUpdater tracks the state used to update the latest events in the
+// room. It mostly just ferries state between the various function calls.
+// The state could be passed using function arguments, but it becomes impractical
+// when there are so many variables to pass around.
 type latestEventsUpdater struct {
 	db                      RoomEventDatabase
 	updater                 types.RoomRecentEventsUpdater
