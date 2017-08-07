@@ -33,7 +33,11 @@ func GetMemberships(
 	accountDB *accounts.Database, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
-	localpart, server, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+	_, server, err := gomatrixserverlib.SplitID('!', roomID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
