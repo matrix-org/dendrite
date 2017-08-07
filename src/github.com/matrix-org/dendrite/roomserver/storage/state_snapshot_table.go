@@ -17,6 +17,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -32,10 +33,10 @@ const stateSnapshotSchema = `
 -- because room state tends to accumulate small changes over time. Although if
 -- the list of deltas becomes too long it becomes more efficient to encode
 -- the full state under single state_block_nid.
-CREATE SEQUENCE IF NOT EXISTS state_snapshot_nid_seq;
-CREATE TABLE IF NOT EXISTS state_snapshots (
+CREATE SEQUENCE IF NOT EXISTS roomserver_state_snapshot_nid_seq;
+CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
     -- Local numeric ID for the state.
-    state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('state_snapshot_nid_seq'),
+    state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_snapshot_nid_seq'),
     -- Local numeric ID of the room this state is for.
     -- Unused in normal operation, but useful for background work or ad-hoc debugging.
     room_nid bigint NOT NULL,
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS state_snapshots (
 `
 
 const insertStateSQL = "" +
-	"INSERT INTO state_snapshots (room_nid, state_block_nids)" +
+	"INSERT INTO roomserver_state_snapshots (room_nid, state_block_nids)" +
 	" VALUES ($1, $2)" +
 	" RETURNING state_snapshot_nid"
 
@@ -53,7 +54,7 @@ const insertStateSQL = "" +
 // Sorting by state_snapshot_nid means we can use binary search over the result
 // to lookup the state data NIDs for a state snapshot NID.
 const bulkSelectStateBlockNIDsSQL = "" +
-	"SELECT state_snapshot_nid, state_block_nids FROM state_snapshots" +
+	"SELECT state_snapshot_nid, state_block_nids FROM roomserver_state_snapshots" +
 	" WHERE state_snapshot_nid = ANY($1) ORDER BY state_snapshot_nid ASC"
 
 type stateSnapshotStatements struct {

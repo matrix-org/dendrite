@@ -23,8 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/input"
-	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -49,8 +47,8 @@ type RoomserverAliasAPIDatabase interface {
 type RoomserverAliasAPI struct {
 	DB       RoomserverAliasAPIDatabase
 	Cfg      *config.Dendrite
-	InputAPI input.RoomserverInputAPI
-	QueryAPI query.RoomserverQueryAPI
+	InputAPI api.RoomserverInputAPI
+	QueryAPI api.RoomserverQueryAPI
 }
 
 // SetRoomAlias implements api.RoomserverAliasAPI

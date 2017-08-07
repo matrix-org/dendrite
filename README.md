@@ -126,7 +126,7 @@ so that the readers can avoid querying the room server unnecessarily.
     * Checks if it has already processed or is processing a request with the
       same `txnID`.
     * Checks the signatures for the events.
-      Fetches the ed2519 keys for the event senders if necessary.
+      Fetches the ed25519 keys for the event senders if necessary.
     * Queries the RoomServer for a copy of the state of the room at each event.
     * If the RoomServer doesn't know the state of the room at an event then
       query the state of the room at the event from the remote server using

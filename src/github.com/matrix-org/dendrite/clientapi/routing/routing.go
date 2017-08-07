@@ -81,6 +81,12 @@ func Setup(
 			)
 		}),
 	)
+	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
+		common.MakeAuthAPI("membership", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return writers.SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, producer)
+		}),
+	).Methods("POST", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
