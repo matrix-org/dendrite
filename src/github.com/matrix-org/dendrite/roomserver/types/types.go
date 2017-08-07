@@ -181,6 +181,8 @@ type RoomRecentEventsUpdater interface {
 // A MembershipUpdater is used to update the membership of a user in a room.
 // (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
 //  lock on the row in the membership table for this user in the room)
+// The caller should call one of SetToInvite, SetToJoin or SetToLeave once to
+// make the update, or none of them if no update is required.
 type MembershipUpdater interface {
 	// True if the target user is invited to the room.
 	IsInvite() bool
@@ -192,6 +194,7 @@ type MembershipUpdater interface {
 	// Returns whether this invite needs to be sent
 	SetToInvite(event gomatrixserverlib.Event) (needsSending bool, err error)
 	// Set the state to join.
+	// Returns a list of invite event IDs that this state change retired.
 	SetToJoin(senderUserID string) (inviteEventIDs []string, err error)
 	// Set the state to leave.
 	// Returns a list of invite event IDs that this state change retired.
