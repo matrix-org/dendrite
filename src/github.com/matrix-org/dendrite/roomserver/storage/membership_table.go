@@ -80,27 +80,27 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *membershipStatements) insertMembership(
-	txn *sql.Tx, roomNID types.RoomNID, targetNID types.EventStateKeyNID,
+	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) error {
-	_, err := txn.Stmt(s.insertMembershipStmt).Exec(roomNID, targetNID)
+	_, err := txn.Stmt(s.insertMembershipStmt).Exec(roomNID, targetUserNID)
 	return err
 }
 
 func (s *membershipStatements) selectMembershipForUpdate(
-	txn *sql.Tx, roomNID types.RoomNID, targetNID types.EventStateKeyNID,
+	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (membership membershipState, err error) {
 	err = txn.Stmt(s.selectMembershipForUpdateStmt).QueryRow(
-		roomNID, targetNID,
+		roomNID, targetUserNID,
 	).Scan(&membership)
 	return
 }
 
 func (s *membershipStatements) updateMembership(
-	txn *sql.Tx, roomNID types.RoomNID, targetNID types.EventStateKeyNID,
-	senderNID types.EventStateKeyNID, membership membershipState,
+	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+	senderUserNID types.EventStateKeyNID, membership membershipState,
 ) error {
 	_, err := txn.Stmt(s.updateMembershipStmt).Exec(
-		roomNID, targetNID, senderNID, membership,
+		roomNID, targetUserNID, senderUserNID, membership,
 	)
 	return err
 }

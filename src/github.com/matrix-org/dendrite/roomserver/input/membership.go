@@ -45,22 +45,22 @@ func updateMemberships(
 	for _, change := range changes {
 		var ae *gomatrixserverlib.Event
 		var re *gomatrixserverlib.Event
-		var targetNID types.EventStateKeyNID
+		var targetUserNID types.EventStateKeyNID
 		if change.removed.EventNID != 0 {
 			ev, _ := eventMap(events).lookup(change.removed.EventNID)
 			if ev != nil {
 				re = &ev.Event
 			}
-			targetNID = change.removed.EventStateKeyNID
+			targetUserNID = change.removed.EventStateKeyNID
 		}
 		if change.added.EventNID != 0 {
 			ev, _ := eventMap(events).lookup(change.added.EventNID)
 			if ev != nil {
 				ae = &ev.Event
 			}
-			targetNID = change.added.EventStateKeyNID
+			targetUserNID = change.added.EventStateKeyNID
 		}
-		if updates, err = updateMembership(updater, targetNID, re, ae, updates); err != nil {
+		if updates, err = updateMembership(updater, targetUserNID, re, ae, updates); err != nil {
 			return nil, err
 		}
 	}
@@ -68,8 +68,8 @@ func updateMemberships(
 }
 
 func updateMembership(
-	updater types.RoomRecentEventsUpdater, targetNID types.EventStateKeyNID,
-	remove *gomatrixserverlib.Event, add *gomatrixserverlib.Event,
+	updater types.RoomRecentEventsUpdater, targetUserNID types.EventStateKeyNID,
+	remove, add *gomatrixserverlib.Event,
 	updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	var err error
@@ -92,7 +92,7 @@ func updateMembership(
 		return updates, nil
 	}
 
-	mu, err := updater.MembershipUpdater(targetNID)
+	mu, err := updater.MembershipUpdater(targetUserNID)
 	if err != nil {
 		return nil, err
 	}

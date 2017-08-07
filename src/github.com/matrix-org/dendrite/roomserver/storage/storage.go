@@ -323,8 +323,8 @@ func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error
 	return u.d.statements.updateEventSentToOutput(u.txn, eventNID)
 }
 
-func (u *roomRecentEventsUpdater) MembershipUpdater(targetNID types.EventStateKeyNID) (types.MembershipUpdater, error) {
-	return u.d.membershipUpdaterTxn(u.txn, u.roomNID, targetNID)
+func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID) (types.MembershipUpdater, error) {
+	return u.d.membershipUpdaterTxn(u.txn, u.roomNID, targetUserNID)
 }
 
 // RoomNID implements query.RoomserverQueryAPIDB
@@ -382,27 +382,27 @@ func (d *Database) StateEntriesForTuples(
 
 type membershipUpdater struct {
 	transaction
-	d          *Database
-	roomNID    types.RoomNID
-	targetNID  types.EventStateKeyNID
-	membership membershipState
+	d             *Database
+	roomNID       types.RoomNID
+	targetUserNID types.EventStateKeyNID
+	membership    membershipState
 }
 
 func (d *Database) membershipUpdaterTxn(
-	txn *sql.Tx, roomNID types.RoomNID, targetNID types.EventStateKeyNID,
+	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (types.MembershipUpdater, error) {
 
-	if err := d.statements.insertMembership(txn, roomNID, targetNID); err != nil {
+	if err := d.statements.insertMembership(txn, roomNID, targetUserNID); err != nil {
 		return nil, err
 	}
 
-	membership, err := d.statements.selectMembershipForUpdate(txn, roomNID, targetNID)
+	membership, err := d.statements.selectMembershipForUpdate(txn, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &membershipUpdater{
-		transaction{txn}, d, roomNID, targetNID, membership,
+		transaction{txn}, d, roomNID, targetUserNID, membership,
 	}, nil
 }
 
@@ -424,20 +424,20 @@ func (u *membershipUpdater) IsLeave() bool {
 // SetToInvite implements types.MembershipUpdater
 func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
 	// TODO: assign the state key inside the transaction.
-	senderNID, err := u.d.assignStateKeyNID(event.Sender())
+	senderUserNID, err := u.d.assignStateKeyNID(event.Sender())
 	if err != nil {
 		return false, err
 	}
 	eventID := event.EventID()
 	inserted, err := u.d.statements.insertInviteEvent(
-		u.txn, eventID, u.roomNID, u.targetNID, senderNID, event.JSON(),
+		u.txn, eventID, u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
 	)
 	if err != nil {
 		return false, err
 	}
 	if u.membership != membershipStateInvite {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetNID, senderNID, membershipStateInvite,
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite,
 		); err != nil {
 			return false, err
 		}
@@ -448,19 +448,19 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, er
 // SetToJoin implements types.MembershipUpdater
 func (u *membershipUpdater) SetToJoin(senderID string) ([]string, error) {
 	// TODO: assign the state key inside the transaction.
-	senderNID, err := u.d.assignStateKeyNID(senderID)
+	senderUserNID, err := u.d.assignStateKeyNID(senderID)
 	if err != nil {
 		return nil, err
 	}
 	inviteEventIDs, err := u.d.statements.updateInviteRetired(
-		u.txn, u.roomNID, u.targetNID,
+		u.txn, u.roomNID, u.targetUserNID,
 	)
 	if err != nil {
 		return nil, err
 	}
 	if u.membership != membershipStateJoin {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetNID, senderNID, membershipStateJoin,
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateJoin,
 		); err != nil {
 			return nil, err
 		}
@@ -471,19 +471,19 @@ func (u *membershipUpdater) SetToJoin(senderID string) ([]string, error) {
 // SetToLeave implements types.MembershipUpdater
 func (u *membershipUpdater) SetToLeave(senderID string) ([]string, error) {
 	// TODO: assign the state key inside the transaction.
-	senderNID, err := u.d.assignStateKeyNID(senderID)
+	senderUserNID, err := u.d.assignStateKeyNID(senderID)
 	if err != nil {
 		return nil, err
 	}
 	inviteEventIDs, err := u.d.statements.updateInviteRetired(
-		u.txn, u.roomNID, u.targetNID,
+		u.txn, u.roomNID, u.targetUserNID,
 	)
 	if err != nil {
 		return nil, err
 	}
 	if u.membership != membershipStateLeaveOrBan {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetNID, senderNID, membershipStateLeaveOrBan,
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateLeaveOrBan,
 		); err != nil {
 			return nil, err
 		}

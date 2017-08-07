@@ -91,11 +91,11 @@ func (s *inviteStatements) prepare(db *sql.DB) (err error) {
 
 func (s *inviteStatements) insertInviteEvent(
 	txn *sql.Tx, inviteEventID string, roomNID types.RoomNID,
-	targetNID, senderNID types.EventStateKeyNID,
+	targetUserNID, senderUserNID types.EventStateKeyNID,
 	inviteEventJSON []byte,
 ) (bool, error) {
 	result, err := txn.Stmt(s.insertInviteEventStmt).Exec(
-		inviteEventID, roomNID, targetNID, senderNID, inviteEventJSON,
+		inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)
 	if err != nil {
 		return false, err
@@ -108,9 +108,9 @@ func (s *inviteStatements) insertInviteEvent(
 }
 
 func (s *inviteStatements) updateInviteRetired(
-	txn *sql.Tx, roomNID types.RoomNID, targetNID types.EventStateKeyNID,
+	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) ([]string, error) {
-	rows, err := txn.Stmt(s.updateInviteRetiredStmt).Query(roomNID, targetNID)
+	rows, err := txn.Stmt(s.updateInviteRetiredStmt).Query(roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
@@ -128,10 +128,10 @@ func (s *inviteStatements) updateInviteRetired(
 
 // selectInviteActiveForUserInRoom returns a list of sender state key NIDs
 func (s *inviteStatements) selectInviteActiveForUserInRoom(
-	targetNID types.EventStateKeyNID, roomNID types.RoomNID,
+	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
 ) ([]types.EventStateKeyNID, error) {
 	rows, err := s.selectInviteActiveForUserInRoomStmt.Query(
-		targetNID, roomNID,
+		targetUserNID, roomNID,
 	)
 	if err != nil {
 		return nil, err
@@ -139,11 +139,11 @@ func (s *inviteStatements) selectInviteActiveForUserInRoom(
 	defer rows.Close()
 	var result []types.EventStateKeyNID
 	for rows.Next() {
-		var senderNID int64
-		if err := rows.Scan(&senderNID); err != nil {
+		var senderUserNID int64
+		if err := rows.Scan(&senderUserNID); err != nil {
 			return nil, err
 		}
-		result = append(result, types.EventStateKeyNID(senderNID))
+		result = append(result, types.EventStateKeyNID(senderUserNID))
 	}
 	return result, nil
 }
