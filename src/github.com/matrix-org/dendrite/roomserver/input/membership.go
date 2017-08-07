@@ -35,6 +35,10 @@ func updateMemberships(
 			eventNIDs = append(eventNIDs, change.removed.EventNID)
 		}
 	}
+
+	// Load the event JSON so we can look up the "membership" key.
+	// TODO: Maybe add a membership key to the events table so we can load that
+	// key without having to load the entire event JSON?
 	events, err := db.Events(eventNIDs)
 	if err != nil {
 		return nil, err
@@ -73,6 +77,7 @@ func updateMembership(
 	updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	var err error
+	// Default the membership to "leave" if no event was added or removed.
 	old := "leave"
 	new := "leave"
 
@@ -89,6 +94,9 @@ func updateMembership(
 		}
 	}
 	if old == new {
+		// If the membership is the same then nothing changed and we can return
+		// immediately. This should help speed up processing for display name
+		// changes where the membership is "join" both before and after.
 		return updates, nil
 	}
 
@@ -114,11 +122,20 @@ func updateMembership(
 func updateToInviteMembership(
 	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
+	// We may have already sent the invite to the user, either because we are
+	// reprocessing this event, or because the we received this invite from a
+	// remote server via the federation invite API. In those cases we don't need
+	// to send the event.
 	needsSending, err := mu.SetToInvite(*add)
 	if err != nil {
 		return nil, err
 	}
 	if needsSending {
+		// We notify the consumers using a special event even though we will
+		// notify them about the change in current state as part of the normal
+		// room event stream. This ensures that the consumers only have to
+		// consider a single stream of events when determining whether a user
+		// is invited, rather than having to combine multiple streams themselves.
 		onie := api.OutputNewInviteEvent{
 			Event: *add,
 		}
@@ -133,10 +150,15 @@ func updateToInviteMembership(
 func updateToJoinMembership(
 	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-
+	// If the user is already marked as being joined then we can return immediately.
+	// TODO: Is this code reachable given the "old != new" guard in updateMembership?
 	if mu.IsJoin() {
 		return updates, nil
 	}
+	// When we mark a user as being joined we will invalidate any invites that
+	// are active for that user. We notify the consumers that the invites have
+	// been retired using a special event, even though they could infer this
+	// by studying the state changes in the room event stream.
 	retired, err := mu.SetToJoin(add.Sender())
 	if err != nil {
 		return nil, err
@@ -161,10 +183,15 @@ func updateToLeaveMembership(
 	mu types.MembershipUpdater, add *gomatrixserverlib.Event,
 	newMembership string, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-
+	// If the user is already neither joined, nor invited to the room then we
+	// can return immediately.
 	if mu.IsLeave() {
 		return updates, nil
 	}
+	// When we mark a user as having left we will invalidate any invites that
+	// are active for that user. We notify the consumers that the invites have
+	// been retired using a special event, even though they could infer this
+	// by studying the state changes in the room event stream.
 	retired, err := mu.SetToLeave(add.Sender())
 	if err != nil {
 		return nil, err
@@ -185,11 +212,27 @@ func updateToLeaveMembership(
 	return updates, nil
 }
 
+// membershipChanges pairs up the membership state changes from a sorted list
+// of state removed and a sorted list of state added.
+func membershipChanges(removed, added []types.StateEntry) []stateChange {
+	changes := pairUpChanges(removed, added)
+	var result []stateChange
+	for _, c := range changes {
+		if c.added.EventTypeNID == types.MRoomMemberNID ||
+			c.removed.EventTypeNID == types.MRoomMemberNID {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
 type stateChange struct {
 	removed types.StateEntry
 	added   types.StateEntry
 }
 
+// pairUpChanges pairs up the state events added and removed for each type,
+// state key tuple. Assumes that removed and added are sorted.
 func pairUpChanges(removed, added []types.StateEntry) []stateChange {
 	var ai int
 	var ri int
@@ -221,18 +264,4 @@ func pairUpChanges(removed, added []types.StateEntry) []stateChange {
 			ri++
 		}
 	}
-}
-
-// membershipChanges pairs up the membership state changes from a sorted list
-// of state removed and a sorted list of state added.
-func membershipChanges(removed, added []types.StateEntry) []stateChange {
-	changes := pairUpChanges(removed, added)
-	var result []stateChange
-	for _, c := range changes {
-		if c.added.EventTypeNID == types.MRoomMemberNID ||
-			c.removed.EventTypeNID == types.MRoomMemberNID {
-			result = append(result, c)
-		}
-	}
-	return result
 }
