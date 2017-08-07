@@ -446,9 +446,9 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, er
 }
 
 // SetToJoin implements types.MembershipUpdater
-func (u *membershipUpdater) SetToJoin(senderID string) ([]string, error) {
+func (u *membershipUpdater) SetToJoin(senderUserID string) ([]string, error) {
 	// TODO: assign the state key inside the transaction.
-	senderUserNID, err := u.d.assignStateKeyNID(senderID)
+	senderUserNID, err := u.d.assignStateKeyNID(senderUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -469,9 +469,9 @@ func (u *membershipUpdater) SetToJoin(senderID string) ([]string, error) {
 }
 
 // SetToLeave implements types.MembershipUpdater
-func (u *membershipUpdater) SetToLeave(senderID string) ([]string, error) {
+func (u *membershipUpdater) SetToLeave(senderUserID string) ([]string, error) {
 	// TODO: assign the state key inside the transaction.
-	senderUserNID, err := u.d.assignStateKeyNID(senderID)
+	senderUserNID, err := u.d.assignStateKeyNID(senderUserID)
 	if err != nil {
 		return nil, err
 	}
