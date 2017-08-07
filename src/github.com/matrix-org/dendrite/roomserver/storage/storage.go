@@ -65,7 +65,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []typ
 	// Assigned a numeric ID for the state_key if there is one present.
 	// Otherwise set the numeric ID for the state_key to 0.
 	if eventStateKey != nil {
-		if eventStateKeyNID, err = d.assignStateKeyNID(*eventStateKey); err != nil {
+		if eventStateKeyNID, err = d.assignStateKeyNID(nil, *eventStateKey); err != nil {
 			return 0, types.StateAtEvent{}, err
 		}
 	}
@@ -132,15 +132,15 @@ func (d *Database) assignEventTypeNID(eventType string) (types.EventTypeNID, err
 	return eventTypeNID, err
 }
 
-func (d *Database) assignStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
+func (d *Database) assignStateKeyNID(txn *sql.Tx, eventStateKey string) (types.EventStateKeyNID, error) {
 	// Check if we already have a numeric ID in the database.
-	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(eventStateKey)
+	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(txn, eventStateKey)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventStateKeyNID, err = d.statements.insertEventStateKeyNID(eventStateKey)
+		eventStateKeyNID, err = d.statements.insertEventStateKeyNID(txn, eventStateKey)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventStateKeyNID, err = d.statements.selectEventStateKeyNID(eventStateKey)
+			eventStateKeyNID, err = d.statements.selectEventStateKeyNID(txn, eventStateKey)
 		}
 	}
 	return eventStateKeyNID, err
@@ -423,14 +423,12 @@ func (u *membershipUpdater) IsLeave() bool {
 
 // SetToInvite implements types.MembershipUpdater
 func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
-	// TODO: assign the state key inside the transaction.
-	senderUserNID, err := u.d.assignStateKeyNID(event.Sender())
+	senderUserNID, err := u.d.assignStateKeyNID(u.txn, event.Sender())
 	if err != nil {
 		return false, err
 	}
-	eventID := event.EventID()
 	inserted, err := u.d.statements.insertInviteEvent(
-		u.txn, eventID, u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
+		u.txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
 	)
 	if err != nil {
 		return false, err
@@ -447,8 +445,7 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, er
 
 // SetToJoin implements types.MembershipUpdater
 func (u *membershipUpdater) SetToJoin(senderUserID string) ([]string, error) {
-	// TODO: assign the state key inside the transaction.
-	senderUserNID, err := u.d.assignStateKeyNID(senderUserID)
+	senderUserNID, err := u.d.assignStateKeyNID(u.txn, senderUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -470,8 +467,7 @@ func (u *membershipUpdater) SetToJoin(senderUserID string) ([]string, error) {
 
 // SetToLeave implements types.MembershipUpdater
 func (u *membershipUpdater) SetToLeave(senderUserID string) ([]string, error) {
-	// TODO: assign the state key inside the transaction.
-	senderUserNID, err := u.d.assignStateKeyNID(senderUserID)
+	senderUserNID, err := u.d.assignStateKeyNID(u.txn, senderUserID)
 	if err != nil {
 		return nil, err
 	}
