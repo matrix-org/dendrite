@@ -22,6 +22,10 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// updateMembership updates the current membership and the invites for each
+// user affected by a change in the current state of the room.
+// Returns a list of output events to write to the kafka log to inform the
+// consumers about the invites added or retired by the change in current state.
 func updateMemberships(
 	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
