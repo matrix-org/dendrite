@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS roomserver_invites (
 	-- we try to join the room.
 	sender_nid BIGINT NOT NULL DEFAULT 0,
 	-- This is used to track whether the invite is still active.
-	-- This is set implicitly when processing KIND_NEW events and explicitly
-	-- when rejecting events over federation.
+	-- This is set implicitly when processing new join and leave events and
+	-- explicitly when rejecting events over federation.
 	retired BOOLEAN NOT NULL DEFAULT FALSE,
 	-- The invite event JSON.
 	invite_event_json TEXT NOT NULL
