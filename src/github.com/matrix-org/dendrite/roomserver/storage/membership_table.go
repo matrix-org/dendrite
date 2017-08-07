@@ -23,9 +23,9 @@ import (
 type membershipState int64
 
 const (
-	membershipStateLeaveOrBan membershipState = 0
-	membershipStateInvite     membershipState = 1
-	membershipStateJoin       membershipState = 2
+	membershipStateLeaveOrBan membershipState = 1
+	membershipStateInvite     membershipState = 2
+	membershipStateJoin       membershipState = 3
 )
 
 const membershipSchema = `
@@ -40,9 +40,12 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 	-- Numeric state key ID for the user ID this state is for.
 	target_nid BIGINT NOT NULL,
 	-- Numeric state key ID for the user ID who changed the state.
+	-- This may be 0 since it is not always possible to identify the user that
+	-- changed the state.
 	sender_nid BIGINT NOT NULL DEFAULT 0,
 	-- The state the user is in within this room.
-	membership_nid BIGINT NOT NULL DEFAULT 0,
+	-- Default value is "membershipStateLeaveOrBan"
+	membership_nid BIGINT NOT NULL DEFAULT 1,
 	UNIQUE (room_nid, target_nid)
 );
 `

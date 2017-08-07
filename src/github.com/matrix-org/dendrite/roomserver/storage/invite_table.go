@@ -56,7 +56,7 @@ const insertInviteEventSQL = "" +
 	" ON CONFLICT DO NOTHING"
 
 const selectInviteActiveForUserInRoomSQL = "" +
-	"SELECT invite_event_id, sender_nid FROM roomserver_invites" +
+	"SELECT sender_nid FROM roomserver_invites" +
 	" WHERE target_nid = $1 AND room_nid = $2" +
 	" AND NOT retired"
 
