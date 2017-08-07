@@ -133,6 +133,20 @@ func Setup(
 		}),
 	).Methods("DELETE")
 
+	r0mux.Handle("/directory/list/room/{roomID}",
+		common.MakeAPI("directory_list", func(req *http.Request) util.JSONResponse {
+			vars := mux.Vars(req)
+			return writers.GetVisibility(req, vars["roomID"])
+		}),
+	).Methods("GET")
+
+	r0mux.Handle("/directory/list/room/{roomID}",
+		common.MakeAuthAPI("directory_list", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return writers.SetVisibility(req, *device, vars["roomID"], cfg)
+		}),
+	).Methods("PUT", "OPTIONS")
+
 	r0mux.Handle("/logout",
 		common.MakeAuthAPI("logout", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return readers.Logout(req, deviceDB, device)
