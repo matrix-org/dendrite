@@ -37,10 +37,10 @@ CREATE TABLE IF NOT EXISTS roomserver_rooms (
     -- The state of the room after the current set of latest events.
     -- This will be 0 if there are no latest events in the room.
     state_snapshot_nid BIGINT NOT NULL DEFAULT 0,
-	-- The visibility of the room.
-	-- This will be true if the room has a public visibility, and false if it
-	-- has a private visibility.
-	visibility BOOLEAN NOT NULL DEFAULT false
+    -- The visibility of the room.
+    -- This will be true if the room has a public visibility, and false if it
+    -- has a private visibility.
+    visibility BOOLEAN NOT NULL DEFAULT false
 );
 `
 
