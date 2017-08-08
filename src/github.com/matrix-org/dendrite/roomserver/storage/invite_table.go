@@ -60,7 +60,7 @@ const selectInviteActiveForUserInRoomSQL = "" +
 	" WHERE target_nid = $1 AND room_nid = $2" +
 	" AND NOT retired"
 
-// Retire every active invite.
+// Retire every active invite for a user in a room.
 // Ideally we'd know which invite events were retired by a given update so we
 // wouldn't need to remove every active invite.
 // However the matrix protocol doesn't give us a way to reliably identify the
