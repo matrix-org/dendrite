@@ -39,14 +39,18 @@ const selectRoomIDFromAliasSQL = "" +
 const selectAliasesFromRoomIDSQL = "" +
 	"SELECT alias FROM roomserver_room_aliases WHERE room_id = $1"
 
+const selectAliasesFromRoomIDsSQL = "" +
+	"SELECT alias, room_id FROM roomserver_room_aliases WHERE room_id = ANY($1)"
+
 const deleteRoomAliasSQL = "" +
 	"DELETE FROM roomserver_room_aliases WHERE alias = $1"
 
 type roomAliasesStatements struct {
-	insertRoomAliasStmt         *sql.Stmt
-	selectRoomIDFromAliasStmt   *sql.Stmt
-	selectAliasesFromRoomIDStmt *sql.Stmt
-	deleteRoomAliasStmt         *sql.Stmt
+	insertRoomAliasStmt          *sql.Stmt
+	selectRoomIDFromAliasStmt    *sql.Stmt
+	selectAliasesFromRoomIDStmt  *sql.Stmt
+	selectAliasesFromRoomIDsStmt *sql.Stmt
+	deleteRoomAliasStmt          *sql.Stmt
 }
 
 func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
@@ -58,6 +62,7 @@ func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
 		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
 		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},
 		{&s.selectAliasesFromRoomIDStmt, selectAliasesFromRoomIDSQL},
+		{&s.selectAliasesFromRoomIDsStmt, selectAliasesFromRoomIDsSQL},
 		{&s.deleteRoomAliasStmt, deleteRoomAliasSQL},
 	}.prepare(db)
 }
@@ -89,6 +94,29 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(roomID string) (aliases 
 		}
 
 		aliases = append(aliases, alias)
+	}
+
+	return
+}
+
+func (s *roomAliasesStatements) selectAliasesFromRoomIDs(roomIDs []string) (aliases map[string][]string, err error) {
+	aliases = make(map[string][]string)
+	rows, err := s.selectAliasesFromRoomIDsStmt.Query(roomIDs)
+	if err != nil {
+		return
+	}
+
+	for rows.Next() {
+		var alias, roomID string
+		if err = rows.Scan(&alias, &roomID); err != nil {
+			return
+		}
+
+		if len(aliases[roomID]) > 0 {
+			aliases[roomID] = append(aliases[roomID], alias)
+		} else {
+			aliases[roomID] = []string{alias}
+		}
 	}
 
 	return

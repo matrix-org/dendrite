@@ -370,6 +370,13 @@ func (d *Database) GetAliasesFromRoomID(roomID string) ([]string, error) {
 	return d.statements.selectAliasesFromRoomID(roomID)
 }
 
+// GetAliasesFromRoomIDs returns a map of the aliases bound to a given set of
+// room IDs, ordered by room ID (ie map[roomID] = []alias)
+// Returns an error if the retrieval failed
+func (d *Database) GetAliasesFromRoomIDs(roomIDs []string) (map[string][]string, error) {
+	return d.statements.selectAliasesFromRoomIDs(roomIDs)
+}
+
 // RemoveRoomAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) RemoveRoomAlias(alias string) error {
 	return d.statements.deleteRoomAlias(alias)
