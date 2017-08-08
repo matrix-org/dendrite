@@ -242,6 +242,9 @@ func pairUpChanges(removed, added []types.StateEntry) []stateChange {
 	for {
 		switch {
 		case ai == len(added):
+			// We've reached the end of the added entries.
+			// The rest of the removed list are events that were removed without
+			// an event with the same state key being added.
 			for _, s := range removed[ri:] {
 				result = append(result, stateChange{
 					StateKeyTuple:   s.StateKeyTuple,
@@ -250,6 +253,9 @@ func pairUpChanges(removed, added []types.StateEntry) []stateChange {
 			}
 			return result
 		case ri == len(removed):
+			// We've reached the end of the removed entries.
+			// The rest of the added list are events that were added without
+			// an event with the same state key being removed.
 			for _, s := range added[ai:] {
 				result = append(result, stateChange{
 					StateKeyTuple: s.StateKeyTuple,
@@ -258,6 +264,8 @@ func pairUpChanges(removed, added []types.StateEntry) []stateChange {
 			}
 			return result
 		case added[ai].StateKeyTuple == removed[ri].StateKeyTuple:
+			// The tuple is in both lists so an event with that key is being
+			// removed and another event with the same key is being added.
 			result = append(result, stateChange{
 				StateKeyTuple:   added[ai].StateKeyTuple,
 				removedEventNID: removed[ri].EventNID,
@@ -266,13 +274,19 @@ func pairUpChanges(removed, added []types.StateEntry) []stateChange {
 			ai++
 			ri++
 		case added[ai].StateKeyTuple.LessThan(removed[ri].StateKeyTuple):
+			// The lists are sorted so the added entry being less than the
+			// removed entry means that the added event was added without an
+			// event with the same key being removed.
 			result = append(result, stateChange{
-
 				StateKeyTuple: added[ai].StateKeyTuple,
 				addedEventNID: added[ai].EventNID,
 			})
 			ai++
 		default:
+			// Reaching the default case implies that the removed entry is less
+			// than the added entry. Since the lists are sorted this means that
+			// the removed event was removed without an event with the same
+			// key being added.
 			result = append(result, stateChange{
 				StateKeyTuple:   removed[ai].StateKeyTuple,
 				removedEventNID: removed[ri].EventNID,
