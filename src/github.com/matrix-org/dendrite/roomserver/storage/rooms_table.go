@@ -36,7 +36,11 @@ CREATE TABLE IF NOT EXISTS roomserver_rooms (
     last_event_sent_nid BIGINT NOT NULL DEFAULT 0,
     -- The state of the room after the current set of latest events.
     -- This will be 0 if there are no latest events in the room.
-    state_snapshot_nid BIGINT NOT NULL DEFAULT 0
+    state_snapshot_nid BIGINT NOT NULL DEFAULT 0,
+	-- The visibility of the room.
+	-- This will be true if the room has a public visibility, and false if it
+	-- has a private visibility.
+	visibility BOOLEAN NOT NULL DEFAULT false
 );
 `
 
@@ -55,15 +59,27 @@ const selectLatestEventNIDsSQL = "" +
 const selectLatestEventNIDsForUpdateSQL = "" +
 	"SELECT latest_event_nids, last_event_sent_nid, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1 FOR UPDATE"
 
+const selectVisibilityForRoomNIDSQL = "" +
+	"SELECT visibility FROM roomserver_rooms WHERE room_nid = $1"
+
+const selectVisibleRoomIDsSQL = "" +
+	"SELECT room_id FROM roomserver_rooms WHERE visibility = true"
+
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE roomserver_rooms SET latest_event_nids = $2, last_event_sent_nid = $3, state_snapshot_nid = $4 WHERE room_nid = $1"
+
+const updateVisibilityForRoomNIDSQL = "" +
+	"UPDATE roomserver_rooms SET visibility = $1 WHERE room_nid = $2"
 
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
+	selectVisibilityForRoomNIDStmt     *sql.Stmt
+	selectVisibleRoomIDsStmt           *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
+	updateVisibilityForRoomNIDStmt     *sql.Stmt
 }
 
 func (s *roomStatements) prepare(db *sql.DB) (err error) {
@@ -76,7 +92,10 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
+		{&s.selectVisibilityForRoomNIDStmt, selectVisibilityForRoomNIDSQL},
+		{&s.selectVisibleRoomIDsStmt, selectVisibleRoomIDsSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
+		{&s.updateVisibilityForRoomNIDStmt, updateVisibilityForRoomNIDSQL},
 	}.prepare(db)
 }
 
@@ -121,6 +140,35 @@ func (s *roomStatements) selectLatestEventsNIDsForUpdate(txn *sql.Tx, roomNID ty
 		eventNIDs[i] = types.EventNID(nids[i])
 	}
 	return eventNIDs, types.EventNID(lastEventSentNID), types.StateSnapshotNID(stateSnapshotNID), nil
+}
+
+func (s *roomStatements) selectVisibilityForRoomNID(roomNID types.RoomNID) (bool, error) {
+	var visibility bool
+	err := s.selectVisibilityForRoomNIDStmt.QueryRow(roomNID).Scan(&visibility)
+	return visibility, err
+}
+
+func (s *roomStatements) selectVisibleRoomIDs() ([]string, error) {
+	roomIDs := []string{}
+	rows, err := s.selectVisibleRoomIDsStmt.Query()
+	if err != nil {
+		return roomIDs, err
+	}
+
+	for rows.Next() {
+		var roomID string
+		if err = rows.Scan(&roomID); err != nil {
+			return roomIDs, err
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+
+	return roomIDs, nil
+}
+
+func (s *roomStatements) updateVisibilityForRoomNID(roomNID types.RoomNID, visibility bool) error {
+	_, err := s.updateVisibilityForRoomNIDStmt.Exec(visibility, roomNID)
+	return err
 }
 
 func (s *roomStatements) updateLatestEventNIDs(
