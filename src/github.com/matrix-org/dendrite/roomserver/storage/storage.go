@@ -370,9 +370,7 @@ func (d *Database) GetAliasesFromRoomID(roomID string) ([]string, error) {
 	return d.statements.selectAliasesFromRoomID(roomID)
 }
 
-// GetAliasesFromRoomIDs returns a map of the aliases bound to a given set of
-// room IDs, ordered by room ID (ie map[roomID] = []alias)
-// Returns an error if the retrieval failed
+// GetAliasesFromRoomIDs implements publicroom.RoomserverPublicRoomAPIDB
 func (d *Database) GetAliasesFromRoomIDs(roomIDs []string) (map[string][]string, error) {
 	return d.statements.selectAliasesFromRoomIDs(roomIDs)
 }
@@ -389,26 +387,17 @@ func (d *Database) StateEntriesForTuples(
 	return d.statements.bulkSelectFilteredStateBlockEntries(stateBlockNIDs, stateKeyTuples)
 }
 
-// IsRoomVisibleFromRoomNID checks the visibility of the room identified by the
-// given numeric ID. Returns true if the room is publicly visible, returns false
-// if not.
-// If there's no room matching this numeric ID, or if the retrieval failed,
-// returns an error.
-func (d *Database) IsRoomVisibleFromRoomNID(roomNID types.RoomNID) (bool, error) {
+// IsRoomPublic implements publicroom.RoomserverPublicRoomAPIDB
+func (d *Database) IsRoomPublic(roomNID types.RoomNID) (bool, error) {
 	return d.statements.selectVisibilityForRoomNID(roomNID)
 }
 
-// GetVisibleRoomIDs returns an array of string containing the room IDs of the
-// rooms that are publicly visible.
-// Returns an error if the retrieval failed.
-func (d *Database) GetVisibleRoomIDs() ([]string, error) {
-	return d.statements.selectVisibleRoomIDs()
+// GetPublicRoomIDs implements publicroom.RoomserverPublicRoomAPIDB
+func (d *Database) GetPublicRoomIDs() ([]string, error) {
+	return d.statements.selectPublicRoomIDs()
 }
 
-// UpdateRoomVisibility updates the visibility for a room to the given value:
-// true means that the room is publicly visible, false means that the room isn't
-// publicly visible.
-// Returns an error if the update failed.
+// UpdateRoomVisibility implements publicroom.RoomserverPublicRoomAPIDB
 func (d *Database) UpdateRoomVisibility(roomNID types.RoomNID, visibility bool) error {
 	return d.statements.updateVisibilityForRoomNID(roomNID, visibility)
 }

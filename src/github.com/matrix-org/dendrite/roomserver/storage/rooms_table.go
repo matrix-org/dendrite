@@ -62,7 +62,7 @@ const selectLatestEventNIDsForUpdateSQL = "" +
 const selectVisibilityForRoomNIDSQL = "" +
 	"SELECT visibility FROM roomserver_rooms WHERE room_nid = $1"
 
-const selectVisibleRoomIDsSQL = "" +
+const selectPublicRoomIDsSQL = "" +
 	"SELECT room_id FROM roomserver_rooms WHERE visibility = true"
 
 const updateLatestEventNIDsSQL = "" +
@@ -77,7 +77,7 @@ type roomStatements struct {
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	selectVisibilityForRoomNIDStmt     *sql.Stmt
-	selectVisibleRoomIDsStmt           *sql.Stmt
+	selectPublicRoomIDsStmt            *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
 	updateVisibilityForRoomNIDStmt     *sql.Stmt
 }
@@ -93,7 +93,7 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.selectVisibilityForRoomNIDStmt, selectVisibilityForRoomNIDSQL},
-		{&s.selectVisibleRoomIDsStmt, selectVisibleRoomIDsSQL},
+		{&s.selectPublicRoomIDsStmt, selectPublicRoomIDsSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.updateVisibilityForRoomNIDStmt, updateVisibilityForRoomNIDSQL},
 	}.prepare(db)
@@ -148,9 +148,9 @@ func (s *roomStatements) selectVisibilityForRoomNID(roomNID types.RoomNID) (bool
 	return visibility, err
 }
 
-func (s *roomStatements) selectVisibleRoomIDs() ([]string, error) {
+func (s *roomStatements) selectPublicRoomIDs() ([]string, error) {
 	roomIDs := []string{}
-	rows, err := s.selectVisibleRoomIDsStmt.Query()
+	rows, err := s.selectPublicRoomIDsStmt.Query()
 	if err != nil {
 		return roomIDs, err
 	}
