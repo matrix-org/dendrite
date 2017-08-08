@@ -78,21 +78,29 @@ func updateLatestEvents(
 // The state could be passed using function arguments, but it becomes impractical
 // when there are so many variables to pass around.
 type latestEventsUpdater struct {
-	db                      RoomEventDatabase
-	updater                 types.RoomRecentEventsUpdater
-	ow                      OutputRoomEventWriter
-	roomNID                 types.RoomNID
-	stateAtEvent            types.StateAtEvent
-	event                   gomatrixserverlib.Event
-	sendAsServer            string
-	lastEventIDSent         string
-	latest                  []types.StateAtEventAndReference
-	removed                 []types.StateEntry
-	added                   []types.StateEntry
+	db           RoomEventDatabase
+	updater      types.RoomRecentEventsUpdater
+	ow           OutputRoomEventWriter
+	roomNID      types.RoomNID
+	stateAtEvent types.StateAtEvent
+	event        gomatrixserverlib.Event
+	// Which server to send this event as.
+	sendAsServer string
+	// The eventID of the event that was processed before this one.
+	lastEventIDSent string
+	// The latest events in the room after processing this event.
+	latest []types.StateAtEventAndReference
+	// The state entries removed from and added to the current state of the
+	// room as a result of processing this event. They are sorted lists.
+	removed []types.StateEntry
+	added   []types.StateEntry
+	// The state entries that are removed and added to recover the state before
+	// the event being processed. They are sorted lists.
 	stateBeforeEventRemoves []types.StateEntry
 	stateBeforeEventAdds    []types.StateEntry
-	oldStateNID             types.StateSnapshotNID
-	newStateNID             types.StateSnapshotNID
+	// The snapshots of current state before and after processing this event
+	oldStateNID types.StateSnapshotNID
+	newStateNID types.StateSnapshotNID
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
