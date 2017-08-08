@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 );
 `
 
+// Insert a row in to membership table so that it can be locked by the
+// SELECT FOR UPDATE
 const insertMembershipSQL = "" +
 	"INSERT INTO roomserver_membership (room_nid, target_nid)" +
 	" VALUES ($1, $2)" +
