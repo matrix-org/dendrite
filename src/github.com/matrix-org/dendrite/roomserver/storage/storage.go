@@ -16,6 +16,7 @@ package storage
 
 import (
 	"database/sql"
+
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -64,7 +65,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []typ
 	// Assigned a numeric ID for the state_key if there is one present.
 	// Otherwise set the numeric ID for the state_key to 0.
 	if eventStateKey != nil {
-		if eventStateKeyNID, err = d.assignStateKeyNID(*eventStateKey); err != nil {
+		if eventStateKeyNID, err = d.assignStateKeyNID(nil, *eventStateKey); err != nil {
 			return 0, types.StateAtEvent{}, err
 		}
 	}
@@ -131,15 +132,15 @@ func (d *Database) assignEventTypeNID(eventType string) (types.EventTypeNID, err
 	return eventTypeNID, err
 }
 
-func (d *Database) assignStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
+func (d *Database) assignStateKeyNID(txn *sql.Tx, eventStateKey string) (types.EventStateKeyNID, error) {
 	// Check if we already have a numeric ID in the database.
-	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(eventStateKey)
+	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(txn, eventStateKey)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventStateKeyNID, err = d.statements.insertEventStateKeyNID(eventStateKey)
+		eventStateKeyNID, err = d.statements.insertEventStateKeyNID(txn, eventStateKey)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventStateKeyNID, err = d.statements.selectEventStateKeyNID(eventStateKey)
+			eventStateKeyNID, err = d.statements.selectEventStateKeyNID(txn, eventStateKey)
 		}
 	}
 	return eventStateKeyNID, err
@@ -249,12 +250,15 @@ func (d *Database) GetLatestEventsForUpdate(roomNID types.RoomNID) (types.RoomRe
 			return nil, err
 		}
 	}
-	return &roomRecentEventsUpdater{txn, d, stateAndRefs, lastEventIDSent, currentStateSnapshotNID}, nil
+	return &roomRecentEventsUpdater{
+		transaction{txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
+	}, nil
 }
 
 type roomRecentEventsUpdater struct {
-	txn                     *sql.Tx
+	transaction
 	d                       *Database
+	roomNID                 types.RoomNID
 	latestEvents            []types.StateAtEventAndReference
 	lastEventIDSent         string
 	currentStateSnapshotNID types.StateSnapshotNID
@@ -319,14 +323,8 @@ func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error
 	return u.d.statements.updateEventSentToOutput(u.txn, eventNID)
 }
 
-// Commit implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) Commit() error {
-	return u.txn.Commit()
-}
-
-// Rollback implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) Rollback() error {
-	return u.txn.Rollback()
+func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID) (types.MembershipUpdater, error) {
+	return u.d.membershipUpdaterTxn(u.txn, u.roomNID, targetUserNID)
 }
 
 // RoomNID implements query.RoomserverQueryAPIDB
@@ -400,4 +398,125 @@ func (d *Database) GetPublicRoomIDs() ([]string, error) {
 // UpdateRoomVisibility implements publicroom.RoomserverPublicRoomAPIDB
 func (d *Database) UpdateRoomVisibility(roomNID types.RoomNID, visibility bool) error {
 	return d.statements.updateVisibilityForRoomNID(roomNID, visibility)
+}
+
+type membershipUpdater struct {
+	transaction
+	d             *Database
+	roomNID       types.RoomNID
+	targetUserNID types.EventStateKeyNID
+	membership    membershipState
+}
+
+func (d *Database) membershipUpdaterTxn(
+	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) (types.MembershipUpdater, error) {
+
+	if err := d.statements.insertMembership(txn, roomNID, targetUserNID); err != nil {
+		return nil, err
+	}
+
+	membership, err := d.statements.selectMembershipForUpdate(txn, roomNID, targetUserNID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &membershipUpdater{
+		transaction{txn}, d, roomNID, targetUserNID, membership,
+	}, nil
+}
+
+// IsInvite implements types.MembershipUpdater
+func (u *membershipUpdater) IsInvite() bool {
+	return u.membership == membershipStateInvite
+}
+
+// IsJoin implements types.MembershipUpdater
+func (u *membershipUpdater) IsJoin() bool {
+	return u.membership == membershipStateJoin
+}
+
+// IsLeave implements types.MembershipUpdater
+func (u *membershipUpdater) IsLeave() bool {
+	return u.membership == membershipStateLeaveOrBan
+}
+
+// SetToInvite implements types.MembershipUpdater
+func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
+	senderUserNID, err := u.d.assignStateKeyNID(u.txn, event.Sender())
+	if err != nil {
+		return false, err
+	}
+	inserted, err := u.d.statements.insertInviteEvent(
+		u.txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
+	)
+	if err != nil {
+		return false, err
+	}
+	if u.membership != membershipStateInvite {
+		if err = u.d.statements.updateMembership(
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite,
+		); err != nil {
+			return false, err
+		}
+	}
+	return inserted, nil
+}
+
+// SetToJoin implements types.MembershipUpdater
+func (u *membershipUpdater) SetToJoin(senderUserID string) ([]string, error) {
+	senderUserNID, err := u.d.assignStateKeyNID(u.txn, senderUserID)
+	if err != nil {
+		return nil, err
+	}
+	inviteEventIDs, err := u.d.statements.updateInviteRetired(
+		u.txn, u.roomNID, u.targetUserNID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if u.membership != membershipStateJoin {
+		if err = u.d.statements.updateMembership(
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateJoin,
+		); err != nil {
+			return nil, err
+		}
+	}
+	return inviteEventIDs, nil
+}
+
+// SetToLeave implements types.MembershipUpdater
+func (u *membershipUpdater) SetToLeave(senderUserID string) ([]string, error) {
+	senderUserNID, err := u.d.assignStateKeyNID(u.txn, senderUserID)
+	if err != nil {
+		return nil, err
+	}
+	inviteEventIDs, err := u.d.statements.updateInviteRetired(
+		u.txn, u.roomNID, u.targetUserNID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if u.membership != membershipStateLeaveOrBan {
+		if err = u.d.statements.updateMembership(
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateLeaveOrBan,
+		); err != nil {
+			return nil, err
+		}
+	}
+	return inviteEventIDs, nil
+}
+
+type transaction struct {
+	txn *sql.Tx
+}
+
+// Commit implements types.Transaction
+func (t *transaction) Commit() error {
+	return t.txn.Commit()
+}
+
+// Rollback implements types.Transaction
+func (t *transaction) Rollback() error {
+	return t.txn.Rollback()
 }

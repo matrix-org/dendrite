@@ -66,69 +66,88 @@ func updateLatestEvents(
 		}
 	}()
 
-	err = doUpdateLatestEvents(db, updater, ow, roomNID, stateAtEvent, event, sendAsServer)
-	return
+	u := latestEventsUpdater{
+		db: db, updater: updater, ow: ow, roomNID: roomNID,
+		stateAtEvent: stateAtEvent, event: event, sendAsServer: sendAsServer,
+	}
+	return u.doUpdateLatestEvents()
 }
 
-func doUpdateLatestEvents(
-	db RoomEventDatabase,
-	updater types.RoomRecentEventsUpdater,
-	ow OutputRoomEventWriter,
-	roomNID types.RoomNID,
-	stateAtEvent types.StateAtEvent,
-	event gomatrixserverlib.Event,
-	sendAsServer string,
-) error {
+// latestEventsUpdater tracks the state used to update the latest events in the
+// room. It mostly just ferries state between the various function calls.
+// The state could be passed using function arguments, but it becomes impractical
+// when there are so many variables to pass around.
+type latestEventsUpdater struct {
+	db           RoomEventDatabase
+	updater      types.RoomRecentEventsUpdater
+	ow           OutputRoomEventWriter
+	roomNID      types.RoomNID
+	stateAtEvent types.StateAtEvent
+	event        gomatrixserverlib.Event
+	// Which server to send this event as.
+	sendAsServer string
+	// The eventID of the event that was processed before this one.
+	lastEventIDSent string
+	// The latest events in the room after processing this event.
+	latest []types.StateAtEventAndReference
+	// The state entries removed from and added to the current state of the
+	// room as a result of processing this event. They are sorted lists.
+	removed []types.StateEntry
+	added   []types.StateEntry
+	// The state entries that are removed and added to recover the state before
+	// the event being processed. They are sorted lists.
+	stateBeforeEventRemoves []types.StateEntry
+	stateBeforeEventAdds    []types.StateEntry
+	// The snapshots of current state before and after processing this event
+	oldStateNID types.StateSnapshotNID
+	newStateNID types.StateSnapshotNID
+}
+
+func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	var err error
 	var prevEvents []gomatrixserverlib.EventReference
-	prevEvents = event.PrevEvents()
-	oldLatest := updater.LatestEvents()
-	lastEventIDSent := updater.LastEventIDSent()
-	oldStateNID := updater.CurrentStateSnapshotNID()
+	prevEvents = u.event.PrevEvents()
+	oldLatest := u.updater.LatestEvents()
+	u.lastEventIDSent = u.updater.LastEventIDSent()
+	u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 
-	if hasBeenSent, err := updater.HasEventBeenSent(stateAtEvent.EventNID); err != nil {
+	if hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID); err != nil {
 		return err
 	} else if hasBeenSent {
 		// Already sent this event so we can stop processing
 		return nil
 	}
 
-	if err = updater.StorePreviousEvents(stateAtEvent.EventNID, prevEvents); err != nil {
+	if err = u.updater.StorePreviousEvents(u.stateAtEvent.EventNID, prevEvents); err != nil {
 		return err
 	}
 
-	eventReference := event.EventReference()
+	eventReference := u.event.EventReference()
 	// Check if this event is already referenced by another event in the room.
 	var alreadyReferenced bool
-	if alreadyReferenced, err = updater.IsReferenced(eventReference); err != nil {
+	if alreadyReferenced, err = u.updater.IsReferenced(eventReference); err != nil {
 		return err
 	}
 
-	newLatest := calculateLatest(oldLatest, alreadyReferenced, prevEvents, types.StateAtEventAndReference{
+	u.latest = calculateLatest(oldLatest, alreadyReferenced, prevEvents, types.StateAtEventAndReference{
 		EventReference: eventReference,
-		StateAtEvent:   stateAtEvent,
+		StateAtEvent:   u.stateAtEvent,
 	})
 
-	latestStateAtEvents := make([]types.StateAtEvent, len(newLatest))
-	for i := range newLatest {
-		latestStateAtEvents[i] = newLatest[i].StateAtEvent
+	if err = u.latestState(); err != nil {
+		return err
 	}
-	newStateNID, err := state.CalculateAndStoreStateAfterEvents(db, roomNID, latestStateAtEvents)
+
+	updates, err := updateMemberships(u.db, u.updater, u.removed, u.added)
 	if err != nil {
 		return err
 	}
 
-	removed, added, err := state.DifferenceBetweeenStateSnapshots(db, oldStateNID, newStateNID)
+	update, err := u.makeOutputNewRoomEvent()
 	if err != nil {
 		return err
 	}
-
-	stateBeforeEventRemoves, stateBeforeEventAdds, err := state.DifferenceBetweeenStateSnapshots(
-		db, newStateNID, stateAtEvent.BeforeStateSnapshotNID,
-	)
-	if err != nil {
-		return err
-	}
+	updates = append(updates, *update)
 
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
@@ -138,21 +157,44 @@ func doUpdateLatestEvents(
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = writeEvent(
-		db, ow, lastEventIDSent, event, newLatest, removed, added,
-		stateBeforeEventRemoves, stateBeforeEventAdds, sendAsServer,
-	); err != nil {
+	if err = u.ow.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
 		return err
 	}
 
-	if err = updater.SetLatestEvents(roomNID, newLatest, stateAtEvent.EventNID, newStateNID); err != nil {
+	if err = u.updater.SetLatestEvents(u.roomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
 		return err
 	}
 
-	if err = updater.MarkEventAsSent(stateAtEvent.EventNID); err != nil {
+	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func (u *latestEventsUpdater) latestState() error {
+	var err error
+
+	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
+	for i := range u.latest {
+		latestStateAtEvents[i] = u.latest[i].StateAtEvent
+	}
+	u.newStateNID, err = state.CalculateAndStoreStateAfterEvents(u.db, u.roomNID, latestStateAtEvents)
+	if err != nil {
+		return err
+	}
+
+	u.removed, u.added, err = state.DifferenceBetweeenStateSnapshots(u.db, u.oldStateNID, u.newStateNID)
+	if err != nil {
+		return err
+	}
+
+	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = state.DifferenceBetweeenStateSnapshots(
+		u.db, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
+	)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -189,57 +231,55 @@ func calculateLatest(oldLatest []types.StateAtEventAndReference, alreadyReferenc
 	return newLatest
 }
 
-func writeEvent(
-	db RoomEventDatabase, ow OutputRoomEventWriter, lastEventIDSent string,
-	event gomatrixserverlib.Event, latest []types.StateAtEventAndReference,
-	removed, added []types.StateEntry,
-	stateBeforeEventRemoves, stateBeforeEventAdds []types.StateEntry,
-	sendAsServer string,
-) error {
+func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error) {
 
-	latestEventIDs := make([]string, len(latest))
-	for i := range latest {
-		latestEventIDs[i] = latest[i].EventID
+	latestEventIDs := make([]string, len(u.latest))
+	for i := range u.latest {
+		latestEventIDs[i] = u.latest[i].EventID
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:           event,
-		LastSentEventID: lastEventIDSent,
+		Event:           u.event,
+		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 	}
 
 	var stateEventNIDs []types.EventNID
-	for _, entry := range added {
+	for _, entry := range u.added {
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
-	for _, entry := range removed {
+	for _, entry := range u.removed {
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
-	for _, entry := range stateBeforeEventRemoves {
+	for _, entry := range u.stateBeforeEventRemoves {
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
-	for _, entry := range stateBeforeEventAdds {
+	for _, entry := range u.stateBeforeEventAdds {
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
 	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
-	eventIDMap, err := db.EventIDs(stateEventNIDs)
+	eventIDMap, err := u.db.EventIDs(stateEventNIDs)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	for _, entry := range added {
+	for _, entry := range u.added {
 		ore.AddsStateEventIDs = append(ore.AddsStateEventIDs, eventIDMap[entry.EventNID])
 	}
-	for _, entry := range removed {
+	for _, entry := range u.removed {
 		ore.RemovesStateEventIDs = append(ore.RemovesStateEventIDs, eventIDMap[entry.EventNID])
 	}
-	for _, entry := range stateBeforeEventRemoves {
+	for _, entry := range u.stateBeforeEventRemoves {
 		ore.StateBeforeRemovesEventIDs = append(ore.StateBeforeRemovesEventIDs, eventIDMap[entry.EventNID])
 	}
-	for _, entry := range stateBeforeEventAdds {
+	for _, entry := range u.stateBeforeEventAdds {
 		ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
 	}
-	ore.SendAsServer = sendAsServer
-	return ow.WriteOutputRoomEvent(ore)
+	ore.SendAsServer = u.sendAsServer
+
+	return &api.OutputEvent{
+		Type:         api.OutputTypeNewRoomEvent,
+		NewRoomEvent: &ore,
+	}, nil
 }
 
 type eventNIDSorter []types.EventNID
