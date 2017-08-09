@@ -108,6 +108,7 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 	req *api.GetPublicRoomsRequest,
 	response *api.GetPublicRoomsResponse,
 ) error {
+	// TODO: Limit by req.Limit and offset by req.Since
 	roomIDs, err := r.DB.GetPublicRoomIDs()
 	if err != nil {
 		return err
