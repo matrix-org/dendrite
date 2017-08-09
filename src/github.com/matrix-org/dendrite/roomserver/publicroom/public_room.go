@@ -114,16 +114,18 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 		return err
 	}
 
-	rooms, err := r.DB.GetAliasesFromRoomIDs(roomIDs)
+	aliases, err := r.DB.GetAliasesFromRoomIDs(roomIDs)
 	if err != nil {
 		return err
 	}
 
-	var chunks []api.PublicRoomsChunk
-	for room, aliases := range rooms {
+	chunks := []api.PublicRoomsChunk{}
+	// Iterate over the array of aliases instead of the array of rooms, because
+	// a room must have at least one alias to be listed
+	for room, as := range aliases {
 		chunk := api.PublicRoomsChunk{
 			RoomID:           room,
-			Aliases:          aliases,
+			Aliases:          as,
 			NumJoinedMembers: 0,
 			WorldReadable:    true,
 			GuestCanJoin:     true,

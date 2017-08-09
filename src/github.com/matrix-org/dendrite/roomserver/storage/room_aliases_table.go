@@ -16,6 +16,8 @@ package storage
 
 import (
 	"database/sql"
+
+	"github.com/lib/pq"
 )
 
 const roomAliasesSchema = `
@@ -101,7 +103,7 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(roomID string) (aliases 
 
 func (s *roomAliasesStatements) selectAliasesFromRoomIDs(roomIDs []string) (aliases map[string][]string, err error) {
 	aliases = make(map[string][]string)
-	rows, err := s.selectAliasesFromRoomIDsStmt.Query(roomIDs)
+	rows, err := s.selectAliasesFromRoomIDsStmt.Query(pq.StringArray(roomIDs))
 	if err != nil {
 		return
 	}
