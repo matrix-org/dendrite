@@ -41,7 +41,7 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 func Setup(
 	apiMux *mux.Router, httpClient *http.Client, cfg config.Dendrite,
 	producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
-	aliasAPI api.RoomserverAliasAPI,
+	aliasAPI api.RoomserverAliasAPI, publicRoomAPI api.RoomserverPublicRoomAPI,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	federation *gomatrixserverlib.FederationClient,
@@ -136,14 +136,14 @@ func Setup(
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeAPI("directory_list", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return writers.GetVisibility(req, vars["roomID"])
+			return writers.GetVisibility(req, vars["roomID"], publicRoomAPI)
 		}),
 	).Methods("GET")
 
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeAuthAPI("directory_list", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return writers.SetVisibility(req, *device, vars["roomID"], cfg)
+			return writers.SetVisibility(req, *device, vars["roomID"], publicRoomAPI)
 		}),
 	).Methods("PUT", "OPTIONS")
 
@@ -276,14 +276,7 @@ func Setup(
 	r0mux.Handle("/publicRooms",
 		common.MakeAPI("public_rooms", func(req *http.Request) util.JSONResponse {
 			// TODO: Return a list of public rooms
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct {
-					Chunk []struct{} `json:"chunk"`
-					Start string     `json:"start"`
-					End   string     `json:"end"`
-				}{[]struct{}{}, "", ""},
-			}
+			return writers.GetPublicRooms(req, publicRoomAPI)
 		}),
 	)
 

@@ -33,6 +33,7 @@ import (
 
 	roomserver_alias "github.com/matrix-org/dendrite/roomserver/alias"
 	roomserver_input "github.com/matrix-org/dendrite/roomserver/input"
+	roomserver_publicroom "github.com/matrix-org/dendrite/roomserver/publicroom"
 	roomserver_query "github.com/matrix-org/dendrite/roomserver/query"
 	roomserver_storage "github.com/matrix-org/dendrite/roomserver/storage"
 
@@ -121,9 +122,10 @@ type monolith struct {
 	federation *gomatrixserverlib.FederationClient
 	keyRing    gomatrixserverlib.KeyRing
 
-	inputAPI *roomserver_input.RoomserverInputAPI
-	queryAPI *roomserver_query.RoomserverQueryAPI
-	aliasAPI *roomserver_alias.RoomserverAliasAPI
+	inputAPI      *roomserver_input.RoomserverInputAPI
+	queryAPI      *roomserver_query.RoomserverQueryAPI
+	aliasAPI      *roomserver_alias.RoomserverAliasAPI
+	publicRoomAPI *roomserver_publicroom.RoomserverPublicRoomAPI
 
 	roomServerProducer *producers.RoomserverProducer
 	userUpdateProducer *producers.UserUpdateProducer
@@ -204,6 +206,10 @@ func (m *monolith) setupRoomServer() {
 		InputAPI: m.inputAPI,
 		QueryAPI: m.queryAPI,
 	}
+
+	m.publicRoomAPI = &roomserver_publicroom.RoomserverPublicRoomAPI{
+		DB: m.roomServerDB,
+	}
 }
 
 func (m *monolith) setupProducers() {
@@ -280,8 +286,8 @@ func (m *monolith) setupConsumers() {
 func (m *monolith) setupAPIs() {
 	clientapi_routing.Setup(
 		m.api, http.DefaultClient, *m.cfg, m.roomServerProducer,
-		m.queryAPI, m.aliasAPI, m.accountDB, m.deviceDB, m.federation, m.keyRing,
-		m.userUpdateProducer, m.syncProducer,
+		m.queryAPI, m.aliasAPI, m.publicRoomAPI, m.accountDB, m.deviceDB,
+		m.federation, m.keyRing, m.userUpdateProducer, m.syncProducer,
 	)
 
 	mediaapi_routing.Setup(
