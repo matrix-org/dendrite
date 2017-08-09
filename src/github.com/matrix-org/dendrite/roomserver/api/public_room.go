@@ -50,19 +50,19 @@ type GetPublicRoomsRequest struct {
 // GetPublicRoomsResponse is a response to GetPublicRooms
 type GetPublicRoomsResponse struct {
 	Chunks                 []PublicRoomsChunk `json:"chunk"`
-	NextBatch              string             `json:"next_batch"`
-	PrevBatch              string             `json:"prev_batch"`
-	TotalRoomCountEstimate int64              `json:"total_room_count_estimate"`
+	NextBatch              string             `json:"next_batch,omitempty"`
+	PrevBatch              string             `json:"prev_batch,omitempty"`
+	TotalRoomCountEstimate int64              `json:"total_room_count_estimate,omitempty"`
 }
 
 // PublicRoomsChunk implements the PublicRoomsChunk structure from the Matrix spec
 type PublicRoomsChunk struct {
 	RoomID           string   `json:"room_id"`
-	Aliases          []string `json:"aliases"`
-	CanonicalAlias   string   `json:"canonical_alias"`
-	Name             string   `json:"name"`
-	Topic            string   `json:"topic"`
-	AvatarURL        string   `json:"avatar_url"`
+	Aliases          []string `json:"aliases,omitempty"`
+	CanonicalAlias   string   `json:"canonical_alias,omitempty"`
+	Name             string   `json:"name,omitempty"`
+	Topic            string   `json:"topic,omitempty"`
+	AvatarURL        string   `json:"avatar_url,omitempty"`
 	NumJoinedMembers int64    `json:"num_joined_members"`
 	WorldReadable    bool     `json:"world_readable"`
 	GuestCanJoin     bool     `json:"guest_can_join"`
