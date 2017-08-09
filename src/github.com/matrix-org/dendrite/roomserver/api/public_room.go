@@ -49,7 +49,7 @@ type GetPublicRoomsRequest struct {
 
 // GetPublicRoomsResponse is a response to GetPublicRooms
 type GetPublicRoomsResponse struct {
-	Chunk                  []PublicRoomsChunk `json:"chunk"`
+	Chunks                 []PublicRoomsChunk `json:"chunk"`
 	NextBatch              string             `json:"next_batch"`
 	PrevBatch              string             `json:"prev_batch"`
 	TotalRoomCountEstimate int64              `json:"total_room_count_estimate"`
@@ -57,15 +57,15 @@ type GetPublicRoomsResponse struct {
 
 // PublicRoomsChunk implements the PublicRoomsChunk structure from the Matrix spec
 type PublicRoomsChunk struct {
-	RoomID         string   `json:"room_id"`
-	Aliases        []string `json:"aliases"`
-	CanonicalAlias string   `json:"canonical_alias"`
-	Name           string   `json:"name"`
-	Topic          string   `json:"topic"`
-	AvatarURL      string   `json:"avatar_url"`
-	JoinedMembers  int64    `json:"num_joined_members"`
-	WorldReadable  bool     `json:"world_readable"`
-	GuestCanJoin   bool     `json:"guest_can_join"`
+	RoomID           string   `json:"room_id"`
+	Aliases          []string `json:"aliases"`
+	CanonicalAlias   string   `json:"canonical_alias"`
+	Name             string   `json:"name"`
+	Topic            string   `json:"topic"`
+	AvatarURL        string   `json:"avatar_url"`
+	NumJoinedMembers int64    `json:"num_joined_members"`
+	WorldReadable    bool     `json:"world_readable"`
+	GuestCanJoin     bool     `json:"guest_can_join"`
 }
 
 // RoomserverPublicRoomAPI is used to update or retrieve the visibility setting

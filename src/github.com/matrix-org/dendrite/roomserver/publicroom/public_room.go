@@ -108,6 +108,29 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 	req *api.GetPublicRoomsRequest,
 	response *api.GetPublicRoomsResponse,
 ) error {
+	roomIDs, err := r.DB.GetPublicRoomIDs()
+	if err != nil {
+		return err
+	}
+
+	rooms, err := r.DB.GetAliasesFromRoomIDs(roomIDs)
+	if err != nil {
+		return err
+	}
+
+	var chunks []api.PublicRoomsChunk
+	for room, aliases := range rooms {
+		chunk := api.PublicRoomsChunk{
+			RoomID:           room,
+			Aliases:          aliases,
+			NumJoinedMembers: 0,
+			WorldReadable:    true,
+			GuestCanJoin:     true,
+		}
+		chunks = append(chunks, chunk)
+	}
+
+	response.Chunks = chunks
 	return nil
 }
 
