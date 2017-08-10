@@ -42,9 +42,16 @@ type GetRoomVisibilityResponse struct {
 }
 
 // GetPublicRoomsRequest is a request to GetPublicRooms
+// TODO: Support the "server" request parameter
 type GetPublicRoomsRequest struct {
-	Limit int16  `json:"limit"`
-	Since string `json:"since"`
+	Limit  int16  `json:"limit"`
+	Since  string `json:"since"`
+	Filter Filter `json:"filter"`
+}
+
+// Filter implements the Filter structure from the Matrix spec
+type Filter struct {
+	SearchTerm string `json:"generic_search_term"`
 }
 
 // GetPublicRoomsResponse is a response to GetPublicRooms

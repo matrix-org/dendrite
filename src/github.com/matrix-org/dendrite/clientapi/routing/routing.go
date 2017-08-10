@@ -278,7 +278,7 @@ func Setup(
 			// TODO: Return a list of public rooms
 			return writers.GetPublicRooms(req, publicRoomAPI)
 		}),
-	)
+	).Methods("GET", "POST", "OPTIONS")
 
 	unstableMux.Handle("/thirdparty/protocols",
 		common.MakeAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {

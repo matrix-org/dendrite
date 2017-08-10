@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -108,7 +109,18 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 	req *api.GetPublicRoomsRequest,
 	response *api.GetPublicRoomsResponse,
 ) error {
-	// TODO: Limit by req.Limit and offset by req.Since
+	var limit int16
+	var offset int64
+
+	limit = req.Limit
+	ofst, err := strconv.Atoi(req.Since)
+	// Atoi returns 0 and an error when trying to parse an empty string
+	// In that case, we want to assign 0 so we ignore the error
+	if err != nil && len(req.Since) > 0 {
+		return err
+	}
+	offset = int64(ofst)
+
 	roomIDs, err := r.DB.GetPublicRoomIDs()
 	if err != nil {
 		return err
@@ -133,7 +145,13 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 		chunks = append(chunks, chunk)
 	}
 
-	response.Chunks = chunks
+	if limit == 0 {
+		// If limit is 0, don't limit the results
+		response.Chunks = chunks[offset:]
+	} else {
+		response.Chunks = chunks[offset:limit]
+	}
+
 	return nil
 }
 
