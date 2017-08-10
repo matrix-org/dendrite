@@ -89,6 +89,8 @@ func GetPublicRooms(
 	}
 }
 
+// fillPublicRoomsReq fills the Limit, Since and Filter attributes of a request to the roomserver's
+// GetPublicRooms API by parsing the incoming HTTP request
 func fillPublicRoomsReq(httpReq *http.Request, queryReq *api.GetPublicRoomsRequest) *util.JSONResponse {
 	if httpReq.Method == "GET" {
 		limit, err := strconv.Atoi(httpReq.FormValue("limit"))

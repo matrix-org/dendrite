@@ -113,13 +113,12 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 	var offset int64
 
 	limit = req.Limit
-	ofst, err := strconv.Atoi(req.Since)
-	// Atoi returns 0 and an error when trying to parse an empty string
+	offset, err := strconv.ParseInt(req.Since, 10, 64)
+	// ParseInt returns 0 and an error when trying to parse an empty string
 	// In that case, we want to assign 0 so we ignore the error
 	if err != nil && len(req.Since) > 0 {
 		return err
 	}
-	offset = int64(ofst)
 
 	roomIDs, err := r.DB.GetPublicRoomIDs()
 	if err != nil {
