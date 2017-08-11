@@ -115,11 +115,11 @@ func (h *httpRoomserverAliasAPI) GetAliasRoomID(
 	request *GetAliasRoomIDRequest,
 	response *GetAliasRoomIDResponse,
 ) error {
-	// RemoveRoomAlias implements RoomserverAliasAPI
 	apiURL := h.roomserverURL + RoomserverGetAliasRoomIDPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 
+// RemoveRoomAlias implements RoomserverAliasAPI
 func (h *httpRoomserverAliasAPI) RemoveRoomAlias(
 	request *RemoveRoomAliasRequest,
 	response *RemoveRoomAliasResponse,

@@ -17,6 +17,7 @@ package storage
 import (
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -33,7 +34,7 @@ const membershipSchema = `
 -- and the room state tables.
 -- This table is updated in one of 3 ways:
 --   1) The membership of a user changes within the current state of the room.
---   2) An invite is received outside of a room over federation. 
+--   2) An invite is received outside of a room over federation.
 --   3) An invite is rejected outside of a room over federation.
 CREATE TABLE IF NOT EXISTS roomserver_membership (
 	room_nid BIGINT NOT NULL,
@@ -61,6 +62,11 @@ const selectMembershipForUpdateSQL = "" +
 	"SELECT membership_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1 AND target_nid = $2 FOR UPDATE"
 
+const countJoinedMembersInRoomsSQL = "" +
+	"SELECT room_nid, COUNT(*) FROM roomserver_membership" +
+	" WHERE room_nid = ANY($1) AND membership_nid = $2" +
+	" GROUP BY room_nid"
+
 const updateMembershipSQL = "" +
 	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4" +
 	" WHERE room_nid = $1 AND target_nid = $2"
@@ -68,6 +74,7 @@ const updateMembershipSQL = "" +
 type membershipStatements struct {
 	insertMembershipStmt          *sql.Stmt
 	selectMembershipForUpdateStmt *sql.Stmt
+	countJoinedMembersInRoomsStmt *sql.Stmt
 	updateMembershipStmt          *sql.Stmt
 }
 
@@ -80,6 +87,7 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 	return statementList{
 		{&s.insertMembershipStmt, insertMembershipSQL},
 		{&s.selectMembershipForUpdateStmt, selectMembershipForUpdateSQL},
+		{&s.countJoinedMembersInRoomsStmt, countJoinedMembersInRoomsSQL},
 		{&s.updateMembershipStmt, updateMembershipSQL},
 	}.prepare(db)
 }
@@ -98,6 +106,32 @@ func (s *membershipStatements) selectMembershipForUpdate(
 		roomNID, targetUserNID,
 	).Scan(&membership)
 	return
+}
+
+func (s *membershipStatements) countJoinedMembersInRooms(roomNIDs []types.RoomNID) (map[types.RoomNID]int64, error) {
+	nIDs := []int64{}
+	for _, roomNID := range roomNIDs {
+		nIDs = append(nIDs, int64(roomNID))
+	}
+
+	rows, err := s.countJoinedMembersInRoomsStmt.Query(pq.Int64Array(nIDs), membershipStateJoin)
+	if err != nil {
+		return nil, err
+	}
+
+	members := make(map[types.RoomNID]int64)
+	for rows.Next() {
+		var roomNID types.RoomNID
+		var count int64
+
+		if err = rows.Scan(&roomNID, &count); err != nil {
+			return members, err
+		}
+
+		members[roomNID] = count
+	}
+
+	return members, err
 }
 
 func (s *membershipStatements) updateMembership(

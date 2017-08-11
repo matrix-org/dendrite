@@ -54,6 +54,7 @@ func main() {
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
+	publicRoomAPI := api.NewRoomserverPublicRoomAPIHTTP(cfg.RoomServerURL(), nil)
 	inputAPI := api.NewRoomserverInputAPIHTTP(cfg.RoomServerURL(), nil)
 
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
@@ -108,8 +109,8 @@ func main() {
 	api := mux.NewRouter()
 	routing.Setup(
 		api, http.DefaultClient, *cfg, roomserverProducer,
-		queryAPI, aliasAPI, accountDB, deviceDB, federation, keyRing,
-		userUpdateProducer, syncProducer,
+		queryAPI, aliasAPI, publicRoomAPI, accountDB, deviceDB, federation,
+		keyRing, userUpdateProducer, syncProducer,
 	)
 	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
