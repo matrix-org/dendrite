@@ -145,7 +145,7 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 		return err
 	}
 
-	chunks := []api.PublicRoomsChunk{}
+	totalChunks := []api.PublicRoomsChunk{}
 	// Iterate over the array of aliases instead of the array of rooms, because
 	// a room must have at least one alias to be listed
 	for roomNID, as := range aliases {
@@ -156,16 +156,23 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 			WorldReadable:    true,
 			GuestCanJoin:     true,
 		}
-		chunks = append(chunks, chunk)
+		totalChunks = append(totalChunks, chunk)
 	}
 
-	chunks = chunks[offset:]
+	chunks := totalChunks[offset:]
 
 	if len(chunks) >= int(limit) {
 		chunks = chunks[offset:limit]
 	}
 
 	response.Chunks = chunks
+	response.TotalRoomCountEstimate = int64(len(totalChunks))
+	if offset > 0 {
+		response.PrevBatch = strconv.Itoa(int(offset) - 1)
+	}
+	if len(totalChunks) > int(limit) {
+		response.NextBatch = strconv.Itoa(int(offset) + int(limit))
+	}
 
 	return nil
 }
