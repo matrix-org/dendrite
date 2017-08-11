@@ -410,6 +410,11 @@ func (d *Database) UpdateRoomVisibility(roomNID types.RoomNID, visibility bool) 
 	return d.statements.updateVisibilityForRoomNID(roomNID, visibility)
 }
 
+// CountJoinedMembersInRooms implements publicroom.RoomserverPublicRoomAPIDB
+func (d *Database) CountJoinedMembersInRooms(roomNIDs []types.RoomNID) (map[types.RoomNID]int64, error) {
+	return d.statements.countJoinedMembersInRooms(roomNIDs)
+}
+
 type membershipUpdater struct {
 	transaction
 	d             *Database

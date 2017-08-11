@@ -54,6 +54,9 @@ type RoomserverPublicRoomAPIDatabase interface {
 	// ordered by room NID (ie map[roomNID] = []alias)
 	// Returns an error if the retrieval failed
 	GetAliasesFromRoomNIDs(roomNIDs []types.RoomNID) (map[types.RoomNID][]string, error)
+	// Returns the number of joined user in roms identified by given room numeric IDs.
+	// Returns an error if the retrieval failed
+	CountJoinedMembersInRooms(roomNIDs []types.RoomNID) (map[types.RoomNID]int64, error)
 }
 
 // RoomserverPublicRoomAPI is an implementation of api.RoomserverPublicRoomAPI
@@ -137,6 +140,10 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 	if err != nil {
 		return err
 	}
+	nbMembers, err := r.DB.CountJoinedMembersInRooms(roomNIDs)
+	if err != nil {
+		return err
+	}
 
 	chunks := []api.PublicRoomsChunk{}
 	// Iterate over the array of aliases instead of the array of rooms, because
@@ -145,7 +152,7 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 		chunk := api.PublicRoomsChunk{
 			RoomID:           roomIDs[roomNID],
 			Aliases:          as,
-			NumJoinedMembers: 0,
+			NumJoinedMembers: nbMembers[roomNID],
 			WorldReadable:    true,
 			GuestCanJoin:     true,
 		}
