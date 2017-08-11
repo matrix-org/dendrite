@@ -18,6 +18,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 const roomAliasesSchema = `
@@ -25,34 +26,34 @@ const roomAliasesSchema = `
 CREATE TABLE IF NOT EXISTS roomserver_room_aliases (
     -- Alias of the room
     alias TEXT NOT NULL PRIMARY KEY,
-    -- Room ID the alias refers to
-    room_id TEXT NOT NULL
+    -- Room numeric ID the alias refers to
+    room_nid TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_room_aliases(room_id);
+CREATE UNIQUE INDEX IF NOT EXISTS roomserver_room_nid_idx ON roomserver_room_aliases(room_nid);
 `
 
 const insertRoomAliasSQL = "" +
-	"INSERT INTO roomserver_room_aliases (alias, room_id) VALUES ($1, $2)"
+	"INSERT INTO roomserver_room_aliases (alias, room_nid) VALUES ($1, $2)"
 
-const selectRoomIDFromAliasSQL = "" +
-	"SELECT room_id FROM roomserver_room_aliases WHERE alias = $1"
+const selectRoomNIDFromAliasSQL = "" +
+	"SELECT room_nid FROM roomserver_room_aliases WHERE alias = $1"
 
-const selectAliasesFromRoomIDSQL = "" +
-	"SELECT alias FROM roomserver_room_aliases WHERE room_id = $1"
+const selectAliasesFromRoomNIDSQL = "" +
+	"SELECT alias FROM roomserver_room_aliases WHERE room_nid = $1"
 
-const selectAliasesFromRoomIDsSQL = "" +
-	"SELECT alias, room_id FROM roomserver_room_aliases WHERE room_id = ANY($1)"
+const selectAliasesFromRoomNIDsSQL = "" +
+	"SELECT alias, room_nid FROM roomserver_room_aliases WHERE room_nid = ANY($1)"
 
 const deleteRoomAliasSQL = "" +
 	"DELETE FROM roomserver_room_aliases WHERE alias = $1"
 
 type roomAliasesStatements struct {
-	insertRoomAliasStmt          *sql.Stmt
-	selectRoomIDFromAliasStmt    *sql.Stmt
-	selectAliasesFromRoomIDStmt  *sql.Stmt
-	selectAliasesFromRoomIDsStmt *sql.Stmt
-	deleteRoomAliasStmt          *sql.Stmt
+	insertRoomAliasStmt           *sql.Stmt
+	selectRoomNIDFromAliasStmt    *sql.Stmt
+	selectAliasesFromRoomNIDStmt  *sql.Stmt
+	selectAliasesFromRoomNIDsStmt *sql.Stmt
+	deleteRoomAliasStmt           *sql.Stmt
 }
 
 func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
@@ -62,29 +63,29 @@ func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
 	}
 	return statementList{
 		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
-		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},
-		{&s.selectAliasesFromRoomIDStmt, selectAliasesFromRoomIDSQL},
-		{&s.selectAliasesFromRoomIDsStmt, selectAliasesFromRoomIDsSQL},
+		{&s.selectRoomNIDFromAliasStmt, selectRoomNIDFromAliasSQL},
+		{&s.selectAliasesFromRoomNIDStmt, selectAliasesFromRoomNIDSQL},
+		{&s.selectAliasesFromRoomNIDsStmt, selectAliasesFromRoomNIDsSQL},
 		{&s.deleteRoomAliasStmt, deleteRoomAliasSQL},
 	}.prepare(db)
 }
 
-func (s *roomAliasesStatements) insertRoomAlias(alias string, roomID string) (err error) {
-	_, err = s.insertRoomAliasStmt.Exec(alias, roomID)
+func (s *roomAliasesStatements) insertRoomAlias(alias string, roomNID types.RoomNID) (err error) {
+	_, err = s.insertRoomAliasStmt.Exec(alias, roomNID)
 	return
 }
 
-func (s *roomAliasesStatements) selectRoomIDFromAlias(alias string) (roomID string, err error) {
-	err = s.selectRoomIDFromAliasStmt.QueryRow(alias).Scan(&roomID)
+func (s *roomAliasesStatements) selectRoomNIDFromAlias(alias string) (roomNID types.RoomNID, err error) {
+	err = s.selectRoomNIDFromAliasStmt.QueryRow(alias).Scan(&roomNID)
 	if err == sql.ErrNoRows {
-		return "", nil
+		return 0, nil
 	}
 	return
 }
 
-func (s *roomAliasesStatements) selectAliasesFromRoomID(roomID string) (aliases []string, err error) {
+func (s *roomAliasesStatements) selectAliasesFromRoomNID(roomNID types.RoomNID) (aliases []string, err error) {
 	aliases = []string{}
-	rows, err := s.selectAliasesFromRoomIDStmt.Query(roomID)
+	rows, err := s.selectAliasesFromRoomNIDStmt.Query(roomNID)
 	if err != nil {
 		return
 	}
@@ -101,23 +102,31 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(roomID string) (aliases 
 	return
 }
 
-func (s *roomAliasesStatements) selectAliasesFromRoomIDs(roomIDs []string) (aliases map[string][]string, err error) {
-	aliases = make(map[string][]string)
-	rows, err := s.selectAliasesFromRoomIDsStmt.Query(pq.StringArray(roomIDs))
+func (s *roomAliasesStatements) selectAliasesFromRoomNIDs(roomNIDs []types.RoomNID) (aliases map[types.RoomNID][]string, err error) {
+	aliases = make(map[types.RoomNID][]string)
+	// Convert the array of numeric IDs into one that can be used in the query
+	nIDs := []int64{}
+	for _, roomNID := range roomNIDs {
+		nIDs = append(nIDs, int64(roomNID))
+	}
+	rows, err := s.selectAliasesFromRoomNIDsStmt.Query(pq.Int64Array(nIDs))
+
 	if err != nil {
 		return
 	}
 
 	for rows.Next() {
-		var alias, roomID string
-		if err = rows.Scan(&alias, &roomID); err != nil {
+		var alias string
+		var roomNID types.RoomNID
+
+		if err = rows.Scan(&alias, &roomNID); err != nil {
 			return
 		}
 
-		if len(aliases[roomID]) > 0 {
-			aliases[roomID] = append(aliases[roomID], alias)
+		if len(aliases[roomNID]) > 0 {
+			aliases[roomNID] = append(aliases[roomNID], alias)
 		} else {
-			aliases[roomID] = []string{alias}
+			aliases[roomNID] = []string{alias}
 		}
 	}
 

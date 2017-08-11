@@ -353,24 +353,29 @@ func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.Ev
 	return references, currentStateSnapshotNID, depth, nil
 }
 
+// RoomID implements alias.RoomserverAliasAPIDB
+func (d *Database) RoomID(roomNID types.RoomNID) (string, error) {
+	return d.statements.selectRoomID(roomNID)
+}
+
 // SetRoomAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) SetRoomAlias(alias string, roomID string) error {
-	return d.statements.insertRoomAlias(alias, roomID)
+func (d *Database) SetRoomAlias(alias string, roomNID types.RoomNID) error {
+	return d.statements.insertRoomAlias(alias, roomNID)
 }
 
-// GetRoomIDFromAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) GetRoomIDFromAlias(alias string) (string, error) {
-	return d.statements.selectRoomIDFromAlias(alias)
+// GetRoomNIDFromAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) GetRoomNIDFromAlias(alias string) (types.RoomNID, error) {
+	return d.statements.selectRoomNIDFromAlias(alias)
 }
 
-// GetAliasesFromRoomID implements alias.RoomserverAliasAPIDB
-func (d *Database) GetAliasesFromRoomID(roomID string) ([]string, error) {
-	return d.statements.selectAliasesFromRoomID(roomID)
+// GetAliasesFromRoomNID implements alias.RoomserverAliasAPIDB
+func (d *Database) GetAliasesFromRoomNID(roomNID types.RoomNID) ([]string, error) {
+	return d.statements.selectAliasesFromRoomNID(roomNID)
 }
 
-// GetAliasesFromRoomIDs implements publicroom.RoomserverPublicRoomAPIDB
-func (d *Database) GetAliasesFromRoomIDs(roomIDs []string) (map[string][]string, error) {
-	return d.statements.selectAliasesFromRoomIDs(roomIDs)
+// GetAliasesFromRoomNIDs implements publicroom.RoomserverPublicRoomAPIDB
+func (d *Database) GetAliasesFromRoomNIDs(roomNIDs []types.RoomNID) (map[types.RoomNID][]string, error) {
+	return d.statements.selectAliasesFromRoomNIDs(roomNIDs)
 }
 
 // RemoveRoomAlias implements alias.RoomserverAliasAPIDB
@@ -385,14 +390,19 @@ func (d *Database) StateEntriesForTuples(
 	return d.statements.bulkSelectFilteredStateBlockEntries(stateBlockNIDs, stateKeyTuples)
 }
 
+// RoomIDs implements publicroom.RoomserverPublicRoomAPIDB
+func (d *Database) RoomIDs(roomNIDs []types.RoomNID) (map[types.RoomNID]string, error) {
+	return d.statements.selectRoomIDs(roomNIDs)
+}
+
 // IsRoomPublic implements publicroom.RoomserverPublicRoomAPIDB
 func (d *Database) IsRoomPublic(roomNID types.RoomNID) (bool, error) {
 	return d.statements.selectVisibilityForRoomNID(roomNID)
 }
 
-// GetPublicRoomIDs implements publicroom.RoomserverPublicRoomAPIDB
-func (d *Database) GetPublicRoomIDs() ([]string, error) {
-	return d.statements.selectPublicRoomIDs()
+// GetPublicRoomNIDs implements publicroom.RoomserverPublicRoomAPIDB
+func (d *Database) GetPublicRoomNIDs() ([]types.RoomNID, error) {
+	return d.statements.selectPublicRoomNIDs()
 }
 
 // UpdateRoomVisibility implements publicroom.RoomserverPublicRoomAPIDB

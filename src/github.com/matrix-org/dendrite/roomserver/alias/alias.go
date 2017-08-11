@@ -23,21 +23,30 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 // RoomserverAliasAPIDatabase has the storage APIs needed to implement the alias API.
 type RoomserverAliasAPIDatabase interface {
-	// Save a given room alias with the room ID it refers to.
+	// Lookup the numeric ID for the room.
+	// Returns 0 if the room doesn't exists.
 	// Returns an error if there was a problem talking to the database.
-	SetRoomAlias(alias string, roomID string) error
-	// Lookup the room ID a given alias refers to.
+	RoomNID(roomID string) (types.RoomNID, error)
+	// Lookup the ID of a room identified by a given numeric ID.
+	// Returns an error if there was a problem talking to the database or if no
+	// room matches the given numeric ID.
+	RoomID(roomNID types.RoomNID) (string, error)
+	// Save a given room alias with the room numeric ID it refers to.
 	// Returns an error if there was a problem talking to the database.
-	GetRoomIDFromAlias(alias string) (string, error)
-	// Lookup all aliases referring to a given room ID.
+	SetRoomAlias(alias string, roomNID types.RoomNID) error
+	// Lookup the room numeric ID a given alias refers to.
 	// Returns an error if there was a problem talking to the database.
-	GetAliasesFromRoomID(roomID string) ([]string, error)
+	GetRoomNIDFromAlias(alias string) (types.RoomNID, error)
+	// Lookup all aliases referring to a given room numeric ID.
+	// Returns an error if there was a problem talking to the database.
+	GetAliasesFromRoomNID(roomNID types.RoomNID) ([]string, error)
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(alias string) error
@@ -57,24 +66,28 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	response *api.SetRoomAliasResponse,
 ) error {
 	// Check if the alias isn't already referring to a room
-	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	roomNID, err := r.DB.GetRoomNIDFromAlias(request.Alias)
 	if err != nil {
 		return err
 	}
-	if len(roomID) > 0 {
+	if roomNID != 0 {
 		// If the alias already exists, stop the process
 		response.AliasExists = true
 		return nil
 	}
 	response.AliasExists = false
 
+	roomNID, err = r.DB.RoomNID(request.RoomID)
+	if err != nil {
+		return err
+	}
 	// Save the new alias
-	if err := r.DB.SetRoomAlias(request.Alias, request.RoomID); err != nil {
+	if err := r.DB.SetRoomAlias(request.Alias, roomNID); err != nil {
 		return err
 	}
 
 	// Send a m.room.aliases event with the updated list of aliases for this room
-	if err := r.sendUpdatedAliasesEvent(request.UserID, request.RoomID); err != nil {
+	if err := r.sendUpdatedAliasesEvent(request.UserID, request.RoomID, roomNID); err != nil {
 		return err
 	}
 
@@ -87,7 +100,12 @@ func (r *RoomserverAliasAPI) GetAliasRoomID(
 	response *api.GetAliasRoomIDResponse,
 ) error {
 	// Lookup the room ID in the database
-	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	roomNID, err := r.DB.GetRoomNIDFromAlias(request.Alias)
+	if err != nil {
+		return err
+	}
+
+	roomID, err := r.DB.RoomID(roomNID)
 	if err != nil {
 		return err
 	}
@@ -102,7 +120,12 @@ func (r *RoomserverAliasAPI) RemoveRoomAlias(
 	response *api.RemoveRoomAliasResponse,
 ) error {
 	// Lookup the room ID in the database
-	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	roomNID, err := r.DB.GetRoomNIDFromAlias(request.Alias)
+	if err != nil {
+		return err
+	}
+
+	roomID, err := r.DB.RoomID(roomNID)
 	if err != nil {
 		return err
 	}
@@ -113,7 +136,7 @@ func (r *RoomserverAliasAPI) RemoveRoomAlias(
 	}
 
 	// Send an updated m.room.aliases event
-	if err := r.sendUpdatedAliasesEvent(request.UserID, roomID); err != nil {
+	if err := r.sendUpdatedAliasesEvent(request.UserID, roomID, roomNID); err != nil {
 		return err
 	}
 
@@ -126,7 +149,7 @@ type roomAliasesContent struct {
 
 // Build the updated m.room.aliases event to send to the room after addition or
 // removal of an alias
-func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(userID string, roomID string) error {
+func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(userID string, roomID string, roomNID types.RoomNID) error {
 	serverName := string(r.Cfg.Matrix.ServerName)
 
 	builder := gomatrixserverlib.EventBuilder{
@@ -138,7 +161,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(userID string, roomID strin
 
 	// Retrieve the updated list of aliases, marhal it and set it as the
 	// event's content
-	aliases, err := r.DB.GetAliasesFromRoomID(roomID)
+	aliases, err := r.DB.GetAliasesFromRoomNID(roomNID)
 	if err != nil {
 		return err
 	}

@@ -53,6 +53,12 @@ const insertRoomNIDSQL = "" +
 const selectRoomNIDSQL = "" +
 	"SELECT room_nid FROM roomserver_rooms WHERE room_id = $1"
 
+const selectRoomIDSQL = "" +
+	"SELECT room_id FROM roomserver_rooms WHERE room_nid = $1"
+
+const selectRoomIDsSQL = "" +
+	"SELECT room_nid, room_id FROM roomserver_rooms WHERE room_nid = ANY($1)"
+
 const selectLatestEventNIDsSQL = "" +
 	"SELECT latest_event_nids, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1"
 
@@ -63,7 +69,7 @@ const selectVisibilityForRoomNIDSQL = "" +
 	"SELECT visibility FROM roomserver_rooms WHERE room_nid = $1"
 
 const selectPublicRoomIDsSQL = "" +
-	"SELECT room_id FROM roomserver_rooms WHERE visibility = true"
+	"SELECT room_nid FROM roomserver_rooms WHERE visibility = true"
 
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE roomserver_rooms SET latest_event_nids = $2, last_event_sent_nid = $3, state_snapshot_nid = $4 WHERE room_nid = $1"
@@ -74,6 +80,8 @@ const updateVisibilityForRoomNIDSQL = "" +
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
+	selectRoomIDStmt                   *sql.Stmt
+	selectRoomIDsStmt                  *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	selectVisibilityForRoomNIDStmt     *sql.Stmt
@@ -90,6 +98,8 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 	return statementList{
 		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
 		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
+		{&s.selectRoomIDStmt, selectRoomIDSQL},
+		{&s.selectRoomIDsStmt, selectRoomIDsSQL},
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.selectVisibilityForRoomNIDStmt, selectVisibilityForRoomNIDSQL},
@@ -109,6 +119,39 @@ func (s *roomStatements) selectRoomNID(roomID string) (types.RoomNID, error) {
 	var roomNID int64
 	err := s.selectRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
+}
+
+func (s *roomStatements) selectRoomID(roomNID types.RoomNID) (string, error) {
+	var roomID string
+	err := s.selectRoomIDStmt.QueryRow(roomNID).Scan(&roomID)
+	return roomID, err
+}
+
+func (s *roomStatements) selectRoomIDs(roomNIDs []types.RoomNID) (map[types.RoomNID]string, error) {
+	roomIDs := make(map[types.RoomNID]string)
+
+	nIDs := []int64{}
+	for _, roomNID := range roomNIDs {
+		nIDs = append(nIDs, int64(roomNID))
+	}
+
+	rows, err := s.selectRoomIDsStmt.Query(pq.Int64Array(nIDs))
+	if err != nil {
+		return roomIDs, err
+	}
+
+	for rows.Next() {
+		var roomNID types.RoomNID
+		var roomID string
+
+		if err := rows.Scan(&roomNID, &roomID); err != nil {
+			return roomIDs, err
+		}
+
+		roomIDs[roomNID] = roomID
+	}
+
+	return roomIDs, nil
 }
 
 func (s *roomStatements) selectLatestEventNIDs(roomNID types.RoomNID) ([]types.EventNID, types.StateSnapshotNID, error) {
@@ -148,22 +191,22 @@ func (s *roomStatements) selectVisibilityForRoomNID(roomNID types.RoomNID) (bool
 	return visibility, err
 }
 
-func (s *roomStatements) selectPublicRoomIDs() ([]string, error) {
-	roomIDs := []string{}
+func (s *roomStatements) selectPublicRoomNIDs() ([]types.RoomNID, error) {
+	roomNIDs := []types.RoomNID{}
 	rows, err := s.selectPublicRoomIDsStmt.Query()
 	if err != nil {
-		return roomIDs, err
+		return roomNIDs, err
 	}
 
 	for rows.Next() {
-		var roomID string
+		var roomID types.RoomNID
 		if err = rows.Scan(&roomID); err != nil {
-			return roomIDs, err
+			return roomNIDs, err
 		}
-		roomIDs = append(roomIDs, roomID)
+		roomNIDs = append(roomNIDs, roomID)
 	}
 
-	return roomIDs, nil
+	return roomNIDs, nil
 }
 
 func (s *roomStatements) updateVisibilityForRoomNID(roomNID types.RoomNID, visibility bool) error {

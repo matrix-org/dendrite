@@ -33,23 +33,27 @@ type RoomserverPublicRoomAPIDatabase interface {
 	// Returns 0 if the room doesn't exists.
 	// Returns an error if there was a problem talking to the database.
 	RoomNID(roomID string) (types.RoomNID, error)
+	// Lookup the room IDs matching a batch of room numeric IDs, ordered by
+	// numeric ID (ie map[roomNID] = roomID).
+	// Returns an error if the retrieval failed.
+	RoomIDs([]types.RoomNID) (map[types.RoomNID]string, error)
 	// Checks the visibility of the room identified by the given numeric ID.
 	// Returns true if the room is publicly visible, returns false if not.
 	// If there's no room matching this numeric ID, or if the retrieval failed,
 	// returns an error.
 	IsRoomPublic(roomNID types.RoomNID) (bool, error)
-	// Returns an array of string containing the room IDs of the rooms that are
-	// publicly visible.
+	// Returns an array of string containing the room numeric IDs of the rooms
+	// that are publicly visible.
 	// Returns an error if the retrieval failed.
-	GetPublicRoomIDs() ([]string, error)
+	GetPublicRoomNIDs() ([]types.RoomNID, error)
 	// Updates the visibility for a room to the given value: true means that the
 	// room is publicly visible, false means that the room isn't publicly visible.
 	// Returns an error if the update failed.
 	UpdateRoomVisibility(roomNID types.RoomNID, visibility bool) error
-	// Returns a map of the aliases bound to a given set of room IDs, ordered
-	// by room ID (ie map[roomID] = []alias)
+	// Returns a map of the aliases bound to a given set of room numeric IDs,
+	// ordered by room NID (ie map[roomNID] = []alias)
 	// Returns an error if the retrieval failed
-	GetAliasesFromRoomIDs(roomIDs []string) (map[string][]string, error)
+	GetAliasesFromRoomNIDs(roomNIDs []types.RoomNID) (map[types.RoomNID][]string, error)
 }
 
 // RoomserverPublicRoomAPI is an implementation of api.RoomserverPublicRoomAPI
@@ -120,12 +124,16 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 		return err
 	}
 
-	roomIDs, err := r.DB.GetPublicRoomIDs()
+	roomNIDs, err := r.DB.GetPublicRoomNIDs()
 	if err != nil {
 		return err
 	}
 
-	aliases, err := r.DB.GetAliasesFromRoomIDs(roomIDs)
+	aliases, err := r.DB.GetAliasesFromRoomNIDs(roomNIDs)
+	if err != nil {
+		return err
+	}
+	roomIDs, err := r.DB.RoomIDs(roomNIDs)
 	if err != nil {
 		return err
 	}
@@ -133,9 +141,9 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 	chunks := []api.PublicRoomsChunk{}
 	// Iterate over the array of aliases instead of the array of rooms, because
 	// a room must have at least one alias to be listed
-	for room, as := range aliases {
+	for roomNID, as := range aliases {
 		chunk := api.PublicRoomsChunk{
-			RoomID:           room,
+			RoomID:           roomIDs[roomNID],
 			Aliases:          as,
 			NumJoinedMembers: 0,
 			WorldReadable:    true,
@@ -144,12 +152,13 @@ func (r *RoomserverPublicRoomAPI) GetPublicRooms(
 		chunks = append(chunks, chunk)
 	}
 
-	if limit == 0 {
-		// If limit is 0, don't limit the results
-		response.Chunks = chunks[offset:]
-	} else {
-		response.Chunks = chunks[offset:limit]
+	chunks = chunks[offset:]
+
+	if len(chunks) >= int(limit) {
+		chunks = chunks[offset:limit]
 	}
+
+	response.Chunks = chunks
 
 	return nil
 }
