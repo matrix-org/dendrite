@@ -75,6 +75,7 @@ database:
 
 # The TCP host:port pairs to bind the internal HTTP APIs to.
 # These shouldn't be exposed to the public internet.
+# These aren't needed when running dendrite as a monolithic server.
 listen:
     room_server: "localhost:7770"
     client_api: "localhost:7771"
