@@ -64,6 +64,10 @@ const selectPublicRoomswithLimitSQL = "" +
 	" ORDER BY joined_members DESC" +
 	" OFFSET $1 LIMIT $2"
 
+const selectRoomVisibilitySQL = "" +
+	"SELECT visibility FROM publicroomsapi_public_rooms" +
+	" WHERE room_id = $1"
+
 const insertNewRoomSQL = "" +
 	"INSERT INTO publicroomsapi_public_rooms(room_id)" +
 	" VALUES ($1)"
@@ -87,6 +91,7 @@ type publicRoomsStatements struct {
 	countPublicRoomsStmt             *sql.Stmt
 	selectPublicRoomsStmt            *sql.Stmt
 	selectPublicRoomswithLimitStmt   *sql.Stmt
+	selectRoomVisibilityStmt         *sql.Stmt
 	insertNewRoomStmt                *sql.Stmt
 	incrementJoinedMembersInRoomStmt *sql.Stmt
 	decrementJoinedMembersInRoomStmt *sql.Stmt
@@ -105,6 +110,9 @@ func (s *publicRoomsStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectPublicRoomswithLimitStmt, err = db.Prepare(selectPublicRoomswithLimitSQL); err != nil {
+		return
+	}
+	if s.selectRoomVisibilityStmt, err = db.Prepare(selectRoomVisibilitySQL); err != nil {
 		return
 	}
 	if s.insertNewRoomStmt, err = db.Prepare(insertNewRoomSQL); err != nil {
@@ -163,6 +171,11 @@ func (s *publicRoomsStatements) selectPublicRooms(offset int64, limit int16) ([]
 	}
 
 	return rooms, nil
+}
+
+func (s *publicRoomsStatements) selectRoomVisibility(roomID string) (v bool, err error) {
+	err = s.selectRoomVisibilityStmt.QueryRow(roomID).Scan(&v)
+	return
 }
 
 func (s *publicRoomsStatements) insertNewRoom(roomID string) error {

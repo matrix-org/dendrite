@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// PublicRoomsServerDatabase represents a public rooms server database
+// PublicRoomsServerDatabase represents a public rooms server database.
 type PublicRoomsServerDatabase struct {
 	db         *sql.DB
 	partitions common.PartitionOffsetStatements
@@ -33,7 +33,7 @@ type PublicRoomsServerDatabase struct {
 
 type attributeValue interface{}
 
-// NewPublicRoomsServerDatabase creates a new public rooms server database
+// NewPublicRoomsServerDatabase creates a new public rooms server database.
 func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerDatabase, error) {
 	var db *sql.DB
 	var err error
@@ -49,6 +49,20 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerData
 		return nil, err
 	}
 	return &PublicRoomsServerDatabase{db, partitions, statements}, nil
+}
+
+// GetRoomVisibility returns the room visibility as a boolean: true if the room
+// is publicly visible, false if not.
+// Returns an error if the retrieval failed.
+func (d *PublicRoomsServerDatabase) GetRoomVisibility(roomID string) (bool, error) {
+	return d.statements.selectRoomVisibility(roomID)
+}
+
+// SetRoomVisibility updates the visibility attribute of a room. This attribute
+// must be set to true if the room is publicly visible, false if not.
+// Returns an error if the update failed.
+func (d *PublicRoomsServerDatabase) SetRoomVisibility(visible bool, roomID string) error {
+	return d.statements.updateRoomAttribute("visibility", visible, roomID)
 }
 
 // CountPublicRooms returns the number of room set as publicly visible on the server.
