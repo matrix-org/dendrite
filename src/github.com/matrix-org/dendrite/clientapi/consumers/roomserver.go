@@ -17,13 +17,13 @@ package consumers
 import (
 	"encoding/json"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	log "github.com/Sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
