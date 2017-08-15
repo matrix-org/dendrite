@@ -34,18 +34,6 @@ type profileUpdate struct {
 	NewValue string `json:"new_value"` // The attribute's value after the update
 }
 
-// NewUserUpdateProducer creates a new UserUpdateProducer
-func NewUserUpdateProducer(kafkaURIs []string, topic string) (*UserUpdateProducer, error) {
-	producer, err := sarama.NewSyncProducer(kafkaURIs, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &UserUpdateProducer{
-		Topic:    topic,
-		Producer: producer,
-	}, nil
-}
-
 // SendUpdate sends an update using kafka to notify the roomserver of the
 // profile update. Returns an error if the update failed to send.
 func (p *UserUpdateProducer) SendUpdate(

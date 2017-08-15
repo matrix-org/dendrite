@@ -33,11 +33,12 @@ type OutputClientData struct {
 }
 
 // NewOutputClientData creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
-func NewOutputClientData(cfg *config.Dendrite, n *sync.Notifier, store *storage.SyncServerDatabase) (*OutputClientData, error) {
-	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
-	if err != nil {
-		return nil, err
-	}
+func NewOutputClientData(
+	cfg *config.Dendrite,
+	kafkaConsumer sarama.Consumer,
+	n *sync.Notifier,
+	store *storage.SyncServerDatabase,
+) *OutputClientData {
 
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputClientData),
@@ -51,7 +52,7 @@ func NewOutputClientData(cfg *config.Dendrite, n *sync.Notifier, store *storage.
 	}
 	consumer.ProcessMessage = s.onMessage
 
-	return s, nil
+	return s
 }
 
 // Start consuming from room servers

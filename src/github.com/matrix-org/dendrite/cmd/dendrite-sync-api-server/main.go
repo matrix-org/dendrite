@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -31,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 
 	log "github.com/Sirupsen/logrus"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 var configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
@@ -48,7 +50,7 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	log.Info("config: ", cfg)
+	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 
 	db, err := storage.NewSyncServerDatabase(string(cfg.Database.SyncAPI))
 	if err != nil {
@@ -74,17 +76,20 @@ func main() {
 	if err = n.Load(db); err != nil {
 		log.Panicf("startup: failed to set up notifier: %s", err)
 	}
-	roomConsumer, err := consumers.NewOutputRoomEvent(cfg, n, db)
+
+	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
 	if err != nil {
-		log.Panicf("startup: failed to create room server consumer: %s", err)
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+			"addresses":  cfg.Kafka.Addresses,
+		}).Panic("Failed to setup kafka consumers")
 	}
+
+	roomConsumer := consumers.NewOutputRoomEvent(cfg, kafkaConsumer, n, db, queryAPI)
 	if err = roomConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer: %s", err)
 	}
-	clientConsumer, err := consumers.NewOutputClientData(cfg, n, db)
-	if err != nil {
-		log.Panicf("startup: failed to create client API server consumer: %s", err)
-	}
+	clientConsumer := consumers.NewOutputClientData(cfg, kafkaConsumer, n, db)
 	if err = clientConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start client API server consumer: %s", err)
 	}
