@@ -81,6 +81,7 @@ func main() {
 	m := newMonolith(cfg)
 	m.setupDatabases()
 	m.setupFederation()
+	m.setupKafka()
 	m.setupRoomServer()
 	m.setupProducers()
 	m.setupNotifiers()
