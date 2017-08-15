@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package events
+package common
 
 // CreateContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-create
 type CreateContent struct {

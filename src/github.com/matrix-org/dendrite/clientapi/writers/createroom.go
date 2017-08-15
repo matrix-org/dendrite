@@ -24,10 +24,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -132,7 +132,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		return httputil.LogThenError(req, err)
 	}
 
-	membershipContent := events.MemberContent{
+	membershipContent := common.MemberContent{
 		Membership:  "join",
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
@@ -159,16 +159,16 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	// harder to reason about, hence sticking to a strict static ordering.
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
 	eventsToMake := []fledglingEvent{
-		{"m.room.create", "", events.CreateContent{Creator: userID}},
+		{"m.room.create", "", common.CreateContent{Creator: userID}},
 		{"m.room.member", userID, membershipContent},
-		{"m.room.power_levels", "", events.InitialPowerLevelsContent(userID)},
+		{"m.room.power_levels", "", common.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
-		{"m.room.join_rules", "", events.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
-		{"m.room.history_visibility", "", events.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
-		{"m.room.guest_access", "", events.GuestAccessContent{"can_join"}},           // FIXME: Allow this to be changed
+		{"m.room.join_rules", "", common.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
+		{"m.room.history_visibility", "", common.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
+		{"m.room.guest_access", "", common.GuestAccessContent{"can_join"}},           // FIXME: Allow this to be changed
 		// TODO: Other initial state items
-		{"m.room.name", "", events.NameContent{r.Name}}, // FIXME: Only send the name event if a name is supplied, to avoid sending a false room name removal event
-		{"m.room.topic", "", events.TopicContent{r.Topic}},
+		{"m.room.name", "", common.NameContent{r.Name}}, // FIXME: Only send the name event if a name is supplied, to avoid sending a false room name removal event
+		{"m.room.topic", "", common.TopicContent{r.Topic}},
 		// TODO: invite events
 		// TODO: 3pid invite events
 		// TODO: m.room.aliases
