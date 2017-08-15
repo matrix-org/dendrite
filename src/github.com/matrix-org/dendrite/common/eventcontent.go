@@ -90,3 +90,13 @@ func InitialPowerLevelsContent(roomCreator string) PowerLevelContent {
 		Users: map[string]int{roomCreator: 100},
 	}
 }
+
+// AliasesContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-aliases
+type AliasesContent struct {
+	Aliases []string `json:"aliases"`
+}
+
+// CanonicalAliasContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-canonical-alias
+type CanonicalAliasContent struct {
+	Alias string `json:"alias"`
+}
