@@ -94,12 +94,14 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Database.RoomServer = config.DataSource(database)
 	cfg.Database.ServerKey = config.DataSource(database)
 	cfg.Database.SyncAPI = config.DataSource(database)
+	cfg.Database.PublicRoomsAPI = config.DataSource(database)
 
 	cfg.Listen.ClientAPI = assignAddress()
 	cfg.Listen.FederationAPI = assignAddress()
 	cfg.Listen.MediaAPI = assignAddress()
 	cfg.Listen.RoomServer = assignAddress()
 	cfg.Listen.SyncAPI = assignAddress()
+	cfg.Listen.PublicRoomsAPI = assignAddress()
 
 	return &cfg, port, nil
 }
