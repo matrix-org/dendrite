@@ -31,6 +31,7 @@ var editableAttributes = []string{
 	"world_readable",
 	"guest_can_join",
 	"avatar_url",
+	"visibility",
 }
 
 const publicRoomsSchema = `

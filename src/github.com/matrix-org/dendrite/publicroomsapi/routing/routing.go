@@ -41,4 +41,9 @@ func Setup(apiMux *mux.Router, publicRoomsDB *storage.PublicRoomsServerDatabase)
 			return directory.SetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
 	).Methods("PUT", "OPTIONS")
+	r0mux.Handle("/publicRooms",
+		common.MakeAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+			return directory.GetPublicRooms(req, publicRoomsDB)
+		}),
+	).Methods("GET", "POST", "OPTIONS")
 }
