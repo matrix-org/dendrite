@@ -226,7 +226,10 @@ func (s *publicRoomsStatements) updateRoomAttribute(attrName string, attrValue a
 	var value interface{}
 	if attrName == "aliases" {
 		// Aliases need a special conversion
-		value = pq.StringArray(attrValue.([]string))
+		if value, err = pq.StringArray(attrValue.([]string)); err != nil {
+			// attrValue isn't a slice of strings
+			return err
+		}
 	} else {
 		value = attrValue
 	}

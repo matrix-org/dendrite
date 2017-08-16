@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS roomserver_room_aliases (
     room_id TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_room_aliases(room_id);
+CREATE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_room_aliases(room_id);
 `
 
 const insertRoomAliasSQL = "" +
