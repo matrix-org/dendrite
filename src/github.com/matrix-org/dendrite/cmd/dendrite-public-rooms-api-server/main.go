@@ -22,6 +22,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/publicroomsapi/consumers"
 	"github.com/matrix-org/dendrite/publicroomsapi/routing"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 
@@ -46,6 +47,14 @@ func main() {
 	db, err := storage.NewPublicRoomsServerDatabase(string(cfg.Database.PublicRoomsAPI))
 	if err != nil {
 		log.Panicf("startup: failed to create public rooms server database with data source %s : %s", cfg.Database.PublicRoomsAPI, err)
+	}
+
+	roomConsumer, err := consumers.NewOutputRoomEvent(cfg, db)
+	if err != nil {
+		log.Panicf("startup: failed to create room server consumer: %s", err)
+	}
+	if err = roomConsumer.Start(); err != nil {
+		log.Panicf("startup: failed to start room server consumer: %s", err)
 	}
 
 	log.Info("Starting public rooms server on ", cfg.Listen.PublicRoomsAPI)

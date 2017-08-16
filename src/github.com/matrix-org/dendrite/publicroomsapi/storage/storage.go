@@ -51,6 +51,16 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerData
 	return &PublicRoomsServerDatabase{db, partitions, statements}, nil
 }
 
+// PartitionOffsets implements common.PartitionStorer
+func (d *PublicRoomsServerDatabase) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
+	return d.partitions.SelectPartitionOffsets(topic)
+}
+
+// SetPartitionOffset implements common.PartitionStorer
+func (d *PublicRoomsServerDatabase) SetPartitionOffset(topic string, partition int32, offset int64) error {
+	return d.partitions.UpsertPartitionOffset(topic, partition, offset)
+}
+
 // GetRoomVisibility returns the room visibility as a boolean: true if the room
 // is publicly visible, false if not.
 // Returns an error if the retrieval failed.
