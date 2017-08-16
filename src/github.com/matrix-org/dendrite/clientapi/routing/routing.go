@@ -100,13 +100,6 @@ func Setup(
 			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], &emptyString, cfg, queryAPI, producer)
 		}),
 	)
-	r0mux.Handle("/rooms/{roomID}/state/{eventType}/",
-		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars := mux.Vars(req)
-			emptyString := ""
-			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], &emptyString, cfg, queryAPI, producer)
-		}),
-	)
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
@@ -262,20 +255,6 @@ func Setup(
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct{}{},
-			}
-		}),
-	)
-
-	r0mux.Handle("/publicRooms",
-		common.MakeAPI("public_rooms", func(req *http.Request) util.JSONResponse {
-			// TODO: Return a list of public rooms
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct {
-					Chunk []struct{} `json:"chunk"`
-					Start string     `json:"start"`
-					End   string     `json:"end"`
-				}{[]struct{}{}, "", ""},
 			}
 		}),
 	)

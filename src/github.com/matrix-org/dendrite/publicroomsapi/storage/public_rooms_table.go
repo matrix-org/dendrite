@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS publicroomsapi_public_rooms(
 	-- Aliases of the room (empty array if none)
 	aliases TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
 	-- Canonical alias of the room (empty string if none)
-	canonical_alias TEXT,
+	canonical_alias TEXT NOT NULL DEFAULT '',
 	-- Name of the room (empty string if none)
 	name TEXT NOT NULL DEFAULT '',
 	-- Topic of the room (empty string if none)
