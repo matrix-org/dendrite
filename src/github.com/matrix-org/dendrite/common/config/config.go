@@ -94,6 +94,11 @@ type Dendrite struct {
 	Kafka struct {
 		// A list of kafka addresses to connect to.
 		Addresses []string `yaml:"addresses"`
+		// Whether to use naffka instead of kafka.
+		// Naffka can only be used when running dendrite as a single monolithic server.
+		// Kafka can be used both with a monolithic server and when running the
+		// components as separate servers.
+		UseNaffka bool `yaml:"use_naffka,omitempty"`
 		// The names of the topics to use when reading and writing from kafka.
 		Topics struct {
 			// Topic for roomserver/api.OutputRoomEvent events.
@@ -173,7 +178,10 @@ type ThumbnailSize struct {
 	ResizeMethod string `yaml:"method,omitempty"`
 }
 
-// Load a yaml config file
+// Load a yaml config file for a server run as multiple processes.
+// Checks the config to ensure that it is valid.
+// The checks are different if the server is run as a monolithic process instead
+// of being split into multiple components
 func Load(configPath string) (*Dendrite, error) {
 	configData, err := ioutil.ReadFile(configPath)
 	if err != nil {
@@ -185,7 +193,27 @@ func Load(configPath string) (*Dendrite, error) {
 	}
 	// Pass the current working directory and ioutil.ReadFile so that they can
 	// be mocked in the tests
-	return loadConfig(basePath, configData, ioutil.ReadFile)
+	monolithic := false
+	return loadConfig(basePath, configData, ioutil.ReadFile, monolithic)
+}
+
+// LoadMonolithic loads a yaml config file for a server run as a single monolith.
+// Checks the config to ensure that it is valid.
+// The checks are different if the server is run as a monolithic process instead
+// of being split into multiple components
+func LoadMonolithic(configPath string) (*Dendrite, error) {
+	configData, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	basePath, err := filepath.Abs(".")
+	if err != nil {
+		return nil, err
+	}
+	// Pass the current working directory and ioutil.ReadFile so that they can
+	// be mocked in the tests
+	monolithic := true
+	return loadConfig(basePath, configData, ioutil.ReadFile, monolithic)
 }
 
 // An Error indicates a problem parsing the config.
@@ -198,6 +226,7 @@ func loadConfig(
 	basePath string,
 	configData []byte,
 	readFile func(string) ([]byte, error),
+	monolithic bool,
 ) (*Dendrite, error) {
 	var config Dendrite
 	var err error
@@ -207,7 +236,7 @@ func loadConfig(
 
 	config.setDefaults()
 
-	if err = config.check(); err != nil {
+	if err = config.check(monolithic); err != nil {
 		return nil, err
 	}
 
@@ -263,7 +292,7 @@ func (e Error) Error() string {
 	)
 }
 
-func (config *Dendrite) check() error {
+func (config *Dendrite) check(monolithic bool) error {
 	var problems []string
 
 	if config.Version != Version {
@@ -301,21 +330,32 @@ func (config *Dendrite) check() error {
 		checkPositive(fmt.Sprintf("media.thumbnail_sizes[%d].width", i), int64(size.Width))
 		checkPositive(fmt.Sprintf("media.thumbnail_sizes[%d].height", i), int64(size.Height))
 	}
-
-	checkNotZero("kafka.addresses", int64(len(config.Kafka.Addresses)))
+	if config.Kafka.UseNaffka {
+		if !monolithic {
+			problems = append(problems, fmt.Sprintf("naffka can only be used in a monolithic server"))
+		}
+	} else {
+		// If we aren't using naffka then we need to have at least one kafka
+		// server to talk to.
+		checkNotZero("kafka.addresses", int64(len(config.Kafka.Addresses)))
+	}
 	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
 	checkNotEmpty("kafka.topics.output_client_data", string(config.Kafka.Topics.OutputClientData))
+	checkNotEmpty("kafka.topics.user_updates", string(config.Kafka.Topics.UserUpdates))
 	checkNotEmpty("database.account", string(config.Database.Account))
 	checkNotEmpty("database.device", string(config.Database.Device))
 	checkNotEmpty("database.server_key", string(config.Database.ServerKey))
 	checkNotEmpty("database.media_api", string(config.Database.MediaAPI))
 	checkNotEmpty("database.sync_api", string(config.Database.SyncAPI))
 	checkNotEmpty("database.room_server", string(config.Database.RoomServer))
-	checkNotEmpty("listen.media_api", string(config.Listen.MediaAPI))
-	checkNotEmpty("listen.client_api", string(config.Listen.ClientAPI))
-	checkNotEmpty("listen.federation_api", string(config.Listen.FederationAPI))
-	checkNotEmpty("listen.sync_api", string(config.Listen.SyncAPI))
-	checkNotEmpty("listen.room_server", string(config.Listen.RoomServer))
+
+	if !monolithic {
+		checkNotEmpty("listen.media_api", string(config.Listen.MediaAPI))
+		checkNotEmpty("listen.client_api", string(config.Listen.ClientAPI))
+		checkNotEmpty("listen.federation_api", string(config.Listen.FederationAPI))
+		checkNotEmpty("listen.sync_api", string(config.Listen.SyncAPI))
+		checkNotEmpty("listen.room_server", string(config.Listen.RoomServer))
+	}
 
 	if problems != nil {
 		return Error{problems}

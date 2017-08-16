@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	log "github.com/Sirupsen/logrus"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 var (
@@ -50,24 +51,28 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	log.Info("config: ", cfg)
-
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
 	inputAPI := api.NewRoomserverInputAPIHTTP(cfg.RoomServerURL(), nil)
 
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
-	userUpdateProducer, err := producers.NewUserUpdateProducer(
-		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.UserUpdates),
-	)
+
+	kafkaProducer, err := sarama.NewSyncProducer(cfg.Kafka.Addresses, nil)
 	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.Kafka.Addresses, err)
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+			"addresses":  cfg.Kafka.Addresses,
+		}).Panic("Failed to setup kafka producers")
 	}
-	syncProducer, err := producers.NewSyncAPIProducer(
-		cfg.Kafka.Addresses, string(cfg.Kafka.Topics.OutputClientData),
-	)
-	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%q): %s", cfg.Kafka.Addresses, err)
+
+	userUpdateProducer := &producers.UserUpdateProducer{
+		Producer: kafkaProducer,
+		Topic:    string(cfg.Kafka.Topics.UserUpdates),
+	}
+
+	syncProducer := &producers.SyncAPIProducer{
+		Producer: kafkaProducer,
+		Topic:    string(cfg.Kafka.Topics.OutputClientData),
 	}
 
 	federation := gomatrixserverlib.NewFederationClient(
@@ -90,15 +95,20 @@ func main() {
 	keyRing := gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
 			// TODO: Use perspective key fetchers for production.
-			&gomatrixserverlib.DirectKeyFetcher{federation.Client},
+			&gomatrixserverlib.DirectKeyFetcher{Client: federation.Client},
 		},
 		KeyDatabase: keyDB,
 	}
 
-	consumer, err := consumers.NewOutputRoomEvent(cfg, accountDB)
+	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
 	if err != nil {
-		log.Panicf("startup: failed to create room server consumer: %s", err)
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+			"addresses":  cfg.Kafka.Addresses,
+		}).Panic("Failed to setup kafka consumers")
 	}
+
+	consumer := consumers.NewOutputRoomEvent(cfg, kafkaConsumer, accountDB, queryAPI)
 	if err = consumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer")
 	}

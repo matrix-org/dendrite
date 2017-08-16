@@ -25,6 +25,7 @@ func TestLoadConfigRelative(t *testing.T) {
 			"/my/config/dir/matrix_key.pem": testKey,
 			"/my/config/dir/tls_cert.pem":   testCert,
 		}.readFile,
+		false,
 	)
 	if err != nil {
 		t.Error("failed to load config:", err)
@@ -42,9 +43,9 @@ media:
 kafka:
   addresses: ["localhost:9092"]
   topics:
-    input_room_event: input.room
     output_room_event: output.room
     output_client_data: output.client
+    user_updates: output.user
 database:
   media_api: "postgresql:///media_api"
   account: "postgresql:///account"
