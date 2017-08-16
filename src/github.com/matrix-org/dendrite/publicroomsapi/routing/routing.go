@@ -27,7 +27,7 @@ import (
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup configures the given mux with publicroomsapi server listeners
-func Setup(apiMux *mux.Router, publicRoomsDB storage.PublicRoomsServerDatabase) {
+func Setup(apiMux *mux.Router, publicRoomsDB *storage.PublicRoomsServerDatabase) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeAPI("directory_list", func(req *http.Request) util.JSONResponse {

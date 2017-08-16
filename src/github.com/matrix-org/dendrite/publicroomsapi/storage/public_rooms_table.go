@@ -16,10 +16,22 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
 )
+
+var editableAttributes = []string{
+	"aliases",
+	"canonical_alias",
+	"name",
+	"topic",
+	"world_readable",
+	"guest_can_join",
+	"avatar_url",
+}
 
 const publicRoomsSchema = `
 -- Stores all of the rooms with data needed to create the server's room directory
@@ -29,7 +41,7 @@ CREATE TABLE IF NOT EXISTS publicroomsapi_public_rooms(
 	-- Number of joined members in the room
 	joined_members INTEGER NOT NULL DEFAULT 0,
 	-- Aliases of the room (empty array if none)
-	aliases TEXT[] NOT NULL DEFAULT DEFAULT '{}'::TEXT[],
+	aliases TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
 	-- Canonical alias of the room (empty string if none)
 	canonical_alias TEXT,
 	-- Name of the room (empty string if none)
@@ -84,8 +96,8 @@ const decrementJoinedMembersInRoomSQL = "" +
 
 const updateRoomAttributeSQL = "" +
 	"UPDATE publicroomsapi_public_rooms" +
-	" SET $1 = $2" +
-	" WHERE room_id = $3"
+	" SET %s = $1" +
+	" WHERE room_id = $2"
 
 type publicRoomsStatements struct {
 	countPublicRoomsStmt             *sql.Stmt
@@ -95,7 +107,7 @@ type publicRoomsStatements struct {
 	insertNewRoomStmt                *sql.Stmt
 	incrementJoinedMembersInRoomStmt *sql.Stmt
 	decrementJoinedMembersInRoomStmt *sql.Stmt
-	updateRoomAttributeStmt          *sql.Stmt
+	updateRoomAttributeStmts         map[string]*sql.Stmt
 }
 
 func (s *publicRoomsStatements) prepare(db *sql.DB) (err error) {
@@ -124,9 +136,15 @@ func (s *publicRoomsStatements) prepare(db *sql.DB) (err error) {
 	if s.decrementJoinedMembersInRoomStmt, err = db.Prepare(decrementJoinedMembersInRoomSQL); err != nil {
 		return
 	}
-	if s.updateRoomAttributeStmt, err = db.Prepare(updateRoomAttributeSQL); err != nil {
-		return
+
+	s.updateRoomAttributeStmts = make(map[string]*sql.Stmt)
+	for _, editable := range editableAttributes {
+		stmt := fmt.Sprintf(updateRoomAttributeSQL, editable)
+		if s.updateRoomAttributeStmts[editable], err = db.Prepare(stmt); err != nil {
+			return
+		}
 	}
+
 	return
 }
 
@@ -194,6 +212,17 @@ func (s *publicRoomsStatements) decrementJoinedMembersInRoom(roomID string) erro
 }
 
 func (s *publicRoomsStatements) updateRoomAttribute(attrName string, attrValue attributeValue, roomID string) error {
+	isEditable := false
+	for _, editable := range editableAttributes {
+		if editable == attrName {
+			isEditable = true
+		}
+	}
+
+	if !isEditable {
+		return errors.New("Cannot edit " + attrName)
+	}
+
 	var value interface{}
 	if attrName == "aliases" {
 		// Aliases need a special conversion
@@ -202,6 +231,6 @@ func (s *publicRoomsStatements) updateRoomAttribute(attrName string, attrValue a
 		value = attrValue
 	}
 
-	_, err := s.updateRoomAttributeStmt.Exec(attrName, value, roomID)
+	_, err := s.updateRoomAttributeStmts[attrName].Exec(value, roomID)
 	return err
 }
