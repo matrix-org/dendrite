@@ -70,8 +70,9 @@ func GetPublicRooms(
 	if offset > 0 {
 		response.PrevBatch = strconv.Itoa(int(offset) - 1)
 	}
-	if response.Estimate > int64(limit) {
-		response.NextBatch = strconv.Itoa(int(offset) + int(limit))
+	nextIndex := int(offset) + int(limit)
+	if response.Estimate > int64(nextIndex) {
+		response.NextBatch = strconv.Itoa(nextIndex)
 	}
 
 	if response.Chunk, err = publicRoomDatabase.GetPublicRooms(offset, limit, request.Filter.SearchTerms); err != nil {
