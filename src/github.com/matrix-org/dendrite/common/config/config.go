@@ -128,6 +128,9 @@ type Dendrite struct {
 		// The FederationSender database stores information used by the FederationSender
 		// It is only accessed by the FederationSender.
 		FederationSender DataSource `yaml:"federation_sender"`
+		// The PublicRoomsAPI database stores information used to compute the public
+		// room directory. It is only accessed by the PublicRoomsAPI server.
+		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
 	} `yaml:"database"`
 
 	// The internal addresses the components will listen on.
