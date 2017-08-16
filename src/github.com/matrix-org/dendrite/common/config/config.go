@@ -142,6 +142,7 @@ type Dendrite struct {
 		SyncAPI          Address `yaml:"sync_api"`
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
+		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
 	} `yaml:"listen"`
 }
 
