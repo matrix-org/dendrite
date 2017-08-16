@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 
 	log "github.com/Sirupsen/logrus"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 var configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
@@ -55,7 +56,15 @@ func main() {
 		log.Panicf("startup: failed to create device database with data source %s : %s", cfg.Database.Device, err)
 	}
 
-	roomConsumer, err := consumers.NewOutputRoomEvent(cfg, db)
+	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
+	if err != nil {
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+			"addresses":  cfg.Kafka.Addresses,
+		}).Panic("Failed to setup kafka consumers")
+	}
+
+	roomConsumer := consumers.NewOutputRoomEvent(cfg, kafkaConsumer, db)
 	if err != nil {
 		log.Panicf("startup: failed to create room server consumer: %s", err)
 	}
