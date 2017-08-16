@@ -86,8 +86,8 @@ func (d *PublicRoomsServerDatabase) CountPublicRooms() (int64, error) {
 // If the limit is 0, doesn't limit the number of results. If the offset is 0 too, the array contains all
 // the rooms set as publicly visible on the server.
 // Returns an error if the retrieval failed.
-func (d *PublicRoomsServerDatabase) GetPublicRooms(offset int64, limit int16) ([]types.PublicRoom, error) {
-	return d.statements.selectPublicRooms(offset, limit)
+func (d *PublicRoomsServerDatabase) GetPublicRooms(offset int64, limit int16, filter string) ([]types.PublicRoom, error) {
+	return d.statements.selectPublicRooms(offset, limit, filter)
 }
 
 // UpdateRoomFromEvent updates the database representation of a room from a Matrix event, by

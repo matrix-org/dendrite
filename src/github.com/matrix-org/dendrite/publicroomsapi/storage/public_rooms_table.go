@@ -71,11 +71,31 @@ const selectPublicRoomsSQL = "" +
 	" ORDER BY joined_members DESC" +
 	" OFFSET $1"
 
-const selectPublicRoomswithLimitSQL = "" +
+const selectPublicRoomsWithLimitSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
 	" FROM publicroomsapi_public_rooms WHERE visibility = true" +
 	" ORDER BY joined_members DESC" +
 	" OFFSET $1 LIMIT $2"
+
+const selectPublicRoomsWithFilterSQL = "" +
+	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
+	" FROM publicroomsapi_public_rooms" +
+	" WHERE visibility = true" +
+	" AND (LOWER(name) LIKE LOWER($1)" +
+	" OR LOWER(topic) LIKE LOWER($1)" +
+	" OR LOWER(ARRAY_TO_STRING(aliases, ',')) LIKE LOWER($1))" +
+	" ORDER BY joined_members DESC" +
+	" OFFSET $2"
+
+const selectPublicRoomsWithLimitAndFilterSQL = "" +
+	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
+	" FROM publicroomsapi_public_rooms" +
+	" WHERE visibility = true" +
+	" AND (LOWER(name) LIKE LOWER($1)" +
+	" OR LOWER(topic) LIKE LOWER($1)" +
+	" OR LOWER(ARRAY_TO_STRING(aliases, ',')) LIKE LOWER($1))" +
+	" ORDER BY joined_members DESC" +
+	" OFFSET $2 LIMIT $3"
 
 const selectRoomVisibilitySQL = "" +
 	"SELECT visibility FROM publicroomsapi_public_rooms" +
@@ -101,14 +121,16 @@ const updateRoomAttributeSQL = "" +
 	" WHERE room_id = $2"
 
 type publicRoomsStatements struct {
-	countPublicRoomsStmt             *sql.Stmt
-	selectPublicRoomsStmt            *sql.Stmt
-	selectPublicRoomswithLimitStmt   *sql.Stmt
-	selectRoomVisibilityStmt         *sql.Stmt
-	insertNewRoomStmt                *sql.Stmt
-	incrementJoinedMembersInRoomStmt *sql.Stmt
-	decrementJoinedMembersInRoomStmt *sql.Stmt
-	updateRoomAttributeStmts         map[string]*sql.Stmt
+	countPublicRoomsStmt                    *sql.Stmt
+	selectPublicRoomsStmt                   *sql.Stmt
+	selectPublicRoomsWithLimitStmt          *sql.Stmt
+	selectPublicRoomsWithFilterStmt         *sql.Stmt
+	selectPublicRoomsWithLimitAndFilterStmt *sql.Stmt
+	selectRoomVisibilityStmt                *sql.Stmt
+	insertNewRoomStmt                       *sql.Stmt
+	incrementJoinedMembersInRoomStmt        *sql.Stmt
+	decrementJoinedMembersInRoomStmt        *sql.Stmt
+	updateRoomAttributeStmts                map[string]*sql.Stmt
 }
 
 func (s *publicRoomsStatements) prepare(db *sql.DB) (err error) {
@@ -116,25 +138,20 @@ func (s *publicRoomsStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.countPublicRoomsStmt, err = db.Prepare(countPublicRoomsSQL); err != nil {
-		return
+
+	stmts := statementList{
+		{&s.countPublicRoomsStmt, countPublicRoomsSQL},
+		{&s.selectPublicRoomsStmt, selectPublicRoomsSQL},
+		{&s.selectPublicRoomsWithLimitStmt, selectPublicRoomsWithLimitSQL},
+		{&s.selectPublicRoomsWithFilterStmt, selectPublicRoomsWithFilterSQL},
+		{&s.selectPublicRoomsWithLimitAndFilterStmt, selectPublicRoomsWithLimitAndFilterSQL},
+		{&s.selectRoomVisibilityStmt, selectRoomVisibilitySQL},
+		{&s.insertNewRoomStmt, insertNewRoomSQL},
+		{&s.incrementJoinedMembersInRoomStmt, incrementJoinedMembersInRoomSQL},
+		{&s.decrementJoinedMembersInRoomStmt, decrementJoinedMembersInRoomSQL},
 	}
-	if s.selectPublicRoomsStmt, err = db.Prepare(selectPublicRoomsSQL); err != nil {
-		return
-	}
-	if s.selectPublicRoomswithLimitStmt, err = db.Prepare(selectPublicRoomswithLimitSQL); err != nil {
-		return
-	}
-	if s.selectRoomVisibilityStmt, err = db.Prepare(selectRoomVisibilitySQL); err != nil {
-		return
-	}
-	if s.insertNewRoomStmt, err = db.Prepare(insertNewRoomSQL); err != nil {
-		return
-	}
-	if s.incrementJoinedMembersInRoomStmt, err = db.Prepare(incrementJoinedMembersInRoomSQL); err != nil {
-		return
-	}
-	if s.decrementJoinedMembersInRoomStmt, err = db.Prepare(decrementJoinedMembersInRoomSQL); err != nil {
+
+	if err = stmts.prepare(db); err != nil {
 		return
 	}
 
@@ -154,14 +171,23 @@ func (s *publicRoomsStatements) countPublicRooms() (nb int64, err error) {
 	return
 }
 
-func (s *publicRoomsStatements) selectPublicRooms(offset int64, limit int16) ([]types.PublicRoom, error) {
+func (s *publicRoomsStatements) selectPublicRooms(offset int64, limit int16, filter string) ([]types.PublicRoom, error) {
 	var rows *sql.Rows
 	var err error
 
-	if limit == 0 {
-		rows, err = s.selectPublicRoomsStmt.Query(offset)
+	if len(filter) > 0 {
+		pattern := "%" + filter + "%"
+		if limit == 0 {
+			rows, err = s.selectPublicRoomsWithFilterStmt.Query(pattern, offset)
+		} else {
+			rows, err = s.selectPublicRoomsWithLimitAndFilterStmt.Query(pattern, offset, limit)
+		}
 	} else {
-		rows, err = s.selectPublicRoomswithLimitStmt.Query(offset, limit)
+		if limit == 0 {
+			rows, err = s.selectPublicRoomsStmt.Query(offset)
+		} else {
+			rows, err = s.selectPublicRoomsWithLimitStmt.Query(offset, limit)
+		}
 	}
 
 	if err != nil {

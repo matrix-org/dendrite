@@ -28,7 +28,11 @@ import (
 type publicRoomReq struct {
 	Since  string `json:"since,omitempty"`
 	Limit  int16  `json:"limit,omitempty"`
-	Filter string `json:"filter,omitempty"`
+	Filter filter `json:"filter,omitempty"`
+}
+
+type filter struct {
+	SearchTerms string `json:"generic_search_term,omitempty"`
 }
 
 type publicRoomRes struct {
@@ -70,7 +74,7 @@ func GetPublicRooms(
 		response.NextBatch = strconv.Itoa(int(offset) + int(limit))
 	}
 
-	if response.Chunk, err = publicRoomDatabase.GetPublicRooms(offset, limit); err != nil {
+	if response.Chunk, err = publicRoomDatabase.GetPublicRooms(offset, limit, request.Filter.SearchTerms); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
