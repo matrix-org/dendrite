@@ -93,13 +93,14 @@ func (d *PublicRoomsServerDatabase) GetPublicRooms(offset int64, limit int16, fi
 // UpdateRoomFromEvents iterate over a slice of state events and call
 // UpdateRoomFromEvent on each of them to update the database representation of
 // the rooms updated by each event.
+// The slice of events to remove is used to process membership events.
 // If the update triggered by one of the events failed, aborts the process and
 // returns an error.
 func (d *PublicRoomsServerDatabase) UpdateRoomFromEvents(
-	eventsToAdd []gomatrixserverlib.Event, iDsToRemove []string,
+	eventsToAdd []gomatrixserverlib.Event, eventsToRemove []gomatrixserverlib.Event,
 ) error {
 	for _, event := range eventsToAdd {
-		if err := d.UpdateRoomFromEvent(event, iDsToRemove); err != nil {
+		if err := d.UpdateRoomFromEvent(event, eventsToRemove); err != nil {
 			return err
 		}
 	}
@@ -110,11 +111,12 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvents(
 // UpdateRoomFromEvent updates the database representation of a room from a Matrix event, by
 // checking the event's type to know which attribute to change and using the event's content
 // to define the new value of the attribute.
+// The slice of events to remove is used to process membership events.
 // If the event doesn't match with any property used to compute the public room directory,
 // does nothing.
 // If something went wrong during the process, returns an error.
 func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(
-	event gomatrixserverlib.Event, iDsToRemove []string,
+	event gomatrixserverlib.Event, eventsToRemove []gomatrixserverlib.Event,
 ) error {
 	roomID := event.RoomID()
 
@@ -123,7 +125,7 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(
 	case "m.room.create":
 		return d.statements.insertNewRoom(roomID)
 	case "m.room.member":
-		return d.updateNumJoinedUsers(event, iDsToRemove, roomID)
+		return d.updateNumJoinedUsers(event, eventsToRemove, roomID)
 	case "m.room.aliases":
 		return d.updateRoomAliases(event, roomID)
 	case "m.room.canonical_alias":
@@ -166,10 +168,11 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(
 
 // updateNumJoinedUsers updates the number of joined user in the database representation
 // of the room identified by a given room ID, using a given Matrix event.
-// If the event's membership is "join", increments the value, if not, decrements it.
+// If the event's membership is "join", increments the value if the event isn't an update,
+// if not, decrements it.
 // Returns an error if the update failed.
 func (d *PublicRoomsServerDatabase) updateNumJoinedUsers(
-	membershipEvent gomatrixserverlib.Event, iDsToRemove []string, roomID string,
+	membershipEvent gomatrixserverlib.Event, eventsToRemove []gomatrixserverlib.Event, roomID string,
 ) error {
 	membership, err := membershipEvent.Membership()
 	if err != nil {
@@ -177,12 +180,14 @@ func (d *PublicRoomsServerDatabase) updateNumJoinedUsers(
 	}
 
 	if membership == "join" {
-		if len(iDsToRemove) > 0 {
-			// This is an update for an user who already joined the room, most
-			// likely triggered by a profile update. We don't increment the
-			// number of joined member in this case because we already counted
-			// this user.
-			return nil
+		for _, event := range eventsToRemove {
+			if event.Type() == "m.room.member" {
+				// This is an update for an user who already joined the room, most
+				// likely triggered by a profile update. We don't increment the
+				// number of joined member in this case because we already counted
+				// this user.
+				return nil
+			}
 		}
 		return d.statements.incrementJoinedMembersInRoom(roomID)
 	} else if membership == "leave" || membership == "ban" {

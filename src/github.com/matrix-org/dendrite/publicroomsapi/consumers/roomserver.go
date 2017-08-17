@@ -83,12 +83,19 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		"type":     ev.Type(),
 	}).Info("received event from roomserver")
 
-	queryReq := api.QueryEventsByIDRequest{output.NewRoomEvent.AddsStateEventIDs}
-	var queryRes api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(&queryReq, &queryRes); err != nil {
+	addQueryReq := api.QueryEventsByIDRequest{output.NewRoomEvent.AddsStateEventIDs}
+	var addQueryRes api.QueryEventsByIDResponse
+	if err := s.query.QueryEventsByID(&addQueryReq, &addQueryRes); err != nil {
 		log.Warn(err)
 		return err
 	}
 
-	return s.db.UpdateRoomFromEvents(queryRes.Events, output.NewRoomEvent.RemovesStateEventIDs)
+	remQueryReq := api.QueryEventsByIDRequest{output.NewRoomEvent.RemovesStateEventIDs}
+	var remQueryRes api.QueryEventsByIDResponse
+	if err := s.query.QueryEventsByID(&remQueryReq, &remQueryRes); err != nil {
+		log.Warn(err)
+		return err
+	}
+
+	return s.db.UpdateRoomFromEvents(addQueryRes.Events, remQueryRes.Events)
 }
