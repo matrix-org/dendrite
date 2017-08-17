@@ -37,8 +37,8 @@ func NewOutputRoomEvent(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	store *storage.PublicRoomsServerDatabase,
+	queryAPI api.RoomserverQueryAPI,
 ) *OutputRoomEvent {
-
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
@@ -47,6 +47,7 @@ func NewOutputRoomEvent(
 	s := &OutputRoomEvent{
 		roomServerConsumer: &consumer,
 		db:                 store,
+		query:              queryAPI,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -82,5 +83,12 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		"type":     ev.Type(),
 	}).Info("received event from roomserver")
 
-	return s.db.UpdateRoomFromEvent(ev)
+	queryReq := api.QueryEventsByIDRequest{output.NewRoomEvent.AddsStateEventIDs}
+	var queryRes api.QueryEventsByIDResponse
+	if err := s.query.QueryEventsByID(&queryReq, &queryRes); err != nil {
+		log.Warn(err)
+		return err
+	}
+
+	return s.db.UpdateRoomFromEvents(queryRes.Events, output.NewRoomEvent.RemovesStateEventIDs)
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/consumers"
 	"github.com/matrix-org/dendrite/publicroomsapi/routing"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
+	"github.com/matrix-org/dendrite/roomserver/api"
 
 	log "github.com/Sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
@@ -46,6 +47,8 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
+	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
+
 	db, err := storage.NewPublicRoomsServerDatabase(string(cfg.Database.PublicRoomsAPI))
 	if err != nil {
 		log.Panicf("startup: failed to create public rooms server database with data source %s : %s", cfg.Database.PublicRoomsAPI, err)
@@ -64,7 +67,7 @@ func main() {
 		}).Panic("Failed to setup kafka consumers")
 	}
 
-	roomConsumer := consumers.NewOutputRoomEvent(cfg, kafkaConsumer, db)
+	roomConsumer := consumers.NewOutputRoomEvent(cfg, kafkaConsumer, db, queryAPI)
 	if err != nil {
 		log.Panicf("startup: failed to create room server consumer: %s", err)
 	}
