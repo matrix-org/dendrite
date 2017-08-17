@@ -130,34 +130,34 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(
 		var content common.CanonicalAliasContent
 		field := &(content.Alias)
 		attrName := "canonical_alias"
-		return d.updateStringOrBooleanAttribute(attrName, event, &content, field, "", roomID)
+		return d.updateStringAttribute(attrName, event, &content, field, roomID)
 	case "m.room.name":
 		var content common.NameContent
 		field := &(content.Name)
 		attrName := "name"
-		return d.updateStringOrBooleanAttribute(attrName, event, &content, field, "", roomID)
+		return d.updateStringAttribute(attrName, event, &content, field, roomID)
 	case "m.room.topic":
 		var content common.TopicContent
 		field := &(content.Topic)
 		attrName := "topic"
-		return d.updateStringOrBooleanAttribute(attrName, event, &content, field, "", roomID)
+		return d.updateStringAttribute(attrName, event, &content, field, roomID)
 	case "m.room.avatar":
 		var content common.AvatarContent
 		field := &(content.URL)
 		attrName := "avatar_url"
-		return d.updateStringOrBooleanAttribute(attrName, event, &content, field, "", roomID)
+		return d.updateStringAttribute(attrName, event, &content, field, roomID)
 	case "m.room.history_visibility":
 		var content common.HistoryVisibilityContent
 		field := &(content.HistoryVisibility)
 		attrName := "world_readable"
 		strForTrue := "world_readable"
-		return d.updateStringOrBooleanAttribute(attrName, event, &content, field, strForTrue, roomID)
+		return d.updateBooleanAttribute(attrName, event, &content, field, strForTrue, roomID)
 	case "m.room.guest_access":
 		var content common.GuestAccessContent
 		field := &(content.GuestAccess)
 		attrName := "guest_can_join"
 		strForTrue := "can_join"
-		return d.updateStringOrBooleanAttribute(attrName, event, &content, field, strForTrue, roomID)
+		return d.updateBooleanAttribute(attrName, event, &content, field, strForTrue, roomID)
 	}
 
 	// If the event type didn't match, return with no error
@@ -192,17 +192,29 @@ func (d *PublicRoomsServerDatabase) updateNumJoinedUsers(
 	}
 }
 
-// updateStringOrBooleanAttribute updates a given string or boolean attribute in
-// the database representation of the room identified by a given ID, using a given
-// string data field from content of the Matrix event triggering the update.
-// It determines the attribute's type by checking the length of the given strForTrue
-// parameter: If it's a non-empty string, it means that the attribute is a boolean
-// which will be set to true if the given data field matches it, and to false in
-// any other case. If the string is empty, it means that the attribute is a string
-// and will be updated with the field's value.
+// updateStringAttribute updates a given string attribute in the database
+// representation of the room identified by a given ID, using a given string data
+// field from content of the Matrix event triggering the update.
 // Returns an error if decoding the Matrix event's content or updating the attribute
 // failed.
-func (d *PublicRoomsServerDatabase) updateStringOrBooleanAttribute(
+func (d *PublicRoomsServerDatabase) updateStringAttribute(
+	attrName string, event gomatrixserverlib.Event, content interface{},
+	field *string, roomID string,
+) error {
+	if err := json.Unmarshal(event.Content(), content); err != nil {
+		return err
+	}
+
+	return d.statements.updateRoomAttribute(attrName, *field, roomID)
+}
+
+// updateBooleanAttribute updates a given boolean attribute in the database
+// representation of the room identified by a given ID, using a given string data
+// field from content of the Matrix event triggering the update.
+// The attribute is set to true if the field matches a given string, false if not.
+// Returns an error if decoding the Matrix event's content or updating the attribute
+// failed.
+func (d *PublicRoomsServerDatabase) updateBooleanAttribute(
 	attrName string, event gomatrixserverlib.Event, content interface{},
 	field *string, strForTrue string, roomID string,
 ) error {
@@ -210,17 +222,11 @@ func (d *PublicRoomsServerDatabase) updateStringOrBooleanAttribute(
 		return err
 	}
 
-	var attrValue attributeValue
-	if len(strForTrue) > 0 {
-		// We're processing a boolean attribute
-		if *field == strForTrue {
-			attrValue = true
-		} else {
-			attrValue = false
-		}
+	var attrValue bool
+	if *field == strForTrue {
+		attrValue = true
 	} else {
-		// We're processing a string attribute
-		attrValue = *field
+		attrValue = false
 	}
 
 	return d.statements.updateRoomAttribute(attrName, attrValue, roomID)
