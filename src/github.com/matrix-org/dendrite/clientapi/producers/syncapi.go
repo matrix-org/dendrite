@@ -28,18 +28,6 @@ type SyncAPIProducer struct {
 	Producer sarama.SyncProducer
 }
 
-// NewSyncAPIProducer creates a new SyncAPIProducer
-func NewSyncAPIProducer(kafkaURIs []string, topic string) (*SyncAPIProducer, error) {
-	producer, err := sarama.NewSyncProducer(kafkaURIs, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &SyncAPIProducer{
-		Topic:    topic,
-		Producer: producer,
-	}, nil
-}
-
 // SendData sends account data to the sync API server
 func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string) error {
 	var m sarama.ProducerMessage

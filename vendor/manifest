@@ -102,6 +102,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/matrix-org/naffka",
+			"repository": "https://github.com/matrix-org/naffka",
+			"revision": "d28656e34f96a8eeaab53e3b7678c9ce14af5786",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/matrix-org/util",
 			"repository": "https://github.com/matrix-org/util",
 			"revision": "53326ed5598b226681112cbd441f59f3cffc9c82",

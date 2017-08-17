@@ -52,9 +52,13 @@ media:
 kafka:
     # Where the kafka servers are running.
     addresses: ["localhost:9092"]
+    # Whether to use naffka instead of kafka.
+    # Naffka can only be used when running dendrite as a single monolithic server.
+    # Kafka can be used both with a monolithic server and when running the
+    # components as separate servers.
+    use_naffka: false
     # The names of the kafka topics to use.
     topics:
-        input_room_event: roomserverInput
         output_room_event: roomserverOutput
         output_client_data: clientapiOutput
         user_updates: userUpdates
@@ -71,6 +75,7 @@ database:
 
 # The TCP host:port pairs to bind the internal HTTP APIs to.
 # These shouldn't be exposed to the public internet.
+# These aren't needed when running dendrite as a monolithic server.
 listen:
     room_server: "localhost:7770"
     client_api: "localhost:7771"

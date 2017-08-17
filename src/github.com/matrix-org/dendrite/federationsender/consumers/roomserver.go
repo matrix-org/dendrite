@@ -38,13 +38,13 @@ type OutputRoomEvent struct {
 }
 
 // NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
-func NewOutputRoomEvent(cfg *config.Dendrite, queues *queue.OutgoingQueues, store *storage.Database) (*OutputRoomEvent, error) {
-	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
-	if err != nil {
-		return nil, err
-	}
-	roomServerURL := cfg.RoomServerURL()
-
+func NewOutputRoomEvent(
+	cfg *config.Dendrite,
+	kafkaConsumer sarama.Consumer,
+	queues *queue.OutgoingQueues,
+	store *storage.Database,
+	queryAPI api.RoomserverQueryAPI,
+) *OutputRoomEvent {
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
@@ -54,11 +54,11 @@ func NewOutputRoomEvent(cfg *config.Dendrite, queues *queue.OutgoingQueues, stor
 		roomServerConsumer: &consumer,
 		db:                 store,
 		queues:             queues,
-		query:              api.NewRoomserverQueryAPIHTTP(roomServerURL, nil),
+		query:              queryAPI,
 	}
 	consumer.ProcessMessage = s.onMessage
 
-	return s, nil
+	return s
 }
 
 // Start consuming from room servers

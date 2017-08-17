@@ -76,15 +76,23 @@ func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *eventStateKeyStatements) insertEventStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
+func (s *eventStateKeyStatements) insertEventStateKeyNID(txn *sql.Tx, eventStateKey string) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	err := s.insertEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
+	stmt := s.insertEventStateKeyNIDStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
+	err := stmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) selectEventStateKeyNID(eventStateKey string) (types.EventStateKeyNID, error) {
+func (s *eventStateKeyStatements) selectEventStateKeyNID(txn *sql.Tx, eventStateKey string) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	err := s.selectEventStateKeyNIDStmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
+	stmt := s.selectEventStateKeyNIDStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
+	err := stmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
