@@ -193,9 +193,9 @@ type MembershipUpdater interface {
 	// Set the state to invite.
 	// Returns whether this invite needs to be sent
 	SetToInvite(event gomatrixserverlib.Event) (needsSending bool, err error)
-	// Set the state to join.
+	// Set the state to join or updates the event ID in the database.
 	// Returns a list of invite event IDs that this state change retired.
-	SetToJoin(senderUserID string) (inviteEventIDs []string, err error)
+	SetToJoin(senderUserID string, eventID string, isUpdate bool) (inviteEventIDs []string, err error)
 	// Set the state to leave.
 	// Returns a list of invite event IDs that this state change retired.
 	SetToLeave(senderUserID string) (inviteEventIDs []string, err error)

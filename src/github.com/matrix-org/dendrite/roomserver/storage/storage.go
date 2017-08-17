@@ -435,7 +435,7 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, er
 	}
 	if u.membership != membershipStateInvite {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite,
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite, "",
 		); err != nil {
 			return false, err
 		}
@@ -444,24 +444,32 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, er
 }
 
 // SetToJoin implements types.MembershipUpdater
-func (u *membershipUpdater) SetToJoin(senderUserID string) ([]string, error) {
+func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpdate bool) ([]string, error) {
+	var inviteEventIDs []string
+
 	senderUserNID, err := u.d.assignStateKeyNID(u.txn, senderUserID)
 	if err != nil {
 		return nil, err
 	}
-	inviteEventIDs, err := u.d.statements.updateInviteRetired(
-		u.txn, u.roomNID, u.targetUserNID,
-	)
-	if err != nil {
-		return nil, err
+
+	// If this is a join event update, there is no invite to update
+	if !isUpdate {
+		inviteEventIDs, err = u.d.statements.updateInviteRetired(
+			u.txn, u.roomNID, u.targetUserNID,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if u.membership != membershipStateJoin {
+
+	if u.membership != membershipStateJoin || isUpdate {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateJoin,
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateJoin, eventID,
 		); err != nil {
 			return nil, err
 		}
 	}
+
 	return inviteEventIDs, nil
 }
 
@@ -479,7 +487,7 @@ func (u *membershipUpdater) SetToLeave(senderUserID string) ([]string, error) {
 	}
 	if u.membership != membershipStateLeaveOrBan {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateLeaveOrBan,
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateLeaveOrBan, "",
 		); err != nil {
 			return nil, err
 		}

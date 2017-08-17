@@ -33,7 +33,7 @@ const membershipSchema = `
 -- and the room state tables.
 -- This table is updated in one of 3 ways:
 --   1) The membership of a user changes within the current state of the room.
---   2) An invite is received outside of a room over federation. 
+--   2) An invite is received outside of a room over federation.
 --   3) An invite is rejected outside of a room over federation.
 CREATE TABLE IF NOT EXISTS roomserver_membership (
 	room_nid BIGINT NOT NULL,
@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 	-- The state the user is in within this room.
 	-- Default value is "membershipStateLeaveOrBan"
 	membership_nid BIGINT NOT NULL DEFAULT 1,
+	-- The ID of the "join" membership event.
+	-- This ID is updated if the join event gets updated (e.g. profile update).
+	-- This column is set to NULL if the user hasn't joined the room yet, e.g.
+	-- if the user was invited but hasn't joined yet.
+	event_id TEXT,
 	UNIQUE (room_nid, target_nid)
 );
 `
@@ -62,7 +67,7 @@ const selectMembershipForUpdateSQL = "" +
 	" WHERE room_nid = $1 AND target_nid = $2 FOR UPDATE"
 
 const updateMembershipSQL = "" +
-	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4" +
+	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4, event_id = $5" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 type membershipStatements struct {
@@ -103,9 +108,14 @@ func (s *membershipStatements) selectMembershipForUpdate(
 func (s *membershipStatements) updateMembership(
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	senderUserNID types.EventStateKeyNID, membership membershipState,
+	eventID string,
 ) error {
+	eID := sql.NullString{
+		String: eventID,
+		Valid:  len(eventID) > 0,
+	}
 	_, err := txn.Stmt(s.updateMembershipStmt).Exec(
-		roomNID, targetUserNID, senderUserNID, membership,
+		roomNID, targetUserNID, senderUserNID, membership, eID,
 	)
 	return err
 }
