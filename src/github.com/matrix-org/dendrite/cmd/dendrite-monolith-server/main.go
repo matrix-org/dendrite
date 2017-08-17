@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/naffka"
 
 	mediaapi_routing "github.com/matrix-org/dendrite/mediaapi/routing"
 	mediaapi_storage "github.com/matrix-org/dendrite/mediaapi/storage"
@@ -60,6 +61,8 @@ var (
 	configPath    = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
 	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
+	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
+	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
 )
 
 func main() {
@@ -70,7 +73,7 @@ func main() {
 	if *configPath == "" {
 		log.Fatal("--config must be supplied")
 	}
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.LoadMonolithic(*configPath)
 	if err != nil {
 		log.Fatalf("Invalid config file: %s", err)
 	}
@@ -78,6 +81,7 @@ func main() {
 	m := newMonolith(cfg)
 	m.setupDatabases()
 	m.setupFederation()
+	m.setupKafka()
 	m.setupRoomServer()
 	m.setupProducers()
 	m.setupNotifiers()
@@ -85,7 +89,20 @@ func main() {
 	m.setupAPIs()
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
-	log.Fatal(http.ListenAndServe(*httpBindAddr, m.api))
+	go func() {
+		log.Info("Listening on ", *httpBindAddr)
+		log.Fatal(http.ListenAndServe(*httpBindAddr, m.api))
+	}()
+	// Handle HTTPS if certificate and key are provided
+	go func() {
+		if *certFile != "" && *keyFile != "" {
+			log.Info("Listening on ", *httpsBindAddr)
+			log.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, m.api))
+		}
+	}()
+
+	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
+	select {}
 }
 
 // A monolith contains all the dendrite components.
@@ -109,6 +126,9 @@ type monolith struct {
 	inputAPI *roomserver_input.RoomserverInputAPI
 	queryAPI *roomserver_query.RoomserverQueryAPI
 	aliasAPI *roomserver_alias.RoomserverAliasAPI
+
+	naffka        *naffka.Naffka
+	kafkaProducer sarama.SyncProducer
 
 	roomServerProducer *producers.RoomserverProducer
 	userUpdateProducer *producers.UserUpdateProducer
@@ -167,15 +187,46 @@ func (m *monolith) setupFederation() {
 	}
 }
 
-func (m *monolith) setupRoomServer() {
-	kafkaProducer, err := sarama.NewSyncProducer(m.cfg.Kafka.Addresses, nil)
-	if err != nil {
-		panic(err)
+func (m *monolith) setupKafka() {
+	var err error
+	if m.cfg.Kafka.UseNaffka {
+		naff, err := naffka.New(&naffka.MemoryDatabase{})
+		if err != nil {
+			log.WithFields(log.Fields{
+				log.ErrorKey: err,
+			}).Panic("Failed to setup naffka")
+		}
+		m.naffka = naff
+		m.kafkaProducer = naff
+	} else {
+		m.kafkaProducer, err = sarama.NewSyncProducer(m.cfg.Kafka.Addresses, nil)
+		if err != nil {
+			log.WithFields(log.Fields{
+				log.ErrorKey: err,
+				"addresses":  m.cfg.Kafka.Addresses,
+			}).Panic("Failed to setup kafka producers")
+		}
 	}
+}
 
+func (m *monolith) kafkaConsumer() sarama.Consumer {
+	if m.cfg.Kafka.UseNaffka {
+		return m.naffka
+	}
+	consumer, err := sarama.NewConsumer(m.cfg.Kafka.Addresses, nil)
+	if err != nil {
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+			"addresses":  m.cfg.Kafka.Addresses,
+		}).Panic("Failed to setup kafka consumers")
+	}
+	return consumer
+}
+
+func (m *monolith) setupRoomServer() {
 	m.inputAPI = &roomserver_input.RoomserverInputAPI{
 		DB:                   m.roomServerDB,
-		Producer:             kafkaProducer,
+		Producer:             m.kafkaProducer,
 		OutputRoomEventTopic: string(m.cfg.Kafka.Topics.OutputRoomEvent),
 	}
 
@@ -192,19 +243,14 @@ func (m *monolith) setupRoomServer() {
 }
 
 func (m *monolith) setupProducers() {
-	var err error
 	m.roomServerProducer = producers.NewRoomserverProducer(m.inputAPI)
-	m.userUpdateProducer, err = producers.NewUserUpdateProducer(
-		m.cfg.Kafka.Addresses, string(m.cfg.Kafka.Topics.UserUpdates),
-	)
-	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%q): %s", m.cfg.Kafka.Addresses, err)
+	m.userUpdateProducer = &producers.UserUpdateProducer{
+		Producer: m.kafkaProducer,
+		Topic:    string(m.cfg.Kafka.Topics.UserUpdates),
 	}
-	m.syncProducer, err = producers.NewSyncAPIProducer(
-		m.cfg.Kafka.Addresses, string(m.cfg.Kafka.Topics.OutputClientData),
-	)
-	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%q): %s", m.cfg.Kafka.Addresses, err)
+	m.syncProducer = &producers.SyncAPIProducer{
+		Producer: m.kafkaProducer,
+		Topic:    string(m.cfg.Kafka.Topics.OutputClientData),
 	}
 }
 
@@ -221,42 +267,34 @@ func (m *monolith) setupNotifiers() {
 }
 
 func (m *monolith) setupConsumers() {
-	clientAPIConsumer, err := clientapi_consumers.NewOutputRoomEvent(m.cfg, m.accountDB)
-	if err != nil {
-		log.Panicf("startup: failed to create room server consumer: %s", err)
-	}
+	var err error
+
+	clientAPIConsumer := clientapi_consumers.NewOutputRoomEvent(
+		m.cfg, m.kafkaConsumer(), m.accountDB, m.queryAPI,
+	)
 	if err = clientAPIConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer")
 	}
 
-	syncAPIRoomConsumer, err := syncapi_consumers.NewOutputRoomEvent(
-		m.cfg, m.syncAPINotifier, m.syncAPIDB,
+	syncAPIRoomConsumer := syncapi_consumers.NewOutputRoomEvent(
+		m.cfg, m.kafkaConsumer(), m.syncAPINotifier, m.syncAPIDB, m.queryAPI,
 	)
-	if err != nil {
-		log.Panicf("startup: failed to create room server consumer: %s", err)
-	}
 	if err = syncAPIRoomConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer: %s", err)
 	}
 
-	syncAPIClientConsumer, err := syncapi_consumers.NewOutputClientData(
-		m.cfg, m.syncAPINotifier, m.syncAPIDB,
+	syncAPIClientConsumer := syncapi_consumers.NewOutputClientData(
+		m.cfg, m.kafkaConsumer(), m.syncAPINotifier, m.syncAPIDB,
 	)
-	if err != nil {
-		log.Panicf("startup: failed to create client API server consumer: %s", err)
-	}
 	if err = syncAPIClientConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start client API server consumer: %s", err)
 	}
 
 	federationSenderQueues := queue.NewOutgoingQueues(m.cfg.Matrix.ServerName, m.federation)
 
-	federationSenderRoomConsumer, err := federationsender_consumers.NewOutputRoomEvent(
-		m.cfg, federationSenderQueues, m.federationSenderDB,
+	federationSenderRoomConsumer := federationsender_consumers.NewOutputRoomEvent(
+		m.cfg, m.kafkaConsumer(), federationSenderQueues, m.federationSenderDB, m.queryAPI,
 	)
-	if err != nil {
-		log.WithError(err).Panicf("startup: failed to create room server consumer")
-	}
 	if err = federationSenderRoomConsumer.Start(); err != nil {
 		log.WithError(err).Panicf("startup: failed to start room server consumer")
 	}
