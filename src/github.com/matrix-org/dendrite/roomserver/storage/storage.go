@@ -17,6 +17,8 @@ package storage
 import (
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
+
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -53,7 +55,7 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []typ
 		err              error
 	)
 
-	if roomNID, err = d.assignRoomNID(event.RoomID()); err != nil {
+	if roomNID, err = d.assignRoomNID(nil, event.RoomID()); err != nil {
 		return 0, types.StateAtEvent{}, err
 	}
 
@@ -104,15 +106,15 @@ func (d *Database) StoreEvent(event gomatrixserverlib.Event, authEventNIDs []typ
 	}, nil
 }
 
-func (d *Database) assignRoomNID(roomID string) (types.RoomNID, error) {
+func (d *Database) assignRoomNID(txn *sql.Tx, roomID string) (types.RoomNID, error) {
 	// Check if we already have a numeric ID in the database.
-	roomNID, err := d.statements.selectRoomNID(roomID)
+	roomNID, err := d.statements.selectRoomNID(txn, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.statements.insertRoomNID(roomID)
+		roomNID, err = d.statements.insertRoomNID(txn, roomID)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			roomNID, err = d.statements.selectRoomNID(roomID)
+			roomNID, err = d.statements.selectRoomNID(txn, roomID)
 		}
 	}
 	return roomNID, err
@@ -329,7 +331,7 @@ func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventSta
 
 // RoomNID implements query.RoomserverQueryAPIDB
 func (d *Database) RoomNID(roomID string) (types.RoomNID, error) {
-	roomNID, err := d.statements.selectRoomNID(roomID)
+	roomNID, err := d.statements.selectRoomNID(nil, roomID)
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
@@ -378,6 +380,27 @@ func (d *Database) StateEntriesForTuples(
 	stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
 	return d.statements.bulkSelectFilteredStateBlockEntries(stateBlockNIDs, stateKeyTuples)
+}
+
+// MembershipUpdater implements input.RoomEventDatabase
+func (d *Database) MembershipUpdater(roomID, targetUserID string) (updater types.MembershipUpdater, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		var (
+			roomNID       types.RoomNID
+			targetUserNID types.EventStateKeyNID
+		)
+		roomNID, err = d.assignRoomNID(txn, roomID)
+		if err != nil {
+			return err
+		}
+		targetUserNID, err = d.assignStateKeyNID(txn, targetUserID)
+		if err != nil {
+			return err
+		}
+		updater, err = d.membershipUpdaterTxn(txn, roomNID, targetUserNID)
+		return err
+	})
+	return
 }
 
 type membershipUpdater struct {
