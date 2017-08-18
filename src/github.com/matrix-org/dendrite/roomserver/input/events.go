@@ -165,6 +165,9 @@ func processInviteEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input ap
 	})
 }
 
+// withTransaction runs a function inside a transaction.
+// Commits the transaction if the function succeeds.
+// Rollsback the transaction if the function fails or panics.
 func withTransaction(t types.Transaction, f func() error) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
