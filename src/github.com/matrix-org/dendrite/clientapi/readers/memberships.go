@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -33,59 +32,24 @@ func GetMemberships(
 	accountDB *accounts.Database, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
-	if err != nil {
+	queryReq := api.QueryMembershipsForRoomRequest{
+		RoomID: roomID,
+		Sender: device.UserID,
+	}
+	var queryRes api.QueryMembershipsForRoomResponse
+	if err := queryAPI.QueryMembershipsForRoom(&queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	_, server, err := gomatrixserverlib.SplitID('!', roomID)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
 
-	events := []gomatrixserverlib.ClientEvent{}
-	if server == cfg.Matrix.ServerName {
-		// TODO: If the user has been in the room before but isn't
-		// anymore, only send the members list as it was before they left.
-		membership, err := accountDB.GetMembership(localpart, roomID)
-		if err != nil {
-			return httputil.LogThenError(req, err)
+	if !queryRes.HasBeenInRoom {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
 		}
-
-		if membership == nil {
-			return util.JSONResponse{
-				Code: 403,
-				JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
-			}
-		}
-
-		memberships, err := accountDB.GetMembershipsByRoomID(roomID)
-		if err != nil {
-			return httputil.LogThenError(req, err)
-		}
-
-		eventIDs := []string{}
-		for _, membership := range memberships {
-			eventIDs = append(eventIDs, membership.EventID)
-		}
-
-		queryReq := api.QueryEventsByIDRequest{
-			EventIDs: eventIDs,
-		}
-		var queryRes api.QueryEventsByIDResponse
-		if err := queryAPI.QueryEventsByID(&queryReq, &queryRes); err != nil {
-			return httputil.LogThenError(req, err)
-		}
-
-		for _, event := range queryRes.Events {
-			ev := gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll)
-			events = append(events, ev)
-		}
-	} else {
-		// TODO: Get memberships from federation
 	}
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: events,
+		JSON: queryRes.JoinEvents,
 	}
 }

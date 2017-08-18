@@ -508,18 +508,13 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 	return inviteEventIDs, nil
 }
 
-// GetMembershipEvents returns an array containing the join events for all
-// members in a room as requested by a given user. If the user is currently in
-// the room, returns the room's current members, if not returns an empty array
-// TODO: in this case, send the list of members as it was when the user left
-// If the user requesting the list of members has never been in the room, returns
-// nil.
-// If there was an issue retrieving the events, returns an error.
+// GetMembershipEvents implements query.RoomserverQueryAPIDB
 func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserID string) (events []types.Event, err error) {
 	txn, err := d.db.Begin()
 	if err != nil {
 		return
 	}
+	defer txn.Commit()
 
 	requestSenderUserNID, err := d.assignStateKeyNID(txn, requestSenderUserID)
 	if err != nil {
@@ -550,6 +545,9 @@ func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserI
 		//       only stores the latest join event NID for a given target user.
 		//       The solution would be to build the state of a room after before
 		//       the leave event and extract a members list from it.
+		//       For now, we return an empty slice so we know the user has been
+		//       in the room before.
+		events = []types.Event{}
 	}
 
 	return
