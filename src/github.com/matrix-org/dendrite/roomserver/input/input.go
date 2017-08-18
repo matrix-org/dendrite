@@ -17,9 +17,6 @@ package input
 
 import (
 	"encoding/json"
-	"fmt"
-	"sync/atomic"
-
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common"
@@ -35,15 +32,6 @@ type RoomserverInputAPI struct {
 	// The kafkaesque topic to output new room events to.
 	// This is the name used in kafka to identify the stream to write events to.
 	OutputRoomEventTopic string
-	// If non-nil then the API will stop processing messages after this
-	// many messages and will shutdown. Malformed messages are not in the count.
-	StopProcessingAfter *int64
-	// If not-nil then the API will call this to shutdown the server.
-	// If this is nil then the API will continue to process messsages even
-	// though StopProcessingAfter has been reached.
-	ShutdownCallback func(reason string)
-	// How many messages the consumer has processed.
-	processed int64
 }
 
 // WriteOutputEvents implements OutputRoomEventWriter
@@ -71,18 +59,6 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 	for i := range request.InputRoomEvents {
 		if err := processRoomEvent(r.DB, r, request.InputRoomEvents[i]); err != nil {
 			return err
-		}
-		// Update the number of processed messages using atomic addition because it is accessed from multiple goroutines.
-		processed := atomic.AddInt64(&r.processed, 1)
-		// Check if we should stop processing.
-		// Note that since we have multiple goroutines it's quite likely that we'll overshoot by a few messages.
-		// If we try to stop processing after M message and we have N goroutines then we will process somewhere
-		// between M and (N + M) messages because the N goroutines could all try to process what they think will be the
-		// last message. We could be more careful here but this is good enough for getting rough benchmarks.
-		if r.StopProcessingAfter != nil && processed >= int64(*r.StopProcessingAfter) {
-			if r.ShutdownCallback != nil {
-				r.ShutdownCallback(fmt.Sprintf("Stopping processing after %d messages", r.processed))
-			}
 		}
 	}
 	return nil
