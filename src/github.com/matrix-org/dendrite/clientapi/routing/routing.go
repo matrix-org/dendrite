@@ -94,7 +94,7 @@ func Setup(
 			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], nil, cfg, queryAPI, producer)
 		}),
 	)
-	r0mux.Handle("/rooms/{roomID}/state/{eventType:[a-z._-]+(?:\\/)?}",
+	r0mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			emptyString := ""
