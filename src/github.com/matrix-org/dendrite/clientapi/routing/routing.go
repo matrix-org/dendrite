@@ -103,14 +103,14 @@ func Setup(
 			if strings.HasSuffix(eventType, "/") {
 				eventType = eventType[:len(eventType)-1]
 			}
-			return writers.SendEvent(req, device, vars["roomID"], eventType, vars["txnID"], &emptyString, cfg, queryAPI, producer)
+			return writers.SendEvent(req, device, vars["roomID"], eventType, "", &emptyString, cfg, queryAPI, producer)
 		}),
 	)
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			stateKey := vars["stateKey"]
-			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], &stateKey, cfg, queryAPI, producer)
+			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], "", &stateKey, cfg, queryAPI, producer)
 		}),
 	)
 
