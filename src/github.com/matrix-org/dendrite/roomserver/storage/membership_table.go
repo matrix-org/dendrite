@@ -46,11 +46,16 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 	-- The state the user is in within this room.
 	-- Default value is "membershipStateLeaveOrBan"
 	membership_nid BIGINT NOT NULL DEFAULT 1,
-	-- The ID of the "join" membership event.
-	-- This ID is updated if the join event gets updated (e.g. profile update).
-	-- This column is set to NULL if the user hasn't joined the room yet, e.g.
-	-- if the user was invited but hasn't joined yet.
-	event_id TEXT,
+	-- The numeric ID of the membership event.
+	-- It refers to the join membership event if the membership_nid is join (3),
+	-- and to the leave/ban membership event if the membership_nid is leave or
+	-- ban (1).
+	-- If the membership_nid is invite (2) and the user has been in the room
+	-- before, it will refer to the previous leave/ban membership event, and will
+	-- be equals to 0 (its default) if the user never joined the room before.
+	-- This NID is updated if the join event gets updated (e.g. profile update),
+	-- or if the user leaves/joins the room.
+	event_nid BIGINT NOT NULL DEFAULT 0,
 	UNIQUE (room_nid, target_nid)
 );
 `
@@ -62,18 +67,33 @@ const insertMembershipSQL = "" +
 	" VALUES ($1, $2)" +
 	" ON CONFLICT DO NOTHING"
 
+const selectMembershipFromRoomAndTargetSQL = "" +
+	"SELECT membership_nid, event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND target_nid = $2"
+
+const selectMembershipsFromRoomAndMembershipSQL = "" +
+	"SELECT event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND membership_nid = $2"
+
+const selectMembershipsFromRoomSQL = "" +
+	"SELECT membership_nid, event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1"
+
 const selectMembershipForUpdateSQL = "" +
 	"SELECT membership_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1 AND target_nid = $2 FOR UPDATE"
 
 const updateMembershipSQL = "" +
-	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4, event_id = $5" +
+	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4, event_nid = $5" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 type membershipStatements struct {
-	insertMembershipStmt          *sql.Stmt
-	selectMembershipForUpdateStmt *sql.Stmt
-	updateMembershipStmt          *sql.Stmt
+	insertMembershipStmt                       *sql.Stmt
+	selectMembershipForUpdateStmt              *sql.Stmt
+	selectMembershipFromRoomAndTargetStmt      *sql.Stmt
+	selectMembershipsFromRoomAndMembershipStmt *sql.Stmt
+	selectMembershipsFromRoomStmt              *sql.Stmt
+	updateMembershipStmt                       *sql.Stmt
 }
 
 func (s *membershipStatements) prepare(db *sql.DB) (err error) {
@@ -85,6 +105,9 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 	return statementList{
 		{&s.insertMembershipStmt, insertMembershipSQL},
 		{&s.selectMembershipForUpdateStmt, selectMembershipForUpdateSQL},
+		{&s.selectMembershipFromRoomAndTargetStmt, selectMembershipFromRoomAndTargetSQL},
+		{&s.selectMembershipsFromRoomAndMembershipStmt, selectMembershipsFromRoomAndMembershipSQL},
+		{&s.selectMembershipsFromRoomStmt, selectMembershipsFromRoomSQL},
 		{&s.updateMembershipStmt, updateMembershipSQL},
 	}.prepare(db)
 }
@@ -105,17 +128,59 @@ func (s *membershipStatements) selectMembershipForUpdate(
 	return
 }
 
+func (s *membershipStatements) selectMembershipFromRoomAndTarget(
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) (eventNID types.EventNID, membership membershipState, err error) {
+	err = s.selectMembershipFromRoomAndTargetStmt.QueryRow(
+		roomNID, targetUserNID,
+	).Scan(&membership, &eventNID)
+	return
+}
+
+func (s *membershipStatements) selectMembershipsFromRoom(
+	roomNID types.RoomNID,
+) (eventNIDs map[types.EventNID]membershipState, err error) {
+	rows, err := s.selectMembershipsFromRoomStmt.Query(roomNID)
+	if err != nil {
+		return
+	}
+
+	eventNIDs = make(map[types.EventNID]membershipState)
+	for rows.Next() {
+		var eNID types.EventNID
+		var membership membershipState
+		if err = rows.Scan(&membership, &eNID); err != nil {
+			return
+		}
+		eventNIDs[eNID] = membership
+	}
+	return
+}
+func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
+	roomNID types.RoomNID, membership membershipState,
+) (eventNIDs []types.EventNID, err error) {
+	rows, err := s.selectMembershipsFromRoomAndMembershipStmt.Query(roomNID, membership)
+	if err != nil {
+		return
+	}
+
+	for rows.Next() {
+		var eNID types.EventNID
+		if err = rows.Scan(&eNID); err != nil {
+			return
+		}
+		eventNIDs = append(eventNIDs, eNID)
+	}
+	return
+}
+
 func (s *membershipStatements) updateMembership(
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	senderUserNID types.EventStateKeyNID, membership membershipState,
-	eventID string,
+	eventNID types.EventNID,
 ) error {
-	eID := sql.NullString{
-		String: eventID,
-		Valid:  len(eventID) > 0,
-	}
 	_, err := txn.Stmt(s.updateMembershipStmt).Exec(
-		roomNID, targetUserNID, senderUserNID, membership, eID,
+		roomNID, targetUserNID, senderUserNID, membership, eventNID,
 	)
 	return err
 }

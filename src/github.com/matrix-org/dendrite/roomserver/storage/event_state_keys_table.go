@@ -58,10 +58,22 @@ const bulkSelectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys" +
 	" WHERE event_state_key = ANY($1)"
 
+const selectEventStateKeySQL = "" +
+	"SELECT event_state_key FROM roomserver_event_state_keys" +
+	" WHERE event_state_key_nid = $1"
+
+// Bulk lookup from numeric ID to string state key for that state key.
+// Takes an array of strings as the query parameter.
+const bulkSelectEventStateKeySQL = "" +
+	"SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys" +
+	" WHERE event_state_key_nid = ANY($1)"
+
 type eventStateKeyStatements struct {
 	insertEventStateKeyNIDStmt     *sql.Stmt
 	selectEventStateKeyNIDStmt     *sql.Stmt
+	selectEventStateKeyStmt        *sql.Stmt
 	bulkSelectEventStateKeyNIDStmt *sql.Stmt
+	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
 func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
@@ -72,7 +84,9 @@ func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
 	return statementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
+		{&s.selectEventStateKeyStmt, selectEventStateKeySQL},
 		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
+		{&s.bulkSelectEventStateKeyStmt, bulkSelectEventStateKeySQL},
 	}.prepare(db)
 }
 
@@ -111,6 +125,39 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(eventStateKeys []st
 			return nil, err
 		}
 		result[stateKey] = types.EventStateKeyNID(stateKeyNID)
+	}
+	return result, nil
+}
+
+func (s *eventStateKeyStatements) selectEventStateKey(txn *sql.Tx, eventStateKeyNID types.EventStateKeyNID) (string, error) {
+	var eventStateKey string
+	stmt := s.selectEventStateKeyStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
+	err := stmt.QueryRow(eventStateKeyNID).Scan(&eventStateKey)
+	return eventStateKey, err
+}
+
+func (s *eventStateKeyStatements) bulkSelectEventStateKey(eventStateKeyNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error) {
+	var nIDs pq.Int64Array
+	for i := range eventStateKeyNIDs {
+		nIDs[i] = int64(eventStateKeyNIDs[i])
+	}
+	rows, err := s.bulkSelectEventStateKeyStmt.Query(nIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
+	for rows.Next() {
+		var stateKey string
+		var stateKeyNID int64
+		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
+			return nil, err
+		}
+		result[types.EventStateKeyNID(stateKeyNID)] = stateKey
 	}
 	return result, nil
 }

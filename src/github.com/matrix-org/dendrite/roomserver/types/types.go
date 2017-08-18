@@ -198,7 +198,7 @@ type MembershipUpdater interface {
 	SetToJoin(senderUserID string, eventID string, isUpdate bool) (inviteEventIDs []string, err error)
 	// Set the state to leave.
 	// Returns a list of invite event IDs that this state change retired.
-	SetToLeave(senderUserID string) (inviteEventIDs []string, err error)
+	SetToLeave(senderUserID string, eventID string) (inviteEventIDs []string, err error)
 	// Implements Transaction so it can be committed or rolledback.
 	Transaction
 }

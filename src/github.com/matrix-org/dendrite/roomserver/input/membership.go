@@ -197,7 +197,7 @@ func updateToLeaveMembership(
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	retired, err := mu.SetToLeave(add.Sender())
+	retired, err := mu.SetToLeave(add.Sender(), add.EventID())
 	if err != nil {
 		return nil, err
 	}

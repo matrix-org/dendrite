@@ -435,7 +435,7 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, er
 	}
 	if u.membership != membershipStateInvite {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite, "",
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite, 0,
 		); err != nil {
 			return false, err
 		}
@@ -462,9 +462,15 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 		}
 	}
 
+	// Lookup the NID of the new join event
+	nIDs, err := u.d.EventNIDs([]string{eventID})
+	if err != nil {
+		return nil, err
+	}
+
 	if u.membership != membershipStateJoin || isUpdate {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateJoin, eventID,
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateJoin, nIDs[eventID],
 		); err != nil {
 			return nil, err
 		}
@@ -474,7 +480,7 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 }
 
 // SetToLeave implements types.MembershipUpdater
-func (u *membershipUpdater) SetToLeave(senderUserID string) ([]string, error) {
+func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]string, error) {
 	senderUserNID, err := u.d.assignStateKeyNID(u.txn, senderUserID)
 	if err != nil {
 		return nil, err
@@ -485,14 +491,68 @@ func (u *membershipUpdater) SetToLeave(senderUserID string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Lookup the NID of the new leave event
+	nIDs, err := u.d.EventNIDs([]string{eventID})
+	if err != nil {
+		return nil, err
+	}
+
 	if u.membership != membershipStateLeaveOrBan {
 		if err = u.d.statements.updateMembership(
-			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateLeaveOrBan, "",
+			u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateLeaveOrBan, nIDs[eventID],
 		); err != nil {
 			return nil, err
 		}
 	}
 	return inviteEventIDs, nil
+}
+
+// GetMembershipEvents returns an array containing the join events for all
+// members in a room as requested by a given user. If the user is currently in
+// the room, returns the room's current members, if not returns an empty array
+// TODO: in this case, send the list of members as it was when the user left
+// If the user requesting the list of members has never been in the room, returns
+// nil.
+// If there was an issue retrieving the events, returns an error.
+func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserID string) (events []types.Event, err error) {
+	txn, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+
+	requestSenderUserNID, err := d.assignStateKeyNID(txn, requestSenderUserID)
+	if err != nil {
+		return
+	}
+
+	_, senderMembership, err := d.statements.selectMembershipFromRoomAndTarget(roomNID, requestSenderUserNID)
+	if err == sql.ErrNoRows {
+		// The user has never been a member of that room
+		return nil, nil
+	} else if err != nil {
+		return
+	}
+
+	if senderMembership == membershipStateJoin {
+		// The user is still in the room: Send the current list of joined members
+		var joinEventNIDs []types.EventNID
+		joinEventNIDs, err = d.statements.selectMembershipsFromRoomAndMembership(roomNID, membershipStateJoin)
+		if err != nil {
+			return nil, err
+		}
+
+		events, err = d.Events(joinEventNIDs)
+	} else {
+		// The user isn't in the room anymore
+		// TODO: Send the list of joined member as it was when the user left
+		//       We cannot do this using only the memberships database, as it
+		//       only stores the latest join event NID for a given target user.
+		//       The solution would be to build the state of a room after before
+		//       the leave event and extract a members list from it.
+	}
+
+	return
 }
 
 type transaction struct {
