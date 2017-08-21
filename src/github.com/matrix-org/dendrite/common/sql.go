@@ -57,7 +57,8 @@ func WithTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 }
 
 // TxStmt wraps an SQL stmt inside an optional transaction.
-// If the transaction is nil then it returns the original statement.
+// If the transaction is nil then it returns the original statement that will
+// run outside of a transaction.
 // Otherwise returns a copy of the statement that will run inside the transaction.
 func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 	if transaction != nil {
