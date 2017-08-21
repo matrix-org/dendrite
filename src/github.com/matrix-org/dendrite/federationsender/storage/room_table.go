@@ -16,6 +16,8 @@ package storage
 
 import (
 	"database/sql"
+
+	"github.com/matrix-org/dendrite/common"
 )
 
 const roomSchema = `
@@ -65,7 +67,7 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 // insertRoom inserts the room if it didn't already exist.
 // If the room didn't exist then last_event_id is set to the empty string.
 func (s *roomStatements) insertRoom(txn *sql.Tx, roomID string) error {
-	_, err := txn.Stmt(s.insertRoomStmt).Exec(roomID)
+	_, err := common.TxStmt(txn, s.insertRoomStmt).Exec(roomID)
 	return err
 }
 
@@ -74,7 +76,7 @@ func (s *roomStatements) insertRoom(txn *sql.Tx, roomID string) error {
 // exists by calling insertRoom first.
 func (s *roomStatements) selectRoomForUpdate(txn *sql.Tx, roomID string) (string, error) {
 	var lastEventID string
-	err := txn.Stmt(s.selectRoomForUpdateStmt).QueryRow(roomID).Scan(&lastEventID)
+	err := common.TxStmt(txn, s.selectRoomForUpdateStmt).QueryRow(roomID).Scan(&lastEventID)
 	if err != nil {
 		return "", err
 	}
@@ -84,6 +86,6 @@ func (s *roomStatements) selectRoomForUpdate(txn *sql.Tx, roomID string) (string
 // updateRoom updates the last_event_id for the room. selectRoomForUpdate should
 // have already been called earlier within the transaction.
 func (s *roomStatements) updateRoom(txn *sql.Tx, roomID, lastEventID string) error {
-	_, err := txn.Stmt(s.updateRoomStmt).Exec(roomID, lastEventID)
+	_, err := common.TxStmt(txn, s.updateRoomStmt).Exec(roomID, lastEventID)
 	return err
 }

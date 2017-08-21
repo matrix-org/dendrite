@@ -121,7 +121,8 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
-// room. It also stores the ID of the `join` membership event.
+// room. It also stores the ID of the membership event and a flag on whether the user
+// is still in the room.
 // If a membership already exists between the user and the room, or of the
 // insert fails, returns the SQL error
 func (d *Database) SaveMembership(localpart string, roomID string, eventID string, txn *sql.Tx) error {
@@ -156,23 +157,19 @@ func (d *Database) UpdateMemberships(eventsToAdd []gomatrixserverlib.Event, idsT
 	})
 }
 
-// GetMembershipsByLocalpart returns an array containing the IDs of all the rooms
-// a user matching a given localpart is a member of
+// GetMembershipsByLocalpart returns an array containing the memberships for all
+// the rooms a user matching a given localpart is a member of
 // If no membership match the given localpart, returns an empty array
 // If there was an issue during the retrieval, returns the SQL error
 func (d *Database) GetMembershipsByLocalpart(localpart string) (memberships []authtypes.Membership, err error) {
 	return d.memberships.selectMembershipsByLocalpart(localpart)
 }
 
-// UpdateMembership update the "join" membership event ID of a membership.
-// This is useful in case of membership upgrade (e.g. profile update)
-// If there was an issue during the update, returns the SQL error
-func (d *Database) UpdateMembership(oldEventID string, newEventID string) error {
-	return d.memberships.updateMembershipByEventID(oldEventID, newEventID)
-}
-
-// newMembership will save a new membership in the database if the given state
-// event is a "join" membership event
+// newMembership will save a new membership in the database, with a flag on whether
+// the user is still in the room. This flag is set to true if the given state
+// event is a "join" membership event and false if the event is a "leave" or "ban"
+// membership. If the event isn't a m.room.member event with one of these three
+// values, does nothing.
 // If the event isn't a "join" membership event, does nothing
 // If an error occurred, returns it
 func (d *Database) newMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error {
