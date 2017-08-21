@@ -45,7 +45,7 @@ const insertMembershipSQL = `
 `
 
 const selectMembershipsByLocalpartSQL = "" +
-	"SELECT * FROM account_memberships WHERE localpart = $1"
+	"SELECT room_id, event_id FROM account_memberships WHERE localpart = $1"
 
 const deleteMembershipsByEventIDsSQL = "" +
 	"DELETE FROM account_memberships WHERE event_id = ANY($1)"
