@@ -44,9 +44,6 @@ const insertMembershipSQL = `
 	ON CONFLICT (localpart, room_id) DO UPDATE SET event_id = EXCLUDED.event_id
 `
 
-const selectMembershipSQL = "" +
-	"SELECT * from account_memberships WHERE localpart = $1 AND room_id = $2"
-
 const selectMembershipsByLocalpartSQL = "" +
 	"SELECT room_id, event_id FROM account_memberships WHERE localpart = $1"
 

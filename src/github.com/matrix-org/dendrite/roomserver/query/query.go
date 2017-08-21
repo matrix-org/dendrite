@@ -52,6 +52,13 @@ type RoomserverQueryAPIDatabase interface {
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(alias string) error
+	// Lookup the join events for all members in a room as requested by a given
+	// user. If the user is currently in the room, returns the room's current
+	// members, if not returns an empty array (TODO: Fix it)
+	// If the user requesting the list of members has never been in the room,
+	// returns nil.
+	// If there was an issue retrieving the events, returns an error.
+	GetMembershipEvents(roomNID types.RoomNID, requestSenderUserID string) (events []types.Event, err error)
 }
 
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
@@ -182,6 +189,37 @@ func (r *RoomserverQueryAPI) loadEvents(eventNIDs []types.EventNID) ([]gomatrixs
 	return result, nil
 }
 
+// QueryMembershipsForRoom implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
+	request *api.QueryMembershipsForRoomRequest,
+	response *api.QueryMembershipsForRoomResponse,
+) error {
+	roomNID, err := r.DB.RoomNID(request.RoomID)
+	if err != nil {
+		return err
+	}
+
+	events, err := r.DB.GetMembershipEvents(roomNID, request.Sender)
+	if err != nil {
+		return nil
+	}
+
+	if events == nil {
+		response.HasBeenInRoom = false
+		response.JoinEvents = nil
+		return nil
+	}
+
+	response.HasBeenInRoom = true
+	response.JoinEvents = []gomatrixserverlib.ClientEvent{}
+	for _, event := range events {
+		clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
+		response.JoinEvents = append(response.JoinEvents, clientEvent)
+	}
+
+	return nil
+}
+
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
@@ -221,6 +259,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryEventsByID(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryMembershipsForRoomPath,
+		common.MakeAPI("queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
+			var request api.QueryMembershipsForRoomRequest
+			var response api.QueryMembershipsForRoomResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryMembershipsForRoom(&request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
