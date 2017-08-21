@@ -2,6 +2,11 @@
 
 Dendrite will be a matrix homeserver written in go.
 
+# Install
+
+Dendrite is still very much a work in progress, but those wishing to work on it
+may be interested in the installation instructions in [INSTALL.md](INSTALL.md).
+
 # Design
 
 ## Log Based Architecture
