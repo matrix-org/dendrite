@@ -125,8 +125,8 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 // is still in the room.
 // If a membership already exists between the user and the room, or of the
 // insert fails, returns the SQL error
-func (d *Database) SaveMembership(localpart string, roomID string, eventID string, stillInRoom bool, txn *sql.Tx) error {
-	return d.memberships.insertMembership(localpart, roomID, eventID, stillInRoom, txn)
+func (d *Database) SaveMembership(localpart string, roomID string, eventID string, txn *sql.Tx) error {
+	return d.memberships.insertMembership(localpart, roomID, eventID, txn)
 }
 
 // removeMembershipsByEventIDs removes the memberships of which the `join` membership
@@ -136,9 +136,9 @@ func (d *Database) removeMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) e
 	return d.memberships.deleteMembershipsByEventIDs(eventIDs, txn)
 }
 
-// UpdateMemberships saves the membership events included in a given state events
-// array, and removes those which ID is included in a given array of events IDs.
-// All of the process is run in a transaction, which commits only once/if every
+// UpdateMemberships adds the "join" membership events included in a given state
+// events array, and removes those which ID is included in a given array of events
+// IDs. All of the process is run in a transaction, which commits only once/if every
 // insertion and deletion has been successfully processed.
 // Returns a SQL error if there was an issue with any part of the process
 func (d *Database) UpdateMemberships(eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error {
@@ -157,34 +157,12 @@ func (d *Database) UpdateMemberships(eventsToAdd []gomatrixserverlib.Event, idsT
 	})
 }
 
-// GetMembership returns the membership for the given localpart and room ID
-// If no membership match the given localpart, returns nil
-// If there was an issue during the retrieval, returns the SQL error
-func (d *Database) GetMembership(localpart string, roomID string) (*authtypes.Membership, error) {
-	return d.memberships.selectMembership(localpart, roomID)
-}
-
 // GetMembershipsByLocalpart returns an array containing the memberships for all
 // the rooms a user matching a given localpart is a member of
 // If no membership match the given localpart, returns an empty array
 // If there was an issue during the retrieval, returns the SQL error
 func (d *Database) GetMembershipsByLocalpart(localpart string) (memberships []authtypes.Membership, err error) {
 	return d.memberships.selectMembershipsByLocalpart(localpart)
-}
-
-// GetMembershipsByRoomID returns an array containing the memberships for all
-// the users that are member of a given room
-// If no membership match the given localpart, returns an empty array
-// If there was an issue during the retrieval, returns the SQL error
-func (d *Database) GetMembershipsByRoomID(roomID string) (memberships []authtypes.Membership, err error) {
-	return d.memberships.selectMembershipsByRoomID(roomID)
-}
-
-// UpdateMembership update the "join" membership event ID of a membership.
-// This is useful in case of membership upgrade (e.g. profile update)
-// If there was an issue during the update, returns the SQL error
-func (d *Database) UpdateMembership(oldEventID string, newEventID string) error {
-	return d.memberships.updateMembershipByEventID(oldEventID, newEventID)
 }
 
 // newMembership will save a new membership in the database, with a flag on whether
@@ -215,13 +193,7 @@ func (d *Database) newMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error 
 
 		// Only "join" membership events can be considered as new memberships
 		if membership == "join" {
-			if err := d.SaveMembership(localpart, roomID, eventID, true, txn); err != nil {
-				return err
-			}
-		} else if membership == "leave" || membership == "ban" {
-			// If the user left the room, save the new event ID and mark them as
-			// not in the room anymore
-			if err := d.SaveMembership(localpart, roomID, eventID, false, txn); err != nil {
+			if err := d.SaveMembership(localpart, roomID, eventID, txn); err != nil {
 				return err
 			}
 		}
