@@ -80,15 +80,23 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *roomStatements) insertRoomNID(roomID string) (types.RoomNID, error) {
+func (s *roomStatements) insertRoomNID(txn *sql.Tx, roomID string) (types.RoomNID, error) {
 	var roomNID int64
-	err := s.insertRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
+	stmt := s.insertRoomNIDStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
+	err := stmt.QueryRow(roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) selectRoomNID(roomID string) (types.RoomNID, error) {
+func (s *roomStatements) selectRoomNID(txn *sql.Tx, roomID string) (types.RoomNID, error) {
 	var roomNID int64
-	err := s.selectRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
+	stmt := s.selectRoomNIDStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
+	err := stmt.QueryRow(roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 

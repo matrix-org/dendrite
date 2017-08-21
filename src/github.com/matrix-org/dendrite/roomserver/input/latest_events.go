@@ -17,6 +17,7 @@ package input
 import (
 	"bytes"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -52,25 +53,19 @@ func updateLatestEvents(
 	if err != nil {
 		return
 	}
-	defer func() {
-		if err == nil {
-			// Commit if there wasn't an error.
-			// Set the returned err value if we encounter an error committing.
-			// This only works because err is a named return.
-			err = updater.Commit()
-		} else {
-			// Ignore any error we get rolling back since we don't want to
-			// clobber the current error
-			// TODO: log the error here.
-			updater.Rollback()
-		}
-	}()
+	succeeded := false
+	defer common.EndTransaction(updater, &succeeded)
 
 	u := latestEventsUpdater{
 		db: db, updater: updater, ow: ow, roomNID: roomNID,
 		stateAtEvent: stateAtEvent, event: event, sendAsServer: sendAsServer,
 	}
-	return u.doUpdateLatestEvents()
+	if err = u.doUpdateLatestEvents(); err != nil {
+		return err
+	}
+
+	succeeded = true
+	return
 }
 
 // latestEventsUpdater tracks the state used to update the latest events in the

@@ -15,6 +15,9 @@
 package input
 
 import (
+	"fmt"
+
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -39,6 +42,8 @@ type RoomEventDatabase interface {
 	GetLatestEventsForUpdate(roomNID types.RoomNID) (updater types.RoomRecentEventsUpdater, err error)
 	// Lookup the string event IDs for a list of numeric event IDs
 	EventIDs(eventNIDs []types.EventNID) (map[types.EventNID]string, error)
+	// Build a membership updater for the target user in a room.
+	MembershipUpdater(roomID, targerUserID string) (types.MembershipUpdater, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -103,13 +108,64 @@ func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.
 		return err
 	}
 
-	// TODO:
-	//  * Caculate the new current state for the room if the forward extremities have changed.
-	//  * Work out the delta between the new current state and the previous current state.
-	//  * Work out the visibility of the event.
-	//  * Write a message to the output logs containing:
-	//      - The event itself
-	//      - The visiblity of the event, i.e. who is allowed to see the event.
-	//      - The changes to the current state of the room.
+	return nil
+}
+
+func processInviteEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.InputInviteEvent) (err error) {
+	if input.Event.StateKey() == nil {
+		return fmt.Errorf("invite must be a state event")
+	}
+
+	roomID := input.Event.RoomID()
+	targetUserID := *input.Event.StateKey()
+
+	updater, err := db.MembershipUpdater(roomID, targetUserID)
+	if err != nil {
+		return err
+	}
+	succeeded := false
+	defer common.EndTransaction(updater, &succeeded)
+
+	if updater.IsJoin() {
+		// If the user is joined to the room then that takes precedence over this
+		// invite event. It makes little sense to move a user that is already
+		// joined to the room into the invite state.
+		// This could plausibly happen if an invite request raced with a join
+		// request for a user. For example if a user was invited to a public
+		// room and they joined the room at the same time as the invite was sent.
+		// The other way this could plausibly happen is if an invite raced with
+		// a kick. For example if a user was kicked from a room in error and in
+		// response someone else in the room re-invited them then it is possible
+		// for the invite request to race with the leave event so that the
+		// target receives invite before it learns that it has been kicked.
+		// There are a few ways this could be plausibly handled in the roomserver.
+		// 1) Store the invite, but mark it as retired. That will result in the
+		//    permanent rejection of that invite event. So even if the target
+		//    user leaves the room and the invite is retransmitted it will be
+		//    ignored. However a new invite with a new event ID would still be
+		//    accepted.
+		// 2) Silently discard the invite event. This means that if the event
+		//    was retransmitted at a later date after the target user had left
+		//    the room we would accept the invite. However since we hadn't told
+		//    the sending server that the invite had been discarded it would
+		//    have no reason to attempt to retry.
+		// 3) Signal the sending server that the user is already joined to the
+		//    room.
+		// For now we will implement option 2. Since in the abesence of a retry
+		// mechanism it will be equivalent to option 1, and we don't have a
+		// signalling mechanism to implement option 3.
+		return nil
+	}
+
+	outputUpdates, err := updateToInviteMembership(updater, &input.Event, nil)
+	if err != nil {
+		return err
+	}
+
+	if err = ow.WriteOutputEvents(roomID, outputUpdates); err != nil {
+		return err
+	}
+
+	succeeded = true
 	return nil
 }
