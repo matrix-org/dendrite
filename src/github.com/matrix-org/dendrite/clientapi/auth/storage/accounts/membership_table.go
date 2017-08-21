@@ -41,7 +41,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS account_membership_event_id ON account_members
 
 const insertMembershipSQL = `
 	INSERT INTO account_memberships(localpart, room_id, event_id) VALUES ($1, $2, $3)
-	ON CONFLICT (localpart, room_id) DO	UPDATE SET event_id = EXCLUDED.event_id
+	ON CONFLICT (localpart, room_id) DO UPDATE SET event_id = EXCLUDED.event_id
 `
 
 const selectMembershipsByLocalpartSQL = "" +
