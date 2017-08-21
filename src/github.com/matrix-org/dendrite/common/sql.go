@@ -18,6 +18,24 @@ import (
 	"database/sql"
 )
 
+// A Transaction is something that can be committed or rolledback.
+type Transaction interface {
+	// Commit the transaction
+	Commit() error
+	// Rollback the transaction.
+	Rollback() error
+}
+
+// EndTransaction ends a transaction.
+// If the transaction succeeded then it is committed, otherwise it is rolledback.
+func EndTransaction(txn Transaction, succeeded *bool) {
+	if *succeeded {
+		txn.Commit()
+	} else {
+		txn.Rollback()
+	}
+}
+
 // WithTransaction runs a block of code passing in an SQL transaction
 // If the code returns an error or panics then the transactions is rolledback
 // Otherwise the transaction is committed.
@@ -26,16 +44,14 @@ func WithTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 	if err != nil {
 		return
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			txn.Rollback()
-			panic(r)
-		} else if err != nil {
-			txn.Rollback()
-		} else {
-			err = txn.Commit()
-		}
-	}()
+	succeeded := false
+	defer EndTransaction(txn, &succeeded)
+
 	err = fn(txn)
+	if err != nil {
+		return
+	}
+
+	succeeded = true
 	return
 }

@@ -17,6 +17,7 @@ package input
 import (
 	"bytes"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -52,12 +53,19 @@ func updateLatestEvents(
 	if err != nil {
 		return
 	}
+	succeeded := false
+	defer common.EndTransaction(updater, &succeeded)
 
 	u := latestEventsUpdater{
 		db: db, updater: updater, ow: ow, roomNID: roomNID,
 		stateAtEvent: stateAtEvent, event: event, sendAsServer: sendAsServer,
 	}
-	return withTransaction(updater, u.doUpdateLatestEvents)
+	if err = u.doUpdateLatestEvents(); err != nil {
+		return err
+	}
+
+	succeeded = true
+	return
 }
 
 // latestEventsUpdater tracks the state used to update the latest events in the

@@ -17,6 +17,7 @@ package input
 import (
 	"fmt"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -122,69 +123,49 @@ func processInviteEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input ap
 	if err != nil {
 		return err
 	}
+	succeeded := false
+	defer common.EndTransaction(updater, &succeeded)
 
-	return withTransaction(updater, func() error {
+	if updater.IsJoin() {
+		// If the user is joined to the room then that takes precedence over this
+		// invite event. It makes little sense to move a user that is already
+		// joined to the room into the invite state.
+		// This could plausibly happen if an invite request raced with a join
+		// request for a user. For example if a user was invited to a public
+		// room and they joined the room at the same time as the invite was sent.
+		// The other way this could plausibly happen is if an invite raced with
+		// a kick. For example if a user was kicked from a room in error and in
+		// response someone else in the room re-invited them then it is possible
+		// for the invite request to race with the leave event so that the
+		// target receives invite before it learns that it has been kicked.
+		// There are a few ways this could be plausibly handled in the roomserver.
+		// 1) Store the invite, but mark it as retired. That will result in the
+		//    permanent rejection of that invite event. So even if the target
+		//    user leaves the room and the invite is retransmitted it will be
+		//    ignored. However a new invite with a new event ID would still be
+		//    accepted.
+		// 2) Silently discard the invite event. This means that if the event
+		//    was retransmitted at a later date after the target user had left
+		//    the room we would accept the invite. However since we hadn't told
+		//    the sending server that the invite had been discarded it would
+		//    have no reason to attempt to retry.
+		// 3) Signal the sending server that the user is already joined to the
+		//    room.
+		// For now we will implement option 2. Since in the abesence of a retry
+		// mechanism it will be equivalent to option 1, and we don't have a
+		// signalling mechanism to implement option 3.
+		return nil
+	}
 
-		if updater.IsJoin() {
-			// If the user is joined to the room then that takes precedence over this
-			// invite event. It makes little sense to move a user that is already
-			// joined to the room into the invite state.
-			// This could plausibly happen if an invite request raced with a join
-			// request for a user. For example if a user was invited to a public
-			// room and they joined the room at the same time as the invite was sent.
-			// The other way this could plausibly happen is if an invite raced with
-			// a kick. For example if a user was kicked from a room in error and in
-			// response someone else in the room re-invited them then it is possible
-			// for the invite request to race with the leave event so that the
-			// target receives invite before it learns that it has been kicked.
-			// There are a few ways this could be plausibly handled in the roomserver.
-			// 1) Store the invite, but mark it as retired. That will result in the
-			//    permanent rejection of that invite event. So even if the target
-			//    user leaves the room and the invite is retransmitted it will be
-			//    ignored. However a new invite with a new event ID would still be
-			//    accepted.
-			// 2) Silently discard the invite event. This means that if the event
-			//    was retransmitted at a later date after the target user had left
-			//    the room we would accept the invite. However since we hadn't told
-			//    the sending server that the invite had been discarded it would
-			//    have no reason to attempt to retry.
-			// 3) Signal the sending server that the user is already joined to the
-			//    room.
-			// For now we will implement option 2. Since in the abesence of a retry
-			// mechanism it will be equivalent to option 1, and we don't have a
-			// signalling mechanism to implement option 3.
-			return nil
-		}
+	outputUpdates, err := updateToInviteMembership(updater, &input.Event, nil)
+	if err != nil {
+		return err
+	}
 
-		outputUpdates, err := updateToInviteMembership(updater, &input.Event, nil)
-		if err != nil {
-			return err
-		}
+	if err = ow.WriteOutputEvents(roomID, outputUpdates); err != nil {
+		return err
+	}
 
-		return ow.WriteOutputEvents(roomID, outputUpdates)
-	})
-}
-
-// withTransaction runs a function inside a transaction.
-// Commits the transaction if the function succeeds.
-// Rollsback the transaction if the function fails or panics.
-func withTransaction(t types.Transaction, f func() error) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Rollback()
-			panic(r)
-		}
-		if err != nil {
-			// Ignore any error we get rolling back since we don't want to
-			// clobber the current error
-			// TODO: log the error here.
-			t.Rollback()
-		} else {
-			// Commit if there wasn't an error.
-			// Set the returned err value if we encounter an error committing.
-			// This only works because err is a named return.
-			err = t.Commit()
-		}
-	}()
-	return f()
+	succeeded = true
+	return nil
 }
