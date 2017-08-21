@@ -18,6 +18,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -136,7 +137,7 @@ func (s *currentRoomStateStatements) selectJoinedUsers() (map[string][]string, e
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
 func (s *currentRoomStateStatements) selectRoomIDsWithMembership(txn *sql.Tx, userID, membership string) ([]string, error) {
-	rows, err := txn.Stmt(s.selectRoomIDsWithMembershipStmt).Query(userID, membership)
+	rows, err := common.TxStmt(txn, s.selectRoomIDsWithMembershipStmt).Query(userID, membership)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +156,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(txn *sql.Tx, us
 
 // CurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID string) ([]gomatrixserverlib.Event, error) {
-	rows, err := txn.Stmt(s.selectCurrentStateStmt).Query(roomID)
+	rows, err := common.TxStmt(txn, s.selectCurrentStateStmt).Query(roomID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,21 +166,21 @@ func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID stri
 }
 
 func (s *currentRoomStateStatements) deleteRoomStateByEventID(txn *sql.Tx, eventID string) error {
-	_, err := txn.Stmt(s.deleteRoomStateByEventIDStmt).Exec(eventID)
+	_, err := common.TxStmt(txn, s.deleteRoomStateByEventIDStmt).Exec(eventID)
 	return err
 }
 
 func (s *currentRoomStateStatements) upsertRoomState(
 	txn *sql.Tx, event gomatrixserverlib.Event, membership *string, addedAt int64,
 ) error {
-	_, err := txn.Stmt(s.upsertRoomStateStmt).Exec(
+	_, err := common.TxStmt(txn, s.upsertRoomStateStmt).Exec(
 		event.RoomID(), event.EventID(), event.Type(), *event.StateKey(), event.JSON(), membership, addedAt,
 	)
 	return err
 }
 
 func (s *currentRoomStateStatements) selectEventsWithEventIDs(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
-	rows, err := txn.Stmt(s.selectEventsWithEventIDsStmt).Query(pq.StringArray(eventIDs))
+	rows, err := common.TxStmt(txn, s.selectEventsWithEventIDsStmt).Query(pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}

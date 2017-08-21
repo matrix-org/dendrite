@@ -17,6 +17,7 @@ package storage
 import (
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -115,14 +116,14 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 func (s *membershipStatements) insertMembership(
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) error {
-	_, err := txn.Stmt(s.insertMembershipStmt).Exec(roomNID, targetUserNID)
+	_, err := common.TxStmt(txn, s.insertMembershipStmt).Exec(roomNID, targetUserNID)
 	return err
 }
 
 func (s *membershipStatements) selectMembershipForUpdate(
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (membership membershipState, err error) {
-	err = txn.Stmt(s.selectMembershipForUpdateStmt).QueryRow(
+	err = common.TxStmt(txn, s.selectMembershipForUpdateStmt).QueryRow(
 		roomNID, targetUserNID,
 	).Scan(&membership)
 	return
@@ -179,7 +180,7 @@ func (s *membershipStatements) updateMembership(
 	senderUserNID types.EventStateKeyNID, membership membershipState,
 	eventNID types.EventNID,
 ) error {
-	_, err := txn.Stmt(s.updateMembershipStmt).Exec(
+	_, err := common.TxStmt(txn, s.updateMembershipStmt).Exec(
 		roomNID, targetUserNID, senderUserNID, membership, eventNID,
 	)
 	return err

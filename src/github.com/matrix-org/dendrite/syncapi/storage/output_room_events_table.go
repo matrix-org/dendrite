@@ -19,6 +19,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -105,7 +106,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 func (s *outputRoomEventsStatements) selectStateInRange(
 	txn *sql.Tx, oldPos, newPos types.StreamPosition,
 ) (map[string]map[string]bool, map[string]streamEvent, error) {
-	rows, err := txn.Stmt(s.selectStateInRangeStmt).Query(oldPos, newPos)
+	rows, err := common.TxStmt(txn, s.selectStateInRangeStmt).Query(oldPos, newPos)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -167,12 +168,8 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 // then this function should only ever be used at startup, as it will race with inserting events if it is
 // done afterwards. If there are no inserted events, 0 is returned.
 func (s *outputRoomEventsStatements) selectMaxID(txn *sql.Tx) (id int64, err error) {
-	stmt := s.selectMaxIDStmt
-	if txn != nil {
-		stmt = txn.Stmt(stmt)
-	}
 	var nullableID sql.NullInt64
-	err = stmt.QueryRow().Scan(&nullableID)
+	err = common.TxStmt(txn, s.selectMaxIDStmt).QueryRow().Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}
@@ -182,7 +179,7 @@ func (s *outputRoomEventsStatements) selectMaxID(txn *sql.Tx) (id int64, err err
 // InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs. Returns the position
 // of the inserted event.
 func (s *outputRoomEventsStatements) insertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) (streamPos int64, err error) {
-	err = txn.Stmt(s.insertEventStmt).QueryRow(
+	err = common.TxStmt(txn, s.insertEventStmt).QueryRow(
 		event.RoomID(), event.EventID(), event.JSON(), pq.StringArray(addState), pq.StringArray(removeState),
 	).Scan(&streamPos)
 	return
@@ -209,11 +206,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
 // from the database.
 func (s *outputRoomEventsStatements) selectEvents(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
-	stmt := s.selectEventsStmt
-	if txn != nil {
-		stmt = txn.Stmt(stmt)
-	}
-	rows, err := stmt.Query(pq.StringArray(eventIDs))
+	rows, err := common.TxStmt(txn, s.selectEventsStmt).Query(pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
