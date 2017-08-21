@@ -17,8 +17,6 @@ package storage
 import (
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
-
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -383,24 +381,35 @@ func (d *Database) StateEntriesForTuples(
 }
 
 // MembershipUpdater implements input.RoomEventDatabase
-func (d *Database) MembershipUpdater(roomID, targetUserID string) (updater types.MembershipUpdater, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		var (
-			roomNID       types.RoomNID
-			targetUserNID types.EventStateKeyNID
-		)
-		roomNID, err = d.assignRoomNID(txn, roomID)
-		if err != nil {
-			return err
+func (d *Database) MembershipUpdater(roomID, targetUserID string) (types.MembershipUpdater, error) {
+	txn, err := d.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			txn.Rollback()
 		}
-		targetUserNID, err = d.assignStateKeyNID(txn, targetUserID)
-		if err != nil {
-			return err
-		}
-		updater, err = d.membershipUpdaterTxn(txn, roomNID, targetUserNID)
-		return err
-	})
-	return
+	}()
+
+	roomNID, err := d.assignRoomNID(txn, roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	targetUserNID, err := d.assignStateKeyNID(txn, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	updater, err := d.membershipUpdaterTxn(txn, roomNID, targetUserNID)
+	if err != nil {
+		return nil, err
+	}
+
+	succeeded = true
+	return updater, nil
 }
 
 type membershipUpdater struct {
