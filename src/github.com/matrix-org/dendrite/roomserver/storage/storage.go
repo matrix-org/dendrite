@@ -19,6 +19,7 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -521,7 +522,7 @@ func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserI
 		return
 	}
 
-	_, senderMembership, err := d.statements.selectMembershipFromRoomAndTarget(roomNID, requestSenderUserNID)
+	senderMembershipEventNID, senderMembership, err := d.statements.selectMembershipFromRoomAndTarget(roomNID, requestSenderUserNID)
 	if err == sql.ErrNoRows {
 		// The user has never been a member of that room
 		return nil, nil
@@ -539,18 +540,64 @@ func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserI
 
 		events, err = d.Events(joinEventNIDs)
 	} else {
-		// The user isn't in the room anymore
-		// TODO: Send the list of joined member as it was when the user left
-		//       We cannot do this using only the memberships database, as it
-		//       only stores the latest join event NID for a given target user.
-		//       The solution would be to build the state of a room after before
-		//       the leave event and extract a members list from it.
-		//       For now, we return an empty slice so we know the user has been
-		//       in the room before.
-		events = []types.Event{}
+		// The user isn't in the room anymore: Send the list of joined user from
+		// when the user left
+		events, err = d.getMembershipsBeforeEventNID(senderMembershipEventNID)
 	}
 
 	return
+}
+
+// getMembershipsBeforeEventNID takes the numeric ID of an event and fetches the state
+// of the event's room as it was when this event was fired, then filters the state events to
+// only keep the "m.room.member" events with a "join" membership. These events are returned.
+// Returns an error if there was an issue fetching the events.
+func (d *Database) getMembershipsBeforeEventNID(eventNID types.EventNID) ([]types.Event, error) {
+	events := []types.Event{}
+	// Lookup the event NID
+	eIDs, err := d.EventIDs([]types.EventNID{eventNID})
+	if err != nil {
+		return nil, err
+	}
+	eventIDs := []string{eIDs[eventNID]}
+
+	prevState, err := d.StateAtEventIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the state as it was when this event was fired
+	stateEntries, err := state.LoadCombinedStateAfterEvents(d, prevState)
+	if err != nil {
+		return nil, err
+	}
+
+	var eventNIDs []types.EventNID
+	for _, entry := range stateEntries {
+		eventNIDs = append(eventNIDs, entry.EventNID)
+	}
+
+	// Get all of the events in this state
+	stateEvents, err := d.Events(eventNIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter the events to only keep the "join" membership events
+	for _, event := range stateEvents {
+		if event.Type() == "m.room.member" {
+			membership, err := event.Membership()
+			if err != nil {
+				return nil, err
+			}
+
+			if membership == "join" {
+				events = append(events, event)
+			}
+		}
+	}
+
+	return events, nil
 }
 
 type transaction struct {
