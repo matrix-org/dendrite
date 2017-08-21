@@ -16,6 +16,7 @@
 package types
 
 import (
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -135,14 +136,6 @@ type StateEntryList struct {
 	StateEntries  []StateEntry
 }
 
-// A Transaction is something that can be committed or rolledback.
-type Transaction interface {
-	// Commit the transaction
-	Commit() error
-	// Rollback the transaction.
-	Rollback() error
-}
-
 // A RoomRecentEventsUpdater is used to update the recent events in a room.
 // (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
 //  lock on the row in the rooms table holding the latest events for the room.)
@@ -175,7 +168,7 @@ type RoomRecentEventsUpdater interface {
 	// It will share the same transaction as this updater.
 	MembershipUpdater(targetUserNID EventStateKeyNID) (MembershipUpdater, error)
 	// Implements Transaction so it can be committed or rolledback
-	Transaction
+	common.Transaction
 }
 
 // A MembershipUpdater is used to update the membership of a user in a room.
@@ -200,7 +193,7 @@ type MembershipUpdater interface {
 	// Returns a list of invite event IDs that this state change retired.
 	SetToLeave(senderUserID string) (inviteEventIDs []string, err error)
 	// Implements Transaction so it can be committed or rolledback.
-	Transaction
+	common.Transaction
 }
 
 // A MissingEventError is an error that happened because the roomserver was
