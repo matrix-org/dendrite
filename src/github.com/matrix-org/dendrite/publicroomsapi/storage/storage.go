@@ -124,48 +124,46 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvents(
 // does nothing.
 // If something went wrong during the process, returns an error.
 func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(event gomatrixserverlib.Event) error {
-	roomID := event.RoomID()
-
 	// Process the event according to its type
 	switch event.Type() {
 	case "m.room.create":
-		return d.statements.insertNewRoom(roomID)
+		return d.statements.insertNewRoom(event.RoomID())
 	case "m.room.member":
 		return d.updateNumJoinedUsers(event, false)
 	case "m.room.aliases":
-		return d.updateRoomAliases(event, roomID)
+		return d.updateRoomAliases(event)
 	case "m.room.canonical_alias":
 		var content common.CanonicalAliasContent
 		field := &(content.Alias)
 		attrName := "canonical_alias"
-		return d.updateStringAttribute(attrName, event, &content, field, roomID)
+		return d.updateStringAttribute(attrName, event, &content, field)
 	case "m.room.name":
 		var content common.NameContent
 		field := &(content.Name)
 		attrName := "name"
-		return d.updateStringAttribute(attrName, event, &content, field, roomID)
+		return d.updateStringAttribute(attrName, event, &content, field)
 	case "m.room.topic":
 		var content common.TopicContent
 		field := &(content.Topic)
 		attrName := "topic"
-		return d.updateStringAttribute(attrName, event, &content, field, roomID)
+		return d.updateStringAttribute(attrName, event, &content, field)
 	case "m.room.avatar":
 		var content common.AvatarContent
 		field := &(content.URL)
 		attrName := "avatar_url"
-		return d.updateStringAttribute(attrName, event, &content, field, roomID)
+		return d.updateStringAttribute(attrName, event, &content, field)
 	case "m.room.history_visibility":
 		var content common.HistoryVisibilityContent
 		field := &(content.HistoryVisibility)
 		attrName := "world_readable"
 		strForTrue := "world_readable"
-		return d.updateBooleanAttribute(attrName, event, &content, field, strForTrue, roomID)
+		return d.updateBooleanAttribute(attrName, event, &content, field, strForTrue)
 	case "m.room.guest_access":
 		var content common.GuestAccessContent
 		field := &(content.GuestAccess)
 		attrName := "guest_can_join"
 		strForTrue := "can_join"
-		return d.updateBooleanAttribute(attrName, event, &content, field, strForTrue, roomID)
+		return d.updateBooleanAttribute(attrName, event, &content, field, strForTrue)
 	}
 
 	// If the event type didn't match, return with no error
@@ -173,7 +171,7 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(event gomatrixserverlib.
 }
 
 // updateNumJoinedUsers updates the number of joined user in the database representation
-// of the room identified by a given room ID, using a given "m.room.member" Matrix event.
+// of a room using a given "m.room.member" Matrix event.
 // If the membership property of the event isn't "join", ignores it and returs nil.
 // If the remove parameter is set to false, increments the joined members counter in the
 // database, if set to truem decrements it.
@@ -197,30 +195,30 @@ func (d *PublicRoomsServerDatabase) updateNumJoinedUsers(
 }
 
 // updateStringAttribute updates a given string attribute in the database
-// representation of the room identified by a given ID, using a given string data
-// field from content of the Matrix event triggering the update.
+// representation of a room using a given string data field from content of the
+// Matrix event triggering the update.
 // Returns an error if decoding the Matrix event's content or updating the attribute
 // failed.
 func (d *PublicRoomsServerDatabase) updateStringAttribute(
 	attrName string, event gomatrixserverlib.Event, content interface{},
-	field *string, roomID string,
+	field *string,
 ) error {
 	if err := json.Unmarshal(event.Content(), content); err != nil {
 		return err
 	}
 
-	return d.statements.updateRoomAttribute(attrName, *field, roomID)
+	return d.statements.updateRoomAttribute(attrName, *field, event.RoomID())
 }
 
 // updateBooleanAttribute updates a given boolean attribute in the database
-// representation of the room identified by a given ID, using a given string data
-// field from content of the Matrix event triggering the update.
+// representation of a room using a given string data field from content of the
+// Matrix event triggering the update.
 // The attribute is set to true if the field matches a given string, false if not.
 // Returns an error if decoding the Matrix event's content or updating the attribute
 // failed.
 func (d *PublicRoomsServerDatabase) updateBooleanAttribute(
 	attrName string, event gomatrixserverlib.Event, content interface{},
-	field *string, strForTrue string, roomID string,
+	field *string, strForTrue string,
 ) error {
 	if err := json.Unmarshal(event.Content(), content); err != nil {
 		return err
@@ -233,17 +231,17 @@ func (d *PublicRoomsServerDatabase) updateBooleanAttribute(
 		attrValue = false
 	}
 
-	return d.statements.updateRoomAttribute(attrName, attrValue, roomID)
+	return d.statements.updateRoomAttribute(attrName, attrValue, event.RoomID())
 }
 
 // updateRoomAliases decodes the content of a "m.room.aliases" Matrix event and update the list of aliases of
 // a given room with it.
 // Returns an error if decoding the Matrix event or updating the list failed.
-func (d *PublicRoomsServerDatabase) updateRoomAliases(aliasesEvent gomatrixserverlib.Event, roomID string) error {
+func (d *PublicRoomsServerDatabase) updateRoomAliases(aliasesEvent gomatrixserverlib.Event) error {
 	var content common.AliasesContent
 	if err := json.Unmarshal(aliasesEvent.Content(), &content); err != nil {
 		return err
 	}
 
-	return d.statements.updateRoomAttribute("aliases", content.Aliases, roomID)
+	return d.statements.updateRoomAttribute("aliases", content.Aliases, aliasesEvent.RoomID())
 }
