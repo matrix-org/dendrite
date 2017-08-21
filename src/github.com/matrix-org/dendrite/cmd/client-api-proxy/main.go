@@ -51,8 +51,8 @@ var (
 	clientAPIURL  = flag.String("client-api-server-url", "", "The base URL of the listening 'dendrite-client-api-server' process. E.g. 'http://localhost:4321'")
 	mediaAPIURL   = flag.String("media-api-server-url", "", "The base URL of the listening 'dendrite-media-api-server' process. E.g. 'http://localhost:7779'")
 	bindAddress   = flag.String("bind-address", ":8008", "The listening port for the proxy.")
-	certFile      = flag.String("tls-cert", "server.crt", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "server.key", "The PEM private key to use for TLS")
+	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
+	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
 )
 
 func makeProxy(targetURL string) (*httputil.ReverseProxy, error) {
