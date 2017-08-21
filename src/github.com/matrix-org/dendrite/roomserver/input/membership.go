@@ -97,7 +97,7 @@ func updateMembership(
 	}
 	if old == new && new != "join" {
 		// If the membership is the same then nothing changed and we can return
-		// immediately.
+		// immediately, unless it's a "join" update (e.g. profile update).
 		return updates, nil
 	}
 
@@ -152,7 +152,8 @@ func updateToJoinMembership(
 	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	// If the user is already marked as being joined, we call SetToJoin to update
-	// the event ID then we can return immediately. Retired is ignored as
+	// the event ID then we can return immediately. Retired is ignored as there
+	// is no invite event to retire.
 	if mu.IsJoin() {
 		_, err := mu.SetToJoin(add.Sender(), add.EventID(), true)
 		if err != nil {
