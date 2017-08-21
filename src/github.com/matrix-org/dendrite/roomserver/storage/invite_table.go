@@ -17,6 +17,7 @@ package storage
 import (
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -94,7 +95,7 @@ func (s *inviteStatements) insertInviteEvent(
 	targetUserNID, senderUserNID types.EventStateKeyNID,
 	inviteEventJSON []byte,
 ) (bool, error) {
-	result, err := txn.Stmt(s.insertInviteEventStmt).Exec(
+	result, err := common.TxStmt(txn, s.insertInviteEventStmt).Exec(
 		inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)
 	if err != nil {
@@ -110,7 +111,7 @@ func (s *inviteStatements) insertInviteEvent(
 func (s *inviteStatements) updateInviteRetired(
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) ([]string, error) {
-	rows, err := txn.Stmt(s.updateInviteRetiredStmt).Query(roomNID, targetUserNID)
+	rows, err := common.TxStmt(txn, s.updateInviteRetiredStmt).Query(roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
