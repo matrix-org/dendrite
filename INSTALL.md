@@ -97,11 +97,13 @@ Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Th
 
 ## Starting a monolith server
 
-It is possible to use 'naffka' as an in-process replacement to Kafka when using the monolith server. To do this, set `use_naffka: true` in `dendrite.yaml`.
+It is possible to use 'naffka' as an in-process replacement to Kafka when using
+the monolith server. To do this, set `use_naffka: true` in `dendrite.yaml`.
 
-The monolith server can be started as shown below. By default it listens on
-ports 8008 and 8448, so point your client at `http://localhost:8008` or
-`https://localhost:8448`.
+The monolith server can be started as shown below. By default it listens for
+HTTP connections on port 8008, so point your client at
+`http://localhost:8008`. If you set `--tls-cert` and `--tls-key` as shown
+below, it will also listen for HTTPS connections on port 8448.
 
 ```bash
 ./bin/dendrite-monolith-server --tls-cert=server.crt --tls-key=server.key
