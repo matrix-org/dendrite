@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -168,52 +169,10 @@ func (r joinRoomReq) joinRoomUsingServers(
 	var eb gomatrixserverlib.EventBuilder
 	r.writeToBuilder(&eb, roomID)
 
-	needed, err := gomatrixserverlib.StateNeededForEventBuilder(&eb)
-	if err != nil {
-		return httputil.LogThenError(r.req, err)
-	}
-
-	// Ask the roomserver for information about this room
-	queryReq := api.QueryLatestEventsAndStateRequest{
-		RoomID:       roomID,
-		StateToFetch: needed.Tuples(),
-	}
 	var queryRes api.QueryLatestEventsAndStateResponse
-	if queryErr := r.queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); queryErr != nil {
-		return httputil.LogThenError(r.req, queryErr)
-	}
-
-	if queryRes.RoomExists {
-		// The room exists in the local database, so we just have to send a join
-		// membership event and return the room ID
-		// TODO: Check if the user is allowed in the room (has been invited if
-		// the room is invite-only)
-		eb.Depth = queryRes.Depth
-		eb.PrevEvents = queryRes.LatestEvents
-
-		authEvents := gomatrixserverlib.NewAuthEvents(nil)
-
-		for i := range queryRes.StateEvents {
-			authEvents.AddEvent(&queryRes.StateEvents[i])
-		}
-
-		refs, err := needed.AuthEventReferences(&authEvents)
-		if err != nil {
-			return httputil.LogThenError(r.req, err)
-		}
-		eb.AuthEvents = refs
-
-		now := time.Now()
-		eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
-		event, err := eb.Build(
-			eventID, now, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
-		)
-		if err != nil {
-			return httputil.LogThenError(r.req, err)
-		}
-
-		if err := r.producer.SendEvents([]gomatrixserverlib.Event{event}, r.cfg.Matrix.ServerName); err != nil {
-			return httputil.LogThenError(r.req, err)
+	if event, err := events.BuildEvent(&eb, r.cfg, r.queryAPI, &queryRes); err == nil {
+		if sendErr := r.producer.SendEvents([]gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName); err != nil {
+			return httputil.LogThenError(r.req, sendErr)
 		}
 
 		return util.JSONResponse{
@@ -222,6 +181,8 @@ func (r joinRoomReq) joinRoomUsingServers(
 				RoomID string `json:"room_id"`
 			}{roomID},
 		}
+	} else if err != events.ErrRoomNoExists {
+		return httputil.LogThenError(r.req, err)
 	}
 
 	if len(servers) == 0 {
