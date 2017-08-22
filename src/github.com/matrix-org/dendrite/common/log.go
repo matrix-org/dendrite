@@ -15,26 +15,45 @@
 package common
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/matrix-org/dugong"
+	"github.com/mgutz/ansi"
 	"github.com/sirupsen/logrus"
 )
 
-type utcFormatter struct {
-	logrus.Formatter
+type dendriteFormatter struct {
+	logrus.TextFormatter
 }
 
-func (f utcFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+func (f dendriteFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	if _, ok := entry.Data["prefix"]; ok {
+		prefix, ok := entry.Data["prefix"].(string)
+		if !ok {
+			return f.TextFormatter.Format(entry)
+		}
+
+		prefix = strings.ToUpper(prefix)
+
+		if !f.TextFormatter.DisableColors {
+			prefix = ansi.Color(prefix, "white+b")
+		}
+
+		entry.Message = fmt.Sprintf("%s: %s", prefix, entry.Message)
+		delete(entry.Data, "prefix")
+	}
+
 	entry.Time = entry.Time.UTC()
-	return f.Formatter.Format(entry)
+	return f.TextFormatter.Format(entry)
 }
 
 // SetupLogging configures the logging format and destination(s).
 func SetupLogging(logDir string) {
-	logrus.SetFormatter(&utcFormatter{
-		&logrus.TextFormatter{
+	logrus.SetFormatter(dendriteFormatter{
+		logrus.TextFormatter{
 			TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
 			FullTimestamp:    true,
 			DisableColors:    false,
@@ -48,8 +67,8 @@ func SetupLogging(logDir string) {
 			filepath.Join(logDir, "info.log"),
 			filepath.Join(logDir, "warn.log"),
 			filepath.Join(logDir, "error.log"),
-			&utcFormatter{
-				&logrus.TextFormatter{
+			dendriteFormatter{
+				logrus.TextFormatter{
 					TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
 					DisableColors:    true,
 					DisableTimestamp: false,
