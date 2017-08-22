@@ -95,6 +95,8 @@ func StartProxy(bindAddr string, cfg *config.Dendrite) (*exec.Cmd, chan error) {
 		"--client-api-server-url", "http://" + string(cfg.Listen.ClientAPI),
 		"--media-api-server-url", "http://" + string(cfg.Listen.MediaAPI),
 		"--public-rooms-api-server-url", "http://" + string(cfg.Listen.PublicRoomsAPI),
+		"--tls-cert", "server.crt",
+		"--tls-key", "server.key",
 	}
 	return CreateBackgroundCommand(
 		filepath.Join(filepath.Dir(os.Args[0]), "client-api-proxy"),

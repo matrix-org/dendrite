@@ -18,6 +18,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -80,15 +81,15 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *roomStatements) insertRoomNID(roomID string) (types.RoomNID, error) {
+func (s *roomStatements) insertRoomNID(txn *sql.Tx, roomID string) (types.RoomNID, error) {
 	var roomNID int64
-	err := s.insertRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
+	err := common.TxStmt(txn, s.insertRoomNIDStmt).QueryRow(roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) selectRoomNID(roomID string) (types.RoomNID, error) {
+func (s *roomStatements) selectRoomNID(txn *sql.Tx, roomID string) (types.RoomNID, error) {
 	var roomNID int64
-	err := s.selectRoomNIDStmt.QueryRow(roomID).Scan(&roomNID)
+	err := common.TxStmt(txn, s.selectRoomNIDStmt).QueryRow(roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 
@@ -112,7 +113,7 @@ func (s *roomStatements) selectLatestEventsNIDsForUpdate(txn *sql.Tx, roomNID ty
 	var nids pq.Int64Array
 	var lastEventSentNID int64
 	var stateSnapshotNID int64
-	err := txn.Stmt(s.selectLatestEventNIDsForUpdateStmt).QueryRow(int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
+	err := common.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt).QueryRow(int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -127,7 +128,7 @@ func (s *roomStatements) updateLatestEventNIDs(
 	txn *sql.Tx, roomNID types.RoomNID, eventNIDs []types.EventNID, lastEventSentNID types.EventNID,
 	stateSnapshotNID types.StateSnapshotNID,
 ) error {
-	_, err := txn.Stmt(s.updateLatestEventNIDsStmt).Exec(
+	_, err := common.TxStmt(txn, s.updateLatestEventNIDsStmt).Exec(
 		roomNID, eventNIDsAsArray(eventNIDs), int64(lastEventSentNID), int64(stateSnapshotNID),
 	)
 	return err

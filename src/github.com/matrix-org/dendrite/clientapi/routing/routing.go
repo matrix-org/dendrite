@@ -17,6 +17,7 @@ package routing
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -93,18 +94,23 @@ func Setup(
 			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], nil, cfg, queryAPI, producer)
 		}),
 	)
-	r0mux.Handle("/rooms/{roomID}/state/{eventType}",
+	r0mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			emptyString := ""
-			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], &emptyString, cfg, queryAPI, producer)
+			eventType := vars["eventType"]
+			// If there's a trailing slash, remove it
+			if strings.HasSuffix(eventType, "/") {
+				eventType = eventType[:len(eventType)-1]
+			}
+			return writers.SendEvent(req, device, vars["roomID"], eventType, "", &emptyString, cfg, queryAPI, producer)
 		}),
 	)
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			stateKey := vars["stateKey"]
-			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], &stateKey, cfg, queryAPI, producer)
+			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], "", &stateKey, cfg, queryAPI, producer)
 		}),
 	)
 
@@ -290,6 +296,13 @@ func Setup(
 		common.MakeAuthAPI("user_account_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return readers.SaveAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
+		}),
+	)
+
+	r0mux.Handle("/rooms/{roomID}/members",
+		common.MakeAuthAPI("rooms_members", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.GetMemberships(req, device, vars["roomID"], accountDB, cfg, queryAPI)
 		}),
 	)
 

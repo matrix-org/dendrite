@@ -95,10 +95,9 @@ func updateMembership(
 			return nil, err
 		}
 	}
-	if old == new {
+	if old == new && new != "join" {
 		// If the membership is the same then nothing changed and we can return
-		// immediately. This should help speed up processing for display name
-		// changes where the membership is "join" both before and after.
+		// immediately, unless it's a "join" update (e.g. profile update).
 		return updates, nil
 	}
 
@@ -152,16 +151,21 @@ func updateToInviteMembership(
 func updateToJoinMembership(
 	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	// If the user is already marked as being joined then we can return immediately.
-	// TODO: Is this code reachable given the "old != new" guard in updateMembership?
+	// If the user is already marked as being joined, we call SetToJoin to update
+	// the event ID then we can return immediately. Retired is ignored as there
+	// is no invite event to retire.
 	if mu.IsJoin() {
+		_, err := mu.SetToJoin(add.Sender(), add.EventID(), true)
+		if err != nil {
+			return nil, err
+		}
 		return updates, nil
 	}
 	// When we mark a user as being joined we will invalidate any invites that
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	retired, err := mu.SetToJoin(add.Sender())
+	retired, err := mu.SetToJoin(add.Sender(), add.EventID(), false)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +198,7 @@ func updateToLeaveMembership(
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	retired, err := mu.SetToLeave(add.Sender())
+	retired, err := mu.SetToLeave(add.Sender(), add.EventID())
 	if err != nil {
 		return nil, err
 	}

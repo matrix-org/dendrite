@@ -18,6 +18,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -79,18 +80,18 @@ func (s *joinedHostsStatements) prepare(db *sql.DB) (err error) {
 func (s *joinedHostsStatements) insertJoinedHosts(
 	txn *sql.Tx, roomID, eventID string, serverName gomatrixserverlib.ServerName,
 ) error {
-	_, err := txn.Stmt(s.insertJoinedHostsStmt).Exec(roomID, eventID, serverName)
+	_, err := common.TxStmt(txn, s.insertJoinedHostsStmt).Exec(roomID, eventID, serverName)
 	return err
 }
 
 func (s *joinedHostsStatements) deleteJoinedHosts(txn *sql.Tx, eventIDs []string) error {
-	_, err := txn.Stmt(s.deleteJoinedHostsStmt).Exec(pq.StringArray(eventIDs))
+	_, err := common.TxStmt(txn, s.deleteJoinedHostsStmt).Exec(pq.StringArray(eventIDs))
 	return err
 }
 
 func (s *joinedHostsStatements) selectJoinedHosts(txn *sql.Tx, roomID string,
 ) ([]types.JoinedHost, error) {
-	rows, err := txn.Stmt(s.selectJoinedHostsStmt).Query(roomID)
+	rows, err := common.TxStmt(txn, s.selectJoinedHostsStmt).Query(roomID)
 	if err != nil {
 		return nil, err
 	}
