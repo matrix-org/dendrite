@@ -78,10 +78,18 @@ func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespStat
 	return c.SendInputRoomEvents(ires)
 }
 
-// SendInputRoomEvents writes the given input room events to the roomserver input log. The length of both
-// arrays must match, and each element must correspond to the same event.
+// SendInputRoomEvents writes the given input room events to the roomserver input API.
 func (c *RoomserverProducer) SendInputRoomEvents(ires []api.InputRoomEvent) error {
 	request := api.InputRoomEventsRequest{InputRoomEvents: ires}
+	var response api.InputRoomEventsResponse
+	return c.InputAPI.InputRoomEvents(&request, &response)
+}
+
+// SendInvite writes the invite event to the roomserver input API.
+func (c *RoomserverProducer) SendInvite(inviteEvent gomatrixserverlib.Event) error {
+	request := api.InputRoomEventsRequest{
+		InputInviteEvents: []api.InputInviteEvent{{Event: inviteEvent}},
+	}
 	var response api.InputRoomEventsResponse
 	return c.InputAPI.InputRoomEvents(&request, &response)
 }
