@@ -161,7 +161,12 @@ func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]types.
 	return d.statements.bulkSelectEventStateKeyNID(eventStateKeys)
 }
 
-// EventNIDs implements query.RoomQueryDatabase
+// EventStateKeys implements query.RoomserverQueryAPIDatabase
+func (d *Database) EventStateKeys(eventStateKeyNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error) {
+	return d.statements.bulkSelectEventStateKey(eventStateKeyNIDs)
+}
+
+// EventNIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) EventNIDs(eventIDs []string) (map[string]types.EventNID, error) {
 	return d.statements.bulkSelectEventNID(eventIDs)
 }
@@ -351,6 +356,13 @@ func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.Ev
 		return nil, 0, 0, err
 	}
 	return references, currentStateSnapshotNID, depth, nil
+}
+
+// GetInvitesForUser implements query.RoomserverQueryAPIDB
+func (d *Database) GetInvitesForUser(
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) (senderUserIDs []types.EventStateKeyNID, err error) {
+	return d.statements.selectInviteActiveForUserInRoom(targetUserNID, roomNID)
 }
 
 // SetRoomAlias implements alias.RoomserverAliasAPIDB

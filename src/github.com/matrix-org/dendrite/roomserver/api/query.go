@@ -117,6 +117,23 @@ type QueryMembershipsForRoomResponse struct {
 	HasBeenInRoom bool `json:"has_been_in_room"`
 }
 
+// QueryInvitesForUserRequest is a request to QueryInvitesForUser
+type QueryInvitesForUserRequest struct {
+	// The room ID to look up invites in.
+	RoomID string `json:"room_id"`
+	// The User ID to look up invites for.
+	TargetUserID string `json:"target_user_id"`
+}
+
+// QueryInvitesForUserResponse is a response to QueryInvitesForUser
+// This is used when accepting an invite or rejecting a invite to tell which
+// remote matrix servers to contact.
+type QueryInvitesForUserResponse struct {
+	// A list of matrix user IDs for each sender of an active invite targeting
+	// the requested user ID.
+	InviteSenderUserIDs []string `json:"invite_sender_user_ids"`
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -142,6 +159,12 @@ type RoomserverQueryAPI interface {
 		request *QueryMembershipsForRoomRequest,
 		response *QueryMembershipsForRoomResponse,
 	) error
+
+	// Query a list of invite event senders for a user in a room.
+	QueryInvitesForUser(
+		request *QueryInvitesForUserRequest,
+		response *QueryInvitesForUserResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -155,6 +178,9 @@ const RoomserverQueryEventsByIDPath = "/api/roomserver/queryEventsByID"
 
 // RoomserverQueryMembershipsForRoomPath is the HTTP path for the QueryMembershipsForRoom API
 const RoomserverQueryMembershipsForRoomPath = "/api/roomserver/queryMembershipsForRoom"
+
+// RoomserverQueryInvitesForUserPath is the HTTP path for the QueryInvitesForUser API
+const RoomserverQueryInvitesForUserPath = "/api/roomserver/queryInvitesForUser"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -203,6 +229,14 @@ func (h *httpRoomserverQueryAPI) QueryMembershipsForRoom(
 	response *QueryMembershipsForRoomResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
+	return postJSON(h.httpClient, apiURL, request, response)
+}
+
+func (h *httpRoomserverQueryAPI) QueryInvitesForUser(
+	request *QueryInvitesForUserRequest,
+	response *QueryInvitesForUserResponse,
+) error {
+	apiURL := h.roomserverURL + RoomserverQueryInvitesForUserPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 

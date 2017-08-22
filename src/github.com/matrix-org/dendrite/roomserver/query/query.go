@@ -40,18 +40,6 @@ type RoomserverQueryAPIDatabase interface {
 	// Lookup the numeric IDs for a list of events.
 	// Returns an error if there was a problem talking to the database.
 	EventNIDs(eventIDs []string) (map[string]types.EventNID, error)
-	// Save a given room alias with the room ID it refers to.
-	// Returns an error if there was a problem talking to the database.
-	SetRoomAlias(alias string, roomID string) error
-	// Lookup the room ID a given alias refers to.
-	// Returns an error if there was a problem talking to the database.
-	GetRoomIDFromAlias(alias string) (string, error)
-	// Lookup all aliases referring to a given room ID.
-	// Returns an error if there was a problem talking to the database.
-	GetAliasesFromRoomID(roomID string) ([]string, error)
-	// Remove a given room alias.
-	// Returns an error if there was a problem talking to the database.
-	RemoveRoomAlias(alias string) error
 	// Lookup the join events for all members in a room as requested by a given
 	// user. If the user is currently in the room, returns the room's current
 	// members, if not returns an empty array (TODO: Fix it)
@@ -59,6 +47,13 @@ type RoomserverQueryAPIDatabase interface {
 	// returns nil.
 	// If there was an issue retrieving the events, returns an error.
 	GetMembershipEvents(roomNID types.RoomNID, requestSenderUserID string) (events []types.Event, err error)
+	// Lookup the active invites targeting a user in a room and return the
+	// numeric state key IDs for the user IDs who sent them.
+	// Returns an error if there was a problem talking to the database.
+	GetInvitesForUser(roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) (senderUserNIDs []types.EventStateKeyNID, err error)
+	// Lookup the string event state keys for a list of numeric event state keys
+	// Returns an error if there was a problem talking to the database.
+	EventStateKeys([]types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error)
 }
 
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
@@ -220,6 +215,39 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 	return nil
 }
 
+// QueryInvitesForUser implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryInvitesForUser(
+	request *api.QueryInvitesForUserRequest,
+	response *api.QueryInvitesForUserResponse,
+) error {
+	roomNID, err := r.DB.RoomNID(request.RoomID)
+	if err != nil {
+		return err
+	}
+
+	targetUserNIDs, err := r.DB.EventStateKeyNIDs([]string{request.TargetUserID})
+	if err != nil {
+		return err
+	}
+	targetUserNID := targetUserNIDs[request.TargetUserID]
+
+	senderUserNIDs, err := r.DB.GetInvitesForUser(roomNID, targetUserNID)
+	if err != nil {
+		return err
+	}
+
+	senderUserIDs, err := r.DB.EventStateKeys(senderUserNIDs)
+	if err != nil {
+		return err
+	}
+
+	for _, senderUserID := range senderUserIDs {
+		response.InviteSenderUserIDs = append(response.InviteSenderUserIDs, senderUserID)
+	}
+
+	return nil
+}
+
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
@@ -273,6 +301,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryMembershipsForRoom(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryInvitesForUserPath,
+		common.MakeAPI("queryInvitesForUser", func(req *http.Request) util.JSONResponse {
+			var request api.QueryInvitesForUserRequest
+			var response api.QueryInvitesForUserResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryInvitesForUser(&request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
