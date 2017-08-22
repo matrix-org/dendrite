@@ -79,8 +79,8 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 				case "invite":
 					userIDs = append(userIDs, userID)
 				case "join":
-					// We have to manually append the new user's ID so they get
-					// notified along all members in the room
+					// Manually append the new user's ID so they get notified
+					// along all members in the room
 					userIDs = append(userIDs, userID)
 					n.addJoinedUser(ev.RoomID(), userID)
 				case "leave":
