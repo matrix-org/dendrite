@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package events
+package common
 
 // CreateContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-create
 type CreateContent struct {
@@ -89,4 +89,30 @@ func InitialPowerLevelsContent(roomCreator string) PowerLevelContent {
 		Kick:  50,
 		Users: map[string]int{roomCreator: 100},
 	}
+}
+
+// AliasesContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-aliases
+type AliasesContent struct {
+	Aliases []string `json:"aliases"`
+}
+
+// CanonicalAliasContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-canonical-alias
+type CanonicalAliasContent struct {
+	Alias string `json:"alias"`
+}
+
+// AvatarContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-avatar
+type AvatarContent struct {
+	Info          ImageInfo `json:"info,omitempty"`
+	URL           string    `json:"url"`
+	ThumbnailURL  string    `json:"thumbnail_url,omitempty"`
+	ThumbnailInfo ImageInfo `json:"thumbnail_info,omitempty"`
+}
+
+// ImageInfo implements the ImageInfo structure from http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-avatar
+type ImageInfo struct {
+	Mimetype string `json:"mimetype"`
+	Height   int64  `json:"h"`
+	Width    int64  `json:"w"`
+	Size     int64  `json:"size"`
 }

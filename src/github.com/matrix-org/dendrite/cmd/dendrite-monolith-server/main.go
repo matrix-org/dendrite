@@ -52,6 +52,10 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	federationsender_storage "github.com/matrix-org/dendrite/federationsender/storage"
 
+	publicroomsapi_consumers "github.com/matrix-org/dendrite/publicroomsapi/consumers"
+	publicroomsapi_routing "github.com/matrix-org/dendrite/publicroomsapi/routing"
+	publicroomsapi_storage "github.com/matrix-org/dendrite/publicroomsapi/storage"
+
 	log "github.com/Sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
@@ -119,6 +123,7 @@ type monolith struct {
 	mediaAPIDB         *mediaapi_storage.Database
 	syncAPIDB          *syncapi_storage.SyncServerDatabase
 	federationSenderDB *federationsender_storage.Database
+	publicRoomsAPIDB   *publicroomsapi_storage.PublicRoomsServerDatabase
 
 	federation *gomatrixserverlib.FederationClient
 	keyRing    gomatrixserverlib.KeyRing
@@ -170,6 +175,10 @@ func (m *monolith) setupDatabases() {
 	m.federationSenderDB, err = federationsender_storage.NewDatabase(string(m.cfg.Database.FederationSender))
 	if err != nil {
 		log.Panicf("startup: failed to create federation sender database with data source %s : %s", m.cfg.Database.FederationSender, err)
+	}
+	m.publicRoomsAPIDB, err = publicroomsapi_storage.NewPublicRoomsServerDatabase(string(m.cfg.Database.PublicRoomsAPI))
+	if err != nil {
+		log.Panicf("startup: failed to setup public rooms api database with data source %s : %s", m.cfg.Database.PublicRoomsAPI, err)
 	}
 }
 
@@ -290,6 +299,13 @@ func (m *monolith) setupConsumers() {
 		log.Panicf("startup: failed to start client API server consumer: %s", err)
 	}
 
+	publicRoomsAPIConsumer := publicroomsapi_consumers.NewOutputRoomEvent(
+		m.cfg, m.kafkaConsumer(), m.publicRoomsAPIDB, m.queryAPI,
+	)
+	if err = publicRoomsAPIConsumer.Start(); err != nil {
+		log.Panicf("startup: failed to start room server consumer: %s", err)
+	}
+
 	federationSenderQueues := queue.NewOutgoingQueues(m.cfg.Matrix.ServerName, m.federation)
 
 	federationSenderRoomConsumer := federationsender_consumers.NewOutputRoomEvent(
@@ -318,4 +334,6 @@ func (m *monolith) setupAPIs() {
 	federationapi_routing.Setup(
 		m.api, *m.cfg, m.queryAPI, m.roomServerProducer, m.keyRing, m.federation,
 	)
+
+	publicroomsapi_routing.Setup(m.api, m.deviceDB, m.publicRoomsAPIDB)
 }

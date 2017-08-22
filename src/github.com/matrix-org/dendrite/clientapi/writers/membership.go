@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -69,7 +70,7 @@ func SendMembership(
 		membership = "leave"
 	}
 
-	content := events.MemberContent{
+	content := common.MemberContent{
 		Membership:  membership,
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,

@@ -265,20 +265,6 @@ func Setup(
 		}),
 	)
 
-	r0mux.Handle("/publicRooms",
-		common.MakeAPI("public_rooms", func(req *http.Request) util.JSONResponse {
-			// TODO: Return a list of public rooms
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct {
-					Chunk []struct{} `json:"chunk"`
-					Start string     `json:"start"`
-					End   string     `json:"end"`
-				}{[]struct{}{}, "", ""},
-			}
-		}),
-	)
-
 	unstableMux.Handle("/thirdparty/protocols",
 		common.MakeAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
 			// TODO: Return the third party protcols
