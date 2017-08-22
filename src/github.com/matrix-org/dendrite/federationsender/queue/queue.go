@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other

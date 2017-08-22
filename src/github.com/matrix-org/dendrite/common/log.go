@@ -18,8 +18,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dugong"
+	"github.com/sirupsen/logrus"
 )
 
 type utcFormatter struct {

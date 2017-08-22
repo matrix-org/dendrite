@@ -17,11 +17,11 @@ package consumers
 import (
 	"encoding/json"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 

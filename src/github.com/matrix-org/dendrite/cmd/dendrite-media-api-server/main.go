@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 var (

@@ -17,10 +17,10 @@ package sync
 import (
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 // Notifier will wake up sleeping requests when there is some new data.
