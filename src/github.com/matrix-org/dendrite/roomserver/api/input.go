@@ -68,9 +68,17 @@ type InputRoomEvent struct {
 	SendAsServer string `json:"send_as_server"`
 }
 
+// InputInviteEvent is a matrix invite event received over federation without
+// the usual context a matrix room event would have. We usually do not have
+// access to the events needed to check the event auth rules for the invite.
+type InputInviteEvent struct {
+	Event gomatrixserverlib.Event `json:"event"`
+}
+
 // InputRoomEventsRequest is a request to InputRoomEvents
 type InputRoomEventsRequest struct {
-	InputRoomEvents []InputRoomEvent `json:"input_room_events"`
+	InputRoomEvents   []InputRoomEvent   `json:"input_room_events"`
+	InputInviteEvents []InputInviteEvent `json:"input_invite_events"`
 }
 
 // InputRoomEventsResponse is a response to InputRoomEvents

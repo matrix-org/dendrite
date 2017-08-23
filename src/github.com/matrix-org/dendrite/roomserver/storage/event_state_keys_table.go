@@ -18,6 +18,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -92,21 +93,13 @@ func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
 
 func (s *eventStateKeyStatements) insertEventStateKeyNID(txn *sql.Tx, eventStateKey string) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := s.insertEventStateKeyNIDStmt
-	if txn != nil {
-		stmt = txn.Stmt(stmt)
-	}
-	err := stmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
+	err := common.TxStmt(txn, s.insertEventStateKeyNIDStmt).QueryRow(eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
 func (s *eventStateKeyStatements) selectEventStateKeyNID(txn *sql.Tx, eventStateKey string) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := s.selectEventStateKeyNIDStmt
-	if txn != nil {
-		stmt = txn.Stmt(stmt)
-	}
-	err := stmt.QueryRow(eventStateKey).Scan(&eventStateKeyNID)
+	err := common.TxStmt(txn, s.selectEventStateKeyNIDStmt).QueryRow(eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
@@ -131,11 +124,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(eventStateKeys []st
 
 func (s *eventStateKeyStatements) selectEventStateKey(txn *sql.Tx, eventStateKeyNID types.EventStateKeyNID) (string, error) {
 	var eventStateKey string
-	stmt := s.selectEventStateKeyStmt
-	if txn != nil {
-		stmt = txn.Stmt(stmt)
-	}
-	err := stmt.QueryRow(eventStateKeyNID).Scan(&eventStateKey)
+	err := common.TxStmt(txn, s.selectEventStateKeyStmt).QueryRow(eventStateKeyNID).Scan(&eventStateKey)
 	return eventStateKey, err
 }
 
