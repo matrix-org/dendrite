@@ -574,7 +574,9 @@ func (d *Database) getMembershipsBeforeEventNID(eventNID types.EventNID) ([]type
 
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
-		eventNIDs = append(eventNIDs, entry.EventNID)
+		if entry.EventStateKeyNID == types.MRoomMemberNID {
+			eventNIDs = append(eventNIDs, entry.EventNID)
+		}
 	}
 
 	// Get all of the events in this state
@@ -585,15 +587,13 @@ func (d *Database) getMembershipsBeforeEventNID(eventNID types.EventNID) ([]type
 
 	// Filter the events to only keep the "join" membership events
 	for _, event := range stateEvents {
-		if event.Type() == "m.room.member" {
-			membership, err := event.Membership()
-			if err != nil {
-				return nil, err
-			}
+		membership, err := event.Membership()
+		if err != nil {
+			return nil, err
+		}
 
-			if membership == "join" {
-				events = append(events, event)
-			}
+		if membership == "join" {
+			events = append(events, event)
 		}
 	}
 
