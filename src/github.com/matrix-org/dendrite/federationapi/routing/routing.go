@@ -57,13 +57,24 @@ func Setup(
 	v2keysmux.Handle("/server/{keyID}", localKeys)
 	v2keysmux.Handle("/server/", localKeys)
 
-	v1fedmux.Handle("/send/{txnID}/", makeAPI("send",
+	v1fedmux.Handle("/send/{txnID}/", makeAPI("federation_send",
 		func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return writers.Send(
 				req, gomatrixserverlib.TransactionID(vars["txnID"]),
 				time.Now(),
 				cfg, query, producer, keys, federation,
+			)
+		},
+	))
+
+	v1fedmux.Handle("/invite/{roomID}/{eventID}", makeAPI("federation_invite",
+		func(req *http.Request) util.JSONResponse {
+			vars := mux.Vars(req)
+			return writers.Invite(
+				req, vars["roomID"], vars["eventID"],
+				time.Now(),
+				cfg, producer, keys,
 			)
 		},
 	))
