@@ -506,7 +506,7 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 		}
 	}
 
-	// Lookup the NID of the new join event
+	// Look up the NID of the new join event
 	nIDs, err := u.d.EventNIDs([]string{eventID})
 	if err != nil {
 		return nil, err
@@ -536,7 +536,7 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 		return nil, err
 	}
 
-	// Lookup the NID of the new leave event
+	// Look up the NID of the new leave event
 	nIDs, err := u.d.EventNIDs([]string{eventID})
 	if err != nil {
 		return nil, err

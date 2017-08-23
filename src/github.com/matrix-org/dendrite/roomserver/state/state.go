@@ -30,30 +30,30 @@ import (
 type RoomStateDatabase interface {
 	// Store the room state at an event in the database
 	AddState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
-	// Lookup the state of a room at each event for a list of string event IDs.
+	// Look up the state of a room at each event for a list of string event IDs.
 	// Returns an error if there is an error talking to the database
 	// Returns a types.MissingEventError if the room state for the event IDs aren't in the database
 	StateAtEventIDs(eventIDs []string) ([]types.StateAtEvent, error)
-	// Lookup the numeric IDs for a list of string event types.
+	// Look up the numeric IDs for a list of string event types.
 	// Returns a map from string event type to numeric ID for the event type.
 	EventTypeNIDs(eventTypes []string) (map[string]types.EventTypeNID, error)
-	// Lookup the numeric IDs for a list of string event state keys.
+	// Look up the numeric IDs for a list of string event state keys.
 	// Returns a map from string state key to numeric ID for the state key.
 	EventStateKeyNIDs(eventStateKeys []string) (map[string]types.EventStateKeyNID, error)
-	// Lookup the numeric state data IDs for each numeric state snapshot ID
+	// Look up the numeric state data IDs for each numeric state snapshot ID
 	// The returned slice is sorted by numeric state snapshot ID.
 	StateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
-	// Lookup the state data for each numeric state data ID
+	// Look up the state data for each numeric state data ID
 	// The returned slice is sorted by numeric state data ID.
 	StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
-	// Lookup the state data for the state key tuples for each numeric state block ID
+	// Look up the state data for the state key tuples for each numeric state block ID
 	// This is used to fetch a subset of the room state at a snapshot.
 	// If a block doesn't contain any of the requested tuples then it can be discarded from the result.
 	// The returned slice is sorted by numeric state block ID.
 	StateEntriesForTuples(stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) (
 		[]types.StateEntryList, error,
 	)
-	// Lookup the Events for a list of numeric event IDs.
+	// Look up the Events for a list of numeric event IDs.
 	// Returns a sorted list of events.
 	Events(eventNIDs []types.EventNID) ([]types.Event, error)
 }

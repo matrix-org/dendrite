@@ -41,7 +41,7 @@ var tokenByteLength = 32
 
 // DeviceDatabase represents a device database.
 type DeviceDatabase interface {
-	// Lookup the device matching the given access token.
+	// Look up the device matching the given access token.
 	GetDeviceByAccessToken(token string) (*authtypes.Device, error)
 }
 
