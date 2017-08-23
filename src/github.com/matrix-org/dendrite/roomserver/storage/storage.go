@@ -19,7 +19,6 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -509,8 +508,8 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 	return inviteEventIDs, nil
 }
 
-// GetMembershipEvents implements query.RoomserverQueryAPIDB
-func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserID string) (events []types.Event, err error) {
+// GetMembership implements query.RoomserverQueryAPIDB
+func (d *Database) GetMembership(roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
 	txn, err := d.db.Begin()
 	if err != nil {
 		return
@@ -525,79 +524,17 @@ func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserI
 	senderMembershipEventNID, senderMembership, err := d.statements.selectMembershipFromRoomAndTarget(roomNID, requestSenderUserNID)
 	if err == sql.ErrNoRows {
 		// The user has never been a member of that room
-		return nil, nil
+		return 0, false, nil
 	} else if err != nil {
 		return
 	}
 
-	if senderMembership == membershipStateJoin {
-		// The user is still in the room: Send the current list of joined members
-		var joinEventNIDs []types.EventNID
-		joinEventNIDs, err = d.statements.selectMembershipsFromRoomAndMembership(roomNID, membershipStateJoin)
-		if err != nil {
-			return nil, err
-		}
-
-		events, err = d.Events(joinEventNIDs)
-	} else {
-		// The user isn't in the room anymore: Send the list of joined user from
-		// when the user left
-		events, err = d.getMembershipsBeforeEventNID(senderMembershipEventNID)
-	}
-
-	return
+	return senderMembershipEventNID, senderMembership == membershipStateJoin, nil
 }
 
-// getMembershipsBeforeEventNID takes the numeric ID of an event and fetches the state
-// of the event's room as it was when this event was fired, then filters the state events to
-// only keep the "m.room.member" events with a "join" membership. These events are returned.
-// Returns an error if there was an issue fetching the events.
-func (d *Database) getMembershipsBeforeEventNID(eventNID types.EventNID) ([]types.Event, error) {
-	events := []types.Event{}
-	// Lookup the event NID
-	eIDs, err := d.EventIDs([]types.EventNID{eventNID})
-	if err != nil {
-		return nil, err
-	}
-	eventIDs := []string{eIDs[eventNID]}
-
-	prevState, err := d.StateAtEventIDs(eventIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Fetch the state as it was when this event was fired
-	stateEntries, err := state.LoadCombinedStateAfterEvents(d, prevState)
-	if err != nil {
-		return nil, err
-	}
-
-	var eventNIDs []types.EventNID
-	for _, entry := range stateEntries {
-		if entry.EventStateKeyNID == types.MRoomMemberNID {
-			eventNIDs = append(eventNIDs, entry.EventNID)
-		}
-	}
-
-	// Get all of the events in this state
-	stateEvents, err := d.Events(eventNIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Filter the events to only keep the "join" membership events
-	for _, event := range stateEvents {
-		membership, err := event.Membership()
-		if err != nil {
-			return nil, err
-		}
-
-		if membership == "join" {
-			events = append(events, event)
-		}
-	}
-
-	return events, nil
+// GetJoinMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
+func (d *Database) GetJoinMembershipEventNIDsForRoom(roomNID types.RoomNID) ([]types.EventNID, error) {
+	return d.statements.selectMembershipsFromRoomAndMembership(roomNID, membershipStateJoin)
 }
 
 type transaction struct {
