@@ -32,10 +32,10 @@ type RoomserverAliasAPIDatabase interface {
 	// Save a given room alias with the room ID it refers to.
 	// Returns an error if there was a problem talking to the database.
 	SetRoomAlias(alias string, roomID string) error
-	// Lookup the room ID a given alias refers to.
+	// Look up the room ID a given alias refers to.
 	// Returns an error if there was a problem talking to the database.
 	GetRoomIDFromAlias(alias string) (string, error)
-	// Lookup all aliases referring to a given room ID.
+	// Look up all aliases referring to a given room ID.
 	// Returns an error if there was a problem talking to the database.
 	GetAliasesFromRoomID(roomID string) ([]string, error)
 	// Remove a given room alias.
@@ -86,7 +86,7 @@ func (r *RoomserverAliasAPI) GetAliasRoomID(
 	request *api.GetAliasRoomIDRequest,
 	response *api.GetAliasRoomIDResponse,
 ) error {
-	// Lookup the room ID in the database
+	// Look up the room ID in the database
 	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
 	if err != nil {
 		return err
@@ -101,7 +101,7 @@ func (r *RoomserverAliasAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	// Lookup the room ID in the database
+	// Look up the room ID in the database
 	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
 	if err != nil {
 		return err
