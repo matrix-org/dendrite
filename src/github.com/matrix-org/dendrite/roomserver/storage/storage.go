@@ -341,7 +341,7 @@ func (d *Database) RoomNID(roomID string) (types.RoomNID, error) {
 	return roomNID, err
 }
 
-// LatestEventIDs implements query.RoomserverQueryAPIDB
+// LatestEventIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error) {
 	eventNIDs, currentStateSnapshotNID, err := d.statements.selectLatestEventNIDs(roomNID)
 	if err != nil {
@@ -358,7 +358,7 @@ func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.Ev
 	return references, currentStateSnapshotNID, depth, nil
 }
 
-// GetInvitesForUser implements query.RoomserverQueryAPIDB
+// GetInvitesForUser implements query.RoomserverQueryAPIDatabase
 func (d *Database) GetInvitesForUser(
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (senderUserIDs []types.EventStateKeyNID, err error) {

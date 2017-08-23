@@ -232,6 +232,7 @@ func (h *httpRoomserverQueryAPI) QueryMembershipsForRoom(
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 
+// QueryInvitesForUser implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryInvitesForUser(
 	request *QueryInvitesForUserRequest,
 	response *QueryInvitesForUserResponse,
