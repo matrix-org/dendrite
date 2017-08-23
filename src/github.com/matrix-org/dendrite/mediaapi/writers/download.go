@@ -67,6 +67,7 @@ func Download(w http.ResponseWriter, req *http.Request, origin gomatrixserverlib
 		},
 		IsThumbnailRequest: isThumbnailRequest,
 		Logger: util.GetLogger(req.Context()).WithFields(log.Fields{
+			"prefix":  "mediaapi",
 			"Origin":  origin,
 			"MediaID": mediaID,
 		}),

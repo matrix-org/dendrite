@@ -78,7 +78,7 @@ func Login(
 			}
 		}
 
-		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
+		util.GetLogger(req.Context()).WithField("prefix", "clientapi").WithField("user", r.User).Info("Processing login request")
 
 		acc, err := accountDB.GetAccountByPassword(r.User, r.Password)
 		if err != nil {

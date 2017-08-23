@@ -46,7 +46,7 @@ func NewRequestPool(db *storage.SyncServerDatabase, n *Notifier, adb *accounts.D
 // until a response is ready, or it times out.
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtypes.Device) util.JSONResponse {
 	// Extract values from request
-	logger := util.GetLogger(req.Context())
+	logger := util.GetLogger(req.Context()).WithField("prefix", "syncapi")
 	userID := device.UserID
 	syncReq, err := newSyncRequest(req, userID)
 	if err != nil {

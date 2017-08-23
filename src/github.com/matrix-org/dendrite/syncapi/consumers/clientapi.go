@@ -21,7 +21,8 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -64,6 +65,7 @@ func (s *OutputClientData) Start() error {
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputClientData) onMessage(msg *sarama.ConsumerMessage) error {
+	log := logrus.WithField("prefix", "syncapi")
 	// Parse out the event JSON
 	var output common.AccountData
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
@@ -72,17 +74,17 @@ func (s *OutputClientData) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	log.WithFields(log.Fields{
+	log.WithFields(logrus.Fields{
 		"type":    output.Type,
 		"room_id": output.RoomID,
 	}).Info("received data from client API server")
 
 	syncStreamPos, err := s.db.UpsertAccountData(string(msg.Key), output.RoomID, output.Type)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"type":       output.Type,
-			"room_id":    output.RoomID,
-			log.ErrorKey: err,
+		log.WithFields(logrus.Fields{
+			"type":          output.Type,
+			"room_id":       output.RoomID,
+			logrus.ErrorKey: err,
 		}).Panicf("could not save account data")
 	}
 

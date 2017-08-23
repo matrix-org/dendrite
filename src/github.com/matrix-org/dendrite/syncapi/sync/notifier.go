@@ -70,7 +70,10 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 			userID := *ev.StateKey()
 			membership, err := ev.Membership()
 			if err != nil {
-				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+				log.WithError(err).WithFields(log.Fields{
+					"prefix":   "syncapi",
+					"event_id": ev.EventID(),
+				}).Errorf(
 					"Notifier.OnNewEvent: Failed to unmarshal member event",
 				)
 			} else {

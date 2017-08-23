@@ -134,6 +134,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 		// since it'll just mark the event as not being needed.
 		if len(addIDs) < len(delIDs) {
 			log.WithFields(log.Fields{
+				"prefix":  "syncapi",
 				"since":   oldPos,
 				"current": newPos,
 				"adds":    addIDs,

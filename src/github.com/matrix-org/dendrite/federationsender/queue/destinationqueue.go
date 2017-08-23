@@ -68,6 +68,7 @@ func (oq *destinationQueue) backgroundSend() {
 		_, err := oq.client.SendTransaction(*t)
 		if err != nil {
 			log.WithFields(log.Fields{
+				"prefix":      "federationsender",
 				"destination": oq.destination,
 				log.ErrorKey:  err,
 			}).Info("problem sending transaction")

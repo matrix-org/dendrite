@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -68,6 +68,7 @@ func (s *OutputRoomEvent) Start() error {
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
+	log := logrus.WithField("prefix", "clientapi")
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
@@ -84,7 +85,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	ev := output.NewRoomEvent.Event
-	log.WithFields(log.Fields{
+	log.WithFields(logrus.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),
 		"type":     ev.Type(),

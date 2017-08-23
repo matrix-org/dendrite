@@ -25,7 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -77,6 +78,7 @@ func (s *OutputRoomEvent) Start() error {
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
+	log := logrus.WithField("prefix", "syncapi")
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
@@ -93,18 +95,18 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	ev := output.NewRoomEvent.Event
-	log.WithFields(log.Fields{
+	log.WithFields(logrus.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),
 	}).Info("received event from roomserver")
 
 	addsStateEvents, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"event":      string(ev.JSON()),
-			log.ErrorKey: err,
-			"add":        output.NewRoomEvent.AddsStateEventIDs,
-			"del":        output.NewRoomEvent.RemovesStateEventIDs,
+		log.WithFields(logrus.Fields{
+			"event":         string(ev.JSON()),
+			logrus.ErrorKey: err,
+			"add":           output.NewRoomEvent.AddsStateEventIDs,
+			"del":           output.NewRoomEvent.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: state event lookup failure")
 	}
 
@@ -126,11 +128,11 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			"event":      string(ev.JSON()),
-			log.ErrorKey: err,
-			"add":        output.NewRoomEvent.AddsStateEventIDs,
-			"del":        output.NewRoomEvent.RemovesStateEventIDs,
+		log.WithFields(logrus.Fields{
+			"event":         string(ev.JSON()),
+			logrus.ErrorKey: err,
+			"add":           output.NewRoomEvent.AddsStateEventIDs,
+			"del":           output.NewRoomEvent.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}

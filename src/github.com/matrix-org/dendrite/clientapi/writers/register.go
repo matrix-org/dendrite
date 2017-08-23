@@ -102,7 +102,7 @@ func Register(req *http.Request, accountDB *accounts.Database, deviceDB *devices
 		return *resErr
 	}
 
-	logger := util.GetLogger(req.Context())
+	logger := util.GetLogger(req.Context()).WithField("prefix", "clientapi")
 	logger.WithFields(log.Fields{
 		"username":   r.Username,
 		"auth.type":  r.Auth.Type,

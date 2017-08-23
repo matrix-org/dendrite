@@ -100,7 +100,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database,
 ) util.JSONResponse {
-	logger := util.GetLogger(req.Context())
+	logger := util.GetLogger(req.Context()).WithField("prefix", "clientapi")
 	userID := device.UserID
 	var r createRoomRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)

@@ -45,6 +45,7 @@ func newSyncRequest(req *http.Request, userID string) (*syncRequest, error) {
 	if err != nil {
 		return nil, err
 	}
+	log := util.GetLogger(req.Context()).WithField("prefix", "syncapi")
 	// TODO: Additional query params: set_presence, filter
 	return &syncRequest{
 		userID:        userID,
@@ -52,7 +53,7 @@ func newSyncRequest(req *http.Request, userID string) (*syncRequest, error) {
 		since:         since,
 		wantFullState: wantFullState,
 		limit:         defaultTimelineLimit, // TODO: read from filter
-		log:           util.GetLogger(req.Context()),
+		log:           log,
 	}, nil
 }
 

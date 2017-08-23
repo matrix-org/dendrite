@@ -87,7 +87,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.Dendrite) (*uploadRe
 			ContentType:   types.ContentType(req.Header.Get("Content-Type")),
 			UploadName:    types.Filename(url.PathEscape(req.FormValue("filename"))),
 		},
-		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName),
+		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName).WithField("prefix", "mediaapi"),
 	}
 
 	if resErr := r.Validate(*cfg.Media.MaxFileSizeBytes); resErr != nil {

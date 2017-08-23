@@ -72,6 +72,8 @@ var (
 func main() {
 	common.SetupLogging(logDir)
 
+	prefixedLog := log.WithField("prefix", "monolith")
+
 	flag.Parse()
 
 	if *configPath == "" {
@@ -82,7 +84,7 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	m := newMonolith(cfg)
+	m := newMonolith(cfg, prefixedLog)
 	m.setupDatabases()
 	m.setupFederation()
 	m.setupKafka()
@@ -94,14 +96,14 @@ func main() {
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		log.Info("Listening on ", *httpBindAddr)
-		log.Fatal(http.ListenAndServe(*httpBindAddr, m.api))
+		prefixedLog.Info("Listening on ", *httpBindAddr)
+		prefixedLog.Fatal(http.ListenAndServe(*httpBindAddr, m.api))
 	}()
 	// Handle HTTPS if certificate and key are provided
 	go func() {
 		if *certFile != "" && *keyFile != "" {
-			log.Info("Listening on ", *httpsBindAddr)
-			log.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, m.api))
+			prefixedLog.Info("Listening on ", *httpsBindAddr)
+			prefixedLog.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, m.api))
 		}
 	}()
 
@@ -113,8 +115,9 @@ func main() {
 // Some of the setup functions depend on previous setup functions, so they must
 // be called in the same order as they are defined in the file.
 type monolith struct {
-	cfg *config.Dendrite
-	api *mux.Router
+	cfg      *config.Dendrite
+	api      *mux.Router
+	logEntry *log.Entry
 
 	roomServerDB       *roomserver_storage.Database
 	accountDB          *accounts.Database
@@ -142,8 +145,8 @@ type monolith struct {
 	syncAPINotifier *syncapi_sync.Notifier
 }
 
-func newMonolith(cfg *config.Dendrite) *monolith {
-	return &monolith{cfg: cfg, api: mux.NewRouter()}
+func newMonolith(cfg *config.Dendrite, log *log.Entry) *monolith {
+	return &monolith{cfg: cfg, api: mux.NewRouter(), logEntry: log}
 }
 
 func (m *monolith) setupDatabases() {
@@ -154,31 +157,31 @@ func (m *monolith) setupDatabases() {
 	}
 	m.accountDB, err = accounts.NewDatabase(string(m.cfg.Database.Account), m.cfg.Matrix.ServerName)
 	if err != nil {
-		log.Panicf("Failed to setup account database(%q): %s", m.cfg.Database.Account, err.Error())
+		m.logEntry.Panicf("Failed to setup account database(%q): %s", m.cfg.Database.Account, err.Error())
 	}
 	m.deviceDB, err = devices.NewDatabase(string(m.cfg.Database.Device), m.cfg.Matrix.ServerName)
 	if err != nil {
-		log.Panicf("Failed to setup device database(%q): %s", m.cfg.Database.Device, err.Error())
+		m.logEntry.Panicf("Failed to setup device database(%q): %s", m.cfg.Database.Device, err.Error())
 	}
 	m.keyDB, err = keydb.NewDatabase(string(m.cfg.Database.ServerKey))
 	if err != nil {
-		log.Panicf("Failed to setup key database(%q): %s", m.cfg.Database.ServerKey, err.Error())
+		m.logEntry.Panicf("Failed to setup key database(%q): %s", m.cfg.Database.ServerKey, err.Error())
 	}
 	m.mediaAPIDB, err = mediaapi_storage.Open(string(m.cfg.Database.MediaAPI))
 	if err != nil {
-		log.Panicf("Failed to setup sync api database(%q): %s", m.cfg.Database.MediaAPI, err.Error())
+		m.logEntry.Panicf("Failed to setup sync api database(%q): %s", m.cfg.Database.MediaAPI, err.Error())
 	}
 	m.syncAPIDB, err = syncapi_storage.NewSyncServerDatabase(string(m.cfg.Database.SyncAPI))
 	if err != nil {
-		log.Panicf("Failed to setup sync api database(%q): %s", m.cfg.Database.SyncAPI, err.Error())
+		m.logEntry.Panicf("Failed to setup sync api database(%q): %s", m.cfg.Database.SyncAPI, err.Error())
 	}
 	m.federationSenderDB, err = federationsender_storage.NewDatabase(string(m.cfg.Database.FederationSender))
 	if err != nil {
-		log.Panicf("startup: failed to create federation sender database with data source %s : %s", m.cfg.Database.FederationSender, err)
+		m.logEntry.Panicf("startup: failed to create federation sender database with data source %s : %s", m.cfg.Database.FederationSender, err)
 	}
 	m.publicRoomsAPIDB, err = publicroomsapi_storage.NewPublicRoomsServerDatabase(string(m.cfg.Database.PublicRoomsAPI))
 	if err != nil {
-		log.Panicf("startup: failed to setup public rooms api database with data source %s : %s", m.cfg.Database.PublicRoomsAPI, err)
+		m.logEntry.Panicf("startup: failed to setup public rooms api database with data source %s : %s", m.cfg.Database.PublicRoomsAPI, err)
 	}
 }
 
@@ -201,7 +204,7 @@ func (m *monolith) setupKafka() {
 	if m.cfg.Kafka.UseNaffka {
 		naff, err := naffka.New(&naffka.MemoryDatabase{})
 		if err != nil {
-			log.WithFields(log.Fields{
+			m.logEntry.WithFields(log.Fields{
 				log.ErrorKey: err,
 			}).Panic("Failed to setup naffka")
 		}
@@ -210,7 +213,7 @@ func (m *monolith) setupKafka() {
 	} else {
 		m.kafkaProducer, err = sarama.NewSyncProducer(m.cfg.Kafka.Addresses, nil)
 		if err != nil {
-			log.WithFields(log.Fields{
+			m.logEntry.WithFields(log.Fields{
 				log.ErrorKey: err,
 				"addresses":  m.cfg.Kafka.Addresses,
 			}).Panic("Failed to setup kafka producers")
@@ -224,7 +227,7 @@ func (m *monolith) kafkaConsumer() sarama.Consumer {
 	}
 	consumer, err := sarama.NewConsumer(m.cfg.Kafka.Addresses, nil)
 	if err != nil {
-		log.WithFields(log.Fields{
+		m.logEntry.WithFields(log.Fields{
 			log.ErrorKey: err,
 			"addresses":  m.cfg.Kafka.Addresses,
 		}).Panic("Failed to setup kafka consumers")
@@ -266,12 +269,12 @@ func (m *monolith) setupProducers() {
 func (m *monolith) setupNotifiers() {
 	pos, err := m.syncAPIDB.SyncStreamPosition()
 	if err != nil {
-		log.Panicf("startup: failed to get latest sync stream position : %s", err)
+		m.logEntry.Panicf("startup: failed to get latest sync stream position : %s", err)
 	}
 
 	m.syncAPINotifier = syncapi_sync.NewNotifier(syncapi_types.StreamPosition(pos))
 	if err = m.syncAPINotifier.Load(m.syncAPIDB); err != nil {
-		log.Panicf("startup: failed to set up notifier: %s", err)
+		m.logEntry.Panicf("startup: failed to set up notifier: %s", err)
 	}
 }
 
@@ -282,28 +285,28 @@ func (m *monolith) setupConsumers() {
 		m.cfg, m.kafkaConsumer(), m.accountDB, m.queryAPI,
 	)
 	if err = clientAPIConsumer.Start(); err != nil {
-		log.Panicf("startup: failed to start room server consumer")
+		m.logEntry.Panicf("startup: failed to start room server consumer")
 	}
 
 	syncAPIRoomConsumer := syncapi_consumers.NewOutputRoomEvent(
 		m.cfg, m.kafkaConsumer(), m.syncAPINotifier, m.syncAPIDB, m.queryAPI,
 	)
 	if err = syncAPIRoomConsumer.Start(); err != nil {
-		log.Panicf("startup: failed to start room server consumer: %s", err)
+		m.logEntry.Panicf("startup: failed to start room server consumer: %s", err)
 	}
 
 	syncAPIClientConsumer := syncapi_consumers.NewOutputClientData(
 		m.cfg, m.kafkaConsumer(), m.syncAPINotifier, m.syncAPIDB,
 	)
 	if err = syncAPIClientConsumer.Start(); err != nil {
-		log.Panicf("startup: failed to start client API server consumer: %s", err)
+		m.logEntry.Panicf("startup: failed to start client API server consumer: %s", err)
 	}
 
 	publicRoomsAPIConsumer := publicroomsapi_consumers.NewOutputRoomEvent(
 		m.cfg, m.kafkaConsumer(), m.publicRoomsAPIDB, m.queryAPI,
 	)
 	if err = publicRoomsAPIConsumer.Start(); err != nil {
-		log.Panicf("startup: failed to start room server consumer: %s", err)
+		m.logEntry.Panicf("startup: failed to start room server consumer: %s", err)
 	}
 
 	federationSenderQueues := queue.NewOutgoingQueues(m.cfg.Matrix.ServerName, m.federation)
@@ -312,7 +315,7 @@ func (m *monolith) setupConsumers() {
 		m.cfg, m.kafkaConsumer(), federationSenderQueues, m.federationSenderDB, m.queryAPI,
 	)
 	if err = federationSenderRoomConsumer.Start(); err != nil {
-		log.WithError(err).Panicf("startup: failed to start room server consumer")
+		m.logEntry.WithError(err).Panicf("startup: failed to start room server consumer")
 	}
 }
 

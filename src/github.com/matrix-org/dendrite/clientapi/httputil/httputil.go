@@ -42,6 +42,6 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 // This should be used to log fatal errors which require investigation. It should not be used
 // to log client validation errors, etc.
 func LogThenError(req *http.Request, err error) util.JSONResponse {
-	util.GetLogger(req.Context()).WithError(err).Error("request failed")
+	util.GetLogger(req.Context()).WithField("prefix", "clientapi").WithError(err).Error("request failed")
 	return jsonerror.InternalServerError()
 }
