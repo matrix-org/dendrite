@@ -271,7 +271,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(eventNID types.EventNI
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
 		// Filter the events to retrieve to only keep the membership events
-		if entry.EventStateKeyNID == types.MRoomMemberNID {
+		if entry.EventTypeNID == types.MRoomMemberNID {
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
