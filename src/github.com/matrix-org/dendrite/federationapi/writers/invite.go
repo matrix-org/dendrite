@@ -34,7 +34,7 @@ func Invite(
 	if err := json.Unmarshal(request.Content(), &event); err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 

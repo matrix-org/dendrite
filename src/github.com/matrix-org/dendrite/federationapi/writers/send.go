@@ -3,6 +3,9 @@ package writers
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -10,8 +13,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"net/http"
-	"time"
 )
 
 // Send implements /_matrix/federation/v1/send/{txnID}
@@ -39,7 +40,7 @@ func Send(
 	if err := json.Unmarshal(request.Content(), &t); err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 
