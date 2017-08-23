@@ -26,11 +26,12 @@ import (
 
 const outputRoomEventsSchema = `
 -- Stores output room events received from the roomserver.
+CREATE SEQUENCE IF NOT EXISTS syncapi_output_room_event_id_seq
 CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     -- An incrementing ID which denotes the position in the log that this event resides at.
     -- NB: 'serial' makes no guarantees to increment by 1 every time, only that it increments.
     --     This isn't a problem for us since we just want to order by this field.
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_output_room_event_id_seq'),
     -- The event ID for the event
     event_id TEXT NOT NULL,
     -- The 'room_id' key for the event.
