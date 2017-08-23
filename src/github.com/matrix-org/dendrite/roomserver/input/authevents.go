@@ -117,7 +117,7 @@ func loadAuthEvents(
 	needed gomatrixserverlib.StateNeeded,
 	state []types.StateEntry,
 ) (result authEvents, err error) {
-	// Lookup the numeric IDs for the state keys needed for auth.
+	// Look up the numeric IDs for the state keys needed for auth.
 	var neededStateKeys []string
 	neededStateKeys = append(neededStateKeys, needed.Member...)
 	neededStateKeys = append(neededStateKeys, needed.ThirdPartyInvite...)

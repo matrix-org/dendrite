@@ -161,7 +161,12 @@ func (d *Database) EventStateKeyNIDs(eventStateKeys []string) (map[string]types.
 	return d.statements.bulkSelectEventStateKeyNID(eventStateKeys)
 }
 
-// EventNIDs implements query.RoomQueryDatabase
+// EventStateKeys implements query.RoomserverQueryAPIDatabase
+func (d *Database) EventStateKeys(eventStateKeyNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error) {
+	return d.statements.bulkSelectEventStateKey(eventStateKeyNIDs)
+}
+
+// EventNIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) EventNIDs(eventIDs []string) (map[string]types.EventNID, error) {
 	return d.statements.bulkSelectEventNID(eventIDs)
 }
@@ -336,7 +341,7 @@ func (d *Database) RoomNID(roomID string) (types.RoomNID, error) {
 	return roomNID, err
 }
 
-// LatestEventIDs implements query.RoomserverQueryAPIDB
+// LatestEventIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error) {
 	eventNIDs, currentStateSnapshotNID, err := d.statements.selectLatestEventNIDs(roomNID)
 	if err != nil {
@@ -351,6 +356,13 @@ func (d *Database) LatestEventIDs(roomNID types.RoomNID) ([]gomatrixserverlib.Ev
 		return nil, 0, 0, err
 	}
 	return references, currentStateSnapshotNID, depth, nil
+}
+
+// GetInvitesForUser implements query.RoomserverQueryAPIDatabase
+func (d *Database) GetInvitesForUser(
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) (senderUserIDs []types.EventStateKeyNID, err error) {
+	return d.statements.selectInviteActiveForUserInRoom(targetUserNID, roomNID)
 }
 
 // SetRoomAlias implements alias.RoomserverAliasAPIDB
@@ -494,7 +506,7 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 		}
 	}
 
-	// Lookup the NID of the new join event
+	// Look up the NID of the new join event
 	nIDs, err := u.d.EventNIDs([]string{eventID})
 	if err != nil {
 		return nil, err
@@ -524,7 +536,7 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 		return nil, err
 	}
 
-	// Lookup the NID of the new leave event
+	// Look up the NID of the new leave event
 	nIDs, err := u.d.EventNIDs([]string{eventID})
 	if err != nil {
 		return nil, err

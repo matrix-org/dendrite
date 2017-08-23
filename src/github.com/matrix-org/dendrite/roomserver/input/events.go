@@ -29,18 +29,18 @@ type RoomEventDatabase interface {
 	state.RoomStateDatabase
 	// Stores a matrix room event in the database
 	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
-	// Lookup the state entries for a list of string event IDs
+	// Look up the state entries for a list of string event IDs
 	// Returns an error if the there is an error talking to the database
 	// Returns a types.MissingEventError if the event IDs aren't in the database.
 	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
 	// Set the state at an event.
 	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error
-	// Lookup the latest events in a room in preparation for an update.
+	// Look up the latest events in a room in preparation for an update.
 	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
 	// If this returns an error then no further action is required.
 	GetLatestEventsForUpdate(roomNID types.RoomNID) (updater types.RoomRecentEventsUpdater, err error)
-	// Lookup the string event IDs for a list of numeric event IDs
+	// Look up the string event IDs for a list of numeric event IDs
 	EventIDs(eventNIDs []types.EventNID) (map[types.EventNID]string, error)
 	// Build a membership updater for the target user in a room.
 	MembershipUpdater(roomID, targerUserID string) (types.MembershipUpdater, error)
