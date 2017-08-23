@@ -32,37 +32,33 @@ type dendriteFormatter struct {
 func (f dendriteFormatter) Format(entry *logrus.Entry) (format []byte, err error) {
 	entry.Time = entry.Time.UTC()
 
-	if _, ok := entry.Data["prefix"]; ok {
-		prefix, ok := entry.Data["prefix"].(string)
-		if !ok {
-			return f.TextFormatter.Format(entry)
-		}
-
-		prefix = strings.ToUpper(prefix)
-
-		if !f.TextFormatter.DisableColors {
-			prefix = ansi.Color(prefix, "white+b")
-		}
-
-		entry.Message = fmt.Sprintf("%s: %s\t", prefix, entry.Message)
-
-		// Generate the formatted log without the prefix as a field
-		// Use a copy of the entry so the same entry isn't altered by multiple
-		// fields at the same time
-		entryCpy := *entry
-		// Go doesn't perform deep copies, so the fields have to be manually
-		// copied
-		fields := make(logrus.Fields)
-		for k, v := range entry.Data {
-			if k != "prefix" {
-				fields[k] = v
-			}
-		}
-		entryCpy.Data = fields
-		format, err = f.TextFormatter.Format(&entryCpy)
-	} else {
-		format, err = f.TextFormatter.Format(entry)
+	prefix, ok := entry.Data["prefix"].(string)
+	if !ok {
+		return f.TextFormatter.Format(entry)
 	}
+
+	prefix = strings.ToUpper(prefix)
+
+	if !f.TextFormatter.DisableColors {
+		prefix = ansi.Color(prefix, "white+b")
+	}
+
+	entry.Message = fmt.Sprintf("%s: %s\t", prefix, entry.Message)
+
+	// Generate the formatted log without the prefix as a field
+	// Use a copy of the entry so the same entry isn't altered by multiple
+	// fields at the same time
+	entryCpy := *entry
+	// Go doesn't perform deep copies, so the fields have to be manually
+	// copied
+	fields := make(logrus.Fields)
+	for k, v := range entry.Data {
+		if k != "prefix" {
+			fields[k] = v
+		}
+	}
+	entryCpy.Data = fields
+	format, err = f.TextFormatter.Format(&entryCpy)
 
 	return
 }
