@@ -64,7 +64,7 @@ Dendrite requires a postgres database engine, version 9.5 or later.
   ```
 * Create databases:
   ```bash
-  for i in account device mediaapi syncapi roomserver serverkey federationsender; do
+  for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
