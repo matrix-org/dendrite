@@ -31,6 +31,14 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type requestBody struct {
+	UserID   string `json:"user_id"`
+	Reason   string `json:"reason"`
+	IDServer string `json:"id_server"`
+	Medium   string `json:"medium"`
+	Address  string `json:"address"`
+}
+
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
 func SendMembership(
@@ -38,7 +46,12 @@ func SendMembership(
 	roomID string, membership string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
 ) util.JSONResponse {
-	stateKey, reason, reqErr := getMembershipStateKey(req, device, membership)
+	var body requestBody
+	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
+		return *reqErr
+	}
+
+	stateKey, reason, reqErr := getMembershipStateKey(body, device, membership)
 	if reqErr != nil {
 		return *reqErr
 	}
@@ -107,22 +120,13 @@ func SendMembership(
 // In the latter case, if there was an issue retrieving the user ID from the request body,
 // returns a JSONResponse with a corresponding error code and message.
 func getMembershipStateKey(
-	req *http.Request, device *authtypes.Device, membership string,
+	body requestBody, device *authtypes.Device, membership string,
 ) (stateKey string, reason string, response *util.JSONResponse) {
 	if membership == "ban" || membership == "unban" || membership == "kick" || membership == "invite" {
 		// If we're in this case, the state key is contained in the request body,
 		// possibly along with a reason (for "kick" and "ban") so we need to parse
 		// it
-		var requestBody struct {
-			UserID string `json:"user_id"`
-			Reason string `json:"reason"`
-		}
-
-		if reqErr := httputil.UnmarshalJSONRequest(req, &requestBody); reqErr != nil {
-			response = reqErr
-			return
-		}
-		if requestBody.UserID == "" {
+		if body.UserID == "" {
 			response = &util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.BadJSON("'user_id' must be supplied."),
@@ -130,8 +134,8 @@ func getMembershipStateKey(
 			return
 		}
 
-		stateKey = requestBody.UserID
-		reason = requestBody.Reason
+		stateKey = body.UserID
+		reason = body.Reason
 	} else {
 		stateKey = device.UserID
 	}
