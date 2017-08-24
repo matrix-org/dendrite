@@ -43,18 +43,6 @@ type RoomserverQueryAPIDatabase interface {
 	// Lookup the event IDs for a batch of event numeric IDs.
 	// Returns an error if the retrieval went wrong.
 	EventIDs(eventNIDs []types.EventNID) (map[types.EventNID]string, error)
-	// Save a given room alias with the room ID it refers to.
-	// Returns an error if there was a problem talking to the database.
-	SetRoomAlias(alias string, roomID string) error
-	// Lookup the room ID a given alias refers to.
-	// Returns an error if there was a problem talking to the database.
-	GetRoomIDFromAlias(alias string) (string, error)
-	// Lookup all aliases referring to a given room ID.
-	// Returns an error if there was a problem talking to the database.
-	GetAliasesFromRoomID(roomID string) ([]string, error)
-	// Remove a given room alias.
-	// Returns an error if there was a problem talking to the database.
-	RemoveRoomAlias(alias string) error
 	// Lookup the membership of a given user in a given room.
 	// Returns the numeric ID of the latest membership event sent from this user
 	// in this room, along a boolean set to true if the user is still in this room,
