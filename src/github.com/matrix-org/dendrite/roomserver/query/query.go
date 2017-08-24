@@ -40,13 +40,20 @@ type RoomserverQueryAPIDatabase interface {
 	// Look up the numeric IDs for a list of events.
 	// Returns an error if there was a problem talking to the database.
 	EventNIDs(eventIDs []string) (map[string]types.EventNID, error)
-	// Look up the join events for all members in a room as requested by a given
-	// user. If the user is currently in the room, returns the room's current
-	// members, if not returns an empty array (TODO: Fix it)
-	// If the user requesting the list of members has never been in the room,
-	// returns nil.
-	// If there was an issue retrieving the events, returns an error.
-	GetMembershipEvents(roomNID types.RoomNID, requestSenderUserID string) (events []types.Event, err error)
+	// Lookup the event IDs for a batch of event numeric IDs.
+	// Returns an error if the retrieval went wrong.
+	EventIDs(eventNIDs []types.EventNID) (map[types.EventNID]string, error)
+	// Lookup the membership of a given user in a given room.
+	// Returns the numeric ID of the latest membership event sent from this user
+	// in this room, along a boolean set to true if the user is still in this room,
+	// false if not.
+	// Returns an error if there was a problem talking to the database.
+	GetMembership(roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error)
+	// Lookup the membership event numeric IDs for all user that are or have
+	// been members of a given room. Only lookup events of "join" membership if
+	// joinOnly is set to true.
+	// Returns an error if there was a problem talking to the database.
+	GetMembershipEventNIDsForRoom(roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error)
 	// Look up the active invites targeting a user in a room and return the
 	// numeric state key IDs for the user IDs who sent them.
 	// Returns an error if there was a problem talking to the database.
@@ -194,12 +201,12 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 		return err
 	}
 
-	events, err := r.DB.GetMembershipEvents(roomNID, request.Sender)
+	membershipEventNID, stillInRoom, err := r.DB.GetMembership(roomNID, request.Sender)
 	if err != nil {
 		return nil
 	}
 
-	if events == nil {
+	if membershipEventNID == 0 {
 		response.HasBeenInRoom = false
 		response.JoinEvents = nil
 		return nil
@@ -207,12 +214,87 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 
 	response.HasBeenInRoom = true
 	response.JoinEvents = []gomatrixserverlib.ClientEvent{}
+
+	var events []types.Event
+	if stillInRoom {
+		var eventNIDs []types.EventNID
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(roomNID, request.JoinedOnly)
+		if err != nil {
+			return err
+		}
+
+		events, err = r.DB.Events(eventNIDs)
+	} else {
+		events, err = r.getMembershipsBeforeEventNID(membershipEventNID, request.JoinedOnly)
+	}
+
+	if err != nil {
+		return err
+	}
+
 	for _, event := range events {
 		clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
 		response.JoinEvents = append(response.JoinEvents, clientEvent)
 	}
 
 	return nil
+}
+
+// getMembershipsBeforeEventNID takes the numeric ID of an event and fetches the state
+// of the event's room as it was when this event was fired, then filters the state events to
+// only keep the "m.room.member" events with a "join" membership. These events are returned.
+// Returns an error if there was an issue fetching the events.
+func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(eventNID types.EventNID, joinedOnly bool) ([]types.Event, error) {
+	events := []types.Event{}
+	// Lookup the event NID
+	eIDs, err := r.DB.EventIDs([]types.EventNID{eventNID})
+	if err != nil {
+		return nil, err
+	}
+	eventIDs := []string{eIDs[eventNID]}
+
+	prevState, err := r.DB.StateAtEventIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the state as it was when this event was fired
+	stateEntries, err := state.LoadCombinedStateAfterEvents(r.DB, prevState)
+	if err != nil {
+		return nil, err
+	}
+
+	var eventNIDs []types.EventNID
+	for _, entry := range stateEntries {
+		// Filter the events to retrieve to only keep the membership events
+		if entry.EventTypeNID == types.MRoomMemberNID {
+			eventNIDs = append(eventNIDs, entry.EventNID)
+		}
+	}
+
+	// Get all of the events in this state
+	stateEvents, err := r.DB.Events(eventNIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	if !joinedOnly {
+		return stateEvents, nil
+	}
+
+	// Filter the events to only keep the "join" membership events
+	for _, event := range stateEvents {
+		membership, err := event.Membership()
+		if err != nil {
+			return nil, err
+		}
+
+		if membership == "join" {
+			events = append(events, event)
+		}
+	}
+
+	return events, nil
 }
 
 // QueryInvitesForUser implements api.RoomserverQueryAPI

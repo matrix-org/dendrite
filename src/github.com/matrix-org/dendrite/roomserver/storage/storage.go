@@ -552,8 +552,8 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 	return inviteEventIDs, nil
 }
 
-// GetMembershipEvents implements query.RoomserverQueryAPIDB
-func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserID string) (events []types.Event, err error) {
+// GetMembership implements query.RoomserverQueryAPIDB
+func (d *Database) GetMembership(roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
 	txn, err := d.db.Begin()
 	if err != nil {
 		return
@@ -565,36 +565,24 @@ func (d *Database) GetMembershipEvents(roomNID types.RoomNID, requestSenderUserI
 		return
 	}
 
-	_, senderMembership, err := d.statements.selectMembershipFromRoomAndTarget(roomNID, requestSenderUserNID)
+	senderMembershipEventNID, senderMembership, err := d.statements.selectMembershipFromRoomAndTarget(roomNID, requestSenderUserNID)
 	if err == sql.ErrNoRows {
 		// The user has never been a member of that room
-		return nil, nil
+		return 0, false, nil
 	} else if err != nil {
 		return
 	}
 
-	if senderMembership == membershipStateJoin {
-		// The user is still in the room: Send the current list of joined members
-		var joinEventNIDs []types.EventNID
-		joinEventNIDs, err = d.statements.selectMembershipsFromRoomAndMembership(roomNID, membershipStateJoin)
-		if err != nil {
-			return nil, err
-		}
+	return senderMembershipEventNID, senderMembership == membershipStateJoin, nil
+}
 
-		events, err = d.Events(joinEventNIDs)
-	} else {
-		// The user isn't in the room anymore
-		// TODO: Send the list of joined member as it was when the user left
-		//       We cannot do this using only the memberships database, as it
-		//       only stores the latest join event NID for a given target user.
-		//       The solution would be to build the state of a room after before
-		//       the leave event and extract a members list from it.
-		//       For now, we return an empty slice so we know the user has been
-		//       in the room before.
-		events = []types.Event{}
+// GetMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
+func (d *Database) GetMembershipEventNIDsForRoom(roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error) {
+	if joinOnly {
+		return d.statements.selectMembershipsFromRoomAndMembership(roomNID, membershipStateJoin)
 	}
 
-	return
+	return d.statements.selectMembershipsFromRoom(roomNID)
 }
 
 type transaction struct {

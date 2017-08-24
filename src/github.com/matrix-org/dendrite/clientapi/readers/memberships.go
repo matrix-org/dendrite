@@ -23,18 +23,24 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
+type response struct {
+	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+}
+
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
-	req *http.Request, device *authtypes.Device, roomID string,
+	req *http.Request, device *authtypes.Device, roomID string, joinedOnly bool,
 	accountDB *accounts.Database, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
 	queryReq := api.QueryMembershipsForRoomRequest{
-		RoomID: roomID,
-		Sender: device.UserID,
+		JoinedOnly: joinedOnly,
+		RoomID:     roomID,
+		Sender:     device.UserID,
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
 	if err := queryAPI.QueryMembershipsForRoom(&queryReq, &queryRes); err != nil {
@@ -50,6 +56,6 @@ func GetMemberships(
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: queryRes.JoinEvents,
+		JSON: response{queryRes.JoinEvents},
 	}
 }

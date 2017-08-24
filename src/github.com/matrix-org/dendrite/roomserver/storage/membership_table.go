@@ -77,7 +77,7 @@ const selectMembershipsFromRoomAndMembershipSQL = "" +
 	" WHERE room_nid = $1 AND membership_nid = $2"
 
 const selectMembershipsFromRoomSQL = "" +
-	"SELECT membership_nid, event_nid FROM roomserver_membership" +
+	"SELECT event_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1"
 
 const selectMembershipForUpdateSQL = "" +
@@ -140,20 +140,18 @@ func (s *membershipStatements) selectMembershipFromRoomAndTarget(
 
 func (s *membershipStatements) selectMembershipsFromRoom(
 	roomNID types.RoomNID,
-) (eventNIDs map[types.EventNID]membershipState, err error) {
+) (eventNIDs []types.EventNID, err error) {
 	rows, err := s.selectMembershipsFromRoomStmt.Query(roomNID)
 	if err != nil {
 		return
 	}
 
-	eventNIDs = make(map[types.EventNID]membershipState)
 	for rows.Next() {
 		var eNID types.EventNID
-		var membership membershipState
-		if err = rows.Scan(&membership, &eNID); err != nil {
+		if err = rows.Scan(&eNID); err != nil {
 			return
 		}
-		eventNIDs[eNID] = membership
+		eventNIDs = append(eventNIDs, eNID)
 	}
 	return
 }
