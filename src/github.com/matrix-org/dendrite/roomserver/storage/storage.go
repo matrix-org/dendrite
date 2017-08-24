@@ -576,9 +576,13 @@ func (d *Database) GetMembership(roomNID types.RoomNID, requestSenderUserID stri
 	return senderMembershipEventNID, senderMembership == membershipStateJoin, nil
 }
 
-// GetJoinMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
-func (d *Database) GetJoinMembershipEventNIDsForRoom(roomNID types.RoomNID) ([]types.EventNID, error) {
-	return d.statements.selectMembershipsFromRoomAndMembership(roomNID, membershipStateJoin)
+// GetMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
+func (d *Database) GetMembershipEventNIDsForRoom(roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error) {
+	if joinOnly {
+		return d.statements.selectMembershipsFromRoomAndMembership(roomNID, membershipStateJoin)
+	}
+
+	return d.statements.selectMembershipsFromRoom(roomNID)
 }
 
 type transaction struct {
