@@ -67,19 +67,9 @@ func SendMembership(
 		return *reqErr
 	}
 
-	localpart, serverName, err := gomatrixserverlib.SplitID('@', stateKey)
+	profile, err := loadProfile(stateKey, cfg, accountDB)
 	if err != nil {
 		return httputil.LogThenError(req, err)
-	}
-
-	var profile *authtypes.Profile
-	if serverName == cfg.Matrix.ServerName {
-		profile, err = accountDB.GetProfileByLocalpart(localpart)
-		if err != nil {
-			return httputil.LogThenError(req, err)
-		}
-	} else {
-		profile = &authtypes.Profile{}
 	}
 
 	builder := gomatrixserverlib.EventBuilder{
@@ -123,6 +113,22 @@ func SendMembership(
 		Code: 200,
 		JSON: struct{}{},
 	}
+}
+
+func loadProfile(userID string, cfg config.Dendrite, accountDB *accounts.Database) (*authtypes.Profile, error) {
+	localpart, serverName, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var profile *authtypes.Profile
+	if serverName == cfg.Matrix.ServerName {
+		profile, err = accountDB.GetProfileByLocalpart(localpart)
+	} else {
+		profile = &authtypes.Profile{}
+	}
+
+	return profile, err
 }
 
 // getMembershipStateKey extracts the target user ID of a membership change.
