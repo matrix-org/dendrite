@@ -58,7 +58,7 @@ func SendMembership(
 		return *reqErr
 	}
 
-	if res := checkAndProcess3PIDInvite(req, device, &body, roomID); res != nil {
+	if res := checkAndProcess3PIDInvite(req, device, &body, cfg, queryAPI, producer, roomID); res != nil {
 		return *res
 	}
 
@@ -162,7 +162,8 @@ func getMembershipStateKey(
 
 func checkAndProcess3PIDInvite(
 	req *http.Request, device *authtypes.Device, body *membershipRequestBody,
-	roomID string,
+	cfg config.Dendrite, queryAPI api.RoomserverQueryAPI,
+	producer *producers.RoomserverProducer, roomID string,
 ) *util.JSONResponse {
 	if body.Address == "" && body.IDServer == "" && body.Medium == "" {
 		// If none of the 3PID-specific fields are supplied, it's a standard invite
@@ -177,18 +178,45 @@ func checkAndProcess3PIDInvite(
 		}
 	}
 
-	resp, _, err := queryIDServer(req, body)
+	resp, err := queryIDServer(req, device, body, roomID)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
 		return &resErr
 	}
 
-	if resp.MXID != "" {
-		// Set the Matrix user ID from the body request and let the process
-		// continue to create a "m.room.member" event
-		body.UserID = resp.MXID
+	if resp.Lookup.MXID == "" {
+		event, err := make3PIDInviteEvent(body, resp.StoreInvite, device, roomID, cfg, queryAPI)
+		if err == events.ErrRoomNoExists {
+			return &util.JSONResponse{
+				Code: 404,
+				JSON: jsonerror.NotFound(err.Error()),
+			}
+		} else if err != nil {
+			resErr := httputil.LogThenError(req, err)
+			return &resErr
+		}
+
+		if err := producer.SendEvents([]gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName); err != nil {
+			resErr := httputil.LogThenError(req, err)
+			return &resErr
+		}
+
+		return &util.JSONResponse{
+			Code: 200,
+			JSON: struct{}{},
+		}
 	}
+
+	// Set the Matrix user ID from the body request and let the process
+	// continue to create a "m.room.member" event
+	body.UserID = resp.Lookup.MXID
+
 	return nil
+}
+
+type idServerResponses struct {
+	Lookup      *idServerLookupResponse
+	StoreInvite *idServerStoreInviteResponse
 }
 
 type idServerLookupResponse struct {
@@ -201,25 +229,36 @@ type idServerLookupResponse struct {
 	Signatures map[string]map[string]string `json:"signatures"`
 }
 
-func queryIDServer(req *http.Request, body *membershipRequestBody) (res *idServerLookupResponse, token string, err error) {
-	res, err = queryIDServerLookup(body)
+type idServerStoreInviteResponse struct {
+	PublicKey   string             `json:"public_key"`
+	Token       string             `json:"token"`
+	DisplayName string             `json:"display_name"`
+	PublicKeys  []common.PublicKey `json:"public_keys"`
+}
+
+func queryIDServer(
+	req *http.Request, device *authtypes.Device, body *membershipRequestBody,
+	roomID string,
+) (res *idServerResponses, err error) {
+	res = new(idServerResponses)
+	res.Lookup, err = queryIDServerLookup(body)
 	if err != nil {
 		return
 	}
-
-	if res.MXID == "" {
-		// TODO: Store the invite and send a 3PID invite event
+	if res.Lookup.MXID == "" {
+		res.StoreInvite, err = queryIDServerStoreInvite(device, body, roomID)
+		return
 	}
 
 	// Get timestamp in milliseconds to compare it
 	now := time.Now().UnixNano() / 1000000
-	if res.NotBefore > now || now > res.NotAfter {
+	if res.Lookup.NotBefore > now || now > res.Lookup.NotAfter {
 		// If the current timestamp isn't in the time frame in which the association
 		// is known to be valid, re-run the query
-		return queryIDServer(req, body)
+		return queryIDServer(req, device, body, roomID)
 	}
 
-	ok, err := checkIDServerSignatures(body, res)
+	ok, err := checkIDServerSignatures(body, res.Lookup)
 	if err != nil {
 		return
 	}
@@ -244,7 +283,7 @@ func queryIDServerLookup(body *membershipRequestBody) (res *idServerLookupRespon
 	return
 }
 
-func queryIDServerStoreInvite(device *authtypes.Device, body *membershipRequestBody, roomID string) (*http.Response, error) {
+func queryIDServerStoreInvite(device *authtypes.Device, body *membershipRequestBody, roomID string) (*idServerStoreInviteResponse, error) {
 	client := http.Client{}
 
 	data := url.Values{}
@@ -260,8 +299,19 @@ func queryIDServerStoreInvite(device *authtypes.Device, body *membershipRequestB
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
 
-	return client.Do(req)
+	if resp.StatusCode != http.StatusOK {
+		errMsg := fmt.Sprintf("Identity server %s responded with a %d error code", body.IDServer, resp.StatusCode)
+		return nil, errors.New(errMsg)
+	}
+
+	idResp := new(idServerStoreInviteResponse)
+	err = json.NewDecoder(resp.Body).Decode(idResp)
+	return idResp, err
 }
 
 func queryIDServerPubKey(body *membershipRequestBody, keyID string) (publicKey []byte, err error) {
@@ -301,4 +351,34 @@ func checkIDServerSignatures(body *membershipRequestBody, res *idServerLookupRes
 	}
 
 	return true, nil
+}
+
+func make3PIDInviteEvent(
+	body *membershipRequestBody, res *idServerStoreInviteResponse,
+	device *authtypes.Device, roomID string, cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+) (*gomatrixserverlib.Event, error) {
+	builder := &gomatrixserverlib.EventBuilder{
+		Sender:   device.UserID,
+		RoomID:   roomID,
+		Type:     "m.room.third_party_invite",
+		StateKey: &res.Token,
+	}
+
+	validityURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/pubkey/isvalid", body.IDServer)
+	content := common.ThirdPartyInviteContent{
+		DisplayName:    res.DisplayName,
+		KeyValidityURL: validityURL,
+		PublicKey:      res.PublicKey,
+	}
+
+	content.PublicKeys = make([]common.PublicKey, len(res.PublicKeys))
+	copy(content.PublicKeys, res.PublicKeys)
+
+	if err := builder.SetContent(content); err != nil {
+		return nil, err
+	}
+
+	var queryRes *api.QueryLatestEventsAndStateResponse
+	return events.BuildEvent(builder, cfg, queryAPI, queryRes)
 }
