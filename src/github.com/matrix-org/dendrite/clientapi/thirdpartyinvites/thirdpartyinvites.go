@@ -194,7 +194,13 @@ func queryIDServerLookup(body *MembershipRequest) (res *idServerLookupResponse, 
 	if err != nil {
 		return
 	}
-	// TODO: Check status code
+
+	if resp.StatusCode != http.StatusOK {
+		// TODO: Log the error supplied with the identity server?
+		errMgs := fmt.Sprintf("Failed to ask %s to store an invite for %s", body.IDServer, body.Address)
+		return nil, errors.New(errMgs)
+	}
+
 	res = new(idServerLookupResponse)
 	err = json.NewDecoder(resp.Body).Decode(res)
 	return
