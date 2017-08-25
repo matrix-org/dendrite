@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -88,7 +89,7 @@ type idServerStoreInviteResponse struct {
 // can be emitted.
 func CheckAndProcess(
 	req *http.Request, device *authtypes.Device, body *MembershipRequest,
-	cfg config.Dendrite, queryAPI api.RoomserverQueryAPI,
+	cfg config.Dendrite, queryAPI api.RoomserverQueryAPI, db *accounts.Database,
 	producer *producers.RoomserverProducer, membership string, roomID string,
 ) *util.JSONResponse {
 	if membership != "invite" || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
@@ -104,7 +105,7 @@ func CheckAndProcess(
 		}
 	}
 
-	resp, err := queryIDServer(req, device, body, roomID)
+	resp, err := queryIDServer(req, db, cfg, device, body, roomID)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
 		return &resErr
@@ -149,8 +150,8 @@ func CheckAndProcess(
 // Returns a representation of the response for both cases.
 // Returns an error if a check or a request failed.
 func queryIDServer(
-	req *http.Request, device *authtypes.Device, body *MembershipRequest,
-	roomID string,
+	req *http.Request, db *accounts.Database, cfg config.Dendrite,
+	device *authtypes.Device, body *MembershipRequest, roomID string,
 ) (res *idServerResponses, err error) {
 	res = new(idServerResponses)
 	// Lookup the 3PID
@@ -162,7 +163,7 @@ func queryIDServer(
 	if res.Lookup.MXID == "" {
 		// No Matrix ID matches with the given 3PID, ask the server to store the
 		// invite and return a token
-		res.StoreInvite, err = queryIDServerStoreInvite(device, body, roomID)
+		res.StoreInvite, err = queryIDServerStoreInvite(db, cfg, device, body, roomID)
 		return
 	}
 
@@ -173,7 +174,7 @@ func queryIDServer(
 	if res.Lookup.NotBefore > now || now > res.Lookup.NotAfter {
 		// If the current timestamp isn't in the time frame in which the association
 		// is known to be valid, re-run the query
-		return queryIDServer(req, device, body, roomID)
+		return queryIDServer(req, db, cfg, device, body, roomID)
 	}
 
 	// Check the request signatures and send an error if one isn't valid
@@ -209,7 +210,26 @@ func queryIDServerLookup(body *MembershipRequest) (res *idServerLookupResponse, 
 // queryIDServerStoreInvite sends a response to the identity server on /_matrix/identity/api/v1/store-invite
 // and returns the response as a structure.
 // Returns an error if the request failed to send or if the response couldn't be parsed.
-func queryIDServerStoreInvite(device *authtypes.Device, body *MembershipRequest, roomID string) (*idServerStoreInviteResponse, error) {
+func queryIDServerStoreInvite(
+	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
+	body *MembershipRequest, roomID string,
+) (*idServerStoreInviteResponse, error) {
+	// Retrieve the sender's profile to get their display name
+	localpart, serverName, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	var profile *authtypes.Profile
+	if serverName == cfg.Matrix.ServerName {
+		profile, err = db.GetProfileByLocalpart(localpart)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		profile = &authtypes.Profile{}
+	}
+
 	client := http.Client{}
 
 	data := url.Values{}
@@ -217,6 +237,13 @@ func queryIDServerStoreInvite(device *authtypes.Device, body *MembershipRequest,
 	data.Add("address", body.Address)
 	data.Add("room_id", roomID)
 	data.Add("sender", device.UserID)
+	data.Add("sender_display_name", profile.DisplayName)
+	// TODO: Also send:
+	//      - The room name (room_name)
+	//      - The room's avatar url (room_avatar_url)
+	//      See https://github.com/matrix-org/sydent/blob/master/sydent/http/servlets/store_invite_servlet.py#L82-L91
+	//      These can be easily retrieved by requesting the public rooms API
+	//      server's database.
 
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/store-invite", body.IDServer)
 	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))

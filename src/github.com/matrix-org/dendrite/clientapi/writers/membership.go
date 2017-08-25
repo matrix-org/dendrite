@@ -44,7 +44,9 @@ func SendMembership(
 		return *reqErr
 	}
 
-	if res := thirdpartyinvites.CheckAndProcess(req, device, &body, cfg, queryAPI, producer, membership, roomID); res != nil {
+	if res := thirdpartyinvites.CheckAndProcess(
+		req, device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
+	); res != nil {
 		return *res
 	}
 
