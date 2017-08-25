@@ -29,7 +29,7 @@ type MemberContent struct {
 	// TODO: ThirdPartyInvite string `json:"third_party_invite,omitempty"`
 }
 
-// ThirdPartyInviteContent is the content event for https://matrix.org/speculator/spec/HEAD/client_server/unstable.html#m-room-third-party-invite
+// ThirdPartyInviteContent is the content event for https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-third-party-invite
 type ThirdPartyInviteContent struct {
 	DisplayName    string      `json:"display_name"`
 	KeyValidityURL string      `json:"key_validity_url"`
@@ -37,7 +37,7 @@ type ThirdPartyInviteContent struct {
 	PublicKeys     []PublicKey `json:"public_keys"`
 }
 
-// PublicKey is the PublicKeys structure in https://matrix.org/speculator/spec/HEAD/client_server/unstable.html#m-room-third-party-invite
+// PublicKey is the PublicKeys structure in https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-third-party-invite
 type PublicKey struct {
 	KeyValidityURL string `json:"key_validity_url"`
 	PublicKey      string `json:"public_key"`
