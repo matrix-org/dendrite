@@ -48,13 +48,6 @@ type MembershipRequest struct {
 	Address  string `json:"address"`
 }
 
-// idServerResponses is a structure containing the representation of the responses
-// for two requests on an identity server: one on /lookup and one on /store-invite
-type idServerResponses struct {
-	Lookup      *idServerLookupResponse
-	StoreInvite *idServerStoreInviteResponse
-}
-
 // idServerLookupResponse represents the response described at https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-identity-api-v1-lookup
 type idServerLookupResponse struct {
 	TS         int64                        `json:"ts"`
@@ -105,17 +98,17 @@ func CheckAndProcess(
 		}
 	}
 
-	resp, err := queryIDServer(req, db, cfg, device, body, roomID)
+	lookupRes, storeInviteRes, err := queryIDServer(req, db, cfg, device, body, roomID)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
 		return &resErr
 	}
 
-	if resp.Lookup.MXID == "" {
+	if lookupRes.MXID == "" {
 		// No Matrix ID could be found for this 3PID, meaning that a
 		// "m.room.third_party_invite" have to be emitted from the data in
-		// resp.StoreInvite.
-		err = emit3PIDInviteEvent(body, resp.StoreInvite, device, roomID, cfg, queryAPI, producer)
+		// storeInviteRes.
+		err = emit3PIDInviteEvent(body, storeInviteRes, device, roomID, cfg, queryAPI, producer)
 		if err == events.ErrRoomNoExists {
 			return &util.JSONResponse{
 				Code: 404,
@@ -135,7 +128,7 @@ func CheckAndProcess(
 
 	// A Matrix ID have been found: set it in the body request and let the process
 	// continue to create a "m.room.member" event with an "invite" membership
-	body.UserID = resp.Lookup.MXID
+	body.UserID = lookupRes.MXID
 
 	return nil
 }
@@ -152,18 +145,17 @@ func CheckAndProcess(
 func queryIDServer(
 	req *http.Request, db *accounts.Database, cfg config.Dendrite,
 	device *authtypes.Device, body *MembershipRequest, roomID string,
-) (res *idServerResponses, err error) {
-	res = new(idServerResponses)
+) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	// Lookup the 3PID
-	res.Lookup, err = queryIDServerLookup(body)
+	lookupRes, err = queryIDServerLookup(body)
 	if err != nil {
 		return
 	}
 
-	if res.Lookup.MXID == "" {
+	if lookupRes.MXID == "" {
 		// No Matrix ID matches with the given 3PID, ask the server to store the
 		// invite and return a token
-		res.StoreInvite, err = queryIDServerStoreInvite(db, cfg, device, body, roomID)
+		storeInviteRes, err = queryIDServerStoreInvite(db, cfg, device, body, roomID)
 		return
 	}
 
@@ -171,14 +163,14 @@ func queryIDServer(
 	// Get timestamp in milliseconds to compare it with the timestamps provided
 	// by the identity server
 	now := time.Now().UnixNano() / 1000000
-	if res.Lookup.NotBefore > now || now > res.Lookup.NotAfter {
+	if lookupRes.NotBefore > now || now > lookupRes.NotAfter {
 		// If the current timestamp isn't in the time frame in which the association
 		// is known to be valid, re-run the query
 		return queryIDServer(req, db, cfg, device, body, roomID)
 	}
 
 	// Check the request signatures and send an error if one isn't valid
-	if err = checkIDServerSignatures(body, res.Lookup); err != nil {
+	if err = checkIDServerSignatures(body, lookupRes); err != nil {
 		return
 	}
 
