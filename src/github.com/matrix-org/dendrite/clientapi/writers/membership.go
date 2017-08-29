@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/clientapi/thirdpartyinvites"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -38,24 +39,25 @@ func SendMembership(
 	roomID string, membership string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
 ) util.JSONResponse {
-	stateKey, reason, reqErr := getMembershipStateKey(req, device, membership)
+	var body thirdpartyinvites.MembershipRequest
+	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
+		return *reqErr
+	}
+
+	if res := thirdpartyinvites.CheckAndProcess(
+		req, device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
+	); res != nil {
+		return *res
+	}
+
+	stateKey, reason, reqErr := getMembershipStateKey(body, device, membership)
 	if reqErr != nil {
 		return *reqErr
 	}
 
-	localpart, serverName, err := gomatrixserverlib.SplitID('@', stateKey)
+	profile, err := loadProfile(stateKey, cfg, accountDB)
 	if err != nil {
 		return httputil.LogThenError(req, err)
-	}
-
-	var profile *authtypes.Profile
-	if serverName == cfg.Matrix.ServerName {
-		profile, err = accountDB.GetProfileByLocalpart(localpart)
-		if err != nil {
-			return httputil.LogThenError(req, err)
-		}
-	} else {
-		profile = &authtypes.Profile{}
 	}
 
 	builder := gomatrixserverlib.EventBuilder{
@@ -101,28 +103,39 @@ func SendMembership(
 	}
 }
 
+// loadProfile lookups the profile of a given user from the database and returns
+// it if the user is local to this server, or returns an empty profile if not.
+// Returns an error if the retrieval failed or if the first parameter isn't a
+// valid Matrix ID.
+func loadProfile(userID string, cfg config.Dendrite, accountDB *accounts.Database) (*authtypes.Profile, error) {
+	localpart, serverName, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var profile *authtypes.Profile
+	if serverName == cfg.Matrix.ServerName {
+		profile, err = accountDB.GetProfileByLocalpart(localpart)
+	} else {
+		profile = &authtypes.Profile{}
+	}
+
+	return profile, err
+}
+
 // getMembershipStateKey extracts the target user ID of a membership change.
 // For "join" and "leave" this will be the ID of the user making the change.
 // For "ban", "unban", "kick" and "invite" the target user ID will be in the JSON request body.
 // In the latter case, if there was an issue retrieving the user ID from the request body,
 // returns a JSONResponse with a corresponding error code and message.
 func getMembershipStateKey(
-	req *http.Request, device *authtypes.Device, membership string,
+	body thirdpartyinvites.MembershipRequest, device *authtypes.Device, membership string,
 ) (stateKey string, reason string, response *util.JSONResponse) {
 	if membership == "ban" || membership == "unban" || membership == "kick" || membership == "invite" {
 		// If we're in this case, the state key is contained in the request body,
 		// possibly along with a reason (for "kick" and "ban") so we need to parse
 		// it
-		var requestBody struct {
-			UserID string `json:"user_id"`
-			Reason string `json:"reason"`
-		}
-
-		if reqErr := httputil.UnmarshalJSONRequest(req, &requestBody); reqErr != nil {
-			response = reqErr
-			return
-		}
-		if requestBody.UserID == "" {
+		if body.UserID == "" {
 			response = &util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.BadJSON("'user_id' must be supplied."),
@@ -130,8 +143,8 @@ func getMembershipStateKey(
 			return
 		}
 
-		stateKey = requestBody.UserID
-		reason = requestBody.Reason
+		stateKey = body.UserID
+		reason = body.Reason
 	} else {
 		stateKey = device.UserID
 	}
