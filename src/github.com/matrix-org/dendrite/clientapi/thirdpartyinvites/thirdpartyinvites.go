@@ -335,10 +335,8 @@ func emit3PIDInviteEvent(
 		DisplayName:    res.DisplayName,
 		KeyValidityURL: validityURL,
 		PublicKey:      res.PublicKey,
+		PublicKeys:     res.PublicKeys,
 	}
-
-	content.PublicKeys = make([]common.PublicKey, len(res.PublicKeys))
-	copy(content.PublicKeys, res.PublicKeys)
 
 	if err := builder.SetContent(content); err != nil {
 		return err
