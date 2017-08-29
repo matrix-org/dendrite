@@ -15,7 +15,6 @@
 package thirdpartyinvites
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -264,15 +263,15 @@ func queryIDServerStoreInvite(
 // a given identity server and returns the matching base64-decoded public key.
 // Returns an error if the request couldn't be sent, if its body couldn't be parsed
 // or if the key couldn't be decoded from base64.
-func queryIDServerPubKey(idServerName string, keyID string) (publicKey []byte, err error) {
+func queryIDServerPubKey(idServerName string, keyID string) ([]byte, error) {
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/pubkey/%s", idServerName, keyID)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	var pubKeyRes struct {
-		PublicKey string `json:"public_key"`
+		PublicKey gomatrixserverlib.Base64String `json:"public_key"`
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -281,11 +280,8 @@ func queryIDServerPubKey(idServerName string, keyID string) (publicKey []byte, e
 		return nil, errors.New(errMsg)
 	}
 
-	if err = json.NewDecoder(resp.Body).Decode(&pubKeyRes); err != nil {
-		return nil, err
-	}
-
-	return base64.RawStdEncoding.DecodeString(pubKeyRes.PublicKey)
+	err = json.NewDecoder(resp.Body).Decode(&pubKeyRes)
+	return pubKeyRes.PublicKey, err
 }
 
 // checkIDServerSignatures iterates over the signatures of a requests.
