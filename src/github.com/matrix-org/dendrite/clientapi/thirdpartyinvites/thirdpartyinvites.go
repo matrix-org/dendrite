@@ -180,12 +180,12 @@ func queryIDServer(
 // queryIDServerLookup sends a response to the identity server on /_matrix/identity/api/v1/lookup
 // and returns the response as a structure.
 // Returns an error if the request failed to send or if the response couldn't be parsed.
-func queryIDServerLookup(body *MembershipRequest) (res *idServerLookupResponse, err error) {
+func queryIDServerLookup(body *MembershipRequest) (*idServerLookupResponse, error) {
 	address := url.QueryEscape(body.Address)
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/lookup?medium=%s&address=%s", body.IDServer, body.Medium, address)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -194,9 +194,9 @@ func queryIDServerLookup(body *MembershipRequest) (res *idServerLookupResponse, 
 		return nil, errors.New(errMgs)
 	}
 
-	res = new(idServerLookupResponse)
-	err = json.NewDecoder(resp.Body).Decode(res)
-	return
+	var res idServerLookupResponse
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	return &res, err
 }
 
 // queryIDServerStoreInvite sends a response to the identity server on /_matrix/identity/api/v1/store-invite
@@ -255,17 +255,17 @@ func queryIDServerStoreInvite(
 		return nil, errors.New(errMsg)
 	}
 
-	idResp := new(idServerStoreInviteResponse)
-	err = json.NewDecoder(resp.Body).Decode(idResp)
-	return idResp, err
+	var idResp idServerStoreInviteResponse
+	err = json.NewDecoder(resp.Body).Decode(&idResp)
+	return &idResp, err
 }
 
 // queryIDServerPubKey requests a public key identified with a given ID to the
 // a given identity server and returns the matching base64-decoded public key.
 // Returns an error if the request couldn't be sent, if its body couldn't be parsed
 // or if the key couldn't be decoded from base64.
-func queryIDServerPubKey(body *MembershipRequest, keyID string) (publicKey []byte, err error) {
-	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/pubkey/%s", body.IDServer, keyID)
+func queryIDServerPubKey(idServerName string, keyID string) (publicKey []byte, err error) {
+	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/pubkey/%s", idServerName, keyID)
 	resp, err := http.Get(url)
 	if err != nil {
 		return
@@ -277,7 +277,7 @@ func queryIDServerPubKey(body *MembershipRequest, keyID string) (publicKey []byt
 
 	if resp.StatusCode != http.StatusOK {
 		// TODO: Log the error supplied with the identity server?
-		errMsg := fmt.Sprintf("Couldn't retrieve key %s from server %s", keyID, body.IDServer)
+		errMsg := fmt.Sprintf("Couldn't retrieve key %s from server %s", keyID, idServerName)
 		return nil, errors.New(errMsg)
 	}
 
@@ -308,7 +308,7 @@ func checkIDServerSignatures(body *MembershipRequest, res *idServerLookupRespons
 	}
 
 	for keyID := range signatures {
-		pubKey, err := queryIDServerPubKey(body, keyID)
+		pubKey, err := queryIDServerPubKey(body.IDServer, keyID)
 		if err != nil {
 			return err
 		}
