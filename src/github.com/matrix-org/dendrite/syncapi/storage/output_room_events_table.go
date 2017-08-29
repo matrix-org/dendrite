@@ -60,8 +60,12 @@ const selectRecentEventsSQL = "" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
+// This uses the current value of the sequence generator rather than lookin at
+// table itself, this means that we can reuse the generator for other tables
+// while exposing a single integer that can be used as the stream token in the
+// client API.
 const selectMaxIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_output_room_events"
+	"SELECT currval('syncapi_output_room_event_id_seq')"
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 const selectStateInRangeSQL = "" +
