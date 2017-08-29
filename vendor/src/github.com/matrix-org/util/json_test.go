@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type MockJSONRequestHandler struct {

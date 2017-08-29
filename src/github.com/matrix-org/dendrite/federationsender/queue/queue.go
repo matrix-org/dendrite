@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other
@@ -61,7 +61,9 @@ func (oqs *OutgoingQueues) SendEvent(
 	destinations = filterDestinations(oqs.origin, destinations)
 
 	log.WithFields(log.Fields{
-		"destinations": destinations, "event": ev.EventID(),
+		"prefix":       "federationsender",
+		"destinations": destinations,
+		"event":        ev.EventID(),
 	}).Info("Sending event")
 
 	oqs.queuesMutex.Lock()

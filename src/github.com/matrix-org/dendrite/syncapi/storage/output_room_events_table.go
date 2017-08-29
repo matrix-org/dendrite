@@ -17,11 +17,11 @@ package storage
 import (
 	"database/sql"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 const outputRoomEventsSchema = `
@@ -134,6 +134,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 		// since it'll just mark the event as not being needed.
 		if len(addIDs) < len(delIDs) {
 			log.WithFields(log.Fields{
+				"prefix":  "syncapi",
 				"since":   oldPos,
 				"current": newPos,
 				"adds":    addIDs,

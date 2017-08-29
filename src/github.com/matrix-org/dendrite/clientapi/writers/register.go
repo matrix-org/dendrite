@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -13,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -102,7 +102,7 @@ func Register(req *http.Request, accountDB *accounts.Database, deviceDB *devices
 		return *resErr
 	}
 
-	logger := util.GetLogger(req.Context())
+	logger := util.GetLogger(req.Context()).WithField("prefix", "clientapi")
 	logger.WithFields(log.Fields{
 		"username":   r.Username,
 		"auth.type":  r.Auth.Type,

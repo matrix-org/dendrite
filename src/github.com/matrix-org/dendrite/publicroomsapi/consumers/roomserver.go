@@ -17,11 +17,12 @@ package consumers
 import (
 	"encoding/json"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver/api"
+
+	"github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -61,6 +62,7 @@ func (s *OutputRoomEvent) Start() error {
 
 // onMessage is called when the sync server receives a new event from the room server output log.
 func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
+	log := logrus.WithField("prefix", "publicroomsapi")
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
@@ -77,7 +79,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	ev := output.NewRoomEvent.Event
-	log.WithFields(log.Fields{
+	log.WithFields(logrus.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),
 		"type":     ev.Type(),

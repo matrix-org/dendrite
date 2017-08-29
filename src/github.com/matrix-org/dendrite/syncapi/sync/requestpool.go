@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -27,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
@@ -46,7 +46,7 @@ func NewRequestPool(db *storage.SyncServerDatabase, n *Notifier, adb *accounts.D
 // until a response is ready, or it times out.
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtypes.Device) util.JSONResponse {
 	// Extract values from request
-	logger := util.GetLogger(req.Context())
+	logger := util.GetLogger(req.Context()).WithField("prefix", "syncapi")
 	userID := device.UserID
 	syncReq, err := newSyncRequest(req, userID)
 	if err != nil {

@@ -21,7 +21,6 @@ import (
 	"net/url"
 	"path"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
@@ -30,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // uploadRequest metadata included in or derivable from an upload request
@@ -87,7 +87,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.Dendrite) (*uploadRe
 			ContentType:   types.ContentType(req.Header.Get("Content-Type")),
 			UploadName:    types.Filename(url.PathEscape(req.FormValue("filename"))),
 		},
-		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName),
+		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName).WithField("prefix", "mediaapi"),
 	}
 
 	if resErr := r.Validate(*cfg.Media.MaxFileSizeBytes); resErr != nil {

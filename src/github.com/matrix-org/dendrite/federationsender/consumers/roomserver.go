@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationsender/queue"
@@ -26,6 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -71,6 +72,7 @@ func (s *OutputRoomEvent) Start() error {
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
 func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
+	log := logrus.WithField("prefix", "roomserver")
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
@@ -85,7 +87,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 	ev := &output.NewRoomEvent.Event
-	log.WithFields(log.Fields{
+	log.WithFields(logrus.Fields{
 		"event_id":       ev.EventID(),
 		"room_id":        ev.RoomID(),
 		"send_as_server": output.NewRoomEvent.SendAsServer,
@@ -93,11 +95,11 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 
 	if err := s.processMessage(*output.NewRoomEvent); err != nil {
 		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			"event":      string(ev.JSON()),
-			log.ErrorKey: err,
-			"add":        output.NewRoomEvent.AddsStateEventIDs,
-			"del":        output.NewRoomEvent.RemovesStateEventIDs,
+		log.WithFields(logrus.Fields{
+			"event":         string(ev.JSON()),
+			logrus.ErrorKey: err,
+			"add":           output.NewRoomEvent.AddsStateEventIDs,
+			"del":           output.NewRoomEvent.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}

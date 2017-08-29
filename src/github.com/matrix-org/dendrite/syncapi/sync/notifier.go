@@ -17,10 +17,10 @@ package sync
 import (
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 // Notifier will wake up sleeping requests when there is some new data.
@@ -70,7 +70,10 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 			userID := *ev.StateKey()
 			membership, err := ev.Membership()
 			if err != nil {
-				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+				log.WithError(err).WithFields(log.Fields{
+					"prefix":   "syncapi",
+					"event_id": ev.EventID(),
+				}).Errorf(
 					"Notifier.OnNewEvent: Failed to unmarshal member event",
 				)
 			} else {

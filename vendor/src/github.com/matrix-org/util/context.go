@@ -3,7 +3,7 @@ package util
 import (
 	"context"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // contextKeys is a type alias for string to namespace Context keys per-package.

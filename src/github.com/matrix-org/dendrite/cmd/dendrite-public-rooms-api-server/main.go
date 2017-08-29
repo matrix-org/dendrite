@@ -28,7 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 

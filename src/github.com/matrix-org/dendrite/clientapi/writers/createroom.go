@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -31,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
@@ -100,7 +100,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database,
 ) util.JSONResponse {
-	logger := util.GetLogger(req.Context())
+	logger := util.GetLogger(req.Context()).WithField("prefix", "clientapi")
 	userID := device.UserID
 	var r createRoomRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
