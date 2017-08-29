@@ -47,7 +47,7 @@ type MembershipRequest struct {
 	Address  string `json:"address"`
 }
 
-// idServerLookupResponse represents the response described at https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-identity-api-v1-lookup
+// idServerLookupResponse represents the response described at https://matrix.org/docs/spec/identity_service/unstable.html#get-matrix-identity-api-v1-lookup
 type idServerLookupResponse struct {
 	TS         int64                        `json:"ts"`
 	NotBefore  int64                        `json:"not_before"`
@@ -58,7 +58,7 @@ type idServerLookupResponse struct {
 	Signatures map[string]map[string]string `json:"signatures"`
 }
 
-// idServerLookupResponse represents the response described at https://matrix.org/docs/spec/client_server/r0.2.0.html#invitation-storage
+// idServerLookupResponse represents the response described at https://matrix.org/docs/spec/identity_service/unstable.html#invitation-storage
 type idServerStoreInviteResponse struct {
 	PublicKey   string             `json:"public_key"`
 	Token       string             `json:"token"`

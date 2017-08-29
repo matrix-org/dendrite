@@ -22,6 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
@@ -55,6 +57,15 @@ type OutputRoomEventWriter interface {
 func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.InputRoomEvent) error {
 	// Parse and validate the event JSON
 	event := input.Event
+
+	if err := checkThirdPartyKeys(input.Event); err != nil {
+		// At least one of the key could not be validated. The specification
+		// says that it should not cause a rejection of the event.
+		// https://matrix.org/docs/spec/client_server/r0.2.0.html#id58
+		// There is no direct way to warn the users that the member's
+		// membership is questionable, so log the error as a warning.
+		logrus.Warn(err)
+	}
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(db, event, input.AuthEventIDs)
