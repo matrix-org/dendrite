@@ -88,6 +88,7 @@ func CheckAndSave3PIDAssociation(
 		return *reqErr
 	}
 
+	// Check if the association has been validated
 	verified, address, medium, err := threepid.CheckAssociation(body.Creds)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -103,6 +104,14 @@ func CheckAndSave3PIDAssociation(
 		}
 	}
 
+	if body.Bind {
+		// Publish the association on the identity server if requested
+		if err = threepid.PublishAssociation(body.Creds, device.UserID); err != nil {
+			return httputil.LogThenError(req, err)
+		}
+	}
+
+	// Save the association in the database
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return httputil.LogThenError(req, err)

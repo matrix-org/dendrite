@@ -118,3 +118,35 @@ func CheckAssociation(creds Credentials) (bool, string, string, error) {
 
 	return true, respBody.Address, respBody.Medium, nil
 }
+
+// PublishAssociation publishes a validated association between a third-party
+// identifier and a Matrix ID.
+// Returns an error if there was a problem sending the request or decoding the
+// response, or if the identity server responded with a non-OK status.
+func PublishAssociation(creds Credentials, userID string) error {
+	postURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/bind", creds.IDServer)
+
+	data := url.Values{}
+	data.Add("sid", creds.SID)
+	data.Add("client_secret", creds.Secret)
+	data.Add("mxid", userID)
+
+	request, err := http.NewRequest("POST", postURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return err
+	}
+	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	client := http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+
+	// Error if the status isn't OK
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Could not publish the association on the server %s", creds.IDServer)
+	}
+
+	return nil
+}
