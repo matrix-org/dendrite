@@ -282,7 +282,7 @@ func (m *monolith) setupConsumers() {
 		m.cfg, m.kafkaConsumer(), m.accountDB, m.queryAPI,
 	)
 	if err = clientAPIConsumer.Start(); err != nil {
-		log.Panicf("startup: failed to start room server consumer")
+		log.Panicf("startup: failed to start room server consumer: %s", err)
 	}
 
 	syncAPIRoomConsumer := syncapi_consumers.NewOutputRoomEvent(
