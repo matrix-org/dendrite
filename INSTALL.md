@@ -71,21 +71,14 @@ Dendrite requires a postgres database engine, version 9.5 or later.
 
 ### Crypto key generation
 
-Generate the keys (unlike synapse, dendrite doesn't autogen yet):
+Generate the keys:
 
 ```bash
 # Generate a self-signed SSL cert for federation:
 test -f server.key || openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 3650 -nodes -subj /CN=localhost
 
 # generate ed25519 signing key
-test -f matrix_key.pem || python3 > matrix_key.pem <<EOF
-import base64;
-r = lambda n: base64.b64encode(open("/dev/urandom", "rb").read(n)).decode("utf8");
-print("-----BEGIN MATRIX PRIVATE KEY-----")
-print("Key-ID:", "ed25519:" + r(3).rstrip("="))
-print(r(32))
-print("-----END MATRIX PRIVATE KEY-----")
-EOF
+test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
 ```
 
 ### Configuration
