@@ -16,6 +16,8 @@ package accounts
 
 import (
 	"database/sql"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 const threepidSchema = `
@@ -88,20 +90,20 @@ func (s *threepidStatements) selectLocalpartForThreePID(txn *sql.Tx, threepid st
 	return
 }
 
-func (s *threepidStatements) selectThreePIDsForLocalpart(localpart string) (threepids map[string]string, err error) {
+func (s *threepidStatements) selectThreePIDsForLocalpart(localpart string) (threepids []authtypes.ThreePID, err error) {
 	rows, err := s.selectThreePIDsForLocalpartStmt.Query(localpart)
 	if err != nil {
 		return
 	}
 
-	threepids = make(map[string]string)
+	threepids = []authtypes.ThreePID{}
 	for rows.Next() {
 		var threepid string
 		var medium string
 		if err = rows.Scan(&threepid, &medium); err != nil {
 			return
 		}
-		threepids[threepid] = medium
+		threepids = append(threepids, authtypes.ThreePID{threepid, medium})
 	}
 
 	return

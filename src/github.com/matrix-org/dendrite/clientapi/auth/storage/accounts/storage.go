@@ -284,6 +284,6 @@ func (d *Database) GetLocalpartForThreePID(threepid string, medium string) (loca
 // a given local user.
 // If no association is known for this user, returns an empty slice.
 // Returns an error if there was an issue talking to the database.
-func (d *Database) GetThreePIDsForLocalpart(localpart string) (threepids map[string]string, err error) {
+func (d *Database) GetThreePIDsForLocalpart(localpart string) (threepids []authtypes.ThreePID, err error) {
 	return d.threepids.selectThreePIDsForLocalpart(localpart)
 }

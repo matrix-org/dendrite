@@ -32,12 +32,7 @@ type reqTokenResponse struct {
 }
 
 type threePIDsResponse struct {
-	ThreePIDs []threePID `json:"threepids"`
-}
-
-type threePID struct {
-	Medium  string `json:"medium"`
-	Address string `json:"address"`
+	ThreePIDs []authtypes.ThreePID `json:"threepids"`
 }
 
 // RequestEmailToken implements:
@@ -141,22 +136,15 @@ func GetAssociated3PIDs(
 		return httputil.LogThenError(req, err)
 	}
 
-	var resp threePIDsResponse
-	resp.ThreePIDs = []threePID{}
-	for address, medium := range threepids {
-		tpid := threePID{Medium: medium, Address: address}
-		resp.ThreePIDs = append(resp.ThreePIDs, tpid)
-	}
-
 	return util.JSONResponse{
 		Code: 200,
-		JSON: resp,
+		JSON: threePIDsResponse{threepids},
 	}
 }
 
 // Forget3PID implements POST /account/3pid/delete
 func Forget3PID(req *http.Request, accountDB *accounts.Database) util.JSONResponse {
-	var body threePID
+	var body authtypes.ThreePID
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
 	}
