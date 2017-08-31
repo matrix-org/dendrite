@@ -62,11 +62,11 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	tlsKeyPath := filepath.Join(configDir, TLSCertFile)
 	mediaBasePath := filepath.Join(configDir, MediaDir)
 
-	if err := newMatrixKey(serverKeyPath); err != nil {
+	if err := NewMatrixKey(serverKeyPath); err != nil {
 		return nil, 0, err
 	}
 
-	if err := newTLSKey(tlsKeyPath, tlsCertPath); err != nil {
+	if err := NewTLSKey(tlsKeyPath, tlsCertPath); err != nil {
 		return nil, 0, err
 	}
 
@@ -119,8 +119,8 @@ func WriteConfig(cfg *config.Dendrite, configDir string) error {
 	return nil
 }
 
-// newMatrixKey generates a new ed25519 matrix server key and writes it to a file.
-func newMatrixKey(matrixKeyPath string) error {
+// NewMatrixKey generates a new ed25519 matrix server key and writes it to a file.
+func NewMatrixKey(matrixKeyPath string) error {
 	var data [35]byte
 	if _, err := rand.Read(data[:]); err != nil {
 		return err
@@ -145,8 +145,8 @@ func newMatrixKey(matrixKeyPath string) error {
 
 const certificateDuration = time.Hour * 24 * 365 * 10
 
-// newTLSKey generates a new RSA TLS key and certificate and writes it to a file.
-func newTLSKey(tlsKeyPath, tlsCertPath string) error {
+// NewTLSKey generates a new RSA TLS key and certificate and writes it to a file.
+func NewTLSKey(tlsKeyPath, tlsCertPath string) error {
 	priv, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return err
