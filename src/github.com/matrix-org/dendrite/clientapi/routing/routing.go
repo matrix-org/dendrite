@@ -253,7 +253,7 @@ func Setup(
 
 	r0mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
 		common.MakeAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
-			return readers.Request3PIDToken(req, accountDB)
+			return readers.RequestEmailToken(req, accountDB)
 		}),
 	).Methods("POST", "OPTIONS")
 

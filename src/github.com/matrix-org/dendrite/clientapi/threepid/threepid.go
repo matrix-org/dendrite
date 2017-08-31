@@ -88,14 +88,14 @@ func CreateSession(req EmailAssociationRequest) (string, error) {
 // identity server.
 // Returns a boolean set to true if the association has been validated, false if not.
 // If the association has been validated, also returns the related third-party
-// identifier.
+// identifier and its medium.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func CheckAssociation(creds Credentials) (bool, string, error) {
+func CheckAssociation(creds Credentials) (bool, string, string, error) {
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/getValidated3pid?sid=%s&client_secret=%s", creds.IDServer, creds.SID, creds.Secret)
 	resp, err := http.Get(url)
 	if err != nil {
-		return false, "", err
+		return false, "", "", err
 	}
 
 	var respBody struct {
@@ -107,14 +107,14 @@ func CheckAssociation(creds Credentials) (bool, string, error) {
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
-		return false, "", err
+		return false, "", "", err
 	}
 
 	if respBody.ErrCode == "M_SESSION_NOT_VALIDATED" {
-		return false, "", nil
+		return false, "", "", nil
 	} else if len(respBody.ErrCode) > 0 {
-		return false, "", errors.New(respBody.Error)
+		return false, "", "", errors.New(respBody.Error)
 	}
 
-	return true, respBody.Address, nil
+	return true, respBody.Address, respBody.Medium, nil
 }

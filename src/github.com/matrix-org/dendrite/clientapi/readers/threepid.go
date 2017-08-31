@@ -40,10 +40,10 @@ type threePID struct {
 	Address string `json:"address"`
 }
 
-// Request3PIDToken implements:
+// RequestEmailToken implements:
 //     POST /account/3pid/email/requestToken
 //     POST /register/email/requestToken
-func Request3PIDToken(req *http.Request, accountDB *accounts.Database) util.JSONResponse {
+func RequestEmailToken(req *http.Request, accountDB *accounts.Database) util.JSONResponse {
 	var body threepid.EmailAssociationRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -53,7 +53,7 @@ func Request3PIDToken(req *http.Request, accountDB *accounts.Database) util.JSON
 	var err error
 
 	// Check if the 3PID is already in use locally
-	localpart, err := accountDB.GetLocalpartForThreePID(body.Email)
+	localpart, err := accountDB.GetLocalpartForThreePID(body.Email, "email")
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -88,7 +88,7 @@ func CheckAndSave3PIDAssociation(
 		return *reqErr
 	}
 
-	verified, address, err := threepid.CheckAssociation(body.Creds)
+	verified, address, medium, err := threepid.CheckAssociation(body.Creds)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -108,7 +108,7 @@ func CheckAndSave3PIDAssociation(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err = accountDB.SaveThreePIDAssociation(address, localpart); err != nil {
+	if err = accountDB.SaveThreePIDAssociation(address, localpart, medium); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -152,7 +152,7 @@ func Forget3PID(req *http.Request, accountDB *accounts.Database) util.JSONRespon
 		return *reqErr
 	}
 
-	if err := accountDB.RemoveThreePIDAssociation(body.Address); err != nil {
+	if err := accountDB.RemoveThreePIDAssociation(body.Address, body.Medium); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

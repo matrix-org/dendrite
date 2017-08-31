@@ -35,16 +35,16 @@ CREATE INDEX IF NOT EXISTS account_threepid_localpart ON account_threepid(localp
 `
 
 const selectLocalpartForThreePIDSQL = "" +
-	"SELECT localpart FROM account_threepid WHERE threepid = $1"
+	"SELECT localpart FROM account_threepid WHERE threepid = $1 AND medium = $2"
 
 const selectThreePIDsForLocalpartSQL = "" +
 	"SELECT threepid, medium FROM account_threepid WHERE localpart = $1"
 
 const insertThreePIDSQL = "" +
-	"INSERT INTO account_threepid (threepid, localpart) VALUES ($1, $2)"
+	"INSERT INTO account_threepid (threepid, medium, localpart) VALUES ($1, $2, $3)"
 
 const deleteThreePIDSQL = "" +
-	"DELETE FROM account_threepid WHERE threepid = $1"
+	"DELETE FROM account_threepid WHERE threepid = $1 AND medium = $2"
 
 type threepidStatements struct {
 	selectLocalpartForThreePIDStmt  *sql.Stmt
@@ -74,14 +74,14 @@ func (s *threepidStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *threepidStatements) selectLocalpartForThreePID(txn *sql.Tx, threepid string) (localpart string, err error) {
+func (s *threepidStatements) selectLocalpartForThreePID(txn *sql.Tx, threepid string, medium string) (localpart string, err error) {
 	var stmt *sql.Stmt
 	if txn != nil {
 		stmt = txn.Stmt(s.selectLocalpartForThreePIDStmt)
 	} else {
 		stmt = s.selectLocalpartForThreePIDStmt
 	}
-	err = stmt.QueryRow(threepid).Scan(&localpart)
+	err = stmt.QueryRow(threepid, medium).Scan(&localpart)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -107,12 +107,12 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(localpart string) (thre
 	return
 }
 
-func (s *threepidStatements) insertThreePID(txn *sql.Tx, threepid string, localpart string) (err error) {
-	_, err = txn.Stmt(s.insertThreePIDStmt).Exec(threepid, localpart)
+func (s *threepidStatements) insertThreePID(txn *sql.Tx, threepid string, medium string, localpart string) (err error) {
+	_, err = txn.Stmt(s.insertThreePIDStmt).Exec(threepid, medium, localpart)
 	return
 }
 
-func (s *threepidStatements) deleteThreePID(threepid string) (err error) {
-	_, err = s.deleteThreePIDStmt.Exec(threepid)
+func (s *threepidStatements) deleteThreePID(threepid string, medium string) (err error) {
+	_, err = s.deleteThreePIDStmt.Exec(threepid, medium)
 	return
 }

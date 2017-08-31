@@ -248,9 +248,9 @@ var Err3PIDInUse = errors.New("This third-party identifier is already in use")
 // and a local Matrix user (identified by the user's ID's local part).
 // If the third-party identifier is already part of an association, returns Err3PIDInUse.
 // Returns an error if there was a problem talking to the database.
-func (d *Database) SaveThreePIDAssociation(threepid string, localpart string) (err error) {
+func (d *Database) SaveThreePIDAssociation(threepid string, localpart string, medium string) (err error) {
 	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		user, err := d.threepids.selectLocalpartForThreePID(txn, threepid)
+		user, err := d.threepids.selectLocalpartForThreePID(txn, threepid, medium)
 		if err != nil {
 			return err
 		}
@@ -259,7 +259,7 @@ func (d *Database) SaveThreePIDAssociation(threepid string, localpart string) (e
 			return Err3PIDInUse
 		}
 
-		return d.threepids.insertThreePID(txn, threepid, localpart)
+		return d.threepids.insertThreePID(txn, threepid, medium, localpart)
 	})
 }
 
@@ -267,8 +267,8 @@ func (d *Database) SaveThreePIDAssociation(threepid string, localpart string) (e
 // identifier.
 // If no association exists involving this third-party identifier, returns nothing.
 // If there was a problem talking to the database, returns an error.
-func (d *Database) RemoveThreePIDAssociation(threepid string) (err error) {
-	return d.threepids.deleteThreePID(threepid)
+func (d *Database) RemoveThreePIDAssociation(threepid string, medium string) (err error) {
+	return d.threepids.deleteThreePID(threepid, medium)
 }
 
 // GetLocalpartForThreePID looks up the localpart associated with a given third-party
@@ -276,8 +276,8 @@ func (d *Database) RemoveThreePIDAssociation(threepid string) (err error) {
 // If no association involves the given third-party idenfitier, returns an empty
 // string.
 // Returns an error if there was a problem talking to the database.
-func (d *Database) GetLocalpartForThreePID(threepid string) (localpart string, err error) {
-	return d.threepids.selectLocalpartForThreePID(nil, threepid)
+func (d *Database) GetLocalpartForThreePID(threepid string, medium string) (localpart string, err error) {
+	return d.threepids.selectLocalpartForThreePID(nil, threepid, medium)
 }
 
 // GetThreePIDsForLocalpart looks up the third-party identifiers associated with
