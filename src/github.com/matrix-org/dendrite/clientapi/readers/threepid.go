@@ -133,6 +133,7 @@ func GetAssociated3PIDs(
 	}
 
 	var resp threePIDsResponse
+	resp.ThreePIDs = []threePID{}
 	for address, medium := range threepids {
 		tpid := threePID{Medium: medium, Address: address}
 		resp.ThreePIDs = append(resp.ThreePIDs, tpid)
