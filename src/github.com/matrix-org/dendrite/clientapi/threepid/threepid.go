@@ -50,6 +50,8 @@ type Credentials struct {
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
 func CreateSession(req EmailAssociationRequest) (string, error) {
+	// TODO: Check if the ID server is trusted
+
 	// Create a session on the ID server
 	postURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/validate/email/requestToken", req.IDServer)
 
@@ -92,6 +94,7 @@ func CreateSession(req EmailAssociationRequest) (string, error) {
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
 func CheckAssociation(creds Credentials) (bool, string, string, error) {
+	// TODO: Check if the ID server is trusted
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/getValidated3pid?sid=%s&client_secret=%s", creds.IDServer, creds.SID, creds.Secret)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -124,6 +127,7 @@ func CheckAssociation(creds Credentials) (bool, string, string, error) {
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
 func PublishAssociation(creds Credentials, userID string) error {
+	// TODO: Check if the ID server is trusted
 	postURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/bind", creds.IDServer)
 
 	data := url.Values{}
