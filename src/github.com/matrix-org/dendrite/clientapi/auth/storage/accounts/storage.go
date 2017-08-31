@@ -16,6 +16,7 @@ package accounts
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common"
@@ -33,6 +34,7 @@ type Database struct {
 	profiles     profilesStatements
 	memberships  membershipStatements
 	accountDatas accountDataStatements
+	threepids    threepidStatements
 	serverName   gomatrixserverlib.ServerName
 }
 
@@ -63,7 +65,11 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = ac.prepare(db); err != nil {
 		return nil, err
 	}
-	return &Database{db, partitions, a, p, m, ac, serverName}, nil
+	t := threepidStatements{}
+	if err = t.prepare(db); err != nil {
+		return nil, err
+	}
+	return &Database{db, partitions, a, p, m, ac, t, serverName}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -232,4 +238,52 @@ func (d *Database) GetAccountDataByType(localpart string, roomID string, dataTyp
 func hashPassword(plaintext string) (hash string, err error) {
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcrypt.DefaultCost)
 	return string(hashBytes), err
+}
+
+// Err3PIDInUse is the error returned when trying to save an association involving
+// a third-party identifier which is already associated to a local user.
+var Err3PIDInUse = errors.New("This third-party identifier is already in use")
+
+// SaveThreePIDAssociation saves the association between a third party identifier
+// and a local Matrix user (identified by the user's ID's local part).
+// If the third-party identifier is already part of an association, returns Err3PIDInUse.
+// Returns an error if there was a problem talking to the database.
+func (d *Database) SaveThreePIDAssociation(threepid string, localpart string) (err error) {
+	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		user, err := d.threepids.selectLocalpartForThreePID(txn, threepid)
+		if err != nil {
+			return err
+		}
+
+		if len(user) > 0 {
+			return Err3PIDInUse
+		}
+
+		return d.threepids.insertThreePID(txn, threepid, localpart)
+	})
+}
+
+// RemoveThreePIDAssociation removes the association involving a given third-party
+// identifier.
+// If no association exists involving this third-party identifier, returns nothing.
+// If there was a problem talking to the database, returns an error.
+func (d *Database) RemoveThreePIDAssociation(threepid string) (err error) {
+	return d.threepids.deleteThreePID(threepid)
+}
+
+// GetLocalpartForThreePID looks up the localpart associated with a given third-party
+// identifier.
+// If no association involves the given third-party idenfitier, returns an empty
+// string.
+// Returns an error if there was a problem talking to the database.
+func (d *Database) GetLocalpartForThreePID(threepid string) (localpart string, err error) {
+	return d.threepids.selectLocalpartForThreePID(nil, threepid)
+}
+
+// GetThreePIDsForLocalpart looks up the third-party identifiers associated with
+// a given local user.
+// If no association is known for this user, returns an empty slice.
+// Returns an error if there was an issue talking to the database.
+func (d *Database) GetThreePIDsForLocalpart(localpart string) (threepids map[string]string, err error) {
+	return d.threepids.selectThreePIDsForLocalpart(localpart)
 }
