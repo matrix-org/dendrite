@@ -7,6 +7,9 @@ cd `dirname $0`/..
 : ${WORKSPACE:="$(pwd)"}
 export WORKSPACE
 
+# remove any detritus from last time
+rm -f sytest/server-*/*.log sytest/results.tap
+
 ./jenkins/prepare-dendrite.sh
 
 if [ ! -d "sytest" ]; then
