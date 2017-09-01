@@ -23,4 +23,4 @@ fi
 
 ./sytest/jenkins/install_and_run.sh \
     -I Dendrite::Monolith \
-    --dendrite-binary-directory $WORKSPACE/bin
+    --dendrite-binary-directory "$WORKSPACE/bin" || true
