@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/clientapi/thirdpartyinvites"
+	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -39,12 +39,12 @@ func SendMembership(
 	roomID string, membership string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
 ) util.JSONResponse {
-	var body thirdpartyinvites.MembershipRequest
+	var body threepid.MembershipRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
 	}
 
-	if res := thirdpartyinvites.CheckAndProcess(
+	if res := threepid.CheckAndProcessInvite(
 		req, device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
 	); res != nil {
 		return *res
@@ -129,7 +129,7 @@ func loadProfile(userID string, cfg config.Dendrite, accountDB *accounts.Databas
 // In the latter case, if there was an issue retrieving the user ID from the request body,
 // returns a JSONResponse with a corresponding error code and message.
 func getMembershipStateKey(
-	body thirdpartyinvites.MembershipRequest, device *authtypes.Device, membership string,
+	body threepid.MembershipRequest, device *authtypes.Device, membership string,
 ) (stateKey string, reason string, response *util.JSONResponse) {
 	if membership == "ban" || membership == "unban" || membership == "kick" || membership == "invite" {
 		// If we're in this case, the state key is contained in the request body,

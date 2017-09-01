@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package thirdpartyinvites
+package threepid
 
 import (
 	"encoding/json"
@@ -66,7 +66,7 @@ type idServerStoreInviteResponse struct {
 	PublicKeys  []common.PublicKey `json:"public_keys"`
 }
 
-// CheckAndProcess analyses the body of an incoming membership request.
+// CheckAndProcessInvite analyses the body of an incoming membership request.
 // If the fields relative to a third-party-invite are all supplied, lookups the
 // matching Matrix ID from the given identity server. If no Matrix ID is
 // associated to the given 3PID, asks the identity server to store the invite
@@ -79,7 +79,7 @@ type idServerStoreInviteResponse struct {
 // must be processed as a non-3PID membership request. In the latter case,
 // fills the Matrix ID in the request body so a normal invite membership event
 // can be emitted.
-func CheckAndProcess(
+func CheckAndProcessInvite(
 	req *http.Request, device *authtypes.Device, body *MembershipRequest,
 	cfg config.Dendrite, queryAPI api.RoomserverQueryAPI, db *accounts.Database,
 	producer *producers.RoomserverProducer, membership string, roomID string,

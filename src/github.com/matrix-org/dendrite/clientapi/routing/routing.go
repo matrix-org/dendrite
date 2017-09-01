@@ -234,15 +234,28 @@ func Setup(
 	// PUT requests, so we need to allow this method
 
 	r0mux.Handle("/account/3pid",
-		common.MakeAPI("account_3pid", func(req *http.Request) util.JSONResponse {
-			// TODO: Get 3pid data for user ID
-			res := json.RawMessage(`{"threepids":[]}`)
-			return util.JSONResponse{
-				Code: 200,
-				JSON: &res,
-			}
+		common.MakeAuthAPI("account_3pid", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return readers.GetAssociated3PIDs(req, accountDB, device)
 		}),
-	)
+	).Methods("GET")
+
+	r0mux.Handle("/account/3pid",
+		common.MakeAuthAPI("account_3pid", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return readers.CheckAndSave3PIDAssociation(req, accountDB, device)
+		}),
+	).Methods("POST", "OPTIONS")
+
+	unstableMux.Handle("/account/3pid/delete",
+		common.MakeAuthAPI("account_3pid", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return readers.Forget3PID(req, accountDB)
+		}),
+	).Methods("POST", "OPTIONS")
+
+	r0mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
+		common.MakeAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
+			return readers.RequestEmailToken(req, accountDB)
+		}),
+	).Methods("POST", "OPTIONS")
 
 	// Riot logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",
