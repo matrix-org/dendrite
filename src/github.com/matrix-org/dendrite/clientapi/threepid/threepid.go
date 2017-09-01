@@ -166,7 +166,9 @@ func PublishAssociation(creds Credentials, userID string, cfg config.Dendrite) e
 	return nil
 }
 
-// isTrusted checks if a given identity server is
+// isTrusted checks if a given identity server is part of the list of trusted
+// identity servers in the configuration file.
+// Returns an error if the server isn't trusted.
 func isTrusted(idServer string, cfg config.Dendrite) error {
 	for _, server := range cfg.Matrix.TrustedIDServers {
 		if idServer == server {
