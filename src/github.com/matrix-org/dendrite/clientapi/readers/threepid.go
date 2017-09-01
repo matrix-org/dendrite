@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
+	"github.com/matrix-org/dendrite/common/config"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -38,7 +39,7 @@ type threePIDsResponse struct {
 // RequestEmailToken implements:
 //     POST /account/3pid/email/requestToken
 //     POST /register/email/requestToken
-func RequestEmailToken(req *http.Request, accountDB *accounts.Database) util.JSONResponse {
+func RequestEmailToken(req *http.Request, accountDB *accounts.Database, cfg config.Dendrite) util.JSONResponse {
 	var body threepid.EmailAssociationRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -63,9 +64,9 @@ func RequestEmailToken(req *http.Request, accountDB *accounts.Database) util.JSO
 		}
 	}
 
-	resp.SID, err = threepid.CreateSession(body)
+	resp.SID, err = threepid.CreateSession(body, cfg)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		return threepid.ProcessIDServerError(req, err)
 	}
 
 	return util.JSONResponse{
@@ -77,6 +78,7 @@ func RequestEmailToken(req *http.Request, accountDB *accounts.Database) util.JSO
 // CheckAndSave3PIDAssociation implements POST /account/3pid
 func CheckAndSave3PIDAssociation(
 	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	cfg config.Dendrite,
 ) util.JSONResponse {
 	var body threepid.EmailAssociationCheckRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -84,9 +86,9 @@ func CheckAndSave3PIDAssociation(
 	}
 
 	// Check if the association has been validated
-	verified, address, medium, err := threepid.CheckAssociation(body.Creds)
+	verified, address, medium, err := threepid.CheckAssociation(body.Creds, cfg)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		return threepid.ProcessIDServerError(req, err)
 	}
 
 	if !verified {
@@ -101,8 +103,8 @@ func CheckAndSave3PIDAssociation(
 
 	if body.Bind {
 		// Publish the association on the identity server if requested
-		if err = threepid.PublishAssociation(body.Creds, device.UserID); err != nil {
-			return httputil.LogThenError(req, err)
+		if err = threepid.PublishAssociation(body.Creds, device.UserID, cfg); err != nil {
+			return threepid.ProcessIDServerError(req, err)
 		}
 	}
 

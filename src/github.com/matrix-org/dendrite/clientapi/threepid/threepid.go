@@ -22,6 +22,9 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common/config"
 )
 
 // EmailAssociationRequest represents the request defined at https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-register-email-requesttoken
@@ -49,8 +52,10 @@ type Credentials struct {
 // Returns the session's ID.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func CreateSession(req EmailAssociationRequest) (string, error) {
-	// TODO: Check if the ID server is trusted
+func CreateSession(req EmailAssociationRequest, cfg config.Dendrite) (string, error) {
+	if err := isTrusted(req.IDServer, cfg); err != nil {
+		return "", err
+	}
 
 	// Create a session on the ID server
 	postURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/validate/email/requestToken", req.IDServer)
@@ -93,8 +98,11 @@ func CreateSession(req EmailAssociationRequest) (string, error) {
 // identifier and its medium.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func CheckAssociation(creds Credentials) (bool, string, string, error) {
-	// TODO: Check if the ID server is trusted
+func CheckAssociation(creds Credentials, cfg config.Dendrite) (bool, string, string, error) {
+	if err := isTrusted(creds.IDServer, cfg); err != nil {
+		return false, "", "", err
+	}
+
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/getValidated3pid?sid=%s&client_secret=%s", creds.IDServer, creds.SID, creds.Secret)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -126,8 +134,11 @@ func CheckAssociation(creds Credentials) (bool, string, string, error) {
 // identifier and a Matrix ID.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func PublishAssociation(creds Credentials, userID string) error {
-	// TODO: Check if the ID server is trusted
+func PublishAssociation(creds Credentials, userID string, cfg config.Dendrite) error {
+	if err := isTrusted(creds.IDServer, cfg); err != nil {
+		return err
+	}
+
 	postURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/bind", creds.IDServer)
 
 	data := url.Values{}
@@ -153,4 +164,14 @@ func PublishAssociation(creds Credentials, userID string) error {
 	}
 
 	return nil
+}
+
+// isTrusted checks if a given identity server is
+func isTrusted(idServer string, cfg config.Dendrite) error {
+	for _, server := range cfg.Matrix.TrustedIDServers {
+		if idServer == server {
+			return nil
+		}
+	}
+	return jsonerror.NotTrusted(idServer)
 }

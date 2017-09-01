@@ -66,6 +66,23 @@ type idServerStoreInviteResponse struct {
 	PublicKeys  []common.PublicKey `json:"public_keys"`
 }
 
+// ProcessIDServerError differentiate errors caused by the absence of the identity
+// server in the list of trusted servers in the configuration file from normal
+// errors caused by a failure in a process.
+// Returns the representation of a 400 error in the former case (without logging),
+// and the one of a 500 error in the latter (with logging of the error).
+func ProcessIDServerError(req *http.Request, err error) util.JSONResponse {
+	// Check whether this is an
+	mErr, ok := err.(*jsonerror.MatrixError)
+	if !ok || mErr.ErrCode != "M_SERVER_NOT_TRUSTED" {
+		return httputil.LogThenError(req, err)
+	}
+	return util.JSONResponse{
+		Code: 400,
+		JSON: mErr,
+	}
+}
+
 // CheckAndProcessInvite analyses the body of an incoming membership request.
 // If the fields relative to a third-party-invite are all supplied, lookups the
 // matching Matrix ID from the given identity server. If no Matrix ID is
@@ -99,7 +116,7 @@ func CheckAndProcessInvite(
 
 	lookupRes, storeInviteRes, err := queryIDServer(req, db, cfg, device, body, roomID)
 	if err != nil {
-		resErr := httputil.LogThenError(req, err)
+		resErr := ProcessIDServerError(req, err)
 		return &resErr
 	}
 
@@ -145,6 +162,10 @@ func queryIDServer(
 	req *http.Request, db *accounts.Database, cfg config.Dendrite,
 	device *authtypes.Device, body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
+	if err = isTrusted(body.IDServer, cfg); err != nil {
+		return nil, nil, err
+	}
+
 	// Lookup the 3PID
 	lookupRes, err = queryIDServerLookup(body)
 	if err != nil {
