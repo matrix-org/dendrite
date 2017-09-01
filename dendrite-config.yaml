@@ -13,6 +13,7 @@ matrix:
     # The x509 certificates used by the federation listeners for this server
     federation_certificates: ["/etc/dendrite/server.pem"]
     # The list of identity servers trusted to verify third party identifiers by this server.
+    # Defaults to no trusted servers.
     trusted_third_party_id_servers:
       - vector.im
       - matrix.org
