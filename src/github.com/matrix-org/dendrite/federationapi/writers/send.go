@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -17,19 +16,15 @@ import (
 
 // Send implements /_matrix/federation/v1/send/{txnID}
 func Send(
-	req *http.Request,
+	httpReq *http.Request,
+	request *gomatrixserverlib.FederationRequest,
 	txnID gomatrixserverlib.TransactionID,
-	now time.Time,
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	request, errResp := gomatrixserverlib.VerifyHTTPRequest(req, now, cfg.Matrix.ServerName, keys)
-	if request == nil {
-		return errResp
-	}
 
 	t := txnReq{
 		query:      query,
@@ -50,7 +45,7 @@ func Send(
 
 	resp, err := t.processTransaction()
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		return httputil.LogThenError(httpReq, err)
 	}
 
 	return util.JSONResponse{

@@ -3,31 +3,25 @@ package writers
 import (
 	"encoding/json"
 	"net/http"
-	"time"
-
-	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 // Invite implements /_matrix/federation/v1/invite/{roomID}/{eventID}
 func Invite(
-	req *http.Request,
+	httpReq *http.Request,
+	request *gomatrixserverlib.FederationRequest,
 	roomID string,
 	eventID string,
-	now time.Time,
 	cfg config.Dendrite,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
-	request, errResp := gomatrixserverlib.VerifyHTTPRequest(req, now, cfg.Matrix.ServerName, keys)
-	if request == nil {
-		return errResp
-	}
 
 	// Decode the event JSON from the request.
 	var event gomatrixserverlib.Event
@@ -70,7 +64,7 @@ func Invite(
 	}}
 	verifyResults, err := keys.VerifyJSONs(verifyRequests)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		return httputil.LogThenError(httpReq, err)
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
@@ -86,7 +80,7 @@ func Invite(
 
 	// Add the invite event to the roomserver.
 	if err = producer.SendInvite(signedEvent); err != nil {
-		return httputil.LogThenError(req, err)
+		return httputil.LogThenError(httpReq, err)
 	}
 
 	// Return the signed event to the originating server, it should then tell
