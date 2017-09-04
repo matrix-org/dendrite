@@ -30,18 +30,37 @@ import (
 // Returns nil if all the verifications succeeded.
 // Returns an error if something failed in the process.
 func CheckIDServerSignatures(idServer string, signatures map[string]map[string]string, marshalledBody []byte) error {
-	// TODO: Check if the domain is part of a list of trusted ID servers
-	idServerSignatures, ok := signatures[idServer]
-	if !ok {
-		return errors.New("No signature for domain " + idServer)
+	if len(idServer) > 0 {
+		// TODO: Check if the domain is part of a list of trusted ID servers
+		idServerSignatures, ok := signatures[idServer]
+		if !ok {
+			return errors.New("No signature for domain " + idServer)
+		}
+
+		return retrieveAndVerify(idServer, idServerSignatures, marshalledBody)
 	}
 
-	for keyID := range idServerSignatures {
-		pubKey, err := queryIDServerPubKey(idServer, keyID)
+	for domain, sigs := range signatures {
+		if err := retrieveAndVerify(domain, sigs, marshalledBody); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// retrieveAndVerify iterates over a given set of signatures and, for each of them,
+// requests the corresponding public key to the identity server and verify the
+// signature.
+// Returns an error if the verification failed or if something went wrong in the
+// process.
+func retrieveAndVerify(domain string, signatures map[string]string, marshalledBody []byte) error {
+	for keyID := range signatures {
+		pubKey, err := queryIDServerPubKey(domain, keyID)
 		if err != nil {
 			return err
 		}
-		if err = gomatrixserverlib.VerifyJSON(idServer, gomatrixserverlib.KeyID(keyID), pubKey, marshalledBody); err != nil {
+		if err = gomatrixserverlib.VerifyJSON(domain, gomatrixserverlib.KeyID(keyID), pubKey, marshalledBody); err != nil {
 			return err
 		}
 	}
