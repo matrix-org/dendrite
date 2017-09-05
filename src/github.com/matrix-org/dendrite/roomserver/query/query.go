@@ -365,6 +365,10 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 		}
 
 		_, domain, err := gomatrixserverlib.SplitID('@', *stateKey)
+		if err != nil {
+			continue
+		}
+
 		if domain == request.ServerName {
 			isInRoom = true
 			break
