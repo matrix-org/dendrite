@@ -271,17 +271,6 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	}
 }
 
-func canonicalJSONInput(jsonData []string) []string {
-	for i := range jsonData {
-		jsonBytes, err := gomatrixserverlib.CanonicalJSON([]byte(jsonData[i]))
-		if err != nil {
-			panic(err)
-		}
-		jsonData[i] = string(jsonBytes)
-	}
-	return jsonData
-}
-
 func equalJSON(a, b string) bool {
 	canonicalA, err := gomatrixserverlib.CanonicalJSON([]byte(a))
 	if err != nil {

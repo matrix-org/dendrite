@@ -49,13 +49,6 @@ var (
 	format           = flag.String("Format", "InputRoomEvent", "The output format to use for the messages: InputRoomEvent or Event")
 )
 
-func defaulting(value, defaultValue string) string {
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
 // By default we use a private key of 0.
 const defaultKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
