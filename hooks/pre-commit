@@ -2,8 +2,14 @@
 
 set -eu
 
+export GOPATH="$(pwd):$(pwd)/vendor"
+export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
+
+echo "Installing lint search engine..."
+go install github.com/alecthomas/gometalinter/
+
 echo "Looking for lint..."
-GOPATH="$(pwd):$(pwd)/vendor" gometalinter --config=linter.json ./...
+gometalinter --config=linter.json ./...
 
 echo "Double checking spelling..."
 misspell -error src *.md
@@ -16,6 +22,6 @@ gb test
 # checks that everything builds. This seems to do a better job of handling
 # missing imports than `gb build` does.
 echo "Double checking it builds..."
-GOPATH=$(pwd):$(pwd)/vendor go build github.com/matrix-org/dendrite/cmd/...
+go build github.com/matrix-org/dendrite/cmd/...
 
 echo "Done!"
