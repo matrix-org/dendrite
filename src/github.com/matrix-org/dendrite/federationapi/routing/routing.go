@@ -16,6 +16,7 @@ package routing
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -74,6 +75,16 @@ func Setup(
 			return writers.Invite(
 				httpReq, request, vars["roomID"], vars["eventID"],
 				cfg, producer, keys,
+			)
+		},
+	))
+
+	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
+		"federation_get_event", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return readers.GetEvent(
+				httpReq, request, cfg, query, time.Now(), keys, vars["eventID"],
 			)
 		},
 	))
