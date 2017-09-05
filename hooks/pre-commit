@@ -7,6 +7,7 @@ export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
 
 echo "Installing lint search engine..."
 go install github.com/alecthomas/gometalinter/
+gometalinter --config=linter.json ./... --install
 
 echo "Looking for lint..."
 gometalinter --config=linter.json ./...
