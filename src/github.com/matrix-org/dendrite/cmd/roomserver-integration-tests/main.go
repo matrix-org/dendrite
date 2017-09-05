@@ -221,14 +221,14 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	if err != nil {
 		panic(err)
 	}
-	if err := test.WriteConfig(cfg, dir); err != nil {
+	if err = test.WriteConfig(cfg, dir); err != nil {
 		panic(err)
 	}
 
 	outputTopic := string(cfg.Kafka.Topics.OutputRoomEvent)
 
 	exe.DeleteTopic(outputTopic)
-	if err := exe.CreateTopic(outputTopic); err != nil {
+	if err = exe.CreateTopic(outputTopic); err != nil {
 		panic(err)
 	}
 
