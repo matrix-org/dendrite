@@ -113,7 +113,7 @@ func createInviteFrom3PIDInvite(
 	content := common.MemberContent{
 		// TODO: Load the profile
 		Membership: "invite",
-		ThirdPartyInvite: common.TPInvite{
+		ThirdPartyInvite: &common.TPInvite{
 			Signed: inv.Signed,
 		},
 	}

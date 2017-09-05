@@ -22,11 +22,11 @@ type CreateContent struct {
 
 // MemberContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-member
 type MemberContent struct {
-	Membership       string   `json:"membership"`
-	DisplayName      string   `json:"displayname,omitempty"`
-	AvatarURL        string   `json:"avatar_url,omitempty"`
-	Reason           string   `json:"reason,omitempty"`
-	ThirdPartyInvite TPInvite `json:"third_party_invite,omitempty"`
+	Membership       string    `json:"membership"`
+	DisplayName      string    `json:"displayname,omitempty"`
+	AvatarURL        string    `json:"avatar_url,omitempty"`
+	Reason           string    `json:"reason,omitempty"`
+	ThirdPartyInvite *TPInvite `json:"third_party_invite,omitempty"`
 }
 
 // TPInvite is the "Invite" structure defined at http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-member
