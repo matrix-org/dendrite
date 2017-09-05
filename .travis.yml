@@ -18,10 +18,8 @@ services:
 
 install:
  - go get github.com/constabulary/gb/...
- - go get github.com/golang/lint/golint
- - go get github.com/fzipp/gocyclo
  - go get github.com/client9/misspell/...
- - go get github.com/gordonklaus/ineffassign
+ - go get github.com/alecthomas/gometalinter
 
 # Generate a self-signed X.509 certificate for TLS.
 before_script:
