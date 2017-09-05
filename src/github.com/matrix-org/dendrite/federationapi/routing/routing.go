@@ -78,6 +78,12 @@ func Setup(
 			)
 		},
 	))
+
+	v1fedmux.Handle("/3pid/onbind", makeAPI("3pid_onbind",
+		func(req *http.Request) util.JSONResponse {
+			return writers.CreateInvitesFrom3PIDInvites(req, query, cfg, producer)
+		},
+	))
 }
 
 func makeAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
