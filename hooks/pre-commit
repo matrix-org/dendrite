@@ -2,29 +2,27 @@
 
 set -eu
 
-golint src/...
+export GOPATH="$(pwd):$(pwd)/vendor"
+export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
+
+echo "Installing lint search engine..."
+go install github.com/alecthomas/gometalinter/
+gometalinter --config=linter.json ./... --install
+
+echo "Looking for lint..."
+gometalinter --config=linter.json ./...
+
+echo "Double checking spelling..."
 misspell -error src *.md
 
-# gofmt doesn't exit with an error code if the files don't match the expected
-# format. So we have to run it and see if it outputs anything.
-if gofmt -l -s ./src/ 2>&1 | read
-then
-    echo "Error: not all code had been formatted with gofmt."
-    echo "Fixing the following files"
-    gofmt -s -w -l ./src/
-    echo
-    echo "Please add them to the commit"
-    git status --short
-    exit 1
-fi
-
-ineffassign ./src/
-go tool vet --all --shadow ./src
-gocyclo -over 12 src/
+echo "Testing..."
 gb test
 
 # Check that all the packages can build.
 # When `go build` is given multiple packages it won't output anything, and just
 # checks that everything builds. This seems to do a better job of handling
 # missing imports than `gb build` does.
-GOPATH=$(pwd):$(pwd)/vendor go build github.com/matrix-org/dendrite/cmd/...
+echo "Double checking it builds..."
+go build github.com/matrix-org/dendrite/cmd/...
+
+echo "Done!"

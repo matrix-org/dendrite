@@ -197,7 +197,6 @@ func (m *monolith) setupFederation() {
 }
 
 func (m *monolith) setupKafka() {
-	var err error
 	if m.cfg.Kafka.UseNaffka {
 		naff, err := naffka.New(&naffka.MemoryDatabase{})
 		if err != nil {
@@ -208,6 +207,7 @@ func (m *monolith) setupKafka() {
 		m.naffka = naff
 		m.kafkaProducer = naff
 	} else {
+		var err error
 		m.kafkaProducer, err = sarama.NewSyncProducer(m.cfg.Kafka.Addresses, nil)
 		if err != nil {
 			log.WithFields(log.Fields{

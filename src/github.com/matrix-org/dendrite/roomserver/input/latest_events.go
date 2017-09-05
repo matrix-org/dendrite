@@ -99,14 +99,14 @@ type latestEventsUpdater struct {
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
-	var err error
 	var prevEvents []gomatrixserverlib.EventReference
 	prevEvents = u.event.PrevEvents()
 	oldLatest := u.updater.LatestEvents()
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 	u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 
-	if hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID); err != nil {
+	hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID)
+	if err != nil {
 		return err
 	} else if hasBeenSent {
 		// Already sent this event so we can stop processing
@@ -119,8 +119,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 	eventReference := u.event.EventReference()
 	// Check if this event is already referenced by another event in the room.
-	var alreadyReferenced bool
-	if alreadyReferenced, err = u.updater.IsReferenced(eventReference); err != nil {
+	alreadyReferenced, err := u.updater.IsReferenced(eventReference)
+	if err != nil {
 		return err
 	}
 
