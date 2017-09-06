@@ -211,7 +211,7 @@ func testUpload(host, filePath string) {
 	req.ContentLength = fileSize
 	req.Header.Set("Content-Type", testContentType)
 
-	wantedBody := `{"content_uri": "mxc://localhost:18001/"` + testMediaID + "}"
+	wantedBody := `{"content_uri": "mxc://localhost:18001/` + testMediaID + `"}`
 	testReq := &test.Request{
 		Req:              req,
 		WantedStatusCode: 200,
