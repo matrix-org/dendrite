@@ -150,7 +150,7 @@ func createTempFileWriter(absBasePath config.Path) (*bufio.Writer, *os.File, typ
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("Failed to create temp dir: %q", err)
 	}
-	writer, tmpFile, err := createFileWriter(tmpDir, "content")
+	writer, tmpFile, err := createFileWriter(tmpDir)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("Failed to create file writer: %q", err)
 	}
@@ -170,11 +170,11 @@ func createTempDir(baseDirectory config.Path) (types.Path, error) {
 	return types.Path(tmpDir), nil
 }
 
-// createFileWriter creates a buffered file writer with a new file at directory/filename
+// createFileWriter creates a buffered file writer with a new file
 // The caller should flush the writer before closing the file.
 // Returns the file handle as it needs to be closed when writing is complete
-func createFileWriter(directory types.Path, filename types.Filename) (*bufio.Writer, *os.File, error) {
-	filePath := filepath.Join(string(directory), string(filename))
+func createFileWriter(directory types.Path) (*bufio.Writer, *os.File, error) {
+	filePath := filepath.Join(string(directory), "content")
 	file, err := os.Create(filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to create file: %v", err)

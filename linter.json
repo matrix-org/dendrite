@@ -12,6 +12,7 @@
         "aligncheck",
         "ineffassign",
         "gas",
-        "misspell"
+        "misspell",
+        "unparam"
     ]
 }

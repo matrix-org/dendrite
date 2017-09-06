@@ -47,7 +47,7 @@ func Setup(
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
 
 	localKeys := common.MakeAPI("localkeys", func(req *http.Request) util.JSONResponse {
-		return readers.LocalKeys(req, cfg)
+		return readers.LocalKeys(cfg)
 	})
 
 	// Ignore the {keyID} argument as we only have a single server key so we always
@@ -84,7 +84,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return readers.GetEvent(
-				httpReq, request, cfg, query, time.Now(), keys, vars["eventID"],
+				request, cfg, query, time.Now(), keys, vars["eventID"],
 			)
 		},
 	))

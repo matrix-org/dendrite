@@ -146,7 +146,7 @@ func SetAvatarURL(
 		AvatarURL:   r.AvatarURL,
 	}
 
-	events, err := buildMembershipEvents(memberships, accountDB, newProfile, userID, cfg, queryAPI)
+	events, err := buildMembershipEvents(memberships, newProfile, userID, cfg, queryAPI)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -238,7 +238,7 @@ func SetDisplayName(
 		AvatarURL:   oldProfile.AvatarURL,
 	}
 
-	events, err := buildMembershipEvents(memberships, accountDB, newProfile, userID, cfg, queryAPI)
+	events, err := buildMembershipEvents(memberships, newProfile, userID, cfg, queryAPI)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -258,7 +258,7 @@ func SetDisplayName(
 }
 
 func buildMembershipEvents(
-	memberships []authtypes.Membership, db *accounts.Database,
+	memberships []authtypes.Membership,
 	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) ([]gomatrixserverlib.Event, error) {

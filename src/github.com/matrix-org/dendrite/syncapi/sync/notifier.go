@@ -168,7 +168,7 @@ func (n *Notifier) wakeupUser(userID string, newPos types.StreamPosition) {
 // function does not wait for data to be available on the stream.
 func (n *Notifier) fetchUserStream(userID string, makeIfNotExists bool) *UserStream {
 	stream, ok := n.userStreams[userID]
-	if !ok {
+	if !ok && makeIfNotExists {
 		// TODO: Unbounded growth of streams (1 per user)
 		stream = NewUserStream(userID)
 		n.userStreams[userID] = stream

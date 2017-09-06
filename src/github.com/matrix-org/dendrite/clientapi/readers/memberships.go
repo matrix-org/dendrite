@@ -18,7 +18,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
@@ -34,7 +33,7 @@ type response struct {
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
 	req *http.Request, device *authtypes.Device, roomID string, joinedOnly bool,
-	accountDB *accounts.Database, cfg config.Dendrite,
+	cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
 	queryReq := api.QueryMembershipsForRoomRequest{

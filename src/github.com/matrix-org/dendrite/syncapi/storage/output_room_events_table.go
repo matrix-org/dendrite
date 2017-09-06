@@ -187,7 +187,7 @@ func (s *outputRoomEventsStatements) insertEvent(txn *sql.Tx, event *gomatrixser
 
 // RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
 func (s *outputRoomEventsStatements) selectRecentEvents(
-	txn *sql.Tx, roomID string, fromPos, toPos types.StreamPosition, limit int,
+	_ *sql.Tx, roomID string, fromPos, toPos types.StreamPosition, limit int,
 ) ([]streamEvent, error) {
 	rows, err := s.selectRecentEventsStmt.Query(roomID, fromPos, toPos, limit)
 	if err != nil {

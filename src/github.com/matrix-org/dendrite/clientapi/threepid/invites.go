@@ -97,7 +97,7 @@ func CheckAndProcessInvite(
 		}
 	}
 
-	lookupRes, storeInviteRes, err := queryIDServer(req, db, cfg, device, body, roomID)
+	lookupRes, storeInviteRes, err := queryIDServer(db, cfg, device, body, roomID)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
 		return &resErr
@@ -142,7 +142,7 @@ func CheckAndProcessInvite(
 // Returns a representation of the response for both cases.
 // Returns an error if a check or a request failed.
 func queryIDServer(
-	req *http.Request, db *accounts.Database, cfg config.Dendrite,
+	db *accounts.Database, cfg config.Dendrite,
 	device *authtypes.Device, body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	// Lookup the 3PID
@@ -165,7 +165,7 @@ func queryIDServer(
 	if lookupRes.NotBefore > now || now > lookupRes.NotAfter {
 		// If the current timestamp isn't in the time frame in which the association
 		// is known to be valid, re-run the query
-		return queryIDServer(req, db, cfg, device, body, roomID)
+		return queryIDServer(db, cfg, device, body, roomID)
 	}
 
 	// Check the request signatures and send an error if one isn't valid

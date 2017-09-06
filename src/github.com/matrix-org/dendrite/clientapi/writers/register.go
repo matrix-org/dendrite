@@ -3,6 +3,7 @@ package writers
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -120,7 +121,7 @@ func Register(req *http.Request, accountDB *accounts.Database, deviceDB *devices
 			Code: 401,
 			// TODO: Hard-coded 'dummy' auth for now with a bogus session ID.
 			//       Server admins should be able to change things around (eg enable captcha)
-			JSON: newUserInteractiveResponse("totallyuniquesessionid", []authFlow{
+			JSON: newUserInteractiveResponse(time.Now().String(), []authFlow{
 				{[]authtypes.LoginType{authtypes.LoginTypeDummy}},
 			}),
 		}

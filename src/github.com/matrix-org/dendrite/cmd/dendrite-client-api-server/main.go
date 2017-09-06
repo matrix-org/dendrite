@@ -117,7 +117,7 @@ func main() {
 
 	api := mux.NewRouter()
 	routing.Setup(
-		api, http.DefaultClient, *cfg, roomserverProducer,
+		api, *cfg, roomserverProducer,
 		queryAPI, aliasAPI, accountDB, deviceDB, federation, keyRing,
 		userUpdateProducer, syncProducer,
 	)
