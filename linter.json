@@ -1,0 +1,17 @@
+{
+    "Vendor": true,
+    "Cyclo": 12,
+    "Enable": [
+        "vetshadow",
+        "gotype",
+        "deadcode",
+        "gocyclo",
+        "golint",
+        "varcheck",
+        "structcheck",
+        "aligncheck",
+        "ineffassign",
+        "gas",
+        "misspell"
+    ]
+}

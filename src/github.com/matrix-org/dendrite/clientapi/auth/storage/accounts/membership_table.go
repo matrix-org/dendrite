@@ -56,7 +56,6 @@ const updateMembershipByEventIDSQL = "" +
 type membershipStatements struct {
 	deleteMembershipsByEventIDsStmt  *sql.Stmt
 	insertMembershipStmt             *sql.Stmt
-	selectMembershipByEventIDStmt    *sql.Stmt
 	selectMembershipsByLocalpartStmt *sql.Stmt
 	updateMembershipByEventIDStmt    *sql.Stmt
 }

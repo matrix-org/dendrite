@@ -1,0 +1,429 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/GoASTScanner/gas",
+			"repository": "https://github.com/GoASTScanner/gas",
+			"vcs": "git",
+			"revision": "1beec25f7754273c9672a3368ea7048d4e73138e",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/alecthomas/gocyclo",
+			"repository": "https://github.com/alecthomas/gocyclo",
+			"vcs": "git",
+			"revision": "aa8f8b160214d8dfccfe3e17e578dd0fcc6fede7",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/client9/misspell",
+			"repository": "https://github.com/client9/misspell",
+			"vcs": "git",
+			"revision": "e1f24e3e0b6b2c8bc98584370d382ae095b13c94",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/golang/lint",
+			"repository": "https://github.com/golang/lint",
+			"vcs": "git",
+			"revision": "c5fb716d6688a859aae56d26d3e6070808df29f7",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/gordonklaus/ineffassign",
+			"repository": "https://github.com/gordonklaus/ineffassign",
+			"vcs": "git",
+			"revision": "da3d65debb9bff70fcfb6f277a8db31e8200de20",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/jgautheron/goconst",
+			"repository": "https://github.com/jgautheron/goconst",
+			"vcs": "git",
+			"revision": "9740945f5dcb78c2faa8eedcce78c2a04aa6e1e9",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/kisielk/errcheck",
+			"repository": "https://github.com/kisielk/errcheck",
+			"vcs": "git",
+			"revision": "23699b7e2cbfdb89481023524954ba2aeff6be90",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/kisielk/gotool",
+			"repository": "https://github.com/kisielk/gotool",
+			"vcs": "git",
+			"revision": "0de1eaf82fa3f583ce21fde859f1e7e0c5e9b220",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/mdempsky/unconvert",
+			"repository": "https://github.com/mdempsky/unconvert",
+			"vcs": "git",
+			"revision": "beb68d938016d2dec1d1b078054f4d3db25f97be",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/mibk/dupl",
+			"repository": "https://github.com/mibk/dupl",
+			"vcs": "git",
+			"revision": "3447d9b0cb5a3e7dccb1a9f1c975f35683f304e6",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/mvdan/interfacer",
+			"repository": "https://github.com/mvdan/interfacer",
+			"vcs": "git",
+			"revision": "22c51662ff476dfd97944f74db1b263ed920ee83",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/mvdan/lint",
+			"repository": "https://github.com/mvdan/lint",
+			"vcs": "git",
+			"revision": "c9cbe299b369cbfea16318baaa037b19a69e45d2",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/mvdan/unparam",
+			"repository": "https://github.com/mvdan/unparam",
+			"vcs": "git",
+			"revision": "d647bb803b10a6777ee4c6a176416b91fa14713e",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/opennota/check",
+			"repository": "https://github.com/opennota/check",
+			"vcs": "git",
+			"revision": "11e2eec79ec4f789607e3efbf405cdca2504d4cb",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/stripe/safesql",
+			"repository": "https://github.com/stripe/safesql",
+			"vcs": "git",
+			"revision": "452e37ed794488bd0d99676532f346e03cc6cd2c",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/tsenart/deadcode",
+			"repository": "https://github.com/tsenart/deadcode",
+			"vcs": "git",
+			"revision": "210d2dc333e90c7e3eedf4f2242507a8e83ed4ab",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/walle/lll",
+			"repository": "https://github.com/walle/lll",
+			"vcs": "git",
+			"revision": "8b13b3fbf7312913fcfdbfa78997b9bd1dbb11af",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/text/internal/gen",
+			"repository": "https://go.googlesource.com/text",
+			"vcs": "git",
+			"revision": "cfdf022e86b4ecfb646e1efbd7db175dd623a8fa",
+			"branch": "master",
+			"path": "internal/gen",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/text/internal/triegen",
+			"repository": "https://go.googlesource.com/text",
+			"vcs": "git",
+			"revision": "cfdf022e86b4ecfb646e1efbd7db175dd623a8fa",
+			"branch": "master",
+			"path": "internal/triegen",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/text/internal/ucd",
+			"repository": "https://go.googlesource.com/text",
+			"vcs": "git",
+			"revision": "cfdf022e86b4ecfb646e1efbd7db175dd623a8fa",
+			"branch": "master",
+			"path": "internal/ucd",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/text/transform",
+			"repository": "https://go.googlesource.com/text",
+			"vcs": "git",
+			"revision": "cfdf022e86b4ecfb646e1efbd7db175dd623a8fa",
+			"branch": "master",
+			"path": "transform",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/text/unicode/cldr",
+			"repository": "https://go.googlesource.com/text",
+			"vcs": "git",
+			"revision": "cfdf022e86b4ecfb646e1efbd7db175dd623a8fa",
+			"branch": "master",
+			"path": "unicode/cldr",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/text/width",
+			"repository": "https://go.googlesource.com/text",
+			"vcs": "git",
+			"revision": "cfdf022e86b4ecfb646e1efbd7db175dd623a8fa",
+			"branch": "master",
+			"path": "/width",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/cmd/goimports",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/cmd/goimports",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/cmd/gotype",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/cmd/gotype",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/container/intsets",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/container/intsets",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/ast/astutil",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "go/ast/astutil",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/buildutil",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "go/buildutil",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/callgraph",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/go/callgraph",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/gcexportdata",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/go/gcexportdata",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/gcimporter15",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/go/gcimporter15",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/loader",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/go/loader",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/pointer",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "go/pointer",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/ssa",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/go/ssa",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/go/types/typeutil",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "/go/types/typeutil",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/tools/imports",
+			"repository": "https://go.googlesource.com/tools",
+			"vcs": "git",
+			"revision": "bce9606b3f617bc6280aab6abbf25962c23f398d",
+			"branch": "master",
+			"path": "imports",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/callgraph",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "callgraph",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/cmd/gosimple",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "/cmd/gosimple",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/cmd/megacheck",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "/cmd/megacheck",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/cmd/staticcheck",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "/cmd/staticcheck",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/cmd/unused",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "/cmd/unused",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/functions",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "functions",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/gcsizes",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "gcsizes",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/internal/sharedcheck",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "/internal/sharedcheck",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/lint",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "lint",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/simple",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "simple",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/ssa",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "ssa",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/staticcheck",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "staticcheck",
+			"notests": true
+		},
+		{
+			"importpath": "honnef.co/go/tools/unused",
+			"repository": "https://github.com/dominikh/go-tools",
+			"vcs": "git",
+			"revision": "f583b587b6ff1149f9a9b0c16ebdda74da44e1a2",
+			"branch": "master",
+			"path": "unused",
+			"notests": true
+		}
+	]
+}

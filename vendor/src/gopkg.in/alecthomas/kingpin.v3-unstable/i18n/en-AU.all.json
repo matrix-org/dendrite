@@ -1,0 +1,230 @@
+[
+  {
+    "id": "'{{.Arg0}}' is a directory",
+    "translation": "'{{.Arg0}}' is a directory"
+  },
+  {
+    "id": "'{{.Arg0}}' is a file",
+    "translation": "'{{.Arg0}}' is a file"
+  },
+  {
+    "id": ": error: ",
+    "translation": ": error: "
+  },
+  {
+    "id": "\u003cEOL\u003e",
+    "translation": "\u003cEOL\u003e"
+  },
+  {
+    "id": "\u003cnil\u003e",
+    "translation": "\u003cnil\u003e"
+  },
+  {
+    "id": "Args() can't be followed by another argument '{{.Arg0}}'",
+    "translation": "Args() can't be followed by another argument '{{.Arg0}}'"
+  },
+  {
+    "id": "Generate a man page.",
+    "translation": "Generate a man page."
+  },
+  {
+    "id": "Generate completion script for ZSH.",
+    "translation": "Generate completion script for ZSH."
+  },
+  {
+    "id": "Generate completion script for bash.",
+    "translation": "Generate completion script for bash."
+  },
+  {
+    "id": "Generate long help.",
+    "translation": "Generate long help."
+  },
+  {
+    "id": "Output possible completions for the given args.",
+    "translation": "Output possible completions for the given args."
+  },
+  {
+    "id": "Show application version.",
+    "translation": "Show application version."
+  },
+  {
+    "id": "Show context-sensitive help.",
+    "translation": "Show context-sensitive help."
+  },
+  {
+    "id": "Show help on command.",
+    "translation": "Show help on command."
+  },
+  {
+    "id": "Show help.",
+    "translation": "Show help."
+  },
+  {
+    "id": "[\u003cflags\u003e]",
+    "translation": "[\u003cflags\u003e]"
+  },
+  {
+    "id": "alias duplicates existing command {{.Arg0}}",
+    "translation": "alias duplicates existing command {{.Arg0}}"
+  },
+  {
+    "id": "argument",
+    "translation": "argument"
+  },
+  {
+    "id": "can't mix Arg()s with Command()s",
+    "translation": "can't mix Arg()s with Command()s"
+  },
+  {
+    "id": "can't mix top-level Arg()s with Command()s",
+    "translation": "can't mix top-level Arg()s with Command()s"
+  },
+  {
+    "id": "command not specified",
+    "translation": "command not specified"
+  },
+  {
+    "id": "default subcommand {{.Arg0}} provided but no subcommands defined",
+    "translation": "default subcommand {{.Arg0}} provided but no subcommands defined"
+  },
+  {
+    "id": "duplicate argument '{{.Arg0}}'",
+    "translation": "duplicate argument '{{.Arg0}}'"
+  },
+  {
+    "id": "duplicate command {{.Arg0}}",
+    "translation": "duplicate command {{.Arg0}}"
+  },
+  {
+    "id": "duplicate long flag --{{.Arg0}}",
+    "translation": "duplicate long flag --{{.Arg0}}"
+  },
+  {
+    "id": "duplicate short flag -{{.Arg0}}",
+    "translation": "duplicate short flag -{{.Arg0}}"
+  },
+  {
+    "id": "enum value must be one of {{.Arg0}}, got '{{.Arg1}}'",
+    "translation": "enum value must be one of {{.Arg0}}, got '{{.Arg1}}'"
+  },
+  {
+    "id": "error",
+    "translation": "error"
+  },
+  {
+    "id": "error: ",
+    "translation": "error: "
+  },
+  {
+    "id": "expected KEY=VALUE got '{{.Arg0}}'",
+    "translation": "expected KEY=VALUE got '{{.Arg0}}'"
+  },
+  {
+    "id": "expected argument for flag '{{.Arg0}}'",
+    "translation": "expected argument for flag '{{.Arg0}}'"
+  },
+  {
+    "id": "expected command but got {{.Arg0}}",
+    "translation": "expected command but got {{.Arg0}}"
+  },
+  {
+    "id": "flag '{{.Arg0}}' cannot be repeated",
+    "translation": "flag '{{.Arg0}}' cannot be repeated"
+  },
+  {
+    "id": "invalid URL: {{.Arg0}}",
+    "translation": "invalid URL: {{.Arg0}}"
+  },
+  {
+    "id": "invalid default for '--{{.Arg0}}', expecting single value",
+    "translation": "invalid default for '--{{.Arg0}}', expecting single value"
+  },
+  {
+    "id": "invalid default value '{{.Arg0}}' for argument '{{.Arg1}}'",
+    "translation": "invalid default value '{{.Arg0}}' for argument '{{.Arg1}}'"
+  },
+  {
+    "id": "long flag",
+    "translation": "long flag"
+  },
+  {
+    "id": "more than one default subcommand exists: {{.Arg0}}",
+    "translation": "more than one default subcommand exists: {{.Arg0}}"
+  },
+  {
+    "id": "must select a subcommand of '{{.Arg0}}'",
+    "translation": "must select a subcommand of '{{.Arg0}}'"
+  },
+  {
+    "id": "no type defined for --{{.Arg0}} (eg. .String())",
+    "translation": "no type defined for --{{.Arg0}} (eg. .String())"
+  },
+  {
+    "id": "path '{{.Arg0}}' does not exist",
+    "translation": "path '{{.Arg0}}' does not exist"
+  },
+  {
+    "id": "required argument '{{.Arg0}}' not provided",
+    "translation": "required argument '{{.Arg0}}' not provided"
+  },
+  {
+    "id": "required arguments found after non-required",
+    "translation": "required arguments found after non-required"
+  },
+  {
+    "id": "required flag '--{{.Arg0}}' with default value that will never be used",
+    "translation": "required flag '--{{.Arg0}}' with default value that will never be used"
+  },
+  {
+    "id": "required flag --{{.Arg0}} not provided",
+    "translation": "required flag --{{.Arg0}} not provided"
+  },
+  {
+    "id": "short flag",
+    "translation": "short flag"
+  },
+  {
+    "id": "unexpected argument '{{.Arg0}}'",
+    "translation": "unexpected argument '{{.Arg0}}'"
+  },
+  {
+    "id": "unexpected '{{.Arg0}}'",
+    "translation": "unexpected '{{.Arg0}}'"
+  },
+  {
+    "id": "unknown",
+    "translation": "unknown"
+  },
+  {
+    "id": "unknown long flag '{{.Arg0}}'",
+    "translation": "unknown long flag '{{.Arg0}}'"
+  },
+  {
+    "id": "unknown short flag '{{.Arg0}}'",
+    "translation": "unknown short flag '{{.Arg0}}'"
+  },
+  {
+    "id": "{{.Arg0}}, try --help",
+    "translation": "{{.Arg0}}, try --help"
+  },
+  {
+    "id": "usage:",
+    "translation": "usage:"
+  },
+  {
+    "id": "Flags:",
+    "translation": "Flags:"
+  },
+  {
+    "id": "Args:",
+    "translation": "Args:"
+  },
+  {
+    "id": "Commands:",
+    "translation": "Commands:"
+  },
+  {
+    "id": "Subcommands:",
+    "translation": "Subcommands:"
+  }
+]

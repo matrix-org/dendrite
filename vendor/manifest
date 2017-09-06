@@ -14,6 +14,18 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/alecthomas/gometalinter",
+			"repository": "https://github.com/alecthomas/gometalinter",
+			"revision": "5507b26af3204e949ffe50ec08ee73e5847938e1",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/alecthomas/units",
+			"repository": "https://github.com/alecthomas/units",
+			"revision": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/beorn7/perks/quantile",
 			"repository": "https://github.com/beorn7/perks",
 			"revision": "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9",
@@ -57,6 +69,12 @@
 			"importpath": "github.com/golang/snappy",
 			"repository": "https://github.com/golang/snappy",
 			"revision": "7db9049039a047d955fe8c19b83c8ff5abd765c7",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/google/shlex",
+			"repository": "https://github.com/google/shlex",
+			"revision": "6f45313302b9c56850fc17f99e40caebce98c716",
 			"branch": "master"
 		},
 		{
@@ -127,6 +145,19 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/nicksnyder/go-i18n/i18n",
+			"repository": "https://github.com/nicksnyder/go-i18n",
+			"revision": "3e70a1a463008cea6726380c908b1a6a8bdf7b24",
+			"branch": "master",
+			"path": "/i18n"
+		},
+		{
+			"importpath": "github.com/pelletier/go-toml",
+			"repository": "https://github.com/pelletier/go-toml",
+			"revision": "1d6b12b7cb290426e27e6b4e38b89fcda3aeef03",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/pierrec/lz4",
 			"repository": "https://github.com/pierrec/lz4",
 			"revision": "5c9560bfa9ace2bf86080bf40d46b34ae44604df",
@@ -138,6 +169,13 @@
 			"revision": "5a004441f897722c627870a981d02b29924215fa",
 			"branch": "master",
 			"path": "/xxHash32"
+		},
+		{
+			"importpath": "github.com/pmezard/go-difflib/difflib",
+			"repository": "https://github.com/pmezard/go-difflib",
+			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
+			"branch": "master",
+			"path": "/difflib"
 		},
 		{
 			"importpath": "github.com/prometheus/client_golang",
@@ -192,6 +230,20 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/stretchr/testify/assert",
+			"repository": "https://github.com/stretchr/testify",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"branch": "master",
+			"path": "/assert"
+		},
+		{
+			"importpath": "github.com/stretchr/testify/require",
+			"repository": "https://github.com/stretchr/testify",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"branch": "master",
+			"path": "/require"
+		},
+		{
 			"importpath": "github.com/tj/go-debug",
 			"repository": "https://github.com/tj/go-debug",
 			"revision": "ff4a55a20a86994118644bbddc6a216da193cc13",
@@ -236,6 +288,12 @@
 			"repository": "https://gopkg.in/airbrake/gobrake.v2",
 			"revision": "668876711219e8b0206e2994bf0a59d889c775aa",
 			"branch": "master"
+		},
+		{
+			"importpath": "gopkg.in/alecthomas/kingpin.v3-unstable",
+			"repository": "https://gopkg.in/alecthomas/kingpin.v3-unstable",
+			"revision": "23bcc3c4eae3c47e1384a1aef1d611e5603b8dfc",
+			"branch": "v3-unstable"
 		},
 		{
 			"importpath": "gopkg.in/gemnasium/logrus-airbrake-hook.v2",
