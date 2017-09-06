@@ -18,12 +18,13 @@ package state
 
 import (
 	"fmt"
+	"sort"
+	"time"
+
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"sort"
-	"time"
 )
 
 // A RoomStateDatabase has the storage APIs needed to load state from the database
@@ -56,6 +57,8 @@ type RoomStateDatabase interface {
 	// Look up the Events for a list of numeric event IDs.
 	// Returns a sorted list of events.
 	Events(eventNIDs []types.EventNID) ([]types.Event, error)
+	// Look up snapshot NID for an event ID string
+	SnapshotNIDFromEventID(eventID string) (types.StateSnapshotNID, error)
 }
 
 // LoadStateAtSnapshot loads the full state of a room at a particular snapshot.
@@ -94,6 +97,21 @@ func LoadStateAtSnapshot(db RoomStateDatabase, stateNID types.StateSnapshotNID) 
 	// Unique returns the last entry and hence the most recent entry for each state key.
 	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
 	return fullState, nil
+}
+
+// LoadStateAtEvent loads the full state of a room at a particular event.
+func LoadStateAtEvent(db RoomStateDatabase, eventID string) ([]types.StateEntry, error) {
+	snapshotNID, err := db.SnapshotNIDFromEventID(eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	stateEntries, err := LoadStateAtSnapshot(db, snapshotNID)
+	if err != nil {
+		return nil, err
+	}
+
+	return stateEntries, nil
 }
 
 // LoadCombinedStateAfterEvents loads a snapshot of the state after each of the events
