@@ -48,9 +48,10 @@ func GetEvent(
 	}
 
 	var eventsResponse api.QueryEventsByIDResponse
-	err = query.QueryEventsByID(&api.QueryEventsByIDRequest{
-		EventIDs: []string{eventID},
-	}, &eventsResponse)
+	err = query.QueryEventsByID(
+		&api.QueryEventsByIDRequest{EventIDs: []string{eventID}},
+		&eventsResponse,
+	)
 
 	if err != nil {
 		return util.ErrorResponse(err)
