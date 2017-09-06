@@ -59,7 +59,7 @@ func CreateInvitesFrom3PIDInvites(
 
 	evs := []gomatrixserverlib.Event{}
 	for _, inv := range body.Invites {
-		err, event := createInviteFrom3PIDInvite(req, queryAPI, cfg, inv)
+		event, err := createInviteFrom3PIDInvite(req, queryAPI, cfg, inv)
 		if err != nil {
 			return *err
 		}
@@ -82,24 +82,24 @@ func CreateInvitesFrom3PIDInvites(
 func createInviteFrom3PIDInvite(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	inv invite,
-) (*util.JSONResponse, *gomatrixserverlib.Event) {
+) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// Check if the token was provided
 	if inv.Signed.Token == "" {
-		return &util.JSONResponse{
+		return nil, &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown("Rejecting received notification of third-party invite without signed"),
-		}, nil
+		}
 	}
 
 	// Check the signatures
 	marshalledSigned, err := json.Marshal(inv.Signed)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
-		return &resErr, nil
+		return nil, &resErr
 	}
 	if err := threepid.CheckIDServerSignatures("", inv.Signed.Signatures, marshalledSigned); err != nil {
 		resErr := httputil.LogThenError(req, err)
-		return &resErr, nil
+		return nil, &resErr
 	}
 
 	// Build the event
@@ -120,13 +120,13 @@ func createInviteFrom3PIDInvite(
 
 	if err := builder.SetContent(content); err != nil {
 		resErr := httputil.LogThenError(req, err)
-		return &resErr, nil
+		return nil, &resErr
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
-		return &resErr, nil
+		return nil, &resErr
 	}
 
 	// Ask the roomserver for information about this room
@@ -137,7 +137,7 @@ func createInviteFrom3PIDInvite(
 	var queryRes api.QueryLatestEventsAndStateResponse
 	if err = queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); err != nil {
 		resErr := httputil.LogThenError(req, err)
-		return &resErr, nil
+		return nil, &resErr
 	}
 
 	if !queryRes.RoomExists {
@@ -147,7 +147,7 @@ func createInviteFrom3PIDInvite(
 
 	if err = fillDisplayName(builder, content, queryRes.StateEvents); err != nil {
 		resErr := httputil.LogThenError(req, err)
-		return &resErr, nil
+		return nil, &resErr
 	}
 
 	// Finish building the event
@@ -163,7 +163,7 @@ func createInviteFrom3PIDInvite(
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
-		return &resErr, nil
+		return nil, &resErr
 	}
 	builder.AuthEvents = refs
 
@@ -172,10 +172,10 @@ func createInviteFrom3PIDInvite(
 	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
-		return &resErr, nil
+		return nil, &resErr
 	}
 
-	return nil, &event
+	return &event, nil
 }
 
 func fillDisplayName(
