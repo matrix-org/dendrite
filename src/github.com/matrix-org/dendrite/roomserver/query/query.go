@@ -340,6 +340,8 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 		return err
 	}
 
+	// TODO: We probably want to make it so that we don't have to pull
+	// out all the state if possible.
 	stateAtEvent, err := r.loadStateEvents(stateEntries)
 	if err != nil {
 		return err
