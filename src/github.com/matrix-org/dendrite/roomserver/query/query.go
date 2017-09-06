@@ -387,6 +387,7 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 }
 
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
+// nolint: gocyclo
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,
