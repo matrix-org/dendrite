@@ -21,11 +21,9 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/threepid"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -79,29 +77,12 @@ func CreateInvitesFrom3PIDInvites(
 	}
 }
 
+// createInviteFrom3PIDInvite processes an invite provided by the identity server
+// and creates a m.room.member event (with "invite" membership) from it
 func createInviteFrom3PIDInvite(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	inv invite,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
-	// Check if the token was provided
-	if inv.Signed.Token == "" {
-		return nil, &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.Unknown("Rejecting received notification of third-party invite without signed"),
-		}
-	}
-
-	// Check the signatures
-	marshalledSigned, err := json.Marshal(inv.Signed)
-	if err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
-	}
-	if err := threepid.CheckIDServerSignatures("", inv.Signed.Signatures, marshalledSigned); err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
-	}
-
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
 		Type:     "m.room.member",
