@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 )
 
@@ -175,5 +174,5 @@ func isTrusted(idServer string, cfg config.Dendrite) error {
 			return nil
 		}
 	}
-	return jsonerror.NotTrusted(idServer)
+	return ErrNotTrusted
 }

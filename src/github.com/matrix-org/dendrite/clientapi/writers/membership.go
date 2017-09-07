@@ -47,10 +47,36 @@ func SendMembership(
 		return *reqErr
 	}
 
-	if res := threepid.CheckAndProcessInvite(
+	inviteStored, err := threepid.CheckAndProcessInvite(
 		req, device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
-	); res != nil {
-		return *res
+	)
+	if err == threepid.ErrMissingParameter {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	} else if err == threepid.ErrNotTrusted {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.NotTrusted(body.IDServer),
+		}
+	} else if err == events.ErrRoomNoExists {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(err.Error()),
+		}
+	} else if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	// If an invite has been stored on an identity server, it means that a
+	// m.room.third_party_invite event has been emitted and that we shouldn't
+	// emit a m.room.member one.
+	if inviteStored {
+		return util.JSONResponse{
+			Code: 200,
+			JSON: struct{}{},
+		}
 	}
 
 	event, err := buildMembershipEvent(

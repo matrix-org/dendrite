@@ -65,8 +65,13 @@ func RequestEmailToken(req *http.Request, accountDB *accounts.Database, cfg conf
 	}
 
 	resp.SID, err = threepid.CreateSession(body, cfg)
-	if err != nil {
-		return threepid.ProcessIDServerError(req, err)
+	if err == threepid.ErrNotTrusted {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.NotTrusted(body.IDServer),
+		}
+	} else if err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
@@ -87,8 +92,13 @@ func CheckAndSave3PIDAssociation(
 
 	// Check if the association has been validated
 	verified, address, medium, err := threepid.CheckAssociation(body.Creds, cfg)
-	if err != nil {
-		return threepid.ProcessIDServerError(req, err)
+	if err == threepid.ErrNotTrusted {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.NotTrusted(body.Creds.IDServer),
+		}
+	} else if err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
 	if !verified {
@@ -103,8 +113,14 @@ func CheckAndSave3PIDAssociation(
 
 	if body.Bind {
 		// Publish the association on the identity server if requested
-		if err = threepid.PublishAssociation(body.Creds, device.UserID, cfg); err != nil {
-			return threepid.ProcessIDServerError(req, err)
+		err = threepid.PublishAssociation(body.Creds, device.UserID, cfg)
+		if err == threepid.ErrNotTrusted {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.NotTrusted(body.Creds.IDServer),
+			}
+		} else if err != nil {
+			return httputil.LogThenError(req, err)
 		}
 	}
 
