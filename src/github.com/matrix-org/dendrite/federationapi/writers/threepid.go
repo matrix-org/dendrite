@@ -59,7 +59,7 @@ func CreateInvitesFrom3PIDInvites(
 	for _, inv := range body.Invites {
 		event, err := createInviteFrom3PIDInvite(req, queryAPI, cfg, inv)
 		if err != nil {
-			return *err
+			return httputil.LogThenError(req, err)
 		}
 		if event != nil {
 			evs = append(evs, *event)
@@ -78,11 +78,11 @@ func CreateInvitesFrom3PIDInvites(
 }
 
 // createInviteFrom3PIDInvite processes an invite provided by the identity server
-// and creates a m.room.member event (with "invite" membership) from it
+// and creates a m.room.member event (with "invite" membership) from it.
 func createInviteFrom3PIDInvite(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	inv invite,
-) (*gomatrixserverlib.Event, *util.JSONResponse) {
+) (*gomatrixserverlib.Event, error) {
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
 		Type:     "m.room.member",
@@ -100,14 +100,12 @@ func createInviteFrom3PIDInvite(
 	}
 
 	if err := builder.SetContent(content); err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
+		return nil, err
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
+		return nil, err
 	}
 
 	// Ask the roomserver for information about this room
@@ -117,8 +115,7 @@ func createInviteFrom3PIDInvite(
 	}
 	var queryRes api.QueryLatestEventsAndStateResponse
 	if err = queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
+		return nil, err
 	}
 
 	if !queryRes.RoomExists {
@@ -127,8 +124,7 @@ func createInviteFrom3PIDInvite(
 	}
 
 	if err = fillDisplayName(builder, content, queryRes.StateEvents); err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
+		return nil, err
 	}
 
 	// Finish building the event
@@ -143,8 +139,7 @@ func createInviteFrom3PIDInvite(
 
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
 	if err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
+		return nil, err
 	}
 	builder.AuthEvents = refs
 
@@ -152,8 +147,7 @@ func createInviteFrom3PIDInvite(
 	now := time.Now()
 	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
+		return nil, err
 	}
 
 	return &event, nil
