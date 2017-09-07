@@ -79,6 +79,8 @@ func CreateInvitesFrom3PIDInvites(
 
 // createInviteFrom3PIDInvite processes an invite provided by the identity server
 // and creates a m.room.member event (with "invite" membership) from it.
+// Returns an error if there was a problem building the event or fetching the
+// necessary data to do so.
 func createInviteFrom3PIDInvite(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	inv invite,
@@ -153,28 +155,40 @@ func createInviteFrom3PIDInvite(
 	return &event, nil
 }
 
+// fillDisplayName looks in the room's state events for a m.room.third_party_invite
+// event with the state key matching a given m.room.member event's content's token.
+// If such an event is found, fills the "display_name" attribute of the
+// "third_party_invite" structure in the m.room.member event with the display_name
+// from the m.room.third_party_invite event.
+// Returns an error if there was a problem parsing the m.room.third_party_invite
+// event's content or updating the m.room.member event's content.
+// Returns nil if no m.room.third_party_invite with a matching token could be
+// found. Returning an error isn't necessary in this case as the event will be
+// rejected by gomatrixserverlib.
 func fillDisplayName(
 	builder *gomatrixserverlib.EventBuilder, content common.MemberContent,
 	stateEvents []gomatrixserverlib.Event,
 ) error {
 	// Look for the m.room.third_party_invite event
-	var thirdPartyInviteEvent gomatrixserverlib.Event
+	var thirdPartyInviteEvent *gomatrixserverlib.Event
 	for _, event := range stateEvents {
-		if event.Type() == "m.room.third_party_invite" {
-			thirdPartyInviteEvent = event
+		if event.Type() == "m.room.third_party_invite" && *(event.StateKey()) == content.ThirdPartyInvite.Signed.Token {
+			thirdPartyInviteEvent = &event
 		}
 	}
 
-	var thirdPartyInviteContent common.ThirdPartyInviteContent
-	if err := json.Unmarshal(thirdPartyInviteEvent.Content(), &thirdPartyInviteContent); err != nil {
-		return err
-	}
+	if thirdPartyInviteEvent != nil {
+		var thirdPartyInviteContent common.ThirdPartyInviteContent
+		if err := json.Unmarshal(thirdPartyInviteEvent.Content(), &thirdPartyInviteContent); err != nil {
+			return err
+		}
 
-	// Use the m.room.third_party_invite event to fill the "displayname" and
-	// update the m.room.member event's content with it
-	content.ThirdPartyInvite.DisplayName = thirdPartyInviteContent.DisplayName
-	if err := builder.SetContent(content); err != nil {
-		return err
+		// Use the m.room.third_party_invite event to fill the "displayname" and
+		// update the m.room.member event's content with it
+		content.ThirdPartyInvite.DisplayName = thirdPartyInviteContent.DisplayName
+		if err := builder.SetContent(content); err != nil {
+			return err
+		}
 	}
 
 	return nil
