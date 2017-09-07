@@ -136,6 +136,20 @@ type QueryInvitesForUserResponse struct {
 	InviteSenderUserIDs []string `json:"invite_sender_user_ids"`
 }
 
+// QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent
+type QueryServerAllowedToSeeEventRequest struct {
+	// The event ID to look up invites in.
+	EventID string `json:"event_id"`
+	// The server interested in the event
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+}
+
+// QueryServerAllowedToSeeEventResponse is a response to QueryServerAllowedToSeeEvent
+type QueryServerAllowedToSeeEventResponse struct {
+	// Wether the server in question is allowed to see the event
+	AllowedToSeeEvent bool `json:"can_see_event"`
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -167,6 +181,12 @@ type RoomserverQueryAPI interface {
 		request *QueryInvitesForUserRequest,
 		response *QueryInvitesForUserResponse,
 	) error
+
+	// Query whether a server is allowed to see an event
+	QueryServerAllowedToSeeEvent(
+		request *QueryServerAllowedToSeeEventRequest,
+		response *QueryServerAllowedToSeeEventResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -183,6 +203,9 @@ const RoomserverQueryMembershipsForRoomPath = "/api/roomserver/queryMembershipsF
 
 // RoomserverQueryInvitesForUserPath is the HTTP path for the QueryInvitesForUser API
 const RoomserverQueryInvitesForUserPath = "/api/roomserver/queryInvitesForUser"
+
+// RoomserverQueryServerAllowedToSeeEventPath is the HTTP path for the QueryServerAllowedToSeeEvent API
+const RoomserverQueryServerAllowedToSeeEventPath = "/api/roomserver/queryServerAllowedToSeeEvent"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -240,6 +263,15 @@ func (h *httpRoomserverQueryAPI) QueryInvitesForUser(
 	response *QueryInvitesForUserResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryInvitesForUserPath
+	return postJSON(h.httpClient, apiURL, request, response)
+}
+
+// QueryServerAllowedToSeeEvent implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
+	request *QueryServerAllowedToSeeEventRequest,
+	response *QueryServerAllowedToSeeEventResponse,
+) error {
+	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
 	return postJSON(h.httpClient, apiURL, request, response)
 }
 

@@ -1,0 +1,46 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/alecthomas/units",
+			"repository": "https://github.com/alecthomas/units",
+			"vcs": "git",
+			"revision": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/google/shlex",
+			"repository": "https://github.com/google/shlex",
+			"vcs": "git",
+			"revision": "6f45313302b9c56850fc17f99e40caebce98c716",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/nicksnyder/go-i18n/i18n",
+			"repository": "https://github.com/nicksnyder/go-i18n",
+			"vcs": "git",
+			"revision": "2c24b78755bd85f2b97c45f6f1bf906660b59d56",
+			"branch": "master",
+			"path": "/i18n",
+			"notests": true
+		},
+		{
+			"importpath": "gopkg.in/alecthomas/kingpin.v3-unstable",
+			"repository": "https://gopkg.in/alecthomas/kingpin.v3-unstable",
+			"vcs": "git",
+			"revision": "9670b87a702e049784340892f0d31a46473041c7",
+			"branch": "v3-unstable",
+			"notests": true
+		},
+		{
+			"importpath": "gopkg.in/yaml.v2",
+			"repository": "https://gopkg.in/yaml.v2",
+			"vcs": "git",
+			"revision": "a3f3340b5840cee44f372bddb5880fcbc419b46a",
+			"branch": "v2",
+			"notests": true
+		}
+	]
+}

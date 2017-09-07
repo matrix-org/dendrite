@@ -226,6 +226,12 @@ func (d *Database) StateEntries(stateBlockNIDs []types.StateBlockNID) ([]types.S
 	return d.statements.bulkSelectStateBlockEntries(stateBlockNIDs)
 }
 
+// SnapshotNIDFromEventID implements state.RoomStateDatabase
+func (d *Database) SnapshotNIDFromEventID(eventID string) (types.StateSnapshotNID, error) {
+	_, stateNID, err := d.statements.selectEvent(eventID)
+	return stateNID, err
+}
+
 // EventIDs implements input.RoomEventDatabase
 func (d *Database) EventIDs(eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
 	return d.statements.bulkSelectEventID(eventNIDs)

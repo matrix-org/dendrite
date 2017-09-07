@@ -330,7 +330,66 @@ func (r *RoomserverQueryAPI) QueryInvitesForUser(
 	return nil
 }
 
+// QueryServerAllowedToSeeEvent implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
+	request *api.QueryServerAllowedToSeeEventRequest,
+	response *api.QueryServerAllowedToSeeEventResponse,
+) error {
+	stateEntries, err := state.LoadStateAtEvent(r.DB, request.EventID)
+	if err != nil {
+		return err
+	}
+
+	// TODO: We probably want to make it so that we don't have to pull
+	// out all the state if possible.
+	stateAtEvent, err := r.loadStateEvents(stateEntries)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Should this be lifted out of here to a more general set of
+	// auth functions?
+
+	isInRoom := false
+	for _, ev := range stateAtEvent {
+		membership, err := ev.Membership()
+		if err != nil {
+			continue
+		}
+
+		if membership != "join" {
+			continue
+		}
+
+		stateKey := ev.StateKey()
+		if stateKey == nil {
+			continue
+		}
+
+		_, domain, err := gomatrixserverlib.SplitID('@', *stateKey)
+		if err != nil {
+			continue
+		}
+
+		if domain == request.ServerName {
+			isInRoom = true
+			break
+		}
+	}
+
+	if isInRoom {
+		response.AllowedToSeeEvent = true
+		return nil
+	}
+
+	// TODO: Check if history visibility is shared and if the server is currently in the room
+
+	response.AllowedToSeeEvent = false
+	return nil
+}
+
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
+// nolint: gocyclo
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,
@@ -397,6 +456,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryInvitesForUser(&request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryServerAllowedToSeeEventPath,
+		common.MakeAPI("queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
+			var request api.QueryServerAllowedToSeeEventRequest
+			var response api.QueryServerAllowedToSeeEventResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryServerAllowedToSeeEvent(&request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
