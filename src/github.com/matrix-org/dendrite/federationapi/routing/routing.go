@@ -79,12 +79,12 @@ func Setup(
 		},
 	))
 
-	v1fedmux.Handle("/3pid/onbind", makeAPI("3pid_onbind",
-		func(req *http.Request) util.JSONResponse {
-			return writers.CreateInvitesFrom3PIDInvites(req, query, cfg, producer)
+	v1fedmux.Handle("/3pid/onbind", common.MakeFedAPI(
+		"3pid_onbind", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			return writers.CreateInvitesFrom3PIDInvites(httpReq, query, cfg, producer)
 		},
 	))
-}
 
 	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
 		"federation_get_event", cfg.Matrix.ServerName, keys,
