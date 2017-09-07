@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/threepid"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -170,11 +169,7 @@ func queryIDServer(
 	}
 
 	// Check the request signatures and send an error if one isn't valid
-	marshalledBody, err := json.Marshal(*lookupRes)
-	if err != nil {
-		return
-	}
-	if err = threepid.CheckIDServerSignatures(body.IDServer, lookupRes.Signatures, marshalledBody); err != nil {
+	if err = checkIDServerSignatures(body, lookupRes); err != nil {
 		return
 	}
 
@@ -262,6 +257,63 @@ func queryIDServerStoreInvite(
 	var idResp idServerStoreInviteResponse
 	err = json.NewDecoder(resp.Body).Decode(&idResp)
 	return &idResp, err
+}
+
+// queryIDServerPubKey requests a public key identified with a given ID to the
+// a given identity server and returns the matching base64-decoded public key.
+// Returns an error if the request couldn't be sent, if its body couldn't be parsed
+// or if the key couldn't be decoded from base64.
+func queryIDServerPubKey(idServerName string, keyID string) ([]byte, error) {
+	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/pubkey/%s", idServerName, keyID)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	var pubKeyRes struct {
+		PublicKey gomatrixserverlib.Base64String `json:"public_key"`
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		// TODO: Log the error supplied with the identity server?
+		errMsg := fmt.Sprintf("Couldn't retrieve key %s from server %s", keyID, idServerName)
+		return nil, errors.New(errMsg)
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&pubKeyRes)
+	return pubKeyRes.PublicKey, err
+}
+
+// checkIDServerSignatures iterates over the signatures of a requests.
+// If no signature can be found for the ID server's domain, returns an error, else
+// iterates over the signature for the said domain, retrieves the matching public
+// key, and verify it.
+// Returns nil if all the verifications succeeded.
+// Returns an error if something failed in the process.
+func checkIDServerSignatures(body *MembershipRequest, res *idServerLookupResponse) error {
+	// Mashall the body so we can give it to VerifyJSON
+	marshalledBody, err := json.Marshal(*res)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Check if the domain is part of a list of trusted ID servers
+	signatures, ok := res.Signatures[body.IDServer]
+	if !ok {
+		return errors.New("No signature for domain " + body.IDServer)
+	}
+
+	for keyID := range signatures {
+		pubKey, err := queryIDServerPubKey(body.IDServer, keyID)
+		if err != nil {
+			return err
+		}
+		if err = gomatrixserverlib.VerifyJSON(body.IDServer, gomatrixserverlib.KeyID(keyID), pubKey, marshalledBody); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // emit3PIDInviteEvent builds and sends a "m.room.third_party_invite" event.
