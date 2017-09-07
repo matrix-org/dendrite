@@ -15,7 +15,6 @@
 package readers
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
@@ -26,7 +25,6 @@ import (
 
 // GetEvent returns the requested event
 func GetEvent(
-	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,

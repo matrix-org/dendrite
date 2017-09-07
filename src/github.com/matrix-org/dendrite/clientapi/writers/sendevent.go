@@ -40,7 +40,7 @@ type sendEventResponse struct {
 func SendEvent(
 	req *http.Request,
 	device *authtypes.Device,
-	roomID, eventType, txnID string, stateKey *string,
+	roomID, eventType, _ string, stateKey *string,
 	cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,

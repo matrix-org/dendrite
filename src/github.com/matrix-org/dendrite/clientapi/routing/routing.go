@@ -40,7 +40,7 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
 func Setup(
-	apiMux *mux.Router, httpClient *http.Client, cfg config.Dendrite,
+	apiMux *mux.Router, cfg config.Dendrite,
 	producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 	aliasAPI api.RoomserverAliasAPI,
 	accountDB *accounts.Database,
@@ -121,7 +121,7 @@ func Setup(
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.DirectoryRoom(req, device, vars["roomAlias"], federation, &cfg, aliasAPI)
+			return readers.DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI)
 		}),
 	).Methods("GET")
 
@@ -135,7 +135,7 @@ func Setup(
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.RemoveLocalAlias(req, device, vars["roomAlias"], &cfg, aliasAPI)
+			return readers.RemoveLocalAlias(req, device, vars["roomAlias"], aliasAPI)
 		}),
 	).Methods("DELETE")
 
@@ -315,14 +315,14 @@ func Setup(
 	r0mux.Handle("/rooms/{roomID}/members",
 		common.MakeAuthAPI("rooms_members", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.GetMemberships(req, device, vars["roomID"], false, accountDB, cfg, queryAPI)
+			return readers.GetMemberships(req, device, vars["roomID"], false, cfg, queryAPI)
 		}),
 	)
 
 	r0mux.Handle("/rooms/{roomID}/joined_members",
 		common.MakeAuthAPI("rooms_members", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.GetMemberships(req, device, vars["roomID"], true, accountDB, cfg, queryAPI)
+			return readers.GetMemberships(req, device, vars["roomID"], true, cfg, queryAPI)
 		}),
 	)
 

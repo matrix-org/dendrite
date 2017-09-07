@@ -31,7 +31,7 @@ import (
 const pathPrefixR0 = "/_matrix/media/v1"
 
 // Setup registers the media API HTTP handlers
-func Setup(apiMux *mux.Router, httpClient *http.Client, cfg *config.Dendrite, db *storage.Database) {
+func Setup(apiMux *mux.Router, cfg *config.Dendrite, db *storage.Database) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{

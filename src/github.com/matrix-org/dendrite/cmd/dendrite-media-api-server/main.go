@@ -54,7 +54,7 @@ func main() {
 	log.Info("Starting media API server on ", cfg.Listen.MediaAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, http.DefaultClient, cfg, db)
+	routing.Setup(api, cfg, db)
 	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.MediaAPI), nil))

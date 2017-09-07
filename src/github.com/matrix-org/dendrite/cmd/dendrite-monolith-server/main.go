@@ -318,13 +318,13 @@ func (m *monolith) setupConsumers() {
 
 func (m *monolith) setupAPIs() {
 	clientapi_routing.Setup(
-		m.api, http.DefaultClient, *m.cfg, m.roomServerProducer,
+		m.api, *m.cfg, m.roomServerProducer,
 		m.queryAPI, m.aliasAPI, m.accountDB, m.deviceDB, m.federation, m.keyRing,
 		m.userUpdateProducer, m.syncProducer,
 	)
 
 	mediaapi_routing.Setup(
-		m.api, http.DefaultClient, m.cfg, m.mediaAPIDB,
+		m.api, m.cfg, m.mediaAPIDB,
 	)
 
 	syncapi_routing.Setup(m.api, syncapi_sync.NewRequestPool(

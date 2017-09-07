@@ -16,17 +16,17 @@ package readers
 
 import (
 	"encoding/json"
+	"time"
+
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/ed25519"
-	"net/http"
-	"time"
 )
 
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
-func LocalKeys(req *http.Request, cfg config.Dendrite) util.JSONResponse {
+func LocalKeys(cfg config.Dendrite) util.JSONResponse {
 	keys, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod))
 	if err != nil {
 		return util.ErrorResponse(err)
