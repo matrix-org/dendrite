@@ -33,7 +33,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-var errMissingUserID = errors.New("'user_id' must be supplied.")
+var errMissingUserID = errors.New("'user_id' must be supplied")
 
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server

@@ -63,8 +63,12 @@ type idServerStoreInviteResponse struct {
 }
 
 var (
+	// ErrMissingParameter is the error raised if a request for 3PID invite has
+	// an incomplete body
 	ErrMissingParameter = errors.New("'address', 'id_server' and 'medium' must all be supplied")
-	ErrNotTrusted       = errors.New("Untrusted server")
+	// ErrNotTrusted is the error raised if an identity server isn't in the list
+	// of trusted servers in the configuration file.
+	ErrNotTrusted = errors.New("untrusted server")
 )
 
 // CheckAndProcessInvite analyses the body of an incoming membership request.
