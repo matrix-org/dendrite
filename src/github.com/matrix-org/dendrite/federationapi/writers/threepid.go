@@ -155,7 +155,7 @@ func createInviteFrom3PIDInvite(
 	return &event, nil
 }
 
-// fillDisplayName looks in the room's state events for a m.room.third_party_invite
+// fillDisplayName looks in a list of auth events for a m.room.third_party_invite
 // event with the state key matching a given m.room.member event's content's token.
 // If such an event is found, fills the "display_name" attribute of the
 // "third_party_invite" structure in the m.room.member event with the display_name
