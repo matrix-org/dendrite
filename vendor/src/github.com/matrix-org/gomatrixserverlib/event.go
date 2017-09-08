@@ -422,7 +422,7 @@ func (e Event) CheckFields() error {
 		if e.fields.Type != MRoomMember {
 			return fmt.Errorf(
 				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
-				eventDomain, e.fields.Origin,
+				senderDomain, e.fields.Origin,
 			)
 		}
 		c, err := newMemberContentFromEvent(e)
@@ -432,7 +432,7 @@ func (e Event) CheckFields() error {
 		if c.Membership != invite || c.ThirdPartyInvite == nil {
 			return fmt.Errorf(
 				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
-				eventDomain, e.fields.Origin,
+				senderDomain, e.fields.Origin,
 			)
 		}
 	}

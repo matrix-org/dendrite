@@ -169,7 +169,12 @@ func TestStateNeededForInvite3PID(t *testing.T) {
 		StateKey: &skey,
 		Sender:   "@u1:a",
 	}
-	b.SetContent(memberContent{"invite", rawJSON(`{"signed":{"token":"my_token"}}`)})
+
+	b.SetContent(memberContent{"invite", &memberThirdPartyInvite{
+		Signed: memberThirdPartyInviteSigned{
+			Token: "my_token",
+		},
+	}})
 	testStateNeededForAuth(t, `[{
 		"type": "m.room.member",
 		"state_key": "@u2:b",
@@ -280,7 +285,7 @@ func testEventAllowed(t *testing.T, testCaseJSON string) {
 			panic(err)
 		}
 		if err := Allowed(event, &tc.AuthEvents); err == nil {
-			t.Fatalf("Expected %q to not be allowed but it was: %q", string(data), err)
+			t.Fatalf("Expected %q to not be allowed but it was", string(data))
 		}
 	}
 }
@@ -527,6 +532,146 @@ func TestAllowedWithNoPowerLevels(t *testing.T) {
 			"content": {"body": "Test"},
 			"unsigned": {
 				"not_allowed": "Sender is not in room"
+			}
+		}]
+	}`)
+}
+
+func TestAllowedInviteFrom3PID(t *testing.T) {
+	testEventAllowed(t, `{
+		"auth_events": {
+			"create": {
+				"type": "m.room.create",
+				"state_key": "",
+				"sender": "@u1:a",
+				"room_id": "!r1:a",
+				"event_id": "$e1:a",
+				"content": {"creator": "@u1:a"}
+			},
+			"member": {
+				"@u1:a": {
+					"type": "m.room.member",
+					"sender": "@u1:a",
+					"room_id": "!r1:a",
+					"state_key": "@u1:a",
+					"event_id": "$e2:a",
+					"content": {"membership": "join"}
+				}
+			},
+			"third_party_invite": {
+				"my_token": {
+					"type": "m.room.third_party_invite",
+					"sender": "@u1:a",
+					"room_id": "!r1:a",
+					"state_key": "my_token",
+					"event_id": "$e3:a",
+					"content": {
+						"display_name": "foo...@bar...",
+						"public_key": "pubkey",
+						"key_validity_url": "https://example.tld/isvalid",
+						"public_keys": [
+							{
+								"public_key": "mrV51jApZKahGjfMhlevp+QtSSTDKCLaLVCzYc4HELY",
+								"key_validity_url": "https://example.tld/isvalid"
+							}
+						]
+					}
+				}
+			}
+		},
+		"allowed": [{
+			"type": "m.room.member",
+			"sender": "@u1:a",
+			"room_id": "!r1:a",
+			"state_key": "@u2:a",
+			"event_id": "$e4:a",
+			"content": {
+				"membership": "invite",
+				"third_party_invite": {
+					"display_name": "foo...@bar...",
+					"signed": {
+						"token": "my_token",
+						"mxid": "@u2:a",
+						"signatures": {
+							"example.tld": {
+								"ed25519:0": "CibGFS0vX93quJFppsQbYQKJFIwxiYEK87lNmekS/fdetUMXPdR2wwNDd09J1jJ28GCH3GogUTuFDB1ScPFxBg"
+							}
+						}
+					}
+				}
+			}
+		}],
+		"not_allowed": [{
+			"type": "m.room.member",
+			"sender": "@u1:a",
+			"room_id": "!r1:a",
+			"state_key": "@u2:a",
+			"event_id": "$e4:a",
+			"content": {
+				"membership": "invite",
+				"third_party_invite": {
+					"display_name": "foo...@bar...",
+					"signed": {
+						"token": "my_token",
+						"mxid": "@u2:a",
+						"signatures": {
+							"example.tld": {
+								"ed25519:0": "some_signature"
+							}
+						}
+					}
+				}
+			},
+			"unsigned": {
+				"not_allowed": "Bad signature"
+			}
+		}, {
+			"type": "m.room.member",
+			"sender": "@u1:a",
+			"room_id": "!r1:a",
+			"state_key": "@u2:a",
+			"event_id": "$e5:a",
+			"content": {
+				"membership": "invite",
+				"third_party_invite": {
+					"display_name": "foo...@bar...",
+					"signed": {
+						"token": "my_token",
+						"mxid": "@u3:a",
+						"signatures": {
+							"example.tld": {
+								"ed25519:0": "CibGFS0vX93quJFppsQbYQKJFIwxiYEK87lNmekS/fdetUMXPdR2wwNDd09J1jJ28GCH3GogUTuFDB1ScPFxBg"
+							}
+						}
+					}
+				}
+			},
+			"unsigned": {
+				"not_allowed": "MXID doesn't match state key"
+			}
+		}, {
+			"type": "m.room.member",
+			"sender": "@u1:a",
+			"room_id": "!r1:a",
+			"state_key": "@u2:a",
+			"event_id": "$e6:a",
+			"content": {
+				"membership": "invite",
+				"third_party_invite": {
+					"display_name": "foo...@bar...",
+					"signed": {
+						"token": "my_other_token",
+						"mxid": "@u2:a",
+						"signatures": {
+							"example.tld": {
+								"ed25519:0": "CibGFS0vX93quJFppsQbYQKJFIwxiYEK87lNmekS/fdetUMXPdR2wwNDd09J1jJ28GCH3GogUTuFDB1ScPFxBg"
+							}
+						}
+					}
+				}
+			},
+			"unsigned": {
+				"not_allowed": "Token doesn't refer to a known third-party invite"
 			}
 		}]
 	}`)

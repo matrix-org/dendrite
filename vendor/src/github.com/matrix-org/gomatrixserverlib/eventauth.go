@@ -18,6 +18,9 @@ package gomatrixserverlib
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/util"
 )
@@ -224,15 +227,7 @@ func accumulateStateNeeded(result *StateNeeded, eventType, sender string, stateK
 }
 
 // thirdPartyInviteToken extracts the token from the third_party_invite.
-func thirdPartyInviteToken(thirdPartyInviteData rawJSON) (string, error) {
-	var thirdPartyInvite struct {
-		Signed struct {
-			Token string `json:"token"`
-		} `json:"signed"`
-	}
-	if err := json.Unmarshal(thirdPartyInviteData, &thirdPartyInvite); err != nil {
-		return "", err
-	}
+func thirdPartyInviteToken(thirdPartyInvite *memberThirdPartyInvite) (string, error) {
 	if thirdPartyInvite.Signed.Token == "" {
 		return "", fmt.Errorf("missing 'third_party_invite.signed.token' JSON key")
 	}
@@ -774,6 +769,8 @@ type membershipAllower struct {
 	powerLevels powerLevelContent
 	// The m.room.join_rules content for the room.
 	joinRule joinRuleContent
+	// The m.room.third_party_invite content referenced by this event.
+	thirdPartyInvite thirdPartyInviteContent
 }
 
 // newMembershipAllower loads the information needed to authenticate the m.room.member event
@@ -805,6 +802,13 @@ func newMembershipAllower(authEvents AuthEventProvider, event Event) (m membersh
 	// We only need to check the join rules if the proposed membership is "join".
 	if m.newMember.Membership == "join" {
 		if m.joinRule, err = newJoinRuleContentFromAuthEvents(authEvents); err != nil {
+			return
+		}
+	}
+	// If this event comes from a third_party_invite, we need to check it against the original event.
+	if m.newMember.ThirdPartyInvite != nil {
+		token := m.newMember.ThirdPartyInvite.Signed.Token
+		if m.thirdPartyInvite, err = newThirdPartyInviteContentFromAuthEvents(authEvents, token); err != nil {
 			return
 		}
 	}
@@ -840,10 +844,10 @@ func (m *membershipAllower) membershipAllowed(event Event) error {
 		// Otherwise fall back to the normal checks.
 	}
 
-	if m.newMember.Membership == invite && len(m.newMember.ThirdPartyInvite) != 0 {
+	if m.newMember.Membership == invite && m.newMember.ThirdPartyInvite != nil {
 		// Special case third party invites
 		// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/api/auth.py#L393
-		panic(fmt.Errorf("ThirdPartyInvite not implemented"))
+		return m.membershipAllowedFromThirdPartyInvite()
 	}
 
 	if m.targetID == m.senderID {
@@ -853,6 +857,42 @@ func (m *membershipAllower) membershipAllowed(event Event) error {
 	}
 	// Otherwise this is an attempt to modify the membership of somebody else.
 	return m.membershipAllowedOther()
+}
+
+// membershipAllowedFronThirdPartyInvite determines if the member events is following
+// up the third_party_invite event it claims.
+func (m *membershipAllower) membershipAllowedFromThirdPartyInvite() error {
+	// Check if the event's target matches with the Matrix ID provided by the
+	// identity server.
+	if m.targetID != m.newMember.ThirdPartyInvite.Signed.MXID {
+		return errorf(
+			"The invite target %s doesn't match with the Matrix ID provided by the identity server %s",
+			m.targetID, m.newMember.ThirdPartyInvite.Signed.MXID,
+		)
+	}
+	// Marshal the "signed" so it can be verified by VerifyJSON.
+	marshalledSigned, err := json.Marshal(m.newMember.ThirdPartyInvite.Signed)
+	if err != nil {
+		return err
+	}
+	// Check each signature with each public key. If one signature could be
+	// verified with one public key, accept the event.
+	for _, publicKey := range m.thirdPartyInvite.PublicKeys {
+		for domain, signatures := range m.newMember.ThirdPartyInvite.Signed.Signatures {
+			for keyID := range signatures {
+				if strings.HasPrefix(keyID, "ed25519") {
+					if err = VerifyJSON(
+						domain, KeyID(keyID),
+						ed25519.PublicKey(publicKey.PublicKey),
+						marshalledSigned,
+					); err == nil {
+						return nil
+					}
+				}
+			}
+		}
+	}
+	return errorf("Couldn't verify signature on third-party invite for %s", m.targetID)
 }
 
 // membershipAllowedSelf determines if the change made by the user to their own membership is allowed.
