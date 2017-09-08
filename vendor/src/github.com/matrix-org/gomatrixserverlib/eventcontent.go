@@ -108,7 +108,18 @@ type memberContent struct {
 	// We use the membership key in order to check if the user is in the room.
 	Membership string `json:"membership"`
 	// We use the third_party_invite key to special case thirdparty invites.
-	ThirdPartyInvite rawJSON `json:"third_party_invite,omitempty"`
+	ThirdPartyInvite *memberThirdPartyInvite `json:"third_party_invite,omitempty"`
+}
+
+type memberThirdPartyInvite struct {
+	DisplayName string                       `json:"display_name"`
+	Signed      memberThirdPartyInviteSigned `json:"signed"`
+}
+
+type memberThirdPartyInviteSigned struct {
+	MXID       string                       `json:"mxid"`
+	Signatures map[string]map[string]string `json:"signatures"`
+	Token      string                       `json:"token"`
 }
 
 // newMemberContentFromAuthEvents loads the member content from the member event for the user ID in the auth events.
@@ -133,6 +144,32 @@ func newMemberContentFromEvent(event Event) (c memberContent, err error) {
 	if err = json.Unmarshal(event.Content(), &c); err != nil {
 		err = errorf("unparsable member event content: %s", err.Error())
 		return
+	}
+	return
+}
+
+// thirdPartyInviteContent is the JSON content of a m.room.third_party_invite event needed for auth checks.
+// See https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-third-party-invite for descriptions of the fields.
+type thirdPartyInviteContent struct {
+	// Public keys are used to verify the signature of a m.room.member event that
+	// came from a m.room.third_party_invite event
+	PublicKeys []struct {
+		PublicKey Base64String `json:"public_key"`
+	} `json:"public_keys"`
+}
+
+func newThirdPartyInviteContentFromAuthEvents(authEvents AuthEventProvider, token string) (t thirdPartyInviteContent, err error) {
+	var thirdPartyInviteEvent *Event
+	if thirdPartyInviteEvent, err = authEvents.ThirdPartyInvite(token); err != nil {
+		return
+	}
+	if thirdPartyInviteEvent == nil {
+		// If there isn't a third_party_invite event, then we return with an error
+		err = errorf("Couldn't find third party invite event")
+		return
+	}
+	if err = json.Unmarshal(thirdPartyInviteEvent.Content(), &t); err != nil {
+		err = errorf("unparsable third party invite event content: %s", err.Error())
 	}
 	return
 }
