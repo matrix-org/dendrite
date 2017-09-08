@@ -48,7 +48,7 @@ type invites struct {
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
-	producer *producers.RoomserverProducer,
+	producer *producers.RoomserverProducer, federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -57,7 +57,7 @@ func CreateInvitesFrom3PIDInvites(
 
 	evs := []gomatrixserverlib.Event{}
 	for _, inv := range body.Invites {
-		event, err := createInviteFrom3PIDInvite(queryAPI, cfg, inv)
+		event, err := createInviteFrom3PIDInvite(queryAPI, cfg, inv, federation)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -83,6 +83,7 @@ func CreateInvitesFrom3PIDInvites(
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
 	queryAPI api.RoomserverQueryAPI, cfg config.Dendrite, inv invite,
+	federation *gomatrixserverlib.FederationClient,
 ) (*gomatrixserverlib.Event, error) {
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
@@ -120,29 +121,33 @@ func createInviteFrom3PIDInvite(
 	}
 
 	if !queryRes.RoomExists {
-		// TODO: Use federation to auth the event
-		return nil, nil
+		// Use federation to auth the event
+		_, remoteServer, err := gomatrixserverlib.SplitID('!', inv.RoomID)
+		*builder, err = federation.ExchangeThirdPartyInvite(remoteServer, *builder)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Auth the event locally
+		builder.Depth = queryRes.Depth
+		builder.PrevEvents = queryRes.LatestEvents
+
+		authEvents := gomatrixserverlib.NewAuthEvents(nil)
+
+		for i := range queryRes.StateEvents {
+			authEvents.AddEvent(&queryRes.StateEvents[i])
+		}
+
+		if err = fillDisplayName(builder, content, authEvents); err != nil {
+			return nil, err
+		}
+
+		refs, err := eventsNeeded.AuthEventReferences(&authEvents)
+		if err != nil {
+			return nil, err
+		}
+		builder.AuthEvents = refs
 	}
-
-	// Finish building the event
-	builder.Depth = queryRes.Depth
-	builder.PrevEvents = queryRes.LatestEvents
-
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
-
-	for i := range queryRes.StateEvents {
-		authEvents.AddEvent(&queryRes.StateEvents[i])
-	}
-
-	if err = fillDisplayName(builder, content, authEvents); err != nil {
-		return nil, err
-	}
-
-	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
-	if err != nil {
-		return nil, err
-	}
-	builder.AuthEvents = refs
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	now := time.Now()
