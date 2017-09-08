@@ -177,18 +177,21 @@ func fillDisplayName(
 		}
 	}
 
-	if thirdPartyInviteEvent != nil {
-		var thirdPartyInviteContent common.ThirdPartyInviteContent
-		if err := json.Unmarshal(thirdPartyInviteEvent.Content(), &thirdPartyInviteContent); err != nil {
-			return err
-		}
+	if thirdPartyInviteEvent == nil {
+		// If the third party invite event doesn't exist then we can't use it to set the display name.
+		return nil
+	}
 
-		// Use the m.room.third_party_invite event to fill the "displayname" and
-		// update the m.room.member event's content with it
-		content.ThirdPartyInvite.DisplayName = thirdPartyInviteContent.DisplayName
-		if err := builder.SetContent(content); err != nil {
-			return err
-		}
+	var thirdPartyInviteContent common.ThirdPartyInviteContent
+	if err := json.Unmarshal(thirdPartyInviteEvent.Content(), &thirdPartyInviteContent); err != nil {
+		return err
+	}
+
+	// Use the m.room.third_party_invite event to fill the "displayname" and
+	// update the m.room.member event's content with it
+	content.ThirdPartyInvite.DisplayName = thirdPartyInviteContent.DisplayName
+	if err := builder.SetContent(content); err != nil {
+		return err
 	}
 
 	return nil
