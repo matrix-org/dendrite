@@ -57,7 +57,7 @@ func CreateInvitesFrom3PIDInvites(
 
 	evs := []gomatrixserverlib.Event{}
 	for _, inv := range body.Invites {
-		event, err := createInviteFrom3PIDInvite(req, queryAPI, cfg, inv)
+		event, err := createInviteFrom3PIDInvite(queryAPI, cfg, inv)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -82,8 +82,7 @@ func CreateInvitesFrom3PIDInvites(
 // Returns an error if there was a problem building the event or fetching the
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
-	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
-	inv invite,
+	queryAPI api.RoomserverQueryAPI, cfg config.Dendrite, inv invite,
 ) (*gomatrixserverlib.Event, error) {
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
