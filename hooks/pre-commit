@@ -2,6 +2,8 @@
 
 set -eu
 
+# Tune the GC to use more memory to reduce the number of garbage collections
+export GOGC=400
 export GOPATH="$(pwd):$(pwd)/vendor"
 export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
 
@@ -10,7 +12,7 @@ go install github.com/alecthomas/gometalinter/
 gometalinter --config=linter.json ./... --install
 
 echo "Looking for lint..."
-gometalinter --config=linter.json ./...
+gometalinter --config=linter.json ./... --enable-gc
 
 echo "Double checking spelling..."
 misspell -error src *.md
