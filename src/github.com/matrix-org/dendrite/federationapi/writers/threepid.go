@@ -125,10 +125,6 @@ func createInviteFrom3PIDInvite(
 		return nil, nil
 	}
 
-	if err = fillDisplayName(builder, content, queryRes.StateEvents); err != nil {
-		return nil, err
-	}
-
 	// Finish building the event
 	builder.Depth = queryRes.Depth
 	builder.PrevEvents = queryRes.LatestEvents
@@ -137,6 +133,10 @@ func createInviteFrom3PIDInvite(
 
 	for i := range queryRes.StateEvents {
 		authEvents.AddEvent(&queryRes.StateEvents[i])
+	}
+
+	if err = fillDisplayName(builder, content, authEvents); err != nil {
+		return nil, err
 	}
 
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
@@ -167,15 +167,10 @@ func createInviteFrom3PIDInvite(
 // rejected by gomatrixserverlib.
 func fillDisplayName(
 	builder *gomatrixserverlib.EventBuilder, content common.MemberContent,
-	stateEvents []gomatrixserverlib.Event,
+	authEvents gomatrixserverlib.AuthEvents,
 ) error {
 	// Look for the m.room.third_party_invite event
-	var thirdPartyInviteEvent *gomatrixserverlib.Event
-	for _, event := range stateEvents {
-		if event.Type() == "m.room.third_party_invite" && *(event.StateKey()) == content.ThirdPartyInvite.Signed.Token {
-			thirdPartyInviteEvent = &event
-		}
-	}
+	thirdPartyInviteEvent, _ := authEvents.ThirdPartyInvite(content.ThirdPartyInvite.Signed.Token)
 
 	if thirdPartyInviteEvent == nil {
 		// If the third party invite event doesn't exist then we can't use it to set the display name.
