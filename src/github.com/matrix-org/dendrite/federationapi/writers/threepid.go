@@ -122,7 +122,7 @@ func createInviteFrom3PIDInvite(
 
 	if !queryRes.RoomExists {
 		// Use federation to auth the event
-		var remoteServers []gomatrixserverlib.ServerName
+		remoteServers := make([]gomatrixserverlib.ServerName, 2)
 		_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
 		if err != nil {
 			return nil, err
@@ -135,12 +135,10 @@ func createInviteFrom3PIDInvite(
 		}
 
 		for _, server := range remoteServers {
-			if server == cfg.Matrix.ServerName {
-				continue
+			if server != cfg.Matrix.ServerName {
+				err = federation.ExchangeThirdPartyInvite(server, *builder)
+				return nil, err
 			}
-
-			err = federation.ExchangeThirdPartyInvite(server, *builder)
-			return nil, err
 		}
 	}
 
