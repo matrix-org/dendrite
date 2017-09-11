@@ -165,23 +165,23 @@ func createInviteFrom3PIDInvite(
 // them responded with an error.
 func sendToRemoteServer(
 	inv invite, federation *gomatrixserverlib.FederationClient, cfg config.Dendrite,
-) error {
+) (err error) {
 	remoteServers := make([]gomatrixserverlib.ServerName, 2)
 	_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
 	if err != nil {
-		return err
+		return
 	}
 	// Fallback to the room's server if the sender's domain is the same as
 	// the current server's
 	_, remoteServers[1], err = gomatrixserverlib.SplitID('!', inv.RoomID)
 	if err != nil {
-		return err
+		return
 	}
 
 	for _, server := range remoteServers {
 		err = federation.ExchangeThirdPartyInvite(server, *builder)
 		if err == nil {
-			return nil
+			return
 		}
 		logrus.WithError(err).Warn("Failed to send 3PID invite via %s.", server)
 	}
