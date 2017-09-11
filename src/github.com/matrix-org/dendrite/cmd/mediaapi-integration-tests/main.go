@@ -65,6 +65,10 @@ var thumbnailSizes = (`
 
 const serverType = "media-api"
 
+const testMediaID = "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0"
+const testContentType = "image/jpeg"
+const testOrigin = "localhost:18001"
+
 var testDatabaseTemplate = "dbname=%s sslmode=disable binary_parameters=yes"
 
 var timeout time.Duration
@@ -81,10 +85,11 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 
 	database := fmt.Sprintf(testDatabaseTemplate, testDatabaseName+suffix)
 	cfg, nextPort, err := test.MakeConfig(dir, kafkaURI, database, "localhost", port)
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(proxyAddr)
 	if err != nil {
 		panic(err)
 	}
+	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(proxyAddr)
+	cfg.Media.DynamicThumbnails = dynamicThumbnails
 	if err = yaml.Unmarshal([]byte(thumbnailSizes), &cfg.Media.ThumbnailSizes); err != nil {
 		panic(err)
 	}
@@ -142,46 +147,46 @@ func main() {
 	server1Cmd, server1CmdChan, _, server1ProxyCmd, _, server1ProxyAddr, server1Dir := startMediaAPI("1", false)
 	defer cleanUpServer(server1Cmd, server1Dir)
 	defer server1ProxyCmd.Process.Kill()
-	testDownload(server1ProxyAddr, server1ProxyAddr, "doesnotexist", "", 404, server1CmdChan)
+	testDownload(server1ProxyAddr, server1ProxyAddr, "doesnotexist", 404, server1CmdChan)
 
 	// upload a JPEG file
-	testUpload(server1ProxyAddr, testJPEG, "image/jpeg", `{
-		"content_uri": "mxc://localhost:18001/1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0"
-	}`, 200, server1CmdChan)
+	testUpload(
+		server1ProxyAddr, testJPEG,
+	)
 
 	// download that JPEG file
-	testDownload(server1ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server1CmdChan)
+	testDownload(server1ProxyAddr, testOrigin, testMediaID, 200, server1CmdChan)
 
 	// thumbnail that JPEG file
-	testThumbnail(64, 64, "crop", server1ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server1CmdChan)
+	testThumbnail(64, 64, "crop", server1ProxyAddr, server1CmdChan)
 
 	// create server2 with dynamic thumbnail generation
 	server2Cmd, server2CmdChan, _, server2ProxyCmd, _, server2ProxyAddr, server2Dir := startMediaAPI("2", true)
 	defer cleanUpServer(server2Cmd, server2Dir)
 	defer server2ProxyCmd.Process.Kill()
-	testDownload(server2ProxyAddr, server2ProxyAddr, "doesnotexist", "", 404, server2CmdChan)
+	testDownload(server2ProxyAddr, server2ProxyAddr, "doesnotexist", 404, server2CmdChan)
 
 	// pre-generated thumbnail that JPEG file via server2
-	testThumbnail(800, 600, "scale", server2ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server2CmdChan)
+	testThumbnail(800, 600, "scale", server2ProxyAddr, server2CmdChan)
 
 	// download that JPEG file via server2
-	testDownload(server2ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server2CmdChan)
+	testDownload(server2ProxyAddr, testOrigin, testMediaID, 200, server2CmdChan)
 
 	// dynamic thumbnail that JPEG file via server2
-	testThumbnail(1920, 1080, "scale", server2ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server2CmdChan)
+	testThumbnail(1920, 1080, "scale", server2ProxyAddr, server2CmdChan)
 
 	// thumbnail that JPEG file via server2
-	testThumbnail(10000, 10000, "scale", server2ProxyAddr, "localhost:18001", "1VuVy8u_hmDllD8BrcY0deM34Bl7SPJeY9J6BkMmpx0", "", 200, server2CmdChan)
+	testThumbnail(10000, 10000, "scale", server2ProxyAddr, server2CmdChan)
 
 }
 
-func getMediaURI(scheme, host, endpoint, query string, components []string) string {
+func getMediaURI(host, endpoint, query string, components []string) string {
 	pathComponents := []string{host, "_matrix/media/v1", endpoint}
 	pathComponents = append(pathComponents, components...)
-	return scheme + path.Join(pathComponents...) + query
+	return "https://" + path.Join(pathComponents...) + query
 }
 
-func testUpload(host, filePath, contentType, wantedBody string, wantedStatusCode int, serverCmdChan chan error) {
+func testUpload(host, filePath string) {
 	fmt.Printf("==TESTING== upload %v to %v\n", filePath, host)
 	file, err := os.Open(filePath)
 	defer file.Close()
@@ -197,18 +202,19 @@ func testUpload(host, filePath, contentType, wantedBody string, wantedStatusCode
 
 	req, err := http.NewRequest(
 		"POST",
-		getMediaURI("https://", host, "upload", "?filename="+filename, nil),
+		getMediaURI(host, "upload", "?filename="+filename, nil),
 		file,
 	)
 	if err != nil {
 		panic(err)
 	}
 	req.ContentLength = fileSize
-	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Content-Type", testContentType)
 
+	wantedBody := `{"content_uri": "mxc://localhost:18001/` + testMediaID + `"}`
 	testReq := &test.Request{
 		Req:              req,
-		WantedStatusCode: wantedStatusCode,
+		WantedStatusCode: 200,
 		WantedBody:       test.CanonicalJSONInput([]string{wantedBody})[0],
 	}
 	if err := testReq.Do(); err != nil {
@@ -217,10 +223,10 @@ func testUpload(host, filePath, contentType, wantedBody string, wantedStatusCode
 	fmt.Printf("==TESTING== upload %v to %v PASSED\n", filePath, host)
 }
 
-func testDownload(host, origin, mediaID, wantedBody string, wantedStatusCode int, serverCmdChan chan error) {
+func testDownload(host, origin, mediaID string, wantedStatusCode int, serverCmdChan chan error) {
 	req, err := http.NewRequest(
 		"GET",
-		getMediaURI("https://", host, "download", "", []string{
+		getMediaURI(host, "download", "", []string{
 			origin,
 			mediaID,
 		}),
@@ -232,21 +238,21 @@ func testDownload(host, origin, mediaID, wantedBody string, wantedStatusCode int
 	testReq := &test.Request{
 		Req:              req,
 		WantedStatusCode: wantedStatusCode,
-		WantedBody:       test.CanonicalJSONInput([]string{wantedBody})[0],
+		WantedBody:       test.CanonicalJSONInput([]string{""})[0],
 	}
 	testReq.Run(fmt.Sprintf("download mxc://%v/%v from %v", origin, mediaID, host), timeout, serverCmdChan)
 }
 
-func testThumbnail(width, height int, resizeMethod, host, origin, mediaID, wantedBody string, wantedStatusCode int, serverCmdChan chan error) {
+func testThumbnail(width, height int, resizeMethod, host string, serverCmdChan chan error) {
 	query := fmt.Sprintf("?width=%v&height=%v", width, height)
 	if resizeMethod != "" {
 		query += "&method=" + resizeMethod
 	}
 	req, err := http.NewRequest(
 		"GET",
-		getMediaURI("https://", host, "thumbnail", query, []string{
-			origin,
-			mediaID,
+		getMediaURI(host, "thumbnail", query, []string{
+			testOrigin,
+			testMediaID,
 		}),
 		nil,
 	)
@@ -255,8 +261,8 @@ func testThumbnail(width, height int, resizeMethod, host, origin, mediaID, wante
 	}
 	testReq := &test.Request{
 		Req:              req,
-		WantedStatusCode: wantedStatusCode,
-		WantedBody:       test.CanonicalJSONInput([]string{wantedBody})[0],
+		WantedStatusCode: 200,
+		WantedBody:       test.CanonicalJSONInput([]string{""})[0],
 	}
-	testReq.Run(fmt.Sprintf("thumbnail mxc://%v/%v%v from %v", origin, mediaID, query, host), timeout, serverCmdChan)
+	testReq.Run(fmt.Sprintf("thumbnail mxc://%v/%v%v from %v", testOrigin, testMediaID, query, host), timeout, serverCmdChan)
 }

@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
-	"golang.org/x/crypto/ed25519"
 	"net/http"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 // This GET request is taken from a request made by a synapse run by sytest.
@@ -62,7 +63,7 @@ func TestSignGetRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := string(buf.Bytes())
+	got := buf.String()
 	want := exampleGetRequest
 	if want != got {
 		t.Errorf("Wanted %q got %q", want, got)
@@ -121,7 +122,7 @@ func TestSignPutRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := string(buf.Bytes())
+	got := buf.String()
 	want := examplePutRequest
 	if want != got {
 		t.Errorf("Wanted %q got %q", want, got)
@@ -159,7 +160,6 @@ func TestVerifyPutRequest(t *testing.T) {
 }
 
 var privateKey1 = mustLoadPrivateKey(privateKeySeed1)
-var privateKey2 = mustLoadPrivateKey(privateKeySeed2)
 
 func mustLoadPrivateKey(seed string) ed25519.PrivateKey {
 	seedBytes, err := base64.RawStdEncoding.DecodeString(seed)

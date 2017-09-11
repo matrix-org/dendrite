@@ -1,0 +1,30 @@
+[
+  {
+    "id": "Show context-sensitive help.",
+    "translation": "Afficher l'aide contextuelle."
+  },
+  {
+    "id": "usage:",
+    "translation": "usage:"
+  },
+  {
+    "id": "Flags:",
+    "translation": "Drapeaux:"
+  },
+  {
+    "id": "Args:",
+    "translation": "Arguments:"
+  },
+  {
+    "id": "Commands:",
+    "translation": "Commandes:"
+  },
+  {
+    "id": "Subcommands:",
+    "translation": "Sous-commandes:"
+  },
+  {
+    "id": "Show help.",
+    "translation": "Afficher l'aide."
+  }
+]

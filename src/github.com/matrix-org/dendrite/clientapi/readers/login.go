@@ -15,7 +15,6 @@
 package readers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -120,8 +119,4 @@ func Login(
 		Code: 405,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
-}
-
-func makeUserID(localpart string, domain gomatrixserverlib.ServerName) string {
-	return fmt.Sprintf("@%s:%s", localpart, domain)
 }

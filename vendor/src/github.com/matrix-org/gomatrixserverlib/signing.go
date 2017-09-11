@@ -18,6 +18,7 @@ package gomatrixserverlib
 import (
 	"encoding/json"
 	"fmt"
+
 	"golang.org/x/crypto/ed25519"
 )
 

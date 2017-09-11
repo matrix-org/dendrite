@@ -2,11 +2,12 @@ package gomatrixserverlib
 
 import (
 	"encoding/json"
-	"github.com/matrix-org/gomatrix"
-	"golang.org/x/crypto/ed25519"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"github.com/matrix-org/gomatrix"
+	"golang.org/x/crypto/ed25519"
 )
 
 // An FederationClient is a matrix federation client that adds
@@ -42,7 +43,7 @@ func (ac *FederationClient) doRequest(r FederationRequest, resBody interface{}) 
 
 	res, err := ac.client.Do(req)
 	if res != nil {
-		defer res.Body.Close()
+		defer res.Body.Close() // nolint: errcheck
 	}
 
 	if err != nil {
@@ -74,6 +75,10 @@ func (ac *FederationClient) doRequest(r FederationRequest, resBody interface{}) 
 
 	if err != nil {
 		return err
+	}
+
+	if resBody == nil {
+		return nil
 	}
 
 	return json.Unmarshal(contents, resBody)
@@ -121,6 +126,22 @@ func (ac *FederationClient) SendJoin(s ServerName, event Event) (res RespSendJoi
 		return
 	}
 	err = ac.doRequest(req, &res)
+	return
+}
+
+// ExchangeThirdPartyInvite sends the builder of a m.room.member event of
+// "invite" membership derived from a response from invites sent by an identity
+// server.
+// This is used to exchange a m.room.third_party_invite event for a m.room.member
+// one in a room the local server isn't a member of.
+func (ac *FederationClient) ExchangeThirdPartyInvite(s ServerName, builder EventBuilder) (err error) {
+	path := "/_matrix/federation/v1/exchange_third_party_invite/" +
+		url.PathEscape(builder.RoomID)
+	req := NewFederationRequest("PUT", s, path)
+	if err = req.SetContent(builder); err != nil {
+		return
+	}
+	err = ac.doRequest(req, nil)
 	return
 }
 

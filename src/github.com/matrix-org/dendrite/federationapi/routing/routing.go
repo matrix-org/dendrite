@@ -20,13 +20,13 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationapi/readers"
 	"github.com/matrix-org/dendrite/federationapi/writers"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -46,8 +46,8 @@ func Setup(
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
 
-	localKeys := makeAPI("localkeys", func(req *http.Request) util.JSONResponse {
-		return readers.LocalKeys(req, cfg)
+	localKeys := common.MakeAPI("localkeys", func(req *http.Request) util.JSONResponse {
+		return readers.LocalKeys(cfg)
 	})
 
 	// Ignore the {keyID} argument as we only have a single server key so we always
@@ -57,30 +57,42 @@ func Setup(
 	v2keysmux.Handle("/server/{keyID}", localKeys)
 	v2keysmux.Handle("/server/", localKeys)
 
-	v1fedmux.Handle("/send/{txnID}/", makeAPI("federation_send",
-		func(req *http.Request) util.JSONResponse {
-			vars := mux.Vars(req)
+	v1fedmux.Handle("/send/{txnID}/", common.MakeFedAPI(
+		"federation_send", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
 			return writers.Send(
-				req, gomatrixserverlib.TransactionID(vars["txnID"]),
-				time.Now(),
+				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
 				cfg, query, producer, keys, federation,
 			)
 		},
 	))
 
-	v1fedmux.Handle("/invite/{roomID}/{eventID}", makeAPI("federation_invite",
-		func(req *http.Request) util.JSONResponse {
-			vars := mux.Vars(req)
+	v1fedmux.Handle("/invite/{roomID}/{eventID}", common.MakeFedAPI(
+		"federation_invite", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
 			return writers.Invite(
-				req, vars["roomID"], vars["eventID"],
-				time.Now(),
+				httpReq, request, vars["roomID"], vars["eventID"],
 				cfg, producer, keys,
 			)
 		},
 	))
-}
 
-func makeAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
-	h := util.NewJSONRequestHandler(f)
-	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
+	v1fedmux.Handle("/3pid/onbind", common.MakeFedAPI(
+		"3pid_onbind", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			return writers.CreateInvitesFrom3PIDInvites(httpReq, query, cfg, producer)
+		},
+	))
+
+	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
+		"federation_get_event", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return readers.GetEvent(
+				request, cfg, query, time.Now(), keys, vars["eventID"],
+			)
+		},
+	))
 }

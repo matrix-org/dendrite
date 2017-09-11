@@ -30,7 +30,6 @@ import (
 // DirectoryRoom looks up a room alias
 func DirectoryRoom(
 	req *http.Request,
-	device *authtypes.Device,
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
@@ -150,7 +149,6 @@ func RemoveLocalAlias(
 	req *http.Request,
 	device *authtypes.Device,
 	alias string,
-	cfg *config.Dendrite,
 	aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
 	queryReq := api.RemoveRoomAliasRequest{

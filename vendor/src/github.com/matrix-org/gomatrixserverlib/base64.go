@@ -18,6 +18,7 @@ package gomatrixserverlib
 import (
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 )
 
 // A Base64String is a string of bytes that are base64 encoded when used in JSON.
@@ -43,6 +44,12 @@ func (b64 *Base64String) UnmarshalJSON(raw []byte) (err error) {
 	if err = json.Unmarshal(raw, &str); err != nil {
 		return
 	}
-	*b64, err = base64.RawStdEncoding.DecodeString(str)
+	// We must check whether the string was encoded in a URL-safe way in order
+	// to use the appropriate encoding.
+	if strings.ContainsAny(str, "-_") {
+		*b64, err = base64.RawURLEncoding.DecodeString(str)
+	} else {
+		*b64, err = base64.RawStdEncoding.DecodeString(str)
+	}
 	return
 }

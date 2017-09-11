@@ -315,6 +315,7 @@ func (e Event) Sign(signingName string, keyID KeyID, privateKey ed25519.PrivateK
 	return Event{
 		redacted:  e.redacted,
 		eventJSON: eventJSON,
+		fields:    e.fields,
 	}
 }
 
@@ -361,7 +362,7 @@ const (
 // Returns an error if the total length of the event JSON is too long.
 // Returns an error if the event ID doesn't match the origin of the event.
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#size-limits
-func (e Event) CheckFields() error {
+func (e Event) CheckFields() error { // nolint: gocyclo
 	if len(e.eventJSON) > maxEventLength {
 		return fmt.Errorf(
 			"gomatrixserverlib: event is too long, length %d > maximum %d",
@@ -422,7 +423,7 @@ func (e Event) CheckFields() error {
 		if e.fields.Type != MRoomMember {
 			return fmt.Errorf(
 				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
-				eventDomain, e.fields.Origin,
+				senderDomain, e.fields.Origin,
 			)
 		}
 		c, err := newMemberContentFromEvent(e)
@@ -432,7 +433,7 @@ func (e Event) CheckFields() error {
 		if c.Membership != invite || c.ThirdPartyInvite == nil {
 			return fmt.Errorf(
 				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
-				eventDomain, e.fields.Origin,
+				senderDomain, e.fields.Origin,
 			)
 		}
 	}

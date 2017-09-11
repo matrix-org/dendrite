@@ -47,9 +47,6 @@ const selectAccountDataSQL = "" +
 const selectAccountDataByTypeSQL = "" +
 	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
 
-const deleteAccountDataSQL = "" +
-	"DELETE FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
-
 type accountDataStatements struct {
 	insertAccountDataStmt       *sql.Stmt
 	selectAccountDataStmt       *sql.Stmt

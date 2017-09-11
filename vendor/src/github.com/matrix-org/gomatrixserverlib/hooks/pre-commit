@@ -2,23 +2,17 @@
 
 set -eu
 
-golint ./...
-misspell -error .
+echo "Installing lint search engine..."
+go get github.com/alecthomas/gometalinter/
+gometalinter --config=linter.json --install --update
 
-# gofmt doesn't exit with an error code if the files don't match the expected
-# format. So we have to run it and see if it outputs anything.
-if gofmt -l -s . 2>&1 | read
-then
-    echo "Error: not all code had been formatted with gofmt."
-    echo "Fixing the following files"
-    gofmt -s -w -l .
-    echo
-    echo "Please add them to the commit"
-    git status --short
-    exit 1
-fi
+echo "Looking for lint..."
+gometalinter --config=linter.json
 
-ineffassign .
-go tool vet --all --shadow .
-gocyclo -over 16 .
-go test -timeout 5s . ./...
+echo "Double checking spelling..."
+misspell -error src *.md
+
+echo "Testing..."
+go test
+
+echo "Done!"

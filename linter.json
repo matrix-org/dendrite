@@ -1,0 +1,19 @@
+{
+    "Vendor": true,
+    "Cyclo": 12,
+    "Deadline": "60s",
+    "Enable": [
+        "vetshadow",
+        "gotype",
+        "deadcode",
+        "gocyclo",
+        "golint",
+        "varcheck",
+        "structcheck",
+        "aligncheck",
+        "ineffassign",
+        "gas",
+        "misspell",
+        "unparam"
+    ]
+}
