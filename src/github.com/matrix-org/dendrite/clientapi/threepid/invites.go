@@ -85,8 +85,8 @@ var (
 // fills the Matrix ID in the request body so a normal invite membership event
 // can be emitted.
 func CheckAndProcessInvite(
-	req *http.Request, device *authtypes.Device, body *MembershipRequest,
-	cfg config.Dendrite, queryAPI api.RoomserverQueryAPI, db *accounts.Database,
+	device *authtypes.Device, body *MembershipRequest, cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI, db *accounts.Database,
 	producer *producers.RoomserverProducer, membership string, roomID string,
 ) (inviteStoredOnIDServer bool, err error) {
 	if membership != "invite" || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
@@ -100,7 +100,7 @@ func CheckAndProcessInvite(
 		return
 	}
 
-	lookupRes, storeInviteRes, err := queryIDServer(req, db, cfg, device, body, roomID)
+	lookupRes, storeInviteRes, err := queryIDServer(db, cfg, device, body, roomID)
 	if err != nil {
 		return
 	}
@@ -132,8 +132,8 @@ func CheckAndProcessInvite(
 // Returns a representation of the response for both cases.
 // Returns an error if a check or a request failed.
 func queryIDServer(
-	req *http.Request, db *accounts.Database, cfg config.Dendrite,
-	device *authtypes.Device, body *MembershipRequest, roomID string,
+	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
+	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	if err = isTrusted(body.IDServer, cfg); err != nil {
 		return
@@ -159,7 +159,7 @@ func queryIDServer(
 	if lookupRes.NotBefore > now || now > lookupRes.NotAfter {
 		// If the current timestamp isn't in the time frame in which the association
 		// is known to be valid, re-run the query
-		return queryIDServer(req, db, cfg, device, body, roomID)
+		return queryIDServer(db, cfg, device, body, roomID)
 	}
 
 	// Check the request signatures and send an error if one isn't valid

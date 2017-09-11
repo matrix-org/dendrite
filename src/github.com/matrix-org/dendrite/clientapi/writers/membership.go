@@ -48,7 +48,7 @@ func SendMembership(
 	}
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req, device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
+		device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
 	)
 	if err == threepid.ErrMissingParameter {
 		return util.JSONResponse{
