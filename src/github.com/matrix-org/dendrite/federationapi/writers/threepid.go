@@ -129,27 +129,27 @@ func createInviteFrom3PIDInvite(
 		}
 		err = federation.ExchangeThirdPartyInvite(remoteServer, *builder)
 		return nil, err
-	} else {
-		// Auth the event locally
-		builder.Depth = queryRes.Depth
-		builder.PrevEvents = queryRes.LatestEvents
-
-		authEvents := gomatrixserverlib.NewAuthEvents(nil)
-
-		for i := range queryRes.StateEvents {
-			authEvents.AddEvent(&queryRes.StateEvents[i])
-		}
-
-		if err = fillDisplayName(builder, content, authEvents); err != nil {
-			return nil, err
-		}
-
-		refs, err := eventsNeeded.AuthEventReferences(&authEvents)
-		if err != nil {
-			return nil, err
-		}
-		builder.AuthEvents = refs
 	}
+
+	// Auth the event locally
+	builder.Depth = queryRes.Depth
+	builder.PrevEvents = queryRes.LatestEvents
+
+	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+
+	for i := range queryRes.StateEvents {
+		authEvents.AddEvent(&queryRes.StateEvents[i])
+	}
+
+	if err = fillDisplayName(builder, content, authEvents); err != nil {
+		return nil, err
+	}
+
+	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
+	if err != nil {
+		return nil, err
+	}
+	builder.AuthEvents = refs
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	now := time.Now()
