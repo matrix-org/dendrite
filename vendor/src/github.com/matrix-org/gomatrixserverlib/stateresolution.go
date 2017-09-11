@@ -99,7 +99,7 @@ func (r *stateResolver) Member(key string) (*Event, error) {
 	return r.resolvedMembers[key], nil
 }
 
-func (r *stateResolver) addConflicted(events []Event) {
+func (r *stateResolver) addConflicted(events []Event) { // nolint: gocyclo
 	type conflictKey struct {
 		eventType string
 		stateKey  string

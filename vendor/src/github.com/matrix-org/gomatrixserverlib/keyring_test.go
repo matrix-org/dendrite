@@ -6,7 +6,6 @@ import (
 )
 
 var privateKeySeed1 = `QJvXAPj0D9MUb1exkD8pIWmCvT1xajlsB8jRYz/G5HE`
-var privateKeySeed2 = `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`
 
 // testKeys taken from a copy of synapse.
 var testKeys = `{

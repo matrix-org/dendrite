@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-func TestToClientEvent(t *testing.T) {
+func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 	ev, err := NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
 		"state_key": "",

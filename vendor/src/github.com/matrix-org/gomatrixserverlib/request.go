@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/matrix-org/util"
-	"golang.org/x/crypto/ed25519"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/matrix-org/util"
+	"golang.org/x/crypto/ed25519"
 )
 
 // A FederationRequest is a request to send to a remote server or a request
@@ -156,7 +157,7 @@ func (r *FederationRequest) HTTPRequest() (*http.Request, error) {
 //
 //    qdtext         = HTAB / SP / %x21 / %x23-5B / %x5D-7E / %x80-FF
 //
-func isSafeInHTTPQuotedString(text string) bool {
+func isSafeInHTTPQuotedString(text string) bool { // nolint: gocyclo
 	for i := 0; i < len(text); i++ {
 		c := text[i]
 		switch {
@@ -234,7 +235,7 @@ func VerifyHTTPRequest(
 }
 
 // Returns an error if there was a problem reading the content of the request
-func readHTTPRequest(req *http.Request) (*FederationRequest, error) {
+func readHTTPRequest(req *http.Request) (*FederationRequest, error) { // nolint: gocyclo
 	var result FederationRequest
 
 	result.fields.Method = req.Method
