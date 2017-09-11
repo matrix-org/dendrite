@@ -70,6 +70,10 @@ type Dendrite struct {
 		// by remote servers.
 		// Defaults to 24 hours.
 		KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
+		// List of domains that the server will trust as identity servers to
+		// verify third-party identifiers.
+		// Defaults to an empty array.
+		TrustedIDServers []string `yaml:"trusted_third_party_id_servers"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.
@@ -271,6 +275,10 @@ func loadConfig(
 func (config *Dendrite) setDefaults() {
 	if config.Matrix.KeyValidityPeriod == 0 {
 		config.Matrix.KeyValidityPeriod = 24 * time.Hour
+	}
+
+	if config.Matrix.TrustedIDServers == nil {
+		config.Matrix.TrustedIDServers = []string{}
 	}
 
 	if config.Media.MaxThumbnailGenerators == 0 {

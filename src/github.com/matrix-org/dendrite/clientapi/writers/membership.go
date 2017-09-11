@@ -15,6 +15,7 @@
 package writers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -32,6 +33,8 @@ import (
 	"github.com/matrix-org/util"
 )
 
+var errMissingUserID = errors.New("'user_id' must be supplied")
+
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
 func SendMembership(
@@ -44,20 +47,78 @@ func SendMembership(
 		return *reqErr
 	}
 
-	if res := threepid.CheckAndProcessInvite(
-		req, device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
-	); res != nil {
-		return *res
+	inviteStored, err := threepid.CheckAndProcessInvite(
+		device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
+	)
+	if err == threepid.ErrMissingParameter {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	} else if err == threepid.ErrNotTrusted {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.NotTrusted(body.IDServer),
+		}
+	} else if err == events.ErrRoomNoExists {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(err.Error()),
+		}
+	} else if err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
-	stateKey, reason, reqErr := getMembershipStateKey(body, device, membership)
-	if reqErr != nil {
-		return *reqErr
+	// If an invite has been stored on an identity server, it means that a
+	// m.room.third_party_invite event has been emitted and that we shouldn't
+	// emit a m.room.member one.
+	if inviteStored {
+		return util.JSONResponse{
+			Code: 200,
+			JSON: struct{}{},
+		}
+	}
+
+	event, err := buildMembershipEvent(
+		body, accountDB, device, membership, roomID, cfg, queryAPI,
+	)
+	if err == errMissingUserID {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	} else if err == events.ErrRoomNoExists {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound(err.Error()),
+		}
+	} else if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := producer.SendEvents([]gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
+	}
+}
+
+func buildMembershipEvent(
+	body threepid.MembershipRequest, accountDB *accounts.Database,
+	device *authtypes.Device, membership string, roomID string, cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+) (*gomatrixserverlib.Event, error) {
+	stateKey, reason, err := getMembershipStateKey(body, device, membership)
+	if err != nil {
+		return nil, err
 	}
 
 	profile, err := loadProfile(stateKey, cfg, accountDB)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		return nil, err
 	}
 
 	builder := gomatrixserverlib.EventBuilder{
@@ -80,27 +141,10 @@ func SendMembership(
 	}
 
 	if err = builder.SetContent(content); err != nil {
-		return httputil.LogThenError(req, err)
+		return nil, err
 	}
 
-	event, err := events.BuildEvent(&builder, cfg, queryAPI, nil)
-	if err == events.ErrRoomNoExists {
-		return util.JSONResponse{
-			Code: 404,
-			JSON: jsonerror.NotFound(err.Error()),
-		}
-	} else if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	if err := producer.SendEvents([]gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName); err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	return util.JSONResponse{
-		Code: 200,
-		JSON: struct{}{},
-	}
+	return events.BuildEvent(&builder, cfg, queryAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns
@@ -130,16 +174,13 @@ func loadProfile(userID string, cfg config.Dendrite, accountDB *accounts.Databas
 // returns a JSONResponse with a corresponding error code and message.
 func getMembershipStateKey(
 	body threepid.MembershipRequest, device *authtypes.Device, membership string,
-) (stateKey string, reason string, response *util.JSONResponse) {
+) (stateKey string, reason string, err error) {
 	if membership == "ban" || membership == "unban" || membership == "kick" || membership == "invite" {
 		// If we're in this case, the state key is contained in the request body,
 		// possibly along with a reason (for "kick" and "ban") so we need to parse
 		// it
 		if body.UserID == "" {
-			response = &util.JSONResponse{
-				Code: 400,
-				JSON: jsonerror.BadJSON("'user_id' must be supplied."),
-			}
+			err = errMissingUserID
 			return
 		}
 

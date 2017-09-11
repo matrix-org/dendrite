@@ -241,7 +241,7 @@ func Setup(
 
 	r0mux.Handle("/account/3pid",
 		common.MakeAuthAPI("account_3pid", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return readers.CheckAndSave3PIDAssociation(req, accountDB, device)
+			return readers.CheckAndSave3PIDAssociation(req, accountDB, device, cfg)
 		}),
 	).Methods("POST", "OPTIONS")
 
@@ -253,7 +253,7 @@ func Setup(
 
 	r0mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
 		common.MakeAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
-			return readers.RequestEmailToken(req, accountDB)
+			return readers.RequestEmailToken(req, accountDB, cfg)
 		}),
 	).Methods("POST", "OPTIONS")
 

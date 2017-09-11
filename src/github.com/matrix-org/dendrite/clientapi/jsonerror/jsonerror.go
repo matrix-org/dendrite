@@ -104,3 +104,12 @@ func LimitExceeded(msg string, retryAfterMS int64) *LimitExceededError {
 		RetryAfterMS: retryAfterMS,
 	}
 }
+
+// NotTrusted is an error which is returned when the client asks the server to
+// proxy a request (e.g. 3PID association) to a server that isn't trusted
+func NotTrusted(serverName string) *MatrixError {
+	return &MatrixError{
+		ErrCode: "M_SERVER_NOT_TRUSTED",
+		Err:     fmt.Sprintf("Untrusted server '%s'", serverName),
+	}
+}

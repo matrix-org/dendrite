@@ -26,15 +26,11 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/events"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/matrix-org/util"
 )
 
 // MembershipRequest represents the body of an incoming POST request
@@ -66,6 +62,15 @@ type idServerStoreInviteResponse struct {
 	PublicKeys  []common.PublicKey `json:"public_keys"`
 }
 
+var (
+	// ErrMissingParameter is the error raised if a request for 3PID invite has
+	// an incomplete body
+	ErrMissingParameter = errors.New("'address', 'id_server' and 'medium' must all be supplied")
+	// ErrNotTrusted is the error raised if an identity server isn't in the list
+	// of trusted servers in the configuration file.
+	ErrNotTrusted = errors.New("untrusted server")
+)
+
 // CheckAndProcessInvite analyses the body of an incoming membership request.
 // If the fields relative to a third-party-invite are all supplied, lookups the
 // matching Matrix ID from the given identity server. If no Matrix ID is
@@ -80,27 +85,24 @@ type idServerStoreInviteResponse struct {
 // fills the Matrix ID in the request body so a normal invite membership event
 // can be emitted.
 func CheckAndProcessInvite(
-	req *http.Request, device *authtypes.Device, body *MembershipRequest,
-	cfg config.Dendrite, queryAPI api.RoomserverQueryAPI, db *accounts.Database,
+	device *authtypes.Device, body *MembershipRequest, cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI, db *accounts.Database,
 	producer *producers.RoomserverProducer, membership string, roomID string,
-) *util.JSONResponse {
+) (inviteStoredOnIDServer bool, err error) {
 	if membership != "invite" || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
 		// If none of the 3PID-specific fields are supplied, it's a standard invite
 		// so return nil for it to be processed as such
-		return nil
+		return
 	} else if body.Address == "" || body.IDServer == "" || body.Medium == "" {
 		// If at least one of the 3PID-specific fields is supplied but not all
 		// of them, return an error
-		return &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.BadJSON("'address', 'id_server' and 'medium' must all be supplied"),
-		}
+		err = ErrMissingParameter
+		return
 	}
 
 	lookupRes, storeInviteRes, err := queryIDServer(db, cfg, device, body, roomID)
 	if err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return &resErr
+		return
 	}
 
 	if lookupRes.MXID == "" {
@@ -108,28 +110,16 @@ func CheckAndProcessInvite(
 		// "m.room.third_party_invite" have to be emitted from the data in
 		// storeInviteRes.
 		err = emit3PIDInviteEvent(body, storeInviteRes, device, roomID, cfg, queryAPI, producer)
-		if err == events.ErrRoomNoExists {
-			return &util.JSONResponse{
-				Code: 404,
-				JSON: jsonerror.NotFound(err.Error()),
-			}
-		} else if err != nil {
-			resErr := httputil.LogThenError(req, err)
-			return &resErr
-		}
+		inviteStoredOnIDServer = err == nil
 
-		// If everything went well, returns with an empty response.
-		return &util.JSONResponse{
-			Code: 200,
-			JSON: struct{}{},
-		}
+		return
 	}
 
 	// A Matrix ID have been found: set it in the body request and let the process
 	// continue to create a "m.room.member" event with an "invite" membership
 	body.UserID = lookupRes.MXID
 
-	return nil
+	return
 }
 
 // queryIDServer handles all the requests to the identity server, starting by
@@ -142,9 +132,13 @@ func CheckAndProcessInvite(
 // Returns a representation of the response for both cases.
 // Returns an error if a check or a request failed.
 func queryIDServer(
-	db *accounts.Database, cfg config.Dendrite,
-	device *authtypes.Device, body *MembershipRequest, roomID string,
+	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
+	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
+	if err = isTrusted(body.IDServer, cfg); err != nil {
+		return
+	}
+
 	// Lookup the 3PID
 	lookupRes, err = queryIDServerLookup(body)
 	if err != nil {
@@ -249,7 +243,6 @@ func queryIDServerStoreInvite(
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// TODO: Log the error supplied with the identity server?
 		errMsg := fmt.Sprintf("Identity server %s responded with a %d error code", body.IDServer, resp.StatusCode)
 		return nil, errors.New(errMsg)
 	}
@@ -275,7 +268,6 @@ func queryIDServerPubKey(idServerName string, keyID string) ([]byte, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// TODO: Log the error supplied with the identity server?
 		errMsg := fmt.Sprintf("Couldn't retrieve key %s from server %s", keyID, idServerName)
 		return nil, errors.New(errMsg)
 	}
@@ -297,7 +289,6 @@ func checkIDServerSignatures(body *MembershipRequest, res *idServerLookupRespons
 		return err
 	}
 
-	// TODO: Check if the domain is part of a list of trusted ID servers
 	signatures, ok := res.Signatures[body.IDServer]
 	if !ok {
 		return errors.New("No signature for domain " + body.IDServer)
