@@ -43,7 +43,7 @@ func LookupServer(serverName ServerName) (*DNSResult, error) { // nolint: gocycl
 	result.Hosts = map[string]HostResult{}
 
 	hosts := map[string][]net.SRV{}
-	if strings.Contains(string(serverName), ":") {
+	if !strings.Contains(string(serverName), ":") {
 		// If there isn't an explicit port set then try to look up the SRV record.
 		var err error
 		result.SRVCName, result.SRVRecords, err = net.LookupSRV("matrix", "tcp", string(serverName))
