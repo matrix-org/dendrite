@@ -16,6 +16,7 @@ package writers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -28,6 +29,8 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/Sirupsen/logrus"
 )
 
 type invite struct {
@@ -48,7 +51,7 @@ type invites struct {
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
-	producer *producers.RoomserverProducer,
+	producer *producers.RoomserverProducer, federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -57,7 +60,7 @@ func CreateInvitesFrom3PIDInvites(
 
 	evs := []gomatrixserverlib.Event{}
 	for _, inv := range body.Invites {
-		event, err := createInviteFrom3PIDInvite(queryAPI, cfg, inv)
+		event, err := createInviteFrom3PIDInvite(queryAPI, cfg, inv, federation)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -83,6 +86,7 @@ func CreateInvitesFrom3PIDInvites(
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
 	queryAPI api.RoomserverQueryAPI, cfg config.Dendrite, inv invite,
+	federation *gomatrixserverlib.FederationClient,
 ) (*gomatrixserverlib.Event, error) {
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
@@ -120,11 +124,11 @@ func createInviteFrom3PIDInvite(
 	}
 
 	if !queryRes.RoomExists {
-		// TODO: Use federation to auth the event
-		return nil, nil
+		// Use federation to auth the event
+		return nil, sendToRemoteServer(inv, federation, cfg, *builder)
 	}
 
-	// Finish building the event
+	// Auth the event locally
 	builder.Depth = queryRes.Depth
 	builder.PrevEvents = queryRes.LatestEvents
 
@@ -152,6 +156,38 @@ func createInviteFrom3PIDInvite(
 	}
 
 	return &event, nil
+}
+
+// sendToRemoteServer uses federation to send an invite provided by an identity
+// server to a remote server in case the current server isn't in the room the
+// invite is for.
+// Returns an error if it couldn't get the server names to reach or if all of
+// them responded with an error.
+func sendToRemoteServer(
+	inv invite, federation *gomatrixserverlib.FederationClient, cfg config.Dendrite,
+	builder gomatrixserverlib.EventBuilder,
+) (err error) {
+	remoteServers := make([]gomatrixserverlib.ServerName, 2)
+	_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
+	if err != nil {
+		return
+	}
+	// Fallback to the room's server if the sender's domain is the same as
+	// the current server's
+	_, remoteServers[1], err = gomatrixserverlib.SplitID('!', inv.RoomID)
+	if err != nil {
+		return
+	}
+
+	for _, server := range remoteServers {
+		err = federation.ExchangeThirdPartyInvite(server, builder)
+		if err == nil {
+			return
+		}
+		logrus.WithError(err).Warn("failed to send 3PID invite via %s", server)
+	}
+
+	return errors.New("failed to send 3PID invite via any server")
 }
 
 // fillDisplayName looks in a list of auth events for a m.room.third_party_invite
