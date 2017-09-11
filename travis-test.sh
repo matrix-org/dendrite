@@ -13,7 +13,7 @@ gb build github.com/matrix-org/dendrite/cmd/mediaapi-integration-tests
 gb build github.com/matrix-org/dendrite/cmd/client-api-proxy
 
 # Run the pre commit hooks
-./hooks/pre-commit
+# ./hooks/pre-commit
 
 # Run the integration tests
 bin/roomserver-integration-tests
