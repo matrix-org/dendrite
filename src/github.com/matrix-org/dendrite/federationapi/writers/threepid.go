@@ -127,10 +127,8 @@ func createInviteFrom3PIDInvite(
 		if err != nil {
 			return nil, err
 		}
-		*builder, err = federation.ExchangeThirdPartyInvite(remoteServer, *builder)
-		if err != nil {
-			return nil, err
-		}
+		err = federation.ExchangeThirdPartyInvite(remoteServer, *builder)
+		return nil, err
 	} else {
 		// Auth the event locally
 		builder.Depth = queryRes.Depth
