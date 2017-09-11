@@ -16,6 +16,7 @@ package writers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -28,6 +29,8 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/sirupsen/logrus"
 )
 
 type invite struct {
@@ -122,24 +125,7 @@ func createInviteFrom3PIDInvite(
 
 	if !queryRes.RoomExists {
 		// Use federation to auth the event
-		remoteServers := make([]gomatrixserverlib.ServerName, 2)
-		_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
-		if err != nil {
-			return nil, err
-		}
-		// Fallback to the room's server if the sender's domain is the same as
-		// the current server's
-		_, remoteServers[1], err = gomatrixserverlib.SplitID('!', inv.RoomID)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, server := range remoteServers {
-			if server != cfg.Matrix.ServerName {
-				err = federation.ExchangeThirdPartyInvite(server, *builder)
-				return nil, err
-			}
-		}
+		return sendToRemoteServer(inv, federation, cfg)
 	}
 
 	// Auth the event locally
@@ -170,6 +156,37 @@ func createInviteFrom3PIDInvite(
 	}
 
 	return &event, nil
+}
+
+// sendToRemoteServer uses federation to send an invite provided by an identity
+// server to a remote server in case the current server isn't in the room the
+// invite is for.
+// Returns an error if it couldn't get the server names to reach or if all of
+// them responded with an error.
+func sendToRemoteServer(
+	inv invite, federation *gomatrixserverlib.FederationClient, cfg config.Dendrite,
+) error {
+	remoteServers := make([]gomatrixserverlib.ServerName, 2)
+	_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
+	if err != nil {
+		return err
+	}
+	// Fallback to the room's server if the sender's domain is the same as
+	// the current server's
+	_, remoteServers[1], err = gomatrixserverlib.SplitID('!', inv.RoomID)
+	if err != nil {
+		return err
+	}
+
+	for _, server := range remoteServers {
+		err = federation.ExchangeThirdPartyInvite(server, *builder)
+		if err == nil {
+			return nil
+		}
+		logrus.WithError(err).Warn("Failed to send 3PID invite via %s.", server)
+	}
+
+	return errors.New("Failed to send 3PID invite via any server.")
 }
 
 // fillDisplayName looks in a list of auth events for a m.room.third_party_invite
