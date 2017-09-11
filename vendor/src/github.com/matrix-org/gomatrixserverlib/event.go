@@ -361,7 +361,7 @@ const (
 // Returns an error if the total length of the event JSON is too long.
 // Returns an error if the event ID doesn't match the origin of the event.
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#size-limits
-func (e Event) CheckFields() error {
+func (e Event) CheckFields() error { // nolint: gocyclo
 	if len(e.eventJSON) > maxEventLength {
 		return fmt.Errorf(
 			"gomatrixserverlib: event is too long, length %d > maximum %d",

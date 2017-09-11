@@ -2,11 +2,12 @@ package gomatrixserverlib
 
 import (
 	"encoding/json"
-	"github.com/matrix-org/gomatrix"
-	"golang.org/x/crypto/ed25519"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"github.com/matrix-org/gomatrix"
+	"golang.org/x/crypto/ed25519"
 )
 
 // An FederationClient is a matrix federation client that adds
@@ -42,7 +43,7 @@ func (ac *FederationClient) doRequest(r FederationRequest, resBody interface{}) 
 
 	res, err := ac.client.Do(req)
 	if res != nil {
-		defer res.Body.Close()
+		defer res.Body.Close() // nolint: errcheck
 	}
 
 	if err != nil {

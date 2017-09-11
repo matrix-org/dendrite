@@ -114,7 +114,7 @@ func (fc *Client) LookupUserInfo(matrixServer ServerName, token string) (u UserI
 	var response *http.Response
 	response, err = fc.client.Get(url.String())
 	if response != nil {
-		defer response.Body.Close()
+		defer response.Body.Close() // nolint: errcheck
 	}
 	if err != nil {
 		return
@@ -152,7 +152,7 @@ func (fc *Client) LookupUserInfo(matrixServer ServerName, token string) (u UserI
 // return a cached copy of the keys or whether they will need to retrieve a fresh
 // copy of the keys.
 // Returns the keys or an error if there was a problem talking to the server.
-func (fc *Client) LookupServerKeys(
+func (fc *Client) LookupServerKeys( // nolint: gocyclo
 	matrixServer ServerName, keyRequests map[PublicKeyRequest]Timestamp,
 ) (map[PublicKeyRequest]ServerKeys, error) {
 	url := url.URL{
@@ -185,7 +185,7 @@ func (fc *Client) LookupServerKeys(
 
 	response, err := fc.client.Post(url.String(), "application/json", bytes.NewBuffer(requestBytes))
 	if response != nil {
-		defer response.Body.Close()
+		defer response.Body.Close() // nolint: errcheck
 	}
 	if err != nil {
 		return nil, err

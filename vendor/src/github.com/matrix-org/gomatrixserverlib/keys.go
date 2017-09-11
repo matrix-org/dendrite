@@ -110,7 +110,7 @@ func FetchKeysDirect(serverName ServerName, addr, sni string) (*ServerKeys, *tls
 	if err != nil {
 		return nil, nil, err
 	}
-	defer tcpconn.Close()
+	defer tcpconn.Close() // nolint: errcheck
 	tlsconn := tls.Client(tcpconn, &tls.Config{
 		ServerName:         sni,
 		InsecureSkipVerify: true, // This must be specified even though the TLS library will ignore it.
@@ -134,7 +134,7 @@ func FetchKeysDirect(serverName ServerName, addr, sni string) (*ServerKeys, *tls
 	// Read the 200 OK from the server.
 	response, err := http.ReadResponse(bufio.NewReader(tlsconn), request)
 	if response != nil {
-		defer response.Body.Close()
+		defer response.Body.Close() // nolint: errcheck
 	}
 	if err != nil {
 		return nil, nil, err
@@ -164,9 +164,9 @@ type KeyChecks struct {
 	MatchingServerName        bool                    // Does the server name match what was requested.
 	FutureValidUntilTS        bool                    // The valid until TS is in the future.
 	HasEd25519Key             bool                    // The server has at least one ed25519 key.
+	HasTLSFingerprint         bool                    // The server has at least one fingerprint.
 	AllEd25519ChecksOK        *bool                   // All the Ed25519 checks are ok. or null if there weren't any to check.
 	Ed25519Checks             map[KeyID]Ed25519Checks // Checks for Ed25519 keys.
-	HasTLSFingerprint         bool                    // The server has at least one fingerprint.
 	AllTLSFingerprintChecksOK *bool                   // All the fingerprint checks are ok.
 	TLSFingerprintChecks      []TLSFingerprintChecks  // Checks for TLS fingerprints.
 	MatchingTLSFingerprint    *bool                   // The TLS fingerprint for the connection matches one of the listed fingerprints.
@@ -206,7 +206,7 @@ func checkFingerprint(connState *tls.ConnectionState, sha256Fingerprints []Base6
 	cert := connState.PeerCertificates[0]
 	digest := sha256.Sum256(cert.Raw)
 	for _, fingerprint := range sha256Fingerprints {
-		if bytes.Compare(digest[:], fingerprint) == 0 {
+		if bytes.Equal(digest[:], fingerprint) {
 			return true
 		}
 	}

@@ -2,9 +2,10 @@ package gomatrixserverlib
 
 import (
 	"fmt"
-	"golang.org/x/crypto/ed25519"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 // A PublicKeyRequest is a request for a public key with a particular key ID.
@@ -72,7 +73,7 @@ type VerifyJSONResult struct {
 // The caller should check the Result field for each entry to see if it was valid.
 // Returns an error if there was a problem talking to the database or one of the other methods
 // of fetching the public keys.
-func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult, error) {
+func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult, error) { // nolint: gocyclo
 	results := make([]VerifyJSONResult, len(requests))
 	keyIDs := make([][]KeyID, len(requests))
 

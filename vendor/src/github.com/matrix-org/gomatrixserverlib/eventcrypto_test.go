@@ -18,8 +18,9 @@ package gomatrixserverlib
 import (
 	"bytes"
 	"encoding/base64"
-	"golang.org/x/crypto/ed25519"
 	"testing"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 func TestVerifyEventSignatureTestVectors(t *testing.T) {

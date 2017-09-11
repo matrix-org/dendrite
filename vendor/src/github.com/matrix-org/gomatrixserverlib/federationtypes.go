@@ -185,9 +185,7 @@ func (r RespSendJoin) MarshalJSON() ([]byte, error) {
 	// (This protocol oddity is the result of a typo in the synapse matrix
 	//  server, and is preserved to maintain compatibility.)
 
-	return json.Marshal([]interface{}{200, respSendJoinFields{
-		r.StateEvents, r.AuthEvents,
-	}})
+	return json.Marshal([]interface{}{200, respSendJoinFields(r)})
 }
 
 // UnmarshalJSON implements json.Unmarshaller
@@ -203,8 +201,7 @@ func (r *RespSendJoin) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(tuple[1], &fields); err != nil {
 		return err
 	}
-	r.StateEvents = fields.StateEvents
-	r.AuthEvents = fields.AuthEvents
+	*r = RespSendJoin(fields)
 	return nil
 }
 
@@ -283,4 +280,40 @@ func checkAllowedByAuthEvents(event Event, eventsByID map[string]*Event) error {
 		)
 	}
 	return nil
+}
+
+// RespInvite is the content of a response to PUT /_matrix/federation/v1/invite/{roomID}/{eventID}
+type RespInvite struct {
+	// The invite event signed by recipient server.
+	Event Event
+}
+
+// MarshalJSON implements json.Marshaller
+func (r RespInvite) MarshalJSON() ([]byte, error) {
+	// The wire format of a RespInvite is slightly is sent as the second element
+	// of a two element list where the first element is the constant integer 200.
+	// (This protocol oddity is the result of a typo in the synapse matrix
+	//  server, and is preserved to maintain compatibility.)
+	return json.Marshal([]interface{}{200, respInviteFields(r)})
+}
+
+// UnmarshalJSON implements json.Unmarshaller
+func (r *RespInvite) UnmarshalJSON(data []byte) error {
+	var tuple []rawJSON
+	if err := json.Unmarshal(data, &tuple); err != nil {
+		return err
+	}
+	if len(tuple) != 2 {
+		return fmt.Errorf("gomatrixserverlib: invalid invite response, invalid length: %d != 2", len(tuple))
+	}
+	var fields respInviteFields
+	if err := json.Unmarshal(tuple[1], &fields); err != nil {
+		return err
+	}
+	*r = RespInvite(fields)
+	return nil
+}
+
+type respInviteFields struct {
+	Event Event `json:"event"`
 }
