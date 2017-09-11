@@ -101,6 +101,11 @@ func Invite(
 	// the other servers in the room that we have been invited.
 	return util.JSONResponse{
 		Code: 200,
-		JSON: &signedEvent,
+		// The response to /invite is the signed event but this is returned as
+		// the second element of a two element list where the first element is
+		// the constant integer 200.
+		// (This protocol oddity is the result of a typo in the synapse matrix
+		//  server, and is preserved to maintain compatibility.)
+		JSON: []interface{}{200, &signedEvent},
 	}
 }
