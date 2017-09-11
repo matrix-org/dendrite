@@ -125,7 +125,7 @@ func createInviteFrom3PIDInvite(
 
 	if !queryRes.RoomExists {
 		// Use federation to auth the event
-		return sendToRemoteServer(inv, federation, cfg)
+		return nil, sendToRemoteServer(inv, federation, cfg, *builder)
 	}
 
 	// Auth the event locally
@@ -165,6 +165,7 @@ func createInviteFrom3PIDInvite(
 // them responded with an error.
 func sendToRemoteServer(
 	inv invite, federation *gomatrixserverlib.FederationClient, cfg config.Dendrite,
+	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
 	remoteServers := make([]gomatrixserverlib.ServerName, 2)
 	_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
@@ -179,14 +180,14 @@ func sendToRemoteServer(
 	}
 
 	for _, server := range remoteServers {
-		err = federation.ExchangeThirdPartyInvite(server, *builder)
+		err = federation.ExchangeThirdPartyInvite(server, builder)
 		if err == nil {
 			return
 		}
-		logrus.WithError(err).Warn("Failed to send 3PID invite via %s.", server)
+		logrus.WithError(err).Warn("failed to send 3PID invite via %s", server)
 	}
 
-	return errors.New("Failed to send 3PID invite via any server.")
+	return errors.New("failed to send 3PID invite via any server")
 }
 
 // fillDisplayName looks in a list of auth events for a m.room.third_party_invite
