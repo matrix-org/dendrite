@@ -315,6 +315,7 @@ func (e Event) Sign(signingName string, keyID KeyID, privateKey ed25519.PrivateK
 	return Event{
 		redacted:  e.redacted,
 		eventJSON: eventJSON,
+		fields:    e.fields,
 	}
 }
 

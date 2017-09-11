@@ -4,7 +4,7 @@ set -eu
 
 echo "Installing lint search engine..."
 go get github.com/alecthomas/gometalinter/
-gometalinter --config=linter.json --install
+gometalinter --config=linter.json --install --update
 
 echo "Looking for lint..."
 gometalinter --config=linter.json
