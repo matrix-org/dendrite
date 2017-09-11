@@ -73,7 +73,7 @@ func Invite(
 	// Check that the event is signed by the server sending the request.
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
 		ServerName: event.Origin(),
-		Message:    event.JSON(),
+		Message:    event.Redact().JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
 	verifyResults, err := keys.VerifyJSONs(verifyRequests)
