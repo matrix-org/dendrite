@@ -116,6 +116,8 @@ func ExchangeThirdPartyInvite(
 			Code: 404,
 			JSON: jsonerror.NotFound("Unknown room " + roomID),
 		}
+	} else if err != nil {
+		return httputil.LogThenError(httpReq, err)
 	}
 
 	// Ask the requesting server to sign the newly created event so we know it
