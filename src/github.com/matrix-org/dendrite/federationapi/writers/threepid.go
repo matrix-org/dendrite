@@ -83,7 +83,7 @@ func CreateInvitesFrom3PIDInvites(
 	}
 }
 
-//
+// ExchangeThirdPartyInvite implements PUT /_matrix/federation/v1/exchange_third_party_invite/{roomID}
 func ExchangeThirdPartyInvite(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -109,6 +109,7 @@ func ExchangeThirdPartyInvite(
 		}
 	}
 
+	// Auth and build the event from what the remote server sent us
 	event, err := buildMembershipEvent(&builder, queryAPI, cfg)
 	if err == errNotInRoom {
 		return util.JSONResponse{
@@ -117,11 +118,14 @@ func ExchangeThirdPartyInvite(
 		}
 	}
 
+	// Ask the requesting server to sign the newly created event so we know it
+	// acknowledged it
 	signedEvent, err := federation.SendInvite(request.Origin(), *event)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
 
+	// Send the event to the roomserver
 	if err = producer.SendInvite(signedEvent.Event); err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
@@ -168,6 +172,11 @@ func createInviteFrom3PIDInvite(
 	return event, nil
 }
 
+// buildMembershipEvent uses a builder for a m.room.member invite event derived
+// from a third-party invite to auth and build the said event. Returns the said
+// event.
+// Returns errNotInRoom if the server is not in the room the invite is for.
+// Returns an error if something failed during the process.
 func buildMembershipEvent(
 	builder *gomatrixserverlib.EventBuilder, queryAPI api.RoomserverQueryAPI,
 	cfg config.Dendrite,
