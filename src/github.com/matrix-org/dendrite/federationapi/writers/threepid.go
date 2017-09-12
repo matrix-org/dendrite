@@ -109,6 +109,23 @@ func ExchangeThirdPartyInvite(
 		}
 	}
 
+	// Check that the state key is correct.
+	_, targetDomain, err := gomatrixserverlib.SplitID('@', *builder.StateKey)
+	if err != nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("The event's state key isn't a Matrix user ID"),
+		}
+	}
+
+	// Check that the target user is from the requesting homeserver.
+	if targetDomain != request.Origin() {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("The event's state key doesn't have the same domain as the request's origin"),
+		}
+	}
+
 	// Auth and build the event from what the remote server sent us
 	event, err := buildMembershipEvent(&builder, queryAPI, cfg)
 	if err == errNotInRoom {
