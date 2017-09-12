@@ -1,4 +1,5 @@
 {
+    "Deadline": "5m",
     "Enable": [
         "vet",
         "vetshadow",

@@ -17,6 +17,7 @@ package gomatrixserverlib
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -103,7 +104,9 @@ func (f *federationTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // LookupUserInfo gets information about a user from a given matrix homeserver
 // using a bearer access token.
-func (fc *Client) LookupUserInfo(matrixServer ServerName, token string) (u UserInfo, err error) {
+func (fc *Client) LookupUserInfo(
+	ctx context.Context, matrixServer ServerName, token string,
+) (u UserInfo, err error) {
 	url := url.URL{
 		Scheme:   "matrix",
 		Host:     string(matrixServer),
@@ -111,8 +114,13 @@ func (fc *Client) LookupUserInfo(matrixServer ServerName, token string) (u UserI
 		RawQuery: url.Values{"access_token": []string{token}}.Encode(),
 	}
 
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return
+	}
+
 	var response *http.Response
-	response, err = fc.client.Get(url.String())
+	response, err = fc.client.Do(req.WithContext(ctx))
 	if response != nil {
 		defer response.Body.Close() // nolint: errcheck
 	}
@@ -153,7 +161,7 @@ func (fc *Client) LookupUserInfo(matrixServer ServerName, token string) (u UserI
 // copy of the keys.
 // Returns the keys or an error if there was a problem talking to the server.
 func (fc *Client) LookupServerKeys( // nolint: gocyclo
-	matrixServer ServerName, keyRequests map[PublicKeyRequest]Timestamp,
+	ctx context.Context, matrixServer ServerName, keyRequests map[PublicKeyRequest]Timestamp,
 ) (map[PublicKeyRequest]ServerKeys, error) {
 	url := url.URL{
 		Scheme: "matrix",
@@ -183,7 +191,13 @@ func (fc *Client) LookupServerKeys( // nolint: gocyclo
 		return nil, err
 	}
 
-	response, err := fc.client.Post(url.String(), "application/json", bytes.NewBuffer(requestBytes))
+	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(requestBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	response, err := fc.client.Do(req.WithContext(ctx))
 	if response != nil {
 		defer response.Body.Close() // nolint: errcheck
 	}

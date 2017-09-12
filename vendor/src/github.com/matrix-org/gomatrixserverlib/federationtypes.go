@@ -1,6 +1,7 @@
 package gomatrixserverlib
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 )
@@ -107,7 +108,7 @@ func (r RespState) Events() ([]Event, error) {
 }
 
 // Check that a response to /state is valid.
-func (r RespState) Check(keyRing KeyRing) error {
+func (r RespState) Check(ctx context.Context, keyRing KeyRing) error {
 	var allEvents []Event
 	for _, event := range r.AuthEvents {
 		if event.StateKey() == nil {
@@ -133,7 +134,7 @@ func (r RespState) Check(keyRing KeyRing) error {
 	}
 
 	// Check if the events pass signature checks.
-	if err := VerifyEventSignatures(allEvents, keyRing); err != nil {
+	if err := VerifyEventSignatures(ctx, allEvents, keyRing); err != nil {
 		return nil
 	}
 
@@ -213,11 +214,11 @@ type respSendJoinFields struct {
 // Check that a response to /send_join is valid.
 // This checks that it would be valid as a response to /state
 // This also checks that the join event is allowed by the state.
-func (r RespSendJoin) Check(keyRing KeyRing, joinEvent Event) error {
+func (r RespSendJoin) Check(ctx context.Context, keyRing KeyRing, joinEvent Event) error {
 	// First check that the state is valid.
 	// The response to /send_join has the same data as a response to /state
 	// and the checks for a response to /state also apply.
-	if err := RespState(r).Check(keyRing); err != nil {
+	if err := RespState(r).Check(ctx, keyRing); err != nil {
 		return err
 	}
 

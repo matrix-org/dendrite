@@ -6,13 +6,13 @@ echo "Installing lint search engine..."
 go get github.com/alecthomas/gometalinter/
 gometalinter --config=linter.json --install --update
 
+echo "Testing..."
+go test
+
 echo "Looking for lint..."
 gometalinter --config=linter.json
 
 echo "Double checking spelling..."
 misspell -error src *.md
-
-echo "Testing..."
-go test
 
 echo "Done!"

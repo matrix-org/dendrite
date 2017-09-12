@@ -15,6 +15,7 @@
 package writers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,7 +61,9 @@ func CreateInvitesFrom3PIDInvites(
 
 	evs := []gomatrixserverlib.Event{}
 	for _, inv := range body.Invites {
-		event, err := createInviteFrom3PIDInvite(queryAPI, cfg, inv, federation)
+		event, err := createInviteFrom3PIDInvite(
+			req.Context(), queryAPI, cfg, inv, federation,
+		)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -85,8 +88,8 @@ func CreateInvitesFrom3PIDInvites(
 // Returns an error if there was a problem building the event or fetching the
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
-	queryAPI api.RoomserverQueryAPI, cfg config.Dendrite, inv invite,
-	federation *gomatrixserverlib.FederationClient,
+	ctx context.Context, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
+	inv invite, federation *gomatrixserverlib.FederationClient,
 ) (*gomatrixserverlib.Event, error) {
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
@@ -125,7 +128,7 @@ func createInviteFrom3PIDInvite(
 
 	if !queryRes.RoomExists {
 		// Use federation to auth the event
-		return nil, sendToRemoteServer(inv, federation, cfg, *builder)
+		return nil, sendToRemoteServer(ctx, inv, federation, cfg, *builder)
 	}
 
 	// Auth the event locally
@@ -164,7 +167,8 @@ func createInviteFrom3PIDInvite(
 // Returns an error if it couldn't get the server names to reach or if all of
 // them responded with an error.
 func sendToRemoteServer(
-	inv invite, federation *gomatrixserverlib.FederationClient, cfg config.Dendrite,
+	ctx context.Context, inv invite,
+	federation *gomatrixserverlib.FederationClient, cfg config.Dendrite,
 	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
 	remoteServers := make([]gomatrixserverlib.ServerName, 2)
@@ -180,7 +184,7 @@ func sendToRemoteServer(
 	}
 
 	for _, server := range remoteServers {
-		err = federation.ExchangeThirdPartyInvite(server, builder)
+		err = federation.ExchangeThirdPartyInvite(ctx, server, builder)
 		if err == nil {
 			return
 		}

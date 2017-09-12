@@ -15,6 +15,7 @@
 package writers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -41,6 +42,7 @@ func Send(
 ) util.JSONResponse {
 
 	t := txnReq{
+		context:    httpReq.Context(),
 		query:      query,
 		producer:   producer,
 		keys:       keys,
@@ -70,6 +72,7 @@ func Send(
 
 type txnReq struct {
 	gomatrixserverlib.Transaction
+	context    context.Context
 	query      api.RoomserverQueryAPI
 	producer   *producers.RoomserverProducer
 	keys       gomatrixserverlib.KeyRing
@@ -78,7 +81,7 @@ type txnReq struct {
 
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	// Check the event signatures
-	if err := gomatrixserverlib.VerifyEventSignatures(t.PDUs, t.keys); err != nil {
+	if err := gomatrixserverlib.VerifyEventSignatures(t.context, t.PDUs, t.keys); err != nil {
 		return nil, err
 	}
 
@@ -110,7 +113,9 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 				// our server so we should bail processing the transaction entirely.
 				return nil, err
 			}
-			results[e.EventID()] = gomatrixserverlib.PDUResult{err.Error()}
+			results[e.EventID()] = gomatrixserverlib.PDUResult{
+				Error: err.Error(),
+			}
 		} else {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
 		}
@@ -197,12 +202,12 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 	// need to fallback to /state.
 	// TODO: Attempt to fill in the gap using /get_missing_events
 	// TODO: Attempt to fetch the state using /state_ids and /events
-	state, err := t.federation.LookupState(t.Origin, e.RoomID(), e.EventID())
+	state, err := t.federation.LookupState(t.context, t.Origin, e.RoomID(), e.EventID())
 	if err != nil {
 		return err
 	}
 	// Check that the returned state is valid.
-	if err := state.Check(t.keys); err != nil {
+	if err := state.Check(t.context, t.keys); err != nil {
 		return err
 	}
 	// Check that the event is allowed by the state.

@@ -1,6 +1,7 @@
 package gomatrixserverlib
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -26,7 +27,7 @@ type KeyFetcher interface {
 	// The result may have fewer (server name, key ID) pairs than were in the request.
 	// The result may have more (server name, key ID) pairs than were in the request.
 	// Returns an error if there was a problem fetching the keys.
-	FetchKeys(requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]ServerKeys, error)
+	FetchKeys(ctx context.Context, requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]ServerKeys, error)
 }
 
 // A KeyDatabase is a store for caching public keys.
@@ -39,7 +40,7 @@ type KeyDatabase interface {
 	// to a concurrent FetchKeys(). This is acceptable since the database is
 	// only used as a cache for the keys, so if a FetchKeys() races with a
 	// StoreKeys() and some of the keys are missing they will be just be refetched.
-	StoreKeys(map[PublicKeyRequest]ServerKeys) error
+	StoreKeys(ctx context.Context, results map[PublicKeyRequest]ServerKeys) error
 }
 
 // A KeyRing stores keys for matrix servers and provides methods for verifying JSON messages.
@@ -73,7 +74,7 @@ type VerifyJSONResult struct {
 // The caller should check the Result field for each entry to see if it was valid.
 // Returns an error if there was a problem talking to the database or one of the other methods
 // of fetching the public keys.
-func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult, error) { // nolint: gocyclo
+func (k *KeyRing) VerifyJSONs(ctx context.Context, requests []VerifyJSONRequest) ([]VerifyJSONResult, error) { // nolint: gocyclo
 	results := make([]VerifyJSONResult, len(requests))
 	keyIDs := make([][]KeyID, len(requests))
 
@@ -109,7 +110,7 @@ func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult,
 		// This will happen if all the objects are missing supported signatures.
 		return results, nil
 	}
-	keysFromDatabase, err := k.KeyDatabase.FetchKeys(keyRequests)
+	keysFromDatabase, err := k.KeyDatabase.FetchKeys(ctx, keyRequests)
 	if err != nil {
 		return nil, err
 	}
@@ -124,14 +125,14 @@ func (k *KeyRing) VerifyJSONs(requests []VerifyJSONRequest) ([]VerifyJSONResult,
 		}
 		// TODO: Coalesce in-flight requests for the same keys.
 		// Otherwise we risk spamming the servers we query the keys from.
-		keysFetched, err := k.KeyFetchers[i].FetchKeys(keyRequests)
+		keysFetched, err := k.KeyFetchers[i].FetchKeys(ctx, keyRequests)
 		if err != nil {
 			return nil, err
 		}
 		k.checkUsingKeys(requests, results, keyIDs, keysFetched)
 
 		// Add the keys to the database so that we won't need to fetch them again.
-		if err := k.KeyDatabase.StoreKeys(keysFetched); err != nil {
+		if err := k.KeyDatabase.StoreKeys(ctx, keysFetched); err != nil {
 			return nil, err
 		}
 	}
@@ -143,7 +144,9 @@ func (k *KeyRing) isAlgorithmSupported(keyID KeyID) bool {
 	return strings.HasPrefix(string(keyID), "ed25519:")
 }
 
-func (k *KeyRing) publicKeyRequests(requests []VerifyJSONRequest, results []VerifyJSONResult, keyIDs [][]KeyID) map[PublicKeyRequest]Timestamp {
+func (k *KeyRing) publicKeyRequests(
+	requests []VerifyJSONRequest, results []VerifyJSONResult, keyIDs [][]KeyID,
+) map[PublicKeyRequest]Timestamp {
 	keyRequests := map[PublicKeyRequest]Timestamp{}
 	for i := range requests {
 		if results[i].Error == nil {
@@ -218,8 +221,10 @@ type PerspectiveKeyFetcher struct {
 }
 
 // FetchKeys implements KeyFetcher
-func (p *PerspectiveKeyFetcher) FetchKeys(requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]ServerKeys, error) {
-	results, err := p.Client.LookupServerKeys(p.PerspectiveServerName, requests)
+func (p *PerspectiveKeyFetcher) FetchKeys(
+	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
+) (map[PublicKeyRequest]ServerKeys, error) {
+	results, err := p.Client.LookupServerKeys(ctx, p.PerspectiveServerName, requests)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +274,9 @@ type DirectKeyFetcher struct {
 }
 
 // FetchKeys implements KeyFetcher
-func (d *DirectKeyFetcher) FetchKeys(requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]ServerKeys, error) {
+func (d *DirectKeyFetcher) FetchKeys(
+	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
+) (map[PublicKeyRequest]ServerKeys, error) {
 	byServer := map[ServerName]map[PublicKeyRequest]Timestamp{}
 	for req, ts := range requests {
 		server := byServer[req.ServerName]
@@ -283,7 +290,7 @@ func (d *DirectKeyFetcher) FetchKeys(requests map[PublicKeyRequest]Timestamp) (m
 	results := map[PublicKeyRequest]ServerKeys{}
 	for server, reqs := range byServer {
 		// TODO: make these requests in parallel
-		serverResults, err := d.fetchKeysForServer(server, reqs)
+		serverResults, err := d.fetchKeysForServer(ctx, server, reqs)
 		if err != nil {
 			// TODO: Should we actually be erroring here? or should we just drop those keys from the result map?
 			return nil, err
@@ -296,9 +303,9 @@ func (d *DirectKeyFetcher) FetchKeys(requests map[PublicKeyRequest]Timestamp) (m
 }
 
 func (d *DirectKeyFetcher) fetchKeysForServer(
-	serverName ServerName, requests map[PublicKeyRequest]Timestamp,
+	ctx context.Context, serverName ServerName, requests map[PublicKeyRequest]Timestamp,
 ) (map[PublicKeyRequest]ServerKeys, error) {
-	results, err := d.Client.LookupServerKeys(serverName, requests)
+	results, err := d.Client.LookupServerKeys(ctx, serverName, requests)
 	if err != nil {
 		return nil, err
 	}

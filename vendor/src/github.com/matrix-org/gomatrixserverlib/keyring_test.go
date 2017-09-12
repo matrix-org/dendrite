@@ -1,6 +1,7 @@
 package gomatrixserverlib
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -36,7 +37,9 @@ var testKeys = `{
 
 type testKeyDatabase struct{}
 
-func (db *testKeyDatabase) FetchKeys(requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]ServerKeys, error) {
+func (db *testKeyDatabase) FetchKeys(
+	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
+) (map[PublicKeyRequest]ServerKeys, error) {
 	results := map[PublicKeyRequest]ServerKeys{}
 	var keys ServerKeys
 	if err := json.Unmarshal([]byte(testKeys), &keys); err != nil {
@@ -54,14 +57,16 @@ func (db *testKeyDatabase) FetchKeys(requests map[PublicKeyRequest]Timestamp) (m
 	return results, nil
 }
 
-func (db *testKeyDatabase) StoreKeys(requests map[PublicKeyRequest]ServerKeys) error {
+func (db *testKeyDatabase) StoreKeys(
+	ctx context.Context, requests map[PublicKeyRequest]ServerKeys,
+) error {
 	return nil
 }
 
 func TestVerifyJSONsSuccess(t *testing.T) {
 	// Check that trying to verify the server key JSON works.
 	k := KeyRing{nil, &testKeyDatabase{}}
-	results, err := k.VerifyJSONs([]VerifyJSONRequest{{
+	results, err := k.VerifyJSONs(context.Background(), []VerifyJSONRequest{{
 		ServerName: "localhost:8800",
 		Message:    []byte(testKeys),
 		AtTS:       1493142432964,
@@ -77,7 +82,7 @@ func TestVerifyJSONsSuccess(t *testing.T) {
 func TestVerifyJSONsUnknownServerFails(t *testing.T) {
 	// Check that trying to verify JSON for an unknown server fails.
 	k := KeyRing{nil, &testKeyDatabase{}}
-	results, err := k.VerifyJSONs([]VerifyJSONRequest{{
+	results, err := k.VerifyJSONs(context.Background(), []VerifyJSONRequest{{
 		ServerName: "unknown:8800",
 		Message:    []byte(testKeys),
 		AtTS:       1493142432964,
@@ -94,7 +99,7 @@ func TestVerifyJSONsDistantFutureFails(t *testing.T) {
 	// Check that trying to verify JSON from the distant future fails.
 	distantFuture := Timestamp(2000000000000)
 	k := KeyRing{nil, &testKeyDatabase{}}
-	results, err := k.VerifyJSONs([]VerifyJSONRequest{{
+	results, err := k.VerifyJSONs(context.Background(), []VerifyJSONRequest{{
 		ServerName: "unknown:8800",
 		Message:    []byte(testKeys),
 		AtTS:       distantFuture,
@@ -110,7 +115,7 @@ func TestVerifyJSONsDistantFutureFails(t *testing.T) {
 func TestVerifyJSONsFetcherError(t *testing.T) {
 	// Check that if the database errors then the attempt to verify JSON fails.
 	k := KeyRing{nil, &erroringKeyDatabase{}}
-	results, err := k.VerifyJSONs([]VerifyJSONRequest{{
+	results, err := k.VerifyJSONs(context.Background(), []VerifyJSONRequest{{
 		ServerName: "localhost:8800",
 		Message:    []byte(testKeys),
 		AtTS:       1493142432964,
@@ -129,10 +134,14 @@ func (e *erroringKeyDatabaseError) Error() string { return "An error with the ke
 var testErrorFetch = erroringKeyDatabaseError(1)
 var testErrorStore = erroringKeyDatabaseError(2)
 
-func (e *erroringKeyDatabase) FetchKeys(requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]ServerKeys, error) {
+func (e *erroringKeyDatabase) FetchKeys(
+	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
+) (map[PublicKeyRequest]ServerKeys, error) {
 	return nil, &testErrorFetch
 }
 
-func (e *erroringKeyDatabase) StoreKeys(keys map[PublicKeyRequest]ServerKeys) error {
+func (e *erroringKeyDatabase) StoreKeys(
+	ctx context.Context, keys map[PublicKeyRequest]ServerKeys,
+) error {
 	return &testErrorStore
 }
