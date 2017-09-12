@@ -126,7 +126,7 @@ func ExchangeThirdPartyInvite(
 	}
 
 	// Send the event to the roomserver
-	if err = producer.SendInvite(signedEvent.Event); err != nil {
+	if err = producer.SendEvents([]gomatrixserverlib.Event{signedEvent.Event}, cfg.Matrix.ServerName); err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
 
