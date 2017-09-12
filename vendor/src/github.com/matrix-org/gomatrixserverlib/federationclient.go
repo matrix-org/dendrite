@@ -84,9 +84,11 @@ func (ac *FederationClient) doRequest(r FederationRequest, resBody interface{}) 
 	return json.Unmarshal(contents, resBody)
 }
 
+var federationPathPrefix = "/_matrix/federation/v1"
+
 // SendTransaction sends a transaction
 func (ac *FederationClient) SendTransaction(t Transaction) (res RespSend, err error) {
-	path := "/_matrix/federation/v1/send/" + string(t.TransactionID) + "/"
+	path := federationPathPrefix + "/send/" + string(t.TransactionID) + "/"
 	req := NewFederationRequest("PUT", t.Destination, path)
 	if err = req.SetContent(t); err != nil {
 		return
@@ -105,7 +107,7 @@ func (ac *FederationClient) SendTransaction(t Transaction) (res RespSend, err er
 // server's key and pass it to SendJoin.
 // See https://matrix.org/docs/spec/server_server/unstable.html#joining-rooms
 func (ac *FederationClient) MakeJoin(s ServerName, roomID, userID string) (res RespMakeJoin, err error) {
-	path := "/_matrix/federation/v1/make_join/" +
+	path := federationPathPrefix + "/make_join/" +
 		url.PathEscape(roomID) + "/" +
 		url.PathEscape(userID)
 	req := NewFederationRequest("GET", s, path)
@@ -118,7 +120,21 @@ func (ac *FederationClient) MakeJoin(s ServerName, roomID, userID string) (res R
 // This is used to join a room the local server isn't a member of.
 // See https://matrix.org/docs/spec/server_server/unstable.html#joining-rooms
 func (ac *FederationClient) SendJoin(s ServerName, event Event) (res RespSendJoin, err error) {
-	path := "/_matrix/federation/v1/send_join/" +
+	path := federationPathPrefix + "/send_join/" +
+		url.PathEscape(event.RoomID()) + "/" +
+		url.PathEscape(event.EventID())
+	req := NewFederationRequest("PUT", s, path)
+	if err = req.SetContent(event); err != nil {
+		return
+	}
+	err = ac.doRequest(req, &res)
+	return
+}
+
+// SendInvite sends an invite m.room.member event to an invited server to be
+// signed by it. This is used to invite a user that is not on the local server.
+func (ac *FederationClient) SendInvite(s ServerName, event Event) (res RespInvite, err error) {
+	path := federationPathPrefix + "/invite/" +
 		url.PathEscape(event.RoomID()) + "/" +
 		url.PathEscape(event.EventID())
 	req := NewFederationRequest("PUT", s, path)
@@ -135,7 +151,7 @@ func (ac *FederationClient) SendJoin(s ServerName, event Event) (res RespSendJoi
 // This is used to exchange a m.room.third_party_invite event for a m.room.member
 // one in a room the local server isn't a member of.
 func (ac *FederationClient) ExchangeThirdPartyInvite(s ServerName, builder EventBuilder) (err error) {
-	path := "/_matrix/federation/v1/exchange_third_party_invite/" +
+	path := federationPathPrefix + "/exchange_third_party_invite/" +
 		url.PathEscape(builder.RoomID)
 	req := NewFederationRequest("PUT", s, path)
 	if err = req.SetContent(builder); err != nil {
@@ -148,7 +164,7 @@ func (ac *FederationClient) ExchangeThirdPartyInvite(s ServerName, builder Event
 // LookupState retrieves the room state for a room at an event from a
 // remote matrix server as full matrix events.
 func (ac *FederationClient) LookupState(s ServerName, roomID, eventID string) (res RespState, err error) {
-	path := "/_matrix/federation/v1/state/" +
+	path := federationPathPrefix + "/state/" +
 		url.PathEscape(roomID) +
 		"/?event_id=" +
 		url.QueryEscape(eventID)
@@ -160,7 +176,7 @@ func (ac *FederationClient) LookupState(s ServerName, roomID, eventID string) (r
 // LookupStateIDs retrieves the room state for a room at an event from a
 // remote matrix server as lists of matrix event IDs.
 func (ac *FederationClient) LookupStateIDs(s ServerName, roomID, eventID string) (res RespStateIDs, err error) {
-	path := "/_matrix/federation/v1/state_ids/" +
+	path := federationPathPrefix + "/state_ids/" +
 		url.PathEscape(roomID) +
 		"/?event_id=" +
 		url.QueryEscape(eventID)
@@ -175,7 +191,7 @@ func (ac *FederationClient) LookupStateIDs(s ServerName, roomID, eventID string)
 // If the room alias doesn't exist on the remote server then a 404 gomatrix.HTTPError
 // is returned.
 func (ac *FederationClient) LookupRoomAlias(s ServerName, roomAlias string) (res RespDirectory, err error) {
-	path := "/_matrix/federation/v1/query/directory?room_alias=" +
+	path := federationPathPrefix + "/query/directory?room_alias=" +
 		url.QueryEscape(roomAlias)
 	req := NewFederationRequest("GET", s, path)
 	err = ac.doRequest(req, &res)
