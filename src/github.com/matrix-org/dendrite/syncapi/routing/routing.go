@@ -32,5 +32,5 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, deviceDB *devices.Database
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
-	}))
+	})).Methods("GET")
 }
