@@ -86,6 +86,8 @@ func (c *RoomserverProducer) SendInputRoomEvents(ires []api.InputRoomEvent) erro
 }
 
 // SendInvite writes the invite event to the roomserver input API.
+// This should only be needed for invite events that occur outside of a known room.
+// If we are in the room then the event should be sent using the SendEvents method.
 func (c *RoomserverProducer) SendInvite(inviteEvent gomatrixserverlib.Event) error {
 	request := api.InputRoomEventsRequest{
 		InputInviteEvents: []api.InputInviteEvent{{Event: inviteEvent}},

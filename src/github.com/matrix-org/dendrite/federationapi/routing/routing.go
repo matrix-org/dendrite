@@ -85,6 +85,16 @@ func Setup(
 		},
 	))
 
+	v1fedmux.Handle("/exchange_third_party_invite/{roomID}", common.MakeFedAPI(
+		"exchange_third_party_invite", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return writers.ExchangeThirdPartyInvite(
+				httpReq, request, vars["roomID"], query, cfg, federation, producer,
+			)
+		},
+	))
+
 	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
 		"federation_get_event", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {

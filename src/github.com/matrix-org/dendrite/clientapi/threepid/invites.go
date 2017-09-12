@@ -254,6 +254,7 @@ func queryIDServerStoreInvite(
 
 // queryIDServerPubKey requests a public key identified with a given ID to the
 // a given identity server and returns the matching base64-decoded public key.
+// We assume that the ID server is trusted at this point.
 // Returns an error if the request couldn't be sent, if its body couldn't be parsed
 // or if the key couldn't be decoded from base64.
 func queryIDServerPubKey(idServerName string, keyID string) ([]byte, error) {
@@ -280,6 +281,7 @@ func queryIDServerPubKey(idServerName string, keyID string) ([]byte, error) {
 // If no signature can be found for the ID server's domain, returns an error, else
 // iterates over the signature for the said domain, retrieves the matching public
 // key, and verify it.
+// We assume that the ID server is trusted at this point.
 // Returns nil if all the verifications succeeded.
 // Returns an error if something failed in the process.
 func checkIDServerSignatures(body *MembershipRequest, res *idServerLookupResponse) error {
