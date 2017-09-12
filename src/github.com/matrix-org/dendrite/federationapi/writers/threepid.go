@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -48,6 +49,8 @@ type invites struct {
 	Invites []invite `json:"invites"`
 }
 
+var errNotInRoom = errors.New("the server isn't currently in the room")
+
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
@@ -72,6 +75,55 @@ func CreateInvitesFrom3PIDInvites(
 	// Send all the events
 	if err := producer.SendEvents(evs, cfg.Matrix.ServerName); err != nil {
 		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
+	}
+}
+
+//
+func ExchangeThirdPartyInvite(
+	httpReq *http.Request,
+	request *gomatrixserverlib.FederationRequest,
+	roomID string,
+	queryAPI api.RoomserverQueryAPI,
+	cfg config.Dendrite,
+	federation *gomatrixserverlib.FederationClient,
+	producer *producers.RoomserverProducer,
+) util.JSONResponse {
+	var builder gomatrixserverlib.EventBuilder
+	if err := json.Unmarshal(request.Content(), &builder); err != nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+
+	// Check that the room ID is correct.
+	if builder.RoomID != roomID {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
+		}
+	}
+
+	event, err := buildMembershipEvent(&builder, queryAPI, cfg)
+	if err == errNotInRoom {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("Unknown room " + roomID),
+		}
+	}
+
+	signedEvent, err := federation.SendInvite(request.Origin(), *event)
+	if err != nil {
+		return httputil.LogThenError(httpReq, err)
+	}
+
+	if err = producer.SendInvite(signedEvent.Event); err != nil {
+		return httputil.LogThenError(httpReq, err)
 	}
 
 	return util.JSONResponse{
@@ -108,6 +160,18 @@ func createInviteFrom3PIDInvite(
 		return nil, err
 	}
 
+	event, err := buildMembershipEvent(builder, queryAPI, cfg)
+	if err == errNotInRoom {
+		return nil, sendToRemoteServer(inv, federation, cfg, *builder)
+	}
+
+	return event, nil
+}
+
+func buildMembershipEvent(
+	builder *gomatrixserverlib.EventBuilder, queryAPI api.RoomserverQueryAPI,
+	cfg config.Dendrite,
+) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
 		return nil, err
@@ -125,7 +189,7 @@ func createInviteFrom3PIDInvite(
 
 	if !queryRes.RoomExists {
 		// Use federation to auth the event
-		return nil, sendToRemoteServer(inv, federation, cfg, *builder)
+		return nil, errNotInRoom
 	}
 
 	// Auth the event locally
@@ -138,7 +202,7 @@ func createInviteFrom3PIDInvite(
 		authEvents.AddEvent(&queryRes.StateEvents[i])
 	}
 
-	if err = fillDisplayName(builder, content, authEvents); err != nil {
+	if err = fillDisplayName(builder, authEvents); err != nil {
 		return nil, err
 	}
 
@@ -151,11 +215,8 @@ func createInviteFrom3PIDInvite(
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	now := time.Now()
 	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
-	if err != nil {
-		return nil, err
-	}
 
-	return &event, nil
+	return &event, err
 }
 
 // sendToRemoteServer uses federation to send an invite provided by an identity
@@ -201,9 +262,13 @@ func sendToRemoteServer(
 // found. Returning an error isn't necessary in this case as the event will be
 // rejected by gomatrixserverlib.
 func fillDisplayName(
-	builder *gomatrixserverlib.EventBuilder, content common.MemberContent,
-	authEvents gomatrixserverlib.AuthEvents,
+	builder *gomatrixserverlib.EventBuilder, authEvents gomatrixserverlib.AuthEvents,
 ) error {
+	var content common.MemberContent
+	if err := json.Unmarshal(builder.Content, &content); err != nil {
+		return err
+	}
+
 	// Look for the m.room.third_party_invite event
 	thirdPartyInviteEvent, _ := authEvents.ThirdPartyInvite(content.ThirdPartyInvite.Signed.Token)
 
