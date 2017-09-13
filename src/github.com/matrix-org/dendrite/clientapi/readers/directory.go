@@ -66,7 +66,7 @@ func DirectoryRoom(
 			}
 		}
 	} else {
-		resp, err = federation.LookupRoomAlias(domain, roomAlias)
+		resp, err = federation.LookupRoomAlias(req.Context(), domain, roomAlias)
 		if err != nil {
 			switch x := err.(type) {
 			case gomatrix.HTTPError:

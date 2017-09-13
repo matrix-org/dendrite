@@ -76,7 +76,7 @@ func Invite(
 		Message:    event.Redact().JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
-	verifyResults, err := keys.VerifyJSONs(verifyRequests)
+	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}

@@ -15,6 +15,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -65,7 +66,7 @@ func (oq *destinationQueue) backgroundSend() {
 		// TODO: handle retries.
 		// TODO: blacklist uncooperative servers.
 
-		_, err := oq.client.SendTransaction(*t)
+		_, err := oq.client.SendTransaction(context.TODO(), *t)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"destination": oq.destination,

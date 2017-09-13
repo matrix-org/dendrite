@@ -136,7 +136,7 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 func (r joinRoomReq) joinRoomByRemoteAlias(
 	domain gomatrixserverlib.ServerName, roomAlias string,
 ) util.JSONResponse {
-	resp, err := r.federation.LookupRoomAlias(domain, roomAlias)
+	resp, err := r.federation.LookupRoomAlias(r.req.Context(), domain, roomAlias)
 	if err != nil {
 		switch x := err.(type) {
 		case gomatrix.HTTPError:
@@ -226,7 +226,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
 func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
-	respMakeJoin, err := r.federation.MakeJoin(server, roomID, r.userID)
+	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
 		return nil, err
@@ -246,12 +246,12 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return &res, nil
 	}
 
-	respSendJoin, err := r.federation.SendJoin(server, event)
+	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = respSendJoin.Check(r.keyRing, event); err != nil {
+	if err = respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
 		return nil, err
 	}
 

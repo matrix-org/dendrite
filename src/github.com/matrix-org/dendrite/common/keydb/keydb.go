@@ -15,7 +15,9 @@
 package keydb
 
 import (
+	"context"
 	"database/sql"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -41,6 +43,7 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 
 // FetchKeys implements gomatrixserverlib.KeyDatabase
 func (d *Database) FetchKeys(
+	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys, error) {
 	return d.statements.bulkSelectServerKeys(requests)
@@ -48,6 +51,7 @@ func (d *Database) FetchKeys(
 
 // StoreKeys implements gomatrixserverlib.KeyDatabase
 func (d *Database) StoreKeys(
+	ctx context.Context,
 	keyMap map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys,
 ) error {
 	// TODO: Inserting all the keys within a single transaction may

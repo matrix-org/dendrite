@@ -215,7 +215,7 @@ func VerifyHTTPRequest(
 		return nil, util.MessageResponse(401, message)
 	}
 
-	results, err := keys.VerifyJSONs([]VerifyJSONRequest{{
+	results, err := keys.VerifyJSONs(req.Context(), []VerifyJSONRequest{{
 		ServerName: request.Origin(),
 		AtTS:       AsTimestamp(now),
 		Message:    toVerify,
