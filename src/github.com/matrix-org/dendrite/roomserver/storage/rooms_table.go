@@ -96,7 +96,7 @@ func (s *roomStatements) selectRoomNID(
 ) (types.RoomNID, error) {
 	var roomNID int64
 	stmt := common.TxStmt(txn, s.selectRoomNIDStmt)
-	err := stmt.QueryRow(ctx, roomID).Scan(&roomNID)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 
