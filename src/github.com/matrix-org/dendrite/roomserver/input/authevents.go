@@ -15,16 +15,23 @@
 package input
 
 import (
+	"context"
+	"sort"
+
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"sort"
 )
 
 // checkAuthEvents checks that the event passes authentication checks
 // Returns the numeric IDs for the auth events.
-func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEventIDs []string) ([]types.EventNID, error) {
+func checkAuthEvents(
+	ctx context.Context,
+	db RoomEventDatabase,
+	event gomatrixserverlib.Event,
+	authEventIDs []string,
+) ([]types.EventNID, error) {
 	// Grab the numeric IDs for the supplied auth state events from the database.
-	authStateEntries, err := db.StateEntriesForEventIDs(authEventIDs)
+	authStateEntries, err := db.StateEntriesForEventIDs(ctx, authEventIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +41,7 @@ func checkAuthEvents(db RoomEventDatabase, event gomatrixserverlib.Event, authEv
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event})
 
 	// Load the actual auth events from the database.
-	authEvents, err := loadAuthEvents(db, stateNeeded, authStateEntries)
+	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +91,10 @@ func (ae *authEvents) ThirdPartyInvite(stateKey string) (*gomatrixserverlib.Even
 }
 
 func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) *gomatrixserverlib.Event {
-	eventNID, ok := ae.state.lookup(types.StateKeyTuple{typeNID, types.EmptyStateKeyNID})
+	eventNID, ok := ae.state.lookup(types.StateKeyTuple{
+		EventTypeNID:     typeNID,
+		EventStateKeyNID: types.EmptyStateKeyNID,
+	})
 	if !ok {
 		return nil
 	}
@@ -100,7 +110,10 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *
 	if !ok {
 		return nil
 	}
-	eventNID, ok := ae.state.lookup(types.StateKeyTuple{typeNID, stateKeyNID})
+	eventNID, ok := ae.state.lookup(types.StateKeyTuple{
+		EventTypeNID:     typeNID,
+		EventStateKeyNID: stateKeyNID,
+	})
 	if !ok {
 		return nil
 	}
@@ -113,6 +126,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *
 
 // loadAuthEvents loads the events needed for authentication from the supplied room state.
 func loadAuthEvents(
+	ctx context.Context,
 	db RoomEventDatabase,
 	needed gomatrixserverlib.StateNeeded,
 	state []types.StateEntry,
@@ -121,7 +135,7 @@ func loadAuthEvents(
 	var neededStateKeys []string
 	neededStateKeys = append(neededStateKeys, needed.Member...)
 	neededStateKeys = append(neededStateKeys, needed.ThirdPartyInvite...)
-	if result.stateKeyNIDMap, err = db.EventStateKeyNIDs(neededStateKeys); err != nil {
+	if result.stateKeyNIDMap, err = db.EventStateKeyNIDs(ctx, neededStateKeys); err != nil {
 		return
 	}
 
@@ -135,34 +149,52 @@ func loadAuthEvents(
 			eventNIDs = append(eventNIDs, eventNID)
 		}
 	}
-	if result.events, err = db.Events(eventNIDs); err != nil {
+	if result.events, err = db.Events(ctx, eventNIDs); err != nil {
 		return
 	}
 	return
 }
 
 // stateKeyTuplesNeeded works out which numeric state key tuples we need to authenticate some events.
-func stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.EventStateKeyNID, stateNeeded gomatrixserverlib.StateNeeded) []types.StateKeyTuple {
+func stateKeyTuplesNeeded(
+	stateKeyNIDMap map[string]types.EventStateKeyNID,
+	stateNeeded gomatrixserverlib.StateNeeded,
+) []types.StateKeyTuple {
 	var keyTuples []types.StateKeyTuple
 	if stateNeeded.Create {
-		keyTuples = append(keyTuples, types.StateKeyTuple{types.MRoomCreateNID, types.EmptyStateKeyNID})
+		keyTuples = append(keyTuples, types.StateKeyTuple{
+			EventTypeNID:     types.MRoomCreateNID,
+			EventStateKeyNID: types.EmptyStateKeyNID,
+		})
 	}
 	if stateNeeded.PowerLevels {
-		keyTuples = append(keyTuples, types.StateKeyTuple{types.MRoomPowerLevelsNID, types.EmptyStateKeyNID})
+		keyTuples = append(keyTuples, types.StateKeyTuple{
+			EventTypeNID:     types.MRoomPowerLevelsNID,
+			EventStateKeyNID: types.EmptyStateKeyNID,
+		})
 	}
 	if stateNeeded.JoinRules {
-		keyTuples = append(keyTuples, types.StateKeyTuple{types.MRoomJoinRulesNID, types.EmptyStateKeyNID})
+		keyTuples = append(keyTuples, types.StateKeyTuple{
+			EventTypeNID:     types.MRoomJoinRulesNID,
+			EventStateKeyNID: types.EmptyStateKeyNID,
+		})
 	}
 	for _, member := range stateNeeded.Member {
 		stateKeyNID, ok := stateKeyNIDMap[member]
 		if ok {
-			keyTuples = append(keyTuples, types.StateKeyTuple{types.MRoomMemberNID, stateKeyNID})
+			keyTuples = append(keyTuples, types.StateKeyTuple{
+				EventTypeNID:     types.MRoomMemberNID,
+				EventStateKeyNID: stateKeyNID,
+			})
 		}
 	}
 	for _, token := range stateNeeded.ThirdPartyInvite {
 		stateKeyNID, ok := stateKeyNIDMap[token]
 		if ok {
-			keyTuples = append(keyTuples, types.StateKeyTuple{types.MRoomThirdPartyInviteNID, stateKeyNID})
+			keyTuples = append(keyTuples, types.StateKeyTuple{
+				EventTypeNID:     types.MRoomThirdPartyInviteNID,
+				EventStateKeyNID: stateKeyNID,
+			})
 		}
 	}
 	return keyTuples

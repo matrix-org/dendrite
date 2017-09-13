@@ -16,6 +16,7 @@ package input
 
 import (
 	"bytes"
+	"context"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -42,6 +43,7 @@ import (
 //      7 <----- latest
 //
 func updateLatestEvents(
+	ctx context.Context,
 	db RoomEventDatabase,
 	ow OutputRoomEventWriter,
 	roomNID types.RoomNID,
@@ -49,7 +51,7 @@ func updateLatestEvents(
 	event gomatrixserverlib.Event,
 	sendAsServer string,
 ) (err error) {
-	updater, err := db.GetLatestEventsForUpdate(roomNID)
+	updater, err := db.GetLatestEventsForUpdate(ctx, roomNID)
 	if err != nil {
 		return
 	}
@@ -57,7 +59,7 @@ func updateLatestEvents(
 	defer common.EndTransaction(updater, &succeeded)
 
 	u := latestEventsUpdater{
-		db: db, updater: updater, ow: ow, roomNID: roomNID,
+		ctx: ctx, db: db, updater: updater, ow: ow, roomNID: roomNID,
 		stateAtEvent: stateAtEvent, event: event, sendAsServer: sendAsServer,
 	}
 	if err = u.doUpdateLatestEvents(); err != nil {
@@ -73,6 +75,7 @@ func updateLatestEvents(
 // The state could be passed using function arguments, but it becomes impractical
 // when there are so many variables to pass around.
 type latestEventsUpdater struct {
+	ctx          context.Context
 	db           RoomEventDatabase
 	updater      types.RoomRecentEventsUpdater
 	ow           OutputRoomEventWriter
@@ -133,7 +136,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return err
 	}
 
-	updates, err := updateMemberships(u.db, u.updater, u.removed, u.added)
+	updates, err := updateMemberships(u.ctx, u.db, u.updater, u.removed, u.added)
 	if err != nil {
 		return err
 	}
@@ -174,18 +177,22 @@ func (u *latestEventsUpdater) latestState() error {
 	for i := range u.latest {
 		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
-	u.newStateNID, err = state.CalculateAndStoreStateAfterEvents(u.db, u.roomNID, latestStateAtEvents)
+	u.newStateNID, err = state.CalculateAndStoreStateAfterEvents(
+		u.ctx, u.db, u.roomNID, latestStateAtEvents,
+	)
 	if err != nil {
 		return err
 	}
 
-	u.removed, u.added, err = state.DifferenceBetweeenStateSnapshots(u.db, u.oldStateNID, u.newStateNID)
+	u.removed, u.added, err = state.DifferenceBetweeenStateSnapshots(
+		u.ctx, u.db, u.oldStateNID, u.newStateNID,
+	)
 	if err != nil {
 		return err
 	}
 
 	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = state.DifferenceBetweeenStateSnapshots(
-		u.db, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
+		u.ctx, u.db, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
 	)
 	if err != nil {
 		return err
@@ -193,7 +200,12 @@ func (u *latestEventsUpdater) latestState() error {
 	return nil
 }
 
-func calculateLatest(oldLatest []types.StateAtEventAndReference, alreadyReferenced bool, prevEvents []gomatrixserverlib.EventReference, newEvent types.StateAtEventAndReference) []types.StateAtEventAndReference {
+func calculateLatest(
+	oldLatest []types.StateAtEventAndReference,
+	alreadyReferenced bool,
+	prevEvents []gomatrixserverlib.EventReference,
+	newEvent types.StateAtEventAndReference,
+) []types.StateAtEventAndReference {
 	var alreadyInLatest bool
 	var newLatest []types.StateAtEventAndReference
 	for _, l := range oldLatest {
@@ -253,7 +265,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
 	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
-	eventIDMap, err := u.db.EventIDs(stateEventNIDs)
+	eventIDMap, err := u.db.EventIDs(u.ctx, stateEventNIDs)
 	if err != nil {
 		return nil, err
 	}

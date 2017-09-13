@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/lib/pq"
@@ -91,20 +92,30 @@ func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *eventStateKeyStatements) insertEventStateKeyNID(txn *sql.Tx, eventStateKey string) (types.EventStateKeyNID, error) {
+func (s *eventStateKeyStatements) insertEventStateKeyNID(
+	ctx context.Context, txn *sql.Tx, eventStateKey string,
+) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	err := common.TxStmt(txn, s.insertEventStateKeyNIDStmt).QueryRow(eventStateKey).Scan(&eventStateKeyNID)
+	stmt := common.TxStmt(txn, s.insertEventStateKeyNIDStmt)
+	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) selectEventStateKeyNID(txn *sql.Tx, eventStateKey string) (types.EventStateKeyNID, error) {
+func (s *eventStateKeyStatements) selectEventStateKeyNID(
+	ctx context.Context, txn *sql.Tx, eventStateKey string,
+) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	err := common.TxStmt(txn, s.selectEventStateKeyNIDStmt).QueryRow(eventStateKey).Scan(&eventStateKeyNID)
+	stmt := common.TxStmt(txn, s.selectEventStateKeyNIDStmt)
+	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(eventStateKeys []string) (map[string]types.EventStateKeyNID, error) {
-	rows, err := s.bulkSelectEventStateKeyNIDStmt.Query(pq.StringArray(eventStateKeys))
+func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
+	ctx context.Context, eventStateKeys []string,
+) (map[string]types.EventStateKeyNID, error) {
+	rows, err := s.bulkSelectEventStateKeyNIDStmt.QueryContext(
+		ctx, pq.StringArray(eventStateKeys),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -122,18 +133,23 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(eventStateKeys []st
 	return result, nil
 }
 
-func (s *eventStateKeyStatements) selectEventStateKey(txn *sql.Tx, eventStateKeyNID types.EventStateKeyNID) (string, error) {
+func (s *eventStateKeyStatements) selectEventStateKey(
+	ctx context.Context, txn *sql.Tx, eventStateKeyNID types.EventStateKeyNID,
+) (string, error) {
 	var eventStateKey string
-	err := common.TxStmt(txn, s.selectEventStateKeyStmt).QueryRow(eventStateKeyNID).Scan(&eventStateKey)
+	stmt := common.TxStmt(txn, s.selectEventStateKeyStmt)
+	err := stmt.QueryRowContext(ctx, eventStateKeyNID).Scan(&eventStateKey)
 	return eventStateKey, err
 }
 
-func (s *eventStateKeyStatements) bulkSelectEventStateKey(eventStateKeyNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error) {
+func (s *eventStateKeyStatements) bulkSelectEventStateKey(
+	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
+) (map[types.EventStateKeyNID]string, error) {
 	var nIDs pq.Int64Array
 	for i := range eventStateKeyNIDs {
 		nIDs[i] = int64(eventStateKeyNIDs[i])
 	}
-	rows, err := s.bulkSelectEventStateKeyStmt.Query(nIDs)
+	rows, err := s.bulkSelectEventStateKeyStmt.QueryContext(ctx, nIDs)
 	if err != nil {
 		return nil, err
 	}

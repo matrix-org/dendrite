@@ -32,16 +32,16 @@ import (
 type RoomserverAliasAPIDatabase interface {
 	// Save a given room alias with the room ID it refers to.
 	// Returns an error if there was a problem talking to the database.
-	SetRoomAlias(alias string, roomID string) error
+	SetRoomAlias(ctx context.Context, alias string, roomID string) error
 	// Look up the room ID a given alias refers to.
 	// Returns an error if there was a problem talking to the database.
-	GetRoomIDFromAlias(alias string) (string, error)
+	GetRoomIDFromAlias(ctx context.Context, alias string) (string, error)
 	// Look up all aliases referring to a given room ID.
 	// Returns an error if there was a problem talking to the database.
-	GetAliasesFromRoomID(roomID string) ([]string, error)
+	GetAliasesFromRoomID(ctx context.Context, roomID string) ([]string, error)
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
-	RemoveRoomAlias(alias string) error
+	RemoveRoomAlias(ctx context.Context, alias string) error
 }
 
 // RoomserverAliasAPI is an implementation of api.RoomserverAliasAPI
@@ -59,7 +59,7 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	response *api.SetRoomAliasResponse,
 ) error {
 	// Check if the alias isn't already referring to a room
-	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	roomID, err := r.DB.GetRoomIDFromAlias(ctx, request.Alias)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	response.AliasExists = false
 
 	// Save the new alias
-	if err := r.DB.SetRoomAlias(request.Alias, request.RoomID); err != nil {
+	if err := r.DB.SetRoomAlias(ctx, request.Alias, request.RoomID); err != nil {
 		return err
 	}
 
@@ -93,7 +93,7 @@ func (r *RoomserverAliasAPI) GetAliasRoomID(
 	response *api.GetAliasRoomIDResponse,
 ) error {
 	// Look up the room ID in the database
-	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	roomID, err := r.DB.GetRoomIDFromAlias(ctx, request.Alias)
 	if err != nil {
 		return err
 	}
@@ -109,18 +109,21 @@ func (r *RoomserverAliasAPI) RemoveRoomAlias(
 	response *api.RemoveRoomAliasResponse,
 ) error {
 	// Look up the room ID in the database
-	roomID, err := r.DB.GetRoomIDFromAlias(request.Alias)
+	roomID, err := r.DB.GetRoomIDFromAlias(ctx, request.Alias)
 	if err != nil {
 		return err
 	}
 
 	// Remove the dalias from the database
-	if err := r.DB.RemoveRoomAlias(request.Alias); err != nil {
+	if err := r.DB.RemoveRoomAlias(ctx, request.Alias); err != nil {
 		return err
 	}
 
 	// Send an updated m.room.aliases event
-	if err := r.sendUpdatedAliasesEvent(ctx, request.UserID, roomID); err != nil {
+	// At this point we've already committed the alias to the database so we
+	// shouldn't cancel this request.
+	// TODO: Ensure that we send unsent events when if server restarts.
+	if err := r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID); err != nil {
 		return err
 	}
 
@@ -147,7 +150,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 
 	// Retrieve the updated list of aliases, marhal it and set it as the
 	// event's content
-	aliases, err := r.DB.GetAliasesFromRoomID(roomID)
+	aliases, err := r.DB.GetAliasesFromRoomID(ctx, roomID)
 	if err != nil {
 		return err
 	}
