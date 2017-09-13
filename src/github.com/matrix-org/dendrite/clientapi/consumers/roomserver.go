@@ -15,6 +15,7 @@
 package consumers
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -137,7 +138,7 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	// Request the missing events from the roomserver
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
 	var eventResp api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(&eventReq, &eventResp); err != nil {
+	if err := s.query.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
 		return nil, err
 	}
 

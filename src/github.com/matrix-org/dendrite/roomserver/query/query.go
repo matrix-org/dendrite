@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -70,6 +71,7 @@ type RoomserverQueryAPI struct {
 
 // QueryLatestEventsAndState implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
+	ctx context.Context,
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
@@ -105,6 +107,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 
 // QueryStateAfterEvents implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryStateAfterEvents(
+	ctx context.Context,
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
 ) error {
@@ -146,6 +149,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 
 // QueryEventsByID implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryEventsByID(
+	ctx context.Context,
 	request *api.QueryEventsByIDRequest,
 	response *api.QueryEventsByIDResponse,
 ) error {
@@ -193,6 +197,7 @@ func (r *RoomserverQueryAPI) loadEvents(eventNIDs []types.EventNID) ([]gomatrixs
 
 // QueryMembershipsForRoom implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
+	ctx context.Context,
 	request *api.QueryMembershipsForRoomRequest,
 	response *api.QueryMembershipsForRoomResponse,
 ) error {
@@ -299,6 +304,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(eventNID types.EventNI
 
 // QueryInvitesForUser implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryInvitesForUser(
+	_ context.Context,
 	request *api.QueryInvitesForUserRequest,
 	response *api.QueryInvitesForUserResponse,
 ) error {
@@ -332,6 +338,7 @@ func (r *RoomserverQueryAPI) QueryInvitesForUser(
 
 // QueryServerAllowedToSeeEvent implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
+	ctx context.Context,
 	request *api.QueryServerAllowedToSeeEventRequest,
 	response *api.QueryServerAllowedToSeeEventResponse,
 ) error {
@@ -399,7 +406,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.QueryLatestEventsAndState(&request, &response); err != nil {
+			if err := r.QueryLatestEventsAndState(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
@@ -413,7 +420,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.QueryStateAfterEvents(&request, &response); err != nil {
+			if err := r.QueryStateAfterEvents(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
@@ -427,7 +434,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.QueryEventsByID(&request, &response); err != nil {
+			if err := r.QueryEventsByID(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
@@ -441,7 +448,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.QueryMembershipsForRoom(&request, &response); err != nil {
+			if err := r.QueryMembershipsForRoom(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
@@ -455,7 +462,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.QueryInvitesForUser(&request, &response); err != nil {
+			if err := r.QueryInvitesForUser(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
@@ -469,7 +476,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.QueryServerAllowedToSeeEvent(&request, &response); err != nil {
+			if err := r.QueryServerAllowedToSeeEvent(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}

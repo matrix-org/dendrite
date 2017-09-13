@@ -143,7 +143,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 		StateToFetch: needed.Tuples(),
 	}
 	var stateResp api.QueryStateAfterEventsResponse
-	if err := t.query.QueryStateAfterEvents(&stateReq, &stateResp); err != nil {
+	if err := t.query.QueryStateAfterEvents(t.context, &stateReq, &stateResp); err != nil {
 		return err
 	}
 
@@ -170,7 +170,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	// TODO: Check that the event is allowed by its auth_events.
 
 	// pass the event to the roomserver
-	if err := t.producer.SendEvents([]gomatrixserverlib.Event{e}, api.DoNotSendToOtherServers); err != nil {
+	if err := t.producer.SendEvents(t.context, []gomatrixserverlib.Event{e}, api.DoNotSendToOtherServers); err != nil {
 		return err
 	}
 
@@ -215,7 +215,7 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 		return err
 	}
 	// pass the event along with the state to the roomserver
-	if err := t.producer.SendEventWithState(state, e); err != nil {
+	if err := t.producer.SendEventWithState(t.context, state, e); err != nil {
 		return err
 	}
 	return nil

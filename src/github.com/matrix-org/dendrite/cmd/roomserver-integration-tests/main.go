@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -199,7 +200,7 @@ func writeToRoomServer(input []string, roomserverURL string) error {
 		}
 	}
 	x := api.NewRoomserverInputAPIHTTP(roomserverURL, nil)
-	return x.InputRoomEvents(&request, &response)
+	return x.InputRoomEvents(context.Background(), &request, &response)
 }
 
 // testRoomserver is used to run integration tests against a single roomserver.
@@ -389,10 +390,11 @@ func main() {
 	testRoomserver(input, want, func(q api.RoomserverQueryAPI) {
 		var response api.QueryLatestEventsAndStateResponse
 		if err := q.QueryLatestEventsAndState(
+			context.Background(),
 			&api.QueryLatestEventsAndStateRequest{
 				RoomID: "!HCXfdvrfksxuYnIFiJ:matrix.org",
 				StateToFetch: []gomatrixserverlib.StateKeyTuple{
-					{"m.room.member", "@richvdh:matrix.org"},
+					{EventType: "m.room.member", StateKey: "@richvdh:matrix.org"},
 				},
 			},
 			&response,

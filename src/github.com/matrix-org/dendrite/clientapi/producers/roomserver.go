@@ -15,6 +15,8 @@
 package producers
 
 import (
+	"context"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -32,7 +34,9 @@ func NewRoomserverProducer(inputAPI api.RoomserverInputAPI) *RoomserverProducer 
 }
 
 // SendEvents writes the given events to the roomserver input log. The events are written with KindNew.
-func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event, sendAsServer gomatrixserverlib.ServerName) error {
+func (c *RoomserverProducer) SendEvents(
+	ctx context.Context, events []gomatrixserverlib.Event, sendAsServer gomatrixserverlib.ServerName,
+) error {
 	ires := make([]api.InputRoomEvent, len(events))
 	for i, event := range events {
 		ires[i] = api.InputRoomEvent{
@@ -42,12 +46,14 @@ func (c *RoomserverProducer) SendEvents(events []gomatrixserverlib.Event, sendAs
 			SendAsServer: string(sendAsServer),
 		}
 	}
-	return c.SendInputRoomEvents(ires)
+	return c.SendInputRoomEvents(ctx, ires)
 }
 
 // SendEventWithState writes an event with KindNew to the roomserver input log
 // with the state at the event as KindOutlier before it.
-func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespState, event gomatrixserverlib.Event) error {
+func (c *RoomserverProducer) SendEventWithState(
+	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.Event,
+) error {
 	outliers, err := state.Events()
 	if err != nil {
 		return err
@@ -75,23 +81,23 @@ func (c *RoomserverProducer) SendEventWithState(state gomatrixserverlib.RespStat
 		StateEventIDs: stateEventIDs,
 	}
 
-	return c.SendInputRoomEvents(ires)
+	return c.SendInputRoomEvents(ctx, ires)
 }
 
 // SendInputRoomEvents writes the given input room events to the roomserver input API.
-func (c *RoomserverProducer) SendInputRoomEvents(ires []api.InputRoomEvent) error {
+func (c *RoomserverProducer) SendInputRoomEvents(ctx context.Context, ires []api.InputRoomEvent) error {
 	request := api.InputRoomEventsRequest{InputRoomEvents: ires}
 	var response api.InputRoomEventsResponse
-	return c.InputAPI.InputRoomEvents(&request, &response)
+	return c.InputAPI.InputRoomEvents(ctx, &request, &response)
 }
 
 // SendInvite writes the invite event to the roomserver input API.
 // This should only be needed for invite events that occur outside of a known room.
 // If we are in the room then the event should be sent using the SendEvents method.
-func (c *RoomserverProducer) SendInvite(inviteEvent gomatrixserverlib.Event) error {
+func (c *RoomserverProducer) SendInvite(ctx context.Context, inviteEvent gomatrixserverlib.Event) error {
 	request := api.InputRoomEventsRequest{
 		InputInviteEvents: []api.InputInviteEvent{{Event: inviteEvent}},
 	}
 	var response api.InputRoomEventsResponse
-	return c.InputAPI.InputRoomEvents(&request, &response)
+	return c.InputAPI.InputRoomEvents(ctx, &request, &response)
 }

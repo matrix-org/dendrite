@@ -15,6 +15,7 @@
 package readers
 
 import (
+	"context"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
@@ -25,6 +26,7 @@ import (
 
 // GetEvent returns the requested event
 func GetEvent(
+	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
@@ -33,10 +35,14 @@ func GetEvent(
 	eventID string,
 ) util.JSONResponse {
 	var authResponse api.QueryServerAllowedToSeeEventResponse
-	err := query.QueryServerAllowedToSeeEvent(&api.QueryServerAllowedToSeeEventRequest{
-		EventID:    eventID,
-		ServerName: request.Origin(),
-	}, &authResponse)
+	err := query.QueryServerAllowedToSeeEvent(
+		ctx,
+		&api.QueryServerAllowedToSeeEventRequest{
+			EventID:    eventID,
+			ServerName: request.Origin(),
+		},
+		&authResponse,
+	)
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
@@ -47,10 +53,10 @@ func GetEvent(
 
 	var eventsResponse api.QueryEventsByIDResponse
 	err = query.QueryEventsByID(
+		ctx,
 		&api.QueryEventsByIDRequest{EventIDs: []string{eventID}},
 		&eventsResponse,
 	)
-
 	if err != nil {
 		return util.ErrorResponse(err)
 	}

@@ -15,6 +15,7 @@
 package events
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -37,6 +38,7 @@ var ErrRoomNoExists = errors.New("Room does not exist")
 // the room doesn't exist
 // Returns an error if something else went wrong
 func BuildEvent(
+	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
@@ -53,7 +55,7 @@ func BuildEvent(
 	if queryRes == nil {
 		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
-	if queryErr := queryAPI.QueryLatestEventsAndState(&queryReq, queryRes); queryErr != nil {
+	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
 		return nil, err
 	}
 

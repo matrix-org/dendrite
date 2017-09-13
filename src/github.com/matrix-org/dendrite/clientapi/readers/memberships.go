@@ -42,7 +42,7 @@ func GetMemberships(
 		Sender:     device.UserID,
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
-	if err := queryAPI.QueryMembershipsForRoom(&queryReq, &queryRes); err != nil {
+	if err := queryAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

@@ -15,6 +15,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 )
 
@@ -61,18 +62,21 @@ type RemoveRoomAliasResponse struct{}
 type RoomserverAliasAPI interface {
 	// Set a room alias
 	SetRoomAlias(
+		ctx context.Context,
 		req *SetRoomAliasRequest,
 		response *SetRoomAliasResponse,
 	) error
 
 	// Get the room ID for an alias
 	GetAliasRoomID(
+		ctx context.Context,
 		req *GetAliasRoomIDRequest,
 		response *GetAliasRoomIDResponse,
 	) error
 
 	// Remove a room alias
 	RemoveRoomAlias(
+		ctx context.Context,
 		req *RemoveRoomAliasRequest,
 		response *RemoveRoomAliasResponse,
 	) error
@@ -103,27 +107,30 @@ type httpRoomserverAliasAPI struct {
 
 // SetRoomAlias implements RoomserverAliasAPI
 func (h *httpRoomserverAliasAPI) SetRoomAlias(
+	ctx context.Context,
 	request *SetRoomAliasRequest,
 	response *SetRoomAliasResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
 
 // GetAliasRoomID implements RoomserverAliasAPI
 func (h *httpRoomserverAliasAPI) GetAliasRoomID(
+	ctx context.Context,
 	request *GetAliasRoomIDRequest,
 	response *GetAliasRoomIDResponse,
 ) error {
-	// RemoveRoomAlias implements RoomserverAliasAPI
 	apiURL := h.roomserverURL + RoomserverGetAliasRoomIDPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
 
+// RemoveRoomAlias implements RoomserverAliasAPI
 func (h *httpRoomserverAliasAPI) RemoveRoomAlias(
+	ctx context.Context,
 	request *RemoveRoomAliasRequest,
 	response *RemoveRoomAliasResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverRemoveRoomAliasPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }

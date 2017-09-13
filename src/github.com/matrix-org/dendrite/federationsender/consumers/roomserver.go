@@ -15,6 +15,7 @@
 package consumers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -312,7 +313,7 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	// from the roomserver using the query API.
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
 	var eventResp api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(&eventReq, &eventResp); err != nil {
+	if err := s.query.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
 		return nil, err
 	}
 

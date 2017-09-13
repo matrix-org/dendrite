@@ -15,6 +15,7 @@
 package readers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -146,12 +147,12 @@ func SetAvatarURL(
 		AvatarURL:   r.AvatarURL,
 	}
 
-	events, err := buildMembershipEvents(memberships, newProfile, userID, cfg, queryAPI)
+	events, err := buildMembershipEvents(req.Context(), memberships, newProfile, userID, cfg, queryAPI)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := rsProducer.SendEvents(events, cfg.Matrix.ServerName); err != nil {
+	if err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -238,12 +239,12 @@ func SetDisplayName(
 		AvatarURL:   oldProfile.AvatarURL,
 	}
 
-	events, err := buildMembershipEvents(memberships, newProfile, userID, cfg, queryAPI)
+	events, err := buildMembershipEvents(req.Context(), memberships, newProfile, userID, cfg, queryAPI)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := rsProducer.SendEvents(events, cfg.Matrix.ServerName); err != nil {
+	if err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -258,6 +259,7 @@ func SetDisplayName(
 }
 
 func buildMembershipEvents(
+	ctx context.Context,
 	memberships []authtypes.Membership,
 	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
@@ -283,7 +285,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := events.BuildEvent(&builder, *cfg, queryAPI, nil)
+		event, err := events.BuildEvent(ctx, &builder, *cfg, queryAPI, nil)
 		if err != nil {
 			return nil, err
 		}
