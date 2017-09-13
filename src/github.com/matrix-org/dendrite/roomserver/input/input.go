@@ -16,6 +16,7 @@
 package input
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -53,6 +54,7 @@ func (r *RoomserverInputAPI) WriteOutputEvents(roomID string, updates []api.Outp
 
 // InputRoomEvents implements api.RoomserverInputAPI
 func (r *RoomserverInputAPI) InputRoomEvents(
+	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) error {
@@ -78,7 +80,7 @@ func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(400, err.Error())
 			}
-			if err := r.InputRoomEvents(&request, &response); err != nil {
+			if err := r.InputRoomEvents(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}

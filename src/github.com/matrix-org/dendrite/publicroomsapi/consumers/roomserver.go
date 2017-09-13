@@ -15,6 +15,7 @@
 package consumers
 
 import (
+	"context"
 	"encoding/json"
 
 	log "github.com/Sirupsen/logrus"
@@ -83,16 +84,16 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		"type":     ev.Type(),
 	}).Info("received event from roomserver")
 
-	addQueryReq := api.QueryEventsByIDRequest{output.NewRoomEvent.AddsStateEventIDs}
+	addQueryReq := api.QueryEventsByIDRequest{EventIDs: output.NewRoomEvent.AddsStateEventIDs}
 	var addQueryRes api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(&addQueryReq, &addQueryRes); err != nil {
+	if err := s.query.QueryEventsByID(context.TODO(), &addQueryReq, &addQueryRes); err != nil {
 		log.Warn(err)
 		return err
 	}
 
-	remQueryReq := api.QueryEventsByIDRequest{output.NewRoomEvent.RemovesStateEventIDs}
+	remQueryReq := api.QueryEventsByIDRequest{EventIDs: output.NewRoomEvent.RemovesStateEventIDs}
 	var remQueryRes api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(&remQueryReq, &remQueryRes); err != nil {
+	if err := s.query.QueryEventsByID(context.TODO(), &remQueryReq, &remQueryRes); err != nil {
 		log.Warn(err)
 		return err
 	}

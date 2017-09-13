@@ -15,6 +15,7 @@
 package alias
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -53,6 +54,7 @@ type RoomserverAliasAPI struct {
 
 // SetRoomAlias implements api.RoomserverAliasAPI
 func (r *RoomserverAliasAPI) SetRoomAlias(
+	ctx context.Context,
 	request *api.SetRoomAliasRequest,
 	response *api.SetRoomAliasResponse,
 ) error {
@@ -74,7 +76,10 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	}
 
 	// Send a m.room.aliases event with the updated list of aliases for this room
-	if err := r.sendUpdatedAliasesEvent(request.UserID, request.RoomID); err != nil {
+	// At this point we've already committed the alias to the database so we
+	// shouldn't cancel this request.
+	// TODO: Ensure that we send unsent events when if server restarts.
+	if err := r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID); err != nil {
 		return err
 	}
 
@@ -83,6 +88,7 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 
 // GetAliasRoomID implements api.RoomserverAliasAPI
 func (r *RoomserverAliasAPI) GetAliasRoomID(
+	ctx context.Context,
 	request *api.GetAliasRoomIDRequest,
 	response *api.GetAliasRoomIDResponse,
 ) error {
@@ -98,6 +104,7 @@ func (r *RoomserverAliasAPI) GetAliasRoomID(
 
 // RemoveRoomAlias implements api.RoomserverAliasAPI
 func (r *RoomserverAliasAPI) RemoveRoomAlias(
+	ctx context.Context,
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
@@ -113,7 +120,7 @@ func (r *RoomserverAliasAPI) RemoveRoomAlias(
 	}
 
 	// Send an updated m.room.aliases event
-	if err := r.sendUpdatedAliasesEvent(request.UserID, roomID); err != nil {
+	if err := r.sendUpdatedAliasesEvent(ctx, request.UserID, roomID); err != nil {
 		return err
 	}
 
@@ -126,7 +133,9 @@ type roomAliasesContent struct {
 
 // Build the updated m.room.aliases event to send to the room after addition or
 // removal of an alias
-func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(userID string, roomID string) error {
+func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
+	ctx context.Context, userID string, roomID string,
+) error {
 	serverName := string(r.Cfg.Matrix.ServerName)
 
 	builder := gomatrixserverlib.EventBuilder{
@@ -162,7 +171,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(userID string, roomID strin
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	var res api.QueryLatestEventsAndStateResponse
-	if err = r.QueryAPI.QueryLatestEventsAndState(&req, &res); err != nil {
+	if err = r.QueryAPI.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
 		return err
 	}
 	builder.Depth = res.Depth
@@ -182,7 +191,9 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(userID string, roomID strin
 	// Build the event
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
 	now := time.Now()
-	event, err := builder.Build(eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
+	event, err := builder.Build(
+		eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey,
+	)
 	if err != nil {
 		return err
 	}
@@ -200,7 +211,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(userID string, roomID strin
 	var inputRes api.InputRoomEventsResponse
 
 	// Send the request
-	if err := r.InputAPI.InputRoomEvents(&inputReq, &inputRes); err != nil {
+	if err := r.InputAPI.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
 		return err
 	}
 
@@ -217,7 +228,7 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.SetRoomAlias(&request, &response); err != nil {
+			if err := r.SetRoomAlias(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
@@ -231,7 +242,7 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.GetAliasRoomID(&request, &response); err != nil {
+			if err := r.GetAliasRoomID(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}
@@ -245,7 +256,7 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.RemoveRoomAlias(&request, &response); err != nil {
+			if err := r.RemoveRoomAlias(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}

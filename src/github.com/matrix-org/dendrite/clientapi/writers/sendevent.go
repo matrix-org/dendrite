@@ -63,7 +63,7 @@ func SendEvent(
 	builder.SetContent(r)
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := events.BuildEvent(&builder, cfg, queryAPI, &queryRes)
+	e, err := events.BuildEvent(req.Context(), &builder, cfg, queryAPI, &queryRes)
 	if err == events.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: 404,
@@ -87,7 +87,9 @@ func SendEvent(
 	}
 
 	// pass the new event to the roomserver
-	if err := producer.SendEvents([]gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName); err != nil {
+	if err := producer.SendEvents(
+		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName,
+	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

@@ -16,6 +16,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -154,36 +155,42 @@ type QueryServerAllowedToSeeEventResponse struct {
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
 	QueryLatestEventsAndState(
+		ctx context.Context,
 		request *QueryLatestEventsAndStateRequest,
 		response *QueryLatestEventsAndStateResponse,
 	) error
 
 	// Query the state after a list of events in a room from the room server.
 	QueryStateAfterEvents(
+		ctx context.Context,
 		request *QueryStateAfterEventsRequest,
 		response *QueryStateAfterEventsResponse,
 	) error
 
 	// Query a list of events by event ID.
 	QueryEventsByID(
+		ctx context.Context,
 		request *QueryEventsByIDRequest,
 		response *QueryEventsByIDResponse,
 	) error
 
 	// Query a list of membership events for a room
 	QueryMembershipsForRoom(
+		ctx context.Context,
 		request *QueryMembershipsForRoomRequest,
 		response *QueryMembershipsForRoomResponse,
 	) error
 
 	// Query a list of invite event senders for a user in a room.
 	QueryInvitesForUser(
+		ctx context.Context,
 		request *QueryInvitesForUserRequest,
 		response *QueryInvitesForUserResponse,
 	) error
 
 	// Query whether a server is allowed to see an event
 	QueryServerAllowedToSeeEvent(
+		ctx context.Context,
 		request *QueryServerAllowedToSeeEventRequest,
 		response *QueryServerAllowedToSeeEventResponse,
 	) error
@@ -223,64 +230,81 @@ type httpRoomserverQueryAPI struct {
 
 // QueryLatestEventsAndState implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryLatestEventsAndState(
+	ctx context.Context,
 	request *QueryLatestEventsAndStateRequest,
 	response *QueryLatestEventsAndStateResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryLatestEventsAndStatePath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
 
 // QueryStateAfterEvents implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryStateAfterEvents(
+	ctx context.Context,
 	request *QueryStateAfterEventsRequest,
 	response *QueryStateAfterEventsResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
 
 // QueryEventsByID implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryEventsByID(
+	ctx context.Context,
 	request *QueryEventsByIDRequest,
 	response *QueryEventsByIDResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
 
 // QueryMembershipsForRoom implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryMembershipsForRoom(
+	ctx context.Context,
 	request *QueryMembershipsForRoomRequest,
 	response *QueryMembershipsForRoomResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
 
 // QueryInvitesForUser implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryInvitesForUser(
+	ctx context.Context,
 	request *QueryInvitesForUserRequest,
 	response *QueryInvitesForUserResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryInvitesForUserPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
 
 // QueryServerAllowedToSeeEvent implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
+	ctx context.Context,
 	request *QueryServerAllowedToSeeEventRequest,
 	response *QueryServerAllowedToSeeEventResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
 
-func postJSON(httpClient *http.Client, apiURL string, request, response interface{}) error {
+func postJSON(
+	ctx context.Context, httpClient *http.Client,
+	apiURL string, request, response interface{},
+) error {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
-	res, err := httpClient.Post(apiURL, "application/json", bytes.NewReader(jsonBytes))
+
+	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(jsonBytes))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := httpClient.Do(req.WithContext(ctx))
 	if res != nil {
 		defer res.Body.Close()
 	}

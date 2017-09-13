@@ -15,6 +15,7 @@
 package writers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -48,6 +49,7 @@ func SendMembership(
 	}
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
+		req.Context(),
 		device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
 	)
 	if err == threepid.ErrMissingParameter {
@@ -80,7 +82,7 @@ func SendMembership(
 	}
 
 	event, err := buildMembershipEvent(
-		body, accountDB, device, membership, roomID, cfg, queryAPI,
+		req.Context(), body, accountDB, device, membership, roomID, cfg, queryAPI,
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
@@ -96,7 +98,9 @@ func SendMembership(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := producer.SendEvents([]gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName); err != nil {
+	if err := producer.SendEvents(
+		req.Context(), []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName,
+	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -107,6 +111,7 @@ func SendMembership(
 }
 
 func buildMembershipEvent(
+	ctx context.Context,
 	body threepid.MembershipRequest, accountDB *accounts.Database,
 	device *authtypes.Device, membership string, roomID string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
@@ -144,7 +149,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return events.BuildEvent(&builder, cfg, queryAPI, nil)
+	return events.BuildEvent(ctx, &builder, cfg, queryAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

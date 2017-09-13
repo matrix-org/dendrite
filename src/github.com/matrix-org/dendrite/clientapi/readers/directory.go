@@ -48,7 +48,7 @@ func DirectoryRoom(
 	if domain == cfg.Matrix.ServerName {
 		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
 		var queryRes api.GetAliasRoomIDResponse
-		if err = aliasAPI.GetAliasRoomID(&queryReq, &queryRes); err != nil {
+		if err = aliasAPI.GetAliasRoomID(req.Context(), &queryReq, &queryRes); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 
@@ -126,7 +126,7 @@ func SetLocalAlias(
 		Alias:  alias,
 	}
 	var queryRes api.SetRoomAliasResponse
-	if err := aliasAPI.SetRoomAlias(&queryReq, &queryRes); err != nil {
+	if err := aliasAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -156,7 +156,7 @@ func RemoveLocalAlias(
 		UserID: device.UserID,
 	}
 	var queryRes api.RemoveRoomAliasResponse
-	if err := aliasAPI.RemoveRoomAlias(&queryReq, &queryRes); err != nil {
+	if err := aliasAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

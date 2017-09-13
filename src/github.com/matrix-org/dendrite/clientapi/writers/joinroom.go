@@ -116,7 +116,7 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 	if domain == r.cfg.Matrix.ServerName {
 		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
 		var queryRes api.GetAliasRoomIDResponse
-		if err = r.aliasAPI.GetAliasRoomID(&queryReq, &queryRes); err != nil {
+		if err = r.aliasAPI.GetAliasRoomID(r.req.Context(), &queryReq, &queryRes); err != nil {
 			return httputil.LogThenError(r.req, err)
 		}
 
@@ -170,18 +170,19 @@ func (r joinRoomReq) joinRoomUsingServers(
 	r.writeToBuilder(&eb, roomID)
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	if event, err := events.BuildEvent(&eb, r.cfg, r.queryAPI, &queryRes); err == nil {
-		if sendErr := r.producer.SendEvents([]gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName); err != nil {
-			return httputil.LogThenError(r.req, sendErr)
+	event, err := events.BuildEvent(r.req.Context(), &eb, r.cfg, r.queryAPI, &queryRes)
+	if err == nil {
+		if err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName); err != nil {
+			return httputil.LogThenError(r.req, err)
 		}
-
 		return util.JSONResponse{
 			Code: 200,
 			JSON: struct {
 				RoomID string `json:"room_id"`
 			}{roomID},
 		}
-	} else if err != events.ErrRoomNoExists {
+	}
+	if err != events.ErrRoomNoExists {
 		return httputil.LogThenError(r.req, err)
 	}
 
@@ -256,7 +257,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	}
 
 	if err = r.producer.SendEventWithState(
-		gomatrixserverlib.RespState(respSendJoin), event,
+		r.req.Context(), gomatrixserverlib.RespState(respSendJoin), event,
 	); err != nil {
 		res := httputil.LogThenError(r.req, err)
 		return &res, nil

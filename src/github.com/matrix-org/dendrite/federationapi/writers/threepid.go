@@ -81,7 +81,7 @@ func CreateInvitesFrom3PIDInvites(
 	}
 
 	// Send all the events
-	if err := producer.SendEvents(evs, cfg.Matrix.ServerName); err != nil {
+	if err := producer.SendEvents(req.Context(), evs, cfg.Matrix.ServerName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -135,7 +135,7 @@ func ExchangeThirdPartyInvite(
 	}
 
 	// Auth and build the event from what the remote server sent us
-	event, err := buildMembershipEvent(&builder, queryAPI, cfg)
+	event, err := buildMembershipEvent(httpReq.Context(), &builder, queryAPI, cfg)
 	if err == errNotInRoom {
 		return util.JSONResponse{
 			Code: 404,
@@ -153,7 +153,9 @@ func ExchangeThirdPartyInvite(
 	}
 
 	// Send the event to the roomserver
-	if err = producer.SendEvents([]gomatrixserverlib.Event{signedEvent.Event}, cfg.Matrix.ServerName); err != nil {
+	if err = producer.SendEvents(
+		httpReq.Context(), []gomatrixserverlib.Event{signedEvent.Event}, cfg.Matrix.ServerName,
+	); err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
 
@@ -207,7 +209,7 @@ func createInviteFrom3PIDInvite(
 		return nil, err
 	}
 
-	event, err := buildMembershipEvent(builder, queryAPI, cfg)
+	event, err := buildMembershipEvent(ctx, builder, queryAPI, cfg)
 	if err == errNotInRoom {
 		return nil, sendToRemoteServer(ctx, inv, federation, cfg, *builder)
 	}
@@ -224,6 +226,7 @@ func createInviteFrom3PIDInvite(
 // Returns errNotInRoom if the server is not in the room the invite is for.
 // Returns an error if something failed during the process.
 func buildMembershipEvent(
+	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, queryAPI api.RoomserverQueryAPI,
 	cfg config.Dendrite,
 ) (*gomatrixserverlib.Event, error) {
@@ -238,7 +241,7 @@ func buildMembershipEvent(
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	var queryRes api.QueryLatestEventsAndStateResponse
-	if err = queryAPI.QueryLatestEventsAndState(&queryReq, &queryRes); err != nil {
+	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, &queryRes); err != nil {
 		return nil, err
 	}
 

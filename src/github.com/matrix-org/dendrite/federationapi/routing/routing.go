@@ -102,7 +102,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return readers.GetEvent(
-				request, cfg, query, time.Now(), keys, vars["eventID"],
+				httpReq.Context(), request, cfg, query, time.Now(), keys, vars["eventID"],
 			)
 		},
 	)).Methods("GET")

@@ -16,6 +16,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -87,6 +88,7 @@ type InputRoomEventsResponse struct{}
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInputAPI interface {
 	InputRoomEvents(
+		ctx context.Context,
 		request *InputRoomEventsRequest,
 		response *InputRoomEventsResponse,
 	) error
@@ -111,9 +113,10 @@ type httpRoomserverInputAPI struct {
 
 // InputRoomEvents implements RoomserverInputAPI
 func (h *httpRoomserverInputAPI) InputRoomEvents(
+	ctx context.Context,
 	request *InputRoomEventsRequest,
 	response *InputRoomEventsResponse,
 ) error {
 	apiURL := h.roomserverURL + RoomserverInputRoomEventsPath
-	return postJSON(h.httpClient, apiURL, request, response)
+	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
