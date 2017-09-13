@@ -196,7 +196,7 @@ func createInviteFrom3PIDInvite(
 		},
 	}
 
-	if err := builder.SetContent(content); err != nil {
+	if err = builder.SetContent(content); err != nil {
 		return nil, err
 	}
 
