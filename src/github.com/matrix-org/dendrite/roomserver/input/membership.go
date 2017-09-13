@@ -15,6 +15,7 @@
 package input
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -27,7 +28,10 @@ import (
 // Returns a list of output events to write to the kafka log to inform the
 // consumers about the invites added or retired by the change in current state.
 func updateMemberships(
-	db RoomEventDatabase, updater types.RoomRecentEventsUpdater, removed, added []types.StateEntry,
+	ctx context.Context,
+	db RoomEventDatabase,
+	updater types.RoomRecentEventsUpdater,
+	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
 	changes := membershipChanges(removed, added)
 	var eventNIDs []types.EventNID
@@ -43,7 +47,7 @@ func updateMemberships(
 	// Load the event JSON so we can look up the "membership" key.
 	// TODO: Maybe add a membership key to the events table so we can load that
 	// key without having to load the entire event JSON?
-	events, err := db.Events(eventNIDs)
+	events, err := db.Events(ctx, eventNIDs)
 	if err != nil {
 		return nil, err
 	}

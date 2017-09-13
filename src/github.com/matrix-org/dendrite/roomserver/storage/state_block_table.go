@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"sort"
@@ -97,9 +98,14 @@ func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *stateBlockStatements) bulkInsertStateData(stateBlockNID types.StateBlockNID, entries []types.StateEntry) error {
+func (s *stateBlockStatements) bulkInsertStateData(
+	ctx context.Context,
+	stateBlockNID types.StateBlockNID,
+	entries []types.StateEntry,
+) error {
 	for _, entry := range entries {
-		_, err := s.insertStateDataStmt.Exec(
+		_, err := s.insertStateDataStmt.ExecContext(
+			ctx,
 			int64(stateBlockNID),
 			int64(entry.EventTypeNID),
 			int64(entry.EventStateKeyNID),
@@ -112,18 +118,22 @@ func (s *stateBlockStatements) bulkInsertStateData(stateBlockNID types.StateBloc
 	return nil
 }
 
-func (s *stateBlockStatements) selectNextStateBlockNID() (types.StateBlockNID, error) {
+func (s *stateBlockStatements) selectNextStateBlockNID(
+	ctx context.Context,
+) (types.StateBlockNID, error) {
 	var stateBlockNID int64
-	err := s.selectNextStateBlockNIDStmt.QueryRow().Scan(&stateBlockNID)
+	err := s.selectNextStateBlockNIDStmt.QueryRowContext(ctx).Scan(&stateBlockNID)
 	return types.StateBlockNID(stateBlockNID), err
 }
 
-func (s *stateBlockStatements) bulkSelectStateBlockEntries(stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error) {
+func (s *stateBlockStatements) bulkSelectStateBlockEntries(
+	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
+) ([]types.StateEntryList, error) {
 	nids := make([]int64, len(stateBlockNIDs))
 	for i := range stateBlockNIDs {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
-	rows, err := s.bulkSelectStateBlockEntriesStmt.Query(pq.Int64Array(nids))
+	rows, err := s.bulkSelectStateBlockEntriesStmt.QueryContext(ctx, pq.Int64Array(nids))
 	if err != nil {
 		return nil, err
 	}
@@ -165,15 +175,20 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(stateBlockNIDs []type
 }
 
 func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
-	stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple,
+	ctx context.Context,
+	stateBlockNIDs []types.StateBlockNID,
+	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
 	tuples := stateKeyTupleSorter(stateKeyTuples)
 	// Sort the tuples so that we can run binary search against them as we filter the rows returned by the db.
 	sort.Sort(tuples)
 
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
-	rows, err := s.bulkSelectFilteredStateBlockEntriesStmt.Query(
-		stateBlockNIDsAsArray(stateBlockNIDs), eventTypeNIDArray, eventStateKeyNIDArray,
+	rows, err := s.bulkSelectFilteredStateBlockEntriesStmt.QueryContext(
+		ctx,
+		stateBlockNIDsAsArray(stateBlockNIDs),
+		eventTypeNIDArray,
+		eventStateKeyNIDArray,
 	)
 	if err != nil {
 		return nil, err

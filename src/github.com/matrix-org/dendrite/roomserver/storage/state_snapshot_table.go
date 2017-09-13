@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -74,21 +75,25 @@ func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *stateSnapshotStatements) insertState(roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID) (stateNID types.StateSnapshotNID, err error) {
+func (s *stateSnapshotStatements) insertState(
+	ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
+) (stateNID types.StateSnapshotNID, err error) {
 	nids := make([]int64, len(stateBlockNIDs))
 	for i := range stateBlockNIDs {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
-	err = s.insertStateStmt.QueryRow(int64(roomNID), pq.Int64Array(nids)).Scan(&stateNID)
+	err = s.insertStateStmt.QueryRowContext(ctx, int64(roomNID), pq.Int64Array(nids)).Scan(&stateNID)
 	return
 }
 
-func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error) {
+func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
+	ctx context.Context, stateNIDs []types.StateSnapshotNID,
+) ([]types.StateBlockNIDList, error) {
 	nids := make([]int64, len(stateNIDs))
 	for i := range stateNIDs {
 		nids[i] = int64(stateNIDs[i])
 	}
-	rows, err := s.bulkSelectStateBlockNIDsStmt.Query(pq.Int64Array(nids))
+	rows, err := s.bulkSelectStateBlockNIDsStmt.QueryContext(ctx, pq.Int64Array(nids))
 	if err != nil {
 		return nil, err
 	}

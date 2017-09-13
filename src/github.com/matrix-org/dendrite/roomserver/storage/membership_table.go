@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
@@ -114,34 +115,38 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *membershipStatements) insertMembership(
+	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) error {
-	_, err := common.TxStmt(txn, s.insertMembershipStmt).Exec(roomNID, targetUserNID)
+	stmt := common.TxStmt(txn, s.insertMembershipStmt)
+	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID)
 	return err
 }
 
 func (s *membershipStatements) selectMembershipForUpdate(
+	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (membership membershipState, err error) {
-	err = common.TxStmt(txn, s.selectMembershipForUpdateStmt).QueryRow(
-		roomNID, targetUserNID,
+	err = common.TxStmt(txn, s.selectMembershipForUpdateStmt).QueryRowContext(
+		ctx, roomNID, targetUserNID,
 	).Scan(&membership)
 	return
 }
 
 func (s *membershipStatements) selectMembershipFromRoomAndTarget(
+	ctx context.Context,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventNID types.EventNID, membership membershipState, err error) {
-	err = s.selectMembershipFromRoomAndTargetStmt.QueryRow(
-		roomNID, targetUserNID,
+	err = s.selectMembershipFromRoomAndTargetStmt.QueryRowContext(
+		ctx, roomNID, targetUserNID,
 	).Scan(&membership, &eventNID)
 	return
 }
 
 func (s *membershipStatements) selectMembershipsFromRoom(
-	roomNID types.RoomNID,
+	ctx context.Context, roomNID types.RoomNID,
 ) (eventNIDs []types.EventNID, err error) {
-	rows, err := s.selectMembershipsFromRoomStmt.Query(roomNID)
+	rows, err := s.selectMembershipsFromRoomStmt.QueryContext(ctx, roomNID)
 	if err != nil {
 		return
 	}
@@ -156,9 +161,11 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 	return
 }
 func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
+	ctx context.Context,
 	roomNID types.RoomNID, membership membershipState,
 ) (eventNIDs []types.EventNID, err error) {
-	rows, err := s.selectMembershipsFromRoomAndMembershipStmt.Query(roomNID, membership)
+	stmt := s.selectMembershipsFromRoomAndMembershipStmt
+	rows, err := stmt.QueryContext(ctx, roomNID, membership)
 	if err != nil {
 		return
 	}
@@ -174,12 +181,13 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 }
 
 func (s *membershipStatements) updateMembership(
+	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	senderUserNID types.EventStateKeyNID, membership membershipState,
 	eventNID types.EventNID,
 ) error {
-	_, err := common.TxStmt(txn, s.updateMembershipStmt).Exec(
-		roomNID, targetUserNID, senderUserNID, membership, eventNID,
+	_, err := common.TxStmt(txn, s.updateMembershipStmt).ExecContext(
+		ctx, roomNID, targetUserNID, senderUserNID, membership, eventNID,
 	)
 	return err
 }

@@ -15,29 +15,30 @@
 package storage
 
 import (
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"sort"
 	"testing"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 func TestStateKeyTupleSorter(t *testing.T) {
 	input := stateKeyTupleSorter{
-		{1, 2},
-		{1, 4},
-		{2, 2},
-		{1, 1},
+		{EventTypeNID: 1, EventStateKeyNID: 2},
+		{EventTypeNID: 1, EventStateKeyNID: 4},
+		{EventTypeNID: 2, EventStateKeyNID: 2},
+		{EventTypeNID: 1, EventStateKeyNID: 1},
 	}
 	want := []types.StateKeyTuple{
-		{1, 1},
-		{1, 2},
-		{1, 4},
-		{2, 2},
+		{EventTypeNID: 1, EventStateKeyNID: 1},
+		{EventTypeNID: 1, EventStateKeyNID: 2},
+		{EventTypeNID: 1, EventStateKeyNID: 4},
+		{EventTypeNID: 2, EventStateKeyNID: 2},
 	}
 	doNotWant := []types.StateKeyTuple{
-		{0, 0},
-		{1, 3},
-		{2, 1},
-		{3, 1},
+		{EventTypeNID: 0, EventStateKeyNID: 0},
+		{EventTypeNID: 1, EventStateKeyNID: 3},
+		{EventTypeNID: 2, EventStateKeyNID: 1},
+		{EventTypeNID: 3, EventStateKeyNID: 1},
 	}
 	wantTypeNIDs := []int64{1, 2}
 	wantStateKeyNIDs := []int64{1, 2, 4}

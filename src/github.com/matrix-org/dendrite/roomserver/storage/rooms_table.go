@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/lib/pq"
@@ -81,22 +82,31 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *roomStatements) insertRoomNID(txn *sql.Tx, roomID string) (types.RoomNID, error) {
+func (s *roomStatements) insertRoomNID(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (types.RoomNID, error) {
 	var roomNID int64
-	err := common.TxStmt(txn, s.insertRoomNIDStmt).QueryRow(roomID).Scan(&roomNID)
+	stmt := common.TxStmt(txn, s.insertRoomNIDStmt)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) selectRoomNID(txn *sql.Tx, roomID string) (types.RoomNID, error) {
+func (s *roomStatements) selectRoomNID(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (types.RoomNID, error) {
 	var roomNID int64
-	err := common.TxStmt(txn, s.selectRoomNIDStmt).QueryRow(roomID).Scan(&roomNID)
+	stmt := common.TxStmt(txn, s.selectRoomNIDStmt)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) selectLatestEventNIDs(roomNID types.RoomNID) ([]types.EventNID, types.StateSnapshotNID, error) {
+func (s *roomStatements) selectLatestEventNIDs(
+	ctx context.Context, roomNID types.RoomNID,
+) ([]types.EventNID, types.StateSnapshotNID, error) {
 	var nids pq.Int64Array
 	var stateSnapshotNID int64
-	err := s.selectLatestEventNIDsStmt.QueryRow(int64(roomNID)).Scan(&nids, &stateSnapshotNID)
+	stmt := s.selectLatestEventNIDsStmt
+	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -107,13 +117,14 @@ func (s *roomStatements) selectLatestEventNIDs(roomNID types.RoomNID) ([]types.E
 	return eventNIDs, types.StateSnapshotNID(stateSnapshotNID), nil
 }
 
-func (s *roomStatements) selectLatestEventsNIDsForUpdate(txn *sql.Tx, roomNID types.RoomNID) (
-	[]types.EventNID, types.EventNID, types.StateSnapshotNID, error,
-) {
+func (s *roomStatements) selectLatestEventsNIDsForUpdate(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+) ([]types.EventNID, types.EventNID, types.StateSnapshotNID, error) {
 	var nids pq.Int64Array
 	var lastEventSentNID int64
 	var stateSnapshotNID int64
-	err := common.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt).QueryRow(int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
+	stmt := common.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
+	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -125,11 +136,20 @@ func (s *roomStatements) selectLatestEventsNIDsForUpdate(txn *sql.Tx, roomNID ty
 }
 
 func (s *roomStatements) updateLatestEventNIDs(
-	txn *sql.Tx, roomNID types.RoomNID, eventNIDs []types.EventNID, lastEventSentNID types.EventNID,
+	ctx context.Context,
+	txn *sql.Tx,
+	roomNID types.RoomNID,
+	eventNIDs []types.EventNID,
+	lastEventSentNID types.EventNID,
 	stateSnapshotNID types.StateSnapshotNID,
 ) error {
-	_, err := common.TxStmt(txn, s.updateLatestEventNIDsStmt).Exec(
-		roomNID, eventNIDsAsArray(eventNIDs), int64(lastEventSentNID), int64(stateSnapshotNID),
+	stmt := common.TxStmt(txn, s.updateLatestEventNIDsStmt)
+	_, err := stmt.ExecContext(
+		ctx,
+		roomNID,
+		eventNIDsAsArray(eventNIDs),
+		int64(lastEventSentNID),
+		int64(stateSnapshotNID),
 	)
 	return err
 }

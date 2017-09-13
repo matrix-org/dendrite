@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
@@ -73,14 +74,26 @@ func (s *previousEventStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *previousEventStatements) insertPreviousEvent(txn *sql.Tx, previousEventID string, previousEventReferenceSHA256 []byte, eventNID types.EventNID) error {
-	_, err := common.TxStmt(txn, s.insertPreviousEventStmt).Exec(previousEventID, previousEventReferenceSHA256, int64(eventNID))
+func (s *previousEventStatements) insertPreviousEvent(
+	ctx context.Context,
+	txn *sql.Tx,
+	previousEventID string,
+	previousEventReferenceSHA256 []byte,
+	eventNID types.EventNID,
+) error {
+	stmt := common.TxStmt(txn, s.insertPreviousEventStmt)
+	_, err := stmt.ExecContext(
+		ctx, previousEventID, previousEventReferenceSHA256, int64(eventNID),
+	)
 	return err
 }
 
 // Check if the event reference exists
 // Returns sql.ErrNoRows if the event reference doesn't exist.
-func (s *previousEventStatements) selectPreviousEventExists(txn *sql.Tx, eventID string, eventReferenceSHA256 []byte) error {
+func (s *previousEventStatements) selectPreviousEventExists(
+	ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte,
+) error {
 	var ok int64
-	return common.TxStmt(txn, s.selectPreviousEventExistsStmt).QueryRow(eventID, eventReferenceSHA256).Scan(&ok)
+	stmt := common.TxStmt(txn, s.selectPreviousEventExistsStmt)
+	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
 }

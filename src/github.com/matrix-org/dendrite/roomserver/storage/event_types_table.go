@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/lib/pq"
@@ -107,20 +108,26 @@ func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *eventTypeStatements) insertEventTypeNID(eventType string) (types.EventTypeNID, error) {
+func (s *eventTypeStatements) insertEventTypeNID(
+	ctx context.Context, eventType string,
+) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.insertEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
+	err := s.insertEventTypeNIDStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) selectEventTypeNID(eventType string) (types.EventTypeNID, error) {
+func (s *eventTypeStatements) selectEventTypeNID(
+	ctx context.Context, eventType string,
+) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.selectEventTypeNIDStmt.QueryRow(eventType).Scan(&eventTypeNID)
+	err := s.selectEventTypeNIDStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) bulkSelectEventTypeNID(eventTypes []string) (map[string]types.EventTypeNID, error) {
-	rows, err := s.bulkSelectEventTypeNIDStmt.Query(pq.StringArray(eventTypes))
+func (s *eventTypeStatements) bulkSelectEventTypeNID(
+	ctx context.Context, eventTypes []string,
+) (map[string]types.EventTypeNID, error) {
+	rows, err := s.bulkSelectEventTypeNIDStmt.QueryContext(ctx, pq.StringArray(eventTypes))
 	if err != nil {
 		return nil, err
 	}

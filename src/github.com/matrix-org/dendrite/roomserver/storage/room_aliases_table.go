@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 )
 
@@ -62,22 +63,28 @@ func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *roomAliasesStatements) insertRoomAlias(alias string, roomID string) (err error) {
-	_, err = s.insertRoomAliasStmt.Exec(alias, roomID)
+func (s *roomAliasesStatements) insertRoomAlias(
+	ctx context.Context, alias string, roomID string,
+) (err error) {
+	_, err = s.insertRoomAliasStmt.ExecContext(ctx, alias, roomID)
 	return
 }
 
-func (s *roomAliasesStatements) selectRoomIDFromAlias(alias string) (roomID string, err error) {
-	err = s.selectRoomIDFromAliasStmt.QueryRow(alias).Scan(&roomID)
+func (s *roomAliasesStatements) selectRoomIDFromAlias(
+	ctx context.Context, alias string,
+) (roomID string, err error) {
+	err = s.selectRoomIDFromAliasStmt.QueryRowContext(ctx, alias).Scan(&roomID)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
 	return
 }
 
-func (s *roomAliasesStatements) selectAliasesFromRoomID(roomID string) (aliases []string, err error) {
+func (s *roomAliasesStatements) selectAliasesFromRoomID(
+	ctx context.Context, roomID string,
+) (aliases []string, err error) {
 	aliases = []string{}
-	rows, err := s.selectAliasesFromRoomIDStmt.Query(roomID)
+	rows, err := s.selectAliasesFromRoomIDStmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return
 	}
@@ -94,7 +101,9 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(roomID string) (aliases 
 	return
 }
 
-func (s *roomAliasesStatements) deleteRoomAlias(alias string) (err error) {
-	_, err = s.deleteRoomAliasStmt.Exec(alias)
+func (s *roomAliasesStatements) deleteRoomAlias(
+	ctx context.Context, alias string,
+) (err error) {
+	_, err = s.deleteRoomAliasStmt.ExecContext(ctx, alias)
 	return
 }

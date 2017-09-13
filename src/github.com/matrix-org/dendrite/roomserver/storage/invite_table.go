@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
@@ -91,12 +92,13 @@ func (s *inviteStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *inviteStatements) insertInviteEvent(
+	ctx context.Context,
 	txn *sql.Tx, inviteEventID string, roomNID types.RoomNID,
 	targetUserNID, senderUserNID types.EventStateKeyNID,
 	inviteEventJSON []byte,
 ) (bool, error) {
-	result, err := common.TxStmt(txn, s.insertInviteEventStmt).Exec(
-		inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
+	result, err := common.TxStmt(txn, s.insertInviteEventStmt).ExecContext(
+		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)
 	if err != nil {
 		return false, err
@@ -109,9 +111,11 @@ func (s *inviteStatements) insertInviteEvent(
 }
 
 func (s *inviteStatements) updateInviteRetired(
+	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) ([]string, error) {
-	rows, err := common.TxStmt(txn, s.updateInviteRetiredStmt).Query(roomNID, targetUserNID)
+	stmt := common.TxStmt(txn, s.updateInviteRetiredStmt)
+	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,10 +133,11 @@ func (s *inviteStatements) updateInviteRetired(
 
 // selectInviteActiveForUserInRoom returns a list of sender state key NIDs
 func (s *inviteStatements) selectInviteActiveForUserInRoom(
+	ctx context.Context,
 	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
 ) ([]types.EventStateKeyNID, error) {
-	rows, err := s.selectInviteActiveForUserInRoomStmt.Query(
-		targetUserNID, roomNID,
+	rows, err := s.selectInviteActiveForUserInRoomStmt.QueryContext(
+		ctx, targetUserNID, roomNID,
 	)
 	if err != nil {
 		return nil, err

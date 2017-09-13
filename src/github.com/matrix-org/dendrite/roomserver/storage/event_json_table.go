@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -65,8 +66,10 @@ func (s *eventJSONStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *eventJSONStatements) insertEventJSON(eventNID types.EventNID, eventJSON []byte) error {
-	_, err := s.insertEventJSONStmt.Exec(int64(eventNID), eventJSON)
+func (s *eventJSONStatements) insertEventJSON(
+	ctx context.Context, eventNID types.EventNID, eventJSON []byte,
+) error {
+	_, err := s.insertEventJSONStmt.ExecContext(ctx, int64(eventNID), eventJSON)
 	return err
 }
 
@@ -75,8 +78,10 @@ type eventJSONPair struct {
 	EventJSON []byte
 }
 
-func (s *eventJSONStatements) bulkSelectEventJSON(eventNIDs []types.EventNID) ([]eventJSONPair, error) {
-	rows, err := s.bulkSelectEventJSONStmt.Query(eventNIDsAsArray(eventNIDs))
+func (s *eventJSONStatements) bulkSelectEventJSON(
+	ctx context.Context, eventNIDs []types.EventNID,
+) ([]eventJSONPair, error) {
+	rows, err := s.bulkSelectEventJSONStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}

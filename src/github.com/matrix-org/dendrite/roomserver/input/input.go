@@ -59,12 +59,12 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 	response *api.InputRoomEventsResponse,
 ) error {
 	for i := range request.InputRoomEvents {
-		if err := processRoomEvent(r.DB, r, request.InputRoomEvents[i]); err != nil {
+		if err := processRoomEvent(ctx, r.DB, r, request.InputRoomEvents[i]); err != nil {
 			return err
 		}
 	}
 	for i := range request.InputInviteEvents {
-		if err := processInviteEvent(r.DB, r, request.InputInviteEvents[i]); err != nil {
+		if err := processInviteEvent(ctx, r.DB, r, request.InputInviteEvents[i]); err != nil {
 			return err
 		}
 	}

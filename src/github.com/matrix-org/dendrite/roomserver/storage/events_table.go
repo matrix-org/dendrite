@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -154,7 +155,10 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *eventStatements) insertEvent(
-	roomNID types.RoomNID, eventTypeNID types.EventTypeNID, eventStateKeyNID types.EventStateKeyNID,
+	ctx context.Context,
+	roomNID types.RoomNID,
+	eventTypeNID types.EventTypeNID,
+	eventStateKeyNID types.EventStateKeyNID,
 	eventID string,
 	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
@@ -162,24 +166,28 @@ func (s *eventStatements) insertEvent(
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
-	err := s.insertEventStmt.QueryRow(
-		int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, referenceSHA256,
-		eventNIDsAsArray(authEventNIDs), depth,
+	err := s.insertEventStmt.QueryRowContext(
+		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
+		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
-func (s *eventStatements) selectEvent(eventID string) (types.EventNID, types.StateSnapshotNID, error) {
+func (s *eventStatements) selectEvent(
+	ctx context.Context, eventID string,
+) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
-	err := s.selectEventStmt.QueryRow(eventID).Scan(&eventNID, &stateNID)
+	err := s.selectEventStmt.QueryRowContext(ctx, eventID).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
 // bulkSelectStateEventByID lookups a list of state events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError
-func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.StateEntry, error) {
-	rows, err := s.bulkSelectStateEventByIDStmt.Query(pq.StringArray(eventIDs))
+func (s *eventStatements) bulkSelectStateEventByID(
+	ctx context.Context, eventIDs []string,
+) ([]types.StateEntry, error) {
+	rows, err := s.bulkSelectStateEventByIDStmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -216,8 +224,10 @@ func (s *eventStatements) bulkSelectStateEventByID(eventIDs []string) ([]types.S
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError.
 // If we do not have the state for any of the requested events it returns a types.MissingEventError.
-func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types.StateAtEvent, error) {
-	rows, err := s.bulkSelectStateAtEventByIDStmt.Query(pq.StringArray(eventIDs))
+func (s *eventStatements) bulkSelectStateAtEventByID(
+	ctx context.Context, eventIDs []string,
+) ([]types.StateAtEvent, error) {
+	rows, err := s.bulkSelectStateAtEventByIDStmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -248,28 +258,40 @@ func (s *eventStatements) bulkSelectStateAtEventByID(eventIDs []string) ([]types
 	return results, err
 }
 
-func (s *eventStatements) updateEventState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error {
-	_, err := s.updateEventStateStmt.Exec(int64(eventNID), int64(stateNID))
+func (s *eventStatements) updateEventState(
+	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
+) error {
+	_, err := s.updateEventStateStmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
 	return err
 }
 
-func (s *eventStatements) selectEventSentToOutput(txn *sql.Tx, eventNID types.EventNID) (sentToOutput bool, err error) {
-	err = common.TxStmt(txn, s.selectEventSentToOutputStmt).QueryRow(int64(eventNID)).Scan(&sentToOutput)
+func (s *eventStatements) selectEventSentToOutput(
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
+) (sentToOutput bool, err error) {
+	stmt := common.TxStmt(txn, s.selectEventSentToOutputStmt)
+	stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
 	return
 }
 
-func (s *eventStatements) updateEventSentToOutput(txn *sql.Tx, eventNID types.EventNID) error {
-	_, err := common.TxStmt(txn, s.updateEventSentToOutputStmt).Exec(int64(eventNID))
+func (s *eventStatements) updateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
+	stmt := common.TxStmt(txn, s.updateEventSentToOutputStmt)
+	_, err := stmt.ExecContext(ctx, int64(eventNID))
 	return err
 }
 
-func (s *eventStatements) selectEventID(txn *sql.Tx, eventNID types.EventNID) (eventID string, err error) {
-	err = common.TxStmt(txn, s.selectEventIDStmt).QueryRow(int64(eventNID)).Scan(&eventID)
+func (s *eventStatements) selectEventID(
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
+) (eventID string, err error) {
+	stmt := common.TxStmt(txn, s.selectEventIDStmt)
+	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&eventID)
 	return
 }
 
-func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventNIDs []types.EventNID) ([]types.StateAtEventAndReference, error) {
-	rows, err := common.TxStmt(txn, s.bulkSelectStateAtEventAndReferenceStmt).Query(eventNIDsAsArray(eventNIDs))
+func (s *eventStatements) bulkSelectStateAtEventAndReference(
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+) ([]types.StateAtEventAndReference, error) {
+	stmt := common.TxStmt(txn, s.bulkSelectStateAtEventAndReferenceStmt)
+	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -304,8 +326,10 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(txn *sql.Tx, eventN
 	return results, nil
 }
 
-func (s *eventStatements) bulkSelectEventReference(eventNIDs []types.EventNID) ([]gomatrixserverlib.EventReference, error) {
-	rows, err := s.bulkSelectEventReferenceStmt.Query(eventNIDsAsArray(eventNIDs))
+func (s *eventStatements) bulkSelectEventReference(
+	ctx context.Context, eventNIDs []types.EventNID,
+) ([]gomatrixserverlib.EventReference, error) {
+	rows, err := s.bulkSelectEventReferenceStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -325,8 +349,8 @@ func (s *eventStatements) bulkSelectEventReference(eventNIDs []types.EventNID) (
 }
 
 // bulkSelectEventID returns a map from numeric event ID to string event ID.
-func (s *eventStatements) bulkSelectEventID(eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
-	rows, err := s.bulkSelectEventIDStmt.Query(eventNIDsAsArray(eventNIDs))
+func (s *eventStatements) bulkSelectEventID(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
+	rows, err := s.bulkSelectEventIDStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -349,8 +373,8 @@ func (s *eventStatements) bulkSelectEventID(eventNIDs []types.EventNID) (map[typ
 
 // bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) bulkSelectEventNID(eventIDs []string) (map[string]types.EventNID, error) {
-	rows, err := s.bulkSelectEventNIDStmt.Query(pq.StringArray(eventIDs))
+func (s *eventStatements) bulkSelectEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error) {
+	rows, err := s.bulkSelectEventNIDStmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -367,9 +391,10 @@ func (s *eventStatements) bulkSelectEventNID(eventIDs []string) (map[string]type
 	return results, nil
 }
 
-func (s *eventStatements) selectMaxEventDepth(eventNIDs []types.EventNID) (int64, error) {
+func (s *eventStatements) selectMaxEventDepth(ctx context.Context, eventNIDs []types.EventNID) (int64, error) {
 	var result int64
-	err := s.selectMaxEventDepthStmt.QueryRow(eventNIDsAsArray(eventNIDs)).Scan(&result)
+	stmt := s.selectMaxEventDepthStmt
+	err := stmt.QueryRowContext(ctx, eventNIDsAsArray(eventNIDs)).Scan(&result)
 	if err != nil {
 		return 0, err
 	}

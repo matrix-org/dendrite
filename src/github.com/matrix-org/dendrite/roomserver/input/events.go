@@ -15,6 +15,7 @@
 package input
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
@@ -28,22 +29,38 @@ import (
 type RoomEventDatabase interface {
 	state.RoomStateDatabase
 	// Stores a matrix room event in the database
-	StoreEvent(event gomatrixserverlib.Event, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
+	StoreEvent(
+		ctx context.Context,
+		event gomatrixserverlib.Event,
+		authEventNIDs []types.EventNID,
+	) (types.RoomNID, types.StateAtEvent, error)
 	// Look up the state entries for a list of string event IDs
 	// Returns an error if the there is an error talking to the database
 	// Returns a types.MissingEventError if the event IDs aren't in the database.
-	StateEntriesForEventIDs(eventIDs []string) ([]types.StateEntry, error)
+	StateEntriesForEventIDs(
+		ctx context.Context, eventIDs []string,
+	) ([]types.StateEntry, error)
 	// Set the state at an event.
-	SetState(eventNID types.EventNID, stateNID types.StateSnapshotNID) error
+	SetState(
+		ctx context.Context,
+		eventNID types.EventNID,
+		stateNID types.StateSnapshotNID,
+	) error
 	// Look up the latest events in a room in preparation for an update.
 	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
 	// If this returns an error then no further action is required.
-	GetLatestEventsForUpdate(roomNID types.RoomNID) (updater types.RoomRecentEventsUpdater, err error)
+	GetLatestEventsForUpdate(
+		ctx context.Context, roomNID types.RoomNID,
+	) (updater types.RoomRecentEventsUpdater, err error)
 	// Look up the string event IDs for a list of numeric event IDs
-	EventIDs(eventNIDs []types.EventNID) (map[types.EventNID]string, error)
+	EventIDs(
+		ctx context.Context, eventNIDs []types.EventNID,
+	) (map[types.EventNID]string, error)
 	// Build a membership updater for the target user in a room.
-	MembershipUpdater(roomID, targerUserID string) (types.MembershipUpdater, error)
+	MembershipUpdater(
+		ctx context.Context, roomID, targerUserID string,
+	) (types.MembershipUpdater, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -52,18 +69,23 @@ type OutputRoomEventWriter interface {
 	WriteOutputEvents(roomID string, updates []api.OutputEvent) error
 }
 
-func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.InputRoomEvent) error {
+func processRoomEvent(
+	ctx context.Context,
+	db RoomEventDatabase,
+	ow OutputRoomEventWriter,
+	input api.InputRoomEvent,
+) error {
 	// Parse and validate the event JSON
 	event := input.Event
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
-	authEventNIDs, err := checkAuthEvents(db, event, input.AuthEventIDs)
+	authEventNIDs, err := checkAuthEvents(ctx, db, event, input.AuthEventIDs)
 	if err != nil {
 		return err
 	}
 
 	// Store the event
-	roomNID, stateAtEvent, err := db.StoreEvent(event, authEventNIDs)
+	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, authEventNIDs)
 	if err != nil {
 		return err
 	}
@@ -82,20 +104,20 @@ func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.
 			// We've been told what the state at the event is so we don't need to calculate it.
 			// Check that those state events are in the database and store the state.
 			var entries []types.StateEntry
-			if entries, err = db.StateEntriesForEventIDs(input.StateEventIDs); err != nil {
+			if entries, err = db.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
 				return err
 			}
 
-			if stateAtEvent.BeforeStateSnapshotNID, err = db.AddState(roomNID, nil, entries); err != nil {
+			if stateAtEvent.BeforeStateSnapshotNID, err = db.AddState(ctx, roomNID, nil, entries); err != nil {
 				return nil
 			}
 		} else {
 			// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-			if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(db, event, roomNID); err != nil {
+			if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, db, event, roomNID); err != nil {
 				return err
 			}
 		}
-		db.SetState(stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
+		db.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 	}
 
 	if input.Kind == api.KindBackfill {
@@ -104,14 +126,19 @@ func processRoomEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.
 	}
 
 	// Update the extremities of the event graph for the room
-	if err := updateLatestEvents(db, ow, roomNID, stateAtEvent, event, input.SendAsServer); err != nil {
+	if err := updateLatestEvents(ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func processInviteEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input api.InputInviteEvent) (err error) {
+func processInviteEvent(
+	ctx context.Context,
+	db RoomEventDatabase,
+	ow OutputRoomEventWriter,
+	input api.InputInviteEvent,
+) (err error) {
 	if input.Event.StateKey() == nil {
 		return fmt.Errorf("invite must be a state event")
 	}
@@ -119,7 +146,7 @@ func processInviteEvent(db RoomEventDatabase, ow OutputRoomEventWriter, input ap
 	roomID := input.Event.RoomID()
 	targetUserID := *input.Event.StateKey()
 
-	updater, err := db.MembershipUpdater(roomID, targetUserID)
+	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID)
 	if err != nil {
 		return err
 	}
