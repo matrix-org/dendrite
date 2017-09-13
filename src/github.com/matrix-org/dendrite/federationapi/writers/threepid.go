@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -50,12 +51,16 @@ type invites struct {
 	Invites []invite `json:"invites"`
 }
 
-var errNotInRoom = errors.New("the server isn't currently in the room")
+var (
+	errNotLocalUser = errors.New("the user is not from this server")
+	errNotInRoom    = errors.New("the server isn't currently in the room")
+)
 
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	producer *producers.RoomserverProducer, federation *gomatrixserverlib.FederationClient,
+	accountDB *accounts.Database,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -65,7 +70,7 @@ func CreateInvitesFrom3PIDInvites(
 	evs := []gomatrixserverlib.Event{}
 	for _, inv := range body.Invites {
 		event, err := createInviteFrom3PIDInvite(
-			req.Context(), queryAPI, cfg, inv, federation,
+			req.Context(), queryAPI, cfg, inv, federation, accountDB,
 		)
 		if err != nil {
 			return httputil.LogThenError(req, err)
@@ -165,7 +170,17 @@ func ExchangeThirdPartyInvite(
 func createInviteFrom3PIDInvite(
 	ctx context.Context, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	inv invite, federation *gomatrixserverlib.FederationClient,
+	accountDB *accounts.Database,
 ) (*gomatrixserverlib.Event, error) {
+	localpart, server, err := gomatrixserverlib.SplitID('@', inv.MXID)
+	if err != nil {
+		return nil, err
+	}
+
+	if server != cfg.Matrix.ServerName {
+		return nil, errNotLocalUser
+	}
+
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
 		Type:     "m.room.member",
@@ -174,15 +189,21 @@ func createInviteFrom3PIDInvite(
 		StateKey: &inv.MXID,
 	}
 
+	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return nil, err
+	}
+
 	content := common.MemberContent{
-		// TODO: Load the profile
-		Membership: "invite",
+		AvatarURL:   profile.AvatarURL,
+		DisplayName: profile.DisplayName,
+		Membership:  "invite",
 		ThirdPartyInvite: &common.TPInvite{
 			Signed: inv.Signed,
 		},
 	}
 
-	if err := builder.SetContent(content); err != nil {
+	if err = builder.SetContent(content); err != nil {
 		return nil, err
 	}
 
