@@ -1,7 +1,7 @@
 {
     "Vendor": true,
     "Cyclo": 12,
-    "Deadline": "60s",
+    "Deadline": "5m",
     "Enable": [
         "vetshadow",
         "gotype",
