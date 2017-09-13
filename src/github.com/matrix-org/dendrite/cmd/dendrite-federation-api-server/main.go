@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -58,6 +59,11 @@ func main() {
 		log.Panicf("Failed to setup key database(%q): %s", cfg.Database.ServerKey, err.Error())
 	}
 
+	accountDB, err := accounts.NewDatabase(string(cfg.Database.Account), cfg.Matrix.ServerName)
+	if err != nil {
+		log.Panicf("Failed to setup account database(%q): %s", cfg.Database.Account, err.Error())
+	}
+
 	keyRing := gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
 			// TODO: Use perspective key fetchers for production.
@@ -78,7 +84,7 @@ func main() {
 	log.Info("Starting federation API server on ", cfg.Listen.FederationAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, *cfg, queryAPI, roomserverProducer, keyRing, federation)
+	routing.Setup(api, *cfg, queryAPI, roomserverProducer, keyRing, federation, accountDB)
 	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.FederationAPI), nil))

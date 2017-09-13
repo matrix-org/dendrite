@@ -333,6 +333,7 @@ func (m *monolith) setupAPIs() {
 
 	federationapi_routing.Setup(
 		m.api, *m.cfg, m.queryAPI, m.roomServerProducer, m.keyRing, m.federation,
+		m.accountDB,
 	)
 
 	publicroomsapi_routing.Setup(m.api, m.deviceDB, m.publicRoomsAPIDB)

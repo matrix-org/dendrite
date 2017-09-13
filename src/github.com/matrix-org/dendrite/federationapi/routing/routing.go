@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -42,6 +43,7 @@ func Setup(
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
+	accountDB *accounts.Database,
 ) {
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
@@ -81,7 +83,7 @@ func Setup(
 
 	v1fedmux.Handle("/3pid/onbind", common.MakeAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
-			return writers.CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation)
+			return writers.CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
 		},
 	)).Methods("POST", "OPTIONS")
 

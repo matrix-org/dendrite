@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -56,6 +57,7 @@ var errNotInRoom = errors.New("the server isn't currently in the room")
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	producer *producers.RoomserverProducer, federation *gomatrixserverlib.FederationClient,
+	accountDB *accounts.Database,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -65,7 +67,7 @@ func CreateInvitesFrom3PIDInvites(
 	evs := []gomatrixserverlib.Event{}
 	for _, inv := range body.Invites {
 		event, err := createInviteFrom3PIDInvite(
-			req.Context(), queryAPI, cfg, inv, federation,
+			req.Context(), queryAPI, cfg, inv, federation, accountDB,
 		)
 		if err != nil {
 			return httputil.LogThenError(req, err)
@@ -165,6 +167,7 @@ func ExchangeThirdPartyInvite(
 func createInviteFrom3PIDInvite(
 	ctx context.Context, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	inv invite, federation *gomatrixserverlib.FederationClient,
+	accountDB *accounts.Database,
 ) (*gomatrixserverlib.Event, error) {
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
@@ -174,9 +177,20 @@ func createInviteFrom3PIDInvite(
 		StateKey: &inv.MXID,
 	}
 
+	localpart, _, err := gomatrixserverlib.SplitID('@', *builder.StateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	if err != nil {
+		return nil, err
+	}
+
 	content := common.MemberContent{
-		// TODO: Load the profile
-		Membership: "invite",
+		AvatarURL:   profile.AvatarURL,
+		DisplayName: profile.DisplayName,
+		Membership:  "invite",
 		ThirdPartyInvite: &common.TPInvite{
 			Signed: inv.Signed,
 		},
