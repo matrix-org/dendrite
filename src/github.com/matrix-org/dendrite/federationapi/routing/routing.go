@@ -54,8 +54,8 @@ func Setup(
 	// return that key.
 	// Even if we had more than one server key, we would probably still ignore the
 	// {keyID} argument and always return a response containing all of the keys.
-	v2keysmux.Handle("/server/{keyID}", localKeys)
-	v2keysmux.Handle("/server/", localKeys)
+	v2keysmux.Handle("/server/{keyID}", localKeys).Methods("GET")
+	v2keysmux.Handle("/server/", localKeys).Methods("GET")
 
 	v1fedmux.Handle("/send/{txnID}/", common.MakeFedAPI(
 		"federation_send", cfg.Matrix.ServerName, keys,
@@ -66,7 +66,7 @@ func Setup(
 				cfg, query, producer, keys, federation,
 			)
 		},
-	))
+	)).Methods("PUT", "OPTIONS")
 
 	v1fedmux.Handle("/invite/{roomID}/{eventID}", common.MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, keys,
@@ -77,13 +77,13 @@ func Setup(
 				cfg, producer, keys,
 			)
 		},
-	))
+	)).Methods("PUT", "OPTIONS")
 
 	v1fedmux.Handle("/3pid/onbind", common.MakeAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
 			return writers.CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation)
 		},
-	))
+	)).Methods("POST", "OPTIONS")
 
 	v1fedmux.Handle("/exchange_third_party_invite/{roomID}", common.MakeFedAPI(
 		"exchange_third_party_invite", cfg.Matrix.ServerName, keys,
@@ -93,7 +93,7 @@ func Setup(
 				httpReq, request, vars["roomID"], query, cfg, federation, producer,
 			)
 		},
-	))
+	)).Methods("PUT", "OPTIONS")
 
 	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
 		"federation_get_event", cfg.Matrix.ServerName, keys,
@@ -103,5 +103,5 @@ func Setup(
 				request, cfg, query, time.Now(), keys, vars["eventID"],
 			)
 		},
-	))
+	)).Methods("GET")
 }

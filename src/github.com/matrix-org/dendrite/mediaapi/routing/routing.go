@@ -41,17 +41,17 @@ func Setup(apiMux *mux.Router, cfg *config.Dendrite, db *storage.Database) {
 	// FIXME: /upload should use common.MakeAuthAPI()
 	r0mux.Handle("/upload", common.MakeAPI("upload", func(req *http.Request) util.JSONResponse {
 		return writers.Upload(req, cfg, db, activeThumbnailGeneration)
-	}))
+	})).Methods("POST", "OPTIONS")
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
 	r0mux.Handle("/download/{serverName}/{mediaId}",
 		makeDownloadAPI("download", cfg, db, activeRemoteRequests, activeThumbnailGeneration),
-	)
+	).Methods("GET")
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", cfg, db, activeRemoteRequests, activeThumbnailGeneration),
-	)
+	).Methods("GET")
 }
 
 func makeDownloadAPI(name string, cfg *config.Dendrite, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests, activeThumbnailGeneration *types.ActiveThumbnailGeneration) http.HandlerFunc {

@@ -64,7 +64,7 @@ func Setup(
 				}},
 			}
 		}),
-	)
+	).Methods("GET")
 
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	unstableMux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
@@ -73,7 +73,7 @@ func Setup(
 		common.MakeAuthAPI("createRoom", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return writers.CreateRoom(req, device, cfg, producer, accountDB)
 		}),
-	)
+	).Methods("POST", "OPTIONS")
 	r0mux.Handle("/join/{roomIDOrAlias}",
 		common.MakeAuthAPI("join", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
@@ -81,7 +81,7 @@ func Setup(
 				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, aliasAPI, keyRing, accountDB,
 			)
 		}),
-	)
+	).Methods("POST", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
 		common.MakeAuthAPI("membership", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
@@ -93,7 +93,7 @@ func Setup(
 			vars := mux.Vars(req)
 			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], nil, cfg, queryAPI, producer)
 		}),
-	)
+	).Methods("PUT", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
@@ -105,18 +105,18 @@ func Setup(
 			}
 			return writers.SendEvent(req, device, vars["roomID"], eventType, "", &emptyString, cfg, queryAPI, producer)
 		}),
-	)
+	).Methods("PUT", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			stateKey := vars["stateKey"]
 			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], "", &stateKey, cfg, queryAPI, producer)
 		}),
-	)
+	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/register", common.MakeAPI("register", func(req *http.Request) util.JSONResponse {
 		return writers.Register(req, accountDB, deviceDB)
-	}))
+	})).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -143,7 +143,7 @@ func Setup(
 		common.MakeAuthAPI("logout", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return readers.Logout(req, deviceDB, device)
 		}),
-	)
+	).Methods("POST", "OPTIONS")
 
 	// Stub endpoints required by Riot
 
@@ -151,7 +151,7 @@ func Setup(
 		common.MakeAPI("login", func(req *http.Request) util.JSONResponse {
 			return readers.Login(req, accountDB, deviceDB, cfg)
 		}),
-	)
+	).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/pushrules/",
 		common.MakeAPI("push_rules", func(req *http.Request) util.JSONResponse {
@@ -170,7 +170,7 @@ func Setup(
 				JSON: &res,
 			}
 		}),
-	)
+	).Methods("GET")
 
 	r0mux.Handle("/user/{userID}/filter",
 		common.MakeAPI("make_filter", func(req *http.Request) util.JSONResponse {
@@ -180,7 +180,7 @@ func Setup(
 				JSON: struct{}{},
 			}
 		}),
-	)
+	).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/user/{userID}/filter/{filterID}",
 		common.MakeAPI("filter", func(req *http.Request) util.JSONResponse {
@@ -190,7 +190,7 @@ func Setup(
 				JSON: struct{}{},
 			}
 		}),
-	)
+	).Methods("GET")
 
 	// Riot user settings
 
@@ -199,7 +199,7 @@ func Setup(
 			vars := mux.Vars(req)
 			return readers.GetProfile(req, accountDB, vars["userID"])
 		}),
-	)
+	).Methods("GET")
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		common.MakeAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
@@ -266,7 +266,7 @@ func Setup(
 				JSON: struct{}{},
 			}
 		}),
-	)
+	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/voip/turnServer",
 		common.MakeAPI("turn_server", func(req *http.Request) util.JSONResponse {
@@ -276,7 +276,7 @@ func Setup(
 				JSON: struct{}{},
 			}
 		}),
-	)
+	).Methods("GET")
 
 	unstableMux.Handle("/thirdparty/protocols",
 		common.MakeAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
@@ -286,7 +286,7 @@ func Setup(
 				JSON: struct{}{},
 			}
 		}),
-	)
+	).Methods("GET")
 
 	r0mux.Handle("/rooms/{roomID}/initialSync",
 		common.MakeAPI("rooms_initial_sync", func(req *http.Request) util.JSONResponse {
@@ -296,47 +296,47 @@ func Setup(
 				JSON: jsonerror.GuestAccessForbidden("Guest access not implemented"),
 			}
 		}),
-	)
+	).Methods("GET")
 
 	r0mux.Handle("/user/{userID}/account_data/{type}",
 		common.MakeAuthAPI("user_account_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return readers.SaveAccountData(req, accountDB, device, vars["userID"], "", vars["type"], syncProducer)
 		}),
-	)
+	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/user/{userID}/rooms/{roomID}/account_data/{type}",
 		common.MakeAuthAPI("user_account_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return readers.SaveAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
 		}),
-	)
+	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/members",
 		common.MakeAuthAPI("rooms_members", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return readers.GetMemberships(req, device, vars["roomID"], false, cfg, queryAPI)
 		}),
-	)
+	).Methods("GET")
 
 	r0mux.Handle("/rooms/{roomID}/joined_members",
 		common.MakeAuthAPI("rooms_members", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return readers.GetMemberships(req, device, vars["roomID"], true, cfg, queryAPI)
 		}),
-	)
+	).Methods("GET")
 
 	r0mux.Handle("/rooms/{roomID}/read_markers",
 		common.MakeAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
 			// TODO: return the read_markers.
 			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
-	)
+	).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
 		common.MakeAPI("rooms_typing", func(req *http.Request) util.JSONResponse {
 			// TODO: handling typing
 			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
-	)
+	).Methods("PUT", "OPTIONS")
 }
