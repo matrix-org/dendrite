@@ -51,7 +51,10 @@ type invites struct {
 	Invites []invite `json:"invites"`
 }
 
-var errNotInRoom = errors.New("the server isn't currently in the room")
+var (
+	errNotLocalUser = errors.New("the user is not from this server")
+	errNotInRoom    = errors.New("the server isn't currently in the room")
+)
 
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
@@ -169,17 +172,21 @@ func createInviteFrom3PIDInvite(
 	inv invite, federation *gomatrixserverlib.FederationClient,
 	accountDB *accounts.Database,
 ) (*gomatrixserverlib.Event, error) {
+	localpart, server, err := gomatrixserverlib.SplitID('@', inv.MXID)
+	if err != nil {
+		return nil, err
+	}
+
+	if server != cfg.Matrix.ServerName {
+		return nil, errNotLocalUser
+	}
+
 	// Build the event
 	builder := &gomatrixserverlib.EventBuilder{
 		Type:     "m.room.member",
 		Sender:   inv.Sender,
 		RoomID:   inv.RoomID,
 		StateKey: &inv.MXID,
-	}
-
-	localpart, _, err := gomatrixserverlib.SplitID('@', *builder.StateKey)
-	if err != nil {
-		return nil, err
 	}
 
 	profile, err := accountDB.GetProfileByLocalpart(localpart)
