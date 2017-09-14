@@ -123,8 +123,12 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputNewRoomEvent) error {
 	// TODO: handle EventIDMismatchError and recover the current state by talking
 	// to the roomserver
 	oldJoinedHosts, err := s.db.UpdateRoom(
-		ore.Event.RoomID(), ore.LastSentEventID, ore.Event.EventID(),
-		addsJoinedHosts, ore.RemovesStateEventIDs,
+		context.TODO(),
+		ore.Event.RoomID(),
+		ore.LastSentEventID,
+		ore.Event.EventID(),
+		addsJoinedHosts,
+		ore.RemovesStateEventIDs,
 	)
 	if err != nil {
 		return err

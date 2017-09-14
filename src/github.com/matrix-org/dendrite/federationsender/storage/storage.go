@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
@@ -73,35 +74,38 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 // UpdateRoom updates the joined hosts for a room and returns what the joined
 // hosts were before the update.
 func (d *Database) UpdateRoom(
+	ctx context.Context,
 	roomID, oldEventID, newEventID string,
 	addHosts []types.JoinedHost,
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if err = d.insertRoom(txn, roomID); err != nil {
+		if err = d.insertRoom(ctx, txn, roomID); err != nil {
 			return err
 		}
-		lastSentEventID, err := d.selectRoomForUpdate(txn, roomID)
+		lastSentEventID, err := d.selectRoomForUpdate(ctx, txn, roomID)
 		if err != nil {
 			return err
 		}
 		if lastSentEventID != oldEventID {
-			return types.EventIDMismatchError{lastSentEventID, oldEventID}
+			return types.EventIDMismatchError{
+				DatabaseID: lastSentEventID, RoomServerID: oldEventID,
+			}
 		}
-		joinedHosts, err = d.selectJoinedHosts(txn, roomID)
+		joinedHosts, err = d.selectJoinedHosts(ctx, txn, roomID)
 		if err != nil {
 			return err
 		}
 		for _, add := range addHosts {
-			err = d.insertJoinedHosts(txn, roomID, add.MemberEventID, add.ServerName)
+			err = d.insertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName)
 			if err != nil {
 				return err
 			}
 		}
-		if err = d.deleteJoinedHosts(txn, removeHosts); err != nil {
+		if err = d.deleteJoinedHosts(ctx, txn, removeHosts); err != nil {
 			return err
 		}
-		return d.updateRoom(txn, roomID, newEventID)
+		return d.updateRoom(ctx, txn, roomID, newEventID)
 	})
 	return
 }

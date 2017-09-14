@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/lib/pq"
@@ -78,20 +79,29 @@ func (s *joinedHostsStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *joinedHostsStatements) insertJoinedHosts(
-	txn *sql.Tx, roomID, eventID string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context,
+	txn *sql.Tx,
+	roomID, eventID string,
+	serverName gomatrixserverlib.ServerName,
 ) error {
-	_, err := common.TxStmt(txn, s.insertJoinedHostsStmt).Exec(roomID, eventID, serverName)
+	stmt := common.TxStmt(txn, s.insertJoinedHostsStmt)
+	_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
 	return err
 }
 
-func (s *joinedHostsStatements) deleteJoinedHosts(txn *sql.Tx, eventIDs []string) error {
-	_, err := common.TxStmt(txn, s.deleteJoinedHostsStmt).Exec(pq.StringArray(eventIDs))
+func (s *joinedHostsStatements) deleteJoinedHosts(
+	ctx context.Context, txn *sql.Tx, eventIDs []string,
+) error {
+	stmt := common.TxStmt(txn, s.deleteJoinedHostsStmt)
+	_, err := stmt.ExecContext(ctx, pq.StringArray(eventIDs))
 	return err
 }
 
-func (s *joinedHostsStatements) selectJoinedHosts(txn *sql.Tx, roomID string,
+func (s *joinedHostsStatements) selectJoinedHosts(
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) ([]types.JoinedHost, error) {
-	rows, err := common.TxStmt(txn, s.selectJoinedHostsStmt).Query(roomID)
+	stmt := common.TxStmt(txn, s.selectJoinedHostsStmt)
+	rows, err := stmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
