@@ -15,6 +15,7 @@
 package threepid
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,7 +52,9 @@ type Credentials struct {
 // Returns the session's ID.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func CreateSession(req EmailAssociationRequest, cfg config.Dendrite) (string, error) {
+func CreateSession(
+	ctx context.Context, req EmailAssociationRequest, cfg config.Dendrite,
+) (string, error) {
 	if err := isTrusted(req.IDServer, cfg); err != nil {
 		return "", err
 	}
@@ -71,7 +74,7 @@ func CreateSession(req EmailAssociationRequest, cfg config.Dendrite) (string, er
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	client := http.Client{}
-	resp, err := client.Do(request)
+	resp, err := client.Do(request.WithContext(ctx))
 	if err != nil {
 		return "", err
 	}
@@ -97,13 +100,19 @@ func CreateSession(req EmailAssociationRequest, cfg config.Dendrite) (string, er
 // identifier and its medium.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func CheckAssociation(creds Credentials, cfg config.Dendrite) (bool, string, string, error) {
+func CheckAssociation(
+	ctx context.Context, creds Credentials, cfg config.Dendrite,
+) (bool, string, string, error) {
 	if err := isTrusted(creds.IDServer, cfg); err != nil {
 		return false, "", "", err
 	}
 
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/getValidated3pid?sid=%s&client_secret=%s", creds.IDServer, creds.SID, creds.Secret)
-	resp, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, "", "", err
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return false, "", "", err
 	}

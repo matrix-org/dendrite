@@ -121,7 +121,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	profile, err := loadProfile(stateKey, cfg, accountDB)
+	profile, err := loadProfile(ctx, stateKey, cfg, accountDB)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,9 @@ func buildMembershipEvent(
 // it if the user is local to this server, or returns an empty profile if not.
 // Returns an error if the retrieval failed or if the first parameter isn't a
 // valid Matrix ID.
-func loadProfile(userID string, cfg config.Dendrite, accountDB *accounts.Database) (*authtypes.Profile, error) {
+func loadProfile(
+	ctx context.Context, userID string, cfg config.Dendrite, accountDB *accounts.Database,
+) (*authtypes.Profile, error) {
 	localpart, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return nil, err
@@ -164,7 +166,7 @@ func loadProfile(userID string, cfg config.Dendrite, accountDB *accounts.Databas
 
 	var profile *authtypes.Profile
 	if serverName == cfg.Matrix.ServerName {
-		profile, err = accountDB.GetProfileByLocalpart(localpart)
+		profile, err = accountDB.GetProfileByLocalpart(ctx, localpart)
 	} else {
 		profile = &authtypes.Profile{}
 	}

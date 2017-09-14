@@ -15,6 +15,7 @@
 package sync
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -29,6 +30,7 @@ const defaultTimelineLimit = 20
 
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
+	ctx           context.Context
 	userID        string
 	limit         int
 	timeout       time.Duration
@@ -47,6 +49,7 @@ func newSyncRequest(req *http.Request, userID string) (*syncRequest, error) {
 	}
 	// TODO: Additional query params: set_presence, filter
 	return &syncRequest{
+		ctx:           req.Context(),
 		userID:        userID,
 		timeout:       timeout,
 		since:         since,

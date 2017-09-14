@@ -15,7 +15,10 @@
 package accounts
 
 import (
+	"context"
 	"database/sql"
+
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
@@ -76,22 +79,21 @@ func (s *threepidStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *threepidStatements) selectLocalpartForThreePID(txn *sql.Tx, threepid string, medium string) (localpart string, err error) {
-	var stmt *sql.Stmt
-	if txn != nil {
-		stmt = txn.Stmt(s.selectLocalpartForThreePIDStmt)
-	} else {
-		stmt = s.selectLocalpartForThreePIDStmt
-	}
-	err = stmt.QueryRow(threepid, medium).Scan(&localpart)
+func (s *threepidStatements) selectLocalpartForThreePID(
+	ctx context.Context, txn *sql.Tx, threepid string, medium string,
+) (localpart string, err error) {
+	stmt := common.TxStmt(txn, s.selectLocalpartForThreePIDStmt)
+	err = stmt.QueryRowContext(ctx, threepid, medium).Scan(&localpart)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
 	return
 }
 
-func (s *threepidStatements) selectThreePIDsForLocalpart(localpart string) (threepids []authtypes.ThreePID, err error) {
-	rows, err := s.selectThreePIDsForLocalpartStmt.Query(localpart)
+func (s *threepidStatements) selectThreePIDsForLocalpart(
+	ctx context.Context, localpart string,
+) (threepids []authtypes.ThreePID, err error) {
+	rows, err := s.selectThreePIDsForLocalpartStmt.QueryContext(ctx, localpart)
 	if err != nil {
 		return
 	}
@@ -103,18 +105,25 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(localpart string) (thre
 		if err = rows.Scan(&threepid, &medium); err != nil {
 			return
 		}
-		threepids = append(threepids, authtypes.ThreePID{threepid, medium})
+		threepids = append(threepids, authtypes.ThreePID{
+			Address: threepid,
+			Medium:  medium,
+		})
 	}
 
 	return
 }
 
-func (s *threepidStatements) insertThreePID(txn *sql.Tx, threepid string, medium string, localpart string) (err error) {
-	_, err = txn.Stmt(s.insertThreePIDStmt).Exec(threepid, medium, localpart)
+func (s *threepidStatements) insertThreePID(
+	ctx context.Context, txn *sql.Tx, threepid, medium, localpart string,
+) (err error) {
+	stmt := common.TxStmt(txn, s.insertThreePIDStmt)
+	_, err = stmt.ExecContext(ctx, threepid, medium, localpart)
 	return
 }
 
-func (s *threepidStatements) deleteThreePID(threepid string, medium string) (err error) {
-	_, err = s.deleteThreePIDStmt.Exec(threepid, medium)
+func (s *threepidStatements) deleteThreePID(
+	ctx context.Context, threepid string, medium string) (err error) {
+	_, err = s.deleteThreePIDStmt.ExecContext(ctx, threepid, medium)
 	return
 }

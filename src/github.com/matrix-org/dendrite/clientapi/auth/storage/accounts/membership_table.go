@@ -15,6 +15,7 @@
 package accounts
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/lib/pq"
@@ -80,18 +81,27 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *membershipStatements) insertMembership(localpart string, roomID string, eventID string, txn *sql.Tx) (err error) {
-	_, err = txn.Stmt(s.insertMembershipStmt).Exec(localpart, roomID, eventID)
+func (s *membershipStatements) insertMembership(
+	ctx context.Context, txn *sql.Tx, localpart, roomID, eventID string,
+) (err error) {
+	stmt := txn.Stmt(s.insertMembershipStmt)
+	_, err = stmt.ExecContext(ctx, localpart, roomID, eventID)
 	return
 }
 
-func (s *membershipStatements) deleteMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) (err error) {
-	_, err = txn.Stmt(s.deleteMembershipsByEventIDsStmt).Exec(pq.StringArray(eventIDs))
+func (s *membershipStatements) deleteMembershipsByEventIDs(
+	ctx context.Context, txn *sql.Tx, eventIDs []string,
+) (err error) {
+	stmt := txn.Stmt(s.deleteMembershipsByEventIDsStmt)
+	_, err = stmt.ExecContext(ctx, pq.StringArray(eventIDs))
 	return
 }
 
-func (s *membershipStatements) selectMembershipsByLocalpart(localpart string) (memberships []authtypes.Membership, err error) {
-	rows, err := s.selectMembershipsByLocalpartStmt.Query(localpart)
+func (s *membershipStatements) selectMembershipsByLocalpart(
+	ctx context.Context, localpart string,
+) (memberships []authtypes.Membership, err error) {
+	stmt := s.selectMembershipsByLocalpartStmt
+	rows, err := stmt.QueryContext(ctx, localpart)
 	if err != nil {
 		return
 	}
@@ -111,7 +121,11 @@ func (s *membershipStatements) selectMembershipsByLocalpart(localpart string) (m
 	return
 }
 
-func (s *membershipStatements) updateMembershipByEventID(oldEventID string, newEventID string) (err error) {
-	_, err = s.updateMembershipByEventIDStmt.Exec(oldEventID, newEventID)
+func (s *membershipStatements) updateMembershipByEventID(
+	ctx context.Context, oldEventID string, newEventID string,
+) (err error) {
+	_, err = s.updateMembershipByEventIDStmt.ExecContext(
+		ctx, oldEventID, newEventID,
+	)
 	return
 }

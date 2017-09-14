@@ -15,6 +15,7 @@
 package accounts
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -76,26 +77,34 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // insertAccount creates a new account. 'hash' should be the password hash for this account. If it is missing,
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
-func (s *accountsStatements) insertAccount(localpart, hash string) (acc *authtypes.Account, err error) {
+func (s *accountsStatements) insertAccount(
+	ctx context.Context, localpart, hash string,
+) (*authtypes.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
-	if _, err = s.insertAccountStmt.Exec(localpart, createdTimeMS, hash); err == nil {
-		acc = &authtypes.Account{
-			Localpart:  localpart,
-			UserID:     makeUserID(localpart, s.serverName),
-			ServerName: s.serverName,
-		}
+	stmt := s.insertAccountStmt
+	if _, err := stmt.ExecContext(ctx, localpart, createdTimeMS, hash); err != nil {
+		return nil, err
 	}
+	return &authtypes.Account{
+		Localpart:  localpart,
+		UserID:     makeUserID(localpart, s.serverName),
+		ServerName: s.serverName,
+	}, nil
+}
+
+func (s *accountsStatements) selectPasswordHash(
+	ctx context.Context, localpart string,
+) (hash string, err error) {
+	err = s.selectPasswordHashStmt.QueryRowContext(ctx, localpart).Scan(&hash)
 	return
 }
 
-func (s *accountsStatements) selectPasswordHash(localpart string) (hash string, err error) {
-	err = s.selectPasswordHashStmt.QueryRow(localpart).Scan(&hash)
-	return
-}
-
-func (s *accountsStatements) selectAccountByLocalpart(localpart string) (*authtypes.Account, error) {
+func (s *accountsStatements) selectAccountByLocalpart(
+	ctx context.Context, localpart string,
+) (*authtypes.Account, error) {
 	var acc authtypes.Account
-	err := s.selectAccountByLocalpartStmt.QueryRow(localpart).Scan(&acc.Localpart)
+	stmt := s.selectAccountByLocalpartStmt
+	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart)
 	if err != nil {
 		acc.UserID = makeUserID(localpart, s.serverName)
 		acc.ServerName = s.serverName

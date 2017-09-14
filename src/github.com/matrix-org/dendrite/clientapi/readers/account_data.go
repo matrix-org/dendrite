@@ -59,7 +59,9 @@ func SaveAccountData(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := accountDB.SaveAccountData(localpart, roomID, dataType, string(body)); err != nil {
+	if err := accountDB.SaveAccountData(
+		req.Context(), localpart, roomID, dataType, string(body),
+	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
