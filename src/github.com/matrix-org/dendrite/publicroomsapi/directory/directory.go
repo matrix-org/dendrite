@@ -32,7 +32,7 @@ func GetVisibility(
 	req *http.Request, publicRoomsDatabase *storage.PublicRoomsServerDatabase,
 	roomID string,
 ) util.JSONResponse {
-	isPublic, err := publicRoomsDatabase.GetRoomVisibility(roomID)
+	isPublic, err := publicRoomsDatabase.GetRoomVisibility(req.Context(), roomID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -62,7 +62,7 @@ func SetVisibility(
 	}
 
 	isPublic := v.Visibility == "public"
-	if err := publicRoomsDatabase.SetRoomVisibility(isPublic, roomID); err != nil {
+	if err := publicRoomsDatabase.SetRoomVisibility(req.Context(), isPublic, roomID); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

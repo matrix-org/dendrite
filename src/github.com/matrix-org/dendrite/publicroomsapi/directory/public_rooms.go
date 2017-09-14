@@ -63,7 +63,7 @@ func GetPublicRooms(
 		return httputil.LogThenError(req, err)
 	}
 
-	if response.Estimate, err = publicRoomDatabase.CountPublicRooms(); err != nil {
+	if response.Estimate, err = publicRoomDatabase.CountPublicRooms(req.Context()); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -75,7 +75,9 @@ func GetPublicRooms(
 		response.NextBatch = strconv.Itoa(nextIndex)
 	}
 
-	if response.Chunk, err = publicRoomDatabase.GetPublicRooms(offset, limit, request.Filter.SearchTerms); err != nil {
+	if response.Chunk, err = publicRoomDatabase.GetPublicRooms(
+		req.Context(), offset, limit, request.Filter.SearchTerms,
+	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
