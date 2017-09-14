@@ -98,5 +98,5 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
-	return s.db.UpdateRoomFromEvents(addQueryRes.Events, remQueryRes.Events)
+	return s.db.UpdateRoomFromEvents(context.TODO(), addQueryRes.Events, remQueryRes.Events)
 }

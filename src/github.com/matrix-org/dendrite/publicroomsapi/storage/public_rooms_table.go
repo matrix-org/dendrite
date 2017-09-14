@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -166,27 +167,35 @@ func (s *publicRoomsStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *publicRoomsStatements) countPublicRooms() (nb int64, err error) {
-	err = s.countPublicRoomsStmt.QueryRow().Scan(&nb)
+func (s *publicRoomsStatements) countPublicRooms(ctx context.Context) (nb int64, err error) {
+	err = s.countPublicRoomsStmt.QueryRowContext(ctx).Scan(&nb)
 	return
 }
 
-func (s *publicRoomsStatements) selectPublicRooms(offset int64, limit int16, filter string) ([]types.PublicRoom, error) {
+func (s *publicRoomsStatements) selectPublicRooms(
+	ctx context.Context, offset int64, limit int16, filter string,
+) ([]types.PublicRoom, error) {
 	var rows *sql.Rows
 	var err error
 
 	if len(filter) > 0 {
 		pattern := "%" + filter + "%"
 		if limit == 0 {
-			rows, err = s.selectPublicRoomsWithFilterStmt.Query(pattern, offset)
+			rows, err = s.selectPublicRoomsWithFilterStmt.QueryContext(
+				ctx, pattern, offset,
+			)
 		} else {
-			rows, err = s.selectPublicRoomsWithLimitAndFilterStmt.Query(pattern, offset, limit)
+			rows, err = s.selectPublicRoomsWithLimitAndFilterStmt.QueryContext(
+				ctx, pattern, offset, limit,
+			)
 		}
 	} else {
 		if limit == 0 {
-			rows, err = s.selectPublicRoomsStmt.Query(offset)
+			rows, err = s.selectPublicRoomsStmt.QueryContext(ctx, offset)
 		} else {
-			rows, err = s.selectPublicRoomsWithLimitStmt.Query(offset, limit)
+			rows, err = s.selectPublicRoomsWithLimitStmt.QueryContext(
+				ctx, offset, limit,
+			)
 		}
 	}
 
@@ -207,10 +216,7 @@ func (s *publicRoomsStatements) selectPublicRooms(offset int64, limit int16, fil
 			return rooms, err
 		}
 
-		r.Aliases = make([]string, len(aliases))
-		for i := range aliases {
-			r.Aliases[i] = aliases[i]
-		}
+		r.Aliases = aliases
 
 		rooms = append(rooms, r)
 	}
@@ -218,51 +224,53 @@ func (s *publicRoomsStatements) selectPublicRooms(offset int64, limit int16, fil
 	return rooms, nil
 }
 
-func (s *publicRoomsStatements) selectRoomVisibility(roomID string) (v bool, err error) {
-	err = s.selectRoomVisibilityStmt.QueryRow(roomID).Scan(&v)
+func (s *publicRoomsStatements) selectRoomVisibility(
+	ctx context.Context, roomID string,
+) (v bool, err error) {
+	err = s.selectRoomVisibilityStmt.QueryRowContext(ctx, roomID).Scan(&v)
 	return
 }
 
-func (s *publicRoomsStatements) insertNewRoom(roomID string) error {
-	_, err := s.insertNewRoomStmt.Exec(roomID)
+func (s *publicRoomsStatements) insertNewRoom(
+	ctx context.Context, roomID string,
+) error {
+	_, err := s.insertNewRoomStmt.ExecContext(ctx, roomID)
 	return err
 }
 
-func (s *publicRoomsStatements) incrementJoinedMembersInRoom(roomID string) error {
-	_, err := s.incrementJoinedMembersInRoomStmt.Exec(roomID)
+func (s *publicRoomsStatements) incrementJoinedMembersInRoom(
+	ctx context.Context, roomID string,
+) error {
+	_, err := s.incrementJoinedMembersInRoomStmt.ExecContext(ctx, roomID)
 	return err
 }
 
-func (s *publicRoomsStatements) decrementJoinedMembersInRoom(roomID string) error {
-	_, err := s.decrementJoinedMembersInRoomStmt.Exec(roomID)
+func (s *publicRoomsStatements) decrementJoinedMembersInRoom(
+	ctx context.Context, roomID string,
+) error {
+	_, err := s.decrementJoinedMembersInRoomStmt.ExecContext(ctx, roomID)
 	return err
 }
 
-func (s *publicRoomsStatements) updateRoomAttribute(attrName string, attrValue attributeValue, roomID string) error {
-	isEditable := false
-	for _, editable := range editableAttributes {
-		if editable == attrName {
-			isEditable = true
-		}
-	}
+func (s *publicRoomsStatements) updateRoomAttribute(
+	ctx context.Context, attrName string, attrValue attributeValue, roomID string,
+) error {
+	stmt, isEditable := s.updateRoomAttributeStmts[attrName]
 
 	if !isEditable {
 		return errors.New("Cannot edit " + attrName)
 	}
 
 	var value interface{}
-	if attrName == "aliases" {
-		// Aliases need a special conversion
-		valueAsSlice, isSlice := attrValue.([]string)
-		if !isSlice {
-			// attrValue isn't a slice of strings
-			return errors.New("New list of aliases is of the wrong type")
-		}
-		value = pq.StringArray(valueAsSlice)
-	} else {
+	switch v := attrValue.(type) {
+	case []string:
+		value = pq.StringArray(v)
+	case bool, string:
 		value = attrValue
+	default:
+		return errors.New("Unsupported attribute type, must be bool, string or []string")
 	}
 
-	_, err := s.updateRoomAttributeStmts[attrName].Exec(value, roomID)
+	_, err := stmt.ExecContext(ctx, value, roomID)
 	return err
 }
