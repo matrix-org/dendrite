@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
@@ -66,17 +67,22 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 
 // insertRoom inserts the room if it didn't already exist.
 // If the room didn't exist then last_event_id is set to the empty string.
-func (s *roomStatements) insertRoom(txn *sql.Tx, roomID string) error {
-	_, err := common.TxStmt(txn, s.insertRoomStmt).Exec(roomID)
+func (s *roomStatements) insertRoom(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := common.TxStmt(txn, s.insertRoomStmt).ExecContext(ctx, roomID)
 	return err
 }
 
 // selectRoomForUpdate locks the row for the room and returns the last_event_id.
 // The row must already exist in the table. Callers can ensure that the row
 // exists by calling insertRoom first.
-func (s *roomStatements) selectRoomForUpdate(txn *sql.Tx, roomID string) (string, error) {
+func (s *roomStatements) selectRoomForUpdate(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (string, error) {
 	var lastEventID string
-	err := common.TxStmt(txn, s.selectRoomForUpdateStmt).QueryRow(roomID).Scan(&lastEventID)
+	stmt := common.TxStmt(txn, s.selectRoomForUpdateStmt)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&lastEventID)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +91,10 @@ func (s *roomStatements) selectRoomForUpdate(txn *sql.Tx, roomID string) (string
 
 // updateRoom updates the last_event_id for the room. selectRoomForUpdate should
 // have already been called earlier within the transaction.
-func (s *roomStatements) updateRoom(txn *sql.Tx, roomID, lastEventID string) error {
-	_, err := common.TxStmt(txn, s.updateRoomStmt).Exec(roomID, lastEventID)
+func (s *roomStatements) updateRoom(
+	ctx context.Context, txn *sql.Tx, roomID, lastEventID string,
+) error {
+	stmt := common.TxStmt(txn, s.updateRoomStmt)
+	_, err := stmt.ExecContext(ctx, roomID, lastEventID)
 	return err
 }
