@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"net/http"
 	"os"
@@ -264,13 +265,13 @@ func (m *monolith) setupProducers() {
 }
 
 func (m *monolith) setupNotifiers() {
-	pos, err := m.syncAPIDB.SyncStreamPosition()
+	pos, err := m.syncAPIDB.SyncStreamPosition(context.Background())
 	if err != nil {
 		log.Panicf("startup: failed to get latest sync stream position : %s", err)
 	}
 
 	m.syncAPINotifier = syncapi_sync.NewNotifier(syncapi_types.StreamPosition(pos))
-	if err = m.syncAPINotifier.Load(m.syncAPIDB); err != nil {
+	if err = m.syncAPINotifier.Load(context.Background(), m.syncAPIDB); err != nil {
 		log.Panicf("startup: failed to set up notifier: %s", err)
 	}
 }

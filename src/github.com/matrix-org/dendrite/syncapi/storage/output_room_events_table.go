@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	log "github.com/Sirupsen/logrus"
@@ -104,9 +105,11 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
-	txn *sql.Tx, oldPos, newPos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
 ) (map[string]map[string]bool, map[string]streamEvent, error) {
-	rows, err := common.TxStmt(txn, s.selectStateInRangeStmt).Query(oldPos, newPos)
+	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
+
+	rows, err := stmt.QueryContext(ctx, oldPos, newPos)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -167,9 +170,12 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
 // then this function should only ever be used at startup, as it will race with inserting events if it is
 // done afterwards. If there are no inserted events, 0 is returned.
-func (s *outputRoomEventsStatements) selectMaxID(txn *sql.Tx) (id int64, err error) {
+func (s *outputRoomEventsStatements) selectMaxID(
+	ctx context.Context, txn *sql.Tx,
+) (id int64, err error) {
 	var nullableID sql.NullInt64
-	err = common.TxStmt(txn, s.selectMaxIDStmt).QueryRow().Scan(&nullableID)
+	stmt := common.TxStmt(txn, s.selectMaxIDStmt)
+	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}
@@ -178,18 +184,29 @@ func (s *outputRoomEventsStatements) selectMaxID(txn *sql.Tx) (id int64, err err
 
 // InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs. Returns the position
 // of the inserted event.
-func (s *outputRoomEventsStatements) insertEvent(txn *sql.Tx, event *gomatrixserverlib.Event, addState, removeState []string) (streamPos int64, err error) {
-	err = common.TxStmt(txn, s.insertEventStmt).QueryRow(
-		event.RoomID(), event.EventID(), event.JSON(), pq.StringArray(addState), pq.StringArray(removeState),
+func (s *outputRoomEventsStatements) insertEvent(
+	ctx context.Context, txn *sql.Tx,
+	event *gomatrixserverlib.Event, addState, removeState []string,
+) (streamPos int64, err error) {
+	stmt := common.TxStmt(txn, s.insertEventStmt)
+	err = stmt.QueryRowContext(
+		ctx,
+		event.RoomID(),
+		event.EventID(),
+		event.JSON(),
+		pq.StringArray(addState),
+		pq.StringArray(removeState),
 	).Scan(&streamPos)
 	return
 }
 
 // RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
 func (s *outputRoomEventsStatements) selectRecentEvents(
-	_ *sql.Tx, roomID string, fromPos, toPos types.StreamPosition, limit int,
+	ctx context.Context, txn *sql.Tx,
+	roomID string, fromPos, toPos types.StreamPosition, limit int,
 ) ([]streamEvent, error) {
-	rows, err := s.selectRecentEventsStmt.Query(roomID, fromPos, toPos, limit)
+	stmt := common.TxStmt(txn, s.selectRecentEventsStmt)
+	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -205,8 +222,11 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
 // from the database.
-func (s *outputRoomEventsStatements) selectEvents(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
-	rows, err := common.TxStmt(txn, s.selectEventsStmt).Query(pq.StringArray(eventIDs))
+func (s *outputRoomEventsStatements) selectEvents(
+	ctx context.Context, txn *sql.Tx, eventIDs []string,
+) ([]streamEvent, error) {
+	stmt := common.TxStmt(txn, s.selectEventsStmt)
+	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}

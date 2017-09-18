@@ -108,9 +108,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (*types.Response, error) {
 	// TODO: handle ignored users
 	if req.since == types.StreamPosition(0) {
-		return rp.db.CompleteSync(req.userID, req.limit)
+		return rp.db.CompleteSync(req.ctx, req.userID, req.limit)
 	}
-	return rp.db.IncrementalSync(req.userID, req.since, currentPos, req.limit)
+	return rp.db.IncrementalSync(req.ctx, req.userID, req.since, currentPos, req.limit)
 }
 
 func (rp *RequestPool) appendAccountData(
@@ -145,7 +145,7 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(userID, req.since, currentPos)
+	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, req.since, currentPos)
 	if err != nil {
 		return nil, err
 	}
