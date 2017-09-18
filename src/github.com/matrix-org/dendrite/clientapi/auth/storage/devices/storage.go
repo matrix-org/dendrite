@@ -15,6 +15,7 @@
 package devices
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -44,8 +45,10 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 
 // GetDeviceByAccessToken returns the device matching the given access token.
 // Returns sql.ErrNoRows if no matching device was found.
-func (d *Database) GetDeviceByAccessToken(token string) (*authtypes.Device, error) {
-	return d.devices.selectDeviceByToken(token)
+func (d *Database) GetDeviceByAccessToken(
+	ctx context.Context, token string,
+) (*authtypes.Device, error) {
+	return d.devices.selectDeviceByToken(ctx, token)
 }
 
 // CreateDevice makes a new device associated with the given user ID localpart.
@@ -53,15 +56,17 @@ func (d *Database) GetDeviceByAccessToken(token string) (*authtypes.Device, erro
 // and replaced with the given accessToken. If the given accessToken is already in use for another device,
 // an error will be returned.
 // Returns the device on success.
-func (d *Database) CreateDevice(localpart, deviceID, accessToken string) (dev *authtypes.Device, returnErr error) {
+func (d *Database) CreateDevice(
+	ctx context.Context, localpart, deviceID, accessToken string,
+) (dev *authtypes.Device, returnErr error) {
 	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
 		// Revoke existing token for this device
-		if err = d.devices.deleteDevice(txn, deviceID, localpart); err != nil {
+		if err = d.devices.deleteDevice(ctx, txn, deviceID, localpart); err != nil {
 			return err
 		}
 
-		dev, err = d.devices.insertDevice(txn, deviceID, localpart, accessToken)
+		dev, err = d.devices.insertDevice(ctx, txn, deviceID, localpart, accessToken)
 		if err != nil {
 			return err
 		}
@@ -74,9 +79,11 @@ func (d *Database) CreateDevice(localpart, deviceID, accessToken string) (dev *a
 // matching with the given device ID and user ID localpart
 // If the device doesn't exist, it will not return an error
 // If something went wrong during the deletion, it will return the SQL error
-func (d *Database) RemoveDevice(deviceID string, localpart string) error {
+func (d *Database) RemoveDevice(
+	ctx context.Context, deviceID, localpart string,
+) error {
 	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if err := d.devices.deleteDevice(txn, deviceID, localpart); err != sql.ErrNoRows {
+		if err := d.devices.deleteDevice(ctx, txn, deviceID, localpart); err != sql.ErrNoRows {
 			return err
 		}
 		return nil

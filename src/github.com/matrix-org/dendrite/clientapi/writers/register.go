@@ -135,9 +135,7 @@ func Register(req *http.Request, accountDB *accounts.Database, deviceDB *devices
 	switch r.Auth.Type {
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(
-			req.Context(), accountDB, deviceDB, r.Username, r.Password,
-		)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password)
 	default:
 		return util.JSONResponse{
 			Code: 501,
@@ -182,7 +180,7 @@ func completeRegistration(
 	}
 
 	// // TODO: Use the device ID in the request.
-	dev, err := deviceDB.CreateDevice(username, auth.UnknownDeviceID, token)
+	dev, err := deviceDB.CreateDevice(ctx, username, auth.UnknownDeviceID, token)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 500,

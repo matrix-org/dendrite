@@ -15,9 +15,12 @@
 package devices
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -84,27 +87,36 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 // insertDevice creates a new device. Returns an error if any device with the same access token already exists.
 // Returns an error if the user already has a device with the given device ID.
 // Returns the device on success.
-func (s *devicesStatements) insertDevice(txn *sql.Tx, id, localpart, accessToken string) (dev *authtypes.Device, err error) {
+func (s *devicesStatements) insertDevice(
+	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
+) (*authtypes.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
-	if _, err = txn.Stmt(s.insertDeviceStmt).Exec(id, localpart, accessToken, createdTimeMS); err == nil {
-		dev = &authtypes.Device{
-			ID:          id,
-			UserID:      makeUserID(localpart, s.serverName),
-			AccessToken: accessToken,
-		}
+	stmt := common.TxStmt(txn, s.insertDeviceStmt)
+	if _, err := stmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS); err != nil {
+		return nil, err
 	}
-	return
+	return &authtypes.Device{
+		ID:          id,
+		UserID:      makeUserID(localpart, s.serverName),
+		AccessToken: accessToken,
+	}, nil
 }
 
-func (s *devicesStatements) deleteDevice(txn *sql.Tx, id, localpart string) error {
-	_, err := txn.Stmt(s.deleteDeviceStmt).Exec(id, localpart)
+func (s *devicesStatements) deleteDevice(
+	ctx context.Context, txn *sql.Tx, id, localpart string,
+) error {
+	stmt := common.TxStmt(txn, s.deleteDeviceStmt)
+	_, err := stmt.ExecContext(ctx, id, localpart)
 	return err
 }
 
-func (s *devicesStatements) selectDeviceByToken(accessToken string) (*authtypes.Device, error) {
+func (s *devicesStatements) selectDeviceByToken(
+	ctx context.Context, accessToken string,
+) (*authtypes.Device, error) {
 	var dev authtypes.Device
 	var localpart string
-	err := s.selectDeviceByTokenStmt.QueryRow(accessToken).Scan(&dev.ID, &localpart)
+	stmt := s.selectDeviceByTokenStmt
+	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.ID, &localpart)
 	if err == nil {
 		dev.UserID = makeUserID(localpart, s.serverName)
 		dev.AccessToken = accessToken
