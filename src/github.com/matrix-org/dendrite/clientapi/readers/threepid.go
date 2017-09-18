@@ -49,7 +49,7 @@ func RequestEmailToken(req *http.Request, accountDB *accounts.Database, cfg conf
 	var err error
 
 	// Check if the 3PID is already in use locally
-	localpart, err := accountDB.GetLocalpartForThreePID(body.Email, "email")
+	localpart, err := accountDB.GetLocalpartForThreePID(req.Context(), body.Email, "email")
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -64,7 +64,7 @@ func RequestEmailToken(req *http.Request, accountDB *accounts.Database, cfg conf
 		}
 	}
 
-	resp.SID, err = threepid.CreateSession(body, cfg)
+	resp.SID, err = threepid.CreateSession(req.Context(), body, cfg)
 	if err == threepid.ErrNotTrusted {
 		return util.JSONResponse{
 			Code: 400,
@@ -91,7 +91,7 @@ func CheckAndSave3PIDAssociation(
 	}
 
 	// Check if the association has been validated
-	verified, address, medium, err := threepid.CheckAssociation(body.Creds, cfg)
+	verified, address, medium, err := threepid.CheckAssociation(req.Context(), body.Creds, cfg)
 	if err == threepid.ErrNotTrusted {
 		return util.JSONResponse{
 			Code: 400,
@@ -130,7 +130,7 @@ func CheckAndSave3PIDAssociation(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err = accountDB.SaveThreePIDAssociation(address, localpart, medium); err != nil {
+	if err = accountDB.SaveThreePIDAssociation(req.Context(), address, localpart, medium); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -149,7 +149,7 @@ func GetAssociated3PIDs(
 		return httputil.LogThenError(req, err)
 	}
 
-	threepids, err := accountDB.GetThreePIDsForLocalpart(localpart)
+	threepids, err := accountDB.GetThreePIDsForLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -167,7 +167,7 @@ func Forget3PID(req *http.Request, accountDB *accounts.Database) util.JSONRespon
 		return *reqErr
 	}
 
-	if err := accountDB.RemoveThreePIDAssociation(body.Address, body.Medium); err != nil {
+	if err := accountDB.RemoveThreePIDAssociation(req.Context(), body.Address, body.Medium); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

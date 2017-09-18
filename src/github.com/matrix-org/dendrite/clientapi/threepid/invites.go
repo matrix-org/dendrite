@@ -102,7 +102,7 @@ func CheckAndProcessInvite(
 		return
 	}
 
-	lookupRes, storeInviteRes, err := queryIDServer(db, cfg, device, body, roomID)
+	lookupRes, storeInviteRes, err := queryIDServer(ctx, db, cfg, device, body, roomID)
 	if err != nil {
 		return
 	}
@@ -134,6 +134,7 @@ func CheckAndProcessInvite(
 // Returns a representation of the response for both cases.
 // Returns an error if a check or a request failed.
 func queryIDServer(
+	ctx context.Context,
 	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
 	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
@@ -142,7 +143,7 @@ func queryIDServer(
 	}
 
 	// Lookup the 3PID
-	lookupRes, err = queryIDServerLookup(body)
+	lookupRes, err = queryIDServerLookup(ctx, body)
 	if err != nil {
 		return
 	}
@@ -150,7 +151,7 @@ func queryIDServer(
 	if lookupRes.MXID == "" {
 		// No Matrix ID matches with the given 3PID, ask the server to store the
 		// invite and return a token
-		storeInviteRes, err = queryIDServerStoreInvite(db, cfg, device, body, roomID)
+		storeInviteRes, err = queryIDServerStoreInvite(ctx, db, cfg, device, body, roomID)
 		return
 	}
 
@@ -161,11 +162,11 @@ func queryIDServer(
 	if lookupRes.NotBefore > now || now > lookupRes.NotAfter {
 		// If the current timestamp isn't in the time frame in which the association
 		// is known to be valid, re-run the query
-		return queryIDServer(db, cfg, device, body, roomID)
+		return queryIDServer(ctx, db, cfg, device, body, roomID)
 	}
 
 	// Check the request signatures and send an error if one isn't valid
-	if err = checkIDServerSignatures(body, lookupRes); err != nil {
+	if err = checkIDServerSignatures(ctx, body, lookupRes); err != nil {
 		return
 	}
 
@@ -175,10 +176,14 @@ func queryIDServer(
 // queryIDServerLookup sends a response to the identity server on /_matrix/identity/api/v1/lookup
 // and returns the response as a structure.
 // Returns an error if the request failed to send or if the response couldn't be parsed.
-func queryIDServerLookup(body *MembershipRequest) (*idServerLookupResponse, error) {
+func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServerLookupResponse, error) {
 	address := url.QueryEscape(body.Address)
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/lookup?medium=%s&address=%s", body.IDServer, body.Medium, address)
-	resp, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -198,6 +203,7 @@ func queryIDServerLookup(body *MembershipRequest) (*idServerLookupResponse, erro
 // and returns the response as a structure.
 // Returns an error if the request failed to send or if the response couldn't be parsed.
 func queryIDServerStoreInvite(
+	ctx context.Context,
 	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
@@ -209,7 +215,7 @@ func queryIDServerStoreInvite(
 
 	var profile *authtypes.Profile
 	if serverName == cfg.Matrix.ServerName {
-		profile, err = db.GetProfileByLocalpart(localpart)
+		profile, err = db.GetProfileByLocalpart(ctx, localpart)
 		if err != nil {
 			return nil, err
 		}
@@ -239,7 +245,7 @@ func queryIDServerStoreInvite(
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := client.Do(req)
+	resp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -259,9 +265,13 @@ func queryIDServerStoreInvite(
 // We assume that the ID server is trusted at this point.
 // Returns an error if the request couldn't be sent, if its body couldn't be parsed
 // or if the key couldn't be decoded from base64.
-func queryIDServerPubKey(idServerName string, keyID string) ([]byte, error) {
+func queryIDServerPubKey(ctx context.Context, idServerName string, keyID string) ([]byte, error) {
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/pubkey/%s", idServerName, keyID)
-	resp, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +296,9 @@ func queryIDServerPubKey(idServerName string, keyID string) ([]byte, error) {
 // We assume that the ID server is trusted at this point.
 // Returns nil if all the verifications succeeded.
 // Returns an error if something failed in the process.
-func checkIDServerSignatures(body *MembershipRequest, res *idServerLookupResponse) error {
+func checkIDServerSignatures(
+	ctx context.Context, body *MembershipRequest, res *idServerLookupResponse,
+) error {
 	// Mashall the body so we can give it to VerifyJSON
 	marshalledBody, err := json.Marshal(*res)
 	if err != nil {
@@ -299,7 +311,7 @@ func checkIDServerSignatures(body *MembershipRequest, res *idServerLookupRespons
 	}
 
 	for keyID := range signatures {
-		pubKey, err := queryIDServerPubKey(body.IDServer, keyID)
+		pubKey, err := queryIDServerPubKey(ctx, body.IDServer, keyID)
 		if err != nil {
 			return err
 		}

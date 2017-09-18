@@ -79,7 +79,7 @@ func Login(
 
 		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
 
-		acc, err := accountDB.GetAccountByPassword(r.User, r.Password)
+		acc, err := accountDB.GetAccountByPassword(req.Context(), r.User, r.Password)
 		if err != nil {
 			// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 			// but that would leak the existence of the user.

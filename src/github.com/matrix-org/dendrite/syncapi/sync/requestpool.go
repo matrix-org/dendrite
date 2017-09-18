@@ -128,7 +128,7 @@ func (rp *RequestPool) appendAccountData(
 		// already been sent. Instead, we send the whole batch.
 		var global []gomatrixserverlib.ClientEvent
 		var rooms map[string][]gomatrixserverlib.ClientEvent
-		global, rooms, err = rp.accountDB.GetAccountData(localpart)
+		global, rooms, err = rp.accountDB.GetAccountData(req.ctx, localpart)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +159,9 @@ func (rp *RequestPool) appendAccountData(
 		events := []gomatrixserverlib.ClientEvent{}
 		// Request the missing data from the database
 		for _, dataType := range dataTypes {
-			evs, err := rp.accountDB.GetAccountDataByType(localpart, roomID, dataType)
+			evs, err := rp.accountDB.GetAccountDataByType(
+				req.ctx, localpart, roomID, dataType,
+			)
 			if err != nil {
 				return nil, err
 			}

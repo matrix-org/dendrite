@@ -60,7 +60,7 @@ func GetProfile(
 		return httputil.LogThenError(req, err)
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -83,7 +83,7 @@ func GetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -127,16 +127,16 @@ func SetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
-	oldProfile, err := accountDB.GetProfileByLocalpart(localpart)
+	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err = accountDB.SetAvatarURL(localpart, r.AvatarURL); err != nil {
+	if err = accountDB.SetAvatarURL(req.Context(), localpart, r.AvatarURL); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	memberships, err := accountDB.GetMembershipsByLocalpart(localpart)
+	memberships, err := accountDB.GetMembershipsByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -175,7 +175,7 @@ func GetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -219,16 +219,16 @@ func SetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
-	oldProfile, err := accountDB.GetProfileByLocalpart(localpart)
+	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if err = accountDB.SetDisplayName(localpart, r.DisplayName); err != nil {
+	if err = accountDB.SetDisplayName(req.Context(), localpart, r.DisplayName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	memberships, err := accountDB.GetMembershipsByLocalpart(localpart)
+	memberships, err := accountDB.GetMembershipsByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

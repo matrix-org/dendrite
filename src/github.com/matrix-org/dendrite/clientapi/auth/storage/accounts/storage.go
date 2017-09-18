@@ -15,6 +15,7 @@
 package accounts
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 
@@ -74,46 +75,56 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
-func (d *Database) GetAccountByPassword(localpart, plaintextPassword string) (*authtypes.Account, error) {
-	hash, err := d.accounts.selectPasswordHash(localpart)
+func (d *Database) GetAccountByPassword(
+	ctx context.Context, localpart, plaintextPassword string,
+) (*authtypes.Account, error) {
+	hash, err := d.accounts.selectPasswordHash(ctx, localpart)
 	if err != nil {
 		return nil, err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(plaintextPassword)); err != nil {
 		return nil, err
 	}
-	return d.accounts.selectAccountByLocalpart(localpart)
+	return d.accounts.selectAccountByLocalpart(ctx, localpart)
 }
 
 // GetProfileByLocalpart returns the profile associated with the given localpart.
 // Returns sql.ErrNoRows if no profile exists which matches the given localpart.
-func (d *Database) GetProfileByLocalpart(localpart string) (*authtypes.Profile, error) {
-	return d.profiles.selectProfileByLocalpart(localpart)
+func (d *Database) GetProfileByLocalpart(
+	ctx context.Context, localpart string,
+) (*authtypes.Profile, error) {
+	return d.profiles.selectProfileByLocalpart(ctx, localpart)
 }
 
 // SetAvatarURL updates the avatar URL of the profile associated with the given
 // localpart. Returns an error if something went wrong with the SQL query
-func (d *Database) SetAvatarURL(localpart string, avatarURL string) error {
-	return d.profiles.setAvatarURL(localpart, avatarURL)
+func (d *Database) SetAvatarURL(
+	ctx context.Context, localpart string, avatarURL string,
+) error {
+	return d.profiles.setAvatarURL(ctx, localpart, avatarURL)
 }
 
 // SetDisplayName updates the display name of the profile associated with the given
 // localpart. Returns an error if something went wrong with the SQL query
-func (d *Database) SetDisplayName(localpart string, displayName string) error {
-	return d.profiles.setDisplayName(localpart, displayName)
+func (d *Database) SetDisplayName(
+	ctx context.Context, localpart string, displayName string,
+) error {
+	return d.profiles.setDisplayName(ctx, localpart, displayName)
 }
 
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
 // for this account. If no password is supplied, the account will be a passwordless account.
-func (d *Database) CreateAccount(localpart, plaintextPassword string) (*authtypes.Account, error) {
+func (d *Database) CreateAccount(
+	ctx context.Context, localpart, plaintextPassword string,
+) (*authtypes.Account, error) {
 	hash, err := hashPassword(plaintextPassword)
 	if err != nil {
 		return nil, err
 	}
-	if err := d.profiles.insertProfile(localpart); err != nil {
+	if err := d.profiles.insertProfile(ctx, localpart); err != nil {
 		return nil, err
 	}
-	return d.accounts.insertAccount(localpart, hash)
+	return d.accounts.insertAccount(ctx, localpart, hash)
 }
 
 // PartitionOffsets implements common.PartitionStorer
@@ -131,15 +142,19 @@ func (d *Database) SetPartitionOffset(topic string, partition int32, offset int6
 // is still in the room.
 // If a membership already exists between the user and the room, or of the
 // insert fails, returns the SQL error
-func (d *Database) SaveMembership(localpart string, roomID string, eventID string, txn *sql.Tx) error {
-	return d.memberships.insertMembership(localpart, roomID, eventID, txn)
+func (d *Database) saveMembership(
+	ctx context.Context, txn *sql.Tx, localpart, roomID, eventID string,
+) error {
+	return d.memberships.insertMembership(ctx, txn, localpart, roomID, eventID)
 }
 
 // removeMembershipsByEventIDs removes the memberships of which the `join` membership
 // event ID is included in a given array of events IDs
 // If the removal fails, or if there is no membership to remove, returns an error
-func (d *Database) removeMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) error {
-	return d.memberships.deleteMembershipsByEventIDs(eventIDs, txn)
+func (d *Database) removeMembershipsByEventIDs(
+	ctx context.Context, txn *sql.Tx, eventIDs []string,
+) error {
+	return d.memberships.deleteMembershipsByEventIDs(ctx, txn, eventIDs)
 }
 
 // UpdateMemberships adds the "join" membership events included in a given state
@@ -147,14 +162,16 @@ func (d *Database) removeMembershipsByEventIDs(eventIDs []string, txn *sql.Tx) e
 // IDs. All of the process is run in a transaction, which commits only once/if every
 // insertion and deletion has been successfully processed.
 // Returns a SQL error if there was an issue with any part of the process
-func (d *Database) UpdateMemberships(eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error {
+func (d *Database) UpdateMemberships(
+	ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string,
+) error {
 	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if err := d.removeMembershipsByEventIDs(idsToRemove, txn); err != nil {
+		if err := d.removeMembershipsByEventIDs(ctx, txn, idsToRemove); err != nil {
 			return err
 		}
 
 		for _, event := range eventsToAdd {
-			if err := d.newMembership(event, txn); err != nil {
+			if err := d.newMembership(ctx, txn, event); err != nil {
 				return err
 			}
 		}
@@ -167,8 +184,10 @@ func (d *Database) UpdateMemberships(eventsToAdd []gomatrixserverlib.Event, idsT
 // the rooms a user matching a given localpart is a member of
 // If no membership match the given localpart, returns an empty array
 // If there was an issue during the retrieval, returns the SQL error
-func (d *Database) GetMembershipsByLocalpart(localpart string) (memberships []authtypes.Membership, err error) {
-	return d.memberships.selectMembershipsByLocalpart(localpart)
+func (d *Database) GetMembershipsByLocalpart(
+	ctx context.Context, localpart string,
+) (memberships []authtypes.Membership, err error) {
+	return d.memberships.selectMembershipsByLocalpart(ctx, localpart)
 }
 
 // newMembership will save a new membership in the database, with a flag on whether
@@ -178,7 +197,9 @@ func (d *Database) GetMembershipsByLocalpart(localpart string) (memberships []au
 // values, does nothing.
 // If the event isn't a "join" membership event, does nothing
 // If an error occurred, returns it
-func (d *Database) newMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error {
+func (d *Database) newMembership(
+	ctx context.Context, txn *sql.Tx, ev gomatrixserverlib.Event,
+) error {
 	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 		localpart, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
 		if err != nil {
@@ -199,7 +220,7 @@ func (d *Database) newMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error 
 
 		// Only "join" membership events can be considered as new memberships
 		if membership == "join" {
-			if err := d.SaveMembership(localpart, roomID, eventID, txn); err != nil {
+			if err := d.saveMembership(ctx, txn, localpart, roomID, eventID); err != nil {
 				return err
 			}
 		}
@@ -212,27 +233,33 @@ func (d *Database) newMembership(ev gomatrixserverlib.Event, txn *sql.Tx) error 
 // If an account data already exists for a given set (user, room, data type), it will
 // update the corresponding row with the new content
 // Returns a SQL error if there was an issue with the insertion/update
-func (d *Database) SaveAccountData(localpart string, roomID string, dataType string, content string) error {
-	return d.accountDatas.insertAccountData(localpart, roomID, dataType, content)
+func (d *Database) SaveAccountData(
+	ctx context.Context, localpart, roomID, dataType, content string,
+) error {
+	return d.accountDatas.insertAccountData(ctx, localpart, roomID, dataType, content)
 }
 
 // GetAccountData returns account data related to a given localpart
 // If no account data could be found, returns an empty arrays
 // Returns an error if there was an issue with the retrieval
-func (d *Database) GetAccountData(localpart string) (
+func (d *Database) GetAccountData(ctx context.Context, localpart string) (
 	global []gomatrixserverlib.ClientEvent,
 	rooms map[string][]gomatrixserverlib.ClientEvent,
 	err error,
 ) {
-	return d.accountDatas.selectAccountData(localpart)
+	return d.accountDatas.selectAccountData(ctx, localpart)
 }
 
 // GetAccountDataByType returns account data matching a given
 // localpart, room ID and type.
 // If no account data could be found, returns an empty array
 // Returns an error if there was an issue with the retrieval
-func (d *Database) GetAccountDataByType(localpart string, roomID string, dataType string) (data []gomatrixserverlib.ClientEvent, err error) {
-	return d.accountDatas.selectAccountDataByType(localpart, roomID, dataType)
+func (d *Database) GetAccountDataByType(
+	ctx context.Context, localpart, roomID, dataType string,
+) (data []gomatrixserverlib.ClientEvent, err error) {
+	return d.accountDatas.selectAccountDataByType(
+		ctx, localpart, roomID, dataType,
+	)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {
@@ -248,9 +275,13 @@ var Err3PIDInUse = errors.New("This third-party identifier is already in use")
 // and a local Matrix user (identified by the user's ID's local part).
 // If the third-party identifier is already part of an association, returns Err3PIDInUse.
 // Returns an error if there was a problem talking to the database.
-func (d *Database) SaveThreePIDAssociation(threepid string, localpart string, medium string) (err error) {
+func (d *Database) SaveThreePIDAssociation(
+	ctx context.Context, threepid, localpart, medium string,
+) (err error) {
 	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		user, err := d.threepids.selectLocalpartForThreePID(txn, threepid, medium)
+		user, err := d.threepids.selectLocalpartForThreePID(
+			ctx, txn, threepid, medium,
+		)
 		if err != nil {
 			return err
 		}
@@ -259,7 +290,7 @@ func (d *Database) SaveThreePIDAssociation(threepid string, localpart string, me
 			return Err3PIDInUse
 		}
 
-		return d.threepids.insertThreePID(txn, threepid, medium, localpart)
+		return d.threepids.insertThreePID(ctx, txn, threepid, medium, localpart)
 	})
 }
 
@@ -267,8 +298,10 @@ func (d *Database) SaveThreePIDAssociation(threepid string, localpart string, me
 // identifier.
 // If no association exists involving this third-party identifier, returns nothing.
 // If there was a problem talking to the database, returns an error.
-func (d *Database) RemoveThreePIDAssociation(threepid string, medium string) (err error) {
-	return d.threepids.deleteThreePID(threepid, medium)
+func (d *Database) RemoveThreePIDAssociation(
+	ctx context.Context, threepid string, medium string,
+) (err error) {
+	return d.threepids.deleteThreePID(ctx, threepid, medium)
 }
 
 // GetLocalpartForThreePID looks up the localpart associated with a given third-party
@@ -276,14 +309,18 @@ func (d *Database) RemoveThreePIDAssociation(threepid string, medium string) (er
 // If no association involves the given third-party idenfitier, returns an empty
 // string.
 // Returns an error if there was a problem talking to the database.
-func (d *Database) GetLocalpartForThreePID(threepid string, medium string) (localpart string, err error) {
-	return d.threepids.selectLocalpartForThreePID(nil, threepid, medium)
+func (d *Database) GetLocalpartForThreePID(
+	ctx context.Context, threepid string, medium string,
+) (localpart string, err error) {
+	return d.threepids.selectLocalpartForThreePID(ctx, nil, threepid, medium)
 }
 
 // GetThreePIDsForLocalpart looks up the third-party identifiers associated with
 // a given local user.
 // If no association is known for this user, returns an empty slice.
 // Returns an error if there was an issue talking to the database.
-func (d *Database) GetThreePIDsForLocalpart(localpart string) (threepids []authtypes.ThreePID, err error) {
-	return d.threepids.selectThreePIDsForLocalpart(localpart)
+func (d *Database) GetThreePIDsForLocalpart(
+	ctx context.Context, localpart string,
+) (threepids []authtypes.ThreePID, err error) {
+	return d.threepids.selectThreePIDsForLocalpart(ctx, localpart)
 }

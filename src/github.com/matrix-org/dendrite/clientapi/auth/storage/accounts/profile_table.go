@@ -15,6 +15,7 @@
 package accounts
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -71,23 +72,36 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *profilesStatements) insertProfile(localpart string) (err error) {
-	_, err = s.insertProfileStmt.Exec(localpart, "", "")
+func (s *profilesStatements) insertProfile(
+	ctx context.Context, localpart string,
+) (err error) {
+	_, err = s.insertProfileStmt.ExecContext(ctx, localpart, "", "")
 	return
 }
 
-func (s *profilesStatements) selectProfileByLocalpart(localpart string) (*authtypes.Profile, error) {
+func (s *profilesStatements) selectProfileByLocalpart(
+	ctx context.Context, localpart string,
+) (*authtypes.Profile, error) {
 	var profile authtypes.Profile
-	err := s.selectProfileByLocalpartStmt.QueryRow(localpart).Scan(&profile.Localpart, &profile.DisplayName, &profile.AvatarURL)
-	return &profile, err
+	err := s.selectProfileByLocalpartStmt.QueryRowContext(ctx, localpart).Scan(
+		&profile.Localpart, &profile.DisplayName, &profile.AvatarURL,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &profile, nil
 }
 
-func (s *profilesStatements) setAvatarURL(localpart string, avatarURL string) (err error) {
-	_, err = s.setAvatarURLStmt.Exec(avatarURL, localpart)
+func (s *profilesStatements) setAvatarURL(
+	ctx context.Context, localpart string, avatarURL string,
+) (err error) {
+	_, err = s.setAvatarURLStmt.ExecContext(ctx, avatarURL, localpart)
 	return
 }
 
-func (s *profilesStatements) setDisplayName(localpart string, displayName string) (err error) {
-	_, err = s.setDisplayNameStmt.Exec(displayName, localpart)
+func (s *profilesStatements) setDisplayName(
+	ctx context.Context, localpart string, displayName string,
+) (err error) {
+	_, err = s.setDisplayNameStmt.ExecContext(ctx, displayName, localpart)
 	return
 }

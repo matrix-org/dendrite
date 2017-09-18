@@ -127,7 +127,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		return httputil.LogThenError(req, err)
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

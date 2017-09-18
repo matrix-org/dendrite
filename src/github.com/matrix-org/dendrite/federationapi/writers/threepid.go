@@ -191,7 +191,7 @@ func createInviteFrom3PIDInvite(
 		StateKey: &inv.MXID,
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(localpart)
+	profile, err := accountDB.GetProfileByLocalpart(ctx, localpart)
 	if err != nil {
 		return nil, err
 	}

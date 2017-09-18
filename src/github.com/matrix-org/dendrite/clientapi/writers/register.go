@@ -1,6 +1,7 @@
 package writers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -134,7 +135,9 @@ func Register(req *http.Request, accountDB *accounts.Database, deviceDB *devices
 	switch r.Auth.Type {
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(accountDB, deviceDB, r.Username, r.Password)
+		return completeRegistration(
+			req.Context(), accountDB, deviceDB, r.Username, r.Password,
+		)
 	default:
 		return util.JSONResponse{
 			Code: 501,
@@ -143,7 +146,12 @@ func Register(req *http.Request, accountDB *accounts.Database, deviceDB *devices
 	}
 }
 
-func completeRegistration(accountDB *accounts.Database, deviceDB *devices.Database, username, password string) util.JSONResponse {
+func completeRegistration(
+	ctx context.Context,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+	username, password string,
+) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
 			Code: 400,
@@ -157,7 +165,7 @@ func completeRegistration(accountDB *accounts.Database, deviceDB *devices.Databa
 		}
 	}
 
-	acc, err := accountDB.CreateAccount(username, password)
+	acc, err := accountDB.CreateAccount(ctx, username, password)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 500,

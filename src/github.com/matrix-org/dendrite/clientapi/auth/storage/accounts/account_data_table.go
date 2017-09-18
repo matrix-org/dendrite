@@ -15,6 +15,7 @@
 package accounts
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -70,17 +71,22 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *accountDataStatements) insertAccountData(localpart string, roomID string, dataType string, content string) (err error) {
-	_, err = s.insertAccountDataStmt.Exec(localpart, roomID, dataType, content)
+func (s *accountDataStatements) insertAccountData(
+	ctx context.Context, localpart, roomID, dataType, content string,
+) (err error) {
+	stmt := s.insertAccountDataStmt
+	_, err = stmt.ExecContext(ctx, localpart, roomID, dataType, content)
 	return
 }
 
-func (s *accountDataStatements) selectAccountData(localpart string) (
+func (s *accountDataStatements) selectAccountData(
+	ctx context.Context, localpart string,
+) (
 	global []gomatrixserverlib.ClientEvent,
 	rooms map[string][]gomatrixserverlib.ClientEvent,
 	err error,
 ) {
-	rows, err := s.selectAccountDataStmt.Query(localpart)
+	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart)
 	if err != nil {
 		return
 	}
@@ -93,7 +99,7 @@ func (s *accountDataStatements) selectAccountData(localpart string) (
 		var dataType string
 		var content []byte
 
-		if err = rows.Scan(&roomID, &dataType, &content); err != nil && err != sql.ErrNoRows {
+		if err = rows.Scan(&roomID, &dataType, &content); err != nil {
 			return
 		}
 
@@ -113,11 +119,12 @@ func (s *accountDataStatements) selectAccountData(localpart string) (
 }
 
 func (s *accountDataStatements) selectAccountDataByType(
-	localpart string, roomID string, dataType string,
+	ctx context.Context, localpart, roomID, dataType string,
 ) (data []gomatrixserverlib.ClientEvent, err error) {
 	data = []gomatrixserverlib.ClientEvent{}
 
-	rows, err := s.selectAccountDataByTypeStmt.Query(localpart, roomID, dataType)
+	stmt := s.selectAccountDataByTypeStmt
+	rows, err := stmt.QueryContext(ctx, localpart, roomID, dataType)
 	if err != nil {
 		return
 	}
