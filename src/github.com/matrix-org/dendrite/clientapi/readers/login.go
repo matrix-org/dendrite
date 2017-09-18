@@ -98,7 +98,9 @@ func Login(
 		}
 
 		// TODO: Use the device ID in the request
-		dev, err := deviceDB.CreateDevice(acc.Localpart, auth.UnknownDeviceID, token)
+		dev, err := deviceDB.CreateDevice(
+			req.Context(), acc.Localpart, auth.UnknownDeviceID, token,
+		)
 		if err != nil {
 			return util.JSONResponse{
 				Code: 500,

@@ -86,7 +86,9 @@ func main() {
 		accessToken = &t
 	}
 
-	device, err := deviceDB.CreateDevice(*username, "create-account-script", *accessToken)
+	device, err := deviceDB.CreateDevice(
+		context.Background(), *username, "create-account-script", *accessToken,
+	)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

@@ -16,6 +16,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
@@ -42,7 +43,7 @@ var tokenByteLength = 32
 // DeviceDatabase represents a device database.
 type DeviceDatabase interface {
 	// Look up the device matching the given access token.
-	GetDeviceByAccessToken(token string) (*authtypes.Device, error)
+	GetDeviceByAccessToken(ctx context.Context, token string) (*authtypes.Device, error)
 }
 
 // VerifyAccessToken verifies that an access token was supplied in the given HTTP request
@@ -57,7 +58,7 @@ func VerifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *auth
 		}
 		return
 	}
-	device, err = deviceDB.GetDeviceByAccessToken(token)
+	device, err = deviceDB.GetDeviceByAccessToken(req.Context(), token)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			resErr = &util.JSONResponse{

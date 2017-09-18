@@ -41,7 +41,7 @@ func Logout(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := deviceDB.RemoveDevice(device.ID, localpart); err != nil {
+	if err := deviceDB.RemoveDevice(req.Context(), device.ID, localpart); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
