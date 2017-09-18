@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -71,14 +72,18 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *accountDataStatements) insertAccountData(
-	pos types.StreamPosition, userID string, roomID string, dataType string,
+	ctx context.Context,
+	pos types.StreamPosition,
+	userID, roomID, dataType string,
 ) (err error) {
-	_, err = s.insertAccountDataStmt.Exec(pos, userID, roomID, dataType)
+	_, err = s.insertAccountDataStmt.ExecContext(ctx, pos, userID, roomID, dataType)
 	return
 }
 
 func (s *accountDataStatements) selectAccountDataInRange(
-	userID string, oldPos types.StreamPosition, newPos types.StreamPosition,
+	ctx context.Context,
+	userID string,
+	oldPos, newPos types.StreamPosition,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
@@ -89,7 +94,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 		oldPos--
 	}
 
-	rows, err := s.selectAccountDataInRangeStmt.Query(userID, oldPos, newPos)
+	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos)
 	if err != nil {
 		return
 	}

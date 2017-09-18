@@ -15,6 +15,7 @@
 package consumers
 
 import (
+	"context"
 	"encoding/json"
 
 	log "github.com/Sirupsen/logrus"
@@ -77,7 +78,9 @@ func (s *OutputClientData) onMessage(msg *sarama.ConsumerMessage) error {
 		"room_id": output.RoomID,
 	}).Info("received data from client API server")
 
-	syncStreamPos, err := s.db.UpsertAccountData(string(msg.Key), output.RoomID, output.Type)
+	syncStreamPos, err := s.db.UpsertAccountData(
+		context.TODO(), string(msg.Key), output.RoomID, output.Type,
+	)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"type":       output.Type,

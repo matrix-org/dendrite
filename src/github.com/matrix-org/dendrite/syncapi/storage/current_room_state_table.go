@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/lib/pq"
@@ -114,8 +115,10 @@ func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
 }
 
 // JoinedMemberLists returns a map of room ID to a list of joined user IDs.
-func (s *currentRoomStateStatements) selectJoinedUsers() (map[string][]string, error) {
-	rows, err := s.selectJoinedUsersStmt.Query()
+func (s *currentRoomStateStatements) selectJoinedUsers(
+	ctx context.Context,
+) (map[string][]string, error) {
+	rows, err := s.selectJoinedUsersStmt.QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -136,8 +139,11 @@ func (s *currentRoomStateStatements) selectJoinedUsers() (map[string][]string, e
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
-func (s *currentRoomStateStatements) selectRoomIDsWithMembership(txn *sql.Tx, userID, membership string) ([]string, error) {
-	rows, err := common.TxStmt(txn, s.selectRoomIDsWithMembershipStmt).Query(userID, membership)
+func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
+	ctx context.Context, txn *sql.Tx, userID, membership string,
+) ([]string, error) {
+	stmt := common.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
+	rows, err := stmt.QueryContext(ctx, userID, membership)
 	if err != nil {
 		return nil, err
 	}
@@ -155,8 +161,11 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(txn *sql.Tx, us
 }
 
 // CurrentState returns all the current state events for the given room.
-func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID string) ([]gomatrixserverlib.Event, error) {
-	rows, err := common.TxStmt(txn, s.selectCurrentStateStmt).Query(roomID)
+func (s *currentRoomStateStatements) selectCurrentState(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) ([]gomatrixserverlib.Event, error) {
+	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
+	rows, err := stmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,22 +174,37 @@ func (s *currentRoomStateStatements) selectCurrentState(txn *sql.Tx, roomID stri
 	return rowsToEvents(rows)
 }
 
-func (s *currentRoomStateStatements) deleteRoomStateByEventID(txn *sql.Tx, eventID string) error {
-	_, err := common.TxStmt(txn, s.deleteRoomStateByEventIDStmt).Exec(eventID)
+func (s *currentRoomStateStatements) deleteRoomStateByEventID(
+	ctx context.Context, txn *sql.Tx, eventID string,
+) error {
+	stmt := common.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
+	_, err := stmt.ExecContext(ctx, eventID)
 	return err
 }
 
 func (s *currentRoomStateStatements) upsertRoomState(
-	txn *sql.Tx, event gomatrixserverlib.Event, membership *string, addedAt int64,
+	ctx context.Context, txn *sql.Tx,
+	event gomatrixserverlib.Event, membership *string, addedAt int64,
 ) error {
-	_, err := common.TxStmt(txn, s.upsertRoomStateStmt).Exec(
-		event.RoomID(), event.EventID(), event.Type(), *event.StateKey(), event.JSON(), membership, addedAt,
+	stmt := common.TxStmt(txn, s.upsertRoomStateStmt)
+	_, err := stmt.ExecContext(
+		ctx,
+		event.RoomID(),
+		event.EventID(),
+		event.Type(),
+		*event.StateKey(),
+		event.JSON(),
+		membership,
+		addedAt,
 	)
 	return err
 }
 
-func (s *currentRoomStateStatements) selectEventsWithEventIDs(txn *sql.Tx, eventIDs []string) ([]streamEvent, error) {
-	rows, err := common.TxStmt(txn, s.selectEventsWithEventIDsStmt).Query(pq.StringArray(eventIDs))
+func (s *currentRoomStateStatements) selectEventsWithEventIDs(
+	ctx context.Context, txn *sql.Tx, eventIDs []string,
+) ([]streamEvent, error) {
+	stmt := common.TxStmt(txn, s.selectEventsWithEventIDsStmt)
+	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -205,10 +229,17 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 	return result, nil
 }
 
-func (s *currentRoomStateStatements) selectStateEvent(evType string, roomID string, stateKey string) (*gomatrixserverlib.Event, error) {
+func (s *currentRoomStateStatements) selectStateEvent(
+	ctx context.Context, evType string, roomID string, stateKey string,
+) (*gomatrixserverlib.Event, error) {
+	stmt := s.selectStateEventStmt
 	var res []byte
-	if err := s.selectStateEventStmt.QueryRow(evType, roomID, stateKey).Scan(&res); err == sql.ErrNoRows {
+	err := stmt.QueryRowContext(ctx, evType, roomID, stateKey).Scan(&res)
+	if err == sql.ErrNoRows {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(res, false)
 	return &ev, err

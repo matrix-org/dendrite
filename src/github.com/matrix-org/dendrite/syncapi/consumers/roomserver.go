@@ -122,7 +122,11 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	syncStreamPos, err := s.db.WriteEvent(
-		&ev, addsStateEvents, output.NewRoomEvent.AddsStateEventIDs, output.NewRoomEvent.RemovesStateEventIDs,
+		context.TODO(),
+		&ev,
+		addsStateEvents,
+		output.NewRoomEvent.AddsStateEventIDs,
+		output.NewRoomEvent.RemovesStateEventIDs,
 	)
 
 	if err != nil {
@@ -157,7 +161,7 @@ func (s *OutputRoomEvent) lookupStateEvents(
 	// Check if this is re-adding a state events that we previously processed
 	// If we have previously received a state event it may still be in
 	// our event database.
-	result, err := s.db.Events(addsStateEventIDs)
+	result, err := s.db.Events(context.TODO(), addsStateEventIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +209,9 @@ func (s *OutputRoomEvent) updateStateEvent(event gomatrixserverlib.Event) (gomat
 		stateKey = *event.StateKey()
 	}
 
-	prevEvent, err := s.db.GetStateEvent(event.Type(), event.RoomID(), stateKey)
+	prevEvent, err := s.db.GetStateEvent(
+		context.TODO(), event.Type(), event.RoomID(), stateKey,
+	)
 	if err != nil {
 		return event, err
 	}

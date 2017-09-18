@@ -15,6 +15,7 @@
 package sync
 
 import (
+	"context"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -131,8 +132,8 @@ func (n *Notifier) WaitForEvents(req syncRequest) types.StreamPosition {
 }
 
 // Load the membership states required to notify users correctly.
-func (n *Notifier) Load(db *storage.SyncServerDatabase) error {
-	roomToUsers, err := db.AllJoinedUsersInRooms()
+func (n *Notifier) Load(ctx context.Context, db *storage.SyncServerDatabase) error {
+	roomToUsers, err := db.AllJoinedUsersInRooms(ctx)
 	if err != nil {
 		return err
 	}

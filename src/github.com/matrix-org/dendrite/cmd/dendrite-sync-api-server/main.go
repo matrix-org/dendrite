@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"net/http"
 	"os"
@@ -67,13 +68,13 @@ func main() {
 		log.Panicf("startup: failed to create account database with data source %s : %s", cfg.Database.Account, err)
 	}
 
-	pos, err := db.SyncStreamPosition()
+	pos, err := db.SyncStreamPosition(context.Background())
 	if err != nil {
 		log.Panicf("startup: failed to get latest sync stream position : %s", err)
 	}
 
 	n := sync.NewNotifier(types.StreamPosition(pos))
-	if err = n.Load(db); err != nil {
+	if err = n.Load(context.Background(), db); err != nil {
 		log.Panicf("startup: failed to set up notifier: %s", err)
 	}
 
