@@ -219,7 +219,7 @@ func (r *downloadRequest) doDownload(
 }
 
 // respondFromLocalFile reads a file from local storage and writes it to the http.ResponseWriter
-// Returns a util.JSONResponse error in case of error
+// If no file was found then returns nil, nil
 func (r *downloadRequest) respondFromLocalFile(
 	w http.ResponseWriter,
 	absBasePath config.Path,
@@ -302,6 +302,7 @@ func (r *downloadRequest) respondFromLocalFile(
 }
 
 // Note: Thumbnail generation may be ongoing asynchronously.
+// If no thumbnail was found then returns nil, nil, nil
 func (r *downloadRequest) getThumbnailFile(
 	filePath types.Path,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
@@ -405,7 +406,6 @@ func (r *downloadRequest) generateThumbnail(
 // A hash map of active remote requests to a struct containing a sync.Cond is used to only download remote files once,
 // regardless of how many download requests are received.
 // Note: The named errorResponse return variable is used in a deferred broadcast of the metadata and error response to waiting goroutines.
-// Returns a util.JSONResponse error in case of error
 func (r *downloadRequest) getRemoteFile(
 	cfg *config.Dendrite,
 	db *storage.Database,
