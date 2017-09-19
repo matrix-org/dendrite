@@ -18,14 +18,19 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 const accountDataSchema = `
+-- This sequence is shared between all the tables generated from kafka logs.
+CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
+
 -- Stores the users account data
 CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
-    -- The highest numeric ID from the output_room_events at the time of saving the data
-    id BIGINT,
+    -- An incrementing ID which denotes the position in the log that this event resides at.
+    id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
     -- ID of the user the data belongs to
     user_id TEXT NOT NULL,
     -- ID of the room the data is related to (empty string if not related to a specific room)
@@ -43,18 +48,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account
 `
 
 const insertAccountDataSQL = "" +
-	"INSERT INTO syncapi_account_data_type (id, user_id, room_id, type) VALUES ($1, $2, $3, $4)" +
+	"INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($2, $3, $4)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_account_data_unique" +
-	" DO UPDATE SET id = EXCLUDED.id"
+	" DO UPDATE SET id = EXCLUDED.id" +
+	" RETURNING id"
 
 const selectAccountDataInRangeSQL = "" +
 	"SELECT room_id, type FROM syncapi_account_data_type" +
 	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id ASC"
 
+const selectMaxAccountDataIDSQL = "" +
+	"SELECT MAX(id) FROM syncapi_account_data_type"
+
 type accountDataStatements struct {
 	insertAccountDataStmt        *sql.Stmt
 	selectAccountDataInRangeStmt *sql.Stmt
+	selectMaxAccountDataIDStmt   *sql.Stmt
 }
 
 func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
@@ -68,15 +78,17 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 	if s.selectAccountDataInRangeStmt, err = db.Prepare(selectAccountDataInRangeSQL); err != nil {
 		return
 	}
+	if s.selectMaxAccountDataIDStmt, err = db.Prepare(selectMaxAccountDataIDSQL); err != nil {
+		return
+	}
 	return
 }
 
 func (s *accountDataStatements) insertAccountData(
 	ctx context.Context,
-	pos types.StreamPosition,
 	userID, roomID, dataType string,
-) (err error) {
-	_, err = s.insertAccountDataStmt.ExecContext(ctx, pos, userID, roomID, dataType)
+) (pos int64, err error) {
+	s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
 	return
 }
 
@@ -114,5 +126,17 @@ func (s *accountDataStatements) selectAccountDataInRange(
 		}
 	}
 
+	return
+}
+
+func (s *accountDataStatements) selectMaxAccountDataID(
+	ctx context.Context, txn *sql.Tx,
+) (id int64, err error) {
+	var nullableID sql.NullInt64
+	stmt := common.TxStmt(txn, s.selectMaxAccountDataIDStmt)
+	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	if nullableID.Valid {
+		id = nullableID.Int64
+	}
 	return
 }

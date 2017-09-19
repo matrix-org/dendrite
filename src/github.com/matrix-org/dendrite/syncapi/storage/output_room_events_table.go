@@ -26,12 +26,15 @@ import (
 )
 
 const outputRoomEventsSchema = `
+-- This sequence is shared between all the tables generated from kafka logs.
+CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
+
 -- Stores output room events received from the roomserver.
 CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     -- An incrementing ID which denotes the position in the log that this event resides at.
     -- NB: 'serial' makes no guarantees to increment by 1 every time, only that it increments.
     --     This isn't a problem for us since we just want to order by this field.
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
     -- The event ID for the event
     event_id TEXT NOT NULL,
     -- The 'room_id' key for the event.
@@ -60,7 +63,7 @@ const selectRecentEventsSQL = "" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
-const selectMaxIDSQL = "" +
+const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
@@ -73,7 +76,7 @@ const selectStateInRangeSQL = "" +
 type outputRoomEventsStatements struct {
 	insertEventStmt        *sql.Stmt
 	selectEventsStmt       *sql.Stmt
-	selectMaxIDStmt        *sql.Stmt
+	selectMaxEventIDStmt   *sql.Stmt
 	selectRecentEventsStmt *sql.Stmt
 	selectStateInRangeStmt *sql.Stmt
 }
@@ -89,7 +92,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectEventsStmt, err = db.Prepare(selectEventsSQL); err != nil {
 		return
 	}
-	if s.selectMaxIDStmt, err = db.Prepare(selectMaxIDSQL); err != nil {
+	if s.selectMaxEventIDStmt, err = db.Prepare(selectMaxEventIDSQL); err != nil {
 		return
 	}
 	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
@@ -170,11 +173,11 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
 // then this function should only ever be used at startup, as it will race with inserting events if it is
 // done afterwards. If there are no inserted events, 0 is returned.
-func (s *outputRoomEventsStatements) selectMaxID(
+func (s *outputRoomEventsStatements) selectMaxEventID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := common.TxStmt(txn, s.selectMaxIDStmt)
+	stmt := common.TxStmt(txn, s.selectMaxEventIDStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
