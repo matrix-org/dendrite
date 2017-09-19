@@ -136,7 +136,7 @@ func TestOpenURL(t *testing.T) {
 	testURL("postgresql://")
 }
 
-const pgpass_file = "/tmp/pqgotest_pgpass"
+const pgpassFile = "/tmp/pqgotest_pgpass"
 
 func TestPgpass(t *testing.T) {
 	if os.Getenv("TRAVIS") != "true" {
@@ -160,11 +160,11 @@ func TestPgpass(t *testing.T) {
 		rows, err := txn.Query("SELECT USER")
 		if err != nil {
 			txn.Rollback()
-			rows.Close()
 			if expected != "fail" {
 				t.Fatalf(reason, err)
 			}
 		} else {
+			rows.Close()
 			if expected != "ok" {
 				t.Fatalf(reason, err)
 			}
@@ -172,10 +172,10 @@ func TestPgpass(t *testing.T) {
 		txn.Rollback()
 	}
 	testAssert("", "ok", "missing .pgpass, unexpected error %#v")
-	os.Setenv("PGPASSFILE", pgpass_file)
+	os.Setenv("PGPASSFILE", pgpassFile)
 	testAssert("host=/tmp", "fail", ", unexpected error %#v")
-	os.Remove(pgpass_file)
-	pgpass, err := os.OpenFile(pgpass_file, os.O_RDWR|os.O_CREATE, 0644)
+	os.Remove(pgpassFile)
+	pgpass, err := os.OpenFile(pgpassFile, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		t.Fatalf("Unexpected error writing pgpass file %#v", err)
 	}
@@ -191,7 +191,7 @@ localhost:*:*:*:pass_C
 	pgpass.Close()
 
 	assertPassword := func(extra values, expected string) {
-		o := &values{
+		o := values{
 			"host":               "localhost",
 			"sslmode":            "disable",
 			"connect_timeout":    "20",
@@ -203,17 +203,17 @@ localhost:*:*:*:pass_C
 			"datestyle":          "ISO, MDY",
 		}
 		for k, v := range extra {
-			(*o)[k] = v
+			o[k] = v
 		}
-		(&conn{}).handlePgpass(*o)
-		if o.Get("password") != expected {
-			t.Fatalf("For %v expected %s got %s", extra, expected, o.Get("password"))
+		(&conn{}).handlePgpass(o)
+		if pw := o["password"]; pw != expected {
+			t.Fatalf("For %v expected %s got %s", extra, expected, pw)
 		}
 	}
 	// wrong permissions for the pgpass file means it should be ignored
 	assertPassword(values{"host": "example.com", "user": "foo"}, "")
 	// fix the permissions and check if it has taken effect
-	os.Chmod(pgpass_file, 0600)
+	os.Chmod(pgpassFile, 0600)
 	assertPassword(values{"host": "server", "dbname": "some_db", "user": "some_user"}, "pass_A")
 	assertPassword(values{"host": "example.com", "user": "foo"}, "pass_fallback")
 	assertPassword(values{"host": "example.com", "dbname": "some_db", "user": "some_user"}, "pass_B")
@@ -221,7 +221,7 @@ localhost:*:*:*:pass_C
 	assertPassword(values{"host": "", "user": "some_user"}, "pass_C")
 	assertPassword(values{"host": "/tmp", "user": "some_user"}, "pass_C")
 	// cleanup
-	os.Remove(pgpass_file)
+	os.Remove(pgpassFile)
 	os.Setenv("PGPASSFILE", "")
 }
 
@@ -393,8 +393,8 @@ func TestEmptyQuery(t *testing.T) {
 	if _, err := res.RowsAffected(); err != errNoRowsAffected {
 		t.Fatalf("expected %s, got %v", errNoRowsAffected, err)
 	}
-	if _, err := res.LastInsertId(); err != errNoLastInsertId {
-		t.Fatalf("expected %s, got %v", errNoLastInsertId, err)
+	if _, err := res.LastInsertId(); err != errNoLastInsertID {
+		t.Fatalf("expected %s, got %v", errNoLastInsertID, err)
 	}
 	rows, err := db.Query("")
 	if err != nil {
@@ -425,8 +425,8 @@ func TestEmptyQuery(t *testing.T) {
 	if _, err := res.RowsAffected(); err != errNoRowsAffected {
 		t.Fatalf("expected %s, got %v", errNoRowsAffected, err)
 	}
-	if _, err := res.LastInsertId(); err != errNoLastInsertId {
-		t.Fatalf("expected %s, got %v", errNoLastInsertId, err)
+	if _, err := res.LastInsertId(); err != errNoLastInsertID {
+		t.Fatalf("expected %s, got %v", errNoLastInsertID, err)
 	}
 	rows, err = stmt.Query()
 	if err != nil {
@@ -686,17 +686,28 @@ func TestCloseBadConn(t *testing.T) {
 	if err := cn.Close(); err != nil {
 		t.Fatal(err)
 	}
+
+	// During the Go 1.9 cycle, https://github.com/golang/go/commit/3792db5
+	// changed this error from
+	//
+	// net.errClosing = errors.New("use of closed network connection")
+	//
+	// to
+	//
+	// internal/poll.ErrClosing = errors.New("use of closed file or network connection")
+	const errClosing = "use of closed"
+
 	// Verify write after closing fails.
 	if _, err := nc.Write(nil); err == nil {
 		t.Fatal("expected error")
-	} else if !strings.Contains(err.Error(), "use of closed network connection") {
-		t.Fatalf("expected use of closed network connection error, got %s", err)
+	} else if !strings.Contains(err.Error(), errClosing) {
+		t.Fatalf("expected %s error, got %s", errClosing, err)
 	}
 	// Verify second close fails.
 	if err := cn.Close(); err == nil {
 		t.Fatal("expected error")
-	} else if !strings.Contains(err.Error(), "use of closed network connection") {
-		t.Fatalf("expected use of closed network connection error, got %s", err)
+	} else if !strings.Contains(err.Error(), errClosing) {
+		t.Fatalf("expected %s error, got %s", errClosing, err)
 	}
 }
 
@@ -1042,16 +1053,16 @@ func TestIssue282(t *testing.T) {
 	db := openTestConn(t)
 	defer db.Close()
 
-	var search_path string
+	var searchPath string
 	err := db.QueryRow(`
 		SET LOCAL search_path TO pg_catalog;
 		SET LOCAL search_path TO pg_catalog;
-		SHOW search_path`).Scan(&search_path)
+		SHOW search_path`).Scan(&searchPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if search_path != "pg_catalog" {
-		t.Fatalf("unexpected search_path %s", search_path)
+	if searchPath != "pg_catalog" {
+		t.Fatalf("unexpected search_path %s", searchPath)
 	}
 }
 
@@ -1491,5 +1502,113 @@ func TestQuoteIdentifier(t *testing.T) {
 		if got != test.want {
 			t.Errorf("QuoteIdentifier(%q) = %v want %v", test.input, got, test.want)
 		}
+	}
+}
+
+func TestRowsResultTag(t *testing.T) {
+	type ResultTag interface {
+		Result() driver.Result
+		Tag() string
+	}
+
+	tests := []struct {
+		query string
+		tag   string
+		ra    int64
+	}{
+		{
+			query: "CREATE TEMP TABLE temp (a int)",
+			tag:   "CREATE TABLE",
+		},
+		{
+			query: "INSERT INTO temp VALUES (1), (2)",
+			tag:   "INSERT",
+			ra:    2,
+		},
+		{
+			query: "SELECT 1",
+		},
+		// A SELECT anywhere should take precedent.
+		{
+			query: "SELECT 1; INSERT INTO temp VALUES (1), (2)",
+		},
+		{
+			query: "INSERT INTO temp VALUES (1), (2); SELECT 1",
+		},
+		// Multiple statements that don't return rows should return the last tag.
+		{
+			query: "CREATE TEMP TABLE t (a int); DROP TABLE t",
+			tag:   "DROP TABLE",
+		},
+		// Ensure a rows-returning query in any position among various tags-returing
+		// statements will prefer the rows.
+		{
+			query: "SELECT 1; CREATE TEMP TABLE t (a int); DROP TABLE t",
+		},
+		{
+			query: "CREATE TEMP TABLE t (a int); SELECT 1; DROP TABLE t",
+		},
+		{
+			query: "CREATE TEMP TABLE t (a int); DROP TABLE t; SELECT 1",
+		},
+		// Verify that an no-results query doesn't set the tag.
+		{
+			query: "CREATE TEMP TABLE t (a int); SELECT 1 WHERE FALSE; DROP TABLE t;",
+		},
+	}
+
+	// If this is the only test run, this will correct the connection string.
+	openTestConn(t).Close()
+
+	conn, err := Open("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	q := conn.(driver.Queryer)
+
+	for _, test := range tests {
+		if rows, err := q.Query(test.query, nil); err != nil {
+			t.Fatalf("%s: %s", test.query, err)
+		} else {
+			r := rows.(ResultTag)
+			if tag := r.Tag(); tag != test.tag {
+				t.Fatalf("%s: unexpected tag %q", test.query, tag)
+			}
+			res := r.Result()
+			if ra, _ := res.RowsAffected(); ra != test.ra {
+				t.Fatalf("%s: unexpected rows affected: %d", test.query, ra)
+			}
+			rows.Close()
+		}
+	}
+}
+
+// TestQuickClose tests that closing a query early allows a subsequent query to work.
+func TestQuickClose(t *testing.T) {
+	db := openTestConn(t)
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := tx.Query("SELECT 1; SELECT 2;")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var id int
+	if err := tx.QueryRow("SELECT 3").Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if id != 3 {
+		t.Fatalf("unexpected %d", id)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
 	}
 }
