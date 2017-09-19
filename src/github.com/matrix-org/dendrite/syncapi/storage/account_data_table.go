@@ -38,8 +38,6 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
     -- Type of the data
     type TEXT NOT NULL,
 
-    PRIMARY KEY(user_id, room_id, type),
-
     -- We don't want two entries of the same type for the same user
     CONSTRAINT syncapi_account_data_unique UNIQUE (user_id, room_id, type)
 );
