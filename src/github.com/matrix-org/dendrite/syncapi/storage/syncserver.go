@@ -174,11 +174,24 @@ func (d *SyncServerDatabase) SetPartitionOffset(topic string, partition int32, o
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 func (d *SyncServerDatabase) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
-	id, err := d.events.selectMaxID(ctx, nil)
+	return d.syncStreamPositionTx(ctx, nil)
+}
+
+func (d *SyncServerDatabase) syncStreamPositionTx(
+	ctx context.Context, txn *sql.Tx,
+) (types.StreamPosition, error) {
+	maxID, err := d.events.selectMaxEventID(ctx, txn)
 	if err != nil {
-		return types.StreamPosition(0), err
+		return 0, err
 	}
-	return types.StreamPosition(id), nil
+	maxAccountDataID, err := d.accountData.selectMaxAccountDataID(ctx, txn)
+	if err != nil {
+		return 0, err
+	}
+	if maxAccountDataID > maxID {
+		maxID = maxAccountDataID
+	}
+	return types.StreamPosition(maxID), nil
 }
 
 // IncrementalSync returns all the data needed in order to create an incremental sync response.
@@ -271,11 +284,10 @@ func (d *SyncServerDatabase) CompleteSync(
 	defer common.EndTransaction(txn, &succeeded)
 
 	// Get the current stream position which we will base the sync response on.
-	id, err := d.events.selectMaxID(ctx, txn)
+	pos, err := d.syncStreamPositionTx(ctx, txn)
 	if err != nil {
 		return nil, err
 	}
-	pos := types.StreamPosition(id)
 
 	// Extract room state and recent events for all rooms the user is joined to.
 	roomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "join")
@@ -348,13 +360,8 @@ func (d *SyncServerDatabase) GetAccountDataInRange(
 func (d *SyncServerDatabase) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (types.StreamPosition, error) {
-	pos, err := d.SyncStreamPosition(ctx)
-	if err != nil {
-		return pos, err
-	}
-
-	err = d.accountData.insertAccountData(ctx, pos, userID, roomID, dataType)
-	return pos, err
+	pos, err := d.accountData.insertAccountData(ctx, userID, roomID, dataType)
+	return types.StreamPosition(pos), err
 }
 
 func (d *SyncServerDatabase) addInvitesToResponse(
