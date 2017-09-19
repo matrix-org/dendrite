@@ -27,7 +27,8 @@ const accountDataSchema = `
 -- This sequence is shared between all the tables generated from kafka logs.
 CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
 
--- Stores the users account data
+-- Stores the types of account data that a user set has globally and in each room
+-- and the stream ID when that type was last updated.
 CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
     -- An incrementing ID which denotes the position in the log that this event resides at.
     id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
