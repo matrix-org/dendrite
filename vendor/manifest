@@ -98,7 +98,7 @@
 		{
 			"importpath": "github.com/lib/pq",
 			"repository": "https://github.com/lib/pq",
-			"revision": "a6657b2386e9b8be76484c08711b02c7cf867ead",
+			"revision": "23da1db4f16d9658a86ae9b717c245fc078f10f1",
 			"branch": "master"
 		},
 		{
