@@ -12,11 +12,12 @@ kafka.tgz
 *.so
 
 # Folders
-kafka
-bin
-pkg
-_obj
-_test
+/kafka
+/bin
+/pkg
+/_obj
+/_test
+/vendor/bin
 
 # Architecture specific extensions/prefixes
 *.[568vq]
