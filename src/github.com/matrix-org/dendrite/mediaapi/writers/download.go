@@ -199,7 +199,7 @@ func (r *downloadRequest) doDownload(
 	// check if we have a record of the media in our database
 	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error querying the database.")
+		return nil, errors.Wrap(err, "error querying the database")
 	}
 	if mediaMetadata == nil {
 		if r.MediaMetadata.Origin == cfg.Matrix.ServerName {
@@ -231,16 +231,16 @@ func (r *downloadRequest) respondFromLocalFile(
 ) (*types.MediaMetadata, error) {
 	filePath, err := fileutils.GetPathFromBase64Hash(r.MediaMetadata.Base64Hash, absBasePath)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get file path from metadata")
+		return nil, errors.Wrap(err, "failed to get file path from metadata")
 	}
 	file, err := os.Open(filePath)
 	defer file.Close()
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to open file")
+		return nil, errors.Wrap(err, "failed to open file")
 	}
 	stat, err := file.Stat()
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to stat file")
+		return nil, errors.Wrap(err, "failed to stat file")
 	}
 
 	if r.MediaMetadata.FileSizeBytes > 0 && int64(r.MediaMetadata.FileSizeBytes) != stat.Size() {
@@ -248,7 +248,7 @@ func (r *downloadRequest) respondFromLocalFile(
 			"fileSizeDatabase": r.MediaMetadata.FileSizeBytes,
 			"fileSizeDisk":     stat.Size(),
 		}).Warn("File size in database and on-disk differ.")
-		return nil, errors.New("File size in database and on-disk differ")
+		return nil, errors.New("file size in database and on-disk differ")
 	}
 
 	var responseFile *os.File
@@ -296,7 +296,7 @@ func (r *downloadRequest) respondFromLocalFile(
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
 	if _, err := io.Copy(w, responseFile); err != nil {
-		return nil, errors.Wrap(err, "Failed to copy from cache")
+		return nil, errors.Wrap(err, "failed to copy from cache")
 	}
 	return responseMetadata, nil
 }
@@ -326,7 +326,7 @@ func (r *downloadRequest) getThumbnailFile(
 		var thumbnails []*types.ThumbnailMetadata
 		thumbnails, err = db.GetThumbnails(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "Error looking up thumbnails")
+			return nil, nil, errors.Wrap(err, "error looking up thumbnails")
 		}
 
 		// If we get a thumbnailSize, a pre-generated thumbnail would be best but it is not yet generated.
@@ -361,16 +361,16 @@ func (r *downloadRequest) getThumbnailFile(
 	thumbFile, err := os.Open(string(thumbPath))
 	if err != nil {
 		thumbFile.Close()
-		return nil, nil, errors.Wrap(err, "Failed to open file")
+		return nil, nil, errors.Wrap(err, "failed to open file")
 	}
 	thumbStat, err := thumbFile.Stat()
 	if err != nil {
 		thumbFile.Close()
-		return nil, nil, errors.Wrap(err, "Failed to stat file")
+		return nil, nil, errors.Wrap(err, "failed to stat file")
 	}
 	if types.FileSizeBytes(thumbStat.Size()) != thumbnail.MediaMetadata.FileSizeBytes {
 		thumbFile.Close()
-		return nil, nil, errors.New("Thumbnail file sizes on disk and in database differ")
+		return nil, nil, errors.New("thumbnail file sizes on disk and in database differ")
 	}
 	return thumbFile, thumbnail, nil
 }
@@ -389,7 +389,7 @@ func (r *downloadRequest) generateThumbnail(
 	})
 	busy, err := thumbnailer.GenerateThumbnail(filePath, thumbnailSize, r.MediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error creating thumbnail")
+		return nil, errors.Wrap(err, "error creating thumbnail")
 	}
 	if busy {
 		return nil, nil
@@ -397,7 +397,7 @@ func (r *downloadRequest) generateThumbnail(
 	var thumbnail *types.ThumbnailMetadata
 	thumbnail, err = db.GetThumbnail(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, thumbnailSize.Width, thumbnailSize.Height, thumbnailSize.ResizeMethod)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error looking up thumbnail")
+		return nil, errors.Wrap(err, "error looking up thumbnail")
 	}
 	return thumbnail, nil
 }
@@ -425,7 +425,7 @@ func (r *downloadRequest) getRemoteFile(
 		defer func() {
 			// Note: errorResponse is the named return variable so we wrap this in a closure to re-evaluate the arguments at defer-time
 			if err := recover(); err != nil {
-				r.broadcastMediaMetadata(activeRemoteRequests, errors.New("Paniced"))
+				r.broadcastMediaMetadata(activeRemoteRequests, errors.New("paniced"))
 				panic(err)
 			}
 			r.broadcastMediaMetadata(activeRemoteRequests, errorResponse)
@@ -434,14 +434,14 @@ func (r *downloadRequest) getRemoteFile(
 		// check if we have a record of the media in our database
 		mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 		if err != nil {
-			return errors.Wrap(err, "Error querying the database.")
+			return errors.Wrap(err, "error querying the database.")
 		}
 
 		if mediaMetadata == nil {
 			// If we do not have a record, we need to fetch the remote file first and then respond from the local file
 			err := r.fetchRemoteFileAndStoreMetadata(cfg.Media.AbsBasePath, *cfg.Media.MaxFileSizeBytes, db, cfg.Media.ThumbnailSizes, activeThumbnailGeneration, cfg.Media.MaxThumbnailGenerators)
 			if err != nil {
-				return errors.Wrap(err, "Error querying the database.")
+				return errors.Wrap(err, "error querying the database.")
 			}
 		} else {
 			// If we have a record, we can respond from the local file
@@ -529,7 +529,7 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 		}
 		// NOTE: It should really not be possible to fail the uniqueness test here so
 		// there is no need to handle that separately
-		return errors.New("Failed to store file metadata in DB")
+		return errors.New("failed to store file metadata in DB")
 	}
 
 	go func() {
@@ -570,11 +570,11 @@ func (r *downloadRequest) fetchRemoteFile(absBasePath config.Path, maxFileSizeBy
 	contentLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
 	if err != nil {
 		r.Logger.WithError(err).Warn("Failed to parse content length")
-		return "", false, errors.Wrap(err, "Invalid response from remote server")
+		return "", false, errors.Wrap(err, "invalid response from remote server")
 	}
 	if contentLength > int64(maxFileSizeBytes) {
 		// TODO: Bubble up this as a 413
-		return "", false, fmt.Errorf("Remote file is too large (%v > %v bytes)", contentLength, maxFileSizeBytes)
+		return "", false, fmt.Errorf("remote file is too large (%v > %v bytes)", contentLength, maxFileSizeBytes)
 	}
 	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(contentLength)
 	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
@@ -595,7 +595,7 @@ func (r *downloadRequest) fetchRemoteFile(absBasePath config.Path, maxFileSizeBy
 			"MaxFileSizeBytes": maxFileSizeBytes,
 		}).Warn("Error while downloading file from remote server")
 		fileutils.RemoveDir(tmpDir, r.Logger)
-		return "", false, errors.New("File could not be downloaded from remote server")
+		return "", false, errors.New("file could not be downloaded from remote server")
 	}
 
 	r.Logger.Info("Remote file transferred")
@@ -609,7 +609,7 @@ func (r *downloadRequest) fetchRemoteFile(absBasePath config.Path, maxFileSizeBy
 	// The database is the source of truth so we need to have moved the file first
 	finalPath, duplicate, err := fileutils.MoveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
 	if err != nil {
-		return "", false, errors.Wrap(err, "Failed to move file")
+		return "", false, errors.Wrap(err, "failed to move file")
 	}
 	if duplicate {
 		r.Logger.WithField("dst", finalPath).Info("File was stored previously - discarding duplicate")
@@ -624,7 +624,7 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, error) {
 
 	resp, err := matrixClient.CreateMediaDownloadRequest(r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
 	if err != nil {
-		return nil, fmt.Errorf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+		return nil, fmt.Errorf("file with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	}
 
 	if resp.StatusCode != 200 {
@@ -634,7 +634,7 @@ func (r *downloadRequest) createRemoteRequest() (*http.Response, error) {
 		r.Logger.WithFields(log.Fields{
 			"StatusCode": resp.StatusCode,
 		}).Warn("Received error response")
-		return nil, fmt.Errorf("File with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+		return nil, fmt.Errorf("file with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	}
 
 	return resp, nil
