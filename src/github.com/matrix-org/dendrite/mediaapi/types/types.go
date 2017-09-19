@@ -19,7 +19,6 @@ import (
 
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // FileSizeBytes is a file size in bytes
@@ -67,8 +66,8 @@ type RemoteRequestResult struct {
 	Cond *sync.Cond
 	// MediaMetadata of the requested file to avoid querying the database for every waiting routine
 	MediaMetadata *MediaMetadata
-	// An error in util.JSONResponse form. nil in case of no error.
-	ErrorResponse *util.JSONResponse
+	// An error, nil in case of no error.
+	Error error
 }
 
 // ActiveRemoteRequests is a lockable map of media URIs requested from remote homeservers
