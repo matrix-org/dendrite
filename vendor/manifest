@@ -171,6 +171,12 @@
 			"path": "/xxHash32"
 		},
 		{
+			"importpath": "github.com/pkg/errors",
+			"repository": "https://github.com/pkg/errors",
+			"revision": "c605e284fe17294bda444b34710735b29d1a9d90",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/pmezard/go-difflib/difflib",
 			"repository": "https://github.com/pmezard/go-difflib",
 			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
