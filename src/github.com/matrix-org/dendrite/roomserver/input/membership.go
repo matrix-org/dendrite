@@ -23,6 +23,13 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// Membership values
+// TODO: Factor these out somewhere sensible?
+const join = "join"
+const leave = "leave"
+const invite = "invite"
+const ban = "ban"
+
 // updateMembership updates the current membership and the invites for each
 // user affected by a change in the current state of the room.
 // Returns a list of output events to write to the kafka log to inform the
@@ -83,9 +90,9 @@ func updateMembership(
 	updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	var err error
-	// Default the membership to "leave" if no event was added or removed.
-	old := "leave"
-	new := "leave"
+	// Default the membership to Leave if no event was added or removed.
+	old := leave
+	new := leave
 
 	if remove != nil {
 		old, err = remove.Membership()
@@ -99,9 +106,9 @@ func updateMembership(
 			return nil, err
 		}
 	}
-	if old == new && new != "join" {
+	if old == new && new != join {
 		// If the membership is the same then nothing changed and we can return
-		// immediately, unless it's a "join" update (e.g. profile update).
+		// immediately, unless it's a Join update (e.g. profile update).
 		return updates, nil
 	}
 
@@ -111,11 +118,11 @@ func updateMembership(
 	}
 
 	switch new {
-	case "invite":
+	case invite:
 		return updateToInviteMembership(mu, add, updates)
-	case "join":
+	case join:
 		return updateToJoinMembership(mu, add, updates)
-	case "leave", "ban":
+	case leave, ban:
 		return updateToLeaveMembership(mu, add, new, updates)
 	default:
 		panic(fmt.Errorf(
@@ -176,7 +183,7 @@ func updateToJoinMembership(
 	for _, eventID := range retired {
 		orie := api.OutputRetireInviteEvent{
 			EventID:    eventID,
-			Membership: "join",
+			Membership: join,
 		}
 		if add != nil {
 			orie.RetiredByEventID = add.EventID()
