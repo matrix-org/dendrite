@@ -11,6 +11,7 @@
         "gas",
         "misspell",
         "errcheck",
-        "vet"
+        "vet",
+        "goconst"
     ]
 }

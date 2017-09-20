@@ -179,9 +179,9 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 		}
 		// Default method to scale if not set
 		if r.ThumbnailSize.ResizeMethod == "" {
-			r.ThumbnailSize.ResizeMethod = "scale"
+			r.ThumbnailSize.ResizeMethod = types.Scale
 		}
-		if r.ThumbnailSize.ResizeMethod != "crop" && r.ThumbnailSize.ResizeMethod != "scale" {
+		if r.ThumbnailSize.ResizeMethod != types.Crop && r.ThumbnailSize.ResizeMethod != types.Scale {
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.Unknown("method must be one of crop or scale"),

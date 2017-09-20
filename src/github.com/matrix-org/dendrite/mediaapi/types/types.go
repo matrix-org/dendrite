@@ -102,3 +102,9 @@ type ActiveThumbnailGeneration struct {
 	// The string key is a thumbnail file path
 	PathToResult map[string]*ThumbnailGenerationResult
 }
+
+// Crop indicates we should crop the thumbnail on resize
+const Crop = "crop"
+
+// Scale indicates we should scale the thumbnail on resize
+const Scale = "scale"
