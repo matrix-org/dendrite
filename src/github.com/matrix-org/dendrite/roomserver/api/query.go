@@ -283,7 +283,7 @@ func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
 	request *QueryServerAllowedToSeeEventRequest,
 	response *QueryServerAllowedToSeeEventResponse,
-) error {
+) (err error) {
 	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
 	return postJSON(ctx, h.httpClient, apiURL, request, response)
 }
@@ -306,7 +306,7 @@ func postJSON(
 
 	res, err := httpClient.Do(req.WithContext(ctx))
 	if res != nil {
-		defer res.Body.Close()
+		defer (func() { err = res.Body.Close() })()
 	}
 	if err != nil {
 		return err

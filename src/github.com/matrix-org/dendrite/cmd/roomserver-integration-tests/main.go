@@ -114,8 +114,8 @@ func runAndReadFromTopic(runCmd *exec.Cmd, readyURL string, doInput func(), topi
 	readCmd.Stderr = os.Stderr
 
 	// Kill both processes before we exit.
-	defer func() { runCmd.Process.Kill() }()
-	defer func() { readCmd.Process.Kill() }()
+	defer func() { runCmd.Process.Kill() }()  // nolint: errcheck
+	defer func() { readCmd.Process.Kill() }() // nolint: errcheck
 
 	// Run the command, read the messages and wait for a timeout in parallel.
 	go func() {
@@ -228,7 +228,11 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 
 	outputTopic := string(cfg.Kafka.Topics.OutputRoomEvent)
 
-	exe.DeleteTopic(outputTopic)
+	err = exe.DeleteTopic(outputTopic)
+	if err != nil {
+		panic(err)
+	}
+
 	if err = exe.CreateTopic(outputTopic); err != nil {
 		panic(err)
 	}

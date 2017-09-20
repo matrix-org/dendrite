@@ -97,7 +97,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
 	for ; rows.Next(); i++ {

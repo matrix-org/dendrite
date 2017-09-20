@@ -120,16 +120,21 @@ func WriteConfig(cfg *config.Dendrite, configDir string) error {
 }
 
 // NewMatrixKey generates a new ed25519 matrix server key and writes it to a file.
-func NewMatrixKey(matrixKeyPath string) error {
+func NewMatrixKey(matrixKeyPath string) (err error) {
 	var data [35]byte
-	if _, err := rand.Read(data[:]); err != nil {
+	_, err = rand.Read(data[:])
+	if err != nil {
 		return err
 	}
 	keyOut, err := os.OpenFile(matrixKeyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	defer keyOut.Close()
+
+	defer (func() {
+		err = keyOut.Close()
+	})()
+
 	if err = pem.Encode(keyOut, &pem.Block{
 		Type: "MATRIX PRIVATE KEY",
 		Headers: map[string]string{
@@ -176,7 +181,7 @@ func NewTLSKey(tlsKeyPath, tlsCertPath string) error {
 	if err != nil {
 		return err
 	}
-	defer certOut.Close()
+	defer certOut.Close() // nolint: errcheck
 	if err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
 		return err
 	}
@@ -185,7 +190,7 @@ func NewTLSKey(tlsKeyPath, tlsCertPath string) error {
 	if err != nil {
 		return err
 	}
-	defer keyOut.Close()
+	defer keyOut.Close() // nolint: errcheck
 	if err = pem.Encode(keyOut, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(priv),

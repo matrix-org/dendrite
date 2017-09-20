@@ -153,21 +153,35 @@ func (r joinRoomReq) joinRoomByRemoteAlias(
 	return r.joinRoomUsingServers(resp.RoomID, resp.Servers)
 }
 
-func (r joinRoomReq) writeToBuilder(eb *gomatrixserverlib.EventBuilder, roomID string) {
+func (r joinRoomReq) writeToBuilder(eb *gomatrixserverlib.EventBuilder, roomID string) error {
 	eb.Type = "m.room.member"
-	eb.SetContent(r.content)
-	eb.SetUnsigned(struct{}{})
+
+	err := eb.SetContent(r.content)
+	if err != nil {
+		return err
+	}
+
+	err = eb.SetUnsigned(struct{}{})
+	if err != nil {
+		return err
+	}
+
 	eb.Sender = r.userID
 	eb.StateKey = &r.userID
 	eb.RoomID = roomID
 	eb.Redacts = ""
+
+	return nil
 }
 
 func (r joinRoomReq) joinRoomUsingServers(
 	roomID string, servers []gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	var eb gomatrixserverlib.EventBuilder
-	r.writeToBuilder(&eb, roomID)
+	err := r.writeToBuilder(&eb, roomID)
+	if err != nil {
+		return httputil.LogThenError(r.req, err)
+	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
 	event, err := events.BuildEvent(r.req.Context(), &eb, r.cfg, r.queryAPI, &queryRes)
@@ -235,7 +249,10 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 
 	// Set all the fields to be what they should be, this should be a no-op
 	// but it's possible that the remote server returned us something "odd"
-	r.writeToBuilder(&respMakeJoin.JoinEvent, roomID)
+	err = r.writeToBuilder(&respMakeJoin.JoinEvent, roomID)
+	if err != nil {
+		return nil, err
+	}
 
 	now := time.Now()
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)

@@ -125,7 +125,8 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 }
 
 func cleanUpServer(cmd *exec.Cmd, dir string) {
-	cmd.Process.Kill() // ensure server is dead, only cleaning up so don't care about errors this returns.
+	// ensure server is dead, only cleaning up so don't care about errors this returns
+	cmd.Process.Kill() // nolint: errcheck
 	if err := os.RemoveAll(dir); err != nil {
 		fmt.Printf("WARNING: Failed to remove temporary directory %v: %q\n", dir, err)
 	}
@@ -146,7 +147,7 @@ func main() {
 	// create server1 with only pre-generated thumbnails allowed
 	server1Cmd, server1CmdChan, _, server1ProxyCmd, _, server1ProxyAddr, server1Dir := startMediaAPI("1", false)
 	defer cleanUpServer(server1Cmd, server1Dir)
-	defer server1ProxyCmd.Process.Kill()
+	defer server1ProxyCmd.Process.Kill() // nolint: errcheck
 	testDownload(server1ProxyAddr, server1ProxyAddr, "doesnotexist", 404, server1CmdChan)
 
 	// upload a JPEG file
@@ -163,7 +164,7 @@ func main() {
 	// create server2 with dynamic thumbnail generation
 	server2Cmd, server2CmdChan, _, server2ProxyCmd, _, server2ProxyAddr, server2Dir := startMediaAPI("2", true)
 	defer cleanUpServer(server2Cmd, server2Dir)
-	defer server2ProxyCmd.Process.Kill()
+	defer server2ProxyCmd.Process.Kill() // nolint: errcheck
 	testDownload(server2ProxyAddr, server2ProxyAddr, "doesnotexist", 404, server2CmdChan)
 
 	// pre-generated thumbnail that JPEG file via server2
@@ -189,7 +190,7 @@ func getMediaURI(host, endpoint, query string, components []string) string {
 func testUpload(host, filePath string) {
 	fmt.Printf("==TESTING== upload %v to %v\n", filePath, host)
 	file, err := os.Open(filePath)
-	defer file.Close()
+	defer file.Close() // nolint: errcheck
 	if err != nil {
 		panic(err)
 	}

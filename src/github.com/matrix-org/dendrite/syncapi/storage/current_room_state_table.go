@@ -122,7 +122,7 @@ func (s *currentRoomStateStatements) selectJoinedUsers(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 
 	result := make(map[string][]string)
 	for rows.Next() {
@@ -147,7 +147,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 
 	var result []string
 	for rows.Next() {
@@ -169,7 +169,7 @@ func (s *currentRoomStateStatements) selectCurrentState(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 
 	return rowsToEvents(rows)
 }
@@ -208,7 +208,7 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	return rowsToStreamEvents(rows)
 }
 

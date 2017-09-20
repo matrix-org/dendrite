@@ -131,7 +131,7 @@ func (s *eventTypeStatements) bulkSelectEventTypeNID(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
 	for rows.Next() {

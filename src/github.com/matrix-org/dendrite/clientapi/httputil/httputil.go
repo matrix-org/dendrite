@@ -25,7 +25,7 @@ import (
 // UnmarshalJSONRequest into the given interface pointer. Returns an error JSON response if
 // there was a problem unmarshalling. Calling this function consumes the request body.
 func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONResponse {
-	defer req.Body.Close()
+	defer req.Body.Close() // nolint: errcheck
 	if err := json.NewDecoder(req.Body).Decode(iface); err != nil {
 		// TODO: We may want to suppress the Error() return in production? It's useful when
 		// debugging because an error will be produced for both invalid/malformed JSON AND

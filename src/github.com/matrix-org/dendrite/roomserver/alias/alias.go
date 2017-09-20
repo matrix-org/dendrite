@@ -183,7 +183,10 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	// Add auth events
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range res.StateEvents {
-		authEvents.AddEvent(&res.StateEvents[i])
+		err = authEvents.AddEvent(&res.StateEvents[i])
+		if err != nil {
+			return err
+		}
 	}
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
 	if err != nil {

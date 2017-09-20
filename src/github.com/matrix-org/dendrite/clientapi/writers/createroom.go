@@ -185,7 +185,10 @@ func createRoom(req *http.Request, device *authtypes.Device,
 			StateKey: &e.StateKey,
 			Depth:    int64(depth),
 		}
-		builder.SetContent(e.Content)
+		err = builder.SetContent(e.Content)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
 		if i > 0 {
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
@@ -194,13 +197,16 @@ func createRoom(req *http.Request, device *authtypes.Device,
 			return httputil.LogThenError(req, err)
 		}
 
-		if err := gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
+		if err = gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 
 		// Add the event to the list of auth events
 		builtEvents = append(builtEvents, *ev)
-		authEvents.AddEvent(ev)
+		err = authEvents.AddEvent(ev)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
 	}
 
 	// send events to the room server

@@ -71,7 +71,7 @@ func (s *PartitionOffsetStatements) SelectPartitionOffsets(topic string) ([]Part
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	var results []PartitionOffset
 	for rows.Next() {
 		var offset PartitionOffset

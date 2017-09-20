@@ -30,9 +30,9 @@ type Transaction interface {
 // If the transaction succeeded then it is committed, otherwise it is rolledback.
 func EndTransaction(txn Transaction, succeeded *bool) {
 	if *succeeded {
-		txn.Commit()
+		txn.Commit() // nolint: errcheck
 	} else {
-		txn.Rollback()
+		txn.Rollback() // nolint: errcheck
 	}
 }
 

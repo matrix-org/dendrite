@@ -69,7 +69,7 @@ func CanonicalJSONInput(jsonData []string) []string {
 }
 
 // Do issues a request and checks the status code and body of the response
-func (r *Request) Do() error {
+func (r *Request) Do() (err error) {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -82,7 +82,7 @@ func (r *Request) Do() error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer (func() { err = res.Body.Close() })()
 
 	if res.StatusCode != r.WantedStatusCode {
 		return fmt.Errorf("incorrect status code. Expected: %d  Got: %d", r.WantedStatusCode, res.StatusCode)
