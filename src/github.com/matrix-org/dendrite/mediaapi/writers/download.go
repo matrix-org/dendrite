@@ -236,7 +236,7 @@ func (r *downloadRequest) respondFromLocalFile(
 		return nil, errors.Wrap(err, "failed to get file path from metadata")
 	}
 	file, err := os.Open(filePath)
-	defer file.Close() // nolint: errcheck
+	defer file.Close() // nolint: errcheck, staticcheck, megacheck
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open file")
 	}

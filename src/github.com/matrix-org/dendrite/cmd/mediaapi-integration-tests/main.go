@@ -190,7 +190,7 @@ func getMediaURI(host, endpoint, query string, components []string) string {
 func testUpload(host, filePath string) {
 	fmt.Printf("==TESTING== upload %v to %v\n", filePath, host)
 	file, err := os.Open(filePath)
-	defer file.Close() // nolint: errcheck
+	defer file.Close() // nolint: errcheck, staticcheck, megacheck
 	if err != nil {
 		panic(err)
 	}
