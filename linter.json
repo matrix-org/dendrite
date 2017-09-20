@@ -14,6 +14,7 @@
         "ineffassign",
         "gas",
         "misspell",
-        "unparam"
+        "unparam",
+        "errcheck"
     ]
 }
