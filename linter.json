@@ -16,6 +16,7 @@
         "misspell",
         "unparam",
         "errcheck",
-        "vet"
+        "vet",
+        "unused"
     ]
 }

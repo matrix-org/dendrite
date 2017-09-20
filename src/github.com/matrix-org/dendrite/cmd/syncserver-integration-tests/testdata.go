@@ -35,15 +35,6 @@ const (
 	i16StateAliceKickCharlie
 	i17BobMsg
 	i18StateAliceRoomName
-	i19BobMsg
-	i20StateBobLeave
-	i21AliceMsg
-	i22StateAliceInviteBob
-	i23StateBobRejectInvite
-	i24AliceMsg
-	i25StateAliceRoomName
-	i26StateCharlieJoin
-	i27CharlieMsg
 )
 
 var outputRoomEventTestData = []string{
