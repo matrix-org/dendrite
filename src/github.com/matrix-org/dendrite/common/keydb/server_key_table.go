@@ -83,7 +83,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	results := map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys{}
 	for rows.Next() {
 		var serverName string

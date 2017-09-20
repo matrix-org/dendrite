@@ -148,7 +148,9 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
 	r.Logger.WithField("code", res.Code).Infof("Responding (%d bytes)", len(resBytes))
-	w.Write(resBytes)
+
+	// we don't really care that much if we fail to write the error response
+	w.Write(resBytes) // nolint: errcheck
 }
 
 // Validate validates the downloadRequest fields
@@ -234,7 +236,7 @@ func (r *downloadRequest) respondFromLocalFile(
 		return nil, errors.Wrap(err, "failed to get file path from metadata")
 	}
 	file, err := os.Open(filePath)
-	defer file.Close()
+	defer file.Close() // nolint: errcheck
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open file")
 	}
@@ -256,7 +258,7 @@ func (r *downloadRequest) respondFromLocalFile(
 	if r.IsThumbnailRequest {
 		thumbFile, thumbMetadata, resErr := r.getThumbnailFile(types.Path(filePath), activeThumbnailGeneration, maxThumbnailGenerators, db, dynamicThumbnails, thumbnailSizes)
 		if thumbFile != nil {
-			defer thumbFile.Close()
+			defer thumbFile.Close() // nolint: errcheck
 		}
 		if resErr != nil {
 			return nil, resErr
@@ -360,16 +362,16 @@ func (r *downloadRequest) getThumbnailFile(
 	thumbPath := string(thumbnailer.GetThumbnailPath(types.Path(filePath), thumbnail.ThumbnailSize))
 	thumbFile, err := os.Open(string(thumbPath))
 	if err != nil {
-		thumbFile.Close()
+		thumbFile.Close() // nolint: errcheck
 		return nil, nil, errors.Wrap(err, "failed to open file")
 	}
 	thumbStat, err := thumbFile.Stat()
 	if err != nil {
-		thumbFile.Close()
+		thumbFile.Close() // nolint: errcheck
 		return nil, nil, errors.Wrap(err, "failed to stat file")
 	}
 	if types.FileSizeBytes(thumbStat.Size()) != thumbnail.MediaMetadata.FileSizeBytes {
-		thumbFile.Close()
+		thumbFile.Close() // nolint: errcheck
 		return nil, nil, errors.New("thumbnail file sizes on disk and in database differ")
 	}
 	return thumbFile, thumbnail, nil
@@ -564,7 +566,7 @@ func (r *downloadRequest) fetchRemoteFile(absBasePath config.Path, maxFileSizeBy
 		// Remote file not found
 		return "", false, nil
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 
 	// get metadata from request and set metadata on response
 	contentLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)

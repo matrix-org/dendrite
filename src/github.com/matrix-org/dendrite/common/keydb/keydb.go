@@ -37,7 +37,10 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 		return nil, err
 	}
 	d := &Database{}
-	d.statements.prepare(db)
+	err = d.statements.prepare(db)
+	if err != nil {
+		return nil, err
+	}
 	return d, nil
 }
 

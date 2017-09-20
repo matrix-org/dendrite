@@ -91,7 +91,7 @@ func (c *ContinualConsumer) Start() error {
 		pc, err := c.Consumer.ConsumePartition(c.Topic, partition, offset)
 		if err != nil {
 			for _, p := range partitionConsumers {
-				p.Close()
+				p.Close() // nolint: errcheck
 			}
 			return err
 		}
@@ -106,7 +106,7 @@ func (c *ContinualConsumer) Start() error {
 
 // consumePartition consumes the room events for a single partition of the kafkaesque stream.
 func (c *ContinualConsumer) consumePartition(pc sarama.PartitionConsumer) {
-	defer pc.Close()
+	defer pc.Close() // nolint: errcheck
 	for message := range pc.Messages() {
 		msgErr := c.ProcessMessage(message)
 		// Advance our position in the stream so that we will start at the right position after a restart.

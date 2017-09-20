@@ -108,7 +108,7 @@ func (s *membershipStatements) selectMembershipsByLocalpart(
 
 	memberships = []authtypes.Membership{}
 
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	for rows.Next() {
 		var m authtypes.Membership
 		m.Localpart = localpart

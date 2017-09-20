@@ -52,7 +52,7 @@ func SaveAccountData(
 		return httputil.LogThenError(req, err)
 	}
 
-	defer req.Body.Close()
+	defer req.Body.Close() // nolint: errcheck
 
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {

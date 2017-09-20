@@ -87,7 +87,7 @@ func (s *accountDataStatements) insertAccountData(
 	ctx context.Context,
 	userID, roomID, dataType string,
 ) (pos int64, err error) {
-	s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
+	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
 	return
 }
 

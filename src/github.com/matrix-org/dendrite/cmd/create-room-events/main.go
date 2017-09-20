@@ -80,20 +80,20 @@ func main() {
 	b.RoomID = *roomID
 	b.Type = "m.room.create"
 	b.StateKey = &emptyString
-	b.SetContent(map[string]string{"creator": *userID})
+	b.SetContent(map[string]string{"creator": *userID}) // nolint: errcheck
 	create := buildAndOutput()
 
 	// Build a m.room.member event.
 	b.Type = "m.room.member"
 	b.StateKey = userID
-	b.SetContent(map[string]string{"membership": "join"})
+	b.SetContent(map[string]string{"membership": "join"}) // nolint: errcheck
 	b.AuthEvents = []gomatrixserverlib.EventReference{create}
 	member := buildAndOutput()
 
 	// Build a number of m.room.message events.
 	b.Type = "m.room.message"
 	b.StateKey = nil
-	b.SetContent(map[string]string{"body": "Test Message"})
+	b.SetContent(map[string]string{"body": "Test Message"}) // nolint: errcheck
 	b.AuthEvents = []gomatrixserverlib.EventReference{create, member}
 	for i := 0; i < *messageCount; i++ {
 		buildAndOutput()

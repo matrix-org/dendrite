@@ -287,19 +287,19 @@ func (d *Database) GetLatestEventsForUpdate(
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.statements.selectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
 	if err != nil {
-		txn.Rollback()
+		txn.Rollback() // nolint: errcheck
 		return nil, err
 	}
 	stateAndRefs, err := d.statements.bulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
 	if err != nil {
-		txn.Rollback()
+		txn.Rollback() // nolint: errcheck
 		return nil, err
 	}
 	var lastEventIDSent string
 	if lastEventNIDSent != 0 {
 		lastEventIDSent, err = d.statements.selectEventID(ctx, txn, lastEventNIDSent)
 		if err != nil {
-			txn.Rollback()
+			txn.Rollback() // nolint: errcheck
 			return nil, err
 		}
 	}
@@ -459,7 +459,7 @@ func (d *Database) MembershipUpdater(
 	succeeded := false
 	defer func() {
 		if !succeeded {
-			txn.Rollback()
+			txn.Rollback() // nolint: errcheck
 		}
 	}()
 

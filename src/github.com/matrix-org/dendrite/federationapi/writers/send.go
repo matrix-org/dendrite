@@ -180,7 +180,10 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserverlib.Event) error {
 	authUsingState := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range stateEvents {
-		authUsingState.AddEvent(&stateEvents[i])
+		err := authUsingState.AddEvent(&stateEvents[i])
+		if err != nil {
+			return err
+		}
 	}
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }

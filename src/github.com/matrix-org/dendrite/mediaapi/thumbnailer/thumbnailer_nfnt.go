@@ -83,7 +83,7 @@ func readFile(src string) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer file.Close() // nolint: errcheck
 
 	img, _, err := image.Decode(file)
 	if err != nil {
@@ -93,12 +93,12 @@ func readFile(src string) (image.Image, error) {
 	return img, nil
 }
 
-func writeFile(img image.Image, dst string) error {
+func writeFile(img image.Image, dst string) (err error) {
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer (func() { err = out.Close() })()
 
 	return jpeg.Encode(out, img, &jpeg.Options{
 		Quality: 85,

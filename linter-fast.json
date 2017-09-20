@@ -7,14 +7,9 @@
         "gotype",
         "deadcode",
         "gocyclo",
-        "golint",
-        "varcheck",
-        "structcheck",
-        "aligncheck",
         "ineffassign",
         "gas",
         "misspell",
-        "unparam",
         "errcheck"
     ]
 }
