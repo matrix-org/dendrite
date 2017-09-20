@@ -413,7 +413,7 @@ func fingerprintPEM(data []byte) *gomatrixserverlib.TLSFingerprint {
 		}
 		if certDERBlock.Type == "CERTIFICATE" {
 			digest := sha256.Sum256(certDERBlock.Bytes)
-			return &gomatrixserverlib.TLSFingerprint{digest[:]}
+			return &gomatrixserverlib.TLSFingerprint{SHA256: digest[:]}
 		}
 	}
 }

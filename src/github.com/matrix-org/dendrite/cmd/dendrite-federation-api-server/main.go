@@ -67,7 +67,7 @@ func main() {
 	keyRing := gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
 			// TODO: Use perspective key fetchers for production.
-			&gomatrixserverlib.DirectKeyFetcher{federation.Client},
+			&gomatrixserverlib.DirectKeyFetcher{Client: federation.Client},
 		},
 		KeyDatabase: keyDB,
 	}

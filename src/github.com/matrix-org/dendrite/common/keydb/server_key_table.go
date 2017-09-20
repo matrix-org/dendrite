@@ -97,7 +97,8 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 			return nil, err
 		}
 		r := gomatrixserverlib.PublicKeyRequest{
-			gomatrixserverlib.ServerName(serverName), gomatrixserverlib.KeyID(keyID),
+			ServerName: gomatrixserverlib.ServerName(serverName),
+			KeyID:      gomatrixserverlib.KeyID(keyID),
 		}
 		results[r] = serverKeys
 	}
