@@ -75,7 +75,7 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	result := map[string]gomatrixserverlib.Event{}
 	for rows.Next() {
 		var (
