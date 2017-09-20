@@ -80,11 +80,7 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 		fitness := calcThumbnailFitness(types.ThumbnailSize(thumbnailSize), nil, desired)
 		if isBetter := fitness.betterThan(bestFit, desired.ResizeMethod == "crop"); isBetter {
 			bestFit = fitness
-			chosenThumbnailSize = &types.ThumbnailSize{
-				Width:        thumbnailSize.Width,
-				Height:       thumbnailSize.Height,
-				ResizeMethod: thumbnailSize.ResizeMethod,
-			}
+			chosenThumbnailSize = (*types.ThumbnailSize)(&thumbnailSize)
 		}
 	}
 

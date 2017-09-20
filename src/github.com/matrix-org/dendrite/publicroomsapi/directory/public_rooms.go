@@ -102,10 +102,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *publicRoomReq) *util.JSO
 		request.Since = httpReq.FormValue("since")
 		return nil
 	} else if httpReq.Method == "POST" {
-		if reqErr := httputil.UnmarshalJSONRequest(httpReq, request); reqErr != nil {
-			return reqErr
-		}
-		return nil
+		return httputil.UnmarshalJSONRequest(httpReq, request)
 	}
 
 	return &util.JSONResponse{

@@ -135,17 +135,14 @@ func NewMatrixKey(matrixKeyPath string) (err error) {
 		err = keyOut.Close()
 	})()
 
-	if err = pem.Encode(keyOut, &pem.Block{
+	err = pem.Encode(keyOut, &pem.Block{
 		Type: "MATRIX PRIVATE KEY",
 		Headers: map[string]string{
 			"Key-ID": "ed25519:" + base64.RawStdEncoding.EncodeToString(data[:3]),
 		},
 		Bytes: data[3:],
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
+	return err
 }
 
 const certificateDuration = time.Hour * 24 * 365 * 10
@@ -191,12 +188,9 @@ func NewTLSKey(tlsKeyPath, tlsCertPath string) error {
 		return err
 	}
 	defer keyOut.Close() // nolint: errcheck
-	if err = pem.Encode(keyOut, &pem.Block{
+	err = pem.Encode(keyOut, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(priv),
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
+	return err
 }

@@ -45,9 +45,6 @@ func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string
 	m.Key = sarama.StringEncoder(userID)
 	m.Value = sarama.ByteEncoder(value)
 
-	if _, _, err := p.Producer.SendMessage(&m); err != nil {
-		return err
-	}
-
-	return nil
+	_, _, err = p.Producer.SendMessage(&m)
+	return err
 }
