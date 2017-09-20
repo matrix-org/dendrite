@@ -15,6 +15,7 @@
         "gas",
         "misspell",
         "unparam",
-        "errcheck"
+        "errcheck",
+        "vet"
     ]
 }

@@ -163,12 +163,12 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		{"m.room.member", userID, membershipContent},
 		{"m.room.power_levels", "", common.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
-		{"m.room.join_rules", "", common.JoinRulesContent{"public"}},                 // FIXME: Allow this to be changed
-		{"m.room.history_visibility", "", common.HistoryVisibilityContent{"joined"}}, // FIXME: Allow this to be changed
-		{"m.room.guest_access", "", common.GuestAccessContent{"can_join"}},           // FIXME: Allow this to be changed
+		{"m.room.join_rules", "", common.JoinRulesContent{JoinRule: "public"}},                          // FIXME: Allow this to be changed
+		{"m.room.history_visibility", "", common.HistoryVisibilityContent{HistoryVisibility: "joined"}}, // FIXME: Allow this to be changed
+		{"m.room.guest_access", "", common.GuestAccessContent{GuestAccess: "can_join"}},                 // FIXME: Allow this to be changed
 		// TODO: Other initial state items
-		{"m.room.name", "", common.NameContent{r.Name}}, // FIXME: Only send the name event if a name is supplied, to avoid sending a false room name removal event
-		{"m.room.topic", "", common.TopicContent{r.Topic}},
+		{"m.room.name", "", common.NameContent{Name: r.Name}}, // FIXME: Only send the name event if a name is supplied, to avoid sending a false room name removal event
+		{"m.room.topic", "", common.TopicContent{Topic: r.Topic}},
 		// TODO: invite events
 		// TODO: 3pid invite events
 		// TODO: m.room.aliases
