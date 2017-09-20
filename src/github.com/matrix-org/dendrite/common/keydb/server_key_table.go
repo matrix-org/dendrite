@@ -116,10 +116,7 @@ func (s *serverKeyStatements) upsertServerKeys(
 		string(request.ServerName), string(request.KeyID), nameAndKeyID(request),
 		int64(keys.ValidUntilTS), keyJSON,
 	)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func nameAndKeyID(request gomatrixserverlib.PublicKeyRequest) string {

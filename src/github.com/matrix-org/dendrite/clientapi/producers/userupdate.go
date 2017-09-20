@@ -57,9 +57,6 @@ func (p *UserUpdateProducer) SendUpdate(
 	}
 	m.Value = sarama.ByteEncoder(value)
 
-	if _, _, err := p.Producer.SendMessage(&m); err != nil {
-		return err
-	}
-
-	return nil
+	_, _, err = p.Producer.SendMessage(&m)
+	return err
 }
