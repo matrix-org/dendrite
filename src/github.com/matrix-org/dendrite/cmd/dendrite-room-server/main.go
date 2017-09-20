@@ -80,7 +80,9 @@ func main() {
 
 	aliasAPI.SetupHTTP(http.DefaultServeMux)
 
-	http.DefaultServeMux.Handle("/metrics", prometheus.Handler())
+	// This is deprecated, but prometheus are still arguing on what to replace
+	// it with. Alternatively we could set it up manually.
+	http.DefaultServeMux.Handle("/metrics", prometheus.Handler()) // nolint: staticcheck, megacheck
 
 	log.Info("Started room server on ", cfg.Listen.RoomServer)
 
