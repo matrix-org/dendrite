@@ -182,11 +182,10 @@ func updateToJoinMembership(
 	}
 	for _, eventID := range retired {
 		orie := api.OutputRetireInviteEvent{
-			EventID:    eventID,
-			Membership: join,
-		}
-		if add != nil {
-			orie.RetiredByEventID = add.EventID()
+			EventID:          eventID,
+			Membership:       join,
+			RetiredByEventID: add.EventID(),
+			TargetUserID:     *add.StateKey(),
 		}
 		updates = append(updates, api.OutputEvent{
 			Type:              api.OutputTypeRetireInviteEvent,
@@ -215,11 +214,10 @@ func updateToLeaveMembership(
 	}
 	for _, eventID := range retired {
 		orie := api.OutputRetireInviteEvent{
-			EventID:    eventID,
-			Membership: newMembership,
-		}
-		if add != nil {
-			orie.RetiredByEventID = add.EventID()
+			EventID:          eventID,
+			Membership:       newMembership,
+			RetiredByEventID: add.EventID(),
+			TargetUserID:     *add.StateKey(),
 		}
 		updates = append(updates, api.OutputEvent{
 			Type:              api.OutputTypeRetireInviteEvent,

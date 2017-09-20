@@ -86,26 +86,37 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	if output.Type != api.OutputTypeNewRoomEvent {
+	switch output.Type {
+	case api.OutputTypeNewRoomEvent:
+		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
+	case api.OutputTypeNewInviteEvent:
+		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
+	case api.OutputTypeRetireInviteEvent:
+		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
+	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
 		return nil
 	}
+}
 
-	ev := output.NewRoomEvent.Event
+func (s *OutputRoomEvent) onNewRoomEvent(
+	ctx context.Context, msg api.OutputNewRoomEvent,
+) error {
+	ev := msg.Event
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),
 	}).Info("received event from roomserver")
 
-	addsStateEvents, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
+	addsStateEvents, err := s.lookupStateEvents(msg.AddsStateEventIDs, ev)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
-			"add":        output.NewRoomEvent.AddsStateEventIDs,
-			"del":        output.NewRoomEvent.RemovesStateEventIDs,
+			"add":        msg.AddsStateEventIDs,
+			"del":        msg.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: state event lookup failure")
 	}
 
@@ -122,25 +133,61 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	syncStreamPos, err := s.db.WriteEvent(
-		context.TODO(),
+		ctx,
 		&ev,
 		addsStateEvents,
-		output.NewRoomEvent.AddsStateEventIDs,
-		output.NewRoomEvent.RemovesStateEventIDs,
+		msg.AddsStateEventIDs,
+		msg.RemovesStateEventIDs,
 	)
+	if err != nil {
+		return err
+	}
 
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
-			"add":        output.NewRoomEvent.AddsStateEventIDs,
-			"del":        output.NewRoomEvent.RemovesStateEventIDs,
+			"add":        msg.AddsStateEventIDs,
+			"del":        msg.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
 	s.notifier.OnNewEvent(&ev, "", types.StreamPosition(syncStreamPos))
 
+	return nil
+}
+
+func (s *OutputRoomEvent) onNewInviteEvent(
+	ctx context.Context, msg api.OutputNewInviteEvent,
+) error {
+	syncStreamPos, err := s.db.AddInviteEvent(ctx, msg.Event)
+	if err != nil {
+		// panic rather than continue with an inconsistent database
+		log.WithFields(log.Fields{
+			"event":      string(msg.Event.JSON()),
+			log.ErrorKey: err,
+		}).Panicf("roomserver output log: write invite failure")
+		return nil
+	}
+	s.notifier.OnNewEvent(&msg.Event, "", syncStreamPos)
+	return nil
+}
+
+func (s *OutputRoomEvent) onRetireInviteEvent(
+	ctx context.Context, msg api.OutputRetireInviteEvent,
+) error {
+	err := s.db.RetireInviteEvent(ctx, msg.EventID)
+	if err != nil {
+		// panic rather than continue with an inconsistent database
+		log.WithFields(log.Fields{
+			"event_id":   msg.EventID,
+			log.ErrorKey: err,
+		}).Panicf("roomserver output log: remove invite failure")
+		return nil
+	}
+	// TODO: Notify any active sync requests that the invite has been retired.
+	// s.notifier.OnNewEvent(nil, msg.TargetUserID, syncStreamPos)
 	return nil
 }
 

@@ -47,32 +47,32 @@ type SyncServerDatabase struct {
 	accountData accountDataStatements
 	events      outputRoomEventsStatements
 	roomstate   currentRoomStateStatements
+	invites     inviteEventsStatements
 }
 
 // NewSyncServerDatabase creates a new sync server database
 func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
-	var db *sql.DB
+	var d SyncServerDatabase
 	var err error
-	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
-	partitions := common.PartitionOffsetStatements{}
-	if err = partitions.Prepare(db, "syncapi"); err != nil {
+	if err = d.partitions.Prepare(d.db, "syncapi"); err != nil {
 		return nil, err
 	}
-	accountData := accountDataStatements{}
-	if err = accountData.prepare(db); err != nil {
+	if err = d.accountData.prepare(d.db); err != nil {
 		return nil, err
 	}
-	events := outputRoomEventsStatements{}
-	if err = events.prepare(db); err != nil {
+	if err = d.events.prepare(d.db); err != nil {
 		return nil, err
 	}
-	state := currentRoomStateStatements{}
-	if err := state.prepare(db); err != nil {
+	if err := d.roomstate.prepare(d.db); err != nil {
 		return nil, err
 	}
-	return &SyncServerDatabase{db, partitions, accountData, events, state}, nil
+	if err := d.invites.prepare(d.db); err != nil {
+		return nil, err
+	}
+	return &d, nil
 }
 
 // AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
@@ -191,6 +191,13 @@ func (d *SyncServerDatabase) syncStreamPositionTx(
 	if maxAccountDataID > maxID {
 		maxID = maxAccountDataID
 	}
+	maxInviteID, err := d.invites.selectMaxInviteID(ctx, txn)
+	if err != nil {
+		return 0, err
+	}
+	if maxInviteID > maxID {
+		maxID = maxInviteID
+	}
 	return types.StreamPosition(maxID), nil
 }
 
@@ -260,7 +267,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 	}
 
 	// TODO: This should be done in getStateDeltas
-	if err = d.addInvitesToResponse(ctx, txn, userID, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, userID, fromPos, toPos, res); err != nil {
 		return nil, err
 	}
 
@@ -322,7 +329,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		res.Rooms.Join[roomID] = *jr
 	}
 
-	if err = d.addInvitesToResponse(ctx, txn, userID, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, userID, 0, pos, res); err != nil {
 		return nil, err
 	}
 
@@ -364,16 +371,45 @@ func (d *SyncServerDatabase) UpsertAccountData(
 	return types.StreamPosition(pos), err
 }
 
+// AddInviteEvent stores a new invite event for a user.
+// If the invite was successfully stored this returns the stream ID it was stored at.
+// Returns an error if there was a problem communicating with the database.
+func (d *SyncServerDatabase) AddInviteEvent(
+	ctx context.Context, inviteEvent gomatrixserverlib.Event,
+) (types.StreamPosition, error) {
+	pos, err := d.invites.insertInviteEvent(ctx, inviteEvent)
+	return types.StreamPosition(pos), err
+}
+
+// RetireInviteEvent removes an old invite event from the database.
+// Returns an error if there was a problem communicating with the database.
+func (d *SyncServerDatabase) RetireInviteEvent(
+	ctx context.Context, inviteEventID string,
+) error {
+	// TODO: Record that invite has been retired in a stream so that we can
+	// notify the user in an incremental sync.
+	err := d.invites.deleteInviteEvent(ctx, inviteEventID)
+	return err
+}
+
 func (d *SyncServerDatabase) addInvitesToResponse(
-	ctx context.Context, txn *sql.Tx, userID string, res *types.Response) error {
-	// Add invites - TODO: This will break over federation as they won't be in the current state table according to Mark.
-	roomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "invite")
+	ctx context.Context, txn *sql.Tx,
+	userID string,
+	fromPos, toPos types.StreamPosition,
+	res *types.Response,
+) error {
+	invites, err := d.invites.selectInviteEventsInRange(
+		ctx, txn, userID, int64(fromPos), int64(toPos),
+	)
 	if err != nil {
 		return err
 	}
-	for _, roomID := range roomIDs {
+	for roomID, inviteEvent := range invites {
 		ir := types.NewInviteResponse()
-		// TODO: invite_state. The state won't be in the current state table in cases where you get invited over federation
+		ir.InviteState.Events = gomatrixserverlib.ToClientEvents(
+			[]gomatrixserverlib.Event{inviteEvent}, gomatrixserverlib.FormatSync,
+		)
+		// TODO: add the invite state from the invite event.
 		res.Rooms.Invite[roomID] = *ir
 	}
 	return nil

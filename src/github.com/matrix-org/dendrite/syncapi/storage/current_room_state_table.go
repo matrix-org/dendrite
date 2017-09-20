@@ -140,7 +140,10 @@ func (s *currentRoomStateStatements) selectJoinedUsers(
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
 func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
-	ctx context.Context, txn *sql.Tx, userID, membership string,
+	ctx context.Context,
+	txn *sql.Tx,
+	userID string,
+	membership string, // nolint: unparam
 ) ([]string, error) {
 	stmt := common.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
 	rows, err := stmt.QueryContext(ctx, userID, membership)
