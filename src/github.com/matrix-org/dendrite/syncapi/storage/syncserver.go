@@ -47,32 +47,32 @@ type SyncServerDatabase struct {
 	accountData accountDataStatements
 	events      outputRoomEventsStatements
 	roomstate   currentRoomStateStatements
+	invites     inviteEventsStatements
 }
 
 // NewSyncServerDatabase creates a new sync server database
 func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
-	var db *sql.DB
+	var d SyncServerDatabase
 	var err error
-	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
-	partitions := common.PartitionOffsetStatements{}
-	if err = partitions.Prepare(db, "syncapi"); err != nil {
+	if err = d.partitions.Prepare(d.db, "syncapi"); err != nil {
 		return nil, err
 	}
-	accountData := accountDataStatements{}
-	if err = accountData.prepare(db); err != nil {
+	if err = d.accountData.prepare(d.db); err != nil {
 		return nil, err
 	}
-	events := outputRoomEventsStatements{}
-	if err = events.prepare(db); err != nil {
+	if err = d.events.prepare(d.db); err != nil {
 		return nil, err
 	}
-	state := currentRoomStateStatements{}
-	if err := state.prepare(db); err != nil {
+	if err := d.roomstate.prepare(d.db); err != nil {
 		return nil, err
 	}
-	return &SyncServerDatabase{db, partitions, accountData, events, state}, nil
+	if err := d.invites.prepare(d.db); err != nil {
+		return nil, err
+	}
+	return &d, nil
 }
 
 // AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
@@ -260,7 +260,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 	}
 
 	// TODO: This should be done in getStateDeltas
-	if err = d.addInvitesToResponse(ctx, txn, userID, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, userID, fromPos, toPos, res); err != nil {
 		return nil, err
 	}
 
@@ -322,7 +322,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		res.Rooms.Join[roomID] = *jr
 	}
 
-	if err = d.addInvitesToResponse(ctx, txn, userID, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, userID, 0, pos, res); err != nil {
 		return nil, err
 	}
 
@@ -365,7 +365,11 @@ func (d *SyncServerDatabase) UpsertAccountData(
 }
 
 func (d *SyncServerDatabase) addInvitesToResponse(
-	ctx context.Context, txn *sql.Tx, userID string, res *types.Response) error {
+	ctx context.Context, txn *sql.Tx,
+	userID string,
+	_, _ types.StreamPosition,
+	res *types.Response,
+) error {
 	// Add invites - TODO: This will break over federation as they won't be in the current state table according to Mark.
 	roomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "invite")
 	if err != nil {

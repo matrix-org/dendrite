@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -8,7 +9,7 @@ import (
 
 const inviteEventsSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_invite_events (
-	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_output_room_event_id_seq'),
+	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,
@@ -51,10 +52,13 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *inviteEventsStatements) insertInviteEvent(
-	inviteEvent gomatrixserverlib.Event,
+	ctx context.Context, inviteEvent gomatrixserverlib.Event,
 ) (streamPos int64, err error) {
-	err = s.insertInviteEventStmt.QueryRow(
-		inviteEvent.RoomID(), inviteEvent.EventID, *inviteEvent.StateKey(),
+	err = s.insertInviteEventStmt.QueryRowContext(
+		ctx,
+		inviteEvent.RoomID(),
+		inviteEvent.EventID(),
+		*inviteEvent.StateKey(),
 		inviteEvent.JSON(),
 	).Scan(&streamPos)
 	return
@@ -63,10 +67,10 @@ func (s *inviteEventsStatements) insertInviteEvent(
 // selectInviteEventsInRange returns a map of room ID to invite event for the
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) selectInviteEventsInRange(
-	targetUserID string, startPos, endPos int64,
+	ctx context.Context, targetUserID string, startPos, endPos int64,
 ) (map[string]gomatrixserverlib.Event, error) {
-	rows, err := s.selectInviteEventsInRangeStmt.Query(
-		targetUserID, startPos, endPos,
+	rows, err := s.selectInviteEventsInRangeStmt.QueryContext(
+		ctx, targetUserID, startPos, endPos,
 	)
 	if err != nil {
 		return nil, err
