@@ -226,7 +226,7 @@ func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath conf
 		// If the file is a duplicate (has the same hash as an existing file) then
 		// there is valid metadata in the database for that file. As such we only
 		// remove the file if it is not a duplicate.
-		if duplicate == false {
+		if !duplicate {
 			fileutils.RemoveDir(types.Path(path.Dir(string(finalPath))), r.Logger)
 		}
 		return &util.JSONResponse{
