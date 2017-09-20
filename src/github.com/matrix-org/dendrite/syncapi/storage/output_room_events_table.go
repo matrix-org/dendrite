@@ -30,7 +30,6 @@ const outputRoomEventsSchema = `
 CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
 
 -- Stores output room events received from the roomserver.
-CREATE SEQUENCE IF NOT EXISTS syncapi_output_room_event_id_seq
 CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     -- An incrementing ID which denotes the position in the log that this event resides at.
     -- NB: 'serial' makes no guarantees to increment by 1 every time, only that it increments.

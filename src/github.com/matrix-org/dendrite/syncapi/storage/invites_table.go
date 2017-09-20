@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
-
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -15,13 +14,16 @@ CREATE TABLE IF NOT EXISTS syncapi_invite_events (
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,
-	event_json TEXT NOT NULL,
+	event_json TEXT NOT NULL
 );
 
 -- For looking up the invites for a given user.
-CREATE INDEX IF NOT EXISTS syncapi_target_user_id_idx
-	ON syncapi_invite_events (target_user_id, id)
-);
+CREATE INDEX IF NOT EXISTS syncapi_invites_target_user_id_idx
+	ON syncapi_invite_events (target_user_id, id);
+
+-- For deleting old invites
+CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx
+	ON syncapi_invite_events(target_user_id, id);
 `
 
 const insertInviteEventSQL = "" +
