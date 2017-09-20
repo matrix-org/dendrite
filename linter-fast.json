@@ -1,0 +1,15 @@
+{
+    "Vendor": true,
+    "Cyclo": 12,
+    "Deadline": "5m",
+    "Enable": [
+        "vetshadow",
+        "gotype",
+        "deadcode",
+        "gocyclo",
+        "ineffassign",
+        "gas",
+        "misspell",
+        "errcheck"
+    ]
+}
