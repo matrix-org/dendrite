@@ -17,6 +17,7 @@
         "unparam",
         "errcheck",
         "vet",
+        "unused",
         "gosimple"
     ]
 }
