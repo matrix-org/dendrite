@@ -213,7 +213,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -233,7 +233,7 @@ func (s *outputRoomEventsStatements) selectEvents(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	return rowsToStreamEvents(rows)
 }
 

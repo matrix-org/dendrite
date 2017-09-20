@@ -105,7 +105,7 @@ func (s *joinedHostsStatements) selectJoinedHosts(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 
 	var result []types.JoinedHost
 	for rows.Next() {

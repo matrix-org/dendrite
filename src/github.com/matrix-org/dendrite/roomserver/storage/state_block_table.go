@@ -137,7 +137,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 
 	results := make([]types.StateEntryList, len(stateBlockNIDs))
 	// current is a pointer to the StateEntryList to append the state entries to.
@@ -193,7 +193,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 
 	var results []types.StateEntryList
 	var current types.StateEntryList

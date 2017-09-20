@@ -175,12 +175,21 @@ func startSyncServer() (*exec.Cmd, chan error) {
 
 // prepareKafka creates the topics which will be written to by the tests.
 func prepareKafka() {
-	exe.DeleteTopic(inputTopic)
-	if err := exe.CreateTopic(inputTopic); err != nil {
+	err := exe.DeleteTopic(inputTopic)
+	if err != nil {
 		panic(err)
 	}
-	exe.DeleteTopic(clientTopic)
-	if err := exe.CreateTopic(clientTopic); err != nil {
+
+	if err = exe.CreateTopic(inputTopic); err != nil {
+		panic(err)
+	}
+
+	err = exe.DeleteTopic(clientTopic)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = exe.CreateTopic(clientTopic); err != nil {
 		panic(err)
 	}
 }
@@ -225,7 +234,8 @@ func main() {
 	fmt.Println("==TESTING==", os.Args[0])
 	prepareKafka()
 	cmd, syncServerCmdChan := startSyncServer()
-	defer cmd.Process.Kill() // ensure server is dead, only cleaning up so don't care about errors this returns.
+	// ensure server is dead, only cleaning up so don't care about errors this returns.
+	defer cmd.Process.Kill() // nolint: errcheck
 
 	// $ curl -XPOST -d '{}' "http://localhost:8009/_matrix/client/r0/createRoom?access_token=@alice:localhost"
 	// $ curl -XPUT -d '{"msgtype":"m.text","body":"hello world"}' "http://localhost:8009/_matrix/client/r0/rooms/%21PjrbIMW2cIiaYF4t:localhost/send/m.room.message/1?access_token=@alice:localhost"

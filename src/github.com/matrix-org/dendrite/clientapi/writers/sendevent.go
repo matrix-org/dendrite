@@ -60,7 +60,10 @@ func SendEvent(
 		Type:     eventType,
 		StateKey: stateKey,
 	}
-	builder.SetContent(r)
+	err := builder.SetContent(r)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
 	e, err := events.BuildEvent(req.Context(), &builder, cfg, queryAPI, &queryRes)

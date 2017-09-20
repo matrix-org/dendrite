@@ -117,7 +117,10 @@ func processRoomEvent(
 				return err
 			}
 		}
-		db.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
+		err = db.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
+		if err != nil {
+			return err
+		}
 	}
 
 	if input.Kind == api.KindBackfill {

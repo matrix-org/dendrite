@@ -69,7 +69,10 @@ func BuildEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		authEvents.AddEvent(&queryRes.StateEvents[i])
+		err = authEvents.AddEvent(&queryRes.StateEvents[i])
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)

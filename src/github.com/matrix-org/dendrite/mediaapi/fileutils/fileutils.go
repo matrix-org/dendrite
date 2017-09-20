@@ -105,12 +105,14 @@ func RemoveDir(dir types.Path, logger *log.Entry) {
 }
 
 // WriteTempFile writes to a new temporary file
-func WriteTempFile(reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, absBasePath config.Path) (types.Base64Hash, types.FileSizeBytes, types.Path, error) {
+func WriteTempFile(reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, absBasePath config.Path) (hash types.Base64Hash, size types.FileSizeBytes, path types.Path, err error) {
+	size = -1
+
 	tmpFileWriter, tmpFile, tmpDir, err := createTempFileWriter(absBasePath)
 	if err != nil {
-		return "", -1, "", err
+		return
 	}
-	defer tmpFile.Close()
+	defer (func() { err = tmpFile.Close() })()
 
 	// The amount of data read is limited to maxFileSizeBytes. At this point, if there is more data it will be truncated.
 	limitedReader := io.LimitReader(reqReader, int64(maxFileSizeBytes))
@@ -121,13 +123,18 @@ func WriteTempFile(reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, a
 	teeReader := io.TeeReader(limitedReader, hasher)
 	bytesWritten, err := io.Copy(tmpFileWriter, teeReader)
 	if err != nil && err != io.EOF {
-		return "", -1, "", err
+		return
 	}
 
-	tmpFileWriter.Flush()
+	err = tmpFileWriter.Flush()
+	if err != nil {
+		return
+	}
 
-	hash := hasher.Sum(nil)
-	return types.Base64Hash(base64.RawURLEncoding.EncodeToString(hash[:])), types.FileSizeBytes(bytesWritten), tmpDir, nil
+	hash = types.Base64Hash(base64.RawURLEncoding.EncodeToString(hasher.Sum(nil)[:]))
+	size = types.FileSizeBytes(bytesWritten)
+	path = tmpDir
+	return
 }
 
 // moveFile attempts to move the file src to dst
