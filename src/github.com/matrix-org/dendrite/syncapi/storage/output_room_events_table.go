@@ -35,11 +35,7 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     -- An incrementing ID which denotes the position in the log that this event resides at.
     -- NB: 'serial' makes no guarantees to increment by 1 every time, only that it increments.
     --     This isn't a problem for us since we just want to order by this field.
-<<<<<<< HEAD
     id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
-=======
-    id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_output_room_event_id_seq'),
->>>>>>> 960083b099c96b25b0c81ea602b372470e9cf889
     -- The event ID for the event
     event_id TEXT NOT NULL,
     -- The 'room_id' key for the event.

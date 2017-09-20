@@ -364,6 +364,27 @@ func (d *SyncServerDatabase) UpsertAccountData(
 	return types.StreamPosition(pos), err
 }
 
+// AddInviteEvent stores a new invite event for a user.
+// If the invite was successfully stored this returns the stream ID it was stored at.
+// Returns an error if there was a problem communicating with the database.
+func (d *SyncServerDatabase) AddInviteEvent(
+	ctx context.Context, inviteEvent gomatrixserverlib.Event,
+) (types.StreamPosition, error) {
+	pos, err := d.invites.insertInviteEvent(ctx, inviteEvent)
+	return types.StreamPosition(pos), err
+}
+
+// RetireInviteEvent removes an old invite event from the database.
+// Returns an error if there was a problem communicating with the database.
+func (d *SyncServerDatabase) RetireInviteEvent(
+	ctx context.Context, inviteEventID string,
+) error {
+	// TODO: Record that invite has been retired in a stream so that we can
+	// notify the user in an incremental sync.
+	err := d.invites.deleteInviteEvent(ctx, inviteEventID)
+	return err
+}
+
 func (d *SyncServerDatabase) addInvitesToResponse(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
@@ -381,7 +402,7 @@ func (d *SyncServerDatabase) addInvitesToResponse(
 		ir.InviteState.Events = gomatrixserverlib.ToClientEvents(
 			[]gomatrixserverlib.Event{inviteEvent}, gomatrixserverlib.FormatSync,
 		)
-		// TODO: invite_state. The state won't be in the current state table in cases where you get invited over federation
+		// TODO: add the invite state from the invite event.
 		res.Rooms.Invite[roomID] = *ir
 	}
 	return nil

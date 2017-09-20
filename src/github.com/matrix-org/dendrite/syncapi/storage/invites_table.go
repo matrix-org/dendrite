@@ -29,6 +29,9 @@ const insertInviteEventSQL = "" +
 	" room_id, event_id, target_user_id, event_json" +
 	") VALUES ($1, $2, $3, $4) RETURNING id"
 
+const deleteInviteEventSQL = "" +
+	"DELETE FROM syncapi_invite_events WHERE event_id = $1"
+
 const selectInviteEventsInRangeSQL = "" +
 	"SELECT room_id, event_json FROM syncapi_invite_events" +
 	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
@@ -37,6 +40,7 @@ const selectInviteEventsInRangeSQL = "" +
 type inviteEventsStatements struct {
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt
+	deleteInviteEventStmt         *sql.Stmt
 }
 
 func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
@@ -48,6 +52,9 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectInviteEventsInRangeStmt, err = db.Prepare(selectInviteEventsInRangeSQL); err != nil {
+		return
+	}
+	if s.deleteInviteEventStmt, err = db.Prepare(deleteInviteEventSQL); err != nil {
 		return
 	}
 	return
@@ -64,6 +71,13 @@ func (s *inviteEventsStatements) insertInviteEvent(
 		inviteEvent.JSON(),
 	).Scan(&streamPos)
 	return
+}
+
+func (s *inviteEventsStatements) deleteInviteEvent(
+	ctx context.Context, inviteEventID string,
+) error {
+	_, err := s.deleteInviteEventStmt.ExecContext(ctx, inviteEventID)
+	return err
 }
 
 // selectInviteEventsInRange returns a map of room ID to invite event for the
