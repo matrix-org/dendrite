@@ -367,16 +367,20 @@ func (d *SyncServerDatabase) UpsertAccountData(
 func (d *SyncServerDatabase) addInvitesToResponse(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
-	_, _ types.StreamPosition,
+	fromPos, toPos types.StreamPosition,
 	res *types.Response,
 ) error {
-	// Add invites - TODO: This will break over federation as they won't be in the current state table according to Mark.
-	roomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "invite")
+	invites, err := d.invites.selectInviteEventsInRange(
+		ctx, txn, userID, int64(fromPos), int64(toPos),
+	)
 	if err != nil {
 		return err
 	}
-	for _, roomID := range roomIDs {
+	for roomID, inviteEvent := range invites {
 		ir := types.NewInviteResponse()
+		ir.InviteState.Events = gomatrixserverlib.ToClientEvents(
+			[]gomatrixserverlib.Event{inviteEvent}, gomatrixserverlib.FormatSync,
+		)
 		// TODO: invite_state. The state won't be in the current state table in cases where you get invited over federation
 		res.Rooms.Invite[roomID] = *ir
 	}

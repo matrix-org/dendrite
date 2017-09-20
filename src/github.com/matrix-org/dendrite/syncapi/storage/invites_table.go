@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -67,11 +69,10 @@ func (s *inviteEventsStatements) insertInviteEvent(
 // selectInviteEventsInRange returns a map of room ID to invite event for the
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) selectInviteEventsInRange(
-	ctx context.Context, targetUserID string, startPos, endPos int64,
+	ctx context.Context, txn *sql.Tx, targetUserID string, startPos, endPos int64,
 ) (map[string]gomatrixserverlib.Event, error) {
-	rows, err := s.selectInviteEventsInRangeStmt.QueryContext(
-		ctx, targetUserID, startPos, endPos,
-	)
+	stmt := common.TxStmt(txn, s.selectInviteEventsInRangeStmt)
+	rows, err := stmt.QueryContext(ctx, targetUserID, startPos, endPos)
 	if err != nil {
 		return nil, err
 	}
