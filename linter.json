@@ -17,7 +17,6 @@
         "unparam",
         "errcheck",
         "vet",
-        "gosimple",
-        "staticcheck"
+        "megacheck"
     ]
 }
