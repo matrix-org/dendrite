@@ -191,6 +191,13 @@ func (d *SyncServerDatabase) syncStreamPositionTx(
 	if maxAccountDataID > maxID {
 		maxID = maxAccountDataID
 	}
+	maxInviteID, err := d.invites.selectMaxInviteID(ctx, txn)
+	if err != nil {
+		return 0, err
+	}
+	if maxInviteID > maxID {
+		maxID = maxInviteID
+	}
 	return types.StreamPosition(maxID), nil
 }
 

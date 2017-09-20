@@ -39,10 +39,14 @@ const selectInviteEventsInRangeSQL = "" +
 	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC"
 
+const selectMaxInviteIDSQL = "" +
+	"SELECT MAX(id) FROM syncapi_invite_events"
+
 type inviteEventsStatements struct {
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt
 	deleteInviteEventStmt         *sql.Stmt
+	selectMaxInviteIDStmt         *sql.Stmt
 }
 
 func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
@@ -57,6 +61,9 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.deleteInviteEventStmt, err = db.Prepare(deleteInviteEventSQL); err != nil {
+		return
+	}
+	if s.selectMaxInviteIDStmt, err = db.Prepare(selectMaxInviteIDSQL); err != nil {
 		return
 	}
 	return
@@ -111,4 +118,16 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 		result[roomID] = event
 	}
 	return result, nil
+}
+
+func (s *inviteEventsStatements) selectMaxInviteID(
+	ctx context.Context, txn *sql.Tx,
+) (id int64, err error) {
+	var nullableID sql.NullInt64
+	stmt := common.TxStmt(txn, s.selectMaxInviteIDStmt)
+	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	if nullableID.Valid {
+		id = nullableID.Int64
+	}
+	return
 }
