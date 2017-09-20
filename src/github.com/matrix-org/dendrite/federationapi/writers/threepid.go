@@ -347,9 +347,5 @@ func fillDisplayName(
 	// Use the m.room.third_party_invite event to fill the "displayname" and
 	// update the m.room.member event's content with it
 	content.ThirdPartyInvite.DisplayName = thirdPartyInviteContent.DisplayName
-	if err := builder.SetContent(content); err != nil {
-		return err
-	}
-
-	return nil
+	return builder.SetContent(content)
 }

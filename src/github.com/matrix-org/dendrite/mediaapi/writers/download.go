@@ -155,7 +155,7 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 
 // Validate validates the downloadRequest fields
 func (r *downloadRequest) Validate() *util.JSONResponse {
-	if mediaIDRegex.MatchString(string(r.MediaMetadata.MediaID)) == false {
+	if !mediaIDRegex.MatchString(string(r.MediaMetadata.MediaID)) {
 		return &util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(fmt.Sprintf("mediaId must be a non-empty string using only characters in %v", mediaIDCharacters)),
@@ -179,9 +179,9 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 		}
 		// Default method to scale if not set
 		if r.ThumbnailSize.ResizeMethod == "" {
-			r.ThumbnailSize.ResizeMethod = "scale"
+			r.ThumbnailSize.ResizeMethod = types.Scale
 		}
-		if r.ThumbnailSize.ResizeMethod != "crop" && r.ThumbnailSize.ResizeMethod != "scale" {
+		if r.ThumbnailSize.ResizeMethod != types.Crop && r.ThumbnailSize.ResizeMethod != types.Scale {
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.Unknown("method must be one of crop or scale"),
@@ -236,7 +236,7 @@ func (r *downloadRequest) respondFromLocalFile(
 		return nil, errors.Wrap(err, "failed to get file path from metadata")
 	}
 	file, err := os.Open(filePath)
-	defer file.Close() // nolint: errcheck
+	defer file.Close() // nolint: errcheck, staticcheck, megacheck
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open file")
 	}
@@ -337,7 +337,7 @@ func (r *downloadRequest) getThumbnailFile(
 		thumbnail, thumbnailSize = thumbnailer.SelectThumbnail(r.ThumbnailSize, thumbnails, thumbnailSizes)
 		// If dynamicThumbnails is true and we are not over-loaded then we would have generated what was requested above.
 		// So we don't try to generate a pre-generated thumbnail here.
-		if thumbnailSize != nil && dynamicThumbnails == false {
+		if thumbnailSize != nil && !dynamicThumbnails {
 			r.Logger.WithFields(log.Fields{
 				"Width":        thumbnailSize.Width,
 				"Height":       thumbnailSize.Height,
@@ -525,7 +525,7 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 		// If the file is a duplicate (has the same hash as an existing file) then
 		// there is valid metadata in the database for that file. As such we only
 		// remove the file if it is not a duplicate.
-		if duplicate == false {
+		if !duplicate {
 			finalDir := filepath.Dir(string(finalPath))
 			fileutils.RemoveDir(types.Path(finalDir), r.Logger)
 		}

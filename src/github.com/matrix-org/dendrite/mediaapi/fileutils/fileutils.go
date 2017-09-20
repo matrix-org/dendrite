@@ -55,7 +55,7 @@ func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath config.Path)
 	// check if the absolute absBasePath is a prefix of the absolute filePath
 	// if so, no directory escape has occurred and the filePath is valid
 	// Note: absBasePath is already absolute
-	if strings.HasPrefix(filePath, string(absBasePath)) == false {
+	if !strings.HasPrefix(filePath, string(absBasePath)) {
 		return "", fmt.Errorf("Invalid filePath (not within absBasePath %v): %v", absBasePath, filePath)
 	}
 

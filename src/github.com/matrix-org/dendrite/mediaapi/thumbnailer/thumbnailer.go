@@ -63,28 +63,24 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 	bestFit := newThumbnailFitness()
 
 	for _, thumbnail := range thumbnails {
-		if desired.ResizeMethod == "scale" && thumbnail.ThumbnailSize.ResizeMethod != "scale" {
+		if desired.ResizeMethod == types.Scale && thumbnail.ThumbnailSize.ResizeMethod != types.Scale {
 			continue
 		}
 		fitness := calcThumbnailFitness(thumbnail.ThumbnailSize, thumbnail.MediaMetadata, desired)
-		if isBetter := fitness.betterThan(bestFit, desired.ResizeMethod == "crop"); isBetter {
+		if isBetter := fitness.betterThan(bestFit, desired.ResizeMethod == types.Crop); isBetter {
 			bestFit = fitness
 			chosenThumbnail = thumbnail
 		}
 	}
 
 	for _, thumbnailSize := range thumbnailSizes {
-		if desired.ResizeMethod == "scale" && thumbnailSize.ResizeMethod != "scale" {
+		if desired.ResizeMethod == types.Scale && thumbnailSize.ResizeMethod != types.Scale {
 			continue
 		}
 		fitness := calcThumbnailFitness(types.ThumbnailSize(thumbnailSize), nil, desired)
-		if isBetter := fitness.betterThan(bestFit, desired.ResizeMethod == "crop"); isBetter {
+		if isBetter := fitness.betterThan(bestFit, desired.ResizeMethod == types.Crop); isBetter {
 			bestFit = fitness
-			chosenThumbnailSize = &types.ThumbnailSize{
-				Width:        thumbnailSize.Width,
-				Height:       thumbnailSize.Height,
-				ResizeMethod: thumbnailSize.ResizeMethod,
-			}
+			chosenThumbnailSize = (*types.ThumbnailSize)(&thumbnailSize)
 		}
 	}
 

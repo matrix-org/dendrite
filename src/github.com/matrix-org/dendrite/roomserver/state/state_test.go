@@ -15,8 +15,9 @@
 package state
 
 import (
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"testing"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 func TestFindDuplicateStateKeys(t *testing.T) {
@@ -25,18 +26,18 @@ func TestFindDuplicateStateKeys(t *testing.T) {
 		Want  []types.StateEntry
 	}{{
 		Input: []types.StateEntry{
-			{types.StateKeyTuple{1, 1}, 1},
-			{types.StateKeyTuple{1, 1}, 2},
-			{types.StateKeyTuple{2, 2}, 3},
+			{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1}, EventNID: 1},
+			{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1}, EventNID: 2},
+			{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 2, EventStateKeyNID: 2}, EventNID: 3},
 		},
 		Want: []types.StateEntry{
-			{types.StateKeyTuple{1, 1}, 1},
-			{types.StateKeyTuple{1, 1}, 2},
+			{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1}, EventNID: 1},
+			{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1}, EventNID: 2},
 		},
 	}, {
 		Input: []types.StateEntry{
-			{types.StateKeyTuple{1, 1}, 1},
-			{types.StateKeyTuple{1, 2}, 2},
+			{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1}, EventNID: 1},
+			{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 2}, EventNID: 2},
 		},
 		Want: nil,
 	}}

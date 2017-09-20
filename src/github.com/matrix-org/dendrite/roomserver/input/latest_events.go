@@ -102,8 +102,7 @@ type latestEventsUpdater struct {
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
-	var prevEvents []gomatrixserverlib.EventReference
-	prevEvents = u.event.PrevEvents()
+	prevEvents := u.event.PrevEvents()
 	oldLatest := u.updater.LatestEvents()
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 	u.oldStateNID = u.updater.CurrentStateSnapshotNID()
@@ -194,10 +193,7 @@ func (u *latestEventsUpdater) latestState() error {
 	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = state.DifferenceBetweeenStateSnapshots(
 		u.ctx, u.db, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
 	)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func calculateLatest(
@@ -211,7 +207,7 @@ func calculateLatest(
 	for _, l := range oldLatest {
 		keep := true
 		for _, prevEvent := range prevEvents {
-			if l.EventID == prevEvent.EventID && bytes.Compare(l.EventSHA256, prevEvent.EventSHA256) == 0 {
+			if l.EventID == prevEvent.EventID && bytes.Equal(l.EventSHA256, prevEvent.EventSHA256) {
 				// This event can be removed from the latest events cause we've found an event that references it.
 				// (If an event is referenced by another event then it can't be one of the latest events in the room
 				//  because we have an event that comes after it)

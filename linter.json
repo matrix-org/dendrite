@@ -15,6 +15,9 @@
         "gas",
         "misspell",
         "unparam",
-        "errcheck"
+        "errcheck",
+        "vet",
+        "megacheck",
+        "goconst"
     ]
 }

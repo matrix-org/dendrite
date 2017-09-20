@@ -217,11 +217,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	var inputRes api.InputRoomEventsResponse
 
 	// Send the request
-	if err := r.InputAPI.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
-		return err
-	}
-
-	return nil
+	return r.InputAPI.InputRoomEvents(ctx, &inputReq, &inputRes)
 }
 
 // SetupHTTP adds the RoomserverAliasAPI handlers to the http.ServeMux.

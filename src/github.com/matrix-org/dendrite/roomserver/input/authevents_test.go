@@ -15,24 +15,29 @@
 package input
 
 import (
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"testing"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 func benchmarkStateEntryMapLookup(entries, lookups int64, b *testing.B) {
 	var list []types.StateEntry
 	for i := int64(0); i < entries; i++ {
-		list = append(list, types.StateEntry{types.StateKeyTuple{
-			types.EventTypeNID(i),
-			types.EventStateKeyNID(i),
-		}, types.EventNID(i)})
+		list = append(list, types.StateEntry{
+			StateKeyTuple: types.StateKeyTuple{
+				EventTypeNID:     types.EventTypeNID(i),
+				EventStateKeyNID: types.EventStateKeyNID(i),
+			},
+			EventNID: types.EventNID(i),
+		})
 	}
 
 	for i := 0; i < b.N; i++ {
 		entryMap := stateEntryMap(list)
 		for j := int64(0); j < lookups; j++ {
 			entryMap.lookup(types.StateKeyTuple{
-				types.EventTypeNID(j), types.EventStateKeyNID(j),
+				EventTypeNID:     types.EventTypeNID(j),
+				EventStateKeyNID: types.EventStateKeyNID(j),
 			})
 		}
 	}
@@ -56,9 +61,9 @@ func BenchmarkStateEntryMap1000Lookup10000(b *testing.B) {
 
 func TestStateEntryMap(t *testing.T) {
 	entryMap := stateEntryMap([]types.StateEntry{
-		{types.StateKeyTuple{1, 1}, 1},
-		{types.StateKeyTuple{1, 3}, 2},
-		{types.StateKeyTuple{2, 1}, 3},
+		{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1}, EventNID: 1},
+		{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 3}, EventNID: 2},
+		{StateKeyTuple: types.StateKeyTuple{EventTypeNID: 2, EventStateKeyNID: 1}, EventNID: 3},
 	})
 
 	testCases := []struct {
@@ -78,7 +83,7 @@ func TestStateEntryMap(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		keyTuple := types.StateKeyTuple{testCase.inputTypeNID, testCase.inputStateKey}
+		keyTuple := types.StateKeyTuple{EventTypeNID: testCase.inputTypeNID, EventStateKeyNID: testCase.inputStateKey}
 		gotEventNID, gotOK := entryMap.lookup(keyTuple)
 		if testCase.wantOK != gotOK {
 			t.Fatalf("stateEntryMap lookup(%v): want ok to be %v, got %v", keyTuple, testCase.wantOK, gotOK)

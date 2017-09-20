@@ -14,7 +14,7 @@
 
 package main
 
-// nolint: varcheck, deadcode
+// nolint: varcheck, deadcode, unused, megacheck
 const (
 	i0StateRoomCreate = iota
 	i1StateAliceJoin

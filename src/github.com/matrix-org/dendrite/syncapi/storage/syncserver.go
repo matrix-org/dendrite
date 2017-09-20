@@ -497,9 +497,7 @@ func (d *SyncServerDatabase) fetchMissingStateEvents(
 	if len(stateEvents) != len(missing) {
 		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
 	}
-	for _, e := range stateEvents {
-		events = append(events, e)
-	}
+	events = append(events, stateEvents...)
 	return events, nil
 }
 

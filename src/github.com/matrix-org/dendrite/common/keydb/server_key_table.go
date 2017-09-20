@@ -97,7 +97,8 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 			return nil, err
 		}
 		r := gomatrixserverlib.PublicKeyRequest{
-			gomatrixserverlib.ServerName(serverName), gomatrixserverlib.KeyID(keyID),
+			ServerName: gomatrixserverlib.ServerName(serverName),
+			KeyID:      gomatrixserverlib.KeyID(keyID),
 		}
 		results[r] = serverKeys
 	}
@@ -115,10 +116,7 @@ func (s *serverKeyStatements) upsertServerKeys(
 		string(request.ServerName), string(request.KeyID), nameAndKeyID(request),
 		int64(keys.ValidUntilTS), keyJSON,
 	)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func nameAndKeyID(request gomatrixserverlib.PublicKeyRequest) string {

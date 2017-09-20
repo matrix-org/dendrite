@@ -52,6 +52,7 @@ func MakeFedAPI(
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
 // listener.
 func SetupHTTPAPI(servMux *http.ServeMux, apiMux *mux.Router) {
-	servMux.Handle("/metrics", prometheus.Handler())
+	// This is deprecated.
+	servMux.Handle("/metrics", prometheus.Handler()) // nolint: megacheck, staticcheck
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }

@@ -149,14 +149,14 @@ func createThumbnail(src types.Path, img image.Image, config types.ThumbnailSize
 	}
 
 	start := time.Now()
-	width, height, err := adjustSize(dst, img, config.Width, config.Height, config.ResizeMethod == "crop", logger)
+	width, height, err := adjustSize(dst, img, config.Width, config.Height, config.ResizeMethod == types.Crop, logger)
 	if err != nil {
 		return false, err
 	}
 	logger.WithFields(log.Fields{
 		"ActualWidth":  width,
 		"ActualHeight": height,
-		"processTime":  time.Now().Sub(start),
+		"processTime":  time.Since(start),
 	}).Info("Generated thumbnail")
 
 	stat, err := os.Stat(string(dst))
