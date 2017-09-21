@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -82,9 +83,12 @@ func (s *thumbnailStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *thumbnailStatements) insertThumbnail(thumbnailMetadata *types.ThumbnailMetadata) error {
+func (s *thumbnailStatements) insertThumbnail(
+	ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata,
+) error {
 	thumbnailMetadata.MediaMetadata.CreationTimestamp = types.UnixMs(time.Now().UnixNano() / 1000000)
-	_, err := s.insertThumbnailStmt.Exec(
+	_, err := s.insertThumbnailStmt.ExecContext(
+		ctx,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.MediaMetadata.ContentType,
@@ -97,7 +101,13 @@ func (s *thumbnailStatements) insertThumbnail(thumbnailMetadata *types.Thumbnail
 	return err
 }
 
-func (s *thumbnailStatements) selectThumbnail(mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName, width, height int, resizeMethod string) (*types.ThumbnailMetadata, error) {
+func (s *thumbnailStatements) selectThumbnail(
+	ctx context.Context,
+	mediaID types.MediaID,
+	mediaOrigin gomatrixserverlib.ServerName,
+	width, height int,
+	resizeMethod string,
+) (*types.ThumbnailMetadata, error) {
 	thumbnailMetadata := types.ThumbnailMetadata{
 		MediaMetadata: &types.MediaMetadata{
 			MediaID: mediaID,
@@ -109,7 +119,8 @@ func (s *thumbnailStatements) selectThumbnail(mediaID types.MediaID, mediaOrigin
 			ResizeMethod: resizeMethod,
 		},
 	}
-	err := s.selectThumbnailStmt.QueryRow(
+	err := s.selectThumbnailStmt.QueryRowContext(
+		ctx,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.ThumbnailSize.Width,
@@ -123,9 +134,11 @@ func (s *thumbnailStatements) selectThumbnail(mediaID types.MediaID, mediaOrigin
 	return &thumbnailMetadata, err
 }
 
-func (s *thumbnailStatements) selectThumbnails(mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) ([]*types.ThumbnailMetadata, error) {
-	rows, err := s.selectThumbnailsStmt.Query(
-		mediaID, mediaOrigin,
+func (s *thumbnailStatements) selectThumbnails(
+	ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName,
+) ([]*types.ThumbnailMetadata, error) {
+	rows, err := s.selectThumbnailsStmt.QueryContext(
+		ctx, mediaID, mediaOrigin,
 	)
 	if err != nil {
 		return nil, err
