@@ -49,7 +49,7 @@ func (d *Database) FetchKeys(
 	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys, error) {
-	return d.statements.bulkSelectServerKeys(requests)
+	return d.statements.bulkSelectServerKeys(ctx, requests)
 }
 
 // StoreKeys implements gomatrixserverlib.KeyDatabase
@@ -62,7 +62,7 @@ func (d *Database) StoreKeys(
 	// high for a single insert statement.
 	var lastErr error
 	for request, keys := range keyMap {
-		if err := d.statements.upsertServerKeys(request, keys); err != nil {
+		if err := d.statements.upsertServerKeys(ctx, request, keys); err != nil {
 			// Rather than returning immediately on error we try to insert the
 			// remaining keys.
 			// Since we are inserting the keys outside of a transaction it is
