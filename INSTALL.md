@@ -108,23 +108,50 @@ The following contains scripts which will run all the required processes in orde
 
 ```
 
-                                                   DB:syncserver
-                                                        |               roomserver_output_topic_dev
-                                     /sync    +--------------------------+ <=====================
-                                   +--------->| dendrite-sync-api-server |                     ||
-                                   |          +--------------------------+        +----------------------+
-Matrix      +------------------+   |        :7773               query API         | dendrite-room-server |--DB:roomserver
-Clients --->| client-api-proxy |---+                           +----------------->+----------------------+
-            +------------------+   |                           |               :7770           ^^
-          :8008                    | CS API   +----------------------------+                   ||
-                                   +--------->| dendrite-client-api-server |===================||
-                                   |          +----------------------------+   roomserver_input_topic_dev
-                                   |        :7771
-                                   |
-                                   | /media   +---------------------------+ 
+                                     /media   +---------------------------+ 
                                    +--------->| dendrite-media-api-server |
-                                              +---------------------------+
-                                            :7774
+                                   |          +---------------------------+
+                                   |        :7774
+                                   |
+                                   |
+                                   |/directory+----------------------------------+
+                                   +--------->| dendrite-public-rooms-api-server |<========++
+                                   |          +----------------------------------+         ||
+                                   |        :7775    |                                     ||
+                                   |    +<-----------+                                     ||
+                                   |    |                                                  ||
+                                   | /sync    +--------------------------+                 ||
+                                   +--------->| dendrite-sync-api-server |<================++
+                                   |    |     +--------------------------+                 ||
+Matrix      +------------------+   |    |   :7773    |                                     ||
+Clients --->| client-api-proxy |---+    +<-----------+                                     ||
+            +------------------+   |    |                                                  ||
+          :8008                    | CS API   +----------------------------+               ||
+                                   +--------->| dendrite-client-api-server |==++           ||
+                                        |     +----------------------------+  ||           ||
+                                        |   :7771    |                        ||           ||
+                                        |            |            client_data ||           ||
+                                        +<-----------+         ++=============++           ||
+                                        |                      ||                          ||
+                                        |                      VV                          ||
+                                        |           +----------------------+    room_event ||
+                                        +---------->| dendrite-room-server |===============++
+                                        |           +----------------------+               ||
+                                        |         :7770                                    ||
+                                        |                      ++==========================++
+                                        +<------------+        ||
+                                        |             |        VV
+                                        |     +-----------------------------------+              Matrix
+                                        |     | dendrite-federation-sender-server |------------> Servers
+                                        |     +-----------------------------------+
+                                        |   :7776
+                                        |
+                                        +<-----------+
+                                                     |
+Matrix      +----------------------+  SS API  +--------------------------------+
+Servers --->| federation-api-proxy |--------->| dendrite-federation-api-server |
+            +----------------------+          +--------------------------------+
+          :8448                             :7772
 
 
    A --> B  = HTTP requests (A = client, B = server)
@@ -136,13 +163,12 @@ Clients --->| client-api-proxy |---+                           +----------------
 This is what Matrix clients will talk to. If you use the script below, point your client at `http://localhost:8008`.
 
 ```bash
-#!/bin/bash
-
 ./bin/client-api-proxy \
 --bind-address ":8008" \
---sync-api-server-url "http://localhost:7773" \
 --client-api-server-url "http://localhost:7771" \
---media-api-server-url "http://localhost:7774"
+--sync-api-server-url "http://localhost:7773" \
+--media-api-server-url "http://localhost:7774" \
+--public-rooms-api-server-url "http://localhost:7775" \
 ```
 
 ### Run a client api
@@ -177,4 +203,41 @@ This implements `/media` requests. Clients talk to this via the proxy in order t
 
 ```bash
 ./bin/dendrite-media-api-server --config dendrite.yaml
+```
+
+### Run public room server
+
+This implements `/directory` requests. Clients talk to this via the proxy in order to retrieve room directory listings.
+
+```bash
+./bin/dendrite-public-rooms-api-server --config dendrite.yaml
+```
+
+### Run a federation api proxy
+
+This is what Matrix servers will talk to. This is only required if you want to support federation.
+
+```bash
+./bin/federation-api-proxy \
+--bind-address ":8448" \
+--federation-api-url "http://localhost:7772" \
+```
+
+### Run a federation api server
+
+This implements federation requests. Servers talk to this via the proxy in
+order to send transactions.  This is only required if you want to support
+federation.
+
+```bash
+./bin/dendrite-federation-api-server --config dendrite.yaml
+```
+
+### Run a federation sender server
+
+This sends events from our users to other servers.  This is only required if
+you want to support federation.
+
+```bash
+./bin/dendrite-federation-sender-server --config dendrite.yaml
 ```
