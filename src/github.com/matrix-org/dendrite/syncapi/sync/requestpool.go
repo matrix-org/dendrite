@@ -130,7 +130,7 @@ func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) 
 	// Fill the prev_content and replaces_state keys if necessary
 	for _, event := range stateEvents {
 		stateEvent := stateEventInStateResp{
-			ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll)
+			ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll),
 		}
 		var prevEventRef types.PrevEventRef
 		fmt.Println(len(event.Unsigned()))
