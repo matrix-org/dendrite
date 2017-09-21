@@ -107,22 +107,31 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	}
 }
 
-type stateEventInResp struct {
+type stateEventInStateResp struct {
 	gomatrixserverlib.ClientEvent
 	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
 	ReplacesState string          `json:"replaces_state,omitempty"`
 }
 
+// OnIncomingStateRequest is called when a client makes a /rooms/{roomID}/state
+// request. It will fetch all the state events from the specified room and will
+// append the necessary keys to them if applicable before returning them.
+// Returns an error if something went wrong in the process.
+// TODO: Check if the user is in the room. If not, check if the room's history
+// is publicly visible. Current behaviour is returning an empty array if the
+// user cannot see the room's history.
 func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) util.JSONResponse {
 	stateEvents, err := rp.db.GetStateEventsForRoom(req.Context(), roomID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	resp := []stateEventInResp{}
+	resp := []stateEventInStateResp{}
 	// Fill the prev_content and replaces_state keys if necessary
 	for _, event := range stateEvents {
-		stateEvent := stateEventInResp{ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll)}
+		stateEvent := stateEventInStateResp{
+			ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll)
+		}
 		var prevEventRef types.PrevEventRef
 		fmt.Println(len(event.Unsigned()))
 		if len(event.Unsigned()) > 0 {

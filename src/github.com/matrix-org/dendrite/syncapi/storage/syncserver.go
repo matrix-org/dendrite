@@ -162,6 +162,9 @@ func (d *SyncServerDatabase) GetStateEvent(
 	return d.roomstate.selectStateEvent(ctx, evType, roomID, stateKey)
 }
 
+// GetStateEventsForRoom fetches the state events for a given room.
+// Returns an empty slice if no state events could be found for this room.
+// Returns an error if there was an issue with the retrieval.
 func (d *SyncServerDatabase) GetStateEventsForRoom(
 	ctx context.Context, roomID string,
 ) (stateEvents []gomatrixserverlib.Event, err error) {
