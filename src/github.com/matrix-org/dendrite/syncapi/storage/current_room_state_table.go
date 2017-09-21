@@ -216,7 +216,7 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 }
 
 func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
-	var result []gomatrixserverlib.Event
+	result := []gomatrixserverlib.Event{}
 	for rows.Next() {
 		var eventBytes []byte
 		if err := rows.Scan(&eventBytes); err != nil {
