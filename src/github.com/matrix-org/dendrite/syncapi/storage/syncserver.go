@@ -42,8 +42,8 @@ type streamEvent struct {
 
 // SyncServerDatabase represents a sync server database
 type SyncServerDatabase struct {
-	db          *sql.DB
-	partitions  common.PartitionOffsetStatements
+	db *sql.DB
+	common.PartitionOffsetStatements
 	accountData accountDataStatements
 	events      outputRoomEventsStatements
 	roomstate   currentRoomStateStatements
@@ -57,7 +57,7 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
-	if err = d.partitions.Prepare(d.db, "syncapi"); err != nil {
+	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
 		return nil, err
 	}
 	if err = d.accountData.prepare(d.db); err != nil {
@@ -160,16 +160,6 @@ func (d *SyncServerDatabase) GetStateEvent(
 	ctx context.Context, evType, roomID, stateKey string,
 ) (*gomatrixserverlib.Event, error) {
 	return d.roomstate.selectStateEvent(ctx, evType, roomID, stateKey)
-}
-
-// PartitionOffsets implements common.PartitionStorer
-func (d *SyncServerDatabase) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
-	return d.partitions.SelectPartitionOffsets(topic)
-}
-
-// SetPartitionOffset implements common.PartitionStorer
-func (d *SyncServerDatabase) SetPartitionOffset(topic string, partition int32, offset int64) error {
-	return d.partitions.UpsertPartitionOffset(topic, partition, offset)
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.

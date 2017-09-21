@@ -27,8 +27,8 @@ import (
 
 // PublicRoomsServerDatabase represents a public rooms server database.
 type PublicRoomsServerDatabase struct {
-	db         *sql.DB
-	partitions common.PartitionOffsetStatements
+	db *sql.DB
+	common.PartitionOffsetStatements
 	statements publicRoomsStatements
 }
 
@@ -50,16 +50,6 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerData
 		return nil, err
 	}
 	return &PublicRoomsServerDatabase{db, partitions, statements}, nil
-}
-
-// PartitionOffsets implements common.PartitionStorer
-func (d *PublicRoomsServerDatabase) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
-	return d.partitions.SelectPartitionOffsets(topic)
-}
-
-// SetPartitionOffset implements common.PartitionStorer
-func (d *PublicRoomsServerDatabase) SetPartitionOffset(topic string, partition int32, offset int64) error {
-	return d.partitions.UpsertPartitionOffset(topic, partition, offset)
 }
 
 // GetRoomVisibility returns the room visibility as a boolean: true if the room
