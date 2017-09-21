@@ -68,6 +68,7 @@ func Download(
 	mediaID types.MediaID,
 	cfg *config.Dendrite,
 	db *storage.Database,
+	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	isThumbnailRequest bool,
@@ -120,7 +121,8 @@ func Download(
 	}
 
 	metadata, err := dReq.doDownload(
-		req.Context(), w, cfg, db, activeRemoteRequests, activeThumbnailGeneration,
+		req.Context(), w, cfg, db, client,
+		activeRemoteRequests, activeThumbnailGeneration,
 	)
 	if err != nil {
 		// TODO: Handle the fact we might have started writing the response
@@ -199,6 +201,7 @@ func (r *downloadRequest) doDownload(
 	w http.ResponseWriter,
 	cfg *config.Dendrite,
 	db *storage.Database,
+	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) (*types.MediaMetadata, error) {
@@ -216,7 +219,7 @@ func (r *downloadRequest) doDownload(
 		}
 		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
 		resErr := r.getRemoteFile(
-			ctx, cfg, db, activeRemoteRequests, activeThumbnailGeneration,
+			ctx, client, cfg, db, activeRemoteRequests, activeThumbnailGeneration,
 		)
 		if resErr != nil {
 			return nil, resErr
@@ -442,6 +445,7 @@ func (r *downloadRequest) generateThumbnail(
 // Note: The named errorResponse return variable is used in a deferred broadcast of the metadata and error response to waiting goroutines.
 func (r *downloadRequest) getRemoteFile(
 	ctx context.Context,
+	client *gomatrixserverlib.Client,
 	cfg *config.Dendrite,
 	db *storage.Database,
 	activeRemoteRequests *types.ActiveRemoteRequests,
@@ -477,7 +481,8 @@ func (r *downloadRequest) getRemoteFile(
 		if mediaMetadata == nil {
 			// If we do not have a record, we need to fetch the remote file first and then respond from the local file
 			err := r.fetchRemoteFileAndStoreMetadata(
-				ctx, cfg.Media.AbsBasePath, *cfg.Media.MaxFileSizeBytes, db,
+				ctx, client,
+				cfg.Media.AbsBasePath, *cfg.Media.MaxFileSizeBytes, db,
 				cfg.Media.ThumbnailSizes, activeThumbnailGeneration,
 				cfg.Media.MaxThumbnailGenerators,
 			)
@@ -541,6 +546,7 @@ func (r *downloadRequest) broadcastMediaMetadata(activeRemoteRequests *types.Act
 // fetchRemoteFileAndStoreMetadata fetches the file from the remote server and stores its metadata in the database
 func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 	ctx context.Context,
+	client *gomatrixserverlib.Client,
 	absBasePath config.Path,
 	maxFileSizeBytes config.FileSizeBytes,
 	db *storage.Database,
@@ -548,7 +554,9 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 ) error {
-	finalPath, duplicate, err := r.fetchRemoteFile(absBasePath, maxFileSizeBytes)
+	finalPath, duplicate, err := r.fetchRemoteFile(
+		ctx, client, absBasePath, maxFileSizeBytes,
+	)
 	if err != nil {
 		return err
 	}
@@ -597,11 +605,16 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 	return nil
 }
 
-func (r *downloadRequest) fetchRemoteFile(absBasePath config.Path, maxFileSizeBytes config.FileSizeBytes) (types.Path, bool, error) {
+func (r *downloadRequest) fetchRemoteFile(
+	ctx context.Context,
+	client *gomatrixserverlib.Client,
+	absBasePath config.Path,
+	maxFileSizeBytes config.FileSizeBytes,
+) (types.Path, bool, error) {
 	r.Logger.Info("Fetching remote file")
 
 	// create request for remote file
-	resp, err := r.createRemoteRequest()
+	resp, err := r.createRemoteRequest(ctx, client)
 	if err != nil {
 		return "", false, err
 	}
@@ -664,10 +677,10 @@ func (r *downloadRequest) fetchRemoteFile(absBasePath config.Path, maxFileSizeBy
 	return types.Path(finalPath), duplicate, nil
 }
 
-func (r *downloadRequest) createRemoteRequest() (*http.Response, error) {
-	matrixClient := gomatrixserverlib.NewClient()
-
-	resp, err := matrixClient.CreateMediaDownloadRequest(r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
+func (r *downloadRequest) createRemoteRequest(
+	ctx context.Context, matrixClient *gomatrixserverlib.Client,
+) (*http.Response, error) {
+	resp, err := matrixClient.CreateMediaDownloadRequest(ctx, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
 	if err != nil {
 		return nil, fmt.Errorf("file with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	}

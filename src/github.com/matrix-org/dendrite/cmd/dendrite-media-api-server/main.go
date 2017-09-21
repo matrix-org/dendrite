@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -51,10 +52,12 @@ func main() {
 		log.WithError(err).Panic("Failed to open database")
 	}
 
+	client := gomatrixserverlib.NewClient()
+
 	log.Info("Starting media API server on ", cfg.Listen.MediaAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, cfg, db)
+	routing.Setup(api, cfg, db, client)
 	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.MediaAPI), nil))

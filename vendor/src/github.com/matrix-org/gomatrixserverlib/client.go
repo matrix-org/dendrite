@@ -236,9 +236,15 @@ func (fc *Client) LookupServerKeys( // nolint: gocyclo
 }
 
 // CreateMediaDownloadRequest creates a request for media on a homeserver and returns the http.Response or an error
-func (fc *Client) CreateMediaDownloadRequest(matrixServer ServerName, mediaID string) (*http.Response, error) {
+func (fc *Client) CreateMediaDownloadRequest(
+	ctx context.Context, matrixServer ServerName, mediaID string,
+) (*http.Response, error) {
 	requestURL := "matrix://" + string(matrixServer) + "/_matrix/media/v1/download/" + string(matrixServer) + "/" + mediaID
-	resp, err := fc.client.Get(requestURL)
+	req, err := http.NewRequest("GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := fc.client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
