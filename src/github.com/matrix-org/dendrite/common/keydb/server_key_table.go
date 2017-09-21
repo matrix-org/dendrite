@@ -15,6 +15,7 @@
 package keydb
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 
@@ -73,13 +74,15 @@ func (s *serverKeyStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *serverKeyStatements) bulkSelectServerKeys(
+	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys, error) {
 	var nameAndKeyIDs []string
 	for request := range requests {
 		nameAndKeyIDs = append(nameAndKeyIDs, nameAndKeyID(request))
 	}
-	rows, err := s.bulkSelectServerKeysStmt.Query(pq.StringArray(nameAndKeyIDs))
+	stmt := s.bulkSelectServerKeysStmt
+	rows, err := stmt.QueryContext(ctx, pq.StringArray(nameAndKeyIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -106,15 +109,21 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 }
 
 func (s *serverKeyStatements) upsertServerKeys(
-	request gomatrixserverlib.PublicKeyRequest, keys gomatrixserverlib.ServerKeys,
+	ctx context.Context,
+	request gomatrixserverlib.PublicKeyRequest,
+	keys gomatrixserverlib.ServerKeys,
 ) error {
 	keyJSON, err := json.Marshal(keys)
 	if err != nil {
 		return err
 	}
-	_, err = s.upsertServerKeysStmt.Exec(
-		string(request.ServerName), string(request.KeyID), nameAndKeyID(request),
-		int64(keys.ValidUntilTS), keyJSON,
+	_, err = s.upsertServerKeysStmt.ExecContext(
+		ctx,
+		string(request.ServerName),
+		string(request.KeyID),
+		nameAndKeyID(request),
+		int64(keys.ValidUntilTS),
+		keyJSON,
 	)
 	return err
 }
