@@ -31,7 +31,12 @@ import (
 const pathPrefixR0 = "/_matrix/media/v1"
 
 // Setup registers the media API HTTP handlers
-func Setup(apiMux *mux.Router, cfg *config.Dendrite, db *storage.Database) {
+func Setup(
+	apiMux *mux.Router,
+	cfg *config.Dendrite,
+	db *storage.Database,
+	client *gomatrixserverlib.Client,
+) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
@@ -47,14 +52,21 @@ func Setup(apiMux *mux.Router, cfg *config.Dendrite, db *storage.Database) {
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
 	r0mux.Handle("/download/{serverName}/{mediaId}",
-		makeDownloadAPI("download", cfg, db, activeRemoteRequests, activeThumbnailGeneration),
+		makeDownloadAPI("download", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
 	).Methods("GET")
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
-		makeDownloadAPI("thumbnail", cfg, db, activeRemoteRequests, activeThumbnailGeneration),
+		makeDownloadAPI("thumbnail", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
 	).Methods("GET")
 }
 
-func makeDownloadAPI(name string, cfg *config.Dendrite, db *storage.Database, activeRemoteRequests *types.ActiveRemoteRequests, activeThumbnailGeneration *types.ActiveThumbnailGeneration) http.HandlerFunc {
+func makeDownloadAPI(
+	name string,
+	cfg *config.Dendrite,
+	db *storage.Database,
+	client *gomatrixserverlib.Client,
+	activeRemoteRequests *types.ActiveRemoteRequests,
+	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
+) http.HandlerFunc {
 	return prometheus.InstrumentHandler(name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		req = util.RequestWithLogging(req)
 
@@ -64,6 +76,17 @@ func makeDownloadAPI(name string, cfg *config.Dendrite, db *storage.Database, ac
 		w.Header().Set("Content-Type", "application/json")
 
 		vars := mux.Vars(req)
-		writers.Download(w, req, gomatrixserverlib.ServerName(vars["serverName"]), types.MediaID(vars["mediaId"]), cfg, db, activeRemoteRequests, activeThumbnailGeneration, name == "thumbnail")
+		writers.Download(
+			w,
+			req,
+			gomatrixserverlib.ServerName(vars["serverName"]),
+			types.MediaID(vars["mediaId"]),
+			cfg,
+			db,
+			client,
+			activeRemoteRequests,
+			activeThumbnailGeneration,
+			name == "thumbnail",
+		)
 	}))
 }
