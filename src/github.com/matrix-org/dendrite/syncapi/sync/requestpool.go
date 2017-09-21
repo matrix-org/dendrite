@@ -15,6 +15,8 @@
 package sync
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -102,6 +104,48 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		}
 	case res := <-done: // received a response
 		return res
+	}
+}
+
+type stateEventInResp struct {
+	gomatrixserverlib.ClientEvent
+	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
+	ReplacesState string          `json:"replaces_state,omitempty"`
+}
+
+func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) util.JSONResponse {
+	stateEvents, err := rp.db.GetStateEventsForRoom(req.Context(), roomID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	resp := []stateEventInResp{}
+	// Fill the prev_content and replaces_state keys if necessary
+	for _, event := range stateEvents {
+		stateEvent := stateEventInResp{ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll)}
+		var prevEventRef types.PrevEventRef
+		fmt.Println(len(event.Unsigned()))
+		if len(event.Unsigned()) > 0 {
+			if err := json.Unmarshal(event.Unsigned(), &prevEventRef); err != nil {
+				return httputil.LogThenError(req, err)
+			}
+			// Fills the previous state event ID if the state event replaces another
+			// state event
+			if len(prevEventRef.ReplacesState) > 0 {
+				stateEvent.ReplacesState = prevEventRef.ReplacesState
+			}
+			// Fill the previous event if the state event references a previous event
+			if prevEventRef.PrevContent != nil {
+				stateEvent.PrevContent = prevEventRef.PrevContent
+			}
+		}
+
+		resp = append(resp, stateEvent)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: resp,
 	}
 }
 
