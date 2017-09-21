@@ -262,9 +262,9 @@ func (s *OutputRoomEvent) updateStateEvent(event gomatrixserverlib.Event) (gomat
 	}
 
 	prev := types.PrevEventRef{
-		PrevContent: prevEvent.Content(),
-		PrevID:      prevEvent.EventID(),
-		PrevSender:  prevEvent.Sender(),
+		PrevContent:   prevEvent.Content(),
+		ReplacesState: prevEvent.EventID(),
+		PrevSender:    prevEvent.Sender(),
 	}
 
 	return event.SetUnsigned(prev)

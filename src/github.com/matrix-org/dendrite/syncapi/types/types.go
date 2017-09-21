@@ -31,9 +31,9 @@ func (sp StreamPosition) String() string {
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
 type PrevEventRef struct {
-	PrevContent json.RawMessage `json:"prev_content"`
-	PrevID      string          `json:"replaces_state"`
-	PrevSender  string          `json:"prev_sender"`
+	PrevContent   json.RawMessage `json:"prev_content"`
+	ReplacesState string          `json:"replaces_state"`
+	PrevSender    string          `json:"prev_sender"`
 }
 
 // Response represents a /sync API response. See https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-client-r0-sync
