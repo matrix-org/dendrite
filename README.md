@@ -150,36 +150,5 @@ so that the readers can avoid querying the room server unnecessarily.
 
 # TODO
 
- - [ ] gomatrixlib
-   - [x] Canonical JSON.
-   - [x] Signed JSON.
-   - [x] Event hashing.
-   - [x] Event signing.
-   - [x] Federation server discovery.
-   - [x] Federation key lookup.
-   - [ ] Federation request signing.
-   - [x] Event authentication.
-   - [ ] Event visibility.
-   - [x] State resolution.
-   - [ ] Third party invites authentication.
- - [ ] Room Server
-   - [x] Inputting new events from logs.
-   - [ ] Inputting back-filled events from logs.
-   - [x] Outputting events and current state to logs.
-   - [ ] Querying state at an event.
-   - [x] Querying current forward extremities and state.
-   - [ ] Querying message history.
-   - [ ] Exporting/importing messages from other servers.
-   - [ ] Other Room Server stuff.
- - [ ] Client Room Send
-   - [x] Handling /client/r0/room/... HTTP PUTs
-   - [ ] Talk to remote servers for joins to remote servers.
-   - [x] Outputting new events to logs.
-   - [ ] Updating the last active time in presence.
-   - [ ] Other Client Room Send stuff.
- - [ ] Client Sync
-   - [ ] Inputting new room events and state from the logs.
-   - [ ] Handling /client/r0/sync HTTP GETs
-   - [ ] Outputting whether the client is syncing to the logs.
-   - [ ] Other Client Sync Stuff.
- - [ ] Other Components.
+There's plenty still to do to make Dendrite usable! We're tracking progress in
+a [spreadsheet](https://docs.google.com/spreadsheets/d/1tkMNpIpPjvuDJWjPFbw_xzNzOHBA-Hp50Rkpcr43xTw).
