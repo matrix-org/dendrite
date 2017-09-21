@@ -69,7 +69,7 @@ func JoinRoomByIDOrAlias(
 	r := joinRoomReq{req, content, device.UserID, cfg, federation, producer, queryAPI, aliasAPI, keyRing}
 
 	if strings.HasPrefix(roomIDOrAlias, "!") {
-		return r.joinRoomByID()
+		return r.joinRoomByID(roomIDOrAlias)
 	}
 	if strings.HasPrefix(roomIDOrAlias, "#") {
 		return r.joinRoomByAlias(roomIDOrAlias)
@@ -93,15 +93,46 @@ type joinRoomReq struct {
 }
 
 // joinRoomByID joins a room by room ID
-func (r joinRoomReq) joinRoomByID() util.JSONResponse {
-	// TODO: Implement joining rooms by ID.
+func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 	// A client should only join a room by room ID when it has an invite
 	// to the room. If the server is already in the room then we can
 	// lookup the invite and process the request as a normal state event.
 	// If the server is not in the room the we will need to look up the
 	// remote server the invite came from in order to request a join event
 	// from that server.
-	panic(fmt.Errorf("Joining rooms by ID is not implemented"))
+	queryReq := api.QueryInvitesForUserRequest{
+		RoomID: roomID, TargetUserID: r.userID,
+	}
+	var queryRes api.QueryInvitesForUserResponse
+	if err := r.queryAPI.QueryInvitesForUser(r.req.Context(), &queryReq, &queryRes); err != nil {
+		return httputil.LogThenError(r.req, err)
+	}
+	if len(queryRes.InviteSenderUserIDs) == 0 {
+		// TODO: We might need to support clients which erroneously try to join
+		// the room by ID even when they are not invited.
+		// This can be done by removing this check and falling through to
+		// joinRoomUsingServers passing an empty list since joinRoomUserServers
+		// will check if we are already in the room first.
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("You are not invited to the room"),
+		}
+	}
+	servers := []gomatrixserverlib.ServerName{}
+	seenBefore := map[gomatrixserverlib.ServerName]bool{}
+	for _, userID := range queryRes.InviteSenderUserIDs {
+		_, domain, err := gomatrixserverlib.SplitID('@', userID)
+		if err != nil {
+			return httputil.LogThenError(r.req, err)
+		}
+		if !seenBefore[domain] {
+			servers = append(servers, domain)
+			seenBefore[domain] = true
+		}
+	}
+
+	return r.joinRoomUsingServers(roomID, servers)
+
 }
 
 // joinRoomByAlias joins a room using a room alias.
