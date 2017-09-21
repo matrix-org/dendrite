@@ -29,8 +29,8 @@ import (
 
 // Database represents an account database
 type Database struct {
-	db           *sql.DB
-	partitions   common.PartitionOffsetStatements
+	db *sql.DB
+	common.PartitionOffsetStatements
 	accounts     accountsStatements
 	profiles     profilesStatements
 	memberships  membershipStatements
@@ -125,16 +125,6 @@ func (d *Database) CreateAccount(
 		return nil, err
 	}
 	return d.accounts.insertAccount(ctx, localpart, hash)
-}
-
-// PartitionOffsets implements common.PartitionStorer
-func (d *Database) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
-	return d.partitions.SelectPartitionOffsets(topic)
-}
-
-// SetPartitionOffset implements common.PartitionStorer
-func (d *Database) SetPartitionOffset(topic string, partition int32, offset int64) error {
-	return d.partitions.UpsertPartitionOffset(topic, partition, offset)
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given

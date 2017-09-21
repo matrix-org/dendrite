@@ -14,8 +14,11 @@
 
 package common
 
-import "database/sql"
-import "strings"
+import (
+	"context"
+	"database/sql"
+	"strings"
+)
 
 const partitionOffsetsSchema = `
 -- The offsets that the server has processed up to.
@@ -66,9 +69,25 @@ func (s *PartitionOffsetStatements) Prepare(db *sql.DB, prefix string) (err erro
 	return
 }
 
-// SelectPartitionOffsets returns all the partition offsets for the given topic.
-func (s *PartitionOffsetStatements) SelectPartitionOffsets(topic string) ([]PartitionOffset, error) {
-	rows, err := s.selectPartitionOffsetsStmt.Query(topic)
+// PartitionOffsets implements PartitionStorer
+func (s *PartitionOffsetStatements) PartitionOffsets(
+	ctx context.Context, topic string,
+) ([]PartitionOffset, error) {
+	return s.selectPartitionOffsets(ctx, topic)
+}
+
+// SetPartitionOffset implements PartitionStorer
+func (s *PartitionOffsetStatements) SetPartitionOffset(
+	ctx context.Context, topic string, partition int32, offset int64,
+) error {
+	return s.upsertPartitionOffset(ctx, topic, partition, offset)
+}
+
+// selectPartitionOffsets returns all the partition offsets for the given topic.
+func (s *PartitionOffsetStatements) selectPartitionOffsets(
+	ctx context.Context, topic string,
+) ([]PartitionOffset, error) {
+	rows, err := s.selectPartitionOffsetsStmt.QueryContext(ctx, topic)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +104,9 @@ func (s *PartitionOffsetStatements) SelectPartitionOffsets(topic string) ([]Part
 }
 
 // UpsertPartitionOffset updates or inserts the partition offset for the given topic.
-func (s *PartitionOffsetStatements) UpsertPartitionOffset(topic string, partition int32, offset int64) error {
-	_, err := s.upsertPartitionOffsetStmt.Exec(topic, partition, offset)
+func (s *PartitionOffsetStatements) upsertPartitionOffset(
+	ctx context.Context, topic string, partition int32, offset int64,
+) error {
+	_, err := s.upsertPartitionOffsetStmt.ExecContext(ctx, topic, partition, offset)
 	return err
 }

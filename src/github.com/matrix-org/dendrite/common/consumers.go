@@ -15,6 +15,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 
 	sarama "gopkg.in/Shopify/sarama.v1"
@@ -31,9 +32,9 @@ type PartitionOffset struct {
 // A PartitionStorer has the storage APIs needed by the consumer.
 type PartitionStorer interface {
 	// PartitionOffsets returns the offsets the consumer has reached for each partition.
-	PartitionOffsets(topic string) ([]PartitionOffset, error)
+	PartitionOffsets(ctx context.Context, topic string) ([]PartitionOffset, error)
 	// SetPartitionOffset records where the consumer has reached for a partition.
-	SetPartitionOffset(topic string, partition int32, offset int64) error
+	SetPartitionOffset(ctx context.Context, topic string, partition int32, offset int64) error
 }
 
 // A ContinualConsumer continually consumes logs even across restarts. It requires a PartitionStorer to
@@ -75,7 +76,7 @@ func (c *ContinualConsumer) Start() error {
 		offsets[partition] = sarama.OffsetOldest
 	}
 
-	storedOffsets, err := c.PartitionStore.PartitionOffsets(c.Topic)
+	storedOffsets, err := c.PartitionStore.PartitionOffsets(context.TODO(), c.Topic)
 	if err != nil {
 		return err
 	}
@@ -110,7 +111,7 @@ func (c *ContinualConsumer) consumePartition(pc sarama.PartitionConsumer) {
 	for message := range pc.Messages() {
 		msgErr := c.ProcessMessage(message)
 		// Advance our position in the stream so that we will start at the right position after a restart.
-		if err := c.PartitionStore.SetPartitionOffset(c.Topic, message.Partition, message.Offset); err != nil {
+		if err := c.PartitionStore.SetPartitionOffset(context.TODO(), c.Topic, message.Partition, message.Offset); err != nil {
 			panic(fmt.Errorf("the ContinualConsumer failed to SetPartitionOffset: %s", err))
 		}
 		// Shutdown if we were told to do so.

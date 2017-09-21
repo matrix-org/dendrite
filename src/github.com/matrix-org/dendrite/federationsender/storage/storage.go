@@ -61,16 +61,6 @@ func (d *Database) prepare() error {
 	return nil
 }
 
-// PartitionOffsets implements common.PartitionStorer
-func (d *Database) PartitionOffsets(topic string) ([]common.PartitionOffset, error) {
-	return d.SelectPartitionOffsets(topic)
-}
-
-// SetPartitionOffset implements common.PartitionStorer
-func (d *Database) SetPartitionOffset(topic string, partition int32, offset int64) error {
-	return d.UpsertPartitionOffset(topic, partition, offset)
-}
-
 // UpdateRoom updates the joined hosts for a room and returns what the joined
 // hosts were before the update.
 func (d *Database) UpdateRoom(
