@@ -15,6 +15,7 @@
 package writers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -118,7 +119,9 @@ func Download(
 		return
 	}
 
-	metadata, err := dReq.doDownload(w, cfg, db, activeRemoteRequests, activeThumbnailGeneration)
+	metadata, err := dReq.doDownload(
+		req.Context(), w, cfg, db, activeRemoteRequests, activeThumbnailGeneration,
+	)
 	if err != nil {
 		// TODO: Handle the fact we might have started writing the response
 		dReq.jsonErrorResponse(w, util.ErrorResponse(err))
@@ -192,6 +195,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 }
 
 func (r *downloadRequest) doDownload(
+	ctx context.Context,
 	w http.ResponseWriter,
 	cfg *config.Dendrite,
 	db *storage.Database,
@@ -199,7 +203,9 @@ func (r *downloadRequest) doDownload(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) (*types.MediaMetadata, error) {
 	// check if we have a record of the media in our database
-	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+	mediaMetadata, err := db.GetMediaMetadata(
+		ctx, r.MediaMetadata.MediaID, r.MediaMetadata.Origin,
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "error querying the database")
 	}
@@ -209,7 +215,9 @@ func (r *downloadRequest) doDownload(
 			return nil, nil
 		}
 		// If we do not have a record and the origin is remote, we need to fetch it and respond with that file
-		resErr := r.getRemoteFile(cfg, db, activeRemoteRequests, activeThumbnailGeneration)
+		resErr := r.getRemoteFile(
+			ctx, cfg, db, activeRemoteRequests, activeThumbnailGeneration,
+		)
 		if resErr != nil {
 			return nil, resErr
 		}
@@ -217,12 +225,17 @@ func (r *downloadRequest) doDownload(
 		// If we have a record, we can respond from the local file
 		r.MediaMetadata = mediaMetadata
 	}
-	return r.respondFromLocalFile(w, cfg.Media.AbsBasePath, activeThumbnailGeneration, cfg.Media.MaxThumbnailGenerators, db, cfg.Media.DynamicThumbnails, cfg.Media.ThumbnailSizes)
+	return r.respondFromLocalFile(
+		ctx, w, cfg.Media.AbsBasePath, activeThumbnailGeneration,
+		cfg.Media.MaxThumbnailGenerators, db,
+		cfg.Media.DynamicThumbnails, cfg.Media.ThumbnailSizes,
+	)
 }
 
 // respondFromLocalFile reads a file from local storage and writes it to the http.ResponseWriter
 // If no file was found then returns nil, nil
 func (r *downloadRequest) respondFromLocalFile(
+	ctx context.Context,
 	w http.ResponseWriter,
 	absBasePath config.Path,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
@@ -256,7 +269,10 @@ func (r *downloadRequest) respondFromLocalFile(
 	var responseFile *os.File
 	var responseMetadata *types.MediaMetadata
 	if r.IsThumbnailRequest {
-		thumbFile, thumbMetadata, resErr := r.getThumbnailFile(types.Path(filePath), activeThumbnailGeneration, maxThumbnailGenerators, db, dynamicThumbnails, thumbnailSizes)
+		thumbFile, thumbMetadata, resErr := r.getThumbnailFile(
+			ctx, types.Path(filePath), activeThumbnailGeneration, maxThumbnailGenerators,
+			db, dynamicThumbnails, thumbnailSizes,
+		)
 		if thumbFile != nil {
 			defer thumbFile.Close() // nolint: errcheck
 		}
@@ -306,6 +322,7 @@ func (r *downloadRequest) respondFromLocalFile(
 // Note: Thumbnail generation may be ongoing asynchronously.
 // If no thumbnail was found then returns nil, nil, nil
 func (r *downloadRequest) getThumbnailFile(
+	ctx context.Context,
 	filePath types.Path,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
@@ -317,7 +334,10 @@ func (r *downloadRequest) getThumbnailFile(
 	var err error
 
 	if dynamicThumbnails {
-		thumbnail, err = r.generateThumbnail(filePath, r.ThumbnailSize, activeThumbnailGeneration, maxThumbnailGenerators, db)
+		thumbnail, err = r.generateThumbnail(
+			ctx, filePath, r.ThumbnailSize, activeThumbnailGeneration,
+			maxThumbnailGenerators, db,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -326,7 +346,9 @@ func (r *downloadRequest) getThumbnailFile(
 	// to trying to use a pre-generated thumbnail
 	if thumbnail == nil {
 		var thumbnails []*types.ThumbnailMetadata
-		thumbnails, err = db.GetThumbnails(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+		thumbnails, err = db.GetThumbnails(
+			ctx, r.MediaMetadata.MediaID, r.MediaMetadata.Origin,
+		)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "error looking up thumbnails")
 		}
@@ -343,7 +365,10 @@ func (r *downloadRequest) getThumbnailFile(
 				"Height":       thumbnailSize.Height,
 				"ResizeMethod": thumbnailSize.ResizeMethod,
 			}).Info("Pre-generating thumbnail for immediate response.")
-			thumbnail, err = r.generateThumbnail(filePath, *thumbnailSize, activeThumbnailGeneration, maxThumbnailGenerators, db)
+			thumbnail, err = r.generateThumbnail(
+				ctx, filePath, *thumbnailSize, activeThumbnailGeneration,
+				maxThumbnailGenerators, db,
+			)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -378,6 +403,7 @@ func (r *downloadRequest) getThumbnailFile(
 }
 
 func (r *downloadRequest) generateThumbnail(
+	ctx context.Context,
 	filePath types.Path,
 	thumbnailSize types.ThumbnailSize,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
@@ -389,7 +415,10 @@ func (r *downloadRequest) generateThumbnail(
 		"Height":       thumbnailSize.Height,
 		"ResizeMethod": thumbnailSize.ResizeMethod,
 	})
-	busy, err := thumbnailer.GenerateThumbnail(filePath, thumbnailSize, r.MediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger)
+	busy, err := thumbnailer.GenerateThumbnail(
+		ctx, filePath, thumbnailSize, r.MediaMetadata,
+		activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger,
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating thumbnail")
 	}
@@ -397,7 +426,10 @@ func (r *downloadRequest) generateThumbnail(
 		return nil, nil
 	}
 	var thumbnail *types.ThumbnailMetadata
-	thumbnail, err = db.GetThumbnail(r.MediaMetadata.MediaID, r.MediaMetadata.Origin, thumbnailSize.Width, thumbnailSize.Height, thumbnailSize.ResizeMethod)
+	thumbnail, err = db.GetThumbnail(
+		ctx, r.MediaMetadata.MediaID, r.MediaMetadata.Origin,
+		thumbnailSize.Width, thumbnailSize.Height, thumbnailSize.ResizeMethod,
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "error looking up thumbnail")
 	}
@@ -409,6 +441,7 @@ func (r *downloadRequest) generateThumbnail(
 // regardless of how many download requests are received.
 // Note: The named errorResponse return variable is used in a deferred broadcast of the metadata and error response to waiting goroutines.
 func (r *downloadRequest) getRemoteFile(
+	ctx context.Context,
 	cfg *config.Dendrite,
 	db *storage.Database,
 	activeRemoteRequests *types.ActiveRemoteRequests,
@@ -434,14 +467,20 @@ func (r *downloadRequest) getRemoteFile(
 		}()
 
 		// check if we have a record of the media in our database
-		mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+		mediaMetadata, err := db.GetMediaMetadata(
+			ctx, r.MediaMetadata.MediaID, r.MediaMetadata.Origin,
+		)
 		if err != nil {
 			return errors.Wrap(err, "error querying the database.")
 		}
 
 		if mediaMetadata == nil {
 			// If we do not have a record, we need to fetch the remote file first and then respond from the local file
-			err := r.fetchRemoteFileAndStoreMetadata(cfg.Media.AbsBasePath, *cfg.Media.MaxFileSizeBytes, db, cfg.Media.ThumbnailSizes, activeThumbnailGeneration, cfg.Media.MaxThumbnailGenerators)
+			err := r.fetchRemoteFileAndStoreMetadata(
+				ctx, cfg.Media.AbsBasePath, *cfg.Media.MaxFileSizeBytes, db,
+				cfg.Media.ThumbnailSizes, activeThumbnailGeneration,
+				cfg.Media.MaxThumbnailGenerators,
+			)
 			if err != nil {
 				return errors.Wrap(err, "error querying the database.")
 			}
@@ -501,6 +540,7 @@ func (r *downloadRequest) broadcastMediaMetadata(activeRemoteRequests *types.Act
 
 // fetchRemoteFileAndStoreMetadata fetches the file from the remote server and stores its metadata in the database
 func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
+	ctx context.Context,
 	absBasePath config.Path,
 	maxFileSizeBytes config.FileSizeBytes,
 	db *storage.Database,
@@ -521,7 +561,7 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 	}).Info("Storing file metadata to media repository database")
 
 	// FIXME: timeout db request
-	if err := db.StoreMediaMetadata(r.MediaMetadata); err != nil {
+	if err := db.StoreMediaMetadata(ctx, r.MediaMetadata); err != nil {
 		// If the file is a duplicate (has the same hash as an existing file) then
 		// there is valid metadata in the database for that file. As such we only
 		// remove the file if it is not a duplicate.
@@ -535,7 +575,10 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 	}
 
 	go func() {
-		busy, err := thumbnailer.GenerateThumbnails(finalPath, thumbnailSizes, r.MediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger)
+		busy, err := thumbnailer.GenerateThumbnails(
+			context.Background(), finalPath, thumbnailSizes, r.MediaMetadata,
+			activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger,
+		)
 		if err != nil {
 			r.Logger.WithError(err).Warn("Error generating thumbnails")
 		}

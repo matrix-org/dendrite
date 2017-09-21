@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -74,9 +75,12 @@ func (s *mediaStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *mediaStatements) insertMedia(mediaMetadata *types.MediaMetadata) error {
+func (s *mediaStatements) insertMedia(
+	ctx context.Context, mediaMetadata *types.MediaMetadata,
+) error {
 	mediaMetadata.CreationTimestamp = types.UnixMs(time.Now().UnixNano() / 1000000)
-	_, err := s.insertMediaStmt.Exec(
+	_, err := s.insertMediaStmt.ExecContext(
+		ctx,
 		mediaMetadata.MediaID,
 		mediaMetadata.Origin,
 		mediaMetadata.ContentType,
@@ -89,13 +93,15 @@ func (s *mediaStatements) insertMedia(mediaMetadata *types.MediaMetadata) error 
 	return err
 }
 
-func (s *mediaStatements) selectMedia(mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) (*types.MediaMetadata, error) {
+func (s *mediaStatements) selectMedia(
+	ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName,
+) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		MediaID: mediaID,
 		Origin:  mediaOrigin,
 	}
-	err := s.selectMediaStmt.QueryRow(
-		mediaMetadata.MediaID, mediaMetadata.Origin,
+	err := s.selectMediaStmt.QueryRowContext(
+		ctx, mediaMetadata.MediaID, mediaMetadata.Origin,
 	).Scan(
 		&mediaMetadata.ContentType,
 		&mediaMetadata.FileSizeBytes,

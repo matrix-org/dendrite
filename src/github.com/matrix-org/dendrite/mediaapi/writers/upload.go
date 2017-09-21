@@ -15,6 +15,7 @@
 package writers
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -57,7 +58,7 @@ func Upload(req *http.Request, cfg *config.Dendrite, db *storage.Database, activ
 		return *resErr
 	}
 
-	if resErr = r.doUpload(req.Body, cfg, db, activeThumbnailGeneration); resErr != nil {
+	if resErr = r.doUpload(req.Context(), req.Body, cfg, db, activeThumbnailGeneration); resErr != nil {
 		return *resErr
 	}
 
@@ -97,7 +98,13 @@ func parseAndValidateRequest(req *http.Request, cfg *config.Dendrite) (*uploadRe
 	return r, nil
 }
 
-func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.Dendrite, db *storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) *util.JSONResponse {
+func (r *uploadRequest) doUpload(
+	ctx context.Context,
+	reqReader io.Reader,
+	cfg *config.Dendrite,
+	db *storage.Database,
+	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
+) *util.JSONResponse {
 	r.Logger.WithFields(log.Fields{
 		"UploadName":    r.MediaMetadata.UploadName,
 		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
@@ -134,7 +141,9 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.Dendrite, db *
 	}).Info("File uploaded")
 
 	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
-	mediaMetadata, err := db.GetMediaMetadata(r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+	mediaMetadata, err := db.GetMediaMetadata(
+		ctx, r.MediaMetadata.MediaID, r.MediaMetadata.Origin,
+	)
 	if err != nil {
 		r.Logger.WithError(err).Error("Error querying the database.")
 		resErr := jsonerror.InternalServerError()
@@ -152,7 +161,10 @@ func (r *uploadRequest) doUpload(reqReader io.Reader, cfg *config.Dendrite, db *
 		}
 	}
 
-	if resErr := r.storeFileAndMetadata(tmpDir, cfg.Media.AbsBasePath, db, cfg.Media.ThumbnailSizes, activeThumbnailGeneration, cfg.Media.MaxThumbnailGenerators); resErr != nil {
+	if resErr := r.storeFileAndMetadata(
+		ctx, tmpDir, cfg.Media.AbsBasePath, db, cfg.Media.ThumbnailSizes,
+		activeThumbnailGeneration, cfg.Media.MaxThumbnailGenerators,
+	); resErr != nil {
 		return resErr
 	}
 
@@ -208,7 +220,15 @@ func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JS
 // The order of operations is important as it avoids metadata entering the database before the file
 // is ready, and if we fail to move the file, it never gets added to the database.
 // Returns a util.JSONResponse error and cleans up directories in case of error.
-func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath config.Path, db *storage.Database, thumbnailSizes []config.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int) *util.JSONResponse {
+func (r *uploadRequest) storeFileAndMetadata(
+	ctx context.Context,
+	tmpDir types.Path,
+	absBasePath config.Path,
+	db *storage.Database,
+	thumbnailSizes []config.ThumbnailSize,
+	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
+	maxThumbnailGenerators int,
+) *util.JSONResponse {
 	finalPath, duplicate, err := fileutils.MoveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to move file.")
@@ -221,7 +241,7 @@ func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath conf
 		r.Logger.WithField("dst", finalPath).Info("File was stored previously - discarding duplicate")
 	}
 
-	if err = db.StoreMediaMetadata(r.MediaMetadata); err != nil {
+	if err = db.StoreMediaMetadata(ctx, r.MediaMetadata); err != nil {
 		r.Logger.WithError(err).Warn("Failed to store metadata")
 		// If the file is a duplicate (has the same hash as an existing file) then
 		// there is valid metadata in the database for that file. As such we only
@@ -236,7 +256,10 @@ func (r *uploadRequest) storeFileAndMetadata(tmpDir types.Path, absBasePath conf
 	}
 
 	go func() {
-		busy, err := thumbnailer.GenerateThumbnails(finalPath, thumbnailSizes, r.MediaMetadata, activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger)
+		busy, err := thumbnailer.GenerateThumbnails(
+			context.Background(), finalPath, thumbnailSizes, r.MediaMetadata,
+			activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger,
+		)
 		if err != nil {
 			r.Logger.WithError(err).Warn("Error generating thumbnails")
 		}

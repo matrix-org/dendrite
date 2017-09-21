@@ -15,6 +15,7 @@
 package thumbnailer
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -130,8 +131,18 @@ func broadcastGeneration(dst types.Path, activeThumbnailGeneration *types.Active
 	delete(activeThumbnailGeneration.PathToResult, string(dst))
 }
 
-func isThumbnailExists(dst types.Path, config types.ThumbnailSize, mediaMetadata *types.MediaMetadata, db *storage.Database, logger *log.Entry) (bool, error) {
-	thumbnailMetadata, err := db.GetThumbnail(mediaMetadata.MediaID, mediaMetadata.Origin, config.Width, config.Height, config.ResizeMethod)
+func isThumbnailExists(
+	ctx context.Context,
+	dst types.Path,
+	config types.ThumbnailSize,
+	mediaMetadata *types.MediaMetadata,
+	db *storage.Database,
+	logger *log.Entry,
+) (bool, error) {
+	thumbnailMetadata, err := db.GetThumbnail(
+		ctx, mediaMetadata.MediaID, mediaMetadata.Origin,
+		config.Width, config.Height, config.ResizeMethod,
+	)
 	if err != nil {
 		logger.Error("Failed to query database for thumbnail.")
 		return false, err
