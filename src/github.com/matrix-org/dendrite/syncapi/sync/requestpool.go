@@ -169,8 +169,11 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.Stre
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
 ) (*types.Response, error) {
-	// TODO: We currently send all account data on every sync response, we should instead send data
-	// that has changed on incremental sync responses
+	// TODO: Account data doesn't have a sync position of its own, meaning that
+	// account data might be sent multiple time to the client if multiple account
+	// data keys were set between two message. This isn't a huge issue since the
+	// duplicate data doesn't represent a huge quantity of data, but an optimisation
+	// here would be making sure each data is sent only once to the client.
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return nil, err
