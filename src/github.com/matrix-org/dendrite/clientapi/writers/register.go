@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -28,6 +29,8 @@ const (
 	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
 )
+
+var validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
 
 // registerRequest represents the submitted registration request.
 // It can be broken down into 2 sections: the auth dictionary and registration parameters.
@@ -67,11 +70,11 @@ type authFlow struct {
 
 // legacyRegisterRequest represents the submitted registration request for v1 API.
 type legacyRegisterRequest struct {
-	Password string              `json:"password"`
-	Username string              `json:"user"`
-	Admin    bool                `json:"admin"`
-	Type     authtypes.LoginType `json:"type"`
-	Mac      gomatrixserverlib.HexString           `json:"mac"`
+	Password string                      `json:"password"`
+	Username string                      `json:"user"`
+	Admin    bool                        `json:"admin"`
+	Type     authtypes.LoginType         `json:"type"`
+	Mac      gomatrixserverlib.HexString `json:"mac"`
 }
 
 func newUserInteractiveResponse(sessionID string, fs []authFlow) userInteractiveResponse {
@@ -105,6 +108,16 @@ func validate(username, password string) *util.JSONResponse {
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
+		}
+	} else if !validUsernameRegex.MatchString(username) {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.InvalidUsername("User ID can only contain characters a-z, 0-9, or '_-./'"),
+		}
+	} else if username[0] == '_' { // Regex checks its not a zero length string
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.InvalidUsername("User ID can't start with a '_'"),
 		}
 	}
 	return nil
