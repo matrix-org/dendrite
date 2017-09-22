@@ -16,6 +16,7 @@ package readers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -79,13 +80,34 @@ func Login(
 
 		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
 
-		acc, err := accountDB.GetAccountByPassword(req.Context(), r.User, r.Password)
+		// r.User can either be a user ID or just the localpart... or other things maybe.
+		localpart := r.User
+		if strings.HasPrefix(r.User, "@") {
+			var domain gomatrixserverlib.ServerName
+			var err error
+			localpart, domain, err = gomatrixserverlib.SplitID('@', r.User)
+			if err != nil {
+				return util.JSONResponse{
+					Code: 400,
+					JSON: jsonerror.InvalidUsername("Invalid username"),
+				}
+			}
+
+			if domain != cfg.Matrix.ServerName {
+				return util.JSONResponse{
+					Code: 400,
+					JSON: jsonerror.InvalidUsername("User ID not ours"),
+				}
+			}
+		}
+
+		acc, err := accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
 		if err != nil {
 			// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 			// but that would leak the existence of the user.
 			return util.JSONResponse{
 				Code: 403,
-				JSON: jsonerror.BadJSON("username or password was incorrect, or the account does not exist"),
+				JSON: jsonerror.Forbidden("username or password was incorrect, or the accouqnt does not exist"),
 			}
 		}
 
