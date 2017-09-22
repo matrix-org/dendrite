@@ -157,7 +157,7 @@ func Setup(
 		common.MakeAPI("login", func(req *http.Request) util.JSONResponse {
 			return readers.Login(req, accountDB, deviceDB, cfg)
 		}),
-	).Methods("POST", "OPTIONS")
+	).Methods("GET", "POST", "OPTIONS")
 
 	r0mux.Handle("/pushrules/",
 		common.MakeAPI("push_rules", func(req *http.Request) util.JSONResponse {
