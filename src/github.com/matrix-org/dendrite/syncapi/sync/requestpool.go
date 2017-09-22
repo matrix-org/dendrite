@@ -16,7 +16,6 @@ package sync
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -133,7 +132,6 @@ func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) 
 			ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll),
 		}
 		var prevEventRef types.PrevEventRef
-		fmt.Println(len(event.Unsigned()))
 		if len(event.Unsigned()) > 0 {
 			if err := json.Unmarshal(event.Unsigned(), &prevEventRef); err != nil {
 				return httputil.LogThenError(req, err)
