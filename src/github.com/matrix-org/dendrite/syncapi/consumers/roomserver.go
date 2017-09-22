@@ -38,12 +38,6 @@ type OutputRoomEvent struct {
 	query              api.RoomserverQueryAPI
 }
 
-type prevEventRef struct {
-	PrevContent json.RawMessage `json:"prev_content"`
-	PrevID      string          `json:"replaces_state"`
-	UserID      string          `json:"prev_sender"`
-}
-
 // NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEvent(
 	cfg *config.Dendrite,
@@ -267,10 +261,10 @@ func (s *OutputRoomEvent) updateStateEvent(event gomatrixserverlib.Event) (gomat
 		return event, nil
 	}
 
-	prev := prevEventRef{
-		PrevContent: prevEvent.Content(),
-		PrevID:      prevEvent.EventID(),
-		UserID:      prevEvent.Sender(),
+	prev := types.PrevEventRef{
+		PrevContent:   prevEvent.Content(),
+		ReplacesState: prevEvent.EventID(),
+		PrevSender:    prevEvent.Sender(),
 	}
 
 	return event.SetUnsigned(prev)

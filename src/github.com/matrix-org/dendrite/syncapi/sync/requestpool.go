@@ -15,6 +15,7 @@
 package sync
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -105,6 +106,56 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	}
 }
 
+type stateEventInStateResp struct {
+	gomatrixserverlib.ClientEvent
+	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
+	ReplacesState string          `json:"replaces_state,omitempty"`
+}
+
+// OnIncomingStateRequest is called when a client makes a /rooms/{roomID}/state
+// request. It will fetch all the state events from the specified room and will
+// append the necessary keys to them if applicable before returning them.
+// Returns an error if something went wrong in the process.
+// TODO: Check if the user is in the room. If not, check if the room's history
+// is publicly visible. Current behaviour is returning an empty array if the
+// user cannot see the room's history.
+func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) util.JSONResponse {
+	stateEvents, err := rp.db.GetStateEventsForRoom(req.Context(), roomID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	resp := []stateEventInStateResp{}
+	// Fill the prev_content and replaces_state keys if necessary
+	for _, event := range stateEvents {
+		stateEvent := stateEventInStateResp{
+			ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll),
+		}
+		var prevEventRef types.PrevEventRef
+		if len(event.Unsigned()) > 0 {
+			if err := json.Unmarshal(event.Unsigned(), &prevEventRef); err != nil {
+				return httputil.LogThenError(req, err)
+			}
+			// Fills the previous state event ID if the state event replaces another
+			// state event
+			if len(prevEventRef.ReplacesState) > 0 {
+				stateEvent.ReplacesState = prevEventRef.ReplacesState
+			}
+			// Fill the previous event if the state event references a previous event
+			if prevEventRef.PrevContent != nil {
+				stateEvent.PrevContent = prevEventRef.PrevContent
+			}
+		}
+
+		resp = append(resp, stateEvent)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: resp,
+	}
+}
+
 func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (*types.Response, error) {
 	// TODO: handle ignored users
 	if req.since == types.StreamPosition(0) {
@@ -116,8 +167,11 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.Stre
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
 ) (*types.Response, error) {
-	// TODO: We currently send all account data on every sync response, we should instead send data
-	// that has changed on incremental sync responses
+	// TODO: Account data doesn't have a sync position of its own, meaning that
+	// account data might be sent multiple time to the client if multiple account
+	// data keys were set between two message. This isn't a huge issue since the
+	// duplicate data doesn't represent a huge quantity of data, but an optimisation
+	// here would be making sure each data is sent only once to the client.
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return nil, err

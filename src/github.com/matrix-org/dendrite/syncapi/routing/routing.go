@@ -30,7 +30,13 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // Setup configures the given mux with sync-server listeners
 func Setup(apiMux *mux.Router, srp *sync.RequestPool, deviceDB *devices.Database) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
+	})).Methods("GET")
+
+	r0mux.Handle("/rooms/{roomID}/state", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		vars := mux.Vars(req)
+		return srp.OnIncomingStateRequest(req, vars["roomID"])
 	})).Methods("GET")
 }

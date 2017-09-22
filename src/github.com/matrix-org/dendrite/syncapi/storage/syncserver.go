@@ -162,6 +162,19 @@ func (d *SyncServerDatabase) GetStateEvent(
 	return d.roomstate.selectStateEvent(ctx, evType, roomID, stateKey)
 }
 
+// GetStateEventsForRoom fetches the state events for a given room.
+// Returns an empty slice if no state events could be found for this room.
+// Returns an error if there was an issue with the retrieval.
+func (d *SyncServerDatabase) GetStateEventsForRoom(
+	ctx context.Context, roomID string,
+) (stateEvents []gomatrixserverlib.Event, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
+		return err
+	})
+	return
+}
+
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 func (d *SyncServerDatabase) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
 	return d.syncStreamPositionTx(ctx, nil)
