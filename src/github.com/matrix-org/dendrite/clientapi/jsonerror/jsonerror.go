@@ -85,6 +85,12 @@ func WeakPassword(msg string) *MatrixError {
 	return &MatrixError{"M_WEAK_PASSWORD", msg}
 }
 
+// InvalidUsername is an error returned when the client tries to register an
+// invalid username
+func InvalidUsername(msg string) *MatrixError {
+	return &MatrixError{"M_INVALID_USERNAME", msg}
+}
+
 // GuestAccessForbidden is an error which is returned when the client is
 // forbidden from accessing a resource as a guest.
 func GuestAccessForbidden(msg string) *MatrixError {

@@ -74,6 +74,9 @@ type Dendrite struct {
 		// verify third-party identifiers.
 		// Defaults to an empty array.
 		TrustedIDServers []string `yaml:"trusted_third_party_id_servers"`
+		// If set, allows registration by anyone who also has the shared
+		// secret, even if registration is otherwise disabled.
+		RegistrationSharedSecret string `yaml:"registration_shared_secret"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.
