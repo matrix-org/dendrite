@@ -135,6 +135,20 @@ func Register(
 	if resErr != nil {
 		return *resErr
 	}
+
+	// All registration requests must specify what auth they are using to perform this request
+	if r.Auth.Type == "" {
+		return util.JSONResponse{
+			Code: 401,
+			// TODO: Hard-coded 'dummy' auth for now with a bogus session ID.
+			//       Server admins should be able to change things around (eg enable captcha)
+			JSON: newUserInteractiveResponse(time.Now().String(), []authFlow{
+				{[]authtypes.LoginType{authtypes.LoginTypeDummy}},
+				{[]authtypes.LoginType{authtypes.LoginTypeSharedSecret}},
+			}),
+		}
+	}
+
 	if resErr = validate(r.Username, r.Password); resErr != nil {
 		return *resErr
 	}
@@ -150,19 +164,6 @@ func Register(
 	// TODO: AS API registration
 	// TODO: Enable registration config flag
 	// TODO: Guest account upgrading
-
-	// All registration requests must specify what auth they are using to perform this request
-	if r.Auth.Type == "" {
-		return util.JSONResponse{
-			Code: 401,
-			// TODO: Hard-coded 'dummy' auth for now with a bogus session ID.
-			//       Server admins should be able to change things around (eg enable captcha)
-			JSON: newUserInteractiveResponse(time.Now().String(), []authFlow{
-				{[]authtypes.LoginType{authtypes.LoginTypeDummy}},
-				{[]authtypes.LoginType{authtypes.LoginTypeSharedSecret}},
-			}),
-		}
-	}
 
 	// TODO: Handle loading of previous session parameters from database.
 	// TODO: Handle mapping registrationRequest parameters into session parameters
