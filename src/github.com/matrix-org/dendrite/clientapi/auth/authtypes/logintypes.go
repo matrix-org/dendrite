@@ -5,5 +5,6 @@ type LoginType string
 
 // The relevant login types implemented in Dendrite
 const (
-	LoginTypeDummy = "m.login.dummy"
+	LoginTypeDummy        = "m.login.dummy"
+	LoginTypeSharedSecret = "org.matrix.login.shared_secret"
 )

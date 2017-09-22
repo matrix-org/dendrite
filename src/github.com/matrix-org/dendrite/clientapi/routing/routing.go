@@ -34,6 +34,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
+const pathPrefixV1 = "/_matrix/client/api/v1"
 const pathPrefixR0 = "/_matrix/client/r0"
 const pathPrefixUnstable = "/_matrix/client/unstable"
 
@@ -67,6 +68,7 @@ func Setup(
 	).Methods("GET")
 
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	v1mux := apiMux.PathPrefix(pathPrefixV1).Subrouter()
 	unstableMux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	r0mux.Handle("/createRoom",
@@ -115,7 +117,11 @@ func Setup(
 	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/register", common.MakeAPI("register", func(req *http.Request) util.JSONResponse {
-		return writers.Register(req, accountDB, deviceDB)
+		return writers.Register(req, accountDB, deviceDB, &cfg)
+	})).Methods("POST", "OPTIONS")
+
+	v1mux.Handle("/register", common.MakeAPI("register", func(req *http.Request) util.JSONResponse {
+		return writers.LegacyRegister(req, accountDB, deviceDB, &cfg)
 	})).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/directory/room/{roomAlias}",
