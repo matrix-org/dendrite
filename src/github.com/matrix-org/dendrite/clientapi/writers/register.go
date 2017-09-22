@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -46,9 +45,9 @@ type registerRequest struct {
 }
 
 type authDict struct {
-	Type    authtypes.LoginType `json:"type"`
-	Session string              `json:"session"`
-	Mac     string              `json:"mac"`
+	Type    authtypes.LoginType         `json:"type"`
+	Session string                      `json:"session"`
+	Mac     gomatrixserverlib.HexString `json:"mac"`
 	// TODO: Lots of custom keys depending on the type
 }
 
@@ -72,7 +71,7 @@ type legacyRegisterRequest struct {
 	Username string              `json:"user"`
 	Admin    bool                `json:"admin"`
 	Type     authtypes.LoginType `json:"type"`
-	Mac      string              `json:"mac"`
+	Mac      gomatrixserverlib.HexString           `json:"mac"`
 }
 
 func newUserInteractiveResponse(sessionID string, fs []authFlow) userInteractiveResponse {
@@ -301,7 +300,8 @@ func completeRegistration(
 func isValidMacLogin(
 	username, password string,
 	isAdmin bool,
-	givenMacStr, sharedSecret string,
+	givenMac []byte,
+	sharedSecret string,
 ) (bool, error) {
 	// Double check that username/passowrd don't contain the HMAC delimiters. We should have
 	// already checked this.
@@ -327,11 +327,6 @@ func isValidMacLogin(
 		return false, err
 	}
 	expectedMAC := mac.Sum(nil)
-
-	givenMac, err := hex.DecodeString(givenMacStr)
-	if err != nil {
-		return false, err
-	}
 
 	return hmac.Equal(givenMac, expectedMAC), nil
 }
