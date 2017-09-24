@@ -106,4 +106,11 @@ func Setup(
 			)
 		},
 	)).Methods("GET")
+
+	v1fedmux.Handle("/version", common.MakeAPI(
+		"federation_version",
+		func(httpReq *http.Request) util.JSONResponse {
+			return readers.Version()
+		},
+	)).Methods("GET")
 }
