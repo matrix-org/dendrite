@@ -90,10 +90,17 @@ func Setup(
 			return writers.SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, producer)
 		}),
 	).Methods("POST", "OPTIONS")
+	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
+		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, queryAPI, producer)
+		}),
+	).Methods("POST", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], vars["txnID"], nil, cfg, queryAPI, producer)
+			txnID := vars["txnID"]
+			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID, nil, cfg, queryAPI, producer)
 		}),
 	).Methods("PUT", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
@@ -105,14 +112,14 @@ func Setup(
 			if strings.HasSuffix(eventType, "/") {
 				eventType = eventType[:len(eventType)-1]
 			}
-			return writers.SendEvent(req, device, vars["roomID"], eventType, "", &emptyString, cfg, queryAPI, producer)
+			return writers.SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, queryAPI, producer)
 		}),
 	).Methods("PUT", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			stateKey := vars["stateKey"]
-			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], "", &stateKey, cfg, queryAPI, producer)
+			return writers.SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, queryAPI, producer)
 		}),
 	).Methods("PUT", "OPTIONS")
 
