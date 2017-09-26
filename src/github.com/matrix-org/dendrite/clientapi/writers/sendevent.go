@@ -35,12 +35,13 @@ type sendEventResponse struct {
 }
 
 // SendEvent implements:
+//   /rooms/{roomID}/send/{eventType}
 //   /rooms/{roomID}/send/{eventType}/{txnID}
 //   /rooms/{roomID}/state/{eventType}/{stateKey}
 func SendEvent(
 	req *http.Request,
 	device *authtypes.Device,
-	roomID, eventType, _ string, stateKey *string,
+	roomID, eventType string, _, stateKey *string,
 	cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
