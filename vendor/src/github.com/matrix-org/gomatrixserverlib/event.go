@@ -389,6 +389,8 @@ func (e Event) CheckFields() error { // nolint: gocyclo
 		return err
 	}
 
+	origin := e.fields.Origin
+
 	senderDomain, err := checkID(e.fields.Sender, "user", '@')
 	if err != nil {
 		return err
@@ -406,34 +408,33 @@ func (e Event) CheckFields() error { // nolint: gocyclo
 	// Since both domains must be valid domains, and there is no good reason for them
 	// to be different we might as well ensure that they are the same since it
 	// makes the signature checks simpler.
-	if e.fields.Origin != ServerName(eventDomain) {
+	if origin != ServerName(eventDomain) {
 		return fmt.Errorf(
 			"gomatrixserverlib: event ID domain doesn't match origin: %q != %q",
-			eventDomain, e.fields.Origin,
+			eventDomain, origin,
 		)
 	}
 
-	if eventDomain != senderDomain {
+	if origin != ServerName(senderDomain) {
 		// For the most part all events should be sent by a user on the
-		// originating server
+		// originating server.
+		//
 		// However "m.room.member" events created from third-party invites
 		// are allowed to have a different sender because they have the same
 		// sender as the "m.room.third_party_invite" event they derived from.
 		// https://github.com/matrix-org/synapse/blob/v0.21.0/synapse/event_auth.py#L58-L64
+		//
+		// Also, some old versions of synapse had a bug wherein some
+		// joins/leaves used the origin and event id supplied by the helping
+		// server instead of the joining/leaving server.
+		//
+		// So in general we allow the sender to be different from the
+		// origin for m.room.member events. In any case, we check it was
+		// signed by both servers later.
 		if e.fields.Type != MRoomMember {
 			return fmt.Errorf(
 				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
-				senderDomain, e.fields.Origin,
-			)
-		}
-		c, err := newMemberContentFromEvent(e)
-		if err != nil {
-			return err
-		}
-		if c.Membership != invite || c.ThirdPartyInvite == nil {
-			return fmt.Errorf(
-				"gomatrixserverlib: sender domain doesn't match origin: %q != %q",
-				senderDomain, e.fields.Origin,
+				senderDomain, origin,
 			)
 		}
 	}

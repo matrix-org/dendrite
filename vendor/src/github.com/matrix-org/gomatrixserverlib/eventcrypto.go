@@ -189,19 +189,33 @@ func verifyEventSignature(signingName string, keyID KeyID, publicKey ed25519.Pub
 
 // VerifyEventSignatures checks that each event in a list of events has valid
 // signatures from the server that sent it.
-func VerifyEventSignatures(ctx context.Context, events []Event, keyRing KeyRing) error { // nolint: gocyclo
+func VerifyEventSignatures(ctx context.Context, events []Event, keyRing JSONVerifier) error { // nolint: gocyclo
 	var toVerify []VerifyJSONRequest
 	for _, event := range events {
 		redactedJSON, err := redactEvent(event.eventJSON)
 		if err != nil {
 			return err
 		}
-		v := VerifyJSONRequest{
-			Message:    redactedJSON,
-			AtTS:       event.OriginServerTS(),
-			ServerName: event.Origin(),
+
+		domains := make(map[ServerName]bool)
+		domains[event.Origin()] = true
+
+		// in general, we expect the domain of the sender id to be the
+		// same as the origin; however there was a bug in an old version
+		// of synapse which meant that some joins/leaves used the origin
+		// and event id supplied by the helping server instead of the
+		// joining/leaving server.
+		//
+		// That's ok, provided it's signed by the sender's server too.
+		//
+		// XXX we may have to exclude 3pid invites here, as per
+		// https://github.com/matrix-org/synapse/blob/v0.21.0/synapse/event_auth.py#L58-L64.
+		//
+		senderDomain, err := domainFromID(event.Sender())
+		if err != nil {
+			return err
 		}
-		toVerify = append(toVerify, v)
+		domains[ServerName(senderDomain)] = true
 
 		// MRoomMember invite events are signed by both the server sending
 		// the invite and the server the invite is for.
@@ -216,10 +230,18 @@ func VerifyEventSignatures(ctx context.Context, events []Event, keyRing KeyRing)
 					return err
 				}
 				if c.Membership == invite {
-					v.ServerName = ServerName(targetDomain)
-					toVerify = append(toVerify, v)
+					domains[ServerName(targetDomain)] = true
 				}
 			}
+		}
+
+		for domain := range domains {
+			v := VerifyJSONRequest{
+				Message:    redactedJSON,
+				AtTS:       event.OriginServerTS(),
+				ServerName: domain,
+			}
+			toVerify = append(toVerify, v)
 		}
 	}
 

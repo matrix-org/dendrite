@@ -184,7 +184,7 @@ func isSafeInHTTPQuotedString(text string) bool { // nolint: gocyclo
 // It consumes the body of the request.
 // The JSON content can be accessed using FederationRequest.Content()
 // Returns an 400 error if there was a problem parsing the request.
-// It authenticates the request using an ed25519 signature using the KeyRing.
+// It authenticates the request using an ed25519 signature using the JSONVerifier.
 // The origin server can be accessed using FederationRequest.Origin()
 // Returns a 401 error if there was a problem authenticating the request.
 // HTTP handlers using this should be careful that they only use the parts of
@@ -192,7 +192,7 @@ func isSafeInHTTPQuotedString(text string) bool { // nolint: gocyclo
 // the query parameters, and the JSON content. In particular the version of
 // HTTP and the headers aren't protected by the signature.
 func VerifyHTTPRequest(
-	req *http.Request, now time.Time, destination ServerName, keys KeyRing,
+	req *http.Request, now time.Time, destination ServerName, keys JSONVerifier,
 ) (*FederationRequest, util.JSONResponse) {
 	request, err := readHTTPRequest(req)
 	if err != nil {

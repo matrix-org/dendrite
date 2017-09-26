@@ -69,12 +69,18 @@ type VerifyJSONResult struct {
 	Error error
 }
 
-// VerifyJSONs performs bulk JSON signature verification for a list of VerifyJSONRequests.
-// Returns a list of VerifyJSONResults with the same length and order as the request list.
-// The caller should check the Result field for each entry to see if it was valid.
-// Returns an error if there was a problem talking to the database or one of the other methods
-// of fetching the public keys.
-func (k *KeyRing) VerifyJSONs(ctx context.Context, requests []VerifyJSONRequest) ([]VerifyJSONResult, error) { // nolint: gocyclo
+// A JSONVerifier is an object which can verify the signatures of JSON messages.
+type JSONVerifier interface {
+	// VerifyJSONs performs bulk JSON signature verification for a list of VerifyJSONRequests.
+	// Returns a list of VerifyJSONResults with the same length and order as the request list.
+	// The caller should check the Result field for each entry to see if it was valid.
+	// Returns an error if there was a problem talking to the database or one of the other methods
+	// of fetching the public keys.
+	VerifyJSONs(ctx context.Context, requests []VerifyJSONRequest) ([]VerifyJSONResult, error)
+}
+
+// VerifyJSONs implements JSONVerifier.
+func (k KeyRing) VerifyJSONs(ctx context.Context, requests []VerifyJSONRequest) ([]VerifyJSONResult, error) { // nolint: gocyclo
 	results := make([]VerifyJSONResult, len(requests))
 	keyIDs := make([][]KeyID, len(requests))
 
