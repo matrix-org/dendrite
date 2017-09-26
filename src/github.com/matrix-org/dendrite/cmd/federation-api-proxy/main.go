@@ -48,6 +48,7 @@ Arguments:
 
 var (
 	federationAPIURL = flag.String("federation-api-url", "", "The base URL of the listening 'dendrite-federation-api-server' process. E.g. 'http://localhost:4200'")
+	mediaAPIURL      = flag.String("media-api-server-url", "", "The base URL of the listening 'dendrite-media-api-server' process. E.g. 'http://localhost:7779'")
 	bindAddress      = flag.String("bind-address", ":8448", "The listening port for the proxy.")
 	certFile         = flag.String("tls-cert", "server.crt", "The PEM formatted X509 certificate to use for TLS")
 	keyFile          = flag.String("tls-key", "server.key", "The PEM private key to use for TLS")
@@ -104,11 +105,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *mediaAPIURL == "" {
+		flag.Usage()
+		fmt.Fprintln(os.Stderr, "no --media-api-server-url specified.")
+		os.Exit(1)
+	}
+
 	federationProxy, err := makeProxy(*federationAPIURL)
 	if err != nil {
 		panic(err)
 	}
 
+	mediaProxy, err := makeProxy(*mediaAPIURL)
+	if err != nil {
+		panic(err)
+	}
+
+	http.Handle("/_matrix/media/v1/", mediaProxy)
 	http.Handle("/", federationProxy)
 
 	srv := &http.Server{
@@ -118,6 +131,7 @@ func main() {
 	}
 
 	fmt.Println("Proxying requests to:")
+	fmt.Println("  /_matrix/media/v1        => ", *mediaAPIURL+"/api/_matrix/media/v1")
 	fmt.Println("  /*                       => ", *federationAPIURL+"/api/*")
 	fmt.Println("Listening on ", *bindAddress)
 	panic(srv.ListenAndServeTLS(*certFile, *keyFile))
