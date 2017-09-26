@@ -1,0 +1,170 @@
+version: '2'
+services:
+    zookeeper:
+        image: wurstmeister/zookeeper
+        networks:
+            - backend
+        expose:
+            - "2181"
+        restart: unless-stopped
+    kafka:
+        image: wurstmeister/kafka:0.10.2.0
+        environment:
+            KAFKA_ADVERTISED_HOST_NAME: kafka
+            KAFKA_ADVERTISED_PORT: "9092"
+            KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        networks:
+            - backend
+        expose:
+            - "9092"
+        depends_on:
+            - zookeeper
+        restart: unless-stopped
+    postgres:
+        image: postgres:9.6
+        environment:
+            POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+        volumes:
+            - ./init-dendrite-dbs.sh:/docker-entrypoint-initdb.d/init-dendrite-dbs.sh
+            - $HOME/dendrite/postgres:/var/lib/postgresql/data
+        networks:
+            - backend
+        ports:
+            - "5432:5432"
+        restart: unless-stopped
+
+    client-api-proxy:
+        image: client-api-proxy
+        command: >-
+            --sync-api-server-url http://sync-api-server:7773
+            --client-api-server-url http://client-api-server:7771
+            --media-api-server-url http://media-api-server:7774
+            --bind-address 0.0.0.0:8443
+            --tls-cert /certs/server.crt
+            --tls-key /certs/server.key
+        volumes:
+            - ./certs:/certs
+        networks:
+            - frontend
+            - backend
+        ports:
+            - "8443:8443"
+        depends_on:
+            - sync-api-server
+            - client-api-server
+            - media-api-server
+        restart: unless-stopped
+    federation-api-proxy:
+        image: federation-api-proxy
+        command: >-
+            --federation-api-url http://federation-api-server:7772
+            --bind-address 0.0.0.0:8449
+            --tls-cert /certs/server.crt
+            --tls-key /certs/server.key
+            # --media-api-url http://media-api-server:7774
+        volumes:
+            - ./certs:/certs
+        networks:
+            - frontend
+            - backend
+        ports:
+            - "8449:8449"
+        depends_on:
+            - federation-api-server
+        restart: unless-stopped
+
+    room-server:
+        image: dendrite-room-server
+        command: --config /dendrite-config.yaml
+        environment:
+            PGHOST: postgres
+            PGPASSWORD: $POSTGRES_PASSWORD
+        volumes:
+            - ./dendrite-config.yaml:/dendrite-config.yaml
+            - ./certs:/certs
+        networks:
+            - backend
+        expose:
+            - "7770"
+        depends_on:
+            - postgres
+            - kafka
+        restart: unless-stopped
+    client-api-server:
+        image: dendrite-client-api-server
+        command: --config /dendrite-config.yaml
+        environment:
+            PGHOST: postgres
+            PGPASSWORD: $POSTGRES_PASSWORD
+        volumes:
+            - ./dendrite-config.yaml:/dendrite-config.yaml
+            - ./certs:/certs
+        networks:
+            - backend
+        expose:
+            - "7771"
+        depends_on:
+            - postgres
+            - kafka
+            - room-server
+        restart: unless-stopped
+    federation-api-server:
+        image: dendrite-federation-api-server
+        command: --config /dendrite-config.yaml
+        environment:
+            PGHOST: postgres
+            PGPASSWORD: $POSTGRES_PASSWORD
+        volumes:
+            - ./dendrite-config.yaml:/dendrite-config.yaml
+            - ./certs:/certs
+        networks:
+            - backend
+        expose:
+            - "7772"
+        depends_on:
+            - postgres
+            - kafka
+            - room-server
+        restart: unless-stopped
+    sync-api-server:
+        image: dendrite-sync-api-server
+        command: --config /dendrite-config.yaml
+        environment:
+            PGHOST: postgres
+            PGPASSWORD: $POSTGRES_PASSWORD
+        volumes:
+            - ./dendrite-config.yaml:/dendrite-config.yaml
+            - ./certs:/certs
+        networks:
+            - backend
+        expose:
+            - "7773"
+        depends_on:
+            - postgres
+            - kafka
+            - room-server
+        restart: unless-stopped
+    media-api-server:
+        image: dendrite-media-api-server
+        command: --config /dendrite-config.yaml
+        environment:
+            PGHOST: postgres
+            PGPASSWORD: $POSTGRES_PASSWORD
+        volumes:
+            - ./dendrite-config.yaml:/dendrite-config.yaml
+            - ./certs:/certs
+            - $HOME/dendrite/media:/media
+        networks:
+            - backend
+        expose:
+            - "7774"
+        depends_on:
+            - postgres
+            - kafka
+        restart: unless-stopped
+
+networks:
+    backend:
+    frontend:
