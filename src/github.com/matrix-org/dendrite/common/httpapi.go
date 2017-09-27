@@ -9,6 +9,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -21,13 +23,41 @@ func MakeAuthAPI(metricsName string, deviceDB auth.DeviceDatabase, f func(*http.
 		}
 		return f(req, device)
 	}
-	return MakeAPI(metricsName, h)
+	return MakeExternalAPI(metricsName, h)
 }
 
-// MakeAPI turns a util.JSONRequestHandler function into an http.Handler.
-func MakeAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
-	h := util.NewJSONRequestHandler(f)
-	return prometheus.InstrumentHandler(metricsName, util.MakeJSONAPI(h))
+// MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.
+func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
+	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		span := opentracing.StartSpan(metricsName)
+		defer span.Finish()
+		h.ServeHTTP(w, req)
+	}
+
+	return prometheus.InstrumentHandler(metricsName, http.HandlerFunc(withSpan))
+}
+
+// MakeInternalAPI turns a util.JSONRequestHandler function into an http.Handler.
+func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
+	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		carrier := opentracing.HTTPHeadersCarrier(req.Header)
+		tracer := opentracing.GlobalTracer()
+		clientContext, err := tracer.Extract(opentracing.HTTPHeaders, carrier)
+		var span opentracing.Span
+		if err == nil {
+			// Default to a span without RPC context.
+			span = tracer.StartSpan(metricsName)
+		} else {
+			// Set the RPC context.
+			span = tracer.StartSpan(metricsName, ext.RPCServerOption(clientContext))
+		}
+		defer span.Finish()
+		h.ServeHTTP(w, req)
+	}
+
+	return prometheus.InstrumentHandler(metricsName, http.HandlerFunc(withSpan))
 }
 
 // MakeFedAPI makes an http.Handler that checks matrix federation authentication.
@@ -46,7 +76,7 @@ func MakeFedAPI(
 		}
 		return f(req, fedReq)
 	}
-	return MakeAPI(metricsName, h)
+	return MakeExternalAPI(metricsName, h)
 }
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics

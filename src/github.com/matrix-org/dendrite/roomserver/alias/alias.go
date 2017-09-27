@@ -224,7 +224,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.RoomserverSetRoomAliasPath,
-		common.MakeAPI("setRoomAlias", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("setRoomAlias", func(req *http.Request) util.JSONResponse {
 			var request api.SetRoomAliasRequest
 			var response api.SetRoomAliasResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -238,7 +238,7 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverGetAliasRoomIDPath,
-		common.MakeAPI("getAliasRoomID", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("getAliasRoomID", func(req *http.Request) util.JSONResponse {
 			var request api.GetAliasRoomIDRequest
 			var response api.GetAliasRoomIDResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -252,7 +252,7 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverRemoveRoomAliasPath,
-		common.MakeAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
 			var request api.RemoveRoomAliasRequest
 			var response api.RemoveRoomAliasResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

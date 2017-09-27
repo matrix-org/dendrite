@@ -32,7 +32,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storage.PublicRoomsServerDatabase) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	r0mux.Handle("/directory/list/room/{roomID}",
-		common.MakeAPI("directory_list", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return directory.GetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
@@ -44,7 +44,7 @@ func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storag
 		}),
 	).Methods("PUT", "OPTIONS")
 	r0mux.Handle("/publicRooms",
-		common.MakeAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
 			return directory.GetPublicRooms(req, publicRoomsDB)
 		}),
 	).Methods("GET", "POST", "OPTIONS")

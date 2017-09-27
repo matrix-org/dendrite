@@ -48,7 +48,7 @@ func Setup(
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
 
-	localKeys := common.MakeAPI("localkeys", func(req *http.Request) util.JSONResponse {
+	localKeys := common.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
 		return readers.LocalKeys(cfg)
 	})
 
@@ -81,7 +81,7 @@ func Setup(
 		},
 	)).Methods("PUT", "OPTIONS")
 
-	v1fedmux.Handle("/3pid/onbind", common.MakeAPI("3pid_onbind",
+	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
 			return writers.CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
 		},
@@ -107,7 +107,7 @@ func Setup(
 		},
 	)).Methods("GET")
 
-	v1fedmux.Handle("/version", common.MakeAPI(
+	v1fedmux.Handle("/version", common.MakeExternalAPI(
 		"federation_version",
 		func(httpReq *http.Request) util.JSONResponse {
 			return readers.Version()

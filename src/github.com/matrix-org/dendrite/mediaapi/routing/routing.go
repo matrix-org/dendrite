@@ -17,7 +17,10 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
@@ -35,6 +38,7 @@ func Setup(
 	apiMux *mux.Router,
 	cfg *config.Dendrite,
 	db *storage.Database,
+	deviceDB *devices.Database,
 	client *gomatrixserverlib.Client,
 ) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
@@ -43,10 +47,13 @@ func Setup(
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
 	}
 
-	// FIXME: /upload should use common.MakeAuthAPI()
-	r0mux.Handle("/upload", common.MakeAPI("upload", func(req *http.Request) util.JSONResponse {
-		return writers.Upload(req, cfg, db, activeThumbnailGeneration)
-	})).Methods("POST", "OPTIONS")
+	r0mux.Handle("/upload", common.MakeAuthAPI(
+		"upload",
+		deviceDB,
+		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
+			return writers.Upload(req, cfg, db, activeThumbnailGeneration)
+		},
+	)).Methods("POST", "OPTIONS")
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
 		MXCToResult: map[string]*types.RemoteRequestResult{},
