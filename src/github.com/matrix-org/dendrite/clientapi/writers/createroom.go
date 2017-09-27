@@ -219,7 +219,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		return httputil.LogThenError(req, err)
 	}
 
-	// TODO(#???): Reserve room alias while we create the room. This stops us
+	// TODO(#269): Reserve room alias while we create the room. This stops us
 	// from creating the room but still failing due to the alias having already
 	// been taken.
 	var roomAlias string
