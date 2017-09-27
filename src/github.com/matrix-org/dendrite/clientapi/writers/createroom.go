@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -87,18 +89,19 @@ type fledglingEvent struct {
 // CreateRoom implements /createRoom
 func CreateRoom(req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database,
+	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
-	// TODO: Check room ID doesn't clash with an existing one, and we
-	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
+	// TODO (#267): Check room ID doesn't clash with an existing one, and we
+	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	return createRoom(req, device, cfg, roomID, producer, accountDB)
+	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI)
 }
 
 // createRoom implements /createRoom
+// nolint: gocyclo
 func createRoom(req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database,
+	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
@@ -192,7 +195,8 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		if i > 0 {
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
-		ev, err := buildEvent(&builder, &authEvents, cfg)
+		var ev *gomatrixserverlib.Event
+		ev, err = buildEvent(&builder, &authEvents, cfg)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -210,12 +214,38 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	}
 
 	// send events to the room server
-	if err := producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName); err != nil {
+	err = producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName)
+	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
+	// TODO(#269): Reserve room alias while we create the room. This stops us
+	// from creating the room but still failing due to the alias having already
+	// been taken.
+	var roomAlias string
+	if r.RoomAliasName != "" {
+		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
+
+		aliasReq := api.SetRoomAliasRequest{
+			Alias:  roomAlias,
+			RoomID: roomID,
+			UserID: userID,
+		}
+
+		var aliasResp api.SetRoomAliasResponse
+		err = aliasAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+
+		if aliasResp.AliasExists {
+			return util.MessageResponse(400, "Alias already exists")
+		}
+	}
+
 	response := createRoomResponse{
-		RoomID: roomID,
+		RoomID:    roomID,
+		RoomAlias: roomAlias,
 	}
 
 	return util.JSONResponse{
