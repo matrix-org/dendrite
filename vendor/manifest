@@ -152,6 +152,12 @@
 			"path": "/i18n"
 		},
 		{
+			"importpath": "github.com/opentracing/opentracing-go",
+			"repository": "https://github.com/opentracing/opentracing-go",
+			"revision": "8ebe5d4e236eed9fd88e593c288bfb804d630b8c",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/pelletier/go-toml",
 			"repository": "https://github.com/pelletier/go-toml",
 			"revision": "1d6b12b7cb290426e27e6b4e38b89fcda3aeef03",
