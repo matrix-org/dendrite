@@ -73,7 +73,7 @@ func Setup(
 
 	r0mux.Handle("/createRoom",
 		common.MakeAuthAPI("createRoom", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return writers.CreateRoom(req, device, cfg, producer, accountDB)
+			return writers.CreateRoom(req, device, cfg, producer, accountDB, aliasAPI)
 		}),
 	).Methods("POST", "OPTIONS")
 	r0mux.Handle("/join/{roomIDOrAlias}",
