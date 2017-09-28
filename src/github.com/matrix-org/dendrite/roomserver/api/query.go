@@ -21,6 +21,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/opentracing/opentracing-go/ext"
+
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -234,8 +238,11 @@ func (h *httpRoomserverQueryAPI) QueryLatestEventsAndState(
 	request *QueryLatestEventsAndStateRequest,
 	response *QueryLatestEventsAndStateResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryLatestEventsAndState")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverQueryLatestEventsAndStatePath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryStateAfterEvents implements RoomserverQueryAPI
@@ -244,8 +251,11 @@ func (h *httpRoomserverQueryAPI) QueryStateAfterEvents(
 	request *QueryStateAfterEventsRequest,
 	response *QueryStateAfterEventsResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryStateAfterEvents")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryEventsByID implements RoomserverQueryAPI
@@ -254,8 +264,11 @@ func (h *httpRoomserverQueryAPI) QueryEventsByID(
 	request *QueryEventsByIDRequest,
 	response *QueryEventsByIDResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryEventsByID")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryMembershipsForRoom implements RoomserverQueryAPI
@@ -264,8 +277,11 @@ func (h *httpRoomserverQueryAPI) QueryMembershipsForRoom(
 	request *QueryMembershipsForRoomRequest,
 	response *QueryMembershipsForRoomResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershipsForRoom")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryInvitesForUser implements RoomserverQueryAPI
@@ -274,8 +290,11 @@ func (h *httpRoomserverQueryAPI) QueryInvitesForUser(
 	request *QueryInvitesForUserRequest,
 	response *QueryInvitesForUserResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryInvitesForUser")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverQueryInvitesForUserPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryServerAllowedToSeeEvent implements RoomserverQueryAPI
@@ -284,12 +303,15 @@ func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	request *QueryServerAllowedToSeeEventRequest,
 	response *QueryServerAllowedToSeeEventResponse,
 ) (err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerAllowedToSeeEvent")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func postJSON(
-	ctx context.Context, httpClient *http.Client,
+	ctx context.Context, span opentracing.Span, httpClient *http.Client,
 	apiURL string, request, response interface{},
 ) error {
 	jsonBytes, err := json.Marshal(request)
@@ -299,6 +321,15 @@ func postJSON(
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(jsonBytes))
 	if err != nil {
+		return err
+	}
+
+	// Mark the span as being an RPC client.
+	ext.SpanKindRPCClient.Set(span)
+	carrier := opentracing.HTTPHeadersCarrier(req.Header)
+	tracer := opentracing.GlobalTracer()
+
+	if err = tracer.Inject(span.Context(), opentracing.HTTPHeaders, carrier); err != nil {
 		return err
 	}
 

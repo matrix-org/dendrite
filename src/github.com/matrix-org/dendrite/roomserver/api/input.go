@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 const (
@@ -117,6 +118,9 @@ func (h *httpRoomserverInputAPI) InputRoomEvents(
 	request *InputRoomEventsRequest,
 	response *InputRoomEventsResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputRoomEvents")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverInputRoomEventsPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
