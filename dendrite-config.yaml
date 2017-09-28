@@ -98,5 +98,4 @@ tracing:
     # See https://godoc.org/github.com/uber/jaeger-client-go/config#Configuration
     # for documtation.
     jaeger:
-        # Remove this line to enable the reporter.
         disabled: true
