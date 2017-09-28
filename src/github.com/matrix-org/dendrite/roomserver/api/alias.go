@@ -17,6 +17,8 @@ package api
 import (
 	"context"
 	"net/http"
+
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // SetRoomAliasRequest is a request to SetRoomAlias
@@ -111,8 +113,11 @@ func (h *httpRoomserverAliasAPI) SetRoomAlias(
 	request *SetRoomAliasRequest,
 	response *SetRoomAliasResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "SetRoomAlias")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // GetAliasRoomID implements RoomserverAliasAPI
@@ -121,8 +126,11 @@ func (h *httpRoomserverAliasAPI) GetAliasRoomID(
 	request *GetAliasRoomIDRequest,
 	response *GetAliasRoomIDResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetAliasRoomID")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverGetAliasRoomIDPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // RemoveRoomAlias implements RoomserverAliasAPI
@@ -131,6 +139,9 @@ func (h *httpRoomserverAliasAPI) RemoveRoomAlias(
 	request *RemoveRoomAliasRequest,
 	response *RemoveRoomAliasResponse,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "RemoveRoomAlias")
+	defer span.Finish()
+
 	apiURL := h.roomserverURL + RoomserverRemoveRoomAliasPath
-	return postJSON(ctx, h.httpClient, apiURL, request, response)
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

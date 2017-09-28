@@ -74,7 +74,7 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 // SetupHTTP adds the RoomserverInputAPI handlers to the http.ServeMux.
 func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(api.RoomserverInputRoomEventsPath,
-		common.MakeAPI("inputRoomEvents", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("inputRoomEvents", func(req *http.Request) util.JSONResponse {
 			var request api.InputRoomEventsRequest
 			var response api.InputRoomEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

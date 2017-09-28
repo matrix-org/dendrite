@@ -53,7 +53,7 @@ func Setup(
 ) {
 
 	apiMux.Handle("/_matrix/client/versions",
-		common.MakeAPI("versions", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: 200,
 				JSON: struct {
@@ -123,11 +123,11 @@ func Setup(
 		}),
 	).Methods("PUT", "OPTIONS")
 
-	r0mux.Handle("/register", common.MakeAPI("register", func(req *http.Request) util.JSONResponse {
+	r0mux.Handle("/register", common.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
 		return writers.Register(req, accountDB, deviceDB, &cfg)
 	})).Methods("POST", "OPTIONS")
 
-	v1mux.Handle("/register", common.MakeAPI("register", func(req *http.Request) util.JSONResponse {
+	v1mux.Handle("/register", common.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
 		return writers.LegacyRegister(req, accountDB, deviceDB, &cfg)
 	})).Methods("POST", "OPTIONS")
 
@@ -161,13 +161,13 @@ func Setup(
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
-		common.MakeAPI("login", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
 			return readers.Login(req, accountDB, deviceDB, cfg)
 		}),
 	).Methods("GET", "POST", "OPTIONS")
 
 	r0mux.Handle("/pushrules/",
-		common.MakeAPI("push_rules", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("push_rules", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement push rules API
 			res := json.RawMessage(`{
 					"global": {
@@ -186,7 +186,7 @@ func Setup(
 	).Methods("GET")
 
 	r0mux.Handle("/user/{userID}/filter",
-		common.MakeAPI("make_filter", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("make_filter", func(req *http.Request) util.JSONResponse {
 			// TODO: Persist filter and return filter ID
 			return util.JSONResponse{
 				Code: 200,
@@ -196,7 +196,7 @@ func Setup(
 	).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/user/{userID}/filter/{filterID}",
-		common.MakeAPI("filter", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("filter", func(req *http.Request) util.JSONResponse {
 			// TODO: Retrieve filter based on ID
 			return util.JSONResponse{
 				Code: 200,
@@ -208,14 +208,14 @@ func Setup(
 	// Riot user settings
 
 	r0mux.Handle("/profile/{userID}",
-		common.MakeAPI("profile", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("profile", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return readers.GetProfile(req, accountDB, vars["userID"])
 		}),
 	).Methods("GET")
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
-		common.MakeAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return readers.GetAvatarURL(req, accountDB, vars["userID"])
 		}),
@@ -231,7 +231,7 @@ func Setup(
 	// PUT requests, so we need to allow this method
 
 	r0mux.Handle("/profile/{userID}/displayname",
-		common.MakeAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return readers.GetDisplayName(req, accountDB, vars["userID"])
 		}),
@@ -265,14 +265,14 @@ func Setup(
 	).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
-		common.MakeAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
 			return readers.RequestEmailToken(req, accountDB, cfg)
 		}),
 	).Methods("POST", "OPTIONS")
 
 	// Riot logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",
-		common.MakeAPI("presence", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
 			// TODO: Set presence (probably the responsibility of a presence server not clientapi)
 			return util.JSONResponse{
 				Code: 200,
@@ -282,7 +282,7 @@ func Setup(
 	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/voip/turnServer",
-		common.MakeAPI("turn_server", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("turn_server", func(req *http.Request) util.JSONResponse {
 			// TODO: Return credentials for a turn server if one is configured.
 			return util.JSONResponse{
 				Code: 200,
@@ -292,7 +292,7 @@ func Setup(
 	).Methods("GET")
 
 	unstableMux.Handle("/thirdparty/protocols",
-		common.MakeAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
 			// TODO: Return the third party protcols
 			return util.JSONResponse{
 				Code: 200,
@@ -302,7 +302,7 @@ func Setup(
 	).Methods("GET")
 
 	r0mux.Handle("/rooms/{roomID}/initialSync",
-		common.MakeAPI("rooms_initial_sync", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("rooms_initial_sync", func(req *http.Request) util.JSONResponse {
 			// TODO: Allow people to peek into rooms.
 			return util.JSONResponse{
 				Code: 403,
@@ -340,14 +340,14 @@ func Setup(
 	).Methods("GET")
 
 	r0mux.Handle("/rooms/{roomID}/read_markers",
-		common.MakeAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
 			// TODO: return the read_markers.
 			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
 	).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
-		common.MakeAPI("rooms_typing", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("rooms_typing", func(req *http.Request) util.JSONResponse {
 			// TODO: handling typing
 			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
@@ -355,7 +355,7 @@ func Setup(
 
 	// Stub implementations for sytest
 	r0mux.Handle("/events",
-		common.MakeAPI("events", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{Code: 200, JSON: map[string]interface{}{
 				"chunk": []interface{}{},
 				"start": "",
@@ -365,7 +365,7 @@ func Setup(
 	).Methods("GET")
 
 	r0mux.Handle("/initialSync",
-		common.MakeAPI("initial_sync", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI("initial_sync", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{Code: 200, JSON: map[string]interface{}{
 				"end": "",
 			}}

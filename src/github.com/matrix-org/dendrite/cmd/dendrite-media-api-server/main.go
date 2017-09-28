@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
@@ -52,12 +53,17 @@ func main() {
 		log.WithError(err).Panic("Failed to open database")
 	}
 
+	deviceDB, err := devices.NewDatabase(string(cfg.Database.Device), cfg.Matrix.ServerName)
+	if err != nil {
+		log.WithError(err).Panicf("Failed to setup device database(%q)", cfg.Database.Device)
+	}
+
 	client := gomatrixserverlib.NewClient()
 
 	log.Info("Starting media API server on ", cfg.Listen.MediaAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, cfg, db, client)
+	routing.Setup(api, cfg, db, deviceDB, client)
 	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.MediaAPI), nil))

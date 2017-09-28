@@ -325,7 +325,7 @@ func (m *monolith) setupAPIs() {
 	)
 
 	mediaapi_routing.Setup(
-		m.api, m.cfg, m.mediaAPIDB, &m.federation.Client,
+		m.api, m.cfg, m.mediaAPIDB, m.deviceDB, &m.federation.Client,
 	)
 
 	syncapi_routing.Setup(m.api, syncapi_sync.NewRequestPool(

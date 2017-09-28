@@ -423,7 +423,7 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,
-		common.MakeAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
 			var request api.QueryLatestEventsAndStateRequest
 			var response api.QueryLatestEventsAndStateResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -437,7 +437,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryStateAfterEventsPath,
-		common.MakeAPI("queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAfterEventsRequest
 			var response api.QueryStateAfterEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -451,7 +451,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryEventsByIDPath,
-		common.MakeAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
 			var request api.QueryEventsByIDRequest
 			var response api.QueryEventsByIDResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -465,7 +465,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryMembershipsForRoomPath,
-		common.MakeAPI("queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMembershipsForRoomRequest
 			var response api.QueryMembershipsForRoomResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -479,7 +479,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryInvitesForUserPath,
-		common.MakeAPI("queryInvitesForUser", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("queryInvitesForUser", func(req *http.Request) util.JSONResponse {
 			var request api.QueryInvitesForUserRequest
 			var response api.QueryInvitesForUserResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -493,7 +493,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryServerAllowedToSeeEventPath,
-		common.MakeAPI("queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
 			var request api.QueryServerAllowedToSeeEventRequest
 			var response api.QueryServerAllowedToSeeEventResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
