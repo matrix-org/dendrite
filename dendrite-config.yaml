@@ -91,3 +91,11 @@ listen:
     media_api: "localhost:7774"
     public_rooms_api: "localhost:7775"
     federation_sender: "localhost:7776"
+
+# The configuration for tracing the dendrite components.
+tracing:
+    # Config for the jaeger opentracing reporter.
+    # See https://godoc.org/github.com/uber/jaeger-client-go/config#Configuration
+    # for documtation.
+    jaeger:
+        disabled: true

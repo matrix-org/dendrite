@@ -48,6 +48,12 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
+	closer, err := cfg.SetupTracing("DendriteMediaAPI")
+	if err != nil {
+		log.WithError(err).Fatalf("Failed to start tracer")
+	}
+	defer closer.Close() // nolint: errcheck
+
 	db, err := storage.Open(string(cfg.Database.MediaAPI))
 	if err != nil {
 		log.WithError(err).Panic("Failed to open database")

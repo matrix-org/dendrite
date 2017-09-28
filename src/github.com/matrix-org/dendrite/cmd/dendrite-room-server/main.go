@@ -49,6 +49,12 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
+	closer, err := cfg.SetupTracing("DendriteRoomServer")
+	if err != nil {
+		log.WithError(err).Fatalf("Failed to start tracer")
+	}
+	defer closer.Close() // nolint: errcheck
+
 	db, err := storage.Open(string(cfg.Database.RoomServer))
 	if err != nil {
 		panic(err)

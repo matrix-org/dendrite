@@ -19,14 +19,19 @@ import (
 	"crypto/sha256"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v2"
+
+	jaegerconfig "github.com/uber/jaeger-client-go/config"
+	jaegermetrics "github.com/uber/jaeger-lib/metrics"
 )
 
 // Version is the current version of the config format.
@@ -156,6 +161,12 @@ type Dendrite struct {
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
 	} `yaml:"listen"`
+
+	// The config for tracing the dendrite servers.
+	Tracing struct {
+		// The config for the jaeger opentracing reporter.
+		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
+	}
 }
 
 // A Path on the filesystem.
@@ -428,4 +439,26 @@ func (config *Dendrite) RoomServerURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return "http://" + string(config.Listen.RoomServer)
+}
+
+// SetupTracing configures the opentracing using the supplied configuration.
+func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err error) {
+	return config.Tracing.Jaeger.InitGlobalTracer(
+		serviceName,
+		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
+		jaegerconfig.Metrics(jaegermetrics.NullFactory),
+	)
+}
+
+// logrusLogger is a small wrapper that implements jaeger.Logger using logrus.
+type logrusLogger struct {
+	l *logrus.Logger
+}
+
+func (l logrusLogger) Error(msg string) {
+	l.l.Error(msg)
+}
+
+func (l logrusLogger) Infof(msg string, args ...interface{}) {
+	l.l.Infof(msg, args...)
 }
