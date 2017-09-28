@@ -27,6 +27,7 @@ func MakeAuthAPI(metricsName string, deviceDB auth.DeviceDatabase, f func(*http.
 }
 
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.
+// This is used for APIs that are called from the internet.
 func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
@@ -40,6 +41,9 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 }
 
 // MakeInternalAPI turns a util.JSONRequestHandler function into an http.Handler.
+// This is used for APIs that are internal to dendrite.
+// If we are passed a tracing context in the request headers then we use that
+// as the parent of any tracing spans we create.
 func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
