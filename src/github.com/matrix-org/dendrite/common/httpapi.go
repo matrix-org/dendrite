@@ -32,6 +32,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		span := opentracing.StartSpan(metricsName)
 		defer span.Finish()
+		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
 		h.ServeHTTP(w, req)
 	}
 
@@ -54,6 +55,7 @@ func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			span = tracer.StartSpan(metricsName, ext.RPCServerOption(clientContext))
 		}
 		defer span.Finish()
+		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
 		h.ServeHTTP(w, req)
 	}
 
