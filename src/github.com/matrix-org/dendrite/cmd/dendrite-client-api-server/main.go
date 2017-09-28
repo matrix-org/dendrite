@@ -51,6 +51,12 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
+	closer, err := cfg.SetupTracing("DendriteClientAPI")
+	if err != nil {
+		log.WithError(err).Fatalf("Failed to start tracer")
+	}
+	defer closer.Close() // nolint: errcheck
+
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
 	inputAPI := api.NewRoomserverInputAPIHTTP(cfg.RoomServerURL(), nil)

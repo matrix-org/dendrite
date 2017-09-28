@@ -47,6 +47,12 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
+	closer, err := cfg.SetupTracing("DendriteFederationSender")
+	if err != nil {
+		log.WithError(err).Fatalf("Failed to start tracer")
+	}
+	defer closer.Close() // nolint: errcheck
+
 	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
 	if err != nil {
 		log.WithFields(log.Fields{
