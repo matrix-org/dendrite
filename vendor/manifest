@@ -26,11 +26,36 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/apache/thrift",
+			"repository": "https://github.com/apache/thrift",
+			"revision": "b2a4d4ae21c789b689dd162deb819665567f481c",
+			"branch": "HEAD"
+		},
+		{
+			"importpath": "github.com/apache/thrift/lib/go/thrift",
+			"repository": "https://github.com/apache/thrift",
+			"revision": "b2a4d4ae21c789b689dd162deb819665567f481c",
+			"branch": "HEAD",
+			"path": "/lib/go/thrift"
+		},
+		{
 			"importpath": "github.com/beorn7/perks/quantile",
 			"repository": "https://github.com/beorn7/perks",
 			"revision": "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9",
 			"branch": "master",
 			"path": "/quantile"
+		},
+		{
+			"importpath": "github.com/codahale/hdrhistogram",
+			"repository": "https://github.com/codahale/hdrhistogram",
+			"revision": "3a0bb77429bd3a61596f5e8a3172445844342120",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/crossdock/crossdock-go",
+			"repository": "https://github.com/crossdock/crossdock-go",
+			"revision": "049aabb0122b03bc9bd30cab8f3f91fb60166361",
+			"branch": "master"
 		},
 		{
 			"importpath": "github.com/davecgh/go-spew/spew",
@@ -262,6 +287,49 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/uber-go/atomic",
+			"repository": "https://github.com/uber-go/atomic",
+			"revision": "54f72d32435d760d5604f17a82e2435b28dc4ba5",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/uber/jaeger-client-go",
+			"repository": "https://github.com/uber/jaeger-client-go",
+			"revision": "3ad49a1d839b517923a6fdac36d81cbf7b744f37",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/uber/jaeger-lib/metrics",
+			"repository": "https://github.com/uber/jaeger-lib",
+			"revision": "21a3da6d66fe0e278072676fdc84cd4c9ccb9b67",
+			"branch": "master",
+			"path": "/metrics"
+		},
+		{
+			"importpath": "github.com/uber/tchannel-go",
+			"repository": "https://github.com/uber/tchannel-go",
+			"revision": "b3e26487e291972fda9c7301864a2ee7a319fd35",
+			"branch": "dev"
+		},
+		{
+			"importpath": "go.uber.org/atomic",
+			"repository": "https://github.com/uber-go/atomic",
+			"revision": "54f72d32435d760d5604f17a82e2435b28dc4ba5",
+			"branch": "master"
+		},
+		{
+			"importpath": "go.uber.org/multierr",
+			"repository": "https://github.com/uber-go/multierr",
+			"revision": "fb7d312c2c04c34f0ad621048bbb953b168f9ff6",
+			"branch": "master"
+		},
+		{
+			"importpath": "go.uber.org/zap",
+			"repository": "https://github.com/uber-go/zap",
+			"revision": "35aad584952c3e7020db7b839f6b102de6271f89",
+			"branch": "master"
+		},
+		{
 			"importpath": "golang.org/x/crypto/bcrypt",
 			"repository": "https://go.googlesource.com/crypto",
 			"revision": "0fe963104e9d1877082f8fb38f816fcd97eb1d10",
@@ -283,11 +351,46 @@
 			"path": "/ed25519"
 		},
 		{
+			"importpath": "golang.org/x/net/bpf",
+			"repository": "https://go.googlesource.com/net",
+			"revision": "0a9397675ba34b2845f758fe3cd68828369c6517",
+			"branch": "master",
+			"path": "/bpf"
+		},
+		{
 			"importpath": "golang.org/x/net/context",
 			"repository": "https://go.googlesource.com/net",
 			"revision": "007e530097ad7f954752df63046b4036f98ba6a6",
 			"branch": "master",
 			"path": "/context"
+		},
+		{
+			"importpath": "golang.org/x/net/internal/iana",
+			"repository": "https://go.googlesource.com/net",
+			"revision": "0a9397675ba34b2845f758fe3cd68828369c6517",
+			"branch": "master",
+			"path": "/internal/iana"
+		},
+		{
+			"importpath": "golang.org/x/net/internal/socket",
+			"repository": "https://go.googlesource.com/net",
+			"revision": "0a9397675ba34b2845f758fe3cd68828369c6517",
+			"branch": "master",
+			"path": "/internal/socket"
+		},
+		{
+			"importpath": "golang.org/x/net/ipv4",
+			"repository": "https://go.googlesource.com/net",
+			"revision": "0a9397675ba34b2845f758fe3cd68828369c6517",
+			"branch": "master",
+			"path": "/ipv4"
+		},
+		{
+			"importpath": "golang.org/x/net/ipv6",
+			"repository": "https://go.googlesource.com/net",
+			"revision": "0a9397675ba34b2845f758fe3cd68828369c6517",
+			"branch": "master",
+			"path": "/ipv6"
 		},
 		{
 			"importpath": "gopkg.in/Shopify/sarama.v1",

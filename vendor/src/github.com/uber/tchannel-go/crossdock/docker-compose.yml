@@ -1,0 +1,30 @@
+version: '2'
+
+services:
+    crossdock:
+        image: crossdock/crossdock
+        links:
+            - go
+            - python
+        environment:
+            - WAIT_FOR=go
+
+            - AXIS_CLIENT=go
+            - AXIS_S1NAME=go
+            - AXIS_SAMPLED=true,false
+            - AXIS_S2NAME=go,python
+            - AXIS_S2ENCODING=json,thrift
+            - AXIS_S3NAME=go,python
+            - AXIS_S3ENCODING=json,thrift
+
+            - BEHAVIOR_TRACE=client,s1name,sampled,s2name,s2encoding,s3name,s3encoding
+
+    go:
+        build: .
+        ports:
+            - "8080-8082"
+
+    python:
+        image: tchannelhub/xdock-py
+        ports:
+            - "8080-8082"
