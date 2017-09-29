@@ -185,23 +185,18 @@ func Setup(
 		}),
 	).Methods("GET")
 
-	r0mux.Handle("/user/{userID}/filter",
-		common.MakeExternalAPI("make_filter", func(req *http.Request) util.JSONResponse {
-			// TODO: Persist filter and return filter ID
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct{}{},
-			}
+
+	r0mux.Handle("/user/{userId}/filter",
+		common.MakeAuthAPI("put_filter", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return writers.PutFilter(req, device, accountDB, vars["userId"])
 		}),
 	).Methods("POST", "OPTIONS")
 
-	r0mux.Handle("/user/{userID}/filter/{filterID}",
-		common.MakeExternalAPI("filter", func(req *http.Request) util.JSONResponse {
-			// TODO: Retrieve filter based on ID
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct{}{},
-			}
+	r0mux.Handle("/user/{userId}/filter/{filterId}",
+		common.MakeAuthAPI("get_filter", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return readers.GetFilter(req, device, accountDB, vars["userId"], vars["filterId"])
 		}),
 	).Methods("GET")
 

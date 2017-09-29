@@ -29,13 +29,14 @@ import (
 
 // Database represents an account database
 type Database struct {
-	db *sql.DB
+	db           *sql.DB
 	common.PartitionOffsetStatements
 	accounts     accountsStatements
 	profiles     profilesStatements
 	memberships  membershipStatements
 	accountDatas accountDataStatements
 	threepids    threepidStatements
+	filter       filterStatements
 	serverName   gomatrixserverlib.ServerName
 }
 
@@ -70,7 +71,11 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = t.prepare(db); err != nil {
 		return nil, err
 	}
-	return &Database{db, partitions, a, p, m, ac, t, serverName}, nil
+	f := filterStatements{}
+	if err = f.prepare(db); err != nil {
+		return nil, err
+	}
+	return &Database{db, partitions, a, p, m, ac, t, f, serverName}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -313,4 +318,24 @@ func (d *Database) GetThreePIDsForLocalpart(
 	ctx context.Context, localpart string,
 ) (threepids []authtypes.ThreePID, err error) {
 	return d.threepids.selectThreePIDsForLocalpart(ctx, localpart)
+}
+
+// GetFilter looks up the filter associated with a given local user and filter ID.
+// Returns an error if no such filter exists or if there was an error taling to the database.
+func (d *Database) GetFilter(
+	ctx context.Context, localpart string, filterID string,
+) (string, error) {
+	return d.filter.selectFilter(ctx, localpart, filterID)
+}
+
+// PutFilter puts the passed filter into the database.
+// Returns an error if something goes wrong.
+func (d *Database) PutFilter(
+	ctx context.Context, localpart, filter string,
+) (string, error) {
+	err := d.filter.insertFilter(ctx, filter, localpart)
+	if err != nil {
+		return "", err
+	}
+	return d.filter.findMaxID(ctx, localpart)
 }
