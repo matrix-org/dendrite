@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/matrix-org/util"
 )
 
 // A Client makes request to the federation listeners of matrix
@@ -120,7 +122,7 @@ func (fc *Client) LookupUserInfo(
 	}
 
 	var response *http.Response
-	response, err = fc.client.Do(req.WithContext(ctx))
+	response, err = fc.doHTTPRequest(ctx, req)
 	if response != nil {
 		defer response.Body.Close() // nolint: errcheck
 	}
@@ -197,7 +199,7 @@ func (fc *Client) LookupServerKeys( // nolint: gocyclo
 	}
 	req.Header.Add("Content-Type", "application/json")
 
-	response, err := fc.client.Do(req.WithContext(ctx))
+	response, err := fc.doHTTPRequest(ctx, req)
 	if response != nil {
 		defer response.Body.Close() // nolint: errcheck
 	}
@@ -244,10 +246,23 @@ func (fc *Client) CreateMediaDownloadRequest(
 	if err != nil {
 		return nil, err
 	}
+
+	return fc.doHTTPRequest(ctx, req)
+}
+
+func (fc *Client) doHTTPRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
+	reqID := util.RandomString(12)
+	logger := util.GetLogger(ctx).WithField("server", req.URL.Host).WithField("out.req.ID", reqID)
+
+	logger.Infof("Outgoing request %s %s", req.Method, req.URL)
 	resp, err := fc.client.Do(req.WithContext(ctx))
 	if err != nil {
+		logger.Infof("Outgoing request %s %s failed with %v", req.Method, req.URL, err)
 		return nil, err
 	}
+
+	// we haven't yet read the body, so this is slightly premature, but it's the easiest place.
+	logger.Infof("Response %d from %s %s", resp.StatusCode, req.Method, req.URL)
 
 	return resp, nil
 }
