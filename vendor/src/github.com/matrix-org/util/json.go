@@ -99,7 +99,7 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 func RequestWithLogging(req *http.Request) *http.Request {
 	reqID := RandomString(12)
 	// Set a Logger and request ID on the context
-	ctx := context.WithValue(req.Context(), ctxValueLogger, log.WithFields(log.Fields{
+	ctx := ContextWithLogger(req.Context(), log.WithFields(log.Fields{
 		"req.method": req.Method,
 		"req.path":   req.URL.Path,
 		"req.id":     reqID,

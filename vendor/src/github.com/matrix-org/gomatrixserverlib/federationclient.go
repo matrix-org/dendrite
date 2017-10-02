@@ -36,6 +36,7 @@ func NewFederationClient(
 func (ac *FederationClient) doRequest(ctx context.Context, r FederationRequest, resBody interface{}) error {
 	reqID := util.RandomString(12)
 	logger := util.GetLogger(ctx).WithField("server", r.fields.Destination).WithField("out.req.ID", reqID)
+	newCtx := util.ContextWithLogger(ctx, logger)
 
 	if err := r.Sign(ac.serverName, ac.serverKeyID, ac.serverPrivateKey); err != nil {
 		return err
@@ -47,7 +48,7 @@ func (ac *FederationClient) doRequest(ctx context.Context, r FederationRequest, 
 	}
 
 	logger.Infof("Outgoing request %s %s", req.Method, req.URL)
-	res, err := ac.client.Do(req.WithContext(ctx))
+	res, err := ac.client.Do(req.WithContext(newCtx))
 	if res != nil {
 		defer res.Body.Close() // nolint: errcheck
 	}

@@ -92,7 +92,13 @@ func (f *federationTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if len(dnsResult.Addrs) == 0 {
+		return nil, fmt.Errorf("no address found for matrix host %v", serverName)
+	}
+
 	var resp *http.Response
+	// TODO: respect the priority and weight fields from the SRV record
 	for _, addr := range dnsResult.Addrs {
 		u := makeHTTPSURL(r.URL, addr)
 		r.URL = &u
@@ -100,8 +106,12 @@ func (f *federationTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		if err == nil {
 			return resp, nil
 		}
+		util.GetLogger(r.Context()).Warnf("Error sending request to %s: %v",
+			u.String(), err)
 	}
-	return nil, fmt.Errorf("no address found for matrix host %v", serverName)
+
+	// just return the most recent error
+	return nil, err
 }
 
 // LookupUserInfo gets information about a user from a given matrix homeserver
@@ -253,9 +263,10 @@ func (fc *Client) CreateMediaDownloadRequest(
 func (fc *Client) doHTTPRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	reqID := util.RandomString(12)
 	logger := util.GetLogger(ctx).WithField("server", req.URL.Host).WithField("out.req.ID", reqID)
+	newCtx := util.ContextWithLogger(ctx, logger)
 
 	logger.Infof("Outgoing request %s %s", req.Method, req.URL)
-	resp, err := fc.client.Do(req.WithContext(ctx))
+	resp, err := fc.client.Do(req.WithContext(newCtx))
 	if err != nil {
 		logger.Infof("Outgoing request %s %s failed with %v", req.Method, req.URL, err)
 		return nil, err
