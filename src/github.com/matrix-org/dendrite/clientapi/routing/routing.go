@@ -352,23 +352,4 @@ func Setup(
 			return util.JSONResponse{Code: 200, JSON: struct{}{}}
 		}),
 	).Methods("PUT", "OPTIONS")
-
-	// Stub implementations for sytest
-	r0mux.Handle("/events",
-		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {
-			return util.JSONResponse{Code: 200, JSON: map[string]interface{}{
-				"chunk": []interface{}{},
-				"start": "",
-				"end":   "",
-			}}
-		}),
-	).Methods("GET")
-
-	r0mux.Handle("/initialSync",
-		common.MakeExternalAPI("initial_sync", func(req *http.Request) util.JSONResponse {
-			return util.JSONResponse{Code: 200, JSON: map[string]interface{}{
-				"end": "",
-			}}
-		}),
-	).Methods("GET")
 }

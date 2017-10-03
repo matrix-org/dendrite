@@ -26,7 +26,10 @@ import (
 )
 
 const defaultSyncTimeout = time.Duration(30) * time.Second
-const defaultTimelineLimit = 20
+
+// DefaultTimelineLimit is the default number limit of timeline entries if no
+// limit was given.
+const DefaultTimelineLimit = 20
 
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
@@ -54,7 +57,7 @@ func newSyncRequest(req *http.Request, userID string) (*syncRequest, error) {
 		timeout:       timeout,
 		since:         since,
 		wantFullState: wantFullState,
-		limit:         defaultTimelineLimit, // TODO: read from filter
+		limit:         DefaultTimelineLimit, // TODO: read from filter
 		log:           util.GetLogger(req.Context()),
 	}, nil
 }

@@ -286,7 +286,7 @@ func newTestSyncRequest(userID string, since types.StreamPosition) syncRequest {
 		timeout:       1 * time.Minute,
 		since:         since,
 		wantFullState: false,
-		limit:         defaultTimelineLimit,
+		limit:         DefaultTimelineLimit,
 		log:           util.GetLogger(context.TODO()),
 	}
 }

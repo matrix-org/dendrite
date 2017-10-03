@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/util"
 )
@@ -28,7 +29,12 @@ import (
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup configures the given mux with sync-server listeners
-func Setup(apiMux *mux.Router, srp *sync.RequestPool, deviceDB *devices.Database) {
+func Setup(
+	apiMux *mux.Router,
+	srp *sync.RequestPool,
+	deviceDB *devices.Database,
+	syncDB *storage.SyncServerDatabase,
+) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -39,4 +45,23 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, deviceDB *devices.Database
 		vars := mux.Vars(req)
 		return srp.OnIncomingStateRequest(req, vars["roomID"])
 	})).Methods("GET")
+
+	// Stub implementations for sytest
+	r0mux.Handle("/events",
+		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {
+			return util.JSONResponse{Code: 200, JSON: map[string]interface{}{
+				"chunk": []interface{}{},
+				"start": "",
+				"end":   "",
+			}}
+		}),
+	).Methods("GET")
+
+	r0mux.Handle("/initialSync",
+		common.MakeAuthAPI("initial_sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return sync.GetInitialSync(
+				req, device, syncDB,
+			)
+		}),
+	).Methods("GET")
 }
