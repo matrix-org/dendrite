@@ -10,7 +10,7 @@ type Event struct {
 	StateKey  *string                `json:"state_key,omitempty"` // The state key for the event. Only present on State Events.
 	Sender    string                 `json:"sender"`              // The user ID of the sender of the event
 	Type      string                 `json:"type"`                // The event type
-	Timestamp int                    `json:"origin_server_ts"`    // The unix timestamp when this message was sent by the origin server
+	Timestamp int64                  `json:"origin_server_ts"`    // The unix timestamp when this message was sent by the origin server
 	ID        string                 `json:"event_id"`            // The unique ID of this event
 	RoomID    string                 `json:"room_id"`             // The room the event was sent to. May be nil (e.g. for presence)
 	Content   map[string]interface{} `json:"content"`             // The JSON content of the event.
