@@ -104,7 +104,7 @@ func main() {
 	log.Info("Starting sync server on ", cfg.Listen.SyncAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, sync.NewRequestPool(db, n, adb), deviceDB)
+	routing.Setup(api, sync.NewRequestPool(db, n, adb), deviceDB, db)
 	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.SyncAPI), nil))
