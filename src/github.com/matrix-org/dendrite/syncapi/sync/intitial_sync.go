@@ -48,7 +48,7 @@ func GetInitialSync(
 }
 
 func syncResponseToIntialSync(syncResponse *types.Response) initialSyncResponse {
-	var rooms []initialSyncRoomResponse
+	rooms := []initialSyncRoomResponse{}
 
 	for roomID, room := range syncResponse.Rooms.Join {
 		rooms = append(rooms, initialSyncRoomResponse{
