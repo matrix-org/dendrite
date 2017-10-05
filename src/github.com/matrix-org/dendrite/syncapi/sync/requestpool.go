@@ -156,6 +156,40 @@ func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) 
 	}
 }
 
+// OnIncomingStateTypeRequest is called when a client makes a
+// /rooms/{roomID}/state/{type}/{statekey} request. It will look in current
+// state to see if there is an event with that type and state key, if there
+// is then (by default) we return the content, otherwise a 404.
+func (rp *RequestPool) OnIncomingStateTypeRequest(req *http.Request, roomID string, evType, stateKey string) util.JSONResponse {
+	logger := util.GetLogger(req.Context())
+	logger.WithFields(log.Fields{
+		"roomID":   roomID,
+		"evType":   evType,
+		"stateKey": stateKey,
+	}).Info("Fetching state")
+
+	event, err := rp.db.GetStateEvent(req.Context(), roomID, evType, stateKey)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if event == nil {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("cannot find state"),
+		}
+	}
+
+	stateEvent := stateEventInStateResp{
+		ClientEvent: gomatrixserverlib.ToClientEvent(*event, gomatrixserverlib.FormatAll),
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: stateEvent.Content,
+	}
+}
+
 func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (*types.Response, error) {
 	// TODO: handle ignored users
 	if req.since == types.StreamPosition(0) {

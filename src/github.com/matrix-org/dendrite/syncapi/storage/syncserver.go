@@ -157,9 +157,9 @@ func (d *SyncServerDatabase) updateRoomState(
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
 func (d *SyncServerDatabase) GetStateEvent(
-	ctx context.Context, evType, roomID, stateKey string,
+	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.Event, error) {
-	return d.roomstate.selectStateEvent(ctx, evType, roomID, stateKey)
+	return d.roomstate.selectStateEvent(ctx, roomID, evType, stateKey)
 }
 
 // GetStateEventsForRoom fetches the state events for a given room.

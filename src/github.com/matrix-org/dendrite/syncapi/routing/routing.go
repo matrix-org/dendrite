@@ -39,4 +39,14 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, deviceDB *devices.Database
 		vars := mux.Vars(req)
 		return srp.OnIncomingStateRequest(req, vars["roomID"])
 	})).Methods("GET")
+
+	r0mux.Handle("/rooms/{roomID}/state/{type}", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		vars := mux.Vars(req)
+		return srp.OnIncomingStateTypeRequest(req, vars["roomID"], vars["type"], "")
+	})).Methods("GET")
+
+	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		vars := mux.Vars(req)
+		return srp.OnIncomingStateTypeRequest(req, vars["roomID"], vars["type"], vars["stateKey"])
+	})).Methods("GET")
 }
