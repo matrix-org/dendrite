@@ -46,6 +46,7 @@ type loginResponse struct {
 	UserID      string                       `json:"user_id"`
 	AccessToken string                       `json:"access_token"`
 	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
+	DeviceID    string                       `json:"device_id"`
 }
 
 func passwordLogin() loginFlows {
@@ -138,6 +139,7 @@ func Login(
 				UserID:      dev.UserID,
 				AccessToken: dev.AccessToken,
 				HomeServer:  cfg.Matrix.ServerName,
+				DeviceID:    deviceID,
 			},
 		}
 	}
