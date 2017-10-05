@@ -113,15 +113,17 @@ func Login(
 
 		token, err := auth.GenerateAccessToken()
 		if err != nil {
-			return util.JSONResponse{
-				Code: 500,
-				JSON: jsonerror.Unknown("Failed to generate access token"),
-			}
+			httputil.LogThenError(req, err)
+		}
+
+		deviceID, err := auth.GenerateDeviceID()
+		if err != nil {
+			httputil.LogThenError(req, err)
 		}
 
 		// TODO: Use the device ID in the request
 		dev, err := deviceDB.CreateDevice(
-			req.Context(), acc.Localpart, auth.UnknownDeviceID, token,
+			req.Context(), acc.Localpart, deviceID, token,
 		)
 		if err != nil {
 			return util.JSONResponse{

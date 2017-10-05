@@ -86,6 +86,18 @@ func GenerateAccessToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
+// GenerateDeviceID creates a new device id. Returns an error if failed to generate
+// random bytes.
+func GenerateDeviceID() (string, error) {
+	b := make([]byte, tokenByteLength)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	// url-safe no padding
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
 // extractAccessToken from a request, or return an error detailing what went wrong. The
 // error message MUST be human-readable and comprehensible to the client.
 func extractAccessToken(req *http.Request) (string, error) {
