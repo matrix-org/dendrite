@@ -120,8 +120,8 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputNewRoomEvent) error {
 	// Update our copy of the current state.
 	// We keep a copy of the current state because the state at each event is
 	// expressed as a delta against the current state.
-	// TODO: handle EventIDMismatchError and recover the current state by talking
-	// to the roomserver
+	// TODO(#290): handle EventIDMismatchError and recover the current state by
+	// talking to the roomserver
 	oldJoinedHosts, err := s.db.UpdateRoom(
 		context.TODO(),
 		ore.Event.RoomID(),
