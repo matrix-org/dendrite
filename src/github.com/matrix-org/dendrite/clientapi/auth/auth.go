@@ -40,6 +40,9 @@ var UnknownDeviceID = "unknown-device"
 // 32 bytes => 256 bits
 var tokenByteLength = 32
 
+// The length of generated device IDs
+var deviceIDByteLength = 8
+
 // DeviceDatabase represents a device database.
 type DeviceDatabase interface {
 	// Look up the device matching the given access token.
@@ -89,7 +92,7 @@ func GenerateAccessToken() (string, error) {
 // GenerateDeviceID creates a new device id. Returns an error if failed to generate
 // random bytes.
 func GenerateDeviceID() (string, error) {
-	b := make([]byte, tokenByteLength)
+	b := make([]byte, deviceIDByteLength)
 	_, err := rand.Read(b)
 	if err != nil {
 		return "", err

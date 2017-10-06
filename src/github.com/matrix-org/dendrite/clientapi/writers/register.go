@@ -290,7 +290,7 @@ func completeRegistration(
 	}
 
 	// // TODO: Use the device ID in the request.
-	dev, err := deviceDB.CreateDevice(ctx, username, auth.UnknownDeviceID, token)
+	dev, err := deviceDB.CreateDevice(ctx, username, nil, token)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 500,

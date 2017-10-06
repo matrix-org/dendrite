@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -55,20 +56,42 @@ func (d *Database) GetDeviceByAccessToken(
 // If there is already a device with the same device ID for this user, that access token will be revoked
 // and replaced with the given accessToken. If the given accessToken is already in use for another device,
 // an error will be returned.
+// If no device ID is given one is generated.
 // Returns the device on success.
 func (d *Database) CreateDevice(
-	ctx context.Context, localpart, deviceID, accessToken string,
+	ctx context.Context, localpart string, deviceID *string, accessToken string,
 ) (dev *authtypes.Device, returnErr error) {
-	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		var err error
-		// Revoke existing token for this device
-		if err = d.devices.deleteDevice(ctx, txn, deviceID, localpart); err != nil {
-			return err
-		}
+	if deviceID != nil {
+		returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+			var err error
+			// Revoke existing token for this device
+			if err = d.devices.deleteDevice(ctx, txn, *deviceID, localpart); err != nil {
+				return err
+			}
 
-		dev, err = d.devices.insertDevice(ctx, txn, deviceID, localpart, accessToken)
-		return err
-	})
+			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken)
+			return err
+		})
+	} else {
+		// We generate device IDs in a loop in case its already taken.
+		// We cap this at going round 5 times to ensure we don't spin forever
+		var newDeviceID string
+		for i := 1; i <= 5; i++ {
+			newDeviceID, returnErr = auth.GenerateDeviceID()
+			if returnErr != nil {
+				return
+			}
+
+			returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+				var err error
+				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken)
+				return err
+			})
+			if returnErr == nil {
+				return
+			}
+		}
+	}
 	return
 }
 

@@ -117,14 +117,9 @@ func Login(
 			httputil.LogThenError(req, err)
 		}
 
-		deviceID, err := auth.GenerateDeviceID()
-		if err != nil {
-			httputil.LogThenError(req, err)
-		}
-
 		// TODO: Use the device ID in the request
 		dev, err := deviceDB.CreateDevice(
-			req.Context(), acc.Localpart, deviceID, token,
+			req.Context(), acc.Localpart, nil, token,
 		)
 		if err != nil {
 			return util.JSONResponse{
@@ -139,7 +134,7 @@ func Login(
 				UserID:      dev.UserID,
 				AccessToken: dev.AccessToken,
 				HomeServer:  cfg.Matrix.ServerName,
-				DeviceID:    deviceID,
+				DeviceID:    dev.ID,
 			},
 		}
 	}
