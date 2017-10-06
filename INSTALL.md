@@ -5,7 +5,7 @@ Dendrite can be run in one of two configurations:
  * A cluster of individual components, dealing with different aspects of the
    Matrix protocol (see [WIRING.md](./WIRING.md)). Components communicate with
    one another via [Apache Kafka](https://kafka.apache.org).
- 
+
  * A monolith server, in which all components run in the same process. In this
    configuration, Kafka can be replaced with an in-process implementation
    called [naffka](https://github.com/matrix-org/naffka).
@@ -17,7 +17,7 @@ Dendrite can be run in one of two configurations:
  - For Kafka (optional if using the monolith server):
    - Unix-based system (https://kafka.apache.org/documentation/#os)
    - JDK 1.8+ / OpenJDK 1.8+
-   - Apache Kafka 0.10.2+ (see https://github.com/matrix-org/dendrite/blob/master/travis-install-kafka.sh for up-to-date version numbers)
+   - Apache Kafka 0.10.2+ (see [travis-install-kafka.sh](travis-install-kafka.sh) for up-to-date version numbers)
 
 
 ## Setting up a development environment
@@ -34,7 +34,7 @@ go get github.com/constabulary/gb/...
 gb build
 ```
 
-If using Kafka, install and start it:
+If using Kafka, install and start it (c.f. [travis-install-kafka.sh](travis-install-kafka.sh)):
 ```bash
 MIRROR=http://apache.mirror.anlx.net/kafka/0.10.2.0/kafka_2.11-0.10.2.0.tgz
 
@@ -108,7 +108,7 @@ The following contains scripts which will run all the required processes in orde
 
 ```
 
-                                         /media   +---------------------------+ 
+                                         /media   +---------------------------+
                       +----------->+------------->| dendrite-media-api-server |
                       ^            ^              +---------------------------+
                       |            |            :7774
