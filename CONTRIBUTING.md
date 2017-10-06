@@ -3,6 +3,19 @@
 Everyone is welcome to contribute to Dendrite! We aim to make it as easy as
 possible to get started.
 
+Please ensure that you sign off your contributions! See [Sign Off](#sign-off)
+section below.
+
+## Getting up and running
+
+See [INSTALL.md](INSTALL.md) for instructions on setting up a running dev
+instance of dendrite, and [CODE_STYLE.md](CODE_STYLE.md) for the code style
+guide.
+
+We use `gb` for managing our dependencies, so `gb build` and `gb test` is how
+to build dendrite and run the unit tests respectively.
+
+
 ## Picking Things To Do
 
 If you're new then feel free to pick up an issue labelled [easy](https://github.com/matrix-org/dendrite/labels/easy).
