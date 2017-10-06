@@ -45,6 +45,13 @@ func RegisterAvailable(
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 
+	if username == "" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.InvalidUsername("Missing query parameter"),
+		}
+	}
+
 	if resErr := validate(username); resErr != nil {
 		return *resErr
 	}
