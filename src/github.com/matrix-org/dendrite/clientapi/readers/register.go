@@ -39,6 +39,7 @@ type availableResponse struct {
 	Available bool `json:"available"`
 }
 
+// RegisterAvailable checks if the username is already taken or invalid
 func RegisterAvailable(
 	req *http.Request,
 	accountDB *accounts.Database,
