@@ -70,7 +70,7 @@ const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
 const selectStateEventSQL = "" +
-	"SELECT event_json FROM syncapi_current_room_state WHERE type = $1 AND room_id = $2 AND state_key = $3"
+	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
 	"SELECT added_at, event_json FROM syncapi_current_room_state WHERE event_id = ANY($1)"
@@ -233,11 +233,11 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 }
 
 func (s *currentRoomStateStatements) selectStateEvent(
-	ctx context.Context, evType string, roomID string, stateKey string,
+	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.Event, error) {
 	stmt := s.selectStateEventStmt
 	var res []byte
-	err := stmt.QueryRowContext(ctx, evType, roomID, stateKey).Scan(&res)
+	err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

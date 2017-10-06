@@ -120,6 +120,9 @@ type stateEventInStateResp struct {
 // is publicly visible. Current behaviour is returning an empty array if the
 // user cannot see the room's history.
 func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) util.JSONResponse {
+	// TODO(#287): Auth request and handle the case where the user has left (where
+	// we should return the state at the poin they left)
+
 	stateEvents, err := rp.db.GetStateEventsForRoom(req.Context(), roomID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -153,6 +156,43 @@ func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) 
 	return util.JSONResponse{
 		Code: 200,
 		JSON: resp,
+	}
+}
+
+// OnIncomingStateTypeRequest is called when a client makes a
+// /rooms/{roomID}/state/{type}/{statekey} request. It will look in current
+// state to see if there is an event with that type and state key, if there
+// is then (by default) we return the content, otherwise a 404.
+func (rp *RequestPool) OnIncomingStateTypeRequest(req *http.Request, roomID string, evType, stateKey string) util.JSONResponse {
+	// TODO(#287): Auth request and handle the case where the user has left (where
+	// we should return the state at the poin they left)
+
+	logger := util.GetLogger(req.Context())
+	logger.WithFields(log.Fields{
+		"roomID":   roomID,
+		"evType":   evType,
+		"stateKey": stateKey,
+	}).Info("Fetching state")
+
+	event, err := rp.db.GetStateEvent(req.Context(), roomID, evType, stateKey)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if event == nil {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("cannot find state"),
+		}
+	}
+
+	stateEvent := stateEventInStateResp{
+		ClientEvent: gomatrixserverlib.ToClientEvent(*event, gomatrixserverlib.FormatAll),
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: stateEvent.Content,
 	}
 }
 
