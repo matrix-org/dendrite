@@ -23,10 +23,10 @@ For questions related to developing on Dendrite we have a dedicated room on
 Matrix [#dendrite-dev:matrix.org](https://riot.im/develop/#/room/#dendrite-dev:matrix.org)
 where we're happy to help.
 
-For more general questions please use [#dendrite:matrix.org](https://riot.im/develop/#/room/#dendrite:matrix.org)
+For more general questions please use [#dendrite:matrix.org](https://riot.im/develop/#/room/#dendrite:matrix.org).
 
 ## Sign off
 
 We ask that everyone who contributes to the project signs off their
-contributions, in accordance with the [DCO](https://github.com/matrix-org/matrix-doc/blob/master/CONTRIBUTING.rst#sign-off)
+contributions, in accordance with the [DCO](https://github.com/matrix-org/matrix-doc/blob/master/CONTRIBUTING.rst#sign-off).
 
