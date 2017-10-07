@@ -66,7 +66,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	// Whichever returns first is the one we will serve back to the client.
 	timeoutChan := make(chan struct{})
 	timer := time.AfterFunc(syncReq.timeout, func() {
-		close(timeoutChan) // signal that the timeout has expired
+		if syncReq.timeout != 0 && syncReq.since != types.StreamPosition(0) && !syncReq.wantFullState {
+			close(timeoutChan) // signal that the timeout has expired
+		}
 	})
 
 	done := make(chan util.JSONResponse)
@@ -75,7 +77,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// We stop the timer BEFORE calculating the response so the cpu work
 		// done to calculate the response is not timed. This stops us from
 		// doing lots of work then timing out and sending back an empty response.
-		timer.Stop()
+		if syncReq.timeout != 0 && syncReq.since != types.StreamPosition(0) && !syncReq.wantFullState {
+			timer.Stop()
+		}
 		syncData, err := rp.currentSyncForUser(*syncReq, currentPos)
 		var res util.JSONResponse
 		if err != nil {
