@@ -77,9 +77,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// We stop the timer BEFORE calculating the response so the cpu work
 		// done to calculate the response is not timed. This stops us from
 		// doing lots of work then timing out and sending back an empty response.
-		if syncReq.timeout != 0 && syncReq.since != types.StreamPosition(0) && !syncReq.wantFullState {
-			timer.Stop()
-		}
+		timer.Stop()
 		syncData, err := rp.currentSyncForUser(*syncReq, currentPos)
 		var res util.JSONResponse
 		if err != nil {
