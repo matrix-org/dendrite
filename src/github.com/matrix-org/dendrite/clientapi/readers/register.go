@@ -50,7 +50,14 @@ func RegisterAvailable(
 		return *resErr
 	}
 
-	if _, resErr := accountDB.GetProfileByLocalpart(req.Context(), username); resErr == nil {
+	availability, availabilityErr := accountDB.CheckAccountAvailability(req.Context(), username)
+	if availabilityErr != nil {
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("failed to check availability: " + availabilityErr.Error()),
+		}
+	}
+	if !availability {
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.InvalidUsername("A different user ID has already been registered for this session"),
