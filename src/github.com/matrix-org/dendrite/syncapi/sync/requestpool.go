@@ -66,7 +66,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	// Whichever returns first is the one we will serve back to the client.
 	timeoutChan := make(chan struct{})
 	timer := time.AfterFunc(syncReq.timeout, func() {
-		close(timeoutChan) // signal that the timeout has expired
+		if syncReq.timeout != 0 && syncReq.since != types.StreamPosition(0) && !syncReq.wantFullState {
+			close(timeoutChan) // signal that the timeout has expired
+		}
 	})
 
 	done := make(chan util.JSONResponse)
