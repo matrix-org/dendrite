@@ -91,23 +91,13 @@ type registerResponse struct {
 	DeviceID    string                       `json:"device_id"`
 }
 
-// Validate returns an error response if the username/password are invalid
-func validate(username, password string) *util.JSONResponse {
+// validateUserName returns an error response if the username is invalid
+func validateUserName(username string) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
-	if len(password) > maxPasswordLength {
-		return &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
-		}
-	} else if len(username) > maxUsernameLength {
+	if len(username) > maxUsernameLength {
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
-		}
-	} else if len(password) > 0 && len(password) < minPasswordLength {
-		return &util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
 		}
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
@@ -118,6 +108,23 @@ func validate(username, password string) *util.JSONResponse {
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.InvalidUsername("User ID can't start with a '_'"),
+		}
+	}
+	return nil
+}
+
+// validatePassword returns an error response if the password is invalid
+func validatePassword(password string) *util.JSONResponse {
+	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	if len(password) > maxPasswordLength {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
+		}
+	} else if len(password) > 0 && len(password) < minPasswordLength {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
 		}
 	}
 	return nil
@@ -149,7 +156,10 @@ func Register(
 		}
 	}
 
-	if resErr = validate(r.Username, r.Password); resErr != nil {
+	if resErr = validateUserName(r.Username); resErr != nil {
+		return *resErr
+	}
+	if resErr = validatePassword(r.Password); resErr != nil {
 		return *resErr
 	}
 
@@ -209,7 +219,10 @@ func LegacyRegister(
 	if resErr != nil {
 		return *resErr
 	}
-	if resErr = validate(r.Username, r.Password); resErr != nil {
+	if resErr = validateUserName(r.Username); resErr != nil {
+		return *resErr
+	}
+	if resErr = validatePassword(r.Password); resErr != nil {
 		return *resErr
 	}
 
@@ -343,4 +356,41 @@ func isValidMacLogin(
 	expectedMAC := mac.Sum(nil)
 
 	return hmac.Equal(givenMac, expectedMAC), nil
+}
+
+type availableResponse struct {
+	Available bool `json:"available"`
+}
+
+// RegisterAvailable checks if the username is already taken or invalid
+func RegisterAvailable(
+	req *http.Request,
+	accountDB *accounts.Database,
+) util.JSONResponse {
+	username := req.URL.Query().Get("username")
+
+	if err := validateUserName(username); err != nil {
+		return *err
+	}
+
+	availability, availabilityErr := accountDB.CheckAccountAvailability(req.Context(), username)
+	if availabilityErr != nil {
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("failed to check availability: " + availabilityErr.Error()),
+		}
+	}
+	if !availability {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.InvalidUsername("A different user ID has already been registered for this session"),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: availableResponse{
+			Available: true,
+		},
+	}
 }
