@@ -134,25 +134,27 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputNewRoomEvent) error {
 		return err
 	}
 
+	if oldJoinedHosts == nil {
+		// This means that there is nothing to update as this is a duplicate
+		// message.
+		return nil
+	}
+
 	if ore.SendAsServer == api.DoNotSendToOtherServers {
 		// Ignore event that we don't need to send anywhere.
 		return nil
 	}
 
 	// Work out which hosts were joined at the event itself.
-	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, oldJoinedHosts)
+	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, *oldJoinedHosts)
 	if err != nil {
 		return err
 	}
 
 	// Send the event.
-	if err = s.queues.SendEvent(
+	return s.queues.SendEvent(
 		&ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
-	); err != nil {
-		return err
-	}
-
-	return nil
+	)
 }
 
 // joinedHostsAtEvent works out a list of matrix servers that were joined to
