@@ -1,5 +1,7 @@
 #! /bin/bash
 
+# Builds, tests and lints dendrite, and should be run before pushing commits
+
 set -eu
 
 export GOPATH="$(pwd):$(pwd)/vendor"
@@ -22,6 +24,3 @@ misspell -error src *.md
 
 echo "Testing..."
 gb test
-
-
-echo "Done!"
