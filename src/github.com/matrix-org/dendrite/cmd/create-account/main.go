@@ -87,7 +87,7 @@ func main() {
 	}
 
 	device, err := deviceDB.CreateDevice(
-		context.Background(), *username, "create-account-script", *accessToken,
+		context.Background(), *username, nil, *accessToken,
 	)
 	if err != nil {
 		fmt.Println(err.Error())
