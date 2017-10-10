@@ -12,49 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package readers
+package routing
 
 import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-type response struct {
-	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
-}
-
-// GetMemberships implements GET /rooms/{roomId}/members
-func GetMemberships(
-	req *http.Request, device *authtypes.Device, roomID string, joinedOnly bool,
-	cfg config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+// Logout handles POST /logout
+func Logout(
+	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
-	queryReq := api.QueryMembershipsForRoomRequest{
-		JoinedOnly: joinedOnly,
-		RoomID:     roomID,
-		Sender:     device.UserID,
+	if req.Method != "POST" {
+		return util.JSONResponse{
+			Code: 405,
+			JSON: jsonerror.NotFound("Bad method"),
+		}
 	}
-	var queryRes api.QueryMembershipsForRoomResponse
-	if err := queryAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
+
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	if !queryRes.HasBeenInRoom {
-		return util.JSONResponse{
-			Code: 403,
-			JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
-		}
+	if err := deviceDB.RemoveDevice(req.Context(), device.ID, localpart); err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: response{queryRes.JoinEvents},
+		JSON: struct{}{},
 	}
 }

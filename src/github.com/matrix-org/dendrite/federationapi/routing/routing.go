@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationapi/readers"
-	"github.com/matrix-org/dendrite/federationapi/writers"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -63,7 +62,7 @@ func Setup(
 		"federation_send", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
-			return writers.Send(
+			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
 				cfg, query, producer, keys, federation,
 			)
@@ -74,7 +73,7 @@ func Setup(
 		"federation_invite", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
-			return writers.Invite(
+			return Invite(
 				httpReq, request, vars["roomID"], vars["eventID"],
 				cfg, producer, keys,
 			)
@@ -83,7 +82,7 @@ func Setup(
 
 	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
-			return writers.CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
+			return CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
 		},
 	)).Methods("POST", "OPTIONS")
 
@@ -91,7 +90,7 @@ func Setup(
 		"exchange_third_party_invite", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
-			return writers.ExchangeThirdPartyInvite(
+			return ExchangeThirdPartyInvite(
 				httpReq, request, vars["roomID"], query, cfg, federation, producer,
 			)
 		},

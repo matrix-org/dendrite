@@ -73,7 +73,7 @@ func main() {
 		}).Panic("Failed to setup kafka consumers")
 	}
 
-	roomConsumer := consumers.NewOutputRoomEvent(cfg, kafkaConsumer, db, queryAPI)
+	roomConsumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, db, queryAPI)
 	if err != nil {
 		log.Panicf("startup: failed to create room server consumer: %s", err)
 	}
