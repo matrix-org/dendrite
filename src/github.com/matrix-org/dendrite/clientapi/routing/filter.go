@@ -79,7 +79,7 @@ type filterResponse struct {
 func PutFilter(
 	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method != "POST" {
+	if req.Method != http.MethodPost {
 		return util.JSONResponse{
 			Code: 405,
 			JSON: jsonerror.NotFound("Bad method"),
