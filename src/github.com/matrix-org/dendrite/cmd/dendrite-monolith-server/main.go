@@ -306,7 +306,7 @@ func (m *monolith) setupConsumers() {
 		log.Panicf("startup: failed to start client API server consumer: %s", err)
 	}
 
-	publicRoomsAPIConsumer := publicroomsapi_consumers.NewOutputRoomEvent(
+	publicRoomsAPIConsumer := publicroomsapi_consumers.NewOutputRoomEventConsumer(
 		m.cfg, m.kafkaConsumer(), m.publicRoomsAPIDB, m.queryAPI,
 	)
 	if err = publicRoomsAPIConsumer.Start(); err != nil {
