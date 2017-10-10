@@ -338,6 +338,7 @@ func (d *Database) PutFilter(
 		return "", err
 	}
 	return d.filter.findMaxID(ctx, localpart)
+}
 
 // CheckAccountAvailability checks if the username/localpart is already present in the database.
 // If the DB returns sql.ErrNoRows the Localpart isn't taken.
