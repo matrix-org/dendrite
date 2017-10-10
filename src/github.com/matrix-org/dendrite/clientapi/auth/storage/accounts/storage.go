@@ -29,7 +29,7 @@ import (
 
 // Database represents an account database
 type Database struct {
-	db           *sql.DB
+	db *sql.DB
 	common.PartitionOffsetStatements
 	accounts     accountsStatements
 	profiles     profilesStatements
@@ -333,11 +333,7 @@ func (d *Database) GetFilter(
 func (d *Database) PutFilter(
 	ctx context.Context, localpart, filter string,
 ) (string, error) {
-	err := d.filter.insertFilter(ctx, filter, localpart)
-	if err != nil {
-		return "", err
-	}
-	return d.filter.findMaxID(ctx, localpart)
+	return d.filter.insertFilter(ctx, filter, localpart)
 }
 
 // CheckAccountAvailability checks if the username/localpart is already present in the database.
