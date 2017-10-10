@@ -33,8 +33,8 @@ type OutputRoomEventConsumer struct {
 	query              api.RoomserverQueryAPI
 }
 
-// NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
-func NewOutputRoomEvent(
+// NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
+func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	store *storage.PublicRoomsServerDatabase,
