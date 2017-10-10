@@ -17,21 +17,22 @@ package readers
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/util"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrix"
 	"encoding/json"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
 func GetFilter(
 	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string, filterID string,
-	) util.JSONResponse {
-	if req.Method != "GET" {
+) util.JSONResponse {
+	if req.Method != http.MethodGet {
 		return util.JSONResponse{
 			Code: 405,
 			JSON: jsonerror.NotFound("Bad method"),
