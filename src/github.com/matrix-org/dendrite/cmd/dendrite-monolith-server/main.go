@@ -285,21 +285,21 @@ func (m *monolith) setupNotifiers() {
 func (m *monolith) setupConsumers() {
 	var err error
 
-	clientAPIConsumer := clientapi_consumers.NewOutputRoomEvent(
+	clientAPIConsumer := clientapi_consumers.NewOutputRoomEventConsumer(
 		m.cfg, m.kafkaConsumer(), m.accountDB, m.queryAPI,
 	)
 	if err = clientAPIConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer: %s", err)
 	}
 
-	syncAPIRoomConsumer := syncapi_consumers.NewOutputRoomEvent(
+	syncAPIRoomConsumer := syncapi_consumers.NewOutputRoomEventConsumer(
 		m.cfg, m.kafkaConsumer(), m.syncAPINotifier, m.syncAPIDB, m.queryAPI,
 	)
 	if err = syncAPIRoomConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer: %s", err)
 	}
 
-	syncAPIClientConsumer := syncapi_consumers.NewOutputClientData(
+	syncAPIClientConsumer := syncapi_consumers.NewOutputClientDataConsumer(
 		m.cfg, m.kafkaConsumer(), m.syncAPINotifier, m.syncAPIDB,
 	)
 	if err = syncAPIClientConsumer.Start(); err != nil {
@@ -315,7 +315,7 @@ func (m *monolith) setupConsumers() {
 
 	federationSenderQueues := queue.NewOutgoingQueues(m.cfg.Matrix.ServerName, m.federation)
 
-	federationSenderRoomConsumer := federationsender_consumers.NewOutputRoomEvent(
+	federationSenderRoomConsumer := federationsender_consumers.NewOutputRoomEventConsumer(
 		m.cfg, m.kafkaConsumer(), federationSenderQueues, m.federationSenderDB, m.queryAPI,
 	)
 	if err = federationSenderRoomConsumer.Start(); err != nil {

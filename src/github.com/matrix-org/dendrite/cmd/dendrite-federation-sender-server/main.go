@@ -74,7 +74,7 @@ func main() {
 
 	queues := queue.NewOutgoingQueues(cfg.Matrix.ServerName, federation)
 
-	consumer := consumers.NewOutputRoomEvent(cfg, kafkaConsumer, queues, db, queryAPI)
+	consumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, queues, db, queryAPI)
 	if err = consumer.Start(); err != nil {
 		log.WithError(err).Panicf("startup: failed to start room server consumer")
 	}
