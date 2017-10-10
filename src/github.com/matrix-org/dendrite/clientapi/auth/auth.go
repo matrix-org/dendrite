@@ -29,19 +29,12 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// UnknownDeviceID is the default device id if one is not specified.
-// This deviates from Synapse which generates a new device ID if one is not specified.
-// It's preferable to not amass a huge list of valid access tokens for an account,
-// so limiting it to 1 unknown device for now limits the number of valid tokens.
-// Clients should be giving us device IDs.
-var UnknownDeviceID = "unknown-device"
-
 // OWASP recommends at least 128 bits of entropy for tokens: https://www.owasp.org/index.php/Insufficient_Session-ID_Length
 // 32 bytes => 256 bits
 var tokenByteLength = 32
 
 // The length of generated device IDs
-var deviceIDByteLength = 8
+var deviceIDByteLength = 6
 
 // DeviceDatabase represents a device database.
 type DeviceDatabase interface {
