@@ -17,7 +17,7 @@ Dendrite can be run in one of two configurations:
  - For Kafka (optional if using the monolith server):
    - Unix-based system (https://kafka.apache.org/documentation/#os)
    - JDK 1.8+ / OpenJDK 1.8+
-   - Apache Kafka 0.10.2+ (see [travis-install-kafka.sh](travis-install-kafka.sh) for up-to-date version numbers)
+   - Apache Kafka 0.10.2+ (see [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh) for up-to-date version numbers)
 
 
 ## Setting up a development environment
@@ -34,7 +34,7 @@ go get github.com/constabulary/gb/...
 gb build
 ```
 
-If using Kafka, install and start it (c.f. [travis-install-kafka.sh](travis-install-kafka.sh)):
+If using Kafka, install and start it (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
 ```bash
 MIRROR=http://apache.mirror.anlx.net/kafka/0.10.2.0/kafka_2.11-0.10.2.0.tgz
 

@@ -1,5 +1,7 @@
 # /bin/bash
 
+# Downloads, installs and runs a kafka instance
+
 set -eu
 
 # The mirror to download kafka from is picked from the list of mirrors at
