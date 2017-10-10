@@ -39,5 +39,3 @@ gometalinter ./... $args
 
 echo "Double checking spelling..."
 misspell -error src *.md
-
-echo "Done!"
