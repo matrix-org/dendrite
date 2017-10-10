@@ -348,4 +348,4 @@ func (d *Database) CheckAccountAvailability(ctx context.Context, localpart strin
 		return true, nil
 	}
 	return false, err
-
+}
