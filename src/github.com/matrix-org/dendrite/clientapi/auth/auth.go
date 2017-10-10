@@ -66,7 +66,7 @@ func VerifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *auth
 		if err == sql.ErrNoRows {
 			resErr = &util.JSONResponse{
 				Code: 401,
-				JSON: jsonerror.Forbidden("Invalid access token"),
+				JSON: jsonerror.UnknownToken("Unknown token"),
 			}
 		} else {
 			resErr = &util.JSONResponse{
