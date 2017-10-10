@@ -187,18 +187,17 @@ func Setup(
 		}),
 	).Methods("GET")
 
-
 	r0mux.Handle("/user/{userId}/filter",
 		common.MakeAuthAPI("put_filter", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return writers.PutFilter(req, device, accountDB, vars["userId"])
+			return PutFilter(req, device, accountDB, vars["userId"])
 		}),
 	).Methods("POST", "OPTIONS")
 
 	r0mux.Handle("/user/{userId}/filter/{filterId}",
 		common.MakeAuthAPI("get_filter", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return readers.GetFilter(req, device, accountDB, vars["userId"], vars["filterId"])
+			return GetFilter(req, device, accountDB, vars["userId"], vars["filterId"])
 		}),
 	).Methods("GET")
 
