@@ -24,8 +24,8 @@ before_script:
  - openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
 
 script:
- - ./travis-install-kafka.sh
- - ./travis-test.sh
+ - ./scripts/install-local-kafka.sh
+ - ./scripts/travis-test.sh
 
 notifications:
     webhooks:

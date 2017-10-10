@@ -131,6 +131,10 @@ func Setup(
 		return writers.LegacyRegister(req, accountDB, deviceDB, &cfg)
 	})).Methods("POST", "OPTIONS")
 
+	r0mux.Handle("/register/available", common.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
+		return writers.RegisterAvailable(req, accountDB)
+	})).Methods("GET")
+
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)

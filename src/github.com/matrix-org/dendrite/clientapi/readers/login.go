@@ -46,6 +46,7 @@ type loginResponse struct {
 	UserID      string                       `json:"user_id"`
 	AccessToken string                       `json:"access_token"`
 	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
+	DeviceID    string                       `json:"device_id"`
 }
 
 func passwordLogin() loginFlows {
@@ -113,15 +114,12 @@ func Login(
 
 		token, err := auth.GenerateAccessToken()
 		if err != nil {
-			return util.JSONResponse{
-				Code: 500,
-				JSON: jsonerror.Unknown("Failed to generate access token"),
-			}
+			httputil.LogThenError(req, err)
 		}
 
 		// TODO: Use the device ID in the request
 		dev, err := deviceDB.CreateDevice(
-			req.Context(), acc.Localpart, auth.UnknownDeviceID, token,
+			req.Context(), acc.Localpart, nil, token,
 		)
 		if err != nil {
 			return util.JSONResponse{
@@ -136,6 +134,7 @@ func Login(
 				UserID:      dev.UserID,
 				AccessToken: dev.AccessToken,
 				HomeServer:  cfg.Matrix.ServerName,
+				DeviceID:    dev.ID,
 			},
 		}
 	}
