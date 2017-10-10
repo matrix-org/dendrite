@@ -2,7 +2,7 @@
 
 Dendrite will be a matrix homeserver written in go.
 
-Its still very much a work in progress, but installation instructions can
+It's still very much a work in progress, but installation instructions can
 be found in [INSTALL.md](INSTALL.md)
 
 An overview of the design can be found in [DESIGN.md](DESIGN.md)
@@ -14,14 +14,10 @@ to get started!
 
 We aim to try and make it as easy as possible to jump in.
 
-# Support
+# Discussion
 
-For general questions about Dendrite we have a dedicated room on Matrix
+For questions about Dendrite we have a dedicated room on Matrix
 [#dendrite:matrix.org](https://riot.im/develop/#/room/#dendrite:matrix.org).
-
-For questions related to developing there's also [#dendrite-dev:matrix.org](https://riot.im/develop/#/room/#dendrite-dev:matrix.org)
-where we're happy to help.
-
 
 # Progress
 
