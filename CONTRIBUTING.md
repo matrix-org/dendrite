@@ -18,16 +18,16 @@ to build dendrite and run the unit tests respectively.
 
 ## Picking Things To Do
 
-If you're new then feel free to pick up an issue labelled [easy](https://github.com/matrix-org/dendrite/labels/easy).
+If you're new then feel free to pick up an issue labelled [good first issue](https://github.com/matrix-org/dendrite/labels/good%20first%20issue).
 These should be well-contained, small pieces of work that can be picked up to
 help you get familiar with the code base.
 
 Once you're comfortable with hacking on Dendrite there are issues lablled as
-[help-wanted](https://github.com/matrix-org/dendrite/labels/help-wanted), these
+[help wanted](https://github.com/matrix-org/dendrite/labels/help%20wanted), these
 are often slightly larger or more complicated pieces of work but are hopefully
 nonetheless fairly well-contained.
 
-We ask people who are familiar with Dendrite to leave the [easy](https://github.com/matrix-org/dendrite/labels/easy)
+We ask people who are familiar with Dendrite to leave the [good first issue](https://github.com/matrix-org/dendrite/labels/good%20first%20issue)
 issues so that there is always a way for new people to come and get involved.
 
 ## Getting Help
