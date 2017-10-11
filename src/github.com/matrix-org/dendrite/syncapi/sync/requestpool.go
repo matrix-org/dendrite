@@ -62,48 +62,71 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		"timeout": syncReq.timeout,
 	}).Info("Incoming /sync request")
 
-	// Fork off 2 goroutines: one to do the work, and one to serve as a timeout.
-	// Whichever returns first is the one we will serve back to the client.
-	timeoutChan := make(chan struct{})
-	timer := time.AfterFunc(syncReq.timeout, func() {
-		close(timeoutChan) // signal that the timeout has expired
-	})
+	currPos := rp.notifier.CurrentPosition()
 
-	done := make(chan util.JSONResponse)
-	go func() {
-		currentPos := rp.notifier.WaitForEvents(*syncReq)
-		// We stop the timer BEFORE calculating the response so the cpu work
-		// done to calculate the response is not timed. This stops us from
-		// doing lots of work then timing out and sending back an empty response.
-		timer.Stop()
-		syncData, err := rp.currentSyncForUser(*syncReq, currentPos)
-		var res util.JSONResponse
+	// If this is an initial sync or timeout=0 we return immediately
+	if syncReq.since == types.StreamPosition(0) || syncReq.timeout == 0 {
+		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
-			res = httputil.LogThenError(req, err)
-		} else {
-			syncData, err = rp.appendAccountData(syncData, device.UserID, *syncReq, currentPos)
-			if err != nil {
-				res = httputil.LogThenError(req, err)
-			} else {
-				res = util.JSONResponse{
-					Code: 200,
-					JSON: syncData,
-				}
-			}
+			return httputil.LogThenError(req, err)
 		}
-		done <- res
-		close(done)
-	}()
-
-	select {
-	case <-timeoutChan: // timeout fired
 		return util.JSONResponse{
 			Code: 200,
-			JSON: types.NewResponse(syncReq.since),
+			JSON: syncData,
 		}
-	case res := <-done: // received a response
-		return res
 	}
+
+	// Otherwise, we wait for the notifier to tell us if something *may* have
+	// happened. We loop in case it turns out that nothing did happen.
+
+	timeoutChan := time.After(syncReq.timeout) // case of timeout=0 is handled above
+	for {
+		select {
+		// Wait for notifier to wake us up
+		case currPos = <-rp.makeNotifyChannel(*syncReq, currPos):
+		// Or for timeout to expire
+		case <-timeoutChan:
+			return util.JSONResponse{
+				Code: 200,
+				JSON: types.NewResponse(syncReq.since),
+			}
+		// Or for the request to be cancelled
+		case <-req.Context().Done():
+			return httputil.LogThenError(req, req.Context().Err())
+		}
+
+		// Note that we don't time out during calculation of sync
+		// response. This ensures that we don't waste the hard work
+		// of calculating the sync only to get timed out before we
+		// can respond
+
+		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+		if !syncData.IsEmpty() {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: syncData,
+			}
+		}
+
+	}
+}
+
+// makeNotifyChannel returns a channel that produces the current stream position
+// when there *may* be something to return to the client. Only produces a single
+// value and then closes the channel.
+func (rp *RequestPool) makeNotifyChannel(syncReq syncRequest, sincePos types.StreamPosition) chan types.StreamPosition {
+	notified := make(chan types.StreamPosition)
+
+	go (func() {
+		currentPos := rp.notifier.WaitForEvents(syncReq, sincePos)
+		notified <- currentPos
+		close(notified)
+	})()
+
+	return notified
 }
 
 type stateEventInStateResp struct {
@@ -196,12 +219,20 @@ func (rp *RequestPool) OnIncomingStateTypeRequest(req *http.Request, roomID stri
 	}
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (*types.Response, error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == types.StreamPosition(0) {
-		return rp.db.CompleteSync(req.ctx, req.userID, req.limit)
+		res, err = rp.db.CompleteSync(req.ctx, req.userID, req.limit)
+	} else {
+		res, err = rp.db.IncrementalSync(req.ctx, req.userID, req.since, currentPos, req.limit)
 	}
-	return rp.db.IncrementalSync(req.ctx, req.userID, req.since, currentPos, req.limit)
+
+	if err != nil {
+		return
+	}
+
+	res, err = rp.appendAccountData(res, req.userID, req, currentPos)
+	return
 }
 
 func (rp *RequestPool) appendAccountData(

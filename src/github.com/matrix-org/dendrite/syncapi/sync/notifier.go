@@ -101,7 +101,7 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 }
 
 // WaitForEvents blocks until there are new events for this request.
-func (n *Notifier) WaitForEvents(req syncRequest) types.StreamPosition {
+func (n *Notifier) WaitForEvents(req syncRequest, sincePos types.StreamPosition) types.StreamPosition {
 	// Do what synapse does: https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/notifier.py#L298
 	// - Bucket request into a lookup map keyed off a list of joined room IDs and separately a user ID
 	// - Incoming events wake requests for a matching room ID
@@ -117,7 +117,7 @@ func (n *Notifier) WaitForEvents(req syncRequest) types.StreamPosition {
 	// TODO: We increment the stream position for any event, so it's possible that we return immediately
 	//       with a pos which contains no new events for this user. We should probably re-wait for events
 	//       automatically in this case.
-	if req.since != currentPos {
+	if sincePos != currentPos {
 		n.streamLock.Unlock()
 		return currentPos
 	}
@@ -139,6 +139,11 @@ func (n *Notifier) Load(ctx context.Context, db *storage.SyncServerDatabase) err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 	return nil
+}
+
+// CurrentPosition returns the current stream position
+func (n *Notifier) CurrentPosition() types.StreamPosition {
+	return n.currPos
 }
 
 // setUsersJoinedToRooms marks the given users as 'joined' to the given rooms, such that new events from

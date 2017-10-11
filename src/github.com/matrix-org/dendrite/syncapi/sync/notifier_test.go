@@ -258,7 +258,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 func waitForEvents(n *Notifier, req syncRequest) (types.StreamPosition, error) {
 	done := make(chan types.StreamPosition, 1)
 	go func() {
-		newPos := n.WaitForEvents(req)
+		newPos := n.WaitForEvents(req, req.since)
 		done <- newPos
 		close(done)
 	}()
