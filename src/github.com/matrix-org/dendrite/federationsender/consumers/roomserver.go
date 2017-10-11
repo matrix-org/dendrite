@@ -30,28 +30,28 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
-// OutputRoomEvent consumes events that originated in the room server.
-type OutputRoomEvent struct {
+// OutputRoomEventConsumer consumes events that originated in the room server.
+type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.Database
 	queues             *queue.OutgoingQueues
 	query              api.RoomserverQueryAPI
 }
 
-// NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
-func NewOutputRoomEvent(
+// NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
+func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store *storage.Database,
 	queryAPI api.RoomserverQueryAPI,
-) *OutputRoomEvent {
+) *OutputRoomEventConsumer {
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
-	s := &OutputRoomEvent{
+	s := &OutputRoomEventConsumer{
 		roomServerConsumer: &consumer,
 		db:                 store,
 		queues:             queues,
@@ -63,7 +63,7 @@ func NewOutputRoomEvent(
 }
 
 // Start consuming from room servers
-func (s *OutputRoomEvent) Start() error {
+func (s *OutputRoomEventConsumer) Start() error {
 	return s.roomServerConsumer.Start()
 }
 
@@ -71,7 +71,7 @@ func (s *OutputRoomEvent) Start() error {
 // It is unsafe to call this with messages for the same room in multiple gorountines
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
-func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
+func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
@@ -108,7 +108,7 @@ func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
 
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
-func (s *OutputRoomEvent) processMessage(ore api.OutputNewRoomEvent) error {
+func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
 	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ore.Event)
 	if err != nil {
 		return err
@@ -164,7 +164,7 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputNewRoomEvent) error {
 // Usually the list can be calculated locally, but sometimes it will need fetch
 // events from the room server.
 // Returns an error if there was a problem talking to the room server.
-func (s *OutputRoomEvent) joinedHostsAtEvent(
+func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	ore api.OutputNewRoomEvent, oldJoinedHosts []types.JoinedHost,
 ) ([]gomatrixserverlib.ServerName, error) {
 	// Combine the delta into a single delta so that the adds and removes can
@@ -283,7 +283,7 @@ func combineDeltas(adds1, removes1, adds2, removes2 []string) (adds, removes []s
 }
 
 // lookupStateEvents looks up the state events that are added by a new event.
-func (s *OutputRoomEvent) lookupStateEvents(
+func (s *OutputRoomEventConsumer) lookupStateEvents(
 	addsStateEventIDs []string, event gomatrixserverlib.Event,
 ) ([]gomatrixserverlib.Event, error) {
 	// Fast path if there aren't any new state events.

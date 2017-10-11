@@ -26,27 +26,27 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
-// OutputClientData consumes events that originated in the client API server.
-type OutputClientData struct {
+// OutputClientDataConsumer consumes events that originated in the client API server.
+type OutputClientDataConsumer struct {
 	clientAPIConsumer *common.ContinualConsumer
 	db                *storage.SyncServerDatabase
 	notifier          *sync.Notifier
 }
 
-// NewOutputClientData creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
-func NewOutputClientData(
+// NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
+func NewOutputClientDataConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
 	store *storage.SyncServerDatabase,
-) *OutputClientData {
+) *OutputClientDataConsumer {
 
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputClientData),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
-	s := &OutputClientData{
+	s := &OutputClientDataConsumer{
 		clientAPIConsumer: &consumer,
 		db:                store,
 		notifier:          n,
@@ -57,14 +57,14 @@ func NewOutputClientData(
 }
 
 // Start consuming from room servers
-func (s *OutputClientData) Start() error {
+func (s *OutputClientDataConsumer) Start() error {
 	return s.clientAPIConsumer.Start()
 }
 
 // onMessage is called when the sync server receives a new event from the client API server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputClientData) onMessage(msg *sarama.ConsumerMessage) error {
+func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output common.AccountData
 	if err := json.Unmarshal(msg.Value, &output); err != nil {

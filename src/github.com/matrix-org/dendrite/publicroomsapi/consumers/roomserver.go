@@ -26,26 +26,26 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
-// OutputRoomEvent consumes events that originated in the room server.
-type OutputRoomEvent struct {
+// OutputRoomEventConsumer consumes events that originated in the room server.
+type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.PublicRoomsServerDatabase
 	query              api.RoomserverQueryAPI
 }
 
-// NewOutputRoomEvent creates a new OutputRoomEvent consumer. Call Start() to begin consuming from room servers.
-func NewOutputRoomEvent(
+// NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
+func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	store *storage.PublicRoomsServerDatabase,
 	queryAPI api.RoomserverQueryAPI,
-) *OutputRoomEvent {
+) *OutputRoomEventConsumer {
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
-	s := &OutputRoomEvent{
+	s := &OutputRoomEventConsumer{
 		roomServerConsumer: &consumer,
 		db:                 store,
 		query:              queryAPI,
@@ -56,12 +56,12 @@ func NewOutputRoomEvent(
 }
 
 // Start consuming from room servers
-func (s *OutputRoomEvent) Start() error {
+func (s *OutputRoomEventConsumer) Start() error {
 	return s.roomServerConsumer.Start()
 }
 
 // onMessage is called when the sync server receives a new event from the room server output log.
-func (s *OutputRoomEvent) onMessage(msg *sarama.ConsumerMessage) error {
+func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
