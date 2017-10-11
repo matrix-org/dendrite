@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
-	"github.com/matrix-org/dendrite/mediaapi/writers"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -51,7 +50,7 @@ func Setup(
 		"upload",
 		deviceDB,
 		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
-			return writers.Upload(req, cfg, db, activeThumbnailGeneration)
+			return Upload(req, cfg, db, activeThumbnailGeneration)
 		},
 	)).Methods("POST", "OPTIONS")
 
@@ -83,7 +82,7 @@ func makeDownloadAPI(
 		w.Header().Set("Content-Type", "application/json")
 
 		vars := mux.Vars(req)
-		writers.Download(
+		Download(
 			w,
 			req,
 			gomatrixserverlib.ServerName(vars["serverName"]),
