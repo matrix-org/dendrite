@@ -71,11 +71,9 @@ func (d *Database) UpdateRoom(
 	roomID, oldEventID, newEventID string,
 	addHosts []types.JoinedHost,
 	removeHosts []string,
-) (*[]types.JoinedHost, error) {
-	var joinedHostsPtr *[]types.JoinedHost
-
-	err := common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		err := d.insertRoom(ctx, txn, roomID)
+) (joinedHosts []types.JoinedHost, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		err = d.insertRoom(ctx, txn, roomID)
 		if err != nil {
 			return err
 		}
@@ -96,12 +94,10 @@ func (d *Database) UpdateRoom(
 			}
 		}
 
-		joinedHosts, err := d.selectJoinedHosts(ctx, txn, roomID)
+		joinedHosts, err = d.selectJoinedHosts(ctx, txn, roomID)
 		if err != nil {
 			return err
 		}
-
-		joinedHostsPtr = &joinedHosts
 
 		for _, add := range addHosts {
 			err = d.insertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName)
@@ -114,5 +110,5 @@ func (d *Database) UpdateRoom(
 		}
 		return d.updateRoom(ctx, txn, roomID, newEventID)
 	})
-	return joinedHostsPtr, err
+	return
 }

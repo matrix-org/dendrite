@@ -146,7 +146,7 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputNewRoomEvent) error {
 	}
 
 	// Work out which hosts were joined at the event itself.
-	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, *oldJoinedHosts)
+	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, oldJoinedHosts)
 	if err != nil {
 		return err
 	}
