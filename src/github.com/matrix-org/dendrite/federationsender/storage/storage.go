@@ -84,7 +84,9 @@ func (d *Database) UpdateRoom(
 		}
 
 		if lastSentEventID == newEventID {
-			// We've handled this messages before, so lets just ignore it
+			// We've handled this message before, so let's just ignore it.
+			// We can only get a duplicate for the last message we processed,
+			// so its enough just to compare the newEventID with lastSentEventID
 			return nil
 		}
 

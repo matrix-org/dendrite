@@ -137,6 +137,8 @@ func (s *OutputRoomEvent) processMessage(ore api.OutputNewRoomEvent) error {
 	if oldJoinedHosts == nil {
 		// This means that there is nothing to update as this is a duplicate
 		// message.
+		// This can happen if dendrite crashed between reading the message and
+		// persisting the stream position.
 		return nil
 	}
 
