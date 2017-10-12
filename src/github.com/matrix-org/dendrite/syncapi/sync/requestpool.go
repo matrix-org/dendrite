@@ -79,13 +79,15 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	// Otherwise, we wait for the notifier to tell us if something *may* have
 	// happened. We loop in case it turns out that nothing did happen.
 
-	timeoutChan := time.After(syncReq.timeout) // case of timeout=0 is handled above
+	timer := time.NewTimer(syncReq.timeout) // case of timeout=0 is handled above
+	defer timer.Stop()
+
 	for {
 		select {
 		// Wait for notifier to wake us up
 		case currPos = <-rp.makeNotifyChannel(*syncReq, currPos):
 		// Or for timeout to expire
-		case <-timeoutChan:
+		case <-timer.C:
 			return util.JSONResponse{
 				Code: 200,
 				JSON: types.NewResponse(syncReq.since),
