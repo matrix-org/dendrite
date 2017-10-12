@@ -100,7 +100,9 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 	}
 }
 
-// WaitForEvents blocks until there are new events for this request.
+// WaitForEvents blocks until there are events for this request after sincePos.
+// In particular, it will return immediately if there are already events after
+// sincePos for the request, but otherwise blocks waiting for new events.
 func (n *Notifier) WaitForEvents(req syncRequest, sincePos types.StreamPosition) types.StreamPosition {
 	// Do what synapse does: https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/notifier.py#L298
 	// - Bucket request into a lookup map keyed off a list of joined room IDs and separately a user ID

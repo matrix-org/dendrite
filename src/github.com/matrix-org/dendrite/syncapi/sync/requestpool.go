@@ -122,6 +122,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 func (rp *RequestPool) makeNotifyChannel(syncReq syncRequest, sincePos types.StreamPosition) chan types.StreamPosition {
 	notified := make(chan types.StreamPosition)
 
+	// TODO(#303): We need to ensure that WaitForEvents gets properly cancelled
+	// when the request is finished, or use some other mechanism to ensure we
+	// don't leak goroutines here
 	go (func() {
 		currentPos := rp.notifier.WaitForEvents(syncReq, sincePos)
 		notified <- currentPos
