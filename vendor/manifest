@@ -129,7 +129,7 @@
 		{
 			"importpath": "github.com/matrix-org/dugong",
 			"repository": "https://github.com/matrix-org/dugong",
-			"revision": "193b8f88e381d12f2d53023fba25e43fc81dc5ac",
+			"revision": "f04553160a2b197248e032f4fe23d57b9af20cde",
 			"branch": "master"
 		},
 		{
@@ -153,7 +153,7 @@
 		{
 			"importpath": "github.com/matrix-org/util",
 			"repository": "https://github.com/matrix-org/util",
-			"revision": "cf7e2e3871b7ae39106a1763312deaaf0c139531",
+			"revision": "8b1c8ab81986c1ce7f06a52fce48f4a1156b66ee",
 			"branch": "master"
 		},
 		{

@@ -8,7 +8,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // JSONResponse represents an HTTP response which contains a JSON body.

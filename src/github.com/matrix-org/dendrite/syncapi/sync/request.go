@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/util"
 )

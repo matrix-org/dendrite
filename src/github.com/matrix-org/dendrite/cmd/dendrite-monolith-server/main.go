@@ -57,7 +57,7 @@ import (
 	publicroomsapi_routing "github.com/matrix-org/dendrite/publicroomsapi/routing"
 	publicroomsapi_storage "github.com/matrix-org/dendrite/publicroomsapi/storage"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
