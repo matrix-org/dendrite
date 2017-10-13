@@ -3,7 +3,7 @@ package dugong
 import (
 	"compress/gzip"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path/filepath"
