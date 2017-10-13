@@ -1,5 +1,5 @@
 # dugong
-Logging utilities for [logrus](https://github.com/Sirupsen/logrus).
+Logging utilities for [logrus](https://github.com/sirupsen/logrus).
 
 To develop on this library, you need logrus on your GOPATH:
 

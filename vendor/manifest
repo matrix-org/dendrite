@@ -8,12 +8,6 @@
 			"branch": "master"
 		},
 		{
-			"importpath": "github.com/Sirupsen/logrus",
-			"repository": "https://github.com/Sirupsen/logrus",
-			"revision": "61e43dc76f7ee59a82bdf3d71033dc12bea4c77d",
-			"branch": "master"
-		},
-		{
 			"importpath": "github.com/alecthomas/gometalinter",
 			"repository": "https://github.com/alecthomas/gometalinter",
 			"revision": "5507b26af3204e949ffe50ec08ee73e5847938e1",
@@ -129,7 +123,7 @@
 		{
 			"importpath": "github.com/matrix-org/dugong",
 			"repository": "https://github.com/matrix-org/dugong",
-			"revision": "f04553160a2b197248e032f4fe23d57b9af20cde",
+			"revision": "a012152b8769963afc822a9af7a3eceac4d776e8",
 			"branch": "master"
 		},
 		{
@@ -263,7 +257,7 @@
 		{
 			"importpath": "github.com/sirupsen/logrus",
 			"repository": "https://github.com/sirupsen/logrus",
-			"revision": "61e43dc76f7ee59a82bdf3d71033dc12bea4c77d",
+			"revision": "89742aefa4b206dcf400792f3bd35b542998eb3b",
 			"branch": "master"
 		},
 		{
@@ -332,23 +326,37 @@
 		{
 			"importpath": "golang.org/x/crypto/bcrypt",
 			"repository": "https://go.googlesource.com/crypto",
-			"revision": "0fe963104e9d1877082f8fb38f816fcd97eb1d10",
+			"revision": "9419663f5a44be8b34ca85f08abc5fe1be11f8a3",
 			"branch": "master",
 			"path": "/bcrypt"
 		},
 		{
 			"importpath": "golang.org/x/crypto/blowfish",
 			"repository": "https://go.googlesource.com/crypto",
-			"revision": "0fe963104e9d1877082f8fb38f816fcd97eb1d10",
+			"revision": "9419663f5a44be8b34ca85f08abc5fe1be11f8a3",
 			"branch": "master",
 			"path": "/blowfish"
 		},
 		{
+			"importpath": "golang.org/x/crypto/curve25519",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "9419663f5a44be8b34ca85f08abc5fe1be11f8a3",
+			"branch": "master",
+			"path": "/curve25519"
+		},
+		{
 			"importpath": "golang.org/x/crypto/ed25519",
 			"repository": "https://go.googlesource.com/crypto",
-			"revision": "77014cf7f9bde4925afeed52b7bf676d5f5b4285",
+			"revision": "9419663f5a44be8b34ca85f08abc5fe1be11f8a3",
 			"branch": "master",
 			"path": "/ed25519"
+		},
+		{
+			"importpath": "golang.org/x/crypto/ssh",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "9419663f5a44be8b34ca85f08abc5fe1be11f8a3",
+			"branch": "master",
+			"path": "/ssh"
 		},
 		{
 			"importpath": "golang.org/x/net/bpf",
@@ -393,6 +401,13 @@
 			"path": "/ipv6"
 		},
 		{
+			"importpath": "golang.org/x/sys/unix",
+			"repository": "https://go.googlesource.com/sys",
+			"revision": "43eea11bc92608addb41b8a406b0407495c106f6",
+			"branch": "master",
+			"path": "/unix"
+		},
+		{
 			"importpath": "gopkg.in/Shopify/sarama.v1",
 			"repository": "https://gopkg.in/Shopify/sarama.v1",
 			"revision": "0fb560e5f7fbcaee2f75e3c34174320709f69944",
@@ -413,7 +428,7 @@
 		{
 			"importpath": "gopkg.in/gemnasium/logrus-airbrake-hook.v2",
 			"repository": "https://gopkg.in/gemnasium/logrus-airbrake-hook.v2",
-			"revision": "bfee1239d796830ca346767650cce5ba90d58c57",
+			"revision": "e928b033a891c0175fb643d5aa0779e86325eb12",
 			"branch": "master"
 		},
 		{
