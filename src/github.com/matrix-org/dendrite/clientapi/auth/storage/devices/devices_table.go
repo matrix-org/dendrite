@@ -85,6 +85,9 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 	if s.deleteDeviceStmt, err = db.Prepare(deleteDeviceSQL); err != nil {
 		return
 	}
+	if s.deleteDevicesByLocalpartStmt, err = db.Prepare(deleteDevicesByLocalpartSQL); err != nil {
+		return
+	}
 	s.serverName = server
 	return
 }
@@ -118,7 +121,7 @@ func (s *devicesStatements) deleteDevice(
 func (s *devicesStatements) deleteDevicesByLocalpart(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) error {
-	stmt := common.TxStmt(txn, s.deleteDeviceStmt)
+	stmt := common.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
 	_, err := stmt.ExecContext(ctx, localpart)
 	return err
 }
