@@ -55,13 +55,6 @@ func Logout(
 func LogoutAll(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
-	if req.Method != "POST" {
-		return util.JSONResponse{
-			Code: 405,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
-
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
