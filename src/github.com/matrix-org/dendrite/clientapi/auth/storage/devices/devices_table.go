@@ -154,14 +154,14 @@ func (s *devicesStatements) selectDeviceByToken(
 }
 
 func (s *devicesStatements) selectDeviceByID(
-	ctx context.Context, localpart, device_id string,
+	ctx context.Context, localpart, deviceID string,
 ) (*authtypes.Device, error) {
 	var dev authtypes.Device
 	var created int64
 	stmt := s.selectDeviceByIDStmt
-	err := stmt.QueryRowContext(ctx, localpart, device_id).Scan(&created)
+	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&created)
 	if err == nil {
-		dev.ID = device_id
+		dev.ID = deviceID
 		dev.UserID = makeUserID(localpart, s.serverName)
 	}
 	return &dev, err
