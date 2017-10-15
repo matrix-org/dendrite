@@ -160,6 +160,12 @@ func Setup(
 		}),
 	).Methods("POST", "OPTIONS")
 
+	r0mux.Handle("/logout/all",
+		common.MakeAuthAPI("logout", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return LogoutAll(req, deviceDB, device)
+		}),
+	).Methods("POST", "OPTIONS")
+
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",

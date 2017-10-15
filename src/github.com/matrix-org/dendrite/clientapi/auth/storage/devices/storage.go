@@ -109,3 +109,17 @@ func (d *Database) RemoveDevice(
 		return nil
 	})
 }
+
+// RemoveAllDevices revokes devices by deleting the entry in the
+// database matching the given user ID localpart.
+// If something went wrong during the deletion, it will return the SQL error.
+func (d *Database) RemoveAllDevices(
+	ctx context.Context, localpart string,
+) error {
+	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if err := d.devices.deleteDevicesByLocalpart(ctx, txn, localpart); err != sql.ErrNoRows {
+			return err
+		}
+		return nil
+	})
+}

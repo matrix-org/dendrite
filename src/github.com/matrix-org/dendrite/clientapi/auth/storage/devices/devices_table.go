@@ -57,13 +57,18 @@ const selectDeviceByTokenSQL = "" +
 const deleteDeviceSQL = "" +
 	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
 
+const deleteDevicesByLocalpartSQL = "" +
+	"DELETE FROM device_devices WHERE localpart = $1"
+
 // TODO: List devices?
 
 type devicesStatements struct {
-	insertDeviceStmt        *sql.Stmt
-	selectDeviceByTokenStmt *sql.Stmt
-	deleteDeviceStmt        *sql.Stmt
-	serverName              gomatrixserverlib.ServerName
+	insertDeviceStmt             *sql.Stmt
+	selectDeviceByTokenStmt      *sql.Stmt
+	deleteDeviceStmt             *sql.Stmt
+	deleteDevicesByLocalpartStmt *sql.Stmt
+
+	serverName gomatrixserverlib.ServerName
 }
 
 func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
@@ -78,6 +83,9 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 		return
 	}
 	if s.deleteDeviceStmt, err = db.Prepare(deleteDeviceSQL); err != nil {
+		return
+	}
+	if s.deleteDevicesByLocalpartStmt, err = db.Prepare(deleteDevicesByLocalpartSQL); err != nil {
 		return
 	}
 	s.serverName = server
@@ -107,6 +115,14 @@ func (s *devicesStatements) deleteDevice(
 ) error {
 	stmt := common.TxStmt(txn, s.deleteDeviceStmt)
 	_, err := stmt.ExecContext(ctx, id, localpart)
+	return err
+}
+
+func (s *devicesStatements) deleteDevicesByLocalpart(
+	ctx context.Context, txn *sql.Tx, localpart string,
+) error {
+	stmt := common.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
+	_, err := stmt.ExecContext(ctx, localpart)
 	return err
 }
 
