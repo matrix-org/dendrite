@@ -55,9 +55,9 @@ func (d *Database) GetDeviceByAccessToken(
 // GetDeviceByID returns the device matching the given ID.
 // Returns sql.ErrNoRows if no matching device was found.
 func (d *Database) GetDeviceByID(
-	ctx context.Context, localpart, device_id string,
+	ctx context.Context, localpart, deviceID string,
 ) (*authtypes.Device, error) {
-	return d.devices.selectDeviceByID(ctx, localpart, device_id)
+	return d.devices.selectDeviceByID(ctx, localpart, deviceID)
 }
 
 // GetDevicesByLocalpart returns the devices matching the given localpart.

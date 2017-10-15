@@ -38,7 +38,7 @@ type devicesJSON struct {
 // GetDeviceByID handles /device/{deviceID}
 func GetDeviceByID(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
-	device_id string,
+	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
@@ -46,7 +46,7 @@ func GetDeviceByID(
 	}
 
 	ctx := req.Context()
-	dev, err := deviceDB.GetDeviceByID(ctx, localpart, device_id)
+	dev, err := deviceDB.GetDeviceByID(ctx, localpart, deviceID)
 	if err == sql.ErrNoRows {
 		return util.JSONResponse{
 			Code: 404,
