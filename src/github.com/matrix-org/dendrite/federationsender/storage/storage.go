@@ -62,7 +62,10 @@ func (d *Database) prepare() error {
 }
 
 // UpdateRoom updates the joined hosts for a room and returns what the joined
-// hosts were before the update.
+// hosts were before the update, or nil if this was a duplicate message.
+// This is called when we receive a message from kafka, so we pass in
+// oldEventID and newEventID to check that we haven't missed any messages or
+// this isn't a duplicate message.
 func (d *Database) UpdateRoom(
 	ctx context.Context,
 	roomID, oldEventID, newEventID string,
@@ -70,22 +73,34 @@ func (d *Database) UpdateRoom(
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if err = d.insertRoom(ctx, txn, roomID); err != nil {
+		err = d.insertRoom(ctx, txn, roomID)
+		if err != nil {
 			return err
 		}
+
 		lastSentEventID, err := d.selectRoomForUpdate(ctx, txn, roomID)
 		if err != nil {
 			return err
 		}
+
+		if lastSentEventID == newEventID {
+			// We've handled this message before, so let's just ignore it.
+			// We can only get a duplicate for the last message we processed,
+			// so its enough just to compare the newEventID with lastSentEventID
+			return nil
+		}
+
 		if lastSentEventID != oldEventID {
 			return types.EventIDMismatchError{
 				DatabaseID: lastSentEventID, RoomServerID: oldEventID,
 			}
 		}
+
 		joinedHosts, err = d.selectJoinedHosts(ctx, txn, roomID)
 		if err != nil {
 			return err
 		}
+
 		for _, add := range addHosts {
 			err = d.insertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName)
 			if err != nil {
