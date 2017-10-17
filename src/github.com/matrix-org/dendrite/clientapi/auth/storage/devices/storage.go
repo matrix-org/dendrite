@@ -52,6 +52,21 @@ func (d *Database) GetDeviceByAccessToken(
 	return d.devices.selectDeviceByToken(ctx, token)
 }
 
+// GetDeviceByID returns the device matching the given ID.
+// Returns sql.ErrNoRows if no matching device was found.
+func (d *Database) GetDeviceByID(
+	ctx context.Context, localpart, deviceID string,
+) (*authtypes.Device, error) {
+	return d.devices.selectDeviceByID(ctx, localpart, deviceID)
+}
+
+// GetDevicesByLocalpart returns the devices matching the given localpart.
+func (d *Database) GetDevicesByLocalpart(
+	ctx context.Context, localpart string,
+) ([]authtypes.Device, error) {
+	return d.devices.selectDevicesByLocalpart(ctx, localpart)
+}
+
 // CreateDevice makes a new device associated with the given user ID localpart.
 // If there is already a device with the same device ID for this user, that access token will be revoked
 // and replaced with the given accessToken. If the given accessToken is already in use for another device,

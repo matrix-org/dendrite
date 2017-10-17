@@ -355,6 +355,19 @@ func Setup(
 		}),
 	).Methods("PUT", "OPTIONS")
 
+	r0mux.Handle("/devices",
+		common.MakeAuthAPI("get_devices", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return GetDevicesByLocalpart(req, deviceDB, device)
+		}),
+	).Methods("GET")
+
+	r0mux.Handle("/device/{deviceID}",
+		common.MakeAuthAPI("get_device", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return GetDeviceByID(req, deviceDB, device, vars["deviceID"])
+		}),
+	).Methods("GET")
+
 	// Stub implementations for sytest
 	r0mux.Handle("/events",
 		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {

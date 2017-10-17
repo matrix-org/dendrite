@@ -54,6 +54,12 @@ const insertDeviceSQL = "" +
 const selectDeviceByTokenSQL = "" +
 	"SELECT device_id, localpart FROM device_devices WHERE access_token = $1"
 
+const selectDeviceByIDSQL = "" +
+	"SELECT created_ts FROM device_devices WHERE localpart = $1 and device_id = $2"
+
+const selectDevicesByLocalpartSQL = "" +
+	"SELECT device_id FROM device_devices WHERE localpart = $1"
+
 const deleteDeviceSQL = "" +
 	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
 
@@ -65,10 +71,11 @@ const deleteDevicesByLocalpartSQL = "" +
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
+	selectDeviceByIDStmt         *sql.Stmt
+	selectDevicesByLocalpartStmt *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
-
-	serverName gomatrixserverlib.ServerName
+	serverName                   gomatrixserverlib.ServerName
 }
 
 func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
@@ -80,6 +87,12 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 		return
 	}
 	if s.selectDeviceByTokenStmt, err = db.Prepare(selectDeviceByTokenSQL); err != nil {
+		return
+	}
+	if s.selectDeviceByIDStmt, err = db.Prepare(selectDeviceByIDSQL); err != nil {
+		return
+	}
+	if s.selectDevicesByLocalpartStmt, err = db.Prepare(selectDevicesByLocalpartSQL); err != nil {
 		return
 	}
 	if s.deleteDeviceStmt, err = db.Prepare(deleteDeviceSQL); err != nil {
@@ -138,6 +151,44 @@ func (s *devicesStatements) selectDeviceByToken(
 		dev.AccessToken = accessToken
 	}
 	return &dev, err
+}
+
+func (s *devicesStatements) selectDeviceByID(
+	ctx context.Context, localpart, deviceID string,
+) (*authtypes.Device, error) {
+	var dev authtypes.Device
+	var created int64
+	stmt := s.selectDeviceByIDStmt
+	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&created)
+	if err == nil {
+		dev.ID = deviceID
+		dev.UserID = makeUserID(localpart, s.serverName)
+	}
+	return &dev, err
+}
+
+func (s *devicesStatements) selectDevicesByLocalpart(
+	ctx context.Context, localpart string,
+) ([]authtypes.Device, error) {
+	devices := []authtypes.Device{}
+
+	rows, err := s.selectDevicesByLocalpartStmt.QueryContext(ctx, localpart)
+
+	if err != nil {
+		return devices, err
+	}
+
+	for rows.Next() {
+		var dev authtypes.Device
+		err = rows.Scan(&dev.ID)
+		if err != nil {
+			return devices, err
+		}
+		dev.UserID = makeUserID(localpart, s.serverName)
+		devices = append(devices, dev)
+	}
+
+	return devices, nil
 }
 
 func makeUserID(localpart string, server gomatrixserverlib.ServerName) string {
