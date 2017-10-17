@@ -13,7 +13,8 @@ instance of dendrite, and [CODE_STYLE.md](CODE_STYLE.md) for the code style
 guide.
 
 We use `gb` for managing our dependencies, so `gb build` and `gb test` is how
-to build dendrite and run the unit tests respectively.
+to build dendrite and run the unit tests respectively. There are [scripts](scripts)
+for [linting](scripts/find-lint.sh) and doing a [build/test/lint run](scripts/build-test-lint.sh).
 
 
 ## Picking Things To Do

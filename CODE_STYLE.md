@@ -15,6 +15,10 @@ for that line or statement using a [comment directive](https://github.com/alecth
 `// nolint: gocyclo`. This should be used sparingly and only when its clear
 that the lint warning is spurious.
 
+The linters are vendored, and can be run using [scripts/find-lint.sh](scripts/find-lint.sh)
+(see file for docs) or as part of a build/test/lint cycle using
+[scripts/build-test-lint.sh](scripts/build-test-lint.sh).
+
 
 ## HTTP Error Handling
 
