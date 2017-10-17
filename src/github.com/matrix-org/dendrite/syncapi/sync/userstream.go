@@ -46,8 +46,8 @@ func NewUserStream(userID string, currPos types.StreamPosition) *UserStream {
 	}
 }
 
-// Wait blocks until there is a new stream position for this user, which is then returned.
-// waitAtPos should be the position the stream thinks it should be waiting at.
+// Wait returns a channel that produces a single stream position when
+// a new event *may* be available to return to the client.
 func (s *UserStream) Wait(ctx context.Context, waitAtPos types.StreamPosition) <-chan types.StreamPosition {
 	posChannel := make(chan types.StreamPosition, 1)
 
@@ -79,7 +79,7 @@ func (s *UserStream) Wait(ctx context.Context, waitAtPos types.StreamPosition) <
 			if posChannel == ch {
 				lastIdx := len(s.waitingChannels)
 				s.waitingChannels[idx] = s.waitingChannels[lastIdx]
-				s.waitingChannels[lastIdx] = nil
+				s.waitingChannels[lastIdx] = nil // Ensure that the channel gets GCed
 				s.waitingChannels = s.waitingChannels[:lastIdx]
 
 				if len(s.waitingChannels) == 0 {
