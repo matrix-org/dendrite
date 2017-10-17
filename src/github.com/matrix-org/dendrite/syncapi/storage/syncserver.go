@@ -411,6 +411,11 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 	recentEvents := streamEventsToEvents(recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 
+	// Don't bother appending empty room entries
+	if len(recentEvents) == 0 && len(delta.stateEvents) == 0 {
+		return nil
+	}
+
 	switch delta.membership {
 	case "join":
 		jr := types.NewJoinResponse()
