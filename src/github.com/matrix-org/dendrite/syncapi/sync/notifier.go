@@ -17,11 +17,12 @@ package sync
 import (
 	"context"
 	"sync"
+	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 // Notifier will wake up sleeping requests when there is some new data.
@@ -38,6 +39,8 @@ type Notifier struct {
 	currPos types.StreamPosition
 	// A map of user_id => UserStream which can be used to wake a given user's /sync request.
 	userStreams map[string]*UserStream
+	// The last time we cleaned out stale entries from the userStreams map
+	lastCleanUpTime time.Time
 }
 
 // NewNotifier creates a new notifier set to the given stream position.
@@ -49,6 +52,7 @@ func NewNotifier(pos types.StreamPosition) *Notifier {
 		roomIDToJoinedUsers: make(map[string]userIDSet),
 		userStreams:         make(map[string]*UserStream),
 		streamLock:          &sync.Mutex{},
+		lastCleanUpTime:     time.Now(),
 	}
 }
 
@@ -62,6 +66,8 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 	n.currPos = pos
+
+	n.removeEmptyUserStreams()
 
 	if ev != nil {
 		// Map this event's room_id to a list of joined users, and wake them up.
@@ -103,7 +109,7 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 // WaitForEvents blocks until there are events for this request after sincePos.
 // In particular, it will return immediately if there are already events after
 // sincePos for the request, but otherwise blocks waiting for new events.
-func (n *Notifier) WaitForEvents(req syncRequest, sincePos types.StreamPosition) types.StreamPosition {
+func (n *Notifier) WaitForEvents(req syncRequest, sincePos types.StreamPosition) <-chan types.StreamPosition {
 	// Do what synapse does: https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/notifier.py#L298
 	// - Bucket request into a lookup map keyed off a list of joined room IDs and separately a user ID
 	// - Incoming events wake requests for a matching room ID
@@ -114,23 +120,11 @@ func (n *Notifier) WaitForEvents(req syncRequest, sincePos types.StreamPosition)
 
 	// In a guard, check if the /sync request should block, and block it until we get woken up
 	n.streamLock.Lock()
-	currentPos := n.currPos
+	defer n.streamLock.Unlock()
 
-	// TODO: We increment the stream position for any event, so it's possible that we return immediately
-	//       with a pos which contains no new events for this user. We should probably re-wait for events
-	//       automatically in this case.
-	if sincePos != currentPos {
-		n.streamLock.Unlock()
-		return currentPos
-	}
+	n.removeEmptyUserStreams()
 
-	// wait to be woken up, and then re-check the stream position
-	req.log.WithField("user_id", req.userID).Info("Waiting for event")
-
-	// give up the stream lock prior to waiting on the user lock
-	stream := n.fetchUserStream(req.userID, true)
-	n.streamLock.Unlock()
-	return stream.Wait(currentPos)
+	return n.fetchUserStream(req.userID, true).Wait(req.ctx, sincePos)
 }
 
 // Load the membership states required to notify users correctly.
@@ -178,7 +172,7 @@ func (n *Notifier) fetchUserStream(userID string, makeIfNotExists bool) *UserStr
 	stream, ok := n.userStreams[userID]
 	if !ok && makeIfNotExists {
 		// TODO: Unbounded growth of streams (1 per user)
-		stream = NewUserStream(userID)
+		stream = NewUserStream(userID, n.currPos)
 		n.userStreams[userID] = stream
 	}
 	return stream
@@ -206,6 +200,29 @@ func (n *Notifier) joinedUsers(roomID string) (userIDs []string) {
 		return
 	}
 	return n.roomIDToJoinedUsers[roomID].values()
+}
+
+// removeEmptyUserStreams iterates through the user stream map and removes any
+// that have been empty for a certain amount of time. This is a crude way of
+// ensuring that the userStreams map doesn't grow forver.
+// This should be called when the notifier gets called for whatever reason,
+// the function itself is responsible for ensuring it doesn't iterate too
+// often.
+// NB: Callers should have locked the mutex before calling this function.
+func (n *Notifier) removeEmptyUserStreams() {
+	// Only clean up  now and again
+	now := time.Now()
+	if n.lastCleanUpTime.Add(time.Minute).After(now) {
+		return
+	}
+	n.lastCleanUpTime = now
+
+	deleteBefore := now.Add(-5 * time.Minute)
+	for key, value := range n.userStreams {
+		if value.TimeOfLastNonEmpty().Before(deleteBefore) {
+			delete(n.userStreams, key)
+		}
+	}
 }
 
 // A string set, mainly existing for improving clarity of structs in this file.

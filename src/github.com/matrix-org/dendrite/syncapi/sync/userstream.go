@@ -15,7 +15,9 @@
 package sync
 
 import (
+	"context"
 	"sync"
+	"time"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -25,55 +27,108 @@ import (
 // goroutines can Broadcast(streamPosition) to other goroutines.
 type UserStream struct {
 	UserID string
-	// Because this is a Cond, we can notify all waiting goroutines so this works
-	// across devices for the same user. Protects pos.
-	cond *sync.Cond
+	// The waiting channels....... TODO
+	waitingChannels []chan<- types.StreamPosition
+	// The lock that protects pos
+	lock sync.Mutex
 	// The position to broadcast to callers of Wait().
 	pos types.StreamPosition
-	// The number of goroutines blocked on Wait() - used for testing and metrics
-	numWaiting int
+	// The time when waitingChannels was last non-empty
+	timeOfLastChannel time.Time
 }
 
 // NewUserStream creates a new user stream
-func NewUserStream(userID string) *UserStream {
+func NewUserStream(userID string, currPos types.StreamPosition) *UserStream {
 	return &UserStream{
-		UserID: userID,
-		cond:   sync.NewCond(&sync.Mutex{}),
+		UserID:            userID,
+		timeOfLastChannel: time.Now(),
+		pos:               currPos,
 	}
 }
 
 // Wait blocks until there is a new stream position for this user, which is then returned.
 // waitAtPos should be the position the stream thinks it should be waiting at.
-func (s *UserStream) Wait(waitAtPos types.StreamPosition) (pos types.StreamPosition) {
-	s.cond.L.Lock()
+func (s *UserStream) Wait(ctx context.Context, waitAtPos types.StreamPosition) <-chan types.StreamPosition {
+	posChannel := make(chan types.StreamPosition, 1)
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	// Before we start blocking, we need to make sure that we didn't race with a call
 	// to Broadcast() between calling Wait() and actually sleeping. We check the last
 	// broadcast pos to see if it is newer than the pos we are meant to wait at. If it
 	// is newer, something has Broadcast to this stream more recently so return immediately.
 	if s.pos > waitAtPos {
-		pos = s.pos
-		s.cond.L.Unlock()
-		return
+		posChannel <- s.pos
+		close(posChannel)
+		return posChannel
 	}
-	s.numWaiting++
-	s.cond.Wait()
-	pos = s.pos
-	s.numWaiting--
-	s.cond.L.Unlock()
-	return
+
+	s.waitingChannels = append(s.waitingChannels, posChannel)
+
+	// We spawn off a goroutine that waits for the request to finish and removes the
+	// channel from waitingChannels
+	go func() {
+		<-ctx.Done()
+
+		s.lock.Lock()
+		defer s.lock.Unlock()
+
+		// Icky but efficient way of filtering out the given channel
+		for idx, ch := range s.waitingChannels {
+			if posChannel == ch {
+				lastIdx := len(s.waitingChannels)
+				s.waitingChannels[idx] = s.waitingChannels[lastIdx]
+				s.waitingChannels[lastIdx] = nil
+				s.waitingChannels = s.waitingChannels[:lastIdx]
+
+				if len(s.waitingChannels) == 0 {
+					s.timeOfLastChannel = time.Now()
+				}
+
+				break
+			}
+		}
+	}()
+
+	return posChannel
 }
 
 // Broadcast a new stream position for this user.
 func (s *UserStream) Broadcast(pos types.StreamPosition) {
-	s.cond.L.Lock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if len(s.waitingChannels) != 0 {
+		s.timeOfLastChannel = time.Now()
+	}
+
 	s.pos = pos
-	s.cond.L.Unlock()
-	s.cond.Broadcast()
+
+	for _, c := range s.waitingChannels {
+		c <- pos
+		close(c)
+	}
+
+	s.waitingChannels = nil
 }
 
 // NumWaiting returns the number of goroutines waiting for Wait() to return. Used for metrics and testing.
 func (s *UserStream) NumWaiting() int {
-	s.cond.L.Lock()
-	defer s.cond.L.Unlock()
-	return s.numWaiting
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return len(s.waitingChannels)
+}
+
+// TimeOfLastNonEmpty returns the last time that the number of waiting channels
+// was non-empty, may be time.Now() if number of waiting channels is currently
+// non-empty.
+func (s *UserStream) TimeOfLastNonEmpty() time.Time {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if len(s.waitingChannels) > 0 {
+		return time.Now()
+	}
+	return s.timeOfLastChannel
 }

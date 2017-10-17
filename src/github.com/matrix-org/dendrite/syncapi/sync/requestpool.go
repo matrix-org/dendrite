@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -28,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
@@ -85,7 +85,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	for {
 		select {
 		// Wait for notifier to wake us up
-		case currPos = <-rp.makeNotifyChannel(*syncReq, currPos):
+		case currPos = <-rp.notifier.WaitForEvents(*syncReq, currPos):
 		// Or for timeout to expire
 		case <-timer.C:
 			return util.JSONResponse{
@@ -114,24 +114,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		}
 
 	}
-}
-
-// makeNotifyChannel returns a channel that produces the current stream position
-// when there *may* be something to return to the client. Only produces a single
-// value and then closes the channel.
-func (rp *RequestPool) makeNotifyChannel(syncReq syncRequest, sincePos types.StreamPosition) chan types.StreamPosition {
-	notified := make(chan types.StreamPosition)
-
-	// TODO(#303): We need to ensure that WaitForEvents gets properly cancelled
-	// when the request is finished, or use some other mechanism to ensure we
-	// don't leak goroutines here
-	go (func() {
-		currentPos := rp.notifier.WaitForEvents(syncReq, sincePos)
-		notified <- currentPos
-		close(notified)
-	})()
-
-	return notified
 }
 
 type stateEventInStateResp struct {
