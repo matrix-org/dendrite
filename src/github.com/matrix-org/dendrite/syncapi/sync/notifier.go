@@ -121,7 +121,6 @@ func (n *Notifier) GetNotifyChannel(
 	// TODO: v1 /events 'peeking' has an 'explicit room ID' which is also tracked,
 	//       but given we don't do /events, let's pretend it doesn't exist.
 
-	// In a guard, check if the /sync request should block, and block it until we get woken up
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
