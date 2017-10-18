@@ -261,7 +261,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.StreamPosition, error) {
 		return types.StreamPosition(0), fmt.Errorf(
 			"waitForEvents timed out waiting for %s (pos=%d)", req.userID, req.since,
 		)
-	case p := <-n.WaitForEvents(req, req.since):
+	case p := <-n.GetNotifyChannel(req, req.since):
 		return p, nil
 	}
 }

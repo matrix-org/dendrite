@@ -85,7 +85,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	for {
 		select {
 		// Wait for notifier to wake us up
-		case currPos = <-rp.notifier.WaitForEvents(*syncReq, currPos):
+		case currPos = <-rp.notifier.GetNotifyChannel(*syncReq, currPos):
 		// Or for timeout to expire
 		case <-timer.C:
 			return util.JSONResponse{

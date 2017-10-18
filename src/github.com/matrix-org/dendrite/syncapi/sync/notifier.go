@@ -106,9 +106,13 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 	}
 }
 
-// WaitForEvents returns a channel that produces a single stream position when
+// GetNotifyChannel returns a channel that produces a single stream position when
 // a new event *may* be available to return to the client.
-func (n *Notifier) WaitForEvents(req syncRequest, sincePos types.StreamPosition) <-chan types.StreamPosition {
+// sincePos specifies from which point we want to be notified about, i.e. don't
+// notify for anything before sincePos
+func (n *Notifier) GetNotifyChannel(
+	req syncRequest, sincePos types.StreamPosition,
+) <-chan types.StreamPosition {
 	// Do what synapse does: https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/notifier.py#L298
 	// - Bucket request into a lookup map keyed off a list of joined room IDs and separately a user ID
 	// - Incoming events wake requests for a matching room ID
@@ -123,7 +127,7 @@ func (n *Notifier) WaitForEvents(req syncRequest, sincePos types.StreamPosition)
 
 	n.removeEmptyUserStreams()
 
-	return n.fetchUserStream(req.userID, true).Wait(req.ctx, sincePos)
+	return n.fetchUserStream(req.userID, true).GetNotifyChannel(req.ctx, sincePos)
 }
 
 // Load the membership states required to notify users correctly.

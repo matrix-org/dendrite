@@ -27,10 +27,10 @@ import (
 // goroutines can Broadcast(streamPosition) to other goroutines.
 type UserStream struct {
 	UserID string
-	// The waiting channels....... TODO
-	waitingChannels []chan<- types.StreamPosition
-	// The lock that protects pos
+	// The lock that protects changes to this struct
 	lock sync.Mutex
+	// The channels waiting for updates for this user
+	waitingChannels []chan<- types.StreamPosition
 	// The position to broadcast to callers of Wait().
 	pos types.StreamPosition
 	// The time when waitingChannels was last non-empty
@@ -46,19 +46,22 @@ func NewUserStream(userID string, currPos types.StreamPosition) *UserStream {
 	}
 }
 
-// Wait returns a channel that produces a single stream position when
+// GetNotifyChannel returns a channel that produces a single stream position when
 // a new event *may* be available to return to the client.
-func (s *UserStream) Wait(ctx context.Context, waitAtPos types.StreamPosition) <-chan types.StreamPosition {
+// sincePos specifies from which point we want to be notified about
+func (s *UserStream) GetNotifyChannel(
+	ctx context.Context, sincePos types.StreamPosition,
+) <-chan types.StreamPosition {
 	posChannel := make(chan types.StreamPosition, 1)
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	// Before we start blocking, we need to make sure that we didn't race with a call
-	// to Broadcast() between calling Wait() and actually sleeping. We check the last
+	// to Broadcast() between calling Wait() and getting the lock. We check the last
 	// broadcast pos to see if it is newer than the pos we are meant to wait at. If it
 	// is newer, something has Broadcast to this stream more recently so return immediately.
-	if s.pos > waitAtPos {
+	if s.pos > sincePos {
 		posChannel <- s.pos
 		close(posChannel)
 		return posChannel
