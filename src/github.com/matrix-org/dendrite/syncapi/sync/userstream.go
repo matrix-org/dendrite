@@ -77,7 +77,7 @@ func (s *UserStream) Wait(ctx context.Context, waitAtPos types.StreamPosition) <
 		// Icky but efficient way of filtering out the given channel
 		for idx, ch := range s.waitingChannels {
 			if posChannel == ch {
-				lastIdx := len(s.waitingChannels)
+				lastIdx := len(s.waitingChannels) - 1
 				s.waitingChannels[idx] = s.waitingChannels[lastIdx]
 				s.waitingChannels[lastIdx] = nil // Ensure that the channel gets GCed
 				s.waitingChannels = s.waitingChannels[:lastIdx]
