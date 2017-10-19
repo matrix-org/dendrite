@@ -418,6 +418,23 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	return nil
 }
 
+// QueryReserveRoomID implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryReserveRoomID(
+	ctx context.Context,
+	request *api.QueryReserveRoomIDRequest,
+	response *api.QueryReserveRoomIDResponse,
+) error {
+	nid, err := r.DB.RoomNID(ctx, request.RoomID)
+	if nid != 0 {
+		response.Success = false
+		return nil
+	}
+
+	response.Success = true
+
+	return err
+}
+
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
 // nolint: gocyclo
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
@@ -500,6 +517,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryServerAllowedToSeeEvent(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryReserveRoomIDPath,
+		common.MakeInternalAPI("queryReserveRoomID", func(req *http.Request) util.JSONResponse {
+			var request api.QueryReserveRoomIDRequest
+			var response api.QueryReserveRoomIDResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryReserveRoomID(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: 200, JSON: &response}

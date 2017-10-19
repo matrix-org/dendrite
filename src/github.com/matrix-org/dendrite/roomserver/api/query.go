@@ -21,9 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-
-	"github.com/opentracing/opentracing-go"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -155,6 +154,18 @@ type QueryServerAllowedToSeeEventResponse struct {
 	AllowedToSeeEvent bool `json:"can_see_event"`
 }
 
+// QueryReserveRoomIDRequest is a request to QueryServerAllowedToSeeEvent
+type QueryReserveRoomIDRequest struct {
+	// TODO: Docs
+	RoomID string `json:"room_id"`
+}
+
+// QueryReserveRoomIDResponse is a response to QueryServerAllowedToSeeEvent
+type QueryReserveRoomIDResponse struct {
+	// TODO: Docs
+	Success bool `json:"success"`
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -217,6 +228,9 @@ const RoomserverQueryInvitesForUserPath = "/api/roomserver/queryInvitesForUser"
 
 // RoomserverQueryServerAllowedToSeeEventPath is the HTTP path for the QueryServerAllowedToSeeEvent API
 const RoomserverQueryServerAllowedToSeeEventPath = "/api/roomserver/queryServerAllowedToSeeEvent"
+
+// RoomserverQueryReserveRoomIDPath is the HTTP path for the QueryReserveRoomID API
+const RoomserverQueryReserveRoomIDPath = "/api/roomserver/queryReserveRoomID"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -307,6 +321,19 @@ func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// TODO: Docs
+func (h *httpRoomserverQueryAPI) QueryReserveRoomID(
+	ctx context.Context,
+	request *QueryReserveRoomIDRequest,
+	response *QueryReserveRoomIDResponse,
+) (err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryReserveRoomID")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryReserveRoomIDPath
 	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
