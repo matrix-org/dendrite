@@ -55,8 +55,8 @@ func NewUserStream(userID string, currPos types.StreamPosition) *UserStream {
 	}
 }
 
-// GetListener returns UserStreamListener a sync request can use to wait for
-// new updates.
+// GetListener returns UserStreamListener that a sync request can use to wait
+// for new updates with.
 // sincePos specifies from which point we want to be notified about
 // UserStreamListener must be closed
 func (s *UserStream) GetListener(sincePos types.StreamPosition) UserStreamListener {
