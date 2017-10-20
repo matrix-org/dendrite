@@ -28,11 +28,15 @@ import (
 type UserStream struct {
 	UserID string
 	// The lock that protects changes to this struct
-	lock              sync.Mutex
-	signalChannel     chan struct{}
-	pos               types.StreamPosition
+	lock sync.Mutex
+	// Closed when there is an update.
+	signalChannel chan struct{}
+	// The last stream position that there may have been an update for the suser
+	pos types.StreamPosition
+	// The last time when we had some listeners waiting
 	timeOfLastChannel time.Time
-	numWaiting        uint
+	// The number of listeners waiting
+	numWaiting uint
 }
 
 // UserStreamListener allows a sync request to wait for updates for a user.
