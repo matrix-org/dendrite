@@ -256,18 +256,22 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 
 // same as Notifier.WaitForEvents but with a timeout.
 func waitForEvents(n *Notifier, req syncRequest) (types.StreamPosition, error) {
+	listener := n.GetListener(req, req.since)
+	defer listener.Close()
+
 	select {
 	case <-time.After(5 * time.Second):
 		return types.StreamPosition(0), fmt.Errorf(
 			"waitForEvents timed out waiting for %s (pos=%d)", req.userID, req.since,
 		)
-	case p := <-n.GetNotifyChannel(req, req.since):
+	case <-listener.GetNotifyChannel():
+		p := listener.GetStreamPosition()
 		return p, nil
 	}
 }
 
 // Wait until something is Wait()ing on the user stream.
-func waitForBlocking(s *UserStream, numBlocking int) {
+func waitForBlocking(s *UserStream, numBlocking uint) {
 	for numBlocking != s.NumWaiting() {
 		// This is horrible but I don't want to add a signalling mechanism JUST for testing.
 		time.Sleep(1 * time.Microsecond)

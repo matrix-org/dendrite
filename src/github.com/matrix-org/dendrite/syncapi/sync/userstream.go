@@ -15,7 +15,6 @@
 package sync
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -23,18 +22,23 @@ import (
 )
 
 // UserStream represents a communication mechanism between the /sync request goroutine
-// and the underlying sync server goroutines. Goroutines can Wait() for a stream position and
-// goroutines can Broadcast(streamPosition) to other goroutines.
+// and the underlying sync server goroutines.
+// Goroutines can get a UserStreamListener to wait for updates, and can Broadcast()
+// updates.
 type UserStream struct {
 	UserID string
 	// The lock that protects changes to this struct
-	lock sync.Mutex
-	// The channels waiting for updates for this user
-	waitingChannels []chan<- types.StreamPosition
-	// The position to broadcast to callers of Wait().
-	pos types.StreamPosition
-	// The time when waitingChannels was last non-empty
+	lock              sync.Mutex
+	signalChannel     chan struct{}
+	pos               types.StreamPosition
 	timeOfLastChannel time.Time
+	numWaiting        uint
+}
+
+// UserStreamListener allows a sync request to wait for updates for a user.
+type UserStreamListener struct {
+	*UserStream
+	sincePos types.StreamPosition
 }
 
 // NewUserStream creates a new user stream
@@ -43,58 +47,24 @@ func NewUserStream(userID string, currPos types.StreamPosition) *UserStream {
 		UserID:            userID,
 		timeOfLastChannel: time.Now(),
 		pos:               currPos,
+		signalChannel:     make(chan struct{}),
 	}
 }
 
-// GetNotifyChannel returns a channel that produces a single stream position when
-// a new event *may* be available to return to the client.
+// GetListener returns UserStreamListener a sync request can use to wait for
+// new updates.
 // sincePos specifies from which point we want to be notified about
-func (s *UserStream) GetNotifyChannel(
-	ctx context.Context, sincePos types.StreamPosition,
-) <-chan types.StreamPosition {
-	posChannel := make(chan types.StreamPosition, 1)
-
+// UserStreamListener must be closed
+func (s *UserStream) GetListener(sincePos types.StreamPosition) UserStreamListener {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// Before we start blocking, we need to make sure that we didn't race with a call
-	// to Broadcast() between calling Wait() and getting the lock. We check the last
-	// broadcast pos to see if it is newer than the pos we are meant to wait at. If it
-	// is newer, something has Broadcast to this stream more recently so return immediately.
-	if s.pos > sincePos {
-		posChannel <- s.pos
-		close(posChannel)
-		return posChannel
+	s.numWaiting++ // We decrement when UserStreamListener is closed
+
+	return UserStreamListener{
+		UserStream: s,
+		sincePos:   sincePos,
 	}
-
-	s.waitingChannels = append(s.waitingChannels, posChannel)
-
-	// We spawn off a goroutine that waits for the request to finish and removes the
-	// channel from waitingChannels
-	go func() {
-		<-ctx.Done()
-
-		s.lock.Lock()
-		defer s.lock.Unlock()
-
-		// Icky but efficient way of filtering out the given channel
-		for idx, ch := range s.waitingChannels {
-			if posChannel == ch {
-				lastIdx := len(s.waitingChannels) - 1
-				s.waitingChannels[idx] = s.waitingChannels[lastIdx]
-				s.waitingChannels[lastIdx] = nil // Ensure that the channel gets GCed
-				s.waitingChannels = s.waitingChannels[:lastIdx]
-
-				if len(s.waitingChannels) == 0 {
-					s.timeOfLastChannel = time.Now()
-				}
-
-				break
-			}
-		}
-	}()
-
-	return posChannel
 }
 
 // Broadcast a new stream position for this user.
@@ -102,36 +72,64 @@ func (s *UserStream) Broadcast(pos types.StreamPosition) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if len(s.waitingChannels) != 0 {
-		s.timeOfLastChannel = time.Now()
-	}
-
 	s.pos = pos
 
-	for _, c := range s.waitingChannels {
-		c <- pos
-		close(c)
-	}
+	close(s.signalChannel)
 
-	s.waitingChannels = nil
+	s.signalChannel = make(chan struct{})
 }
 
-// NumWaiting returns the number of goroutines waiting for Wait() to return. Used for metrics and testing.
-func (s *UserStream) NumWaiting() int {
+// NumWaiting returns the number of goroutines waiting for waiting for updates.
+// Used for metrics and testing.
+func (s *UserStream) NumWaiting() uint {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	return len(s.waitingChannels)
+	return s.numWaiting
 }
 
-// TimeOfLastNonEmpty returns the last time that the number of waiting channels
-// was non-empty, may be time.Now() if number of waiting channels is currently
+// TimeOfLastNonEmpty returns the last time that the number of waiting listeners
+// was non-empty, may be time.Now() if number of waiting listeners is currently
 // non-empty.
 func (s *UserStream) TimeOfLastNonEmpty() time.Time {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if len(s.waitingChannels) > 0 {
+	if s.numWaiting > 0 {
 		return time.Now()
 	}
+
 	return s.timeOfLastChannel
+}
+
+// GetStreamPosition returns last stream position which the UserStream was
+// notified about
+func (s *UserStream) GetStreamPosition() types.StreamPosition {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.pos
+}
+
+// GetNotifyChannel returns a channel that is closed when there may be an
+// update for the user.
+func (s *UserStreamListener) GetNotifyChannel() <-chan struct{} {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.sincePos < s.pos {
+		posChannel := make(chan struct{})
+		close(posChannel)
+		return posChannel
+	}
+
+	return s.signalChannel
+}
+
+// Close cleans up resources used
+func (s *UserStreamListener) Close() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.numWaiting--
+	s.timeOfLastChannel = time.Now()
 }

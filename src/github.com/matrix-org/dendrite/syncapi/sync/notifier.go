@@ -106,13 +106,13 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, userID string, pos ty
 	}
 }
 
-// GetNotifyChannel returns a channel that produces a single stream position when
-// a new event *may* be available to return to the client.
+// GetListener returns a UserStreamListener that can be used to wait for
+// updates for a user. Must be closed.
 // sincePos specifies from which point we want to be notified about, i.e. don't
 // notify for anything before sincePos
-func (n *Notifier) GetNotifyChannel(
+func (n *Notifier) GetListener(
 	req syncRequest, sincePos types.StreamPosition,
-) <-chan types.StreamPosition {
+) UserStreamListener {
 	// Do what synapse does: https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/notifier.py#L298
 	// - Bucket request into a lookup map keyed off a list of joined room IDs and separately a user ID
 	// - Incoming events wake requests for a matching room ID
@@ -126,7 +126,7 @@ func (n *Notifier) GetNotifyChannel(
 
 	n.removeEmptyUserStreams()
 
-	return n.fetchUserStream(req.userID, true).GetNotifyChannel(req.ctx, sincePos)
+	return n.fetchUserStream(req.userID, true).GetListener(sincePos)
 }
 
 // Load the membership states required to notify users correctly.
