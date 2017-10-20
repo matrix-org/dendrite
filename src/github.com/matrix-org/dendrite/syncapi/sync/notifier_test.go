@@ -256,7 +256,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 
 // same as Notifier.WaitForEvents but with a timeout.
 func waitForEvents(n *Notifier, req syncRequest) (types.StreamPosition, error) {
-	listener := n.GetListener(req, req.since)
+	listener := n.GetListener(req)
 	defer listener.Close()
 
 	select {
@@ -264,7 +264,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.StreamPosition, error) {
 		return types.StreamPosition(0), fmt.Errorf(
 			"waitForEvents timed out waiting for %s (pos=%d)", req.userID, req.since,
 		)
-	case <-listener.GetNotifyChannel():
+	case <-listener.GetNotifyChannel(req.since):
 		p := listener.GetStreamPosition()
 		return p, nil
 	}

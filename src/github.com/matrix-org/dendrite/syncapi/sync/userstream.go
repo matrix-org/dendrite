@@ -15,10 +15,13 @@
 package sync
 
 import (
+	"context"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/util"
 )
 
 // UserStream represents a communication mechanism between the /sync request goroutine
@@ -42,7 +45,9 @@ type UserStream struct {
 // UserStreamListener allows a sync request to wait for updates for a user.
 type UserStreamListener struct {
 	*UserStream
-	sincePos types.StreamPosition
+
+	// Whether the stream has been closed
+	hasClosed bool
 }
 
 // NewUserStream creates a new user stream
@@ -57,18 +62,26 @@ func NewUserStream(userID string, currPos types.StreamPosition) *UserStream {
 
 // GetListener returns UserStreamListener that a sync request can use to wait
 // for new updates with.
-// sincePos specifies from which point we want to be notified about
 // UserStreamListener must be closed
-func (s *UserStream) GetListener(sincePos types.StreamPosition) UserStreamListener {
+func (s *UserStream) GetListener(ctx context.Context) UserStreamListener {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.numWaiting++ // We decrement when UserStreamListener is closed
 
-	return UserStreamListener{
+	listener := UserStreamListener{
 		UserStream: s,
-		sincePos:   sincePos,
 	}
+
+	// Lets be a bit paranoid here and check that Close() is being called
+	runtime.SetFinalizer(&listener, func(l *UserStreamListener) {
+		if !l.hasClosed {
+			util.GetLogger(ctx).Warn("Didn't call Close on UserStreamListener")
+			l.Close()
+		}
+	})
+
+	return listener
 }
 
 // Broadcast a new stream position for this user.
@@ -116,11 +129,12 @@ func (s *UserStream) GetStreamPosition() types.StreamPosition {
 
 // GetNotifyChannel returns a channel that is closed when there may be an
 // update for the user.
-func (s *UserStreamListener) GetNotifyChannel() <-chan struct{} {
+// sincePos specifies from which point we want to be notified about
+func (s *UserStreamListener) GetNotifyChannel(sincePos types.StreamPosition) <-chan struct{} {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if s.sincePos < s.pos {
+	if sincePos < s.pos {
 		posChannel := make(chan struct{})
 		close(posChannel)
 		return posChannel
@@ -134,6 +148,10 @@ func (s *UserStreamListener) Close() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.numWaiting--
-	s.timeOfLastChannel = time.Now()
+	if !s.hasClosed {
+		s.numWaiting--
+		s.timeOfLastChannel = time.Now()
+	}
+
+	s.hasClosed = true
 }
