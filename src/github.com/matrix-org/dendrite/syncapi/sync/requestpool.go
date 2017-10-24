@@ -82,14 +82,14 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	timer := time.NewTimer(syncReq.timeout) // case of timeout=0 is handled above
 	defer timer.Stop()
 
-	userStream := rp.notifier.GetListener(*syncReq)
-	defer userStream.Close()
+	userStreamListener := rp.notifier.GetListener(*syncReq)
+	defer userStreamListener.Close()
 
 	for {
 		select {
 		// Wait for notifier to wake us up
-		case <-userStream.GetNotifyChannel(currPos):
-			currPos = userStream.GetStreamPosition()
+		case <-userStreamListener.GetNotifyChannel(currPos):
+			currPos = userStreamListener.GetStreamPosition()
 		// Or for timeout to expire
 		case <-timer.C:
 			return util.JSONResponse{
