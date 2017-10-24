@@ -135,9 +135,12 @@ func (s *UserStreamListener) GetNotifyChannel(sincePos types.StreamPosition) <-c
 	defer s.lock.Unlock()
 
 	if sincePos < s.pos {
-		posChannel := make(chan struct{})
-		close(posChannel)
-		return posChannel
+		// If the listener is behind, i.e. missed a potential update, then we
+		// want them to wake up immediately. We do this by returning a new
+		// closed stream, which returns immediately when selected.
+		closedChannel := make(chan struct{})
+		close(closedChannel)
+		return closedChannel
 	}
 
 	return s.signalChannel
