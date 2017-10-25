@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/federationapi/readers"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -48,7 +47,7 @@ func Setup(
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
 
 	localKeys := common.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
-		return readers.LocalKeys(cfg)
+		return LocalKeys(cfg)
 	})
 
 	// Ignore the {keyID} argument as we only have a single server key so we always
@@ -100,7 +99,7 @@ func Setup(
 		"federation_get_event", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
-			return readers.GetEvent(
+			return GetEvent(
 				httpReq.Context(), request, cfg, query, time.Now(), keys, vars["eventID"],
 			)
 		},
@@ -109,7 +108,7 @@ func Setup(
 	v1fedmux.Handle("/version", common.MakeExternalAPI(
 		"federation_version",
 		func(httpReq *http.Request) util.JSONResponse {
-			return readers.Version()
+			return Version()
 		},
 	)).Methods("GET")
 }
