@@ -26,7 +26,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -351,7 +350,7 @@ func emit3PIDInviteEvent(
 	}
 
 	var queryRes *api.QueryLatestEventsAndStateResponse
-	event, err := events.BuildEvent(ctx, builder, cfg, queryAPI, queryRes)
+	event, err := common.BuildEvent(ctx, builder, cfg, queryAPI, queryRes)
 	if err != nil {
 		return err
 	}

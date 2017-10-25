@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -285,7 +284,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := events.BuildEvent(ctx, &builder, *cfg, queryAPI, nil)
+		event, err := common.BuildEvent(ctx, &builder, *cfg, queryAPI, nil)
 		if err != nil {
 			return nil, err
 		}
