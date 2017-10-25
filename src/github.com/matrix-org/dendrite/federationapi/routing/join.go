@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -39,13 +40,27 @@ func MakeJoin(
 	keys gomatrixserverlib.KeyRing,
 	roomID, userID string,
 ) util.JSONResponse {
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("Invalid UserID"),
+		}
+	}
+	if domain != request.Origin() {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("The join must be sent by the server of the user"),
+		}
+	}
+
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:   userID,
 		RoomID:   roomID,
 		Type:     "m.room.member",
 		StateKey: &userID,
 	}
-	err := builder.SetContent(map[string]interface{}{"membership": "join"})
+	err = builder.SetContent(map[string]interface{}{"membership": "join"})
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
@@ -86,6 +101,7 @@ func SendJoin(
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
+	producer *producers.RoomserverProducer,
 	now time.Time,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
@@ -139,13 +155,27 @@ func SendJoin(
 		}
 	}
 
-	// TODO: Fetch state and auth events
+	var stateAndAuthChainRepsonse api.QueryStateAndAuthChainResponse
+	err = query.QueryStateAndAuthChain(ctx, &api.QueryStateAndAuthChainRequest{
+		PrevEventIDs: event.PrevEventIDs(),
+		RoomID:       roomID,
+	}, &stateAndAuthChainRepsonse)
+	if err != nil {
+		return httputil.LogThenError(httpReq, err)
+	}
+
+	// We are responsible for notifying other servers that the user has joined
+	// the room
+	err = producer.SendEvents(ctx, []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName)
+	if err != nil {
+		return httputil.LogThenError(httpReq, err)
+	}
 
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
-			"state":      []gomatrixserverlib.Event{},
-			"auth_chain": []gomatrixserverlib.Event{},
+			"state":      stateAndAuthChainRepsonse.StateEvents,
+			"auth_chain": stateAndAuthChainRepsonse.AuthChainEvents,
 		},
 	}
 }

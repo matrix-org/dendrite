@@ -142,8 +142,8 @@ func Setup(
 			vars := mux.Vars(httpReq)
 			roomID := vars["roomID"]
 			userID := vars["userID"]
-			return MakeJoin(
-				httpReq.Context(), httpReq, request, cfg, query, time.Now(), keys, roomID, userID,
+			return SendJoin(
+				httpReq.Context(), httpReq, request, cfg, query, producer, time.Now(), keys, roomID, userID,
 			)
 		},
 	)).Methods("PUT")
