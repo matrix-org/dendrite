@@ -136,6 +136,18 @@ func Setup(
 		},
 	)).Methods("GET")
 
+	v1fedmux.Handle("/send_join/{roomID}/{userID}", common.MakeFedAPI(
+		"federation_send_join", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			roomID := vars["roomID"]
+			userID := vars["userID"]
+			return MakeJoin(
+				httpReq.Context(), httpReq, request, cfg, query, time.Now(), keys, roomID, userID,
+			)
+		},
+	)).Methods("PUT")
+
 	v1fedmux.Handle("/version", common.MakeExternalAPI(
 		"federation_version",
 		func(httpReq *http.Request) util.JSONResponse {
