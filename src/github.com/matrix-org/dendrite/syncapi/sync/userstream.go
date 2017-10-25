@@ -129,7 +129,9 @@ func (s *UserStreamListener) GetStreamPosition() types.StreamPosition {
 
 // GetNotifyChannel returns a channel that is closed when there may be an
 // update for the user.
-// sincePos specifies from which point we want to be notified about
+// sincePos specifies from which point we want to be notified about. If there
+// has already been an update after sincePos we'll return a closed channel
+// immediately.
 func (s *UserStreamListener) GetNotifyChannel(sincePos types.StreamPosition) <-chan struct{} {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
