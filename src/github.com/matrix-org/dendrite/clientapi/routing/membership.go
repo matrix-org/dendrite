@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -62,7 +61,7 @@ func SendMembership(
 			Code: 400,
 			JSON: jsonerror.NotTrusted(body.IDServer),
 		}
-	} else if err == events.ErrRoomNoExists {
+	} else if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(err.Error()),
@@ -89,7 +88,7 @@ func SendMembership(
 			Code: 400,
 			JSON: jsonerror.BadJSON(err.Error()),
 		}
-	} else if err == events.ErrRoomNoExists {
+	} else if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound(err.Error()),
@@ -149,7 +148,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return events.BuildEvent(ctx, &builder, cfg, queryAPI, nil)
+	return common.BuildEvent(ctx, &builder, cfg, queryAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

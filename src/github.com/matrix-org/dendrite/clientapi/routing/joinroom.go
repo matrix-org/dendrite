@@ -22,10 +22,10 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
@@ -215,7 +215,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := events.BuildEvent(r.req.Context(), &eb, r.cfg, r.queryAPI, &queryRes)
+	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.queryAPI, &queryRes)
 	if err == nil {
 		if err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName); err != nil {
 			return httputil.LogThenError(r.req, err)
@@ -227,7 +227,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 			}{roomID},
 		}
 	}
-	if err != events.ErrRoomNoExists {
+	if err != common.ErrRoomNoExists {
 		return httputil.LogThenError(r.req, err)
 	}
 

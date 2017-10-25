@@ -18,10 +18,10 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -67,8 +67,8 @@ func SendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := events.BuildEvent(req.Context(), &builder, cfg, queryAPI, &queryRes)
-	if err == events.ErrRoomNoExists {
+	e, err := common.BuildEvent(req.Context(), &builder, cfg, queryAPI, &queryRes)
+	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound("Room does not exist"),
