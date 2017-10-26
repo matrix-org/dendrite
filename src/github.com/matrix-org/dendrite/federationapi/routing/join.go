@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
+// MakeJoin implements the /make_join API
 func MakeJoin(
 	ctx context.Context,
 	httpReq *http.Request,
@@ -54,6 +55,7 @@ func MakeJoin(
 		}
 	}
 
+	// Try building an event for the server
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:   userID,
 		RoomID:   roomID,
@@ -76,7 +78,7 @@ func MakeJoin(
 		return httputil.LogThenError(httpReq, err)
 	}
 
-	// check to see if this user can perform this operation
+	// Check that the join is allowed or not
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = &queryRes.StateEvents[i]
@@ -85,7 +87,7 @@ func MakeJoin(
 	if err = gomatrixserverlib.Allowed(*event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
+			JSON: jsonerror.Forbidden(err.Error()),
 		}
 	}
 
@@ -95,6 +97,7 @@ func MakeJoin(
 	}
 }
 
+// SendJoin implements the /send_join API
 func SendJoin(
 	ctx context.Context,
 	httpReq *http.Request,
@@ -155,6 +158,8 @@ func SendJoin(
 		}
 	}
 
+	// Fetch the state and auth chain. We do this before we send the events
+	// on, in case this fails.
 	var stateAndAuthChainRepsonse api.QueryStateAndAuthChainResponse
 	err = query.QueryStateAndAuthChain(ctx, &api.QueryStateAndAuthChainRequest{
 		PrevEventIDs: event.PrevEventIDs(),
@@ -164,8 +169,9 @@ func SendJoin(
 		return httputil.LogThenError(httpReq, err)
 	}
 
+	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
-	// the room
+	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	err = producer.SendEvents(ctx, []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
