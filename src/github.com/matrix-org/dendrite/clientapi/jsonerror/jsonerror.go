@@ -67,6 +67,18 @@ func NotFound(msg string) *MatrixError {
 	return &MatrixError{"M_NOT_FOUND", msg}
 }
 
+// MissingArgument is an error when the client tries to access a resource
+// without providing an argument that is required.
+func MissingArgument(msg string) *MatrixError {
+	return &MatrixError{"M_MISSING_ARGUMENT", msg}
+}
+
+// InvalidArgumentBody is an error when the client tries to provide an
+// invalid body under a valid argument
+func InvalidArgumentBody(msg string) *MatrixError {
+	return &MatrixError{"M_INVALID_ARGUMENT_BODY", msg}
+}
+
 // MissingToken is an error when the client tries to access a resource which
 // requires authentication without supplying credentials.
 func MissingToken(msg string) *MatrixError {

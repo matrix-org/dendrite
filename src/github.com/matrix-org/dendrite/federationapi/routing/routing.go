@@ -105,6 +105,15 @@ func Setup(
 		},
 	)).Methods("GET")
 
+	v1fedmux.Handle("/query/profile", common.MakeFedAPI(
+		"federation_query_profile", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			return GetProfile(
+				httpReq, accountDB,
+			)
+		},
+	)).Methods("GET")
+
 	v1fedmux.Handle("/version", common.MakeExternalAPI(
 		"federation_version",
 		func(httpReq *http.Request) util.JSONResponse {
