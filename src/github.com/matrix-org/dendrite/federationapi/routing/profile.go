@@ -20,24 +20,12 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-type profileResponse struct {
-	AvatarURL   string `json:"avatar_url"`
-	DisplayName string `json:"displayname"`
-}
-
-type avatarURL struct {
-	AvatarURL string `json:"avatar_url"`
-}
-
-type displayName struct {
-	DisplayName string `json:"displayname"`
-}
-
-// GetProfile implements /_matrix/federation/v1/query/profile
+// GetProfile implements GET /_matrix/federation/v1/query/profile
 func GetProfile(
 	httpReq *http.Request,
 	accountDB *accounts.Database,
@@ -68,19 +56,19 @@ func GetProfile(
 	if field != "" {
 		switch field {
 		case "displayname":
-			res = displayName{
+			res = common.DisplayName{
 				profile.DisplayName,
 			}
 		case "avatar_url":
-			res = avatarURL{
+			res = common.AvatarURL{
 				profile.AvatarURL,
 			}
 		default:
 			code = 400
-			res = jsonerror.InvalidArgumentBody("The request body did not contain allowed values of argument 'field'. Allowed: 'avatar_url', 'displayname'.")
+			res = jsonerror.InvalidArgumentValue("The request body did not contain an allowed value of argument 'field'. Allowed values are either: 'avatar_url', 'displayname'.")
 		}
 	} else {
-		res = profileResponse{
+		res = common.ProfileResponse{
 			profile.AvatarURL,
 			profile.DisplayName,
 		}
