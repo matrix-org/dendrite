@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -29,6 +30,7 @@ import (
 func GetProfile(
 	httpReq *http.Request,
 	accountDB *accounts.Database,
+	cfg config.Dendrite,
 ) util.JSONResponse {
 	userID, field := httpReq.FormValue("user_id"), httpReq.FormValue("field")
 
@@ -40,8 +42,12 @@ func GetProfile(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
+		return httputil.LogThenError(httpReq, err)
+	}
+
+	if domain != cfg.Matrix.ServerName {
 		return httputil.LogThenError(httpReq, err)
 	}
 

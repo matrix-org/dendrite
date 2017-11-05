@@ -109,7 +109,7 @@ func Setup(
 		"federation_query_profile", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return GetProfile(
-				httpReq, accountDB,
+				httpReq, accountDB, cfg,
 			)
 		},
 	)).Methods("GET")
