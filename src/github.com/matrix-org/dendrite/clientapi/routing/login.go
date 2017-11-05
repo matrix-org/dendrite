@@ -38,8 +38,9 @@ type flow struct {
 }
 
 type passwordRequest struct {
-	User     string `json:"user"`
-	Password string `json:"password"`
+	User               string `json:"user"`
+	Password           string `json:"password"`
+	InitialDisplayName string `json:"initial_device_display_name"`
 }
 
 type loginResponse struct {
@@ -119,7 +120,7 @@ func Login(
 
 		// TODO: Use the device ID in the request
 		dev, err := deviceDB.CreateDevice(
-			req.Context(), acc.Localpart, nil, token,
+			req.Context(), acc.Localpart, nil, token, r.InitialDisplayName,
 		)
 		if err != nil {
 			return util.JSONResponse{

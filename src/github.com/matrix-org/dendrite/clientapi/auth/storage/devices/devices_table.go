@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS device_devices (
     -- migration to different domain names easier.
     localpart TEXT NOT NULL,
     -- When this devices was first recognised on the network, as a unix timestamp (ms resolution).
-    created_ts BIGINT NOT NULL
+    created_ts BIGINT NOT NULL,
+    -- The display name, human friendlier than device_id and updatable
+    display_name TEXT
     -- TODO: device keys, device display names, last used ts and IP address?, token restrictions (if 3rd-party OAuth app)
 );
 
@@ -49,16 +51,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(loca
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name) VALUES ($1, $2, $3, $4, $5)"
 
 const selectDeviceByTokenSQL = "" +
-	"SELECT device_id, localpart FROM device_devices WHERE access_token = $1"
+	"SELECT device_id, localpart, display_name FROM device_devices WHERE access_token = $1"
 
 const selectDeviceByIDSQL = "" +
-	"SELECT created_ts FROM device_devices WHERE localpart = $1 and device_id = $2"
+	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id FROM device_devices WHERE localpart = $1"
+	"SELECT device_id, display_name FROM device_devices WHERE localpart = $1"
+
+const updateDeviceNameSQL = "" +
+	"UPDATE device_devices SET display_name = $1 WHERE device_id = $2"
 
 const deleteDeviceSQL = "" +
 	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
@@ -66,13 +71,12 @@ const deleteDeviceSQL = "" +
 const deleteDevicesByLocalpartSQL = "" +
 	"DELETE FROM device_devices WHERE localpart = $1"
 
-// TODO: List devices?
-
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
 	selectDeviceByIDStmt         *sql.Stmt
 	selectDevicesByLocalpartStmt *sql.Stmt
+	updateDeviceNameStmt         *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
@@ -95,6 +99,9 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 	if s.selectDevicesByLocalpartStmt, err = db.Prepare(selectDevicesByLocalpartSQL); err != nil {
 		return
 	}
+	if s.updateDeviceNameStmt, err = db.Prepare(updateDeviceNameSQL); err != nil {
+		return
+	}
 	if s.deleteDeviceStmt, err = db.Prepare(deleteDeviceSQL); err != nil {
 		return
 	}
@@ -109,11 +116,11 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 // Returns an error if the user already has a device with the given device ID.
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(
-	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
+	ctx context.Context, txn *sql.Tx, id, localpart, accessToken, displayName string,
 ) (*authtypes.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := common.TxStmt(txn, s.insertDeviceStmt)
-	if _, err := stmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS); err != nil {
+	if _, err := stmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName); err != nil {
 		return nil, err
 	}
 	return &authtypes.Device{
@@ -136,6 +143,14 @@ func (s *devicesStatements) deleteDevicesByLocalpart(
 ) error {
 	stmt := common.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
 	_, err := stmt.ExecContext(ctx, localpart)
+	return err
+}
+
+func (s *devicesStatements) updateDeviceName(
+	ctx context.Context, txn *sql.Tx, deviceID, displayName string,
+) error {
+	stmt := common.TxStmt(txn, s.updateDeviceNameStmt)
+	_, err := stmt.ExecContext(ctx, displayName, deviceID)
 	return err
 }
 
