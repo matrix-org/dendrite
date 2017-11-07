@@ -150,6 +150,25 @@ type Dendrite struct {
 		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
 	} `yaml:"database"`
 
+	// TURN Server Config
+	TURN struct {
+		// Whether or not guests can request TURN credentials
+		AllowGuests bool `yaml:"turn_allow_guests"`
+		// How long the authorization should last
+		UserLifetime string `yaml:"turn_user_lifetime"`
+		// The list of TURN URIs to pass to clients
+		URIs []string `yaml:"turn_uris"`
+
+		// Authorization via Shared Secret
+		// The shared secret from coturn
+		SharedSecret string `yaml:"turn_shared_secret"`
+
+		// Authorization via Static Username & Password
+		// Hardcoded Username and Password
+		Username string `yaml:"turn_username"`
+		Password string `yaml:"turn_password"`
+	}
+
 	// The internal addresses the components will listen on.
 	// These should not be exposed externally as they expose metrics and debugging APIs.
 	Listen struct {
