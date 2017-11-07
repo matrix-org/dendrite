@@ -23,9 +23,6 @@ if [ "${TEST_SUITE-lint}" == "lint" ]; then
     ./scripts/find-lint.sh
 fi
 
-echo "Double checking spelling..."
-misspell -error src *.md
-
 if [ "${TEST_SUITE-unit-test}" == "unit-test" ]; then
     echo "Testing..."
     gb test
