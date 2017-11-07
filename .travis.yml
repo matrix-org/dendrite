@@ -8,13 +8,6 @@ env:
 - TEST_SUITE="unit-test"
 - TEST_SUITE="integ-test"
 
-matrix:
-  include:
-    - env: TEST_SUITE="integ-test"
-      apt:
-        packages:
-          - openssl
-
 sudo: false
 
 # Use trusty for postgres 9.5 support
