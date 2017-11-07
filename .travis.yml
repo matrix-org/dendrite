@@ -27,8 +27,8 @@ install:
 
 # Generate a self-signed X.509 certificate for TLS.
 before_script:
- - if [[ "$TEST_SUITE" -eq "integ-test" ]]; then openssl req -x509 -newkey rsa:512 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost; fi
- - if [[ "$TEST_SUITE" -eq "integ-test" ]]; then ./scripts/install-local-kafka.sh; fi
+ - if [[ "$TEST_SUITE" == "integ-test" ]]; then openssl req -x509 -newkey rsa:512 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost; fi
+ - if [[ "$TEST_SUITE" == "integ-test" ]]; then ./scripts/install-local-kafka.sh; fi
 
 script:
  - ./scripts/travis-test.sh
