@@ -1,6 +1,12 @@
 language: go
 go:
  - 1.8
+ - 1.9
+
+env:
+- TEST_SUITE="lint"
+- TEST_SUITE="unit-test"
+- TEST_SUITE="integ-test"
 
 sudo: false
 
@@ -21,10 +27,10 @@ install:
 
 # Generate a self-signed X.509 certificate for TLS.
 before_script:
- - openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
+ - if [ "$TEST_SUITE" -eq "integ-test" ] openssl req -x509 -newkey rsa:512 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
+ - if [ "$TEST_SUITE" -eq "integ-test" ] ./scripts/install-local-kafka.sh
 
 script:
- - ./scripts/install-local-kafka.sh
  - ./scripts/travis-test.sh
 
 notifications:
