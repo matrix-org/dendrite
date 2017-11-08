@@ -24,7 +24,7 @@ fi
 # Run unit tests and linters
 ./scripts/build-test-lint.sh
 
-if [ "${TEST_SUITE-unit-test}" == "integ-test" ]; then
+if [ "${TEST_SUITE-integ-test}" == "integ-test" ]; then
     # Run the integration tests
     bin/roomserver-integration-tests
     bin/syncserver-integration-tests
