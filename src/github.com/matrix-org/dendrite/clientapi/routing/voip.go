@@ -36,6 +36,8 @@ type turnServerResponse struct {
 	TTL int `json:"ttl"`
 }
 
+// RequestTurnServer implements:
+//     GET /voip/turnServer
 func RequestTurnServer(req *http.Request, device *authtypes.Device, cfg config.Dendrite) util.JSONResponse {
 	turnConfig := cfg.TURN
 
