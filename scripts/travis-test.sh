@@ -43,7 +43,8 @@ if [ "${TEST_SUITE:-integ-test}" == "integ-test" ]; then
     gb build github.com/matrix-org/dendrite/cmd/client-api-proxy
 
     # Create necessary certificates and keys to run dendrite
-    openssl req -x509 -newkey rsa:512 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
+    time openssl req -x509 -newkey rsa:512 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
+    time ./scripts/install-local-kafka.sh
 
     # Run the integration tests
     bin/roomserver-integration-tests
