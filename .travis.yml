@@ -22,10 +22,6 @@ services:
 install:
  - go get github.com/constabulary/gb/...
 
-# Generate a self-signed X.509 certificate for TLS.
-before_script:
- - if [[ "${TEST_SUITE:-integ-test}" == "integ-test" ]]; then ./scripts/install-local-kafka.sh; fi
-
 script:
  - ./scripts/travis-test.sh
 
