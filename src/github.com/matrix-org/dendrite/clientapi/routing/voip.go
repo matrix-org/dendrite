@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 )
 
 type turnServerResponse struct {
@@ -39,38 +40,35 @@ func RequestTurnServer(req *http.Request, device *authtypes.Device, cfg config.D
 	turnConfig := cfg.TURN
 
 	// TODO Guest Support
-	if len(turnConfig.URIs) == 0 /* || (isGuest && !turnConfig.AllowGuests) */ {
+	if len(turnConfig.URIs) == 0 || turnConfig.UserLifetime == "" {
 		return util.JSONResponse{
 			Code: 200,
 			JSON: struct{}{},
 		}
 	}
 
-	duration, err := time.ParseDuration(turnConfig.UserLifetime)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Warn("Invalid configuration value turn.turn_user_lifetime")
-		return util.JSONResponse{
-			Code: 200,
-			JSON: struct{}{},
-		}
-	}
+	// Duration checked at startup, err not possible
+	duration, _ := time.ParseDuration(turnConfig.UserLifetime)
 
 	resp := turnServerResponse{
-		Username: turnConfig.Username,
-		Password: turnConfig.Password,
 		URIs: turnConfig.URIs,
 		TTL: int(duration.Seconds()),
 	}
 
 	if turnConfig.SharedSecret != "" {
 		expiry := time.Now().Add(duration).Unix()
-		resp.Username = fmt.Sprintf("%d:%s", expiry, device.UserID)
-
 		mac := hmac.New(sha1.New, []byte(turnConfig.SharedSecret))
-		mac.Write([]byte(resp.Username))
+		_, err := mac.Write([]byte(resp.Username))
+
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+
+		resp.Username = fmt.Sprintf("%d:%s", expiry, device.UserID)
 		resp.Password = base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	} else if turnConfig.Username != "" && turnConfig.Password != "" {
-		// Already have turnConfig.Username and turnConfig.Password in resp
+		resp.Username = turnConfig.Username
+		resp.Password = turnConfig.Password
 	} else {
 		return util.JSONResponse{
 			Code: 200,
