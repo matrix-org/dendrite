@@ -194,13 +194,7 @@ func (m *monolith) setupFederation() {
 		m.cfg.Matrix.ServerName, m.cfg.Matrix.KeyID, m.cfg.Matrix.PrivateKey,
 	)
 
-	m.keyRing = gomatrixserverlib.KeyRing{
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			// TODO: Use perspective key fetchers for production.
-			&gomatrixserverlib.DirectKeyFetcher{Client: m.federation.Client},
-		},
-		KeyDatabase: m.keyDB,
-	}
+	m.keyRing = keydb.CreateKeyRing(m.federation.Client, m.keyDB)
 }
 
 func (m *monolith) setupKafka() {
