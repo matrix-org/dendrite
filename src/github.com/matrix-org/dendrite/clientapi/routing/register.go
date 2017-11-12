@@ -28,7 +28,6 @@ import (
 
 	"github.com/matrix-org/dendrite/common/config"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -37,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -45,7 +45,7 @@ const (
 	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
 )
 
-var validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
+var validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-./]+$`)
 
 // registerRequest represents the submitted registration request.
 // It can be broken down into 2 sections: the auth dictionary and registration parameters.
