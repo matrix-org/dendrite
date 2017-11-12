@@ -40,16 +40,16 @@ CREATE INDEX IF NOT EXISTS account_filter_localpart ON account_filter(localpart)
 const selectFilterSQL = "" +
 	"SELECT filter FROM account_filter WHERE localpart = $1 AND id = $2"
 
-const selectFilterByContentSQL = "" +
-	"SELECT filter FROM account_filter WHERE localpart = $1 AND filter = $2"
+const selectFilterIDByContentSQL = "" +
+	"SELECT id FROM account_filter WHERE localpart = $1 AND filter = $2"
 
 const insertFilterSQL = "" +
 	"INSERT INTO account_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id"
 
 type filterStatements struct {
-	selectFilterStmt          *sql.Stmt
-	selectFilterByContentStmt *sql.Stmt
-	insertFilterStmt          *sql.Stmt
+	selectFilterStmt            *sql.Stmt
+	selectFilterIDByContentStmt *sql.Stmt
+	insertFilterStmt            *sql.Stmt
 }
 
 func (s *filterStatements) prepare(db *sql.DB) (err error) {
@@ -60,7 +60,7 @@ func (s *filterStatements) prepare(db *sql.DB) (err error) {
 	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
 		return
 	}
-	if s.selectFilterByContentStmt, err = db.Prepare(selectFilterByContentSQL); err != nil {
+	if s.selectFilterIDByContentStmt, err = db.Prepare(selectFilterIDByContentSQL); err != nil {
 		return
 	}
 	if s.insertFilterStmt, err = db.Prepare(insertFilterSQL); err != nil {
@@ -71,31 +71,37 @@ func (s *filterStatements) prepare(db *sql.DB) (err error) {
 
 func (s *filterStatements) selectFilter(
 	ctx context.Context, localpart string, filterID string,
-) (filter string, err error) {
-	err = s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterJSON)
+) (filter []byte, err error) {
+	err = s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filter)
 	return
 }
 
 func (s *filterStatements) insertFilter(
-	ctx context.Context, filter string, localpart string,
-) (pos string, err error) {
-	var existingFilter string
+	ctx context.Context, filter []byte, localpart string,
+) (filterID string, err error) {
+	var existingFilterID string
 
 	// This can result in a race condition when two clients try to insert the
 	// same filter and localpart at the same time, however this is not a
 	// problem as both calls will result in the same filterID
-	filterJSON, errN := gomatrixserverlib.CanonicalJSON(filter)
-	if err {
+	filterJSON, err := gomatrixserverlib.CanonicalJSON(filter)
+	if err != nil {
 		return "", err
 	}
 
 	// Check if filter already exists in the database
-	err = s.selectFilterByContentStmt.QueryRowContext(ctx,
-		localpart, filterJSON).Scan(&existingFilter)
-	if existingFilter != "" {
-		return existingFilter, err
+	err = s.selectFilterIDByContentStmt.QueryRowContext(ctx,
+		localpart, filterJSON).Scan(&existingFilterID)
+	if err != nil {
+		return "", err
+	}
+	// If it does, return the existing ID
+	if len(existingFilterID) != 0 {
+		return existingFilterID, err
 	}
 
-	err = s.insertFilterStmt.QueryRowContext(ctx, filterJSON, localpart).Scan(&pos)
+	// Otherwise insert the filter and return the new ID
+	err = s.insertFilterStmt.QueryRowContext(ctx, filterJSON, localpart).
+		Scan(&filterID)
 	return
 }
