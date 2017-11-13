@@ -18,7 +18,7 @@ import "github.com/matrix-org/gomatrixserverlib"
 
 // CreateKeyRing creates and configures a KeyRing object.
 //
-// It creats the necessary key fetchers and collects them into a KeyRing
+// It creates the necessary key fetchers and collects them into a KeyRing
 // backed by the given KeyDatabase.
 func CreateKeyRing(client gomatrixserverlib.Client,
 	keyDB gomatrixserverlib.KeyDatabase) gomatrixserverlib.KeyRing {
