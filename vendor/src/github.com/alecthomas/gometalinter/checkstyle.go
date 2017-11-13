@@ -4,7 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"gopkg.in/alecthomas/kingpin.v3-unstable"
+	kingpin "gopkg.in/alecthomas/kingpin.v3-unstable"
 )
 
 type checkstyleOutput struct {

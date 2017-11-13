@@ -14,7 +14,7 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/alecthomas/kingpin.v3-unstable"
+	kingpin "gopkg.in/alecthomas/kingpin.v3-unstable"
 )
 
 var (
@@ -51,16 +51,17 @@ func setupFlags(app *kingpin.Application) {
 	app.Flag("line-length", "Report lines longer than N (using lll).").PlaceHolder("80").IntVar(&config.LineLength)
 	app.Flag("min-confidence", "Minimum confidence interval to pass to golint.").PlaceHolder(".80").FloatVar(&config.MinConfidence)
 	app.Flag("min-occurrences", "Minimum occurrences to pass to goconst.").PlaceHolder("3").IntVar(&config.MinOccurrences)
-	app.Flag("min-const-length", "Minimumum constant length.").PlaceHolder("3").IntVar(&config.MinConstLength)
+	app.Flag("min-const-length", "Minimum constant length.").PlaceHolder("3").IntVar(&config.MinConstLength)
 	app.Flag("dupl-threshold", "Minimum token sequence as a clone for dupl.").PlaceHolder("50").IntVar(&config.DuplThreshold)
 	app.Flag("sort", fmt.Sprintf("Sort output by any of %s.", strings.Join(sortKeys, ", "))).PlaceHolder("none").EnumsVar(&config.Sort, sortKeys...)
-	app.Flag("tests", "Include test files for linters that support this option").Short('t').BoolVar(&config.Test)
+	app.Flag("tests", "Include test files for linters that support this option.").Short('t').BoolVar(&config.Test)
 	app.Flag("deadline", "Cancel linters if they have not completed within this duration.").PlaceHolder("30s").DurationVar((*time.Duration)(&config.Deadline))
 	app.Flag("errors", "Only show errors.").BoolVar(&config.Errors)
 	app.Flag("json", "Generate structured JSON rather than standard line-based output.").BoolVar(&config.JSON)
 	app.Flag("checkstyle", "Generate checkstyle XML rather than standard line-based output.").BoolVar(&config.Checkstyle)
 	app.Flag("enable-gc", "Enable GC for linters (useful on large repositories).").BoolVar(&config.EnableGC)
 	app.Flag("aggregate", "Aggregate issues reported by several linters.").BoolVar(&config.Aggregate)
+	app.Flag("warn-unmatched-nolint", "Warn if a nolint directive is not matched with an issue.").BoolVar(&config.WarnUnmatchedDirective)
 	app.GetFlag("help").Short('h')
 }
 
@@ -200,6 +201,9 @@ Severity override map (default is "warning"):
 	paths := resolvePaths(*pathsArg, config.Skip)
 
 	linters := lintersFromConfig(config)
+	err := validateLinters(linters, config)
+	kingpin.FatalIfError(err, "")
+
 	issues, errch := runLinters(linters, paths, config.Concurrency, exclude, include)
 	status := 0
 	if config.JSON {
@@ -222,7 +226,7 @@ Severity override map (default is "warning"):
 func processConfig(config *Config) (include *regexp.Regexp, exclude *regexp.Regexp) {
 	tmpl, err := template.New("output").Parse(config.Format)
 	kingpin.FatalIfError(err, "invalid format %q", config.Format)
-	formatTemplate = tmpl
+	config.formatTemplate = tmpl
 
 	// Linters are by their very nature, short lived, so disable GC.
 	// Reduced (user) linting time on kingpin from 0.97s to 0.64s.
