@@ -74,7 +74,8 @@ func (d *Database) GetDevicesByLocalpart(
 // If no device ID is given one is generated.
 // Returns the device on success.
 func (d *Database) CreateDevice(
-	ctx context.Context, localpart string, deviceID *string, accessToken, displayName string,
+	ctx context.Context, localpart string, deviceID *string, accessToken string,
+	displayName *string,
 ) (dev *authtypes.Device, returnErr error) {
 	if deviceID != nil {
 		returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
@@ -113,10 +114,10 @@ func (d *Database) CreateDevice(
 // UpdateDevice updates the given device with the display name.
 // Returns SQL error if there are problems and nil on success.
 func (d *Database) UpdateDevice(
-	ctx context.Context, deviceID, displayName string,
+	ctx context.Context, localpart, deviceID string, displayName *string,
 ) error {
 	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		return d.devices.updateDeviceName(ctx, txn, deviceID, displayName)
+		return d.devices.updateDeviceName(ctx, txn, localpart, deviceID, displayName)
 	})
 }
 

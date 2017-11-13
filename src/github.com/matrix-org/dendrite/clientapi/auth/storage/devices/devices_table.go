@@ -63,7 +63,7 @@ const selectDevicesByLocalpartSQL = "" +
 	"SELECT device_id, display_name FROM device_devices WHERE localpart = $1"
 
 const updateDeviceNameSQL = "" +
-	"UPDATE device_devices SET display_name = $1 WHERE device_id = $2"
+	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
 
 const deleteDeviceSQL = "" +
 	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
@@ -116,7 +116,8 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 // Returns an error if the user already has a device with the given device ID.
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(
-	ctx context.Context, txn *sql.Tx, id, localpart, accessToken, displayName string,
+	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
+	displayName *string,
 ) (*authtypes.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := common.TxStmt(txn, s.insertDeviceStmt)
@@ -147,10 +148,10 @@ func (s *devicesStatements) deleteDevicesByLocalpart(
 }
 
 func (s *devicesStatements) updateDeviceName(
-	ctx context.Context, txn *sql.Tx, deviceID, displayName string,
+	ctx context.Context, txn *sql.Tx, localpart, deviceID string, displayName *string,
 ) error {
 	stmt := common.TxStmt(txn, s.updateDeviceNameStmt)
-	_, err := stmt.ExecContext(ctx, displayName, deviceID)
+	_, err := stmt.ExecContext(ctx, displayName, localpart, deviceID)
 	return err
 }
 

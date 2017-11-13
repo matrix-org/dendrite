@@ -37,7 +37,7 @@ type devicesJSON struct {
 }
 
 type deviceUpdateJSON struct {
-	DisplayName string `json:"display_name"`
+	DisplayName *string `json:"display_name"`
 }
 
 // GetDeviceByID handles /device/{deviceID}
@@ -113,7 +113,28 @@ func UpdateDeviceByID(
 		}
 	}
 
-	// TODO: who should be able to update device displayName?
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	ctx := req.Context()
+	dev, err := deviceDB.GetDeviceByID(ctx, localpart, deviceID)
+	if err == sql.ErrNoRows {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("Unknown device"),
+		}
+	} else if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if dev.UserID != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("device not owned by current user"),
+		}
+	}
 
 	defer req.Body.Close() // nolint: errcheck
 
@@ -123,9 +144,7 @@ func UpdateDeviceByID(
 		return httputil.LogThenError(req, err)
 	}
 
-	ctx := req.Context()
-
-	if err := deviceDB.UpdateDevice(ctx, deviceID, payload.DisplayName); err != nil {
+	if err := deviceDB.UpdateDevice(ctx, localpart, deviceID, payload.DisplayName); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 

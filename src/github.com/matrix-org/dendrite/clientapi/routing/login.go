@@ -38,9 +38,9 @@ type flow struct {
 }
 
 type passwordRequest struct {
-	User               string `json:"user"`
-	Password           string `json:"password"`
-	InitialDisplayName string `json:"initial_device_display_name"`
+	User               string  `json:"user"`
+	Password           string  `json:"password"`
+	InitialDisplayName *string `json:"initial_device_display_name"`
 }
 
 type loginResponse struct {

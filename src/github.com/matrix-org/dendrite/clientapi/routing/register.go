@@ -61,7 +61,7 @@ type registerRequest struct {
 	// user-interactive auth params
 	Auth authDict `json:"auth"`
 
-	InitialDisplayName string `json:"initial_device_display_name"`
+	InitialDisplayName *string `json:"initial_device_display_name"`
 }
 
 type authDict struct {
@@ -272,12 +272,10 @@ func LegacyRegister(
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
-		// TODO: does the legacy registration request support initial
-		// display name?
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "legacy registration")
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "legacy registration")
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, nil)
 	default:
 		return util.JSONResponse{
 			Code: 501,
@@ -290,7 +288,8 @@ func completeRegistration(
 	ctx context.Context,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
-	username, password, displayName string,
+	username, password string,
+	displayName *string,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
