@@ -2,17 +2,13 @@ package gomatrixserverlib
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/util"
 	"golang.org/x/crypto/ed25519"
 )
 
-// An FederationClient is a matrix federation client that adds
+// A FederationClient is a matrix federation client that adds
 // "Authorization: X-Matrix" headers to requests that need ed25519 signatures
 type FederationClient struct {
 	Client
@@ -34,10 +30,6 @@ func NewFederationClient(
 }
 
 func (ac *FederationClient) doRequest(ctx context.Context, r FederationRequest, resBody interface{}) error {
-	reqID := util.RandomString(12)
-	logger := util.GetLogger(ctx).WithField("server", r.fields.Destination).WithField("out.req.ID", reqID)
-	newCtx := util.ContextWithLogger(ctx, logger)
-
 	if err := r.Sign(ac.serverName, ac.serverKeyID, ac.serverPrivateKey); err != nil {
 		return err
 	}
@@ -47,52 +39,7 @@ func (ac *FederationClient) doRequest(ctx context.Context, r FederationRequest, 
 		return err
 	}
 
-	logger.Infof("Outgoing request %s %s", req.Method, req.URL)
-	res, err := ac.client.Do(req.WithContext(newCtx))
-	if res != nil {
-		defer res.Body.Close() // nolint: errcheck
-	}
-
-	if err != nil {
-		logger.Infof("Outgoing request %s %s failed with %v", req.Method, req.URL, err)
-		return err
-	}
-
-	contents, err := ioutil.ReadAll(res.Body)
-
-	logger.Infof("Response %d from %s %s", res.StatusCode, req.Method, req.URL)
-
-	if res.StatusCode/100 != 2 { // not 2xx
-		// Adapted from https://github.com/matrix-org/gomatrix/blob/master/client.go
-		var wrap error
-		var respErr gomatrix.RespError
-		if _ = json.Unmarshal(contents, &respErr); respErr.ErrCode != "" {
-			wrap = respErr
-		}
-
-		// If we failed to decode as RespError, don't just drop the HTTP body, include it in the
-		// HTTP error instead (e.g proxy errors which return HTML).
-		msg := "Failed to " + r.Method() + " JSON to " + r.RequestURI()
-		if wrap == nil {
-			msg = msg + ": " + string(contents)
-		}
-
-		return gomatrix.HTTPError{
-			Code:         res.StatusCode,
-			Message:      msg,
-			WrappedError: wrap,
-		}
-	}
-
-	if err != nil {
-		return err
-	}
-
-	if resBody == nil {
-		return nil
-	}
-
-	return json.Unmarshal(contents, resBody)
+	return ac.Client.DoRequestAndParseResponse(ctx, req, resBody)
 }
 
 var federationPathPrefix = "/_matrix/federation/v1"
