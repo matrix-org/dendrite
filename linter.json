@@ -4,7 +4,6 @@
     "Deadline": "5m",
     "Enable": [
         "vetshadow",
-        "gotype",
         "deadcode",
         "gocyclo",
         "golint",
