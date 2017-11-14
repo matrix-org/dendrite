@@ -80,7 +80,7 @@ func GetDevicesByLocalpart(
 	}
 
 	ctx := req.Context()
-	devices, err := deviceDB.GetDevicesByLocalpart(ctx, localpart)
+	deviceList, err := deviceDB.GetDevicesByLocalpart(ctx, localpart)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -88,7 +88,7 @@ func GetDevicesByLocalpart(
 
 	res := devicesJSON{}
 
-	for _, dev := range devices {
+	for _, dev := range deviceList {
 		res.Devices = append(res.Devices, deviceJSON{
 			DeviceID: dev.ID,
 			UserID:   dev.UserID,
