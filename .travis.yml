@@ -1,6 +1,12 @@
 language: go
 go:
  - 1.8
+ - 1.9
+
+env:
+- TEST_SUITE="lint"
+- TEST_SUITE="unit-test"
+- TEST_SUITE="integ-test"
 
 sudo: false
 
@@ -8,9 +14,6 @@ sudo: false
 dist: trusty
 
 addons:
-  apt:
-    packages:
-    - openssl
   postgresql: "9.5"
 
 services:
@@ -19,12 +22,7 @@ services:
 install:
  - go get github.com/constabulary/gb/...
 
-# Generate a self-signed X.509 certificate for TLS.
-before_script:
- - openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
-
 script:
- - ./scripts/install-local-kafka.sh
  - ./scripts/travis-test.sh
 
 notifications:

@@ -19,8 +19,5 @@ go build github.com/matrix-org/dendrite/cmd/...
 
 ./scripts/find-lint.sh
 
-echo "Double checking spelling..."
-misspell -error src *.md
-
 echo "Testing..."
 gb test
