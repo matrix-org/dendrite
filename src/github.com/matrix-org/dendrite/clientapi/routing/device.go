@@ -16,6 +16,7 @@ package routing
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -33,6 +34,10 @@ type deviceJSON struct {
 
 type devicesJSON struct {
 	Devices []deviceJSON `json:"devices"`
+}
+
+type deviceUpdateJSON struct {
+	DisplayName *string `json:"display_name"`
 }
 
 // GetDeviceByID handles /device/{deviceID}
@@ -93,5 +98,58 @@ func GetDevicesByLocalpart(
 	return util.JSONResponse{
 		Code: 200,
 		JSON: res,
+	}
+}
+
+// UpdateDeviceByID handles PUT on /devices/{deviceID}
+func UpdateDeviceByID(
+	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	deviceID string,
+) util.JSONResponse {
+	if req.Method != "PUT" {
+		return util.JSONResponse{
+			Code: 405,
+			JSON: jsonerror.NotFound("Bad Method"),
+		}
+	}
+
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	ctx := req.Context()
+	dev, err := deviceDB.GetDeviceByID(ctx, localpart, deviceID)
+	if err == sql.ErrNoRows {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("Unknown device"),
+		}
+	} else if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if dev.UserID != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("device not owned by current user"),
+		}
+	}
+
+	defer req.Body.Close() // nolint: errcheck
+
+	payload := deviceUpdateJSON{}
+
+	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := deviceDB.UpdateDevice(ctx, localpart, deviceID, payload.DisplayName); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
 	}
 }
