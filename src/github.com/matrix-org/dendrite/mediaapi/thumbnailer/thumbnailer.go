@@ -89,7 +89,7 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 }
 
 // getActiveThumbnailGeneration checks for active thumbnail generation
-func getActiveThumbnailGeneration(dst types.Path, config types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, logger *log.Entry) (isActive bool, busy bool, errorReturn error) {
+func getActiveThumbnailGeneration(dst types.Path, _ types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, logger *log.Entry) (isActive bool, busy bool, errorReturn error) {
 	// Check if there is active thumbnail generation.
 	activeThumbnailGeneration.Lock()
 	defer activeThumbnailGeneration.Unlock()
@@ -119,7 +119,7 @@ func getActiveThumbnailGeneration(dst types.Path, config types.ThumbnailSize, ac
 
 // broadcastGeneration broadcasts that thumbnail generation completed and the error to all waiting goroutines
 // Note: This should only be called by the owner of the activeThumbnailGenerationResult
-func broadcastGeneration(dst types.Path, activeThumbnailGeneration *types.ActiveThumbnailGeneration, config types.ThumbnailSize, errorReturn error, logger *log.Entry) {
+func broadcastGeneration(dst types.Path, activeThumbnailGeneration *types.ActiveThumbnailGeneration, _ types.ThumbnailSize, errorReturn error, logger *log.Entry) {
 	activeThumbnailGeneration.Lock()
 	defer activeThumbnailGeneration.Unlock()
 	if activeThumbnailGenerationResult, ok := activeThumbnailGeneration.PathToResult[string(dst)]; ok {
