@@ -1,6 +1,8 @@
 package regressiontests
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestUnparam(t *testing.T) {
 	t.Parallel()
@@ -133,9 +135,6 @@ func AsSliceElem(f FooType) []int {
 
 var SliceElems = []func(FooType) []int{AsSliceElem} `
 	expected := Issues{
-		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 103, Col: 16, Message: "parameter a is unused"},
-		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 103, Col: 27, Message: "parameter r is unused"},
-		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 123, Col: 18, Message: "parameter f is unused"},
 		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 13, Col: 19, Message: "parameter b is unused"},
 		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 20, Col: 20, Message: "parameter f is unused"},
 		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 34, Col: 37, Message: "parameter code is unused"},
@@ -146,6 +145,9 @@ var SliceElems = []func(FooType) []int{AsSliceElem} `
 		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 85, Col: 25, Message: "parameter s is unused"},
 		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 95, Col: 15, Message: "parameter a is unused"},
 		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 95, Col: 26, Message: "parameter b is unused"},
+		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 103, Col: 16, Message: "parameter a is unused"},
+		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 103, Col: 27, Message: "parameter r is unused"},
+		Issue{Linter: "unparam", Severity: "warning", Path: "test.go", Line: 123, Col: 18, Message: "parameter f is unused"},
 	}
 	ExpectIssues(t, "unparam", source, expected)
 }

@@ -5,27 +5,21 @@ import (
 	"strings"
 )
 
-type (
-	issueKey struct {
-		path      string
-		line, col int
-		message   string
-	}
-
-	multiIssue struct {
-		*Issue
-		linterNames []string
-	}
-)
-
-func maybeAggregateIssues(issues chan *Issue) chan *Issue {
-	if !config.Aggregate {
-		return issues
-	}
-	return aggregateIssues(issues)
+type issueKey struct {
+	path      string
+	line, col int
+	message   string
 }
 
-func aggregateIssues(issues chan *Issue) chan *Issue {
+type multiIssue struct {
+	*Issue
+	linterNames []string
+}
+
+// AggregateIssueChan reads issues from a channel, aggregates issues which have
+// the same file, line, vol, and message, and returns aggregated issues on
+// a new channel.
+func AggregateIssueChan(issues chan *Issue) chan *Issue {
 	out := make(chan *Issue, 1000000)
 	issueMap := make(map[issueKey]*multiIssue)
 	go func() {

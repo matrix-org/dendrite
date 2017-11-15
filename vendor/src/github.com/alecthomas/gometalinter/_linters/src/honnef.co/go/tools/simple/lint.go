@@ -6,9 +6,7 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
-	"math"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"honnef.co/go/tools/internal/sharedcheck"
@@ -42,7 +40,7 @@ func (c *Checker) Funcs() map[string]lint.Func {
 		"S1002": c.LintIfBoolCmp,
 		"S1003": c.LintStringsContains,
 		"S1004": c.LintBytesCompare,
-		"S1005": c.LintRanges,
+		"S1005": c.LintUnnecessaryBlank,
 		"S1006": c.LintForTrue,
 		"S1007": c.LintRegexpRaw,
 		"S1008": c.LintIfReturn,
@@ -51,22 +49,24 @@ func (c *Checker) Funcs() map[string]lint.Func {
 		"S1011": c.LintLoopAppend,
 		"S1012": c.LintTimeSince,
 		"S1013": c.LintSimplerReturn,
-		"S1014": c.LintReceiveIntoBlank,
-		"S1015": c.LintFormatInt,
+		"S1014": nil,
+		"S1015": nil,
 		"S1016": c.LintSimplerStructConversion,
 		"S1017": c.LintTrim,
 		"S1018": c.LintLoopSlide,
 		"S1019": c.LintMakeLenCap,
 		"S1020": c.LintAssertNotNil,
 		"S1021": c.LintDeclareAssign,
-		"S1022": c.LintBlankOK,
+		"S1022": nil,
 		"S1023": c.LintRedundantBreak,
 		"S1024": c.LintTimeUntil,
 		"S1025": c.LintRedundantSprintf,
 		"S1026": c.LintStringCopy,
-		"S1027": c.LintRedundantReturn,
+		"S1027": nil,
 		"S1028": c.LintErrorsNewSprintf,
 		"S1029": c.LintRangeStringRunes,
+		"S1030": c.LintBytesBufferConversions,
+		"S1031": c.LintNilCheckAroundRange,
 	}
 }
 
@@ -247,6 +247,36 @@ func (c *Checker) LintIfBoolCmp(j *lint.Job) {
 	}
 }
 
+func (c *Checker) LintBytesBufferConversions(j *lint.Job) {
+	fn := func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok || len(call.Args) != 1 {
+			return true
+		}
+
+		argCall, ok := call.Args[0].(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := argCall.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		typ := j.Program.Info.TypeOf(call.Fun)
+		if typ == types.Universe.Lookup("string").Type() && j.IsCallToAST(call.Args[0], "(*bytes.Buffer).Bytes") {
+			j.Errorf(call, "should use %v.String() instead of %v", j.Render(sel.X), j.Render(call))
+		} else if typ, ok := typ.(*types.Slice); ok && typ.Elem() == types.Universe.Lookup("byte").Type() && j.IsCallToAST(call.Args[0], "(*bytes.Buffer).String") {
+			j.Errorf(call, "should use %v.Bytes() instead of %v", j.Render(sel.X), j.Render(call))
+		}
+
+		return true
+	}
+	for _, f := range c.filterGenerated(j.Program.Files) {
+		ast.Inspect(f, fn)
+	}
+}
+
 func (c *Checker) LintStringsContains(j *lint.Job) {
 	// map of value to token to bool value
 	allowed := map[int64]map[token.Token]bool{
@@ -345,23 +375,6 @@ func (c *Checker) LintBytesCompare(j *lint.Job) {
 			prefix = "!"
 		}
 		j.Errorf(node, "should use %sbytes.Equal(%s) instead", prefix, args)
-		return true
-	}
-	for _, f := range c.filterGenerated(j.Program.Files) {
-		ast.Inspect(f, fn)
-	}
-}
-
-func (c *Checker) LintRanges(j *lint.Job) {
-	fn := func(node ast.Node) bool {
-		rs, ok := node.(*ast.RangeStmt)
-		if !ok {
-			return true
-		}
-		if lint.IsBlank(rs.Key) && (rs.Value == nil || lint.IsBlank(rs.Value)) {
-			j.Errorf(rs.Key, "should omit values from range; this loop is equivalent to `for range ...`")
-		}
-
 		return true
 	}
 	for _, f := range c.filterGenerated(j.Program.Files) {
@@ -941,14 +954,44 @@ func (c *Checker) LintSimplerReturn(j *lint.Job) {
 	}
 }
 
-func (c *Checker) LintReceiveIntoBlank(j *lint.Job) {
-	fn := func(node ast.Node) bool {
+func (c *Checker) LintUnnecessaryBlank(j *lint.Job) {
+	fn1 := func(node ast.Node) {
+		assign, ok := node.(*ast.AssignStmt)
+		if !ok {
+			return
+		}
+		if len(assign.Lhs) != 2 || len(assign.Rhs) != 1 {
+			return
+		}
+		if !lint.IsBlank(assign.Lhs[1]) {
+			return
+		}
+		switch rhs := assign.Rhs[0].(type) {
+		case *ast.IndexExpr:
+			// The type-checker should make sure that it's a map, but
+			// let's be safe.
+			if _, ok := j.Program.Info.TypeOf(rhs.X).Underlying().(*types.Map); !ok {
+				return
+			}
+		case *ast.UnaryExpr:
+			if rhs.Op != token.ARROW {
+				return
+			}
+		default:
+			return
+		}
+		cp := *assign
+		cp.Lhs = cp.Lhs[0:1]
+		j.Errorf(assign, "should write %s instead of %s", j.Render(&cp), j.Render(assign))
+	}
+
+	fn2 := func(node ast.Node) {
 		stmt, ok := node.(*ast.AssignStmt)
 		if !ok {
-			return true
+			return
 		}
 		if len(stmt.Lhs) != len(stmt.Rhs) {
-			return true
+			return
 		}
 		for i, lh := range stmt.Lhs {
 			rh := stmt.Rhs[i]
@@ -964,101 +1007,22 @@ func (c *Checker) LintReceiveIntoBlank(j *lint.Job) {
 			}
 			j.Errorf(lh, "'_ = <-ch' can be simplified to '<-ch'")
 		}
-		return true
 	}
-	for _, f := range c.filterGenerated(j.Program.Files) {
-		ast.Inspect(f, fn)
-	}
-}
 
-func (c *Checker) LintFormatInt(j *lint.Job) {
-	checkBasic := func(v ast.Expr) bool {
-		typ, ok := j.Program.Info.TypeOf(v).(*types.Basic)
+	fn3 := func(node ast.Node) {
+		rs, ok := node.(*ast.RangeStmt)
 		if !ok {
-			return false
+			return
 		}
-		return typ.Kind() == types.Int
-	}
-	checkConst := func(v *ast.Ident) bool {
-		c, ok := j.Program.Info.ObjectOf(v).(*types.Const)
-		if !ok {
-			return false
+		if lint.IsBlank(rs.Key) && (rs.Value == nil || lint.IsBlank(rs.Value)) {
+			j.Errorf(rs.Key, "should omit values from range; this loop is equivalent to `for range ...`")
 		}
-		if c.Val().Kind() != constant.Int {
-			return false
-		}
-		i, _ := constant.Int64Val(c.Val())
-		return i <= math.MaxInt32
-	}
-	checkConstStrict := func(v *ast.Ident) bool {
-		if !checkConst(v) {
-			return false
-		}
-		basic, ok := j.Program.Info.ObjectOf(v).(*types.Const).Type().(*types.Basic)
-		return ok && basic.Kind() == types.UntypedInt
 	}
 
 	fn := func(node ast.Node) bool {
-		call, ok := node.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		if !j.IsCallToAST(call, "strconv.FormatInt") {
-			return true
-		}
-		if len(call.Args) != 2 {
-			return true
-		}
-		if lit, ok := call.Args[1].(*ast.BasicLit); !ok || lit.Value != "10" {
-			return true
-		}
-
-		matches := false
-		switch v := call.Args[0].(type) {
-		case *ast.CallExpr:
-			if len(v.Args) != 1 {
-				return true
-			}
-			ident, ok := v.Fun.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			obj, ok := j.Program.Info.ObjectOf(ident).(*types.TypeName)
-			if !ok || obj.Parent() != types.Universe || obj.Name() != "int64" {
-				return true
-			}
-
-			switch vv := v.Args[0].(type) {
-			case *ast.BasicLit:
-				i, _ := strconv.ParseInt(vv.Value, 10, 64)
-				if i <= math.MaxInt32 {
-					matches = true
-				}
-			case *ast.Ident:
-				if checkConst(vv) || checkBasic(v.Args[0]) {
-					matches = true
-				}
-			default:
-				if checkBasic(v.Args[0]) {
-					matches = true
-				}
-			}
-		case *ast.BasicLit:
-			if v.Kind != token.INT {
-				return true
-			}
-			i, _ := strconv.ParseInt(v.Value, 10, 64)
-			if i <= math.MaxInt32 {
-				matches = true
-			}
-		case *ast.Ident:
-			if checkConstStrict(v) {
-				matches = true
-			}
-		}
-		if matches {
-			j.Errorf(call, "should use strconv.Itoa instead of strconv.FormatInt")
-		}
+		fn1(node)
+		fn2(node)
+		fn3(node)
 		return true
 	}
 	for _, f := range c.filterGenerated(j.Program.Files) {
@@ -1067,23 +1031,34 @@ func (c *Checker) LintFormatInt(j *lint.Job) {
 }
 
 func (c *Checker) LintSimplerStructConversion(j *lint.Job) {
+	var skip ast.Node
 	fn := func(node ast.Node) bool {
+		// Do not suggest type conversion between pointers
+		if unary, ok := node.(*ast.UnaryExpr); ok && unary.Op == token.AND {
+			if lit, ok := unary.X.(*ast.CompositeLit); ok {
+				skip = lit
+			}
+			return true
+		}
+
+		if node == skip {
+			return true
+		}
+
 		lit, ok := node.(*ast.CompositeLit)
 		if !ok {
 			return true
 		}
-		typ1 := j.Program.Info.TypeOf(lit.Type)
+		typ1, _ := j.Program.Info.TypeOf(lit.Type).(*types.Named)
 		if typ1 == nil {
 			return true
 		}
-		// FIXME support pointer to struct
 		s1, ok := typ1.Underlying().(*types.Struct)
 		if !ok {
 			return true
 		}
 
-		n := s1.NumFields()
-		var typ2 types.Type
+		var typ2 *types.Named
 		var ident *ast.Ident
 		getSelType := func(expr ast.Expr) (types.Type, *ast.Ident, bool) {
 			sel, ok := expr.(*ast.SelectorExpr)
@@ -1100,8 +1075,10 @@ func (c *Checker) LintSimplerStructConversion(j *lint.Job) {
 		if len(lit.Elts) == 0 {
 			return true
 		}
+		if s1.NumFields() != len(lit.Elts) {
+			return true
+		}
 		for i, elt := range lit.Elts {
-			n--
 			var t types.Type
 			var id *ast.Ident
 			var ok bool
@@ -1129,21 +1106,27 @@ func (c *Checker) LintSimplerStructConversion(j *lint.Job) {
 			if !ok {
 				return true
 			}
-			if typ2 != nil && typ2 != t {
-				return true
-			}
+			// All fields must be initialized from the same object
 			if ident != nil && ident.Obj != id.Obj {
 				return true
 			}
-			typ2 = t
+			typ2, _ = t.(*types.Named)
+			if typ2 == nil {
+				return true
+			}
 			ident = id
 		}
 
-		if n != 0 {
+		if typ2 == nil {
 			return true
 		}
 
-		if typ2 == nil {
+		if typ1.Obj().Pkg() != typ2.Obj().Pkg() {
+			// Do not suggest type conversions between different
+			// packages. Types in different packages might only match
+			// by coincidence. Furthermore, if the dependency ever
+			// adds more fields to its type, it could break the code
+			// that relies on the type conversion to work.
 			return true
 		}
 
@@ -1157,7 +1140,8 @@ func (c *Checker) LintSimplerStructConversion(j *lint.Job) {
 		if !structsIdentical(s1, s2) {
 			return true
 		}
-		j.Errorf(node, "should use type conversion instead of struct literal")
+		j.Errorf(node, "should convert %s (type %s) to %s instead of using struct literal",
+			ident.Name, typ2.Obj().Name(), typ1.Obj().Name())
 		return true
 	}
 	for _, f := range c.filterGenerated(j.Program.Files) {
@@ -1598,56 +1582,52 @@ func (c *Checker) LintDeclareAssign(j *lint.Job) {
 	}
 }
 
-func (c *Checker) LintBlankOK(j *lint.Job) {
-	fn := func(node ast.Node) bool {
-		assign, ok := node.(*ast.AssignStmt)
-		if !ok {
-			return true
-		}
-		if len(assign.Lhs) != 2 || len(assign.Rhs) != 1 {
-			return true
-		}
-		if !lint.IsBlank(assign.Lhs[1]) {
-			return true
-		}
-		switch rhs := assign.Rhs[0].(type) {
-		case *ast.IndexExpr:
-			// The type-checker should make sure that it's a map, but
-			// let's be safe.
-			if _, ok := j.Program.Info.TypeOf(rhs.X).Underlying().(*types.Map); !ok {
-				return true
-			}
-		case *ast.UnaryExpr:
-			if rhs.Op != token.ARROW {
-				return true
-			}
-		default:
-			return true
-		}
-		cp := *assign
-		cp.Lhs = cp.Lhs[0:1]
-		j.Errorf(assign, "should write %s instead of %s", j.Render(&cp), j.Render(assign))
-		return true
-	}
-	for _, f := range c.filterGenerated(j.Program.Files) {
-		ast.Inspect(f, fn)
-	}
-}
-
 func (c *Checker) LintRedundantBreak(j *lint.Job) {
-	fn := func(node ast.Node) bool {
+	fn1 := func(node ast.Node) {
 		clause, ok := node.(*ast.CaseClause)
 		if !ok {
-			return true
+			return
 		}
 		if len(clause.Body) < 2 {
-			return true
+			return
 		}
 		branch, ok := clause.Body[len(clause.Body)-1].(*ast.BranchStmt)
 		if !ok || branch.Tok != token.BREAK || branch.Label != nil {
-			return true
+			return
 		}
 		j.Errorf(branch, "redundant break statement")
+		return
+	}
+	fn2 := func(node ast.Node) {
+		var ret *ast.FieldList
+		var body *ast.BlockStmt
+		switch x := node.(type) {
+		case *ast.FuncDecl:
+			ret = x.Type.Results
+			body = x.Body
+		case *ast.FuncLit:
+			ret = x.Type.Results
+			body = x.Body
+		default:
+			return
+		}
+		// if the func has results, a return can't be redundant.
+		// similarly, if there are no statements, there can be
+		// no return.
+		if ret != nil || body == nil || len(body.List) < 1 {
+			return
+		}
+		rst, ok := body.List[len(body.List)-1].(*ast.ReturnStmt)
+		if !ok {
+			return
+		}
+		// we don't need to check rst.Results as we already
+		// checked x.Type.Results to be nil.
+		j.Errorf(rst, "redundant return statement")
+	}
+	fn := func(node ast.Node) bool {
+		fn1(node)
+		fn2(node)
 		return true
 	}
 	for _, f := range c.filterGenerated(j.Program.Files) {
@@ -1797,40 +1777,6 @@ func (c *Checker) LintStringCopy(j *lint.Job) {
 	}
 }
 
-func (c *Checker) LintRedundantReturn(j *lint.Job) {
-	fn := func(node ast.Node) bool {
-		var ret *ast.FieldList
-		var body *ast.BlockStmt
-		switch x := node.(type) {
-		case *ast.FuncDecl:
-			ret = x.Type.Results
-			body = x.Body
-		case *ast.FuncLit:
-			ret = x.Type.Results
-			body = x.Body
-		default:
-			return true
-		}
-		// if the func has results, a return can't be redundant.
-		// similarly, if there are no statements, there can be
-		// no return.
-		if ret != nil || body == nil || len(body.List) < 1 {
-			return true
-		}
-		rst, ok := body.List[len(body.List)-1].(*ast.ReturnStmt)
-		if !ok {
-			return true
-		}
-		// we don't need to check rst.Results as we already
-		// checked x.Type.Results to be nil.
-		j.Errorf(rst, "redundant return statement")
-		return true
-	}
-	for _, f := range c.filterGenerated(j.Program.Files) {
-		ast.Inspect(f, fn)
-	}
-}
-
 func (c *Checker) LintErrorsNewSprintf(j *lint.Job) {
 	fn := func(node ast.Node) bool {
 		if !j.IsCallToAST(node, "errors.New") {
@@ -1850,4 +1796,46 @@ func (c *Checker) LintErrorsNewSprintf(j *lint.Job) {
 
 func (c *Checker) LintRangeStringRunes(j *lint.Job) {
 	sharedcheck.CheckRangeStringRunes(c.nodeFns, j)
+}
+
+func (c *Checker) LintNilCheckAroundRange(j *lint.Job) {
+	fn := func(node ast.Node) bool {
+		ifstmt, ok := node.(*ast.IfStmt)
+		if !ok {
+			return true
+		}
+
+		cond, ok := ifstmt.Cond.(*ast.BinaryExpr)
+		if !ok {
+			return true
+		}
+
+		if cond.Op != token.NEQ || !j.IsNil(cond.Y) || len(ifstmt.Body.List) != 1 {
+			return true
+		}
+
+		loop, ok := ifstmt.Body.List[0].(*ast.RangeStmt)
+		if !ok {
+			return true
+		}
+		ifXIdent, ok := cond.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		rangeXIdent, ok := loop.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		if ifXIdent.Obj != rangeXIdent.Obj {
+			return true
+		}
+		switch j.Program.Info.TypeOf(rangeXIdent).(type) {
+		case *types.Slice, *types.Map:
+			j.Errorf(node, "unnecessary nil check around range")
+		}
+		return true
+	}
+	for _, f := range c.filterGenerated(j.Program.Files) {
+		ast.Inspect(f, fn)
+	}
 }

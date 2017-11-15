@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 )
@@ -9,6 +10,29 @@ import (
 const MaxCommandBytes = 32000
 
 type partitionStrategy func([]string, []string) ([][]string, error)
+
+func (ps *partitionStrategy) UnmarshalJSON(raw []byte) error {
+	var strategyName string
+	if err := json.Unmarshal(raw, &strategyName); err != nil {
+		return err
+	}
+
+	switch strategyName {
+	case "directories":
+		*ps = partitionPathsAsDirectories
+	case "files":
+		*ps = partitionPathsAsFiles
+	case "packages":
+		*ps = partitionPathsAsPackages
+	case "files-by-package":
+		*ps = partitionPathsAsFilesGroupedByPackage
+	case "single-directory":
+		*ps = partitionPathsByDirectory
+	default:
+		return fmt.Errorf("unknown parition strategy %s", strategyName)
+	}
+	return nil
+}
 
 func pathsToFileGlobs(paths []string) ([]string, error) {
 	filePaths := []string{}
@@ -22,7 +46,7 @@ func pathsToFileGlobs(paths []string) ([]string, error) {
 	return filePaths, nil
 }
 
-func partitionToMaxArgSize(cmdArgs []string, paths []string) ([][]string, error) {
+func partitionPathsAsDirectories(cmdArgs []string, paths []string) ([][]string, error) {
 	return partitionToMaxSize(cmdArgs, paths, MaxCommandBytes), nil
 }
 
@@ -72,15 +96,15 @@ func (p *sizePartitioner) end() [][]string {
 	return p.parts
 }
 
-func partitionToMaxArgSizeWithFileGlobs(cmdArgs []string, paths []string) ([][]string, error) {
+func partitionPathsAsFiles(cmdArgs []string, paths []string) ([][]string, error) {
 	filePaths, err := pathsToFileGlobs(paths)
 	if err != nil || len(filePaths) == 0 {
 		return nil, err
 	}
-	return partitionToMaxArgSize(cmdArgs, filePaths)
+	return partitionPathsAsDirectories(cmdArgs, filePaths)
 }
 
-func partitionToPackageFileGlobs(cmdArgs []string, paths []string) ([][]string, error) {
+func partitionPathsAsFilesGroupedByPackage(cmdArgs []string, paths []string) ([][]string, error) {
 	parts := [][]string{}
 	for _, path := range paths {
 		filePaths, err := pathsToFileGlobs([]string{path})
@@ -95,12 +119,12 @@ func partitionToPackageFileGlobs(cmdArgs []string, paths []string) ([][]string, 
 	return parts, nil
 }
 
-func partitionToMaxArgSizeWithPackagePaths(cmdArgs []string, paths []string) ([][]string, error) {
+func partitionPathsAsPackages(cmdArgs []string, paths []string) ([][]string, error) {
 	packagePaths, err := pathsToPackagePaths(paths)
 	if err != nil || len(packagePaths) == 0 {
 		return nil, err
 	}
-	return partitionToMaxArgSize(cmdArgs, packagePaths)
+	return partitionPathsAsDirectories(cmdArgs, packagePaths)
 }
 
 func pathsToPackagePaths(paths []string) ([]string, error) {
@@ -128,4 +152,12 @@ func packageNameFromPath(path string) (string, error) {
 		return rel, nil
 	}
 	return "", fmt.Errorf("%s not in GOPATH", path)
+}
+
+func partitionPathsByDirectory(cmdArgs []string, paths []string) ([][]string, error) {
+	parts := [][]string{}
+	for _, path := range paths {
+		parts = append(parts, append(cmdArgs, path))
+	}
+	return parts, nil
 }
