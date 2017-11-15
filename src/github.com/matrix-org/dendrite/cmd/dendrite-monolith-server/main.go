@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
 	"net/http"
 	"os"
@@ -199,7 +200,21 @@ func (m *monolith) setupFederation() {
 
 func (m *monolith) setupKafka() {
 	if m.cfg.Kafka.UseNaffka {
-		naff, err := naffka.New(&naffka.MemoryDatabase{})
+		db, err := sql.Open("postgres", string(m.cfg.Database.Naffka))
+		if err != nil {
+			log.WithFields(log.Fields{
+				log.ErrorKey: err,
+			}).Panic("Failed to open naffka database")
+		}
+
+		naffkaDB, err := naffka.NewPostgresqlDatabase(db)
+		if err != nil {
+			log.WithFields(log.Fields{
+				log.ErrorKey: err,
+			}).Panic("Failed to setup naffka database")
+		}
+
+		naff, err := naffka.New(naffkaDB)
 		if err != nil {
 			log.WithFields(log.Fields{
 				log.ErrorKey: err,
