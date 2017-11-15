@@ -101,7 +101,10 @@ func CreateRoom(req *http.Request, device *authtypes.Device,
 
 		queryReq := api.QueryReserveRoomIDRequest{RoomID: checkRoomID}
 		var queryResp api.QueryReserveRoomIDResponse
-		queryAPI.QueryReserveRoomID(req.Context(), &queryReq, &queryResp)
+		err := queryAPI.QueryReserveRoomID(req.Context(), &queryReq, &queryResp)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
 
 		if queryResp.Success {
 			roomID = checkRoomID
