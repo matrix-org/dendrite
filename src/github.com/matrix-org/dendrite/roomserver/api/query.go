@@ -209,6 +209,13 @@ type RoomserverQueryAPI interface {
 		request *QueryServerAllowedToSeeEventRequest,
 		response *QueryServerAllowedToSeeEventResponse,
 	) error
+
+	// Query if a room ID is available and reserve it.
+	QueryReserveRoomID(
+		ctx context.Context,
+		request *QueryReserveRoomIDRequest,
+		response *QueryReserveRoomIDResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.

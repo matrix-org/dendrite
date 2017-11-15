@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -33,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
@@ -90,10 +90,24 @@ type fledglingEvent struct {
 func CreateRoom(req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
+	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
-	// TODO (#267): Check room ID doesn't clash with an existing one, and we
-	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	// Generate a room ID and reserve it.
+	// Keep trying until we have one which is unused.
+	var roomID string
+	for roomID == "" {
+		checkRoomID := util.RandomString(16)
+		checkRoomID = fmt.Sprintf("!%s:%s", checkRoomID, cfg.Matrix.ServerName)
+
+		queryReq := api.QueryReserveRoomIDRequest{RoomID: checkRoomID}
+		var queryResp api.QueryReserveRoomIDResponse
+		queryAPI.QueryReserveRoomID(req.Context(), &queryReq, &queryResp)
+
+		if queryResp.Success {
+			roomID = checkRoomID
+		}
+	}
+
 	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI)
 }
 
