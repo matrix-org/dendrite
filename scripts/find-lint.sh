@@ -14,7 +14,7 @@
 set -eu
 
 export GOPATH="$(pwd):$(pwd)/vendor"
-export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
+export PATH="$PATH:$(pwd)/bin"
 
 args=""
 if [ ${1:-""} = "fast" ]

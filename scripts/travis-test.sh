@@ -13,7 +13,7 @@ export GOGC=400
 export DENDRITE_LINT_DISABLE_GC=1
 
 export GOPATH="$(pwd):$(pwd)/vendor"
-export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
+export PATH="$PATH:$(pwd)/bin"
 
 if [ "${TEST_SUITE:-lint}" == "lint" ]; then
     ./scripts/find-lint.sh

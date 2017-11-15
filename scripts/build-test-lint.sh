@@ -5,7 +5,7 @@
 set -eu
 
 export GOPATH="$(pwd):$(pwd)/vendor"
-export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
+export PATH="$PATH:$(pwd)/bin"
 
 echo "Checking that it builds"
 gb build
