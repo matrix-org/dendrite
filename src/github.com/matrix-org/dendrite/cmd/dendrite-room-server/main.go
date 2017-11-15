@@ -20,7 +20,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/alias"
@@ -28,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
