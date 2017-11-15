@@ -79,11 +79,7 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	// At this point we've already committed the alias to the database so we
 	// shouldn't cancel this request.
 	// TODO: Ensure that we send unsent events when if server restarts.
-	if err := r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID); err != nil {
-		return err
-	}
-
-	return nil
+	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID)
 }
 
 // GetAliasRoomID implements api.RoomserverAliasAPI
@@ -123,11 +119,7 @@ func (r *RoomserverAliasAPI) RemoveRoomAlias(
 	// At this point we've already committed the alias to the database so we
 	// shouldn't cancel this request.
 	// TODO: Ensure that we send unsent events when if server restarts.
-	if err := r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID); err != nil {
-		return err
-	}
-
-	return nil
+	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID)
 }
 
 type roomAliasesContent struct {

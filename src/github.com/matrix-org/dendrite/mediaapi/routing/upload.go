@@ -22,7 +22,6 @@ import (
 	"net/url"
 	"path"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
@@ -31,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // uploadRequest metadata included in or derivable from an upload request
@@ -161,14 +161,10 @@ func (r *uploadRequest) doUpload(
 		}
 	}
 
-	if resErr := r.storeFileAndMetadata(
+	return r.storeFileAndMetadata(
 		ctx, tmpDir, cfg.Media.AbsBasePath, db, cfg.Media.ThumbnailSizes,
 		activeThumbnailGeneration, cfg.Media.MaxThumbnailGenerators,
-	); resErr != nil {
-		return resErr
-	}
-
-	return nil
+	)
 }
 
 // Validate validates the uploadRequest fields
