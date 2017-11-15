@@ -54,11 +54,7 @@ func (d *Database) prepare() error {
 		return err
 	}
 
-	if err = d.PartitionOffsetStatements.Prepare(d.db, "federationsender"); err != nil {
-		return err
-	}
-
-	return nil
+	return d.PartitionOffsetStatements.Prepare(d.db, "federationsender")
 }
 
 // UpdateRoom updates the joined hosts for a room and returns what the joined
