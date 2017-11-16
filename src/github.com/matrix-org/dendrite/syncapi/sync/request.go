@@ -70,6 +70,8 @@ func getTimeout(timeoutMS string) time.Duration {
 	return time.Duration(i) * time.Millisecond
 }
 
+// getSyncStreamPosition tries to pass a string taken from the API to a stream
+// position. If the string is empty then (nil, nil) is returned.
 func getSyncStreamPosition(since string) (*types.StreamPosition, error) {
 	if since == "" {
 		return nil, nil
