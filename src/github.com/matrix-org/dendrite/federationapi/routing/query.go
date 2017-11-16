@@ -16,7 +16,8 @@ package routing
 
 import (
 	"net/http"
-	
+	"fmt"
+
 	"github.com/matrix-org/util"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -26,16 +27,15 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// RoomAliasToID converts the queried alias into a room ID and returns it
 func RoomAliasToID (
 	httpReq *http.Request,
 	federation *gomatrixserverlib.FederationClient,
-	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
 	aliasAPI api.RoomserverAliasAPI,
-	query api.RoomserverQueryAPI,
 	roomAlias string,
 ) util.JSONResponse {
-	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
+	_, domain, err := gomatrixserverlib.SplitID('#', httpReq.FormValue("alias"))
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
@@ -52,7 +52,7 @@ var resp gomatrixserverlib.RespDirectory
 			return httputil.LogThenError(httpReq, err)
 		}
 
-		if len(queryRes.RoomID) > 0 {
+		if (queryRes.RoomID == "") {
 			// TODO: List servers that are aware of this room alias
 			resp = gomatrixserverlib.RespDirectory{
 				RoomID:  queryRes.RoomID,
@@ -62,7 +62,7 @@ var resp gomatrixserverlib.RespDirectory
 			// If the response doesn't contain a non-empty string, return an error
 			return util.JSONResponse{
 				Code: 404,
-				JSON: jsonerror.NotFound("Room alias " + roomAlias + " not found."),
+				JSON: jsonerror.NotFound(fmt.Sprintf("Room alias %s not found", roomAlias)),
 			}
 		}
 	} else {
@@ -86,5 +86,5 @@ var resp gomatrixserverlib.RespDirectory
 	return util.JSONResponse{
 		Code: 200,
 		JSON: resp,
-}
+	}
 }
