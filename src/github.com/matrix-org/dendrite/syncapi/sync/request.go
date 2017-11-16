@@ -34,7 +34,7 @@ type syncRequest struct {
 	userID        string
 	limit         int
 	timeout       time.Duration
-	since         types.StreamPosition
+	since         *types.StreamPosition
 	wantFullState bool
 	log           *log.Entry
 }
@@ -70,13 +70,14 @@ func getTimeout(timeoutMS string) time.Duration {
 	return time.Duration(i) * time.Millisecond
 }
 
-func getSyncStreamPosition(since string) (types.StreamPosition, error) {
+func getSyncStreamPosition(since string) (*types.StreamPosition, error) {
 	if since == "" {
-		return types.StreamPosition(0), nil
+		return nil, nil
 	}
 	i, err := strconv.Atoi(since)
 	if err != nil {
-		return types.StreamPosition(0), err
+		return nil, err
 	}
-	return types.StreamPosition(i), nil
+	token := types.StreamPosition(i)
+	return &token, nil
 }

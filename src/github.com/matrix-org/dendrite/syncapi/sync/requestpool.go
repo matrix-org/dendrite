@@ -64,7 +64,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	currPos := rp.notifier.CurrentPosition()
 
 	// If this is an initial sync or timeout=0 we return immediately
-	if syncReq.since == types.StreamPosition(0) || syncReq.timeout == 0 {
+	if syncReq.since == nil || syncReq.timeout == 0 {
 		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			return httputil.LogThenError(req, err)
@@ -93,7 +93,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		case <-timer.C:
 			return util.JSONResponse{
 				Code: 200,
-				JSON: types.NewResponse(syncReq.since),
+				JSON: types.NewResponse(currPos),
 			}
 		// Or for the request to be cancelled
 		case <-req.Context().Done():
@@ -121,10 +121,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (res *types.Response, err error) {
 	// TODO: handle ignored users
-	if req.since == types.StreamPosition(0) {
+	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, req.userID, req.limit)
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.userID, req.since, currentPos, req.limit)
+		res, err = rp.db.IncrementalSync(req.ctx, req.userID, *req.since, currentPos, req.limit)
 	}
 
 	if err != nil {
@@ -148,7 +148,7 @@ func (rp *RequestPool) appendAccountData(
 		return nil, err
 	}
 
-	if req.since == types.StreamPosition(0) {
+	if req.since == nil {
 		// If this is the initial sync, we don't need to check if a data has
 		// already been sent. Instead, we send the whole batch.
 		var global []gomatrixserverlib.ClientEvent
@@ -170,7 +170,7 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, req.since, currentPos)
+	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, *req.since, currentPos)
 	if err != nil {
 		return nil, err
 	}
