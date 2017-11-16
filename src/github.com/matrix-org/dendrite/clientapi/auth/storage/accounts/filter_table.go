@@ -92,11 +92,11 @@ func (s *filterStatements) insertFilter(
 	// Check if filter already exists in the database
 	err = s.selectFilterIDByContentStmt.QueryRowContext(ctx,
 		localpart, filterJSON).Scan(&existingFilterID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return "", err
 	}
 	// If it does, return the existing ID
-	if len(existingFilterID) != 0 {
+	if existingFilterID != "" {
 		return existingFilterID, err
 	}
 
