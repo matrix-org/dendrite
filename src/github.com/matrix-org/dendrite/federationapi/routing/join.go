@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -37,8 +36,6 @@ func MakeJoin(
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
-	now time.Time,
-	keys gomatrixserverlib.KeyRing,
 	roomID, userID string,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
@@ -105,7 +102,6 @@ func SendJoin(
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
-	now time.Time,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
@@ -147,7 +143,7 @@ func SendJoin(
 		Message:    event.Redact().JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
-	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
+	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
