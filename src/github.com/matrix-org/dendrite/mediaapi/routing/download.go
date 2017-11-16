@@ -28,7 +28,6 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
@@ -38,6 +37,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const mediaIDCharacters = "A-Za-z0-9_=-"
