@@ -17,6 +17,7 @@
         "errcheck",
         "vet",
         "megacheck",
+	"gofmt",
         "goconst"
     ]
 }
