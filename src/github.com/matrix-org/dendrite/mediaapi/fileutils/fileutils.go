@@ -25,9 +25,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	log "github.com/sirupsen/logrus"
 )
 
 // GetPathFromBase64Hash evaluates the path to a media file from its Base64Hash

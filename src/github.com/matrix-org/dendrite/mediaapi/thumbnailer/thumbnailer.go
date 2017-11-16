@@ -22,10 +22,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	log "github.com/sirupsen/logrus"
 )
 
 type thumbnailFitness struct {

@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v2"
 

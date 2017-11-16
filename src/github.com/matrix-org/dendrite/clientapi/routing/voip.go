@@ -24,16 +24,16 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 )
 
 type turnServerResponse struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	URIs []string `json:"uris"`
-	TTL int `json:"ttl"`
+	Username string   `json:"username"`
+	Password string   `json:"password"`
+	URIs     []string `json:"uris"`
+	TTL      int      `json:"ttl"`
 }
 
 // RequestTurnServer implements:
@@ -54,7 +54,7 @@ func RequestTurnServer(req *http.Request, device *authtypes.Device, cfg config.D
 
 	resp := turnServerResponse{
 		URIs: turnConfig.URIs,
-		TTL: int(duration.Seconds()),
+		TTL:  int(duration.Seconds()),
 	}
 
 	if turnConfig.SharedSecret != "" {
