@@ -54,7 +54,7 @@ const insertDeviceSQL = "" +
 	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name) VALUES ($1, $2, $3, $4, $5)"
 
 const selectDeviceByTokenSQL = "" +
-	"SELECT device_id, localpart, display_name FROM device_devices WHERE access_token = $1"
+	"SELECT device_id, localpart FROM device_devices WHERE access_token = $1"
 
 const selectDeviceByIDSQL = "" +
 	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
