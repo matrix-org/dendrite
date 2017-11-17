@@ -33,7 +33,7 @@ type response struct {
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
 	req *http.Request, device *authtypes.Device, roomID string, joinedOnly bool,
-	cfg config.Dendrite,
+	_ config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
 	queryReq := api.QueryMembershipsForRoomRequest{

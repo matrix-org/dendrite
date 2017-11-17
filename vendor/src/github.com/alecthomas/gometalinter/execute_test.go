@@ -1,29 +1,67 @@
 package main
 
 import (
-	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestSortedIssues(t *testing.T) {
-	actual := []*Issue{
-		{Path: "b.go", Line: 5},
-		{Path: "a.go", Line: 3},
-		{Path: "b.go", Line: 1},
-		{Path: "a.go", Line: 1},
+func TestLinterStateCommand(t *testing.T) {
+	varsDefault := Vars{"tests": "", "not_tests": "true"}
+	varsWithTest := Vars{"tests": "true", "not_tests": ""}
+
+	var testcases = []struct {
+		linter   string
+		vars     Vars
+		expected string
+	}{
+		{
+			linter:   "errcheck",
+			vars:     varsWithTest,
+			expected: `errcheck -abspath `,
+		},
+		{
+			linter:   "errcheck",
+			vars:     varsDefault,
+			expected: `errcheck -abspath -ignoretests`,
+		},
+		{
+			linter:   "gotype",
+			vars:     varsDefault,
+			expected: `gotype -e `,
+		},
+		{
+			linter:   "gotype",
+			vars:     varsWithTest,
+			expected: `gotype -e -t`,
+		},
+		{
+			linter:   "structcheck",
+			vars:     varsDefault,
+			expected: `structcheck `,
+		},
+		{
+			linter:   "structcheck",
+			vars:     varsWithTest,
+			expected: `structcheck -t`,
+		},
+		{
+			linter: "unparam",
+			vars: varsDefault,
+			expected: `unparam -tests=false`,
+		},
+		{
+			linter: "unparam",
+			vars: varsWithTest,
+			expected: `unparam `,
+		},
 	}
-	issues := &sortedIssues{
-		issues: actual,
-		order:  []string{"path", "line"},
+
+	for _, testcase := range testcases {
+		ls := linterState{
+			Linter: getLinterByName(testcase.linter, LinterConfig{}),
+			vars:   testcase.vars,
+		}
+		assert.Equal(t, testcase.expected, ls.command())
 	}
-	sort.Sort(issues)
-	expected := []*Issue{
-		{Path: "a.go", Line: 1},
-		{Path: "a.go", Line: 3},
-		{Path: "b.go", Line: 1},
-		{Path: "b.go", Line: 5},
-	}
-	require.Equal(t, expected, actual)
 }

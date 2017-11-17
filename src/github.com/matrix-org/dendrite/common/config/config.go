@@ -160,6 +160,8 @@ type Dendrite struct {
 		// The PublicRoomsAPI database stores information used to compute the public
 		// room directory. It is only accessed by the PublicRoomsAPI server.
 		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
+		// The Naffka database is used internally by the naffka library, if used.
+		Naffka DataSource `yaml:"naffka,omitempty"`
 	} `yaml:"database"`
 
 	// TURN Server Config
@@ -398,6 +400,8 @@ func (config *Dendrite) check(monolithic bool) error {
 		if !monolithic {
 			problems = append(problems, fmt.Sprintf("naffka can only be used in a monolithic server"))
 		}
+
+		checkNotEmpty("database.naffka", string(config.Database.Naffka))
 	} else {
 		// If we aren't using naffka then we need to have at least one kafka
 		// server to talk to.

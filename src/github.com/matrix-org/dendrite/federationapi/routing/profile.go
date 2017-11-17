@@ -63,11 +63,11 @@ func GetProfile(
 		switch field {
 		case "displayname":
 			res = common.DisplayName{
-				profile.DisplayName,
+				DisplayName: profile.DisplayName,
 			}
 		case "avatar_url":
 			res = common.AvatarURL{
-				profile.AvatarURL,
+				AvatarURL: profile.AvatarURL,
 			}
 		default:
 			code = 400
@@ -75,8 +75,8 @@ func GetProfile(
 		}
 	} else {
 		res = common.ProfileResponse{
-			profile.AvatarURL,
-			profile.DisplayName,
+			AvatarURL:   profile.AvatarURL,
+			DisplayName: profile.DisplayName,
 		}
 	}
 

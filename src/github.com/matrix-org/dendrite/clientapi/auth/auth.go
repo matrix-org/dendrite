@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
 )
@@ -62,10 +63,8 @@ func VerifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *auth
 				JSON: jsonerror.UnknownToken("Unknown token"),
 			}
 		} else {
-			resErr = &util.JSONResponse{
-				Code: 500,
-				JSON: jsonerror.Unknown("Failed to check access token"),
-			}
+			jsonErr := httputil.LogThenError(req, err)
+			resErr = &jsonErr
 		}
 	}
 	return
