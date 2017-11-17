@@ -162,6 +162,7 @@ func validatePassword(password string) *util.JSONResponse {
 
 // validateRecaptcha returns an error response if the captcha response is invalid
 func validateRecaptcha(
+	req *http.Request,
 	cfg *config.Dendrite,
 	response string,
 	clientip string,
@@ -189,7 +190,16 @@ func validateRecaptcha(
 		}
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		err := resp.Body.Close()
+
+		if err != nil {
+			logger := util.GetLogger(req.Context())
+			logger.WithFields(log.Fields{
+				"response": response,
+			}).Info("Failed to close recaptcha request response body")
+		}
+	}()
 
 	// Grab the body of the response from the captcha server
 	var r recaptchaResponse
@@ -281,7 +291,7 @@ func Register(
 		}).Info("Submitting recaptcha response")
 
 		// Check given captcha response
-		if resErr = validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr); resErr != nil {
+		if resErr = validateRecaptcha(req, cfg, r.Auth.Response, req.RemoteAddr); resErr != nil {
 			return *resErr
 		}
 		return completeRegistration(req.Context(), accountDB, deviceDB,
