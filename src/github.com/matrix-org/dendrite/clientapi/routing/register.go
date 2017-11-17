@@ -284,14 +284,16 @@ func Register(
 		if resErr = validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr); resErr != nil {
 			return *resErr
 		}
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password)
+		return completeRegistration(req.Context(), accountDB, deviceDB,
+			r.Username, r.Password, r.InitialDisplayName)
 
 	case authtypes.LoginTypeSharedSecret:
 		if cfg.Matrix.RegistrationSharedSecret == "" {
 			return util.MessageResponse(400, "Shared secret registration is disabled")
 		}
 
-		valid, err := isValidMacLogin(r.Username, r.Password, r.Admin, r.Auth.Mac, cfg.Matrix.RegistrationSharedSecret)
+		valid, err := isValidMacLogin(r.Username, r.Password, r.Admin,
+			r.Auth.Mac, cfg.Matrix.RegistrationSharedSecret)
 
 		if err != nil {
 			return httputil.LogThenError(req, err)
@@ -301,10 +303,12 @@ func Register(
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, r.InitialDisplayName)
+		return completeRegistration(req.Context(), accountDB, deviceDB,
+			r.Username, r.Password, r.InitialDisplayName)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, r.InitialDisplayName)
+		return completeRegistration(req.Context(), accountDB, deviceDB,
+			r.Username, r.Password, r.InitialDisplayName)
 	default:
 		return util.JSONResponse{
 			Code: 501,
