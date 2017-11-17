@@ -15,20 +15,20 @@
 package routing
 
 import (
-	"net/http"
 	"fmt"
+	"net/http"
 
-	"github.com/matrix-org/util"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 // RoomAliasToID converts the queried alias into a room ID and returns it
-func RoomAliasToID (
+func RoomAliasToID(
 	httpReq *http.Request,
 	federation *gomatrixserverlib.FederationClient,
 	cfg config.Dendrite,
@@ -43,7 +43,7 @@ func RoomAliasToID (
 		}
 	}
 
-var resp gomatrixserverlib.RespDirectory
+	var resp gomatrixserverlib.RespDirectory
 
 	if domain == cfg.Matrix.ServerName {
 		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
@@ -52,7 +52,7 @@ var resp gomatrixserverlib.RespDirectory
 			return httputil.LogThenError(httpReq, err)
 		}
 
-		if (queryRes.RoomID == "") {
+		if queryRes.RoomID == "" {
 			// TODO: List servers that are aware of this room alias
 			resp = gomatrixserverlib.RespDirectory{
 				RoomID:  queryRes.RoomID,
