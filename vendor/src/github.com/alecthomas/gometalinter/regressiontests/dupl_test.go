@@ -40,8 +40,8 @@ func two() string {
 `
 
 	expected := Issues{
-		{Linter: "dupl", Severity: "warning", Path: "test.go", Line: 19, Col: 0, Message: "duplicate of test.go:3-17"},
 		{Linter: "dupl", Severity: "warning", Path: "test.go", Line: 3, Col: 0, Message: "duplicate of test.go:19-33"},
+		{Linter: "dupl", Severity: "warning", Path: "test.go", Line: 19, Col: 0, Message: "duplicate of test.go:3-17"},
 	}
 	ExpectIssues(t, "dupl", source, expected)
 }

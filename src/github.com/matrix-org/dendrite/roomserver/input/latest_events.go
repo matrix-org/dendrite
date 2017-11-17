@@ -162,11 +162,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return err
 	}
 
-	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
-		return err
-	}
-
-	return nil
+	return u.updater.MarkEventAsSent(u.stateAtEvent.EventNID)
 }
 
 func (u *latestEventsUpdater) latestState() error {

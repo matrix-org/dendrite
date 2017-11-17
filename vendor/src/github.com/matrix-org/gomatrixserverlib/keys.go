@@ -37,8 +37,6 @@ type ServerName string
 type ServerKeys struct {
 	// Copy of the raw JSON for signature checking.
 	Raw []byte
-	// The server the raw JSON was downloaded from.
-	FromServer ServerName
 	// The decoded JSON fields.
 	ServerKeyFields
 }
@@ -140,7 +138,6 @@ func FetchKeysDirect(serverName ServerName, addr, sni string) (*ServerKeys, *tls
 		return nil, nil, err
 	}
 	var keys ServerKeys
-	keys.FromServer = serverName
 	if err = json.NewDecoder(response.Body).Decode(&keys); err != nil {
 		return nil, nil, err
 	}

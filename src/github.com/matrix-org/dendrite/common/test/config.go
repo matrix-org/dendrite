@@ -113,10 +113,7 @@ func WriteConfig(cfg *config.Dendrite, configDir string) error {
 	if err != nil {
 		return err
 	}
-	if err = ioutil.WriteFile(filepath.Join(configDir, ConfigFile), data, 0666); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(filepath.Join(configDir, ConfigFile), data, 0666)
 }
 
 // NewMatrixKey generates a new ed25519 matrix server key and writes it to a file.

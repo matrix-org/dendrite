@@ -28,10 +28,10 @@ import (
 func GetEvent(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	_ config.Dendrite,
 	query api.RoomserverQueryAPI,
-	now time.Time,
-	keys gomatrixserverlib.KeyRing,
+	_ time.Time,
+	_ gomatrixserverlib.KeyRing,
 	eventID string,
 ) util.JSONResponse {
 	var authResponse api.QueryServerAllowedToSeeEventResponse

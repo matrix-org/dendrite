@@ -87,7 +87,7 @@ func main() {
 	}
 
 	device, err := deviceDB.CreateDevice(
-		context.Background(), *username, nil, *accessToken,
+		context.Background(), *username, nil, *accessToken, nil,
 	)
 	if err != nil {
 		fmt.Println(err.Error())

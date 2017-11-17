@@ -38,7 +38,6 @@ func localKeys(cfg config.Dendrite, validUntil time.Time) (*gomatrixserverlib.Se
 	var keys gomatrixserverlib.ServerKeys
 
 	keys.ServerName = cfg.Matrix.ServerName
-	keys.FromServer = cfg.Matrix.ServerName
 
 	publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 

@@ -81,45 +81,54 @@ func Setup(
 	)).Methods("PUT", "OPTIONS")
 
 	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
-	func(req *http.Request) util.JSONResponse {
-		return CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
-	},
+		func(req *http.Request) util.JSONResponse {
+			return CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
+		},
 	)).Methods("POST", "OPTIONS")
 
-v1fedmux.Handle("/exchange_third_party_invite/{roomID}", common.MakeFedAPI(
-	"exchange_third_party_invite", cfg.Matrix.ServerName, keys,
-	func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-		vars := mux.Vars(httpReq)
-		return ExchangeThirdPartyInvite(
-			httpReq, request, vars["roomID"], query, cfg, federation, producer,
-		)
-	},
-)).Methods("PUT", "OPTIONS")
+	v1fedmux.Handle("/exchange_third_party_invite/{roomID}", common.MakeFedAPI(
+		"exchange_third_party_invite", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return ExchangeThirdPartyInvite(
+				httpReq, request, vars["roomID"], query, cfg, federation, producer,
+			)
+		},
+	)).Methods("PUT", "OPTIONS")
 
-v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
-	"federation_get_event", cfg.Matrix.ServerName, keys,
-	func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-		vars := mux.Vars(httpReq)
-		return GetEvent(
-			httpReq.Context(), request, cfg, query, time.Now(), keys, vars["eventID"],
-		)
-	},
-)).Methods("GET")
+	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
+		"federation_get_event", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return GetEvent(
+				httpReq.Context(), request, cfg, query, time.Now(), keys, vars["eventID"],
+			)
+		},
+	)).Methods("GET")
 
-v1fedmux.Handle("/version", common.MakeExternalAPI(
-	"federation_version",
-	func(httpReq *http.Request) util.JSONResponse {
-		return Version()
-	},
-)).Methods("GET")
+	v1fedmux.Handle("/query/directory/?room_alias={alias}", common.MakeFedAPI(
+		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return RoomAliasToID(
+				httpReq, federation, cfg, aliasAPI, vars["alias"],
+			)
+		},
+	)).Methods("Get")
 
-v1fedmux.Handle("/query/directory/?room_alias={alias}", common.MakeFedAPI(
-	"federation_query_room_alias", cfg.Matrix.ServerName, keys,
-	func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-		vars := mux.Vars(httpReq)
-		return RoomAliasToID(
-			httpReq, federation, cfg, aliasAPI, vars["alias"],
-		)
-	},
-)).Methods("Get")
+	v1fedmux.Handle("/query/profile", common.MakeFedAPI(
+		"federation_query_profile", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			return GetProfile(
+				httpReq, accountDB, cfg,
+			)
+		},
+	)).Methods("GET")
+
+	v1fedmux.Handle("/version", common.MakeExternalAPI(
+		"federation_version",
+		func(httpReq *http.Request) util.JSONResponse {
+			return Version()
+		},
+	)).Methods("GET")
 }

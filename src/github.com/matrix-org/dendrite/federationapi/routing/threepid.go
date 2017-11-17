@@ -287,7 +287,7 @@ func buildMembershipEvent(
 // them responded with an error.
 func sendToRemoteServer(
 	ctx context.Context, inv invite,
-	federation *gomatrixserverlib.FederationClient, cfg config.Dendrite,
+	federation *gomatrixserverlib.FederationClient, _ config.Dendrite,
 	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
 	remoteServers := make([]gomatrixserverlib.ServerName, 2)
