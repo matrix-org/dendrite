@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v2"
 
@@ -82,6 +82,18 @@ type Dendrite struct {
 		// If set, allows registration by anyone who also has the shared
 		// secret, even if registration is otherwise disabled.
 		RegistrationSharedSecret string `yaml:"registration_shared_secret"`
+		// This Home Server's ReCAPTCHA public key.
+		RecaptchaPublicKey string `yaml:"recaptcha_public_key"`
+		// This Home Server's ReCAPTCHA private key.
+		RecaptchaPrivateKey string `yaml:"recaptcha_private_key"`
+		// Boolean stating whether catpcha registration is enabled
+		// and required
+		RegistrationRecaptcha bool `yaml:"enable_registration_captcha"`
+		// Secret used to bypass the captcha registration entirely
+		RecaptchaBypassSecret string `yaml:"captcha_bypass_secret"`
+		// HTTP API endpoint used to verify whether the captcha response
+		// was successful
+		RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.

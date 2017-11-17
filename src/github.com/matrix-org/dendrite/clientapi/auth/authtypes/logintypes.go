@@ -7,4 +7,5 @@ type LoginType string
 const (
 	LoginTypeDummy        = "m.login.dummy"
 	LoginTypeSharedSecret = "org.matrix.login.shared_secret"
+	LoginTypeRecaptcha    = "m.login.recaptcha"
 )

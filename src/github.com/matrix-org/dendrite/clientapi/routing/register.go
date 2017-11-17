@@ -19,16 +19,18 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -37,6 +39,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -66,6 +69,9 @@ type authDict struct {
 	Type    authtypes.LoginType         `json:"type"`
 	Session string                      `json:"session"`
 	Mac     gomatrixserverlib.HexString `json:"mac"`
+
+	// ReCaptcha
+	Response string `json:"response"`
 	// TODO: Lots of custom keys depending on the type
 }
 
@@ -104,6 +110,13 @@ type registerResponse struct {
 	AccessToken string                       `json:"access_token"`
 	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
 	DeviceID    string                       `json:"device_id"`
+}
+
+type recaptchaResponse struct {
+	Success     bool      `json:"success"`
+	ChallengeTS time.Time `json:"challenge_ts"`
+	Hostname    string    `json:"hostname"`
+	ErrorCodes  []int     `json:"error-codes"`
 }
 
 // validateUserName returns an error response if the username is invalid
@@ -145,6 +158,64 @@ func validatePassword(password string) *util.JSONResponse {
 	return nil
 }
 
+// validateRecaptcha returns an error response if the captcha response is invalid
+func validateRecaptcha(
+	cfg *config.Dendrite,
+	response string,
+	clientip string,
+) *util.JSONResponse {
+	if response == "" {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("Captcha response is required"),
+		}
+	}
+
+	// Make a POST request to Google's API to check the captcha response
+	resp, err := http.PostForm(cfg.Matrix.RecaptchaSiteVerifyAPI,
+		url.Values{
+			"secret":   {cfg.Matrix.RecaptchaPrivateKey},
+			"response": {response},
+			"remoteip": {clientip},
+		},
+	)
+
+	if err != nil {
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.BadJSON("Error in requesting validation of captcha response"),
+		}
+	}
+
+	defer resp.Body.Close()
+
+	// Grab the body of the response from the captcha server
+	var r recaptchaResponse
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.BadJSON("Error in contacting captcha server" + err.Error()),
+		}
+	}
+	err = json.Unmarshal(body, &r)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()),
+		}
+	}
+
+	// Check that we received a "success"
+	if !r.Success {
+		return &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.BadJSON("Invalid captcha response. Please try again."),
+		}
+	}
+	return nil
+}
+
 // Register processes a /register request. http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
@@ -166,6 +237,7 @@ func Register(
 			//       Server admins should be able to change things around (eg enable captcha)
 			JSON: newUserInteractiveResponse(time.Now().String(), []authFlow{
 				{[]authtypes.LoginType{authtypes.LoginTypeDummy}},
+				{[]authtypes.LoginType{authtypes.LoginTypeRecaptcha}},
 				{[]authtypes.LoginType{authtypes.LoginTypeSharedSecret}},
 			}),
 		}
@@ -193,8 +265,25 @@ func Register(
 	// TODO: Handle loading of previous session parameters from database.
 	// TODO: Handle mapping registrationRequest parameters into session parameters
 
-	// TODO: email / msisdn / recaptcha auth types.
+	// TODO: email / msisdn auth types.
 	switch r.Auth.Type {
+	case authtypes.LoginTypeRecaptcha:
+		if !cfg.Matrix.RegistrationRecaptcha {
+			return util.MessageResponse(400, "Captcha registration is disabled")
+		}
+
+		logger := util.GetLogger(req.Context())
+		logger.WithFields(log.Fields{
+			"clientip": req.RemoteAddr,
+			"response": r.Auth.Response,
+		}).Info("Submitting recaptcha response")
+
+		// Check given captcha response
+		if resErr = validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr); resErr != nil {
+			return *resErr
+		}
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password)
+
 	case authtypes.LoginTypeSharedSecret:
 		if cfg.Matrix.RegistrationSharedSecret == "" {
 			return util.MessageResponse(400, "Shared secret registration is disabled")
