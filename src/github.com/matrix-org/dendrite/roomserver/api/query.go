@@ -156,13 +156,14 @@ type QueryServerAllowedToSeeEventResponse struct {
 
 // QueryReserveRoomIDRequest is a request to QueryServerAllowedToSeeEvent
 type QueryReserveRoomIDRequest struct {
-	// TODO: Docs
+	// The room ID to check and reserve.
 	RoomID string `json:"room_id"`
 }
 
 // QueryReserveRoomIDResponse is a response to QueryServerAllowedToSeeEvent
 type QueryReserveRoomIDResponse struct {
-	// TODO: Docs
+	// Whether the room ID has been reserved.
+	// False means that the room ID is already is use, or already reserved.
 	Success bool `json:"success"`
 }
 
@@ -331,7 +332,7 @@ func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// TODO: Docs
+// QueryReserveRoomID implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryReserveRoomID(
 	ctx context.Context,
 	request *QueryReserveRoomIDRequest,
