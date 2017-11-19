@@ -355,9 +355,5 @@ func emit3PIDInviteEvent(
 		return err
 	}
 
-	if err := producer.SendEvents(ctx, []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName); err != nil {
-		return err
-	}
-
-	return nil
+	return producer.SendEvents(ctx, []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName)
 }

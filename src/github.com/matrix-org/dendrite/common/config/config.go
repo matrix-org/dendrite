@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v2"
 
@@ -148,7 +148,29 @@ type Dendrite struct {
 		// The PublicRoomsAPI database stores information used to compute the public
 		// room directory. It is only accessed by the PublicRoomsAPI server.
 		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
+		// The Naffka database is used internally by the naffka library, if used.
+		Naffka DataSource `yaml:"naffka,omitempty"`
 	} `yaml:"database"`
+
+	// TURN Server Config
+	TURN struct {
+		// TODO Guest Support
+		// Whether or not guests can request TURN credentials
+		//AllowGuests bool `yaml:"turn_allow_guests"`
+		// How long the authorization should last
+		UserLifetime string `yaml:"turn_user_lifetime"`
+		// The list of TURN URIs to pass to clients
+		URIs []string `yaml:"turn_uris"`
+
+		// Authorization via Shared Secret
+		// The shared secret from coturn
+		SharedSecret string `yaml:"turn_shared_secret"`
+
+		// Authorization via Static Username & Password
+		// Hardcoded Username and Password
+		Username string `yaml:"turn_username"`
+		Password string `yaml:"turn_password"`
+	}
 
 	// The internal addresses the components will listen on.
 	// These should not be exposed externally as they expose metrics and debugging APIs.
@@ -341,9 +363,19 @@ func (config *Dendrite) check(monolithic bool) error {
 		}
 	}
 
+	checkValidDuration := func(key, value string) {
+		if _, err := time.ParseDuration(config.TURN.UserLifetime); err != nil {
+			problems = append(problems, fmt.Sprintf("invalid duration for config key %q: %s", key, value))
+		}
+	}
+
 	checkNotEmpty("matrix.server_name", string(config.Matrix.ServerName))
 	checkNotEmpty("matrix.private_key", string(config.Matrix.PrivateKeyPath))
 	checkNotZero("matrix.federation_certificates", int64(len(config.Matrix.FederationCertificatePaths)))
+
+	if config.TURN.UserLifetime != "" {
+		checkValidDuration("turn.turn_user_lifetime", config.TURN.UserLifetime)
+	}
 
 	checkNotEmpty("media.base_path", string(config.Media.BasePath))
 	checkPositive("media.max_file_size_bytes", int64(*config.Media.MaxFileSizeBytes))
@@ -356,6 +388,8 @@ func (config *Dendrite) check(monolithic bool) error {
 		if !monolithic {
 			problems = append(problems, fmt.Sprintf("naffka can only be used in a monolithic server"))
 		}
+
+		checkNotEmpty("database.naffka", string(config.Database.Naffka))
 	} else {
 		// If we aren't using naffka then we need to have at least one kafka
 		// server to talk to.

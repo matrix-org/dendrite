@@ -8,7 +8,7 @@ import (
 )
 
 // Config for gometalinter. This can be loaded from a JSON file with --config.
-type Config struct { // nolint: aligncheck
+type Config struct { // nolint: maligned
 	// A map from linter name -> <LinterConfig|string>.
 	//
 	// For backwards compatibility, the value stored in the JSON blob can also
@@ -51,6 +51,11 @@ type Config struct { // nolint: aligncheck
 	EnableGC        bool
 	Aggregate       bool
 	EnableAll       bool
+
+	// Warn if a nolint directive was never matched to a linter issue
+	WarnUnmatchedDirective bool
+
+	formatTemplate *template.Template
 }
 
 type StringOrLinterConfig LinterConfig
@@ -58,7 +63,8 @@ type StringOrLinterConfig LinterConfig
 func (c *StringOrLinterConfig) UnmarshalJSON(raw []byte) error {
 	var linterConfig LinterConfig
 	// first try to un-marshall directly into struct
-	if err := json.Unmarshal(raw, &linterConfig); err == nil {
+	origErr := json.Unmarshal(raw, &linterConfig)
+	if origErr == nil {
 		*c = StringOrLinterConfig(linterConfig)
 		return nil
 	}
@@ -66,7 +72,7 @@ func (c *StringOrLinterConfig) UnmarshalJSON(raw []byte) error {
 	// i.e. bytes didn't represent the struct, treat them as a string
 	var linterSpec string
 	if err := json.Unmarshal(raw, &linterSpec); err != nil {
-		return err
+		return origErr
 	}
 	linter, err := parseLinterConfigSpec("", linterSpec)
 	if err != nil {
@@ -93,18 +99,16 @@ func (td *jsonDuration) Duration() time.Duration {
 	return time.Duration(*td)
 }
 
-// TODO: should be a field on Config struct
-var formatTemplate = &template.Template{}
-
 var sortKeys = []string{"none", "path", "line", "column", "severity", "message", "linter"}
 
 // Configuration defaults.
 var config = &Config{
-	Format: "{{.Path}}:{{.Line}}:{{if .Col}}{{.Col}}{{end}}:{{.Severity}}: {{.Message}} ({{.Linter}})",
+	Format: DefaultIssueFormat,
 
 	Linters: map[string]StringOrLinterConfig{},
 	Severity: map[string]string{
 		"gotype":  "error",
+		"gotypex": "error",
 		"test":    "error",
 		"testify": "error",
 		"vet":     "error",

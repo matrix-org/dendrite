@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
 	"net/http"
 	"os"
@@ -194,18 +195,26 @@ func (m *monolith) setupFederation() {
 		m.cfg.Matrix.ServerName, m.cfg.Matrix.KeyID, m.cfg.Matrix.PrivateKey,
 	)
 
-	m.keyRing = gomatrixserverlib.KeyRing{
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			// TODO: Use perspective key fetchers for production.
-			&gomatrixserverlib.DirectKeyFetcher{Client: m.federation.Client},
-		},
-		KeyDatabase: m.keyDB,
-	}
+	m.keyRing = keydb.CreateKeyRing(m.federation.Client, m.keyDB)
 }
 
 func (m *monolith) setupKafka() {
 	if m.cfg.Kafka.UseNaffka {
-		naff, err := naffka.New(&naffka.MemoryDatabase{})
+		db, err := sql.Open("postgres", string(m.cfg.Database.Naffka))
+		if err != nil {
+			log.WithFields(log.Fields{
+				log.ErrorKey: err,
+			}).Panic("Failed to open naffka database")
+		}
+
+		naffkaDB, err := naffka.NewPostgresqlDatabase(db)
+		if err != nil {
+			log.WithFields(log.Fields{
+				log.ErrorKey: err,
+			}).Panic("Failed to setup naffka database")
+		}
+
+		naff, err := naffka.New(naffkaDB)
 		if err != nil {
 			log.WithFields(log.Fields{
 				log.ErrorKey: err,
@@ -336,7 +345,7 @@ func (m *monolith) setupAPIs() {
 
 	syncapi_routing.Setup(m.api, syncapi_sync.NewRequestPool(
 		m.syncAPIDB, m.syncAPINotifier, m.accountDB,
-	), m.deviceDB)
+	), m.syncAPIDB, m.deviceDB)
 
 	federationapi_routing.Setup(
 		m.api, *m.cfg, m.queryAPI, m.aliasAPI, m.roomServerProducer, m.keyRing, m.federation,

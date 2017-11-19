@@ -23,15 +23,13 @@ type statements struct {
 	thumbnail thumbnailStatements
 }
 
-func (s *statements) prepare(db *sql.DB) error {
-	var err error
-
+func (s *statements) prepare(db *sql.DB) (err error) {
 	if err = s.media.prepare(db); err != nil {
-		return err
+		return
 	}
 	if err = s.thumbnail.prepare(db); err != nil {
-		return err
+		return
 	}
 
-	return nil
+	return
 }

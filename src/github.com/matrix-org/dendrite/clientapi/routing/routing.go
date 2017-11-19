@@ -284,12 +284,8 @@ func Setup(
 	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/voip/turnServer",
-		common.MakeExternalAPI("turn_server", func(req *http.Request) util.JSONResponse {
-			// TODO: Return credentials for a turn server if one is configured.
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct{}{},
-			}
+		common.MakeAuthAPI("turn_server", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return RequestTurnServer(req, device, cfg)
 		}),
 	).Methods("GET")
 
@@ -367,6 +363,13 @@ func Setup(
 			return GetDeviceByID(req, deviceDB, device, vars["deviceID"])
 		}),
 	).Methods("GET")
+
+	r0mux.Handle("/devices/{deviceID}",
+		common.MakeAuthAPI("device_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return UpdateDeviceByID(req, deviceDB, device, vars["deviceID"])
+		}),
+	).Methods("PUT", "OPTIONS")
 
 	// Stub implementations for sytest
 	r0mux.Handle("/events",

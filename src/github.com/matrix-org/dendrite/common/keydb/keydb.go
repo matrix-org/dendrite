@@ -48,14 +48,14 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 func (d *Database) FetchKeys(
 	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
-) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys, error) {
+) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	return d.statements.bulkSelectServerKeys(ctx, requests)
 }
 
 // StoreKeys implements gomatrixserverlib.KeyDatabase
 func (d *Database) StoreKeys(
 	ctx context.Context,
-	keyMap map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.ServerKeys,
+	keyMap map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
 	// TODO: Inserting all the keys within a single transaction may
 	// be more efficient since the transaction overhead can be quite

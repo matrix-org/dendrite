@@ -106,13 +106,6 @@ func Setup(
 		},
 	)).Methods("GET")
 
-	v1fedmux.Handle("/version", common.MakeExternalAPI(
-		"federation_version",
-		func(httpReq *http.Request) util.JSONResponse {
-			return Version()
-		},
-	)).Methods("GET")
-
 	v1fedmux.Handle("/query/directory/", common.MakeFedAPI(
 		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
@@ -121,4 +114,29 @@ func Setup(
 			)
 		},
 	)).Methods("Get")
+	v1fedmux.Handle("/query/directory/?room_alias={alias}", common.MakeFedAPI(
+		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return RoomAliasToID(
+				httpReq, federation, cfg, aliasAPI, vars["alias"],
+			)
+		},
+	)).Methods("Get")
+
+	v1fedmux.Handle("/query/profile", common.MakeFedAPI(
+		"federation_query_profile", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			return GetProfile(
+				httpReq, accountDB, cfg,
+			)
+		},
+	)).Methods("GET")
+
+	v1fedmux.Handle("/version", common.MakeExternalAPI(
+		"federation_version",
+		func(httpReq *http.Request) util.JSONResponse {
+			return Version()
+		},
+	)).Methods("GET")
 }

@@ -60,7 +60,7 @@ func GetFilter(
 		}
 	}
 	filter := gomatrix.Filter{}
-	err = json.Unmarshal([]byte(res), &filter)
+	err = json.Unmarshal(res, &filter)
 	if err != nil {
 		httputil.LogThenError(req, err)
 	}
@@ -111,7 +111,7 @@ func PutFilter(
 		}
 	}
 
-	filterID, err := accountDB.PutFilter(req.Context(), localpart, string(filterArray))
+	filterID, err := accountDB.PutFilter(req.Context(), localpart, filterArray)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

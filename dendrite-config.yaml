@@ -54,6 +54,24 @@ media:
         height: 600
         method: scale
 
+# The config for the TURN server
+turn:
+    # Whether or not guests can request TURN credentials
+    turn_allow_guests: true
+    # How long the authorization should last
+    turn_user_lifetime: "1h"
+    # The list of TURN URIs to pass to clients
+    turn_uris: []
+
+    # Authorization via Shared Secret
+    # The shared secret from coturn
+    turn_shared_secret: "<SECRET STRING GOES HERE>"
+
+    # Authorization via Static Username & Password
+    # Hardcoded Username and Password
+    turn_username: ""
+    turn_password: ""
+
 # The config for communicating with kafka
 kafka:
     # Where the kafka servers are running.

@@ -14,7 +14,7 @@
 set -eu
 
 export GOPATH="$(pwd):$(pwd)/vendor"
-export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
+export PATH="$PATH:$(pwd)/bin"
 
 args=""
 if [ ${1:-""} = "fast" ]
@@ -31,7 +31,7 @@ then args="$args --enable-gc"
 fi
 
 echo "Installing lint search engine..."
-go install github.com/alecthomas/gometalinter/
+gb build github.com/alecthomas/gometalinter/
 gometalinter --config=linter.json ./... --install
 
 echo "Looking for lint..."

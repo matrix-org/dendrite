@@ -75,6 +75,7 @@ func (d *Database) GetDevicesByLocalpart(
 // Returns the device on success.
 func (d *Database) CreateDevice(
 	ctx context.Context, localpart string, deviceID *string, accessToken string,
+	displayName *string,
 ) (dev *authtypes.Device, returnErr error) {
 	if deviceID != nil {
 		returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
@@ -84,7 +85,7 @@ func (d *Database) CreateDevice(
 				return err
 			}
 
-			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken)
+			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken, displayName)
 			return err
 		})
 	} else {
@@ -99,7 +100,7 @@ func (d *Database) CreateDevice(
 
 			returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 				var err error
-				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken)
+				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName)
 				return err
 			})
 			if returnErr == nil {
@@ -108,6 +109,16 @@ func (d *Database) CreateDevice(
 		}
 	}
 	return
+}
+
+// UpdateDevice updates the given device with the display name.
+// Returns SQL error if there are problems and nil on success.
+func (d *Database) UpdateDevice(
+	ctx context.Context, localpart, deviceID string, displayName *string,
+) error {
+	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.devices.updateDeviceName(ctx, txn, localpart, deviceID, displayName)
+	})
 }
 
 // RemoveDevice revokes a device by deleting the entry in the database
