@@ -98,13 +98,7 @@ func main() {
 		log.Panicf("Failed to setup key database(%q): %s", cfg.Database.ServerKey, err.Error())
 	}
 
-	keyRing := gomatrixserverlib.KeyRing{
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			// TODO: Use perspective key fetchers for production.
-			&gomatrixserverlib.DirectKeyFetcher{Client: federation.Client},
-		},
-		KeyDatabase: keyDB,
-	}
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
 	if err != nil {

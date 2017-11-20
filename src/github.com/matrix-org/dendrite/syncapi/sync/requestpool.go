@@ -15,11 +15,9 @@
 package sync
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -28,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
@@ -62,146 +61,78 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		"timeout": syncReq.timeout,
 	}).Info("Incoming /sync request")
 
-	// Fork off 2 goroutines: one to do the work, and one to serve as a timeout.
-	// Whichever returns first is the one we will serve back to the client.
-	timeoutChan := make(chan struct{})
-	timer := time.AfterFunc(syncReq.timeout, func() {
-		close(timeoutChan) // signal that the timeout has expired
-	})
+	currPos := rp.notifier.CurrentPosition()
 
-	done := make(chan util.JSONResponse)
-	go func() {
-		currentPos := rp.notifier.WaitForEvents(*syncReq)
-		// We stop the timer BEFORE calculating the response so the cpu work
-		// done to calculate the response is not timed. This stops us from
-		// doing lots of work then timing out and sending back an empty response.
-		timer.Stop()
-		syncData, err := rp.currentSyncForUser(*syncReq, currentPos)
-		var res util.JSONResponse
+	// If this is an initial sync or timeout=0 we return immediately
+	if syncReq.since == types.StreamPosition(0) || syncReq.timeout == 0 {
+		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
-			res = httputil.LogThenError(req, err)
-		} else {
-			syncData, err = rp.appendAccountData(syncData, device.UserID, *syncReq, currentPos)
-			if err != nil {
-				res = httputil.LogThenError(req, err)
-			} else {
-				res = util.JSONResponse{
-					Code: 200,
-					JSON: syncData,
-				}
-			}
+			return httputil.LogThenError(req, err)
 		}
-		done <- res
-		close(done)
-	}()
-
-	select {
-	case <-timeoutChan: // timeout fired
 		return util.JSONResponse{
 			Code: 200,
-			JSON: types.NewResponse(syncReq.since),
+			JSON: syncData,
 		}
-	case res := <-done: // received a response
-		return res
-	}
-}
-
-type stateEventInStateResp struct {
-	gomatrixserverlib.ClientEvent
-	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
-	ReplacesState string          `json:"replaces_state,omitempty"`
-}
-
-// OnIncomingStateRequest is called when a client makes a /rooms/{roomID}/state
-// request. It will fetch all the state events from the specified room and will
-// append the necessary keys to them if applicable before returning them.
-// Returns an error if something went wrong in the process.
-// TODO: Check if the user is in the room. If not, check if the room's history
-// is publicly visible. Current behaviour is returning an empty array if the
-// user cannot see the room's history.
-func (rp *RequestPool) OnIncomingStateRequest(req *http.Request, roomID string) util.JSONResponse {
-	// TODO(#287): Auth request and handle the case where the user has left (where
-	// we should return the state at the poin they left)
-
-	stateEvents, err := rp.db.GetStateEventsForRoom(req.Context(), roomID)
-	if err != nil {
-		return httputil.LogThenError(req, err)
 	}
 
-	resp := []stateEventInStateResp{}
-	// Fill the prev_content and replaces_state keys if necessary
-	for _, event := range stateEvents {
-		stateEvent := stateEventInStateResp{
-			ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll),
+	// Otherwise, we wait for the notifier to tell us if something *may* have
+	// happened. We loop in case it turns out that nothing did happen.
+
+	timer := time.NewTimer(syncReq.timeout) // case of timeout=0 is handled above
+	defer timer.Stop()
+
+	userStreamListener := rp.notifier.GetListener(*syncReq)
+	defer userStreamListener.Close()
+
+	for {
+		select {
+		// Wait for notifier to wake us up
+		case <-userStreamListener.GetNotifyChannel(currPos):
+			currPos = userStreamListener.GetStreamPosition()
+		// Or for timeout to expire
+		case <-timer.C:
+			return util.JSONResponse{
+				Code: 200,
+				JSON: types.NewResponse(syncReq.since),
+			}
+		// Or for the request to be cancelled
+		case <-req.Context().Done():
+			return httputil.LogThenError(req, req.Context().Err())
 		}
-		var prevEventRef types.PrevEventRef
-		if len(event.Unsigned()) > 0 {
-			if err := json.Unmarshal(event.Unsigned(), &prevEventRef); err != nil {
-				return httputil.LogThenError(req, err)
-			}
-			// Fills the previous state event ID if the state event replaces another
-			// state event
-			if len(prevEventRef.ReplacesState) > 0 {
-				stateEvent.ReplacesState = prevEventRef.ReplacesState
-			}
-			// Fill the previous event if the state event references a previous event
-			if prevEventRef.PrevContent != nil {
-				stateEvent.PrevContent = prevEventRef.PrevContent
+
+		// Note that we don't time out during calculation of sync
+		// response. This ensures that we don't waste the hard work
+		// of calculating the sync only to get timed out before we
+		// can respond
+
+		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+		if !syncData.IsEmpty() {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: syncData,
 			}
 		}
 
-		resp = append(resp, stateEvent)
-	}
-
-	return util.JSONResponse{
-		Code: 200,
-		JSON: resp,
 	}
 }
 
-// OnIncomingStateTypeRequest is called when a client makes a
-// /rooms/{roomID}/state/{type}/{statekey} request. It will look in current
-// state to see if there is an event with that type and state key, if there
-// is then (by default) we return the content, otherwise a 404.
-func (rp *RequestPool) OnIncomingStateTypeRequest(req *http.Request, roomID string, evType, stateKey string) util.JSONResponse {
-	// TODO(#287): Auth request and handle the case where the user has left (where
-	// we should return the state at the poin they left)
-
-	logger := util.GetLogger(req.Context())
-	logger.WithFields(log.Fields{
-		"roomID":   roomID,
-		"evType":   evType,
-		"stateKey": stateKey,
-	}).Info("Fetching state")
-
-	event, err := rp.db.GetStateEvent(req.Context(), roomID, evType, stateKey)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	if event == nil {
-		return util.JSONResponse{
-			Code: 404,
-			JSON: jsonerror.NotFound("cannot find state"),
-		}
-	}
-
-	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.ToClientEvent(*event, gomatrixserverlib.FormatAll),
-	}
-
-	return util.JSONResponse{
-		Code: 200,
-		JSON: stateEvent.Content,
-	}
-}
-
-func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (*types.Response, error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == types.StreamPosition(0) {
-		return rp.db.CompleteSync(req.ctx, req.userID, req.limit)
+		res, err = rp.db.CompleteSync(req.ctx, req.userID, req.limit)
+	} else {
+		res, err = rp.db.IncrementalSync(req.ctx, req.userID, req.since, currentPos, req.limit)
 	}
-	return rp.db.IncrementalSync(req.ctx, req.userID, req.since, currentPos, req.limit)
+
+	if err != nil {
+		return
+	}
+
+	res, err = rp.appendAccountData(res, req.userID, req, currentPos)
+	return
 }
 
 func (rp *RequestPool) appendAccountData(

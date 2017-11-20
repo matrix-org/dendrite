@@ -20,9 +20,9 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 const defaultSyncTimeout = time.Duration(30) * time.Second

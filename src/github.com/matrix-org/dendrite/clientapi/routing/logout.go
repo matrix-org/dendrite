@@ -50,3 +50,22 @@ func Logout(
 		JSON: struct{}{},
 	}
 }
+
+// LogoutAll handles POST /logout/all
+func LogoutAll(
+	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+) util.JSONResponse {
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if err := deviceDB.RemoveAllDevices(req.Context(), localpart); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
+	}
+}

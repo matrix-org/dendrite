@@ -75,7 +75,7 @@ var timeout time.Duration
 
 var port = 10000
 
-func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error, string, *exec.Cmd, chan error, string, string) {
+func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error, *exec.Cmd, string, string) {
 	dir, err := ioutil.TempDir("", serverType+"-server-test"+suffix)
 	if err != nil {
 		panic(err)
@@ -107,7 +107,7 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 		testDatabaseName + suffix,
 	}
 
-	proxyCmd, proxyCmdChan := test.StartProxy(proxyAddr, cfg)
+	proxyCmd, _ := test.StartProxy(proxyAddr, cfg)
 
 	test.InitDatabase(
 		postgresDatabase,
@@ -121,7 +121,7 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 	)
 
 	fmt.Printf("==TESTSERVER== STARTED %v -> %v : %v\n", proxyAddr, cfg.Listen.MediaAPI, dir)
-	return cmd, cmdChan, string(cfg.Listen.MediaAPI), proxyCmd, proxyCmdChan, proxyAddr, dir
+	return cmd, cmdChan, proxyCmd, proxyAddr, dir
 }
 
 func cleanUpServer(cmd *exec.Cmd, dir string) {
@@ -145,7 +145,7 @@ func main() {
 	}
 
 	// create server1 with only pre-generated thumbnails allowed
-	server1Cmd, server1CmdChan, _, server1ProxyCmd, _, server1ProxyAddr, server1Dir := startMediaAPI("1", false)
+	server1Cmd, server1CmdChan, server1ProxyCmd, server1ProxyAddr, server1Dir := startMediaAPI("1", false)
 	defer cleanUpServer(server1Cmd, server1Dir)
 	defer server1ProxyCmd.Process.Kill() // nolint: errcheck
 	testDownload(server1ProxyAddr, server1ProxyAddr, "doesnotexist", 404, server1CmdChan)
@@ -162,7 +162,7 @@ func main() {
 	testThumbnail(64, 64, "crop", server1ProxyAddr, server1CmdChan)
 
 	// create server2 with dynamic thumbnail generation
-	server2Cmd, server2CmdChan, _, server2ProxyCmd, _, server2ProxyAddr, server2Dir := startMediaAPI("2", true)
+	server2Cmd, server2CmdChan, server2ProxyCmd, server2ProxyAddr, server2Dir := startMediaAPI("2", true)
 	defer cleanUpServer(server2Cmd, server2Dir)
 	defer server2ProxyCmd.Process.Kill() // nolint: errcheck
 	testDownload(server2ProxyAddr, server2ProxyAddr, "doesnotexist", 404, server2CmdChan)

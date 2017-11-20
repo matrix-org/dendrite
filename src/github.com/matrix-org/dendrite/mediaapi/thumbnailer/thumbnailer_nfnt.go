@@ -28,11 +28,11 @@ import (
 	"os"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/nfnt/resize"
+	log "github.com/sirupsen/logrus"
 )
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file

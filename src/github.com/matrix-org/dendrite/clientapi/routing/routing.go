@@ -160,6 +160,12 @@ func Setup(
 		}),
 	).Methods("POST", "OPTIONS")
 
+	r0mux.Handle("/logout/all",
+		common.MakeAuthAPI("logout", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return LogoutAll(req, deviceDB, device)
+		}),
+	).Methods("POST", "OPTIONS")
+
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
@@ -278,12 +284,8 @@ func Setup(
 	).Methods("PUT", "OPTIONS")
 
 	r0mux.Handle("/voip/turnServer",
-		common.MakeExternalAPI("turn_server", func(req *http.Request) util.JSONResponse {
-			// TODO: Return credentials for a turn server if one is configured.
-			return util.JSONResponse{
-				Code: 200,
-				JSON: struct{}{},
-			}
+		common.MakeAuthAPI("turn_server", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return RequestTurnServer(req, device, cfg)
 		}),
 	).Methods("GET")
 
@@ -346,6 +348,26 @@ func Setup(
 		common.MakeExternalAPI("rooms_typing", func(req *http.Request) util.JSONResponse {
 			// TODO: handling typing
 			return util.JSONResponse{Code: 200, JSON: struct{}{}}
+		}),
+	).Methods("PUT", "OPTIONS")
+
+	r0mux.Handle("/devices",
+		common.MakeAuthAPI("get_devices", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return GetDevicesByLocalpart(req, deviceDB, device)
+		}),
+	).Methods("GET")
+
+	r0mux.Handle("/device/{deviceID}",
+		common.MakeAuthAPI("get_device", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return GetDeviceByID(req, deviceDB, device, vars["deviceID"])
+		}),
+	).Methods("GET")
+
+	r0mux.Handle("/devices/{deviceID}",
+		common.MakeAuthAPI("device_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return UpdateDeviceByID(req, deviceDB, device, vars["deviceID"])
 		}),
 	).Methods("PUT", "OPTIONS")
 

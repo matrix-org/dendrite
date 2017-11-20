@@ -2,7 +2,6 @@ package gomatrixserverlib
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 )
 
@@ -39,26 +38,44 @@ type testKeyDatabase struct{}
 
 func (db *testKeyDatabase) FetchKeys(
 	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
-) (map[PublicKeyRequest]ServerKeys, error) {
-	results := map[PublicKeyRequest]ServerKeys{}
-	var keys ServerKeys
-	if err := json.Unmarshal([]byte(testKeys), &keys); err != nil {
-		return nil, err
-	}
+) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
+	results := map[PublicKeyRequest]PublicKeyLookupResult{}
 
 	req1 := PublicKeyRequest{"localhost:8800", "ed25519:old"}
 	req2 := PublicKeyRequest{"localhost:8800", "ed25519:a_Obwu"}
 
 	for req := range requests {
-		if req == req1 || req == req2 {
-			results[req] = keys
+		if req == req1 {
+			vk := VerifyKey{}
+			err := vk.Key.Decode("O2onvM62pC1io6jQKm8Nc2UyFXcd4kOmOsBIoYtZ2ik")
+			if err != nil {
+				return nil, err
+			}
+			results[req] = PublicKeyLookupResult{
+				VerifyKey:    vk,
+				ValidUntilTS: PublicKeyNotValid,
+				ExpiredTS:    929059200,
+			}
+		}
+
+		if req == req2 {
+			vk := VerifyKey{}
+			err := vk.Key.Decode("2UwTWD4+tgTgENV7znGGNqhAOGY+BW1mRAnC6W6FBQg")
+			if err != nil {
+				return nil, err
+			}
+			results[req] = PublicKeyLookupResult{
+				VerifyKey:    vk,
+				ValidUntilTS: 1493142432964,
+				ExpiredTS:    PublicKeyNotExpired,
+			}
 		}
 	}
 	return results, nil
 }
 
 func (db *testKeyDatabase) StoreKeys(
-	ctx context.Context, requests map[PublicKeyRequest]ServerKeys,
+	ctx context.Context, requests map[PublicKeyRequest]PublicKeyLookupResult,
 ) error {
 	return nil
 }
@@ -136,12 +153,12 @@ var testErrorStore = erroringKeyDatabaseError(2)
 
 func (e *erroringKeyDatabase) FetchKeys(
 	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
-) (map[PublicKeyRequest]ServerKeys, error) {
+) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
 	return nil, &testErrorFetch
 }
 
 func (e *erroringKeyDatabase) StoreKeys(
-	ctx context.Context, keys map[PublicKeyRequest]ServerKeys,
+	ctx context.Context, keys map[PublicKeyRequest]PublicKeyLookupResult,
 ) error {
 	return &testErrorStore
 }

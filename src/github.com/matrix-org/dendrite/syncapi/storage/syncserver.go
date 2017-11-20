@@ -229,43 +229,9 @@ func (d *SyncServerDatabase) IncrementalSync(
 
 	res := types.NewResponse(toPos)
 	for _, delta := range deltas {
-		endPos := toPos
-		if delta.membershipPos > 0 && delta.membership == "leave" {
-			// make sure we don't leak recent events after the leave event.
-			// TODO: History visibility makes this somewhat complex to handle correctly. For example:
-			// TODO: This doesn't work for join -> leave in a single /sync request (see events prior to join).
-			// TODO: This will fail on join -> leave -> sensitive msg -> join -> leave
-			//       in a single /sync request
-			// This is all "okay" assuming history_visibility == "shared" which it is by default.
-			endPos = delta.membershipPos
-		}
-		var recentStreamEvents []streamEvent
-		recentStreamEvents, err = d.events.selectRecentEvents(
-			ctx, txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom,
-		)
+		err = d.addRoomDeltaToResponse(ctx, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
 		if err != nil {
 			return nil, err
-		}
-		recentEvents := streamEventsToEvents(recentStreamEvents)
-		delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
-
-		switch delta.membership {
-		case "join":
-			jr := types.NewJoinResponse()
-			jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-			jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
-			jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
-			res.Rooms.Join[delta.roomID] = *jr
-		case "leave":
-			fallthrough // transitions to leave are the same as ban
-		case "ban":
-			// TODO: recentEvents may contain events that this user is not allowed to see because they are
-			//       no longer in the room.
-			lr := types.NewLeaveResponse()
-			lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-			lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
-			lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
-			res.Rooms.Leave[delta.roomID] = *lr
 		}
 	}
 
@@ -415,6 +381,60 @@ func (d *SyncServerDatabase) addInvitesToResponse(
 		// TODO: add the invite state from the invite event.
 		res.Rooms.Invite[roomID] = *ir
 	}
+	return nil
+}
+
+// addRoomDeltaToResponse adds a room state delta to a sync response
+func (d *SyncServerDatabase) addRoomDeltaToResponse(
+	ctx context.Context, txn *sql.Tx,
+	fromPos, toPos types.StreamPosition,
+	delta stateDelta,
+	numRecentEventsPerRoom int,
+	res *types.Response,
+) error {
+	endPos := toPos
+	if delta.membershipPos > 0 && delta.membership == "leave" {
+		// make sure we don't leak recent events after the leave event.
+		// TODO: History visibility makes this somewhat complex to handle correctly. For example:
+		// TODO: This doesn't work for join -> leave in a single /sync request (see events prior to join).
+		// TODO: This will fail on join -> leave -> sensitive msg -> join -> leave
+		//       in a single /sync request
+		// This is all "okay" assuming history_visibility == "shared" which it is by default.
+		endPos = delta.membershipPos
+	}
+	recentStreamEvents, err := d.events.selectRecentEvents(
+		ctx, txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom,
+	)
+	if err != nil {
+		return err
+	}
+	recentEvents := streamEventsToEvents(recentStreamEvents)
+	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
+
+	// Don't bother appending empty room entries
+	if len(recentEvents) == 0 && len(delta.stateEvents) == 0 {
+		return nil
+	}
+
+	switch delta.membership {
+	case "join":
+		jr := types.NewJoinResponse()
+		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+		jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
+		res.Rooms.Join[delta.roomID] = *jr
+	case "leave":
+		fallthrough // transitions to leave are the same as ban
+	case "ban":
+		// TODO: recentEvents may contain events that this user is not allowed to see because they are
+		//       no longer in the room.
+		lr := types.NewLeaveResponse()
+		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+		lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
+		res.Rooms.Leave[delta.roomID] = *lr
+	}
+
 	return nil
 }
 

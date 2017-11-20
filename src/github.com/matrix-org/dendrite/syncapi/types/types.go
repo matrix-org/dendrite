@@ -74,6 +74,16 @@ func NewResponse(pos StreamPosition) *Response {
 	return &res
 }
 
+// IsEmpty returns true if the response is empty, i.e. used to decided whether
+// to return the response immediately to the client or to wait for more data.
+func (r *Response) IsEmpty() bool {
+	return len(r.Rooms.Join) == 0 &&
+		len(r.Rooms.Invite) == 0 &&
+		len(r.Rooms.Leave) == 0 &&
+		len(r.AccountData.Events) == 0 &&
+		len(r.Presence.Events) == 0
+}
+
 // JoinResponse represents a /sync response for a room which is under the 'join' key.
 type JoinResponse struct {
 	State struct {

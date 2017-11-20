@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/events"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -31,19 +30,6 @@ import (
 
 	"github.com/matrix-org/util"
 )
-
-type profileResponse struct {
-	AvatarURL   string `json:"avatar_url"`
-	DisplayName string `json:"displayname"`
-}
-
-type avatarURL struct {
-	AvatarURL string `json:"avatar_url"`
-}
-
-type displayName struct {
-	DisplayName string `json:"displayname"`
-}
 
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
@@ -64,7 +50,7 @@ func GetProfile(
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	res := profileResponse{
+	res := common.ProfileResponse{
 		AvatarURL:   profile.AvatarURL,
 		DisplayName: profile.DisplayName,
 	}
@@ -87,7 +73,7 @@ func GetAvatarURL(
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	res := avatarURL{
+	res := common.AvatarURL{
 		AvatarURL: profile.AvatarURL,
 	}
 	return util.JSONResponse{
@@ -111,7 +97,7 @@ func SetAvatarURL(
 
 	changedKey := "avatar_url"
 
-	var r avatarURL
+	var r common.AvatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -179,7 +165,7 @@ func GetDisplayName(
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	res := displayName{
+	res := common.DisplayName{
 		DisplayName: profile.DisplayName,
 	}
 	return util.JSONResponse{
@@ -203,7 +189,7 @@ func SetDisplayName(
 
 	changedKey := "displayname"
 
-	var r displayName
+	var r common.DisplayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -285,7 +271,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := events.BuildEvent(ctx, &builder, *cfg, queryAPI, nil)
+		event, err := common.BuildEvent(ctx, &builder, *cfg, queryAPI, nil)
 		if err != nil {
 			return nil, err
 		}

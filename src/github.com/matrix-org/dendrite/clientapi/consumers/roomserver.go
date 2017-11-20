@@ -96,11 +96,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
-	if err := s.db.UpdateMemberships(context.TODO(), events, output.NewRoomEvent.RemovesStateEventIDs); err != nil {
-		return err
-	}
-
-	return nil
+	return s.db.UpdateMemberships(context.TODO(), events, output.NewRoomEvent.RemovesStateEventIDs)
 }
 
 // lookupStateEvents looks up the state events that are added by a new event.

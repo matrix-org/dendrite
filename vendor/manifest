@@ -10,7 +10,7 @@
 		{
 			"importpath": "github.com/alecthomas/gometalinter",
 			"repository": "https://github.com/alecthomas/gometalinter",
-			"revision": "5507b26af3204e949ffe50ec08ee73e5847938e1",
+			"revision": "0262fb20957a4c2d3bb7c834a6a125ae3884a2c6",
 			"branch": "master"
 		},
 		{
@@ -135,13 +135,13 @@
 		{
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
-			"revision": "fb17c27f65a0699b0d15f5311a530225b4aea5e0",
+			"revision": "076933f95312aae3a9476e78d6b4118e1b45d542",
 			"branch": "master"
 		},
 		{
 			"importpath": "github.com/matrix-org/naffka",
 			"repository": "https://github.com/matrix-org/naffka",
-			"revision": "d28656e34f96a8eeaab53e3b7678c9ce14af5786",
+			"revision": "662bfd0841d0194bfe0a700d54226bb96eac574d",
 			"branch": "master"
 		},
 		{

@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/util"
 )
@@ -28,7 +29,7 @@ import (
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup configures the given mux with sync-server listeners
-func Setup(apiMux *mux.Router, srp *sync.RequestPool, deviceDB *devices.Database) {
+func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -37,16 +38,16 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, deviceDB *devices.Database
 
 	r0mux.Handle("/rooms/{roomID}/state", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
-		return srp.OnIncomingStateRequest(req, vars["roomID"])
+		return OnIncomingStateRequest(req, syncDB, vars["roomID"])
 	})).Methods("GET")
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
-		return srp.OnIncomingStateTypeRequest(req, vars["roomID"], vars["type"], "")
+		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], "")
 	})).Methods("GET")
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
-		return srp.OnIncomingStateTypeRequest(req, vars["roomID"], vars["type"], vars["stateKey"])
+		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], vars["stateKey"])
 	})).Methods("GET")
 }

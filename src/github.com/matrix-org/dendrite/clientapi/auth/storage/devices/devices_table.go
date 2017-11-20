@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS device_devices (
     -- migration to different domain names easier.
     localpart TEXT NOT NULL,
     -- When this devices was first recognised on the network, as a unix timestamp (ms resolution).
-    created_ts BIGINT NOT NULL
+    created_ts BIGINT NOT NULL,
+    -- The display name, human friendlier than device_id and updatable
+    display_name TEXT
     -- TODO: device keys, device display names, last used ts and IP address?, token restrictions (if 3rd-party OAuth app)
 );
 
@@ -49,21 +51,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(loca
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name) VALUES ($1, $2, $3, $4, $5)"
 
 const selectDeviceByTokenSQL = "" +
 	"SELECT device_id, localpart FROM device_devices WHERE access_token = $1"
 
+const selectDeviceByIDSQL = "" +
+	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
+
+const selectDevicesByLocalpartSQL = "" +
+	"SELECT device_id, display_name FROM device_devices WHERE localpart = $1"
+
+const updateDeviceNameSQL = "" +
+	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
+
 const deleteDeviceSQL = "" +
 	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
 
-// TODO: List devices?
+const deleteDevicesByLocalpartSQL = "" +
+	"DELETE FROM device_devices WHERE localpart = $1"
 
 type devicesStatements struct {
-	insertDeviceStmt        *sql.Stmt
-	selectDeviceByTokenStmt *sql.Stmt
-	deleteDeviceStmt        *sql.Stmt
-	serverName              gomatrixserverlib.ServerName
+	insertDeviceStmt             *sql.Stmt
+	selectDeviceByTokenStmt      *sql.Stmt
+	selectDeviceByIDStmt         *sql.Stmt
+	selectDevicesByLocalpartStmt *sql.Stmt
+	updateDeviceNameStmt         *sql.Stmt
+	deleteDeviceStmt             *sql.Stmt
+	deleteDevicesByLocalpartStmt *sql.Stmt
+	serverName                   gomatrixserverlib.ServerName
 }
 
 func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
@@ -77,7 +93,19 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 	if s.selectDeviceByTokenStmt, err = db.Prepare(selectDeviceByTokenSQL); err != nil {
 		return
 	}
+	if s.selectDeviceByIDStmt, err = db.Prepare(selectDeviceByIDSQL); err != nil {
+		return
+	}
+	if s.selectDevicesByLocalpartStmt, err = db.Prepare(selectDevicesByLocalpartSQL); err != nil {
+		return
+	}
+	if s.updateDeviceNameStmt, err = db.Prepare(updateDeviceNameSQL); err != nil {
+		return
+	}
 	if s.deleteDeviceStmt, err = db.Prepare(deleteDeviceSQL); err != nil {
+		return
+	}
+	if s.deleteDevicesByLocalpartStmt, err = db.Prepare(deleteDevicesByLocalpartSQL); err != nil {
 		return
 	}
 	s.serverName = server
@@ -89,10 +117,11 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
+	displayName *string,
 ) (*authtypes.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := common.TxStmt(txn, s.insertDeviceStmt)
-	if _, err := stmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS); err != nil {
+	if _, err := stmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName); err != nil {
 		return nil, err
 	}
 	return &authtypes.Device{
@@ -110,6 +139,22 @@ func (s *devicesStatements) deleteDevice(
 	return err
 }
 
+func (s *devicesStatements) deleteDevicesByLocalpart(
+	ctx context.Context, txn *sql.Tx, localpart string,
+) error {
+	stmt := common.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
+	_, err := stmt.ExecContext(ctx, localpart)
+	return err
+}
+
+func (s *devicesStatements) updateDeviceName(
+	ctx context.Context, txn *sql.Tx, localpart, deviceID string, displayName *string,
+) error {
+	stmt := common.TxStmt(txn, s.updateDeviceNameStmt)
+	_, err := stmt.ExecContext(ctx, displayName, localpart, deviceID)
+	return err
+}
+
 func (s *devicesStatements) selectDeviceByToken(
 	ctx context.Context, accessToken string,
 ) (*authtypes.Device, error) {
@@ -122,6 +167,44 @@ func (s *devicesStatements) selectDeviceByToken(
 		dev.AccessToken = accessToken
 	}
 	return &dev, err
+}
+
+func (s *devicesStatements) selectDeviceByID(
+	ctx context.Context, localpart, deviceID string,
+) (*authtypes.Device, error) {
+	var dev authtypes.Device
+	var created int64
+	stmt := s.selectDeviceByIDStmt
+	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&created)
+	if err == nil {
+		dev.ID = deviceID
+		dev.UserID = makeUserID(localpart, s.serverName)
+	}
+	return &dev, err
+}
+
+func (s *devicesStatements) selectDevicesByLocalpart(
+	ctx context.Context, localpart string,
+) ([]authtypes.Device, error) {
+	devices := []authtypes.Device{}
+
+	rows, err := s.selectDevicesByLocalpartStmt.QueryContext(ctx, localpart)
+
+	if err != nil {
+		return devices, err
+	}
+
+	for rows.Next() {
+		var dev authtypes.Device
+		err = rows.Scan(&dev.ID)
+		if err != nil {
+			return devices, err
+		}
+		dev.UserID = makeUserID(localpart, s.serverName)
+		devices = append(devices, dev)
+	}
+
+	return devices, nil
 }
 
 func makeUserID(localpart string, server gomatrixserverlib.ServerName) string {

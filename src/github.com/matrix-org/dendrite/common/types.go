@@ -20,3 +20,19 @@ type AccountData struct {
 	RoomID string `json:"room_id"`
 	Type   string `json:"type"`
 }
+
+// ProfileResponse is a struct containing all known user profile data
+type ProfileResponse struct {
+	AvatarURL   string `json:"avatar_url"`
+	DisplayName string `json:"displayname"`
+}
+
+// AvatarURL is a struct containing only the URL to a user's avatar
+type AvatarURL struct {
+	AvatarURL string `json:"avatar_url"`
+}
+
+// DisplayName is a struct containing only a user's display name
+type DisplayName struct {
+	DisplayName string `json:"displayname"`
+}

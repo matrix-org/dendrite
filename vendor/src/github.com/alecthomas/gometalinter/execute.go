@@ -8,14 +8,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/shlex"
-	"gopkg.in/alecthomas/kingpin.v3-unstable"
+	kingpin "gopkg.in/alecthomas/kingpin.v3-unstable"
 )
 
 type Vars map[string]string
@@ -41,35 +40,8 @@ func (v Vars) Replace(s string) string {
 	return s
 }
 
-// Severity of linter message.
-type Severity string
-
-// Linter message severity levels.
-const ( // nolint: deadcode
-	Error   Severity = "error"
-	Warning Severity = "warning"
-)
-
-type Issue struct {
-	Linter   string   `json:"linter"`
-	Severity Severity `json:"severity"`
-	Path     string   `json:"path"`
-	Line     int      `json:"line"`
-	Col      int      `json:"col"`
-	Message  string   `json:"message"`
-}
-
-func (i *Issue) String() string {
-	buf := new(bytes.Buffer)
-	err := formatTemplate.Execute(buf, i)
-	kingpin.FatalIfError(err, "Invalid output format")
-	return buf.String()
-}
-
 type linterState struct {
 	*Linter
-	id       int
-	paths    []string
 	issues   chan *Issue
 	vars     Vars
 	exclude  *regexp.Regexp
@@ -77,26 +49,34 @@ type linterState struct {
 	deadline <-chan time.Time
 }
 
-func (l *linterState) Partitions() ([][]string, error) {
-	command := l.vars.Replace(l.Command)
-	cmdArgs, err := parseCommand(command)
+func (l *linterState) Partitions(paths []string) ([][]string, error) {
+	cmdArgs, err := parseCommand(l.command())
 	if err != nil {
 		return nil, err
 	}
-	parts, err := l.Linter.PartitionStrategy(cmdArgs, l.paths)
+	parts, err := l.Linter.PartitionStrategy(cmdArgs, paths)
 	if err != nil {
 		return nil, err
 	}
 	return parts, nil
 }
 
+func (l *linterState) command() string {
+	return l.vars.Replace(l.Command)
+}
+
 func runLinters(linters map[string]*Linter, paths []string, concurrency int, exclude, include *regexp.Regexp) (chan *Issue, chan error) {
 	errch := make(chan error, len(linters))
 	concurrencych := make(chan bool, concurrency)
 	incomingIssues := make(chan *Issue, 1000000)
-	processedIssues := filterIssuesViaDirectives(
-		newDirectiveParser(),
-		maybeSortIssues(maybeAggregateIssues(incomingIssues)))
+
+	directiveParser := newDirectiveParser()
+	if config.WarnUnmatchedDirective {
+		directiveParser.LoadFiles(paths)
+	}
+
+	processedIssues := maybeSortIssues(filterIssuesViaDirectives(
+		directiveParser, maybeAggregateIssues(incomingIssues)))
 
 	vars := Vars{
 		"duplthreshold":    fmt.Sprintf("%d", config.DuplThreshold),
@@ -106,9 +86,11 @@ func runLinters(linters map[string]*Linter, paths []string, concurrency int, exc
 		"min_occurrences":  fmt.Sprintf("%d", config.MinOccurrences),
 		"min_const_length": fmt.Sprintf("%d", config.MinConstLength),
 		"tests":            "",
+		"not_tests":        "true",
 	}
 	if config.Test {
-		vars["tests"] = "-t"
+		vars["tests"] = "true"
+		vars["not_tests"] = ""
 	}
 
 	wg := &sync.WaitGroup{}
@@ -118,25 +100,24 @@ func runLinters(linters map[string]*Linter, paths []string, concurrency int, exc
 		state := &linterState{
 			Linter:   linter,
 			issues:   incomingIssues,
-			paths:    paths,
 			vars:     vars,
 			exclude:  exclude,
 			include:  include,
 			deadline: deadline,
 		}
 
-		partitions, err := state.Partitions()
+		partitions, err := state.Partitions(paths)
 		if err != nil {
 			errch <- err
 			continue
 		}
 		for _, args := range partitions {
 			wg.Add(1)
+			concurrencych <- true
 			// Call the goroutine with a copy of the args array so that the
 			// contents of the array are not modified by the next iteration of
 			// the above for loop
 			go func(id int, args []string) {
-				concurrencych <- true
 				err := executeLinter(id, state, args)
 				if err != nil {
 					errch <- err
@@ -243,7 +224,9 @@ func processOutput(dbg debugFunction, state *linterState, out []byte) {
 			group = append(group, fragment)
 		}
 
-		issue := &Issue{Line: 1, Linter: state.Linter.Name}
+		issue, err := NewIssue(state.Linter.Name, config.formatTemplate)
+		kingpin.FatalIfError(err, "Invalid output format")
+
 		for i, name := range re.SubexpNames() {
 			if group[i] == nil {
 				continue
@@ -279,8 +262,6 @@ func processOutput(dbg debugFunction, state *linterState, out []byte) {
 		}
 		if sev, ok := config.Severity[state.Name]; ok {
 			issue.Severity = Severity(sev)
-		} else {
-			issue.Severity = Warning
 		}
 		if state.exclude != nil && state.exclude.MatchString(issue.String()) {
 			continue
@@ -323,66 +304,16 @@ func resolvePath(path string) string {
 	return path
 }
 
-type sortedIssues struct {
-	issues []*Issue
-	order  []string
-}
-
-func (s *sortedIssues) Len() int      { return len(s.issues) }
-func (s *sortedIssues) Swap(i, j int) { s.issues[i], s.issues[j] = s.issues[j], s.issues[i] }
-
-// nolint: gocyclo
-func (s *sortedIssues) Less(i, j int) bool {
-	l, r := s.issues[i], s.issues[j]
-	for _, key := range s.order {
-		switch key {
-		case "path":
-			if l.Path > r.Path {
-				return false
-			}
-		case "line":
-			if l.Line > r.Line {
-				return false
-			}
-		case "column":
-			if l.Col > r.Col {
-				return false
-			}
-		case "severity":
-			if l.Severity > r.Severity {
-				return false
-			}
-		case "message":
-			if l.Message > r.Message {
-				return false
-			}
-		case "linter":
-			if l.Linter > r.Linter {
-				return false
-			}
-		}
-	}
-	return true
-}
-
 func maybeSortIssues(issues chan *Issue) chan *Issue {
 	if reflect.DeepEqual([]string{"none"}, config.Sort) {
 		return issues
 	}
-	out := make(chan *Issue, 1000000)
-	sorted := &sortedIssues{
-		issues: []*Issue{},
-		order:  config.Sort,
+	return SortIssueChan(issues, config.Sort)
+}
+
+func maybeAggregateIssues(issues chan *Issue) chan *Issue {
+	if !config.Aggregate {
+		return issues
 	}
-	go func() {
-		for issue := range issues {
-			sorted.issues = append(sorted.issues, issue)
-		}
-		sort.Sort(sorted)
-		for _, issue := range sorted.issues {
-			out <- issue
-		}
-		close(out)
-	}()
-	return out
+	return AggregateIssueChan(issues)
 }

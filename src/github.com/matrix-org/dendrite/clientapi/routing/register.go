@@ -28,7 +28,6 @@ import (
 
 	"github.com/matrix-org/dendrite/common/config"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -37,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -60,6 +60,8 @@ type registerRequest struct {
 	Admin    bool   `json:"admin"`
 	// user-interactive auth params
 	Auth authDict `json:"auth"`
+
+	InitialDisplayName *string `json:"initial_device_display_name"`
 }
 
 type authDict struct {
@@ -210,10 +212,10 @@ func Register(
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, r.InitialDisplayName)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, r.InitialDisplayName)
 	default:
 		return util.JSONResponse{
 			Code: 501,
@@ -270,10 +272,10 @@ func LegacyRegister(
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, nil)
 	default:
 		return util.JSONResponse{
 			Code: 501,
@@ -287,6 +289,7 @@ func completeRegistration(
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	username, password string,
+	displayName *string,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
@@ -318,7 +321,7 @@ func completeRegistration(
 	}
 
 	// // TODO: Use the device ID in the request.
-	dev, err := deviceDB.CreateDevice(ctx, username, nil, token)
+	dev, err := deviceDB.CreateDevice(ctx, username, nil, token, displayName)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 500,

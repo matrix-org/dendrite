@@ -5,7 +5,7 @@
 set -eu
 
 export GOPATH="$(pwd):$(pwd)/vendor"
-export PATH="$PATH:$(pwd)/vendor/bin:$(pwd)/bin"
+export PATH="$PATH:$(pwd)/bin"
 
 echo "Checking that it builds"
 gb build
@@ -18,9 +18,6 @@ echo "Double checking it builds..."
 go build github.com/matrix-org/dendrite/cmd/...
 
 ./scripts/find-lint.sh
-
-echo "Double checking spelling..."
-misspell -error src *.md
 
 echo "Testing..."
 gb test

@@ -321,22 +321,25 @@ func (d *Database) GetThreePIDsForLocalpart(
 }
 
 // GetFilter looks up the filter associated with a given local user and filter ID.
-// Returns an error if no such filter exists or if there was an error taling to the database.
+// Returns a filter represented as a byte slice. Otherwise returns an error if
+// no such filter exists or if there was an error talking to the database.
 func (d *Database) GetFilter(
 	ctx context.Context, localpart string, filterID string,
-) (string, error) {
+) ([]byte, error) {
 	return d.filter.selectFilter(ctx, localpart, filterID)
 }
 
 // PutFilter puts the passed filter into the database.
-// Returns an error if something goes wrong.
+// Returns the filterID as a string. Otherwise returns an error if something
+// goes wrong.
 func (d *Database) PutFilter(
-	ctx context.Context, localpart, filter string,
+	ctx context.Context, localpart string, filter []byte,
 ) (string, error) {
 	return d.filter.insertFilter(ctx, filter, localpart)
 }
 
-// CheckAccountAvailability checks if the username/localpart is already present in the database.
+// CheckAccountAvailability checks if the username/localpart is already present
+// in the database.
 // If the DB returns sql.ErrNoRows the Localpart isn't taken.
 func (d *Database) CheckAccountAvailability(ctx context.Context, localpart string) (bool, error) {
 	_, err := d.accounts.selectAccountByLocalpart(ctx, localpart)
