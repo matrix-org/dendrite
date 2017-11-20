@@ -38,6 +38,7 @@ func Setup(
 	apiMux *mux.Router,
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
+	aliasAPI api.RoomserverAliasAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
@@ -101,6 +102,15 @@ func Setup(
 			vars := mux.Vars(httpReq)
 			return GetEvent(
 				httpReq.Context(), request, cfg, query, time.Now(), keys, vars["eventID"],
+			)
+		},
+	)).Methods("GET")
+
+	v1fedmux.Handle("/query/directory/", common.MakeFedAPI(
+		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			return RoomAliasToID(
+				httpReq, federation, cfg, aliasAPI,
 			)
 		},
 	)).Methods("GET")
