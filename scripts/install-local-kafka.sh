@@ -18,7 +18,7 @@ mkdir -p kafka && tar xzf kafka.tgz -C kafka --strip-components 1
 kafka/bin/zookeeper-server-start.sh -daemon kafka/config/zookeeper.properties
 # Enable topic deletion so that the integration tests can create a fresh topic
 # for each test run.
-echo "delete.topic.enable=true" >> kafka/config/server.properties
+echo -e "\n\ndelete.topic.enable=true" >> kafka/config/server.properties
 # Start the kafka server running in the background.
 # By default the kafka listens on localhost:9092
 kafka/bin/kafka-server-start.sh -daemon kafka/config/server.properties
