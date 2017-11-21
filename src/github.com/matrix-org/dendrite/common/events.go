@@ -42,9 +42,29 @@ func BuildEvent(
 	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	err := AddPrevEventsToEvent(ctx, builder, cfg, queryAPI, queryRes)
 	if err != nil {
 		return nil, err
+	}
+
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	now := time.Now()
+	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
+func AddPrevEventsToEvent(
+	ctx context.Context,
+	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
+) error {
+	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	if err != nil {
+		return err
 	}
 
 	// Ask the roomserver for information about this room
@@ -56,11 +76,11 @@ func BuildEvent(
 		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
 	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
-		return nil, err
+		return err
 	}
 
 	if !queryRes.RoomExists {
-		return nil, ErrRoomNoExists
+		return ErrRoomNoExists
 	}
 
 	builder.Depth = queryRes.Depth
@@ -71,22 +91,15 @@ func BuildEvent(
 	for i := range queryRes.StateEvents {
 		err = authEvents.AddEvent(&queryRes.StateEvents[i])
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	builder.AuthEvents = refs
 
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	now := time.Now()
-	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return &event, nil
+	return nil
 }

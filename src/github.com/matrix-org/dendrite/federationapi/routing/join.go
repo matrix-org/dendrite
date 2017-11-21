@@ -90,7 +90,7 @@ func MakeJoin(
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: event,
+		JSON: map[string]interface{}{"event": builder},
 	}
 }
 
@@ -159,6 +159,7 @@ func SendJoin(
 	var stateAndAuthChainRepsonse api.QueryStateAndAuthChainResponse
 	err = query.QueryStateAndAuthChain(ctx, &api.QueryStateAndAuthChainRequest{
 		PrevEventIDs: event.PrevEventIDs(),
+		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
 	}, &stateAndAuthChainRepsonse)
 	if err != nil {
