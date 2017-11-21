@@ -52,6 +52,25 @@ github. These can be added just before merging of the PR to master, and the
 issue number should be added to the comment, e.g. `// TODO(#324): ...`
 
 
+## Logging
+
+We prefer to log with static log messages and include any dynamic information
+in fields.
+
+```golang
+logger := util.GetLogger(ctx)
+
+// Not recommended
+logger.Infof("Finished processing keys for %s, number of keys %d", name, numKeys)
+
+// Recommended
+logger.WithFields(logrus.Fields{
+    "numberOfKeys": numKeys,
+    "entityName":   name,
+}).Info("Finished processing keys")
+```
+
+
 ## Visual Studio Code
 
 If you use VSCode then the following is an example of a workspace setting that
