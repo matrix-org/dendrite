@@ -54,8 +54,8 @@ issue number should be added to the comment, e.g. `// TODO(#324): ...`
 
 ## Logging
 
-We prefer to log with static log messages and include any dynamic information
-in fields.
+We generally prefer to log with static log messages and include any dynamic
+information in fields.
 
 ```golang
 logger := util.GetLogger(ctx)
@@ -69,6 +69,10 @@ logger.WithFields(logrus.Fields{
     "entityName":   name,
 }).Info("Finished processing keys")
 ```
+
+This is useful when logging to systems that natively understand log fields, as
+it allows people to search and process the fields without having to parse the
+log message.
 
 
 ## Visual Studio Code
