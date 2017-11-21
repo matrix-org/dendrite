@@ -26,15 +26,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/util"
 )
-
-type turnServerResponse struct {
-	Username string   `json:"username"`
-	Password string   `json:"password"`
-	URIs     []string `json:"uris"`
-	TTL      int      `json:"ttl"`
-}
 
 // RequestTurnServer implements:
 //     GET /voip/turnServer
@@ -52,7 +46,7 @@ func RequestTurnServer(req *http.Request, device *authtypes.Device, cfg config.D
 	// Duration checked at startup, err not possible
 	duration, _ := time.ParseDuration(turnConfig.UserLifetime)
 
-	resp := turnServerResponse{
+	resp := gomatrix.RespTurnServer{
 		URIs: turnConfig.URIs,
 		TTL:  int(duration.Seconds()),
 	}

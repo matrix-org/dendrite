@@ -8,7 +8,8 @@ import (
 // A MemoryDatabase stores the message history as arrays in memory.
 // It can be used to run unit tests.
 // If the process is stopped then any messages that haven't been
-// processed by a consumer are lost forever.
+// processed by a consumer are lost forever and all offsets become
+// invalid.
 type MemoryDatabase struct {
 	topicsMutex sync.Mutex
 	topics      map[string]*memoryDatabaseTopic
@@ -58,10 +59,7 @@ func (m *MemoryDatabase) getTopic(topicName string) *memoryDatabaseTopic {
 
 // StoreMessages implements Database
 func (m *MemoryDatabase) StoreMessages(topic string, messages []Message) error {
-	if err := m.getTopic(topic).addMessages(messages); err != nil {
-		return err
-	}
-	return nil
+	return m.getTopic(topic).addMessages(messages)
 }
 
 // FetchMessages implements Database
@@ -73,10 +71,10 @@ func (m *MemoryDatabase) FetchMessages(topic string, startOffset, endOffset int6
 	if startOffset >= endOffset {
 		return nil, fmt.Errorf("start offset %d greater than or equal to end offset %d", startOffset, endOffset)
 	}
-	if startOffset < -1 {
-		return nil, fmt.Errorf("start offset %d less than -1", startOffset)
+	if startOffset < 0 {
+		return nil, fmt.Errorf("start offset %d less than 0", startOffset)
 	}
-	return messages[startOffset+1 : endOffset], nil
+	return messages[startOffset:endOffset], nil
 }
 
 // MaxOffsets implements Database
