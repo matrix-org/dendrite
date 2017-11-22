@@ -23,9 +23,12 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -46,9 +49,13 @@ const (
 	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
 	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
+	sessionIDLength   = 24
 )
 
-var validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
+var (
+	sessions           = make(map[string][]authtypes.LoginType) // Sessions and completed flow stages
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
+)
 
 // registerRequest represents the submitted registration request.
 // It can be broken down into 2 sections: the auth dictionary and registration parameters.
@@ -79,16 +86,10 @@ type authDict struct {
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
 type userInteractiveResponse struct {
-	Flows     []authFlow             `json:"flows"`
+	Flows     []authtypes.Flow       `json:"flows"`
 	Completed []authtypes.LoginType  `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
 	Session   string                 `json:"session"`
-}
-
-// authFlow represents one possible way that the client can authenticate a request.
-// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
-type authFlow struct {
-	Stages []authtypes.LoginType `json:"stages"`
 }
 
 // legacyRegisterRequest represents the submitted registration request for v1 API.
@@ -100,9 +101,9 @@ type legacyRegisterRequest struct {
 	Mac      gomatrixserverlib.HexString `json:"mac"`
 }
 
-func newUserInteractiveResponse(sessionID string, fs []authFlow) userInteractiveResponse {
+func newUserInteractiveResponse(sessionID string, fs []authtypes.Flow) userInteractiveResponse {
 	return userInteractiveResponse{
-		fs, []authtypes.LoginType{}, make(map[string]interface{}), sessionID,
+		fs, sessions[sessionID], make(map[string]interface{}), sessionID,
 	}
 }
 
@@ -114,6 +115,7 @@ type registerResponse struct {
 	DeviceID    string                       `json:"device_id"`
 }
 
+// recaptchaResponse represents the HTTP response from a Google ReCaptcha server
 type recaptchaResponse struct {
 	Success     bool      `json:"success"`
 	ChallengeTS time.Time `json:"challenge_ts"`
@@ -190,16 +192,8 @@ func validateRecaptcha(
 		}
 	}
 
-	defer func() {
-		err := resp.Body.Close()
-
-		if err != nil {
-			logger := util.GetLogger(req.Context())
-			logger.WithFields(log.Fields{
-				"response": response,
-			}).Info("Failed to close recaptcha request response body")
-		}
-	}()
+	// Close the request once we're finishing reading from it
+	defer resp.Body.Close() // noline: errcheck
 
 	// Grab the body of the response from the captcha server
 	var r recaptchaResponse
@@ -228,6 +222,9 @@ func validateRecaptcha(
 	return nil
 }
 
+// TODO: Create flows in config.go so that they're cached. Always show msisdn flows as long as flows only depend on config-file options.
+// Store it just like the config does in a struct and keep it there.
+
 // Register processes a /register request. http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
@@ -235,23 +232,25 @@ func Register(
 	deviceDB *devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
+
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
 
-	// All registration requests must specify what auth they are using to perform this request
+	// Retrieve or generate the sessionID
+	sessionID := r.Auth.Session
+	if sessionID == "" {
+		// Generate a new, random session ID
+		sessionID = RandString(sessionIDLength)
+	}
+
+	// If no auth type is specified by the client, send back the list of available flows
 	if r.Auth.Type == "" {
 		return util.JSONResponse{
 			Code: 401,
-			// TODO: Hard-coded 'dummy' auth for now with a bogus session ID.
-			//       Server admins should be able to change things around (eg enable captcha)
-			JSON: newUserInteractiveResponse(time.Now().String(), []authFlow{
-				{[]authtypes.LoginType{authtypes.LoginTypeDummy}},
-				{[]authtypes.LoginType{authtypes.LoginTypeRecaptcha}},
-				{[]authtypes.LoginType{authtypes.LoginTypeSharedSecret}},
-			}),
+			JSON: newUserInteractiveResponse(sessionID, cfg.Derived.Flows),
 		}
 	}
 
@@ -280,7 +279,7 @@ func Register(
 	// TODO: email / msisdn auth types.
 	switch r.Auth.Type {
 	case authtypes.LoginTypeRecaptcha:
-		if !cfg.Matrix.RegistrationRecaptcha {
+		if !cfg.Matrix.RecaptchaEnabled {
 			return util.MessageResponse(400, "Captcha registration is disabled")
 		}
 
@@ -294,8 +293,9 @@ func Register(
 		if resErr = validateRecaptcha(req, cfg, r.Auth.Response, req.RemoteAddr); resErr != nil {
 			return *resErr
 		}
-		return completeRegistration(req.Context(), accountDB, deviceDB,
-			r.Username, r.Password, r.InitialDisplayName)
+
+		// Add Recaptcha to the list of completed registration stages
+		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeRecaptcha)
 
 	case authtypes.LoginTypeSharedSecret:
 		if cfg.Matrix.RegistrationSharedSecret == "" {
@@ -313,17 +313,34 @@ func Register(
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB,
-			r.Username, r.Password, r.InitialDisplayName)
+		// Add SharedSecret to the list of completed registration stages
+		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeSharedSecret)
+
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB,
-			r.Username, r.Password, r.InitialDisplayName)
+		// Add Dummy to the list of completed registration stages
+		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeDummy)
+
 	default:
 		return util.JSONResponse{
 			Code: 501,
 			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
 		}
+	}
+
+	// Check if a registration flow has been completed successfully
+	for _, flow := range cfg.Derived.Flows {
+		if checkFlowsEqual(flow, authtypes.Flow{sessions[sessionID]}) {
+			return completeRegistration(req.Context(), accountDB, deviceDB,
+				r.Username, r.Password, r.InitialDisplayName)
+		}
+	}
+
+	// There are still more stages to complete.
+	// Return the flows and those that have been completed.
+	return util.JSONResponse{
+		Code: 401,
+		JSON: newUserInteractiveResponse(sessionID, cfg.Derived.Flows),
 	}
 }
 
@@ -477,6 +494,62 @@ func isValidMacLogin(
 	expectedMAC := mac.Sum(nil)
 
 	return hmac.Equal(givenMac, expectedMAC), nil
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const (
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+)
+
+// RandString returns a random string of characters with a given length.
+// Do note that it is not thread-safe in its current form.
+// https://stackoverflow.com/a/31832326
+var src = rand.NewSource(time.Now().UnixNano())
+
+func RandString(n int) string {
+	b := make([]byte, n)
+
+	// A src.Int63() generates 63 random bits
+	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
+	}
+
+	return string(b)
+}
+
+// checkFlowsEqual checks if two registration flows have the same stages
+// within them. Order of stages does not matter.
+func checkFlowsEqual(aFlow, bFlow authtypes.Flow) bool {
+	a := aFlow.Stages
+	b := bFlow.Stages
+	if len(a) != len(b) {
+		return false
+	}
+
+	a_copy := make([]string, len(a))
+	b_copy := make([]string, len(b))
+
+	for loginType := range a {
+		a_copy = append(a_copy, string(loginType))
+	}
+	for loginType := range b {
+		b_copy = append(b_copy, string(loginType))
+	}
+
+	sort.Strings(a_copy)
+	sort.Strings(b_copy)
+
+	return reflect.DeepEqual(a_copy, b_copy)
 }
 
 type availableResponse struct {
