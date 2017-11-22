@@ -486,7 +486,7 @@ func (r *RoomserverQueryAPI) getAuthChain(
 	// Check if there's anything left to do
 	for len(eventsToFetch) > 0 {
 		// Convert eventIDs to events. First need to fetch NIDs
-		nidMap, err := r.DB.EventNIDs(ctx, authEventIDs)
+		nidMap, err := r.DB.EventNIDs(ctx, eventsToFetch)
 		if err != nil {
 			return nil, err
 		}
