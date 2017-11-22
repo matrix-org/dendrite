@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -649,6 +650,17 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 	}
 
 	return d.statements.selectMembershipsFromRoom(ctx, roomNID)
+}
+
+// RoomIDReserved implements query.RoomserverQueryAPIDB
+func (d *Database) RoomIDReserved(ctx context.Context, roomID string) (time.Time, error) {
+	return d.statements.selectReservedRoom(ctx, roomID)
+}
+
+// ReserveRoomID implements query.RoomserverQueryAPIDB
+// It saved the given room ID as reserved.
+func (d *Database) ReserveRoomID(ctx context.Context, roomID string) error {
+	return d.statements.insertReservedRoom(ctx, roomID, time.Now())
 }
 
 type transaction struct {

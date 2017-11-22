@@ -90,10 +90,27 @@ type fledglingEvent struct {
 func CreateRoom(req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
+	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
-	// TODO (#267): Check room ID doesn't clash with an existing one, and we
-	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	// Generate a room ID and reserve it.
+	// Keep trying until we have one which is unused.
+	var roomID string
+	for roomID == "" {
+		checkRoomID := util.RandomString(16)
+		checkRoomID = fmt.Sprintf("!%s:%s", checkRoomID, cfg.Matrix.ServerName)
+
+		queryReq := api.QueryReserveRoomIDRequest{RoomID: checkRoomID}
+		var queryResp api.QueryReserveRoomIDResponse
+		err := queryAPI.QueryReserveRoomID(req.Context(), &queryReq, &queryResp)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+
+		if queryResp.Success {
+			roomID = checkRoomID
+		}
+	}
+
 	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI)
 }
 
