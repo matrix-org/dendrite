@@ -264,7 +264,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.StreamPosition, error) {
 		return types.StreamPosition(0), fmt.Errorf(
 			"waitForEvents timed out waiting for %s (pos=%d)", req.userID, req.since,
 		)
-	case <-listener.GetNotifyChannel(req.since):
+	case <-listener.GetNotifyChannel(*req.since):
 		p := listener.GetStreamPosition()
 		return p, nil
 	}
@@ -282,7 +282,7 @@ func newTestSyncRequest(userID string, since types.StreamPosition) syncRequest {
 	return syncRequest{
 		userID:        userID,
 		timeout:       1 * time.Minute,
-		since:         since,
+		since:         &since,
 		wantFullState: false,
 		limit:         defaultTimelineLimit,
 		log:           util.GetLogger(context.TODO()),
