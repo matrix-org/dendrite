@@ -80,6 +80,7 @@ kafka:
     # Naffka can only be used when running dendrite as a single monolithic server.
     # Kafka can be used both with a monolithic server and when running the
     # components as separate servers.
+    # If enabled database.naffka must also be specified.
     use_naffka: false
     # The names of the kafka topics to use.
     topics:
@@ -97,6 +98,8 @@ database:
     server_key: "postgres://dendrite:itsasecret@localhost/dendrite_serverkey?sslmode=disable"
     federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
     public_rooms_api: "postgres://dendrite:itsasecret@localhost/dendrite_publicroomsapi?sslmode=disable"
+    # If using naffka you need to specify a naffka database
+    # naffka: "postgres://dendrite:itsasecret@localhost/dendrite_naffk?sslmode=disable"
 
 # The TCP host:port pairs to bind the internal HTTP APIs to.
 # These shouldn't be exposed to the public internet.
