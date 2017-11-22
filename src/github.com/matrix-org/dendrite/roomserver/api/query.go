@@ -159,9 +159,10 @@ type QueryServerAllowedToSeeEventResponse struct {
 type QueryStateAndAuthChainRequest struct {
 	// The room ID to query the state in.
 	RoomID string `json:"room_id"`
-	// The list of events to return state after.
+	// The list of prev events for the event. Used to calculate the state at
+	// the event
 	PrevEventIDs []string `json:"prev_event_ids"`
-	// The list of auth events to get the auth chain for.
+	// The list of auth events for the event. Used to calculate the auth chain
 	AuthEventIDs []string `json:"auth_event_ids"`
 }
 
@@ -225,7 +226,9 @@ type RoomserverQueryAPI interface {
 		response *QueryServerAllowedToSeeEventResponse,
 	) error
 
-	// Query to get state and auth chain
+	// Query to get state and auth chain for a (potentially hypothetical) event.
+	// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
+	// the state and auth chain to return.
 	QueryStateAndAuthChain(
 		ctx context.Context,
 		request *QueryStateAndAuthChainRequest,
