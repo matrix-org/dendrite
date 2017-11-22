@@ -607,4 +607,18 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: 200, JSON: &response}
 		}),
 	)
+	servMux.Handle(
+		api.RoomserverQueryStateAndAuthChainPath,
+		common.MakeInternalAPI("queryStateAndAuthChain", func(req *http.Request) util.JSONResponse {
+			var request api.QueryStateAndAuthChainRequest
+			var response api.QueryStateAndAuthChainResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryStateAndAuthChain(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: 200, JSON: &response}
+		}),
+	)
 }
