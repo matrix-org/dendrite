@@ -239,7 +239,7 @@ func testDownload(host, origin, mediaID string, wantedStatusCode int, serverCmdC
 	testReq := &test.Request{
 		Req:              req,
 		WantedStatusCode: wantedStatusCode,
-		WantedBody:       test.CanonicalJSONInput([]string{""})[0],
+		WantedBody:       "",
 	}
 	testReq.Run(fmt.Sprintf("download mxc://%v/%v from %v", origin, mediaID, host), timeout, serverCmdChan)
 }
