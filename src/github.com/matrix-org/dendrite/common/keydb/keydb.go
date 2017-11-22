@@ -44,6 +44,11 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 	return d, nil
 }
 
+// FetcherName implements KeyFetcher
+func (d Database) FetcherName() string {
+	return "KeyDatabase"
+}
+
 // FetchKeys implements gomatrixserverlib.KeyDatabase
 func (d *Database) FetchKeys(
 	ctx context.Context,
