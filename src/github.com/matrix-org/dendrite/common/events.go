@@ -42,7 +42,7 @@ func BuildEvent(
 	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
-	err := AddPrevEventsToEvent(ctx, builder, cfg, queryAPI, queryRes)
+	err := AddPrevEventsToEvent(ctx, builder, queryAPI, queryRes)
 	if err != nil {
 		return nil, err
 	}
@@ -57,9 +57,10 @@ func BuildEvent(
 	return &event, nil
 }
 
+// AddPrevEventsToEvent fills out the prev_events and auth_events fields in EventBuilder
 func AddPrevEventsToEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite,
+	builder *gomatrixserverlib.EventBuilder,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) error {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
