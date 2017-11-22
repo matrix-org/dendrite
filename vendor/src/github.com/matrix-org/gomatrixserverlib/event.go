@@ -16,11 +16,13 @@
 package gomatrixserverlib
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/tidwall/sjson"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -183,37 +185,52 @@ func (eb *EventBuilder) Build(eventID string, now time.Time, origin ServerName, 
 // It also checks the content hashes to ensure the event has not been tampered with.
 // This should be used when receiving new events from remote servers.
 func NewEventFromUntrustedJSON(eventJSON []byte) (result Event, err error) {
-	var event map[string]rawJSON
-	if err = json.Unmarshal(eventJSON, &event); err != nil {
+	// We parse the JSON early on so that we don't have to check if the JSON
+	// is valid
+	if err = json.Unmarshal(eventJSON, &result.fields); err != nil {
 		return
 	}
+
 	// Synapse removes these keys from events in case a server accidentally added them.
 	// https://github.com/matrix-org/synapse/blob/v0.18.5/synapse/crypto/event_signing.py#L57-L62
-	delete(event, "outlier")
-	delete(event, "destinations")
-	delete(event, "age_ts")
-
-	if eventJSON, err = json.Marshal(event); err != nil {
-		return
-	}
-
-	if err = checkEventContentHash(eventJSON); err != nil {
-		result.redacted = true
-		// If the content hash doesn't match then we have to discard all non-essential fields
-		// because they've been tampered with.
-		if eventJSON, err = redactEvent(eventJSON); err != nil {
+	for _, key := range []string{"outlier", "destinations", "age_ts"} {
+		if eventJSON, err = sjson.DeleteBytes(eventJSON, key); err != nil {
 			return
 		}
 	}
 
-	if eventJSON, err = CanonicalJSON(eventJSON); err != nil {
-		return
+	// We know the JSON must be valid here.
+	eventJSON = CanonicalJSONAssumeValid(eventJSON)
+
+	if err = checkEventContentHash(eventJSON); err != nil {
+		result.redacted = true
+
+		// If the content hash doesn't match then we have to discard all non-essential fields
+		// because they've been tampered with.
+		var redactedJSON []byte
+		if redactedJSON, err = redactEvent(eventJSON); err != nil {
+			return
+		}
+
+		redactedJSON = CanonicalJSONAssumeValid(redactedJSON)
+
+		// We need to ensure that `result` is the redacted event.
+		// If redactedJSON is the same as eventJSON then `result` is already
+		// correct. If not then we need to reparse.
+		//
+		// Yes, this means that for some events we parse twice (which is slow),
+		// but means that parsing unredacted events is fast.
+		if !bytes.Equal(redactedJSON, eventJSON) {
+			result = Event{redacted: true}
+			if err = json.Unmarshal(redactedJSON, &result.fields); err != nil {
+				return
+			}
+		}
+
+		eventJSON = redactedJSON
 	}
 
 	result.eventJSON = eventJSON
-	if err = json.Unmarshal(eventJSON, &result.fields); err != nil {
-		return
-	}
 
 	if err = result.CheckFields(); err != nil {
 		return

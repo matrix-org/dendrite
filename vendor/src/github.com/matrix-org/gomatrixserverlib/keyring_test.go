@@ -36,6 +36,10 @@ var testKeys = `{
 
 type testKeyDatabase struct{}
 
+func (db testKeyDatabase) FetcherName() string {
+	return "testKeyDatabase"
+}
+
 func (db *testKeyDatabase) FetchKeys(
 	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
 ) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
@@ -150,6 +154,11 @@ func (e *erroringKeyDatabaseError) Error() string { return "An error with the ke
 
 var testErrorFetch = erroringKeyDatabaseError(1)
 var testErrorStore = erroringKeyDatabaseError(2)
+
+// FetcherName implements KeyFetcher
+func (e erroringKeyDatabase) FetcherName() string {
+	return "ErroringKeyDatabase"
+}
 
 func (e *erroringKeyDatabase) FetchKeys(
 	ctx context.Context, requests map[PublicKeyRequest]Timestamp,

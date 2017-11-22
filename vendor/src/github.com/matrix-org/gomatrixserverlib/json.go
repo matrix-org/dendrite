@@ -16,66 +16,73 @@
 package gomatrixserverlib
 
 import (
-	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"sort"
 	"unicode/utf8"
+
+	"github.com/pkg/errors"
+	"github.com/tidwall/gjson"
 )
 
 // CanonicalJSON re-encodes the JSON in a canonical encoding. The encoding is
 // the shortest possible encoding using integer values with sorted object keys.
 // https://matrix.org/docs/spec/server_server/unstable.html#canonical-json
 func CanonicalJSON(input []byte) ([]byte, error) {
-	sorted, err := SortJSON(input, make([]byte, 0, len(input)))
-	if err != nil {
-		return nil, err
+	if !gjson.Valid(string(input)) {
+		return nil, errors.Errorf("invalid json")
 	}
-	return CompactJSON(sorted, make([]byte, 0, len(sorted))), nil
+
+	return CanonicalJSONAssumeValid(input), nil
+}
+
+// CanonicalJSONAssumeValid is the same as CanonicalJSON, but assumes the
+// input is valid JSON
+func CanonicalJSONAssumeValid(input []byte) []byte {
+	input = CompactJSON(input, make([]byte, 0, len(input)))
+	return SortJSON(input, make([]byte, 0, len(input)))
 }
 
 // SortJSON reencodes the JSON with the object keys sorted by lexicographically
 // by codepoint. The input must be valid JSON.
-func SortJSON(input, output []byte) ([]byte, error) {
-	// Skip to the first character that isn't whitespace.
-	var decoded interface{}
+func SortJSON(input, output []byte) []byte {
+	result := gjson.ParseBytes(input)
 
-	decoder := json.NewDecoder(bytes.NewReader(input))
-	decoder.UseNumber()
-	if err := decoder.Decode(&decoded); err != nil {
-		return nil, err
-	}
-	return sortJSONValue(decoded, output)
+	rawJSON := rawJSONFromResult(result, input)
+	return sortJSONValue(result, rawJSON, output)
 }
 
-func sortJSONValue(input interface{}, output []byte) ([]byte, error) {
-	switch value := input.(type) {
-	case []interface{}:
-		// If the JSON is an array then we need to sort the keys of its children.
-		return sortJSONArray(value, output)
-	case map[string]interface{}:
-		// If the JSON is an object then we need to sort its keys and the keys of its children.
-		return sortJSONObject(value, output)
-	default:
-		// Otherwise the JSON is a value and can be encoded without any further sorting.
-		bytes, err := json.Marshal(value)
-		if err != nil {
-			return nil, err
-		}
-		return append(output, bytes...), nil
+// sortJSONValue takes a gjson.Result and sorts it. inputJSON must be the
+// raw JSON bytes that gjson.Result points to.
+func sortJSONValue(input gjson.Result, inputJSON, output []byte) []byte {
+	if input.IsArray() {
+		return sortJSONArray(input, inputJSON, output)
 	}
+
+	if input.IsObject() {
+		return sortJSONObject(input, inputJSON, output)
+	}
+
+	// If its neither an object nor an array then there is no sub structure
+	// to sort, so just append the raw bytes.
+	return append(output, inputJSON...)
 }
 
-func sortJSONArray(input []interface{}, output []byte) ([]byte, error) {
-	var err error
+// sortJSONArray takes a gjson.Result and sorts it, assuming its an array.
+// inputJSON must be the raw JSON bytes that gjson.Result points to.
+func sortJSONArray(input gjson.Result, inputJSON, output []byte) []byte {
 	sep := byte('[')
-	for _, value := range input {
+
+	// Iterate over each value in the array and sort it.
+	input.ForEach(func(_, value gjson.Result) bool {
 		output = append(output, sep)
 		sep = ','
-		if output, err = sortJSONValue(value, output); err != nil {
-			return nil, err
-		}
-	}
+
+		rawJSON := rawJSONFromResult(value, inputJSON)
+		output = sortJSONValue(value, rawJSON, output)
+
+		return true // keep iterating
+	})
+
 	if sep == '[' {
 		// If sep is still '[' then the array was empty and we never wrote the
 		// initial '[', so we write it now along with the closing ']'.
@@ -84,31 +91,49 @@ func sortJSONArray(input []interface{}, output []byte) ([]byte, error) {
 		// Otherwise we end the array by writing a single ']'
 		output = append(output, ']')
 	}
-	return output, nil
+	return output
 }
 
-func sortJSONObject(input map[string]interface{}, output []byte) ([]byte, error) {
-	var err error
-	keys := make([]string, len(input))
-	var j int
-	for key := range input {
-		keys[j] = key
-		j++
+// sortJSONObject takes a gjson.Result and sorts it, assuming its an object.
+// inputJSON must be the raw JSON bytes that gjson.Result points to.
+func sortJSONObject(input gjson.Result, inputJSON, output []byte) []byte {
+	type entry struct {
+		key    string // The parsed key string
+		rawKey []byte // The raw, unparsed key JSON string
+		value  gjson.Result
 	}
-	sort.Strings(keys)
+
+	var entries []entry
+
+	// Iterate over each key/value pair and add it to a slice
+	// that we can sort
+	input.ForEach(func(key, value gjson.Result) bool {
+		entries = append(entries, entry{
+			key:    key.String(),
+			rawKey: rawJSONFromResult(key, inputJSON),
+			value:  value,
+		})
+		return true // keep iterating
+	})
+
+	// Sort the slice based on the *parsed* key
+	sort.Slice(entries, func(a, b int) bool {
+		return entries[a].key < entries[b].key
+	})
+
 	sep := byte('{')
-	for _, key := range keys {
+
+	for _, entry := range entries {
 		output = append(output, sep)
 		sep = ','
-		var encoded []byte
-		if encoded, err = json.Marshal(key); err != nil {
-			return nil, err
-		}
-		output = append(output, encoded...)
+
+		// Append the raw unparsed JSON key, *not* the parsed key
+		output = append(output, entry.rawKey...)
 		output = append(output, ':')
-		if output, err = sortJSONValue(input[key], output); err != nil {
-			return nil, err
-		}
+
+		rawJSON := rawJSONFromResult(entry.value, inputJSON)
+
+		output = sortJSONValue(entry.value, rawJSON, output)
 	}
 	if sep == '{' {
 		// If sep is still '{' then the object was empty and we never wrote the
@@ -118,7 +143,7 @@ func sortJSONObject(input map[string]interface{}, output []byte) ([]byte, error)
 		// Otherwise we end the object by writing a single '}'
 		output = append(output, '}')
 	}
-	return output, nil
+	return output
 }
 
 // CompactJSON makes the encoded JSON as small as possible by removing
@@ -236,4 +261,20 @@ func readHexDigits(input []byte) uint32 {
 	hex &= 0xFF00FF
 	hex |= hex >> 8
 	return hex & 0xFFFF
+}
+
+// rawJSONFromResult extracts the raw JSON bytes pointed to by result.
+// input must be the json bytes that were used to generate result
+func rawJSONFromResult(result gjson.Result, input []byte) (rawJSON []byte) {
+	// This is lifted from gjson README. Basically, result.Raw is a copy of
+	// the bytes we want, but its more efficient to take a slice.
+	// If Index is 0 then for some reason we can't extract it from the original
+	// JSON bytes.
+	if result.Index > 0 {
+		rawJSON = input[result.Index : result.Index+len(result.Raw)]
+	} else {
+		rawJSON = []byte(result.Raw)
+	}
+
+	return
 }

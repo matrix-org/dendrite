@@ -20,10 +20,8 @@ import (
 )
 
 func testSortJSON(t *testing.T, input, want string) {
-	got, err := SortJSON([]byte(input), nil)
-	if err != nil {
-		t.Error(err)
-	}
+	got := SortJSON([]byte(input), nil)
+
 	// Squash out the whitespace before comparing the JSON in case SortJSON had inserted whitespace.
 	if string(CompactJSON(got, nil)) != want {
 		t.Errorf("SortJSON(%q): want %q got %q", input, want, got)
@@ -36,6 +34,7 @@ func TestSortJSON(t *testing.T) {
 		`{"A":{"1":1,"2":2},"B":{"3":3,"4":4}}`)
 	testSortJSON(t, `[true,false,null]`, `[true,false,null]`)
 	testSortJSON(t, `[9007199254740991]`, `[9007199254740991]`)
+	testSortJSON(t, "\t\n[9007199254740991]", `[9007199254740991]`)
 }
 
 func testCompactJSON(t *testing.T, input, want string) {
