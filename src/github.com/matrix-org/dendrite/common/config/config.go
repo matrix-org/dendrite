@@ -208,6 +208,10 @@ type Dendrite struct {
 		// Flows for registration. As long as they given flows only relies on config file options,
 		// we can generate them on startup and store them until needed
 		Flows []authtypes.Flow `json:"flows"`
+
+		// Params for registration. Data that is returned to the client while registering and
+		// that which is necessary to complete certain registration flow stages
+		Params map[string]interface{} `json:"params"`
 	}
 }
 
@@ -335,11 +339,15 @@ func loadConfig(
 // the config file
 func (config *Dendrite) derive() {
 	// Determine registrations flows based off config values
+
+	config.Derived.Params = make(map[string]interface{})
+
 	// TODO: Add email auth type
 	// TODO: Add MSISDN auth type
 
 	if config.Matrix.RecaptchaEnabled {
-		config.Derived.Flows = append(config.Derived.Flows, 
+		config.Derived.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.Matrix.RecaptchaPublicKey}
+		config.Derived.Flows = append(config.Derived.Flows,
 			authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
 	} else {
 		config.Derived.Flows = append(config.Derived.Flows,

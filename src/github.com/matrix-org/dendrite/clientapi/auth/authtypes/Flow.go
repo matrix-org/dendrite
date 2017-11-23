@@ -14,7 +14,7 @@
 
 package authtypes
 
-// AuthFlow represents one possible way that the client can authenticate a request.
+// Flow represents one possible way that the client can authenticate a request.
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
 type Flow struct {
 	Stages []LoginType `json:"stages"`

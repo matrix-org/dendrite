@@ -101,9 +101,13 @@ type legacyRegisterRequest struct {
 	Mac      gomatrixserverlib.HexString `json:"mac"`
 }
 
-func newUserInteractiveResponse(sessionID string, fs []authtypes.Flow) userInteractiveResponse {
+func newUserInteractiveResponse(
+	sessionID string,
+	fs []authtypes.Flow,
+	params map[string]interface{},
+) userInteractiveResponse {
 	return userInteractiveResponse{
-		fs, sessions[sessionID], make(map[string]interface{}), sessionID,
+		fs, sessions[sessionID], params, sessionID,
 	}
 }
 
@@ -164,7 +168,6 @@ func validatePassword(password string) *util.JSONResponse {
 
 // validateRecaptcha returns an error response if the captcha response is invalid
 func validateRecaptcha(
-	req *http.Request,
 	cfg *config.Dendrite,
 	response string,
 	clientip string,
@@ -193,7 +196,7 @@ func validateRecaptcha(
 	}
 
 	// Close the request once we're finishing reading from it
-	defer resp.Body.Close() // noline: errcheck
+	defer resp.Body.Close() // nolint: errcheck
 
 	// Grab the body of the response from the captcha server
 	var r recaptchaResponse
@@ -250,7 +253,8 @@ func Register(
 	if r.Auth.Type == "" {
 		return util.JSONResponse{
 			Code: 401,
-			JSON: newUserInteractiveResponse(sessionID, cfg.Derived.Flows),
+			JSON: newUserInteractiveResponse(sessionID,
+				cfg.Derived.Flows, cfg.Derived.Params),
 		}
 	}
 
@@ -268,6 +272,19 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
+	return handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
+}
+
+// handleRegistrationFlow will direct and complete registration flow stages
+// that the client has requested.
+func handleRegistrationFlow(
+	req *http.Request,
+	r registerRequest,
+	sessionID string,
+	cfg *config.Dendrite,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: AS API registration
 	// TODO: Enable registration config flag
@@ -290,7 +307,8 @@ func Register(
 		}).Info("Submitting recaptcha response")
 
 		// Check given captcha response
-		if resErr = validateRecaptcha(req, cfg, r.Auth.Response, req.RemoteAddr); resErr != nil {
+		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
+		if resErr != nil {
 			return *resErr
 		}
 
@@ -340,7 +358,8 @@ func Register(
 	// Return the flows and those that have been completed.
 	return util.JSONResponse{
 		Code: 401,
-		JSON: newUserInteractiveResponse(sessionID, cfg.Derived.Flows),
+		JSON: newUserInteractiveResponse(sessionID,
+			cfg.Derived.Flows, cfg.Derived.Params),
 	}
 }
 
@@ -503,11 +522,11 @@ const (
 	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
 
+var src = rand.NewSource(time.Now().UnixNano())
+
 // RandString returns a random string of characters with a given length.
 // Do note that it is not thread-safe in its current form.
 // https://stackoverflow.com/a/31832326
-var src = rand.NewSource(time.Now().UnixNano())
-
 func RandString(n int) string {
 	b := make([]byte, n)
 
@@ -536,20 +555,20 @@ func checkFlowsEqual(aFlow, bFlow authtypes.Flow) bool {
 		return false
 	}
 
-	a_copy := make([]string, len(a))
-	b_copy := make([]string, len(b))
+	aCopy := make([]string, len(a))
+	bCopy := make([]string, len(b))
 
 	for loginType := range a {
-		a_copy = append(a_copy, string(loginType))
+		aCopy = append(aCopy, string(loginType))
 	}
 	for loginType := range b {
-		b_copy = append(b_copy, string(loginType))
+		bCopy = append(bCopy, string(loginType))
 	}
 
-	sort.Strings(a_copy)
-	sort.Strings(b_copy)
+	sort.Strings(aCopy)
+	sort.Strings(bCopy)
 
-	return reflect.DeepEqual(a_copy, b_copy)
+	return reflect.DeepEqual(aCopy, bCopy)
 }
 
 type availableResponse struct {
