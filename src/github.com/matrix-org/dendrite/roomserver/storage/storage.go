@@ -651,6 +651,21 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 	return d.statements.selectMembershipsFromRoom(ctx, roomNID)
 }
 
+// EventsFromIDs implements query.RoomserverQueryAPIEventDB
+func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
+	nidMap, err := d.EventNIDs(ctx, eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var nids []types.EventNID
+	for _, nid := range nidMap {
+		nids = append(nids, nid)
+	}
+
+	return d.Events(ctx, nids)
+}
+
 type transaction struct {
 	ctx context.Context
 	txn *sql.Tx

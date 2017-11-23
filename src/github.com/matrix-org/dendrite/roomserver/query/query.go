@@ -27,9 +27,19 @@ import (
 	"github.com/matrix-org/util"
 )
 
+// RoomserverQueryAPIEventDB has a convenience API to fetch events directly by
+// EventIDs.
+type RoomserverQueryAPIEventDB interface {
+	// Look up the Events for a list of event IDs. Does not error if event was
+	// not found.
+	// Returns an error if the retrieval went wrong.
+	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
+}
+
 // RoomserverQueryAPIDatabase has the storage APIs needed to implement the query API.
 type RoomserverQueryAPIDatabase interface {
 	state.RoomStateDatabase
+	RoomserverQueryAPIEventDB
 	// Look up the numeric ID for the room.
 	// Returns 0 if the room doesn't exists.
 	// Returns an error if there was a problem talking to the database.
@@ -459,7 +469,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	}
 
 	response.StateEvents = stateEvents
-	response.AuthChainEvents, err = r.getAuthChain(ctx, request.AuthEventIDs)
+	response.AuthChainEvents, err = getAuthChain(ctx, r.DB, request.AuthEventIDs)
 	return err
 }
 
@@ -468,8 +478,8 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 // auth_events section, and all their auth_events, recursively.
 // The returned set of events contain the given events.
 // Will *not* error if we don't have all auth events.
-func (r *RoomserverQueryAPI) getAuthChain(
-	ctx context.Context, authEventIDs []string,
+func getAuthChain(
+	ctx context.Context, dB RoomserverQueryAPIEventDB, authEventIDs []string,
 ) ([]gomatrixserverlib.Event, error) {
 	var authEvents []gomatrixserverlib.Event
 
@@ -486,17 +496,7 @@ func (r *RoomserverQueryAPI) getAuthChain(
 	// Check if there's anything left to do
 	for len(eventsToFetch) > 0 {
 		// Convert eventIDs to events. First need to fetch NIDs
-		nidMap, err := r.DB.EventNIDs(ctx, eventsToFetch)
-		if err != nil {
-			return nil, err
-		}
-
-		var nids []types.EventNID
-		for _, nid := range nidMap {
-			nids = append(nids, nid)
-		}
-
-		events, err := r.DB.Events(ctx, nids)
+		events, err := dB.EventsFromIDs(ctx, eventsToFetch)
 		if err != nil {
 			return nil, err
 		}
