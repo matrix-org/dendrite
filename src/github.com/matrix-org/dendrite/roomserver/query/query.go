@@ -489,9 +489,6 @@ func getAuthChain(
 
 	// Set of events we've already fetched.
 	fetchedEventMap := make(map[string]bool)
-	for _, eventID := range authEventIDs {
-		fetchedEventMap[eventID] = true
-	}
 
 	// Check if there's anything left to do
 	for len(eventsToFetch) > 0 {
@@ -506,14 +503,17 @@ func getAuthChain(
 		// add them to the list of events to fetch.
 		eventsToFetch = eventsToFetch[:0]
 		for _, event := range events {
+			fetchedEventMap[event.EventID()] = true
+			authEvents = append(authEvents, event.Event)
+
+			// Now we need to fetch any auth events that we haven't
+			// previously seen.
 			for _, authEventID := range event.AuthEventIDs() {
 				if !fetchedEventMap[authEventID] {
 					fetchedEventMap[authEventID] = true
 					eventsToFetch = append(eventsToFetch, authEventID)
 				}
 			}
-
-			authEvents = append(authEvents, event.Event)
 		}
 	}
 
