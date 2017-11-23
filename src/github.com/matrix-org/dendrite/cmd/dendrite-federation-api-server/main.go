@@ -80,6 +80,7 @@ func main() {
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	inputAPI := api.NewRoomserverInputAPIHTTP(cfg.RoomServerURL(), nil)
+	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
 
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 
@@ -90,7 +91,7 @@ func main() {
 	log.Info("Starting federation API server on ", cfg.Listen.FederationAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, *cfg, queryAPI, roomserverProducer, keyRing, federation, accountDB)
+	routing.Setup(api, *cfg, queryAPI, aliasAPI, roomserverProducer, keyRing, federation, accountDB)
 	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.FederationAPI), nil))

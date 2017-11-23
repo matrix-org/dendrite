@@ -348,7 +348,7 @@ func (m *monolith) setupAPIs() {
 	), m.syncAPIDB, m.deviceDB)
 
 	federationapi_routing.Setup(
-		m.api, *m.cfg, m.queryAPI, m.roomServerProducer, m.keyRing, m.federation,
+		m.api, *m.cfg, m.queryAPI, m.aliasAPI, m.roomServerProducer, m.keyRing, m.federation,
 		m.accountDB,
 	)
 

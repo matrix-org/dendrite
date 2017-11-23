@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
@@ -188,7 +189,7 @@ func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JS
 			JSON: jsonerror.Unknown("HTTP Content-Type request header must be set."),
 		}
 	}
-	if r.MediaMetadata.UploadName[0] == '~' {
+	if strings.HasPrefix(string(r.MediaMetadata.UploadName), "~") {
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.Unknown("File name must not begin with '~'."),
