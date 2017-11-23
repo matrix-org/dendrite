@@ -263,7 +263,7 @@ func testThumbnail(width, height int, resizeMethod, host string, serverCmdChan c
 	testReq := &test.Request{
 		Req:              req,
 		WantedStatusCode: 200,
-		WantedBody:       test.CanonicalJSONInput([]string{""})[0],
+		WantedBody:       "",
 	}
 	testReq.Run(fmt.Sprintf("thumbnail mxc://%v/%v%v from %v", testOrigin, testMediaID, query, host), timeout, serverCmdChan)
 }
