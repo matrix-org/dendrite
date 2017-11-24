@@ -36,7 +36,7 @@ func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storag
 			vars := mux.Vars(req)
 			return directory.GetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeAuthAPI("directory_list", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
