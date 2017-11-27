@@ -34,20 +34,20 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServer
 
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
-	})).Methods("GET")
+	})).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/state", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
 		return OnIncomingStateRequest(req, syncDB, vars["roomID"])
-	})).Methods("GET")
+	})).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], "")
-	})).Methods("GET")
+	})).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], vars["stateKey"])
-	})).Methods("GET")
+	})).Methods("GET", "OPTIONS")
 }
