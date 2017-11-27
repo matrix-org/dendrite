@@ -251,21 +251,19 @@ func handleRegistrationFlow(
 		}
 	}
 
-	// Check if a registration flow has been completed successfully
-	for _, flow := range cfg.Derived.Registration.Flows {
-		if checkFlowsEqual(flow, authtypes.Flow{sessions[sessionID]}) {
-			return completeRegistration(req.Context(), accountDB, deviceDB,
-				r.Username, r.Password, r.InitialDisplayName)
+	// Check if the user's registration flow has been completed successfully
+	if !checkFlowCompleted(authtypes.Flow{sessions[sessionID]}, cfg.Derived.Registration.Flows) {
+		// There are still more stages to complete.
+		// Return the flows and those that have been completed.
+		return util.JSONResponse{
+			Code: 401,
+			JSON: newUserInteractiveResponse(sessionID,
+				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 		}
 	}
 
-	// There are still more stages to complete.
-	// Return the flows and those that have been completed.
-	return util.JSONResponse{
-		Code: 401,
-		JSON: newUserInteractiveResponse(sessionID,
-			cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
-	}
+	return completeRegistration(req.Context(), accountDB, deviceDB,
+		r.Username, r.Password, r.InitialDisplayName)
 }
 
 // LegacyRegister process register requests from the legacy v1 API
@@ -420,24 +418,22 @@ func isValidMacLogin(
 	return hmac.Equal(givenMac, expectedMAC), nil
 }
 
-// checkFlowsEqual checks if two registration flows have the same stages
-// within them. Order of stages does not matter.
-func checkFlowsEqual(aFlow, bFlow authtypes.Flow) bool {
-	a := aFlow.Stages
-	b := bFlow.Stages
-	if len(a) != len(b) {
-		return false
-	}
+// checkFlows checks a single flow a against another, b. If a contains at least
+// all of the stages that b does, checkFlows returns true.
+func checkFlows(a []authtypes.LoginType, b []authtypes.LoginType) bool {
+	// Sort the slices for simple comparison
 	sort.Slice(a, func(i, j int) bool { return a[i] < a[j] })
 	sort.Slice(b, func(i, j int) bool { return b[i] < b[j] })
 
-	// Account for any extra stages a user may do unnecessarily
-	extraStages := len(b) - len(a)
+	// Account for any extra stages a user may unnecessarily do.
+	extraStages := len(a) - len(b)
 	for i := range b {
 		if extraStages < 0 {
+			// The provided flow has run out of possible extraneous stages.
 			return false
 		}
 		if a[i] != b[i] {
+			// Wasn't a match, drop an extraneous stage.
 			extraStages--
 			continue
 		}
@@ -445,11 +441,24 @@ func checkFlowsEqual(aFlow, bFlow authtypes.Flow) bool {
 	return true
 }
 
+// checkFlowCompleted checks if a registration flow complies with any flow
+// dictated by the server. Order of stages does not matter. A user may complete
+// extra stages as long as the required stages of at least one flow is met.
+func checkFlowCompleted(flow authtypes.Flow, derivedFlows []authtypes.Flow) bool {
+	// Iterate through possible flows to check whether any have been fully completed.
+	for _, derivedFlow := range derivedFlows {
+		if checkFlows(flow.Stages, derivedFlow.Stages) {
+			return true
+		}
+	}
+	return false
+}
+
 type availableResponse struct {
 	Available bool `json:"available"`
 }
 
-// RegisterAvailable checks if the username is already taken or invalid
+// RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
 	accountDB *accounts.Database,
