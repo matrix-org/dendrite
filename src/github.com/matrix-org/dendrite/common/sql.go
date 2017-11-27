@@ -16,6 +16,15 @@ package common
 
 import (
 	"database/sql"
+	"fmt"
+
+	// Import the postgres database driver for migrate
+	_ "github.com/lib/pq"
+
+	"github.com/mattes/migrate"
+	"github.com/mattes/migrate/database/postgres"
+	// Import the file source driver for migrate
+	_ "github.com/mattes/migrate/source/file"
 )
 
 // A Transaction is something that can be committed or rolledback.
@@ -65,4 +74,39 @@ func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 		statement = transaction.Stmt(statement)
 	}
 	return statement
+}
+
+// DoMigrations runs any new schema migrations.
+// The db param is just a connection to the postgres database, while `prefix`
+// is the prefix of the tables. The prefix is used to 1) namespace the
+// internal schema migrations table and 2) as the directory in `db-schema`
+// where the migration files can be found.
+func DoMigrations(db *sql.DB, prefix string) (err error) {
+	tableName := fmt.Sprintf("%s_schema_migrations", prefix)
+
+	driver, err := postgres.WithInstance(db, &postgres.Config{
+		MigrationsTable: tableName,
+	})
+	if err != nil {
+		return err
+	}
+
+	// We explicitly don't use path.Join here as it doesn't like the `file://`
+	// part of it
+	source := fmt.Sprintf("file://db-schema/%s", prefix)
+	migrater, err := migrate.NewWithDatabaseInstance(
+		source, "postgres", driver,
+	)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Handle stops gracefully via migrater.GracefulStop <- true
+
+	err = migrater.Up()
+	if err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+
+	return nil
 }
