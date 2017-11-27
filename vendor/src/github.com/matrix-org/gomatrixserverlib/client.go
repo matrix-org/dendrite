@@ -175,7 +175,29 @@ func (fc *Client) LookupUserInfo(
 	return
 }
 
-// LookupServerKeys lookups up the keys for a matrix server from a matrix server.
+// GetServerKeys asks a matrix server for its signing keys and TLS cert
+func (fc *Client) GetServerKeys(
+	ctx context.Context, matrixServer ServerName,
+) (ServerKeys, error) {
+	url := url.URL{
+		Scheme: "matrix",
+		Host:   string(matrixServer),
+		Path:   "/_matrix/key/v2/server",
+	}
+
+	var body ServerKeys
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return body, err
+	}
+
+	err = fc.DoRequestAndParseResponse(
+		ctx, req, &body,
+	)
+	return body, err
+}
+
+// LookupServerKeys looks up the keys for a matrix server from a matrix server.
 // The first argument is the name of the matrix server to download the keys from.
 // The second argument is a map from (server name, key ID) pairs to timestamps.
 // The (server name, key ID) pair identifies the key to download.

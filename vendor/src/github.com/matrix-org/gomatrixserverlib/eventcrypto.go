@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -68,40 +70,28 @@ func addContentHashesToEvent(eventJSON []byte) ([]byte, error) {
 }
 
 // checkEventContentHash checks if the unredacted content of the event matches the SHA-256 hash under the "hashes" key.
+// Assumes that eventJSON has been canonicalised already.
 func checkEventContentHash(eventJSON []byte) error {
-	var event map[string]rawJSON
+	var err error
 
-	if err := json.Unmarshal(eventJSON, &event); err != nil {
+	result := gjson.GetBytes(eventJSON, "hashes.sha256")
+	var hash Base64String
+	if err = hash.Decode(result.Str); err != nil {
 		return err
 	}
 
-	hashesJSON := event["hashes"]
+	hashableEventJSON := eventJSON
 
-	delete(event, "signatures")
-	delete(event, "unsigned")
-	delete(event, "hashes")
-
-	var hashes struct {
-		Sha256 Base64String `json:"sha256"`
-	}
-	if err := json.Unmarshal(hashesJSON, &hashes); err != nil {
-		return err
-	}
-
-	hashableEventJSON, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-
-	hashableEventJSON, err = CanonicalJSON(hashableEventJSON)
-	if err != nil {
-		return err
+	for _, key := range []string{"signatures", "unsigned", "hashes"} {
+		if hashableEventJSON, err = sjson.DeleteBytes(hashableEventJSON, key); err != nil {
+			return err
+		}
 	}
 
 	sha256Hash := sha256.Sum256(hashableEventJSON)
 
-	if !bytes.Equal(sha256Hash[:], []byte(hashes.Sha256)) {
-		return fmt.Errorf("Invalid Sha256 content hash: %v != %v", sha256Hash[:], []byte(hashes.Sha256))
+	if !bytes.Equal(sha256Hash[:], []byte(hash)) {
+		return fmt.Errorf("Invalid Sha256 content hash: %v != %v", sha256Hash[:], []byte(hash))
 	}
 
 	return nil

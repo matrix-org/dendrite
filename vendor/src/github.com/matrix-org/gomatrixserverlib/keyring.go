@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/util"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -60,6 +61,10 @@ type KeyFetcher interface {
 	// The result may have more (server name, key ID) pairs than were in the request.
 	// Returns an error if there was a problem fetching the keys.
 	FetchKeys(ctx context.Context, requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]PublicKeyLookupResult, error)
+
+	// FetcherName returns the name of this fetcher, which can then be used for
+	// logging errors etc.
+	FetcherName() string
 }
 
 // A KeyDatabase is a store for caching public keys.
@@ -113,6 +118,7 @@ type JSONVerifier interface {
 
 // VerifyJSONs implements JSONVerifier.
 func (k KeyRing) VerifyJSONs(ctx context.Context, requests []VerifyJSONRequest) ([]VerifyJSONResult, error) { // nolint: gocyclo
+	logger := util.GetLogger(ctx)
 	results := make([]VerifyJSONResult, len(requests))
 	keyIDs := make([][]KeyID, len(requests))
 
@@ -154,7 +160,7 @@ func (k KeyRing) VerifyJSONs(ctx context.Context, requests []VerifyJSONRequest) 
 	}
 	k.checkUsingKeys(requests, results, keyIDs, keysFromDatabase)
 
-	for i := range k.KeyFetchers {
+	for _, fetcher := range k.KeyFetchers {
 		// TODO: we should distinguish here between expired keys, and those we don't have.
 		// If the key has expired, it's no use re-requesting it.
 		keyRequests := k.publicKeyRequests(requests, results, keyIDs)
@@ -163,12 +169,22 @@ func (k KeyRing) VerifyJSONs(ctx context.Context, requests []VerifyJSONRequest) 
 			// This means that we've checked every JSON object we can check.
 			return results, nil
 		}
+		fetcherLogger := logger.WithField("fetcher", fetcher.FetcherName())
+
 		// TODO: Coalesce in-flight requests for the same keys.
 		// Otherwise we risk spamming the servers we query the keys from.
-		keysFetched, err := k.KeyFetchers[i].FetchKeys(ctx, keyRequests)
+
+		fetcherLogger.WithField("num_key_requests", len(keyRequests)).
+			Info("Requesting keys from fetcher")
+
+		keysFetched, err := fetcher.FetchKeys(ctx, keyRequests)
 		if err != nil {
 			return nil, err
 		}
+
+		fetcherLogger.WithField("num_keys_fetched", len(keysFetched)).
+			Info("Got keys from fetcher")
+
 		k.checkUsingKeys(requests, results, keyIDs, keysFetched)
 
 		// Add the keys to the database so that we won't need to fetch them again.
@@ -259,6 +275,11 @@ type PerspectiveKeyFetcher struct {
 	Client Client
 }
 
+// FetcherName implements KeyFetcher
+func (p PerspectiveKeyFetcher) FetcherName() string {
+	return fmt.Sprintf("perspective server %s", p.PerspectiveServerName)
+}
+
 // FetchKeys implements KeyFetcher
 func (p *PerspectiveKeyFetcher) FetchKeys(
 	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
@@ -303,7 +324,8 @@ func (p *PerspectiveKeyFetcher) FetchKeys(
 			return nil, fmt.Errorf("gomatrixserverlib: key response from perspective server failed checks")
 		}
 
-		// TODO: What happens if the same key ID appears in multiple responses?
+		// TODO (matrix-org/dendrite#345): What happens if the same key ID
+		// appears in multiple responses?
 		// We should probably take the response with the highest valid_until_ts.
 		mapServerKeysToPublicKeyLookupResult(keys, results)
 	}
@@ -316,6 +338,11 @@ func (p *PerspectiveKeyFetcher) FetchKeys(
 type DirectKeyFetcher struct {
 	// The federation client to use to fetch keys with.
 	Client Client
+}
+
+// FetcherName implements KeyFetcher
+func (d DirectKeyFetcher) FetcherName() string {
+	return "DirectKeyFetcher"
 }
 
 // FetchKeys implements KeyFetcher
@@ -333,9 +360,9 @@ func (d *DirectKeyFetcher) FetchKeys(
 	}
 
 	results := map[PublicKeyRequest]PublicKeyLookupResult{}
-	for server, reqs := range byServer {
+	for server := range byServer {
 		// TODO: make these requests in parallel
-		serverResults, err := d.fetchKeysForServer(ctx, server, reqs)
+		serverResults, err := d.fetchKeysForServer(ctx, server)
 		if err != nil {
 			// TODO: Should we actually be erroring here? or should we just drop those keys from the result map?
 			return nil, err
@@ -348,25 +375,23 @@ func (d *DirectKeyFetcher) FetchKeys(
 }
 
 func (d *DirectKeyFetcher) fetchKeysForServer(
-	ctx context.Context, serverName ServerName, requests map[PublicKeyRequest]Timestamp,
+	ctx context.Context, serverName ServerName,
 ) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
-	serverKeys, err := d.Client.LookupServerKeys(ctx, serverName, requests)
+	keys, err := d.Client.GetServerKeys(ctx, serverName)
 	if err != nil {
 		return nil, err
 	}
+	// Check that the keys are valid for the server.
+	checks, _, _ := CheckKeys(serverName, time.Unix(0, 0), keys, nil)
+	if !checks.AllChecksOK {
+		return nil, fmt.Errorf("gomatrixserverlib: key response direct from %q failed checks", serverName)
+	}
 
 	results := map[PublicKeyRequest]PublicKeyLookupResult{}
-	for _, keys := range serverKeys {
-		// Check that the keys are valid for the server.
-		checks, _, _ := CheckKeys(serverName, time.Unix(0, 0), keys, nil)
-		if !checks.AllChecksOK {
-			return nil, fmt.Errorf("gomatrixserverlib: key response direct from %q failed checks", serverName)
-		}
 
-		// TODO: What happens if the same key ID appears in multiple responses?
-		// We should probably take the response with the highest valid_until_ts.
-		mapServerKeysToPublicKeyLookupResult(keys, results)
-	}
+	// TODO (matrix-org/dendrite#345): What happens if the same key ID
+	// appears in multiple responses? We should probably reject the response.
+	mapServerKeysToPublicKeyLookupResult(keys, results)
 
 	return results, nil
 }

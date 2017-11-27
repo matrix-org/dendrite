@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/matrix-org/util"
 )
 
 // A RespSend is the content of a response to PUT /_matrix/federation/v1/send/{txnID}/
@@ -109,6 +111,7 @@ func (r RespState) Events() ([]Event, error) {
 
 // Check that a response to /state is valid.
 func (r RespState) Check(ctx context.Context, keyRing JSONVerifier) error {
+	logger := util.GetLogger(ctx)
 	var allEvents []Event
 	for _, event := range r.AuthEvents {
 		if event.StateKey() == nil {
@@ -134,8 +137,9 @@ func (r RespState) Check(ctx context.Context, keyRing JSONVerifier) error {
 	}
 
 	// Check if the events pass signature checks.
+	logger.Infof("Checking event signatures for %d events of room state", len(allEvents))
 	if err := VerifyEventSignatures(ctx, allEvents, keyRing); err != nil {
-		return nil
+		return err
 	}
 
 	eventsByID := map[string]*Event{}
