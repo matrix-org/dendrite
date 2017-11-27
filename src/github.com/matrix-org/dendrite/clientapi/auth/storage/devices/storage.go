@@ -37,6 +37,12 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if db, err = sql.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
+
+	err = common.DoMigrations(db, "devices")
+	if err != nil {
+		return nil, err
+	}
+
 	d := devicesStatements{}
 	if err = d.prepare(db, serverName); err != nil {
 		return nil, err

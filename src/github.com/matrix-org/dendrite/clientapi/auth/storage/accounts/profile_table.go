@@ -21,18 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
-const profilesSchema = `
--- Stores data about accounts profiles.
-CREATE TABLE IF NOT EXISTS account_profiles (
-    -- The Matrix user ID localpart for this account
-    localpart TEXT NOT NULL PRIMARY KEY,
-    -- The display name for this account
-    display_name TEXT,
-    -- The URL of the avatar for this account
-    avatar_url TEXT
-);
-`
-
 const insertProfileSQL = "" +
 	"INSERT INTO account_profiles(localpart, display_name, avatar_url) VALUES ($1, $2, $3)"
 
@@ -53,10 +41,6 @@ type profilesStatements struct {
 }
 
 func (s *profilesStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(profilesSchema)
-	if err != nil {
-		return
-	}
 	if s.insertProfileStmt, err = db.Prepare(insertProfileSQL); err != nil {
 		return
 	}

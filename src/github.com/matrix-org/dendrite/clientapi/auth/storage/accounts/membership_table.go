@@ -22,24 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
-const membershipSchema = `
--- Stores data about users memberships to rooms.
-CREATE TABLE IF NOT EXISTS account_memberships (
-    -- The Matrix user ID localpart for the member
-    localpart TEXT NOT NULL,
-    -- The room this user is a member of
-    room_id TEXT NOT NULL,
-    -- The ID of the join membership event
-    event_id TEXT NOT NULL,
-
-    -- A user can only be member of a room once
-    PRIMARY KEY (localpart, room_id)
-);
-
--- Use index to process deletion by ID more efficiently
-CREATE UNIQUE INDEX IF NOT EXISTS account_membership_event_id ON account_memberships(event_id);
-`
-
 const insertMembershipSQL = `
 	INSERT INTO account_memberships(localpart, room_id, event_id) VALUES ($1, $2, $3)
 	ON CONFLICT (localpart, room_id) DO UPDATE SET event_id = EXCLUDED.event_id
@@ -58,10 +40,6 @@ type membershipStatements struct {
 }
 
 func (s *membershipStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(membershipSchema)
-	if err != nil {
-		return
-	}
 	if s.deleteMembershipsByEventIDsStmt, err = db.Prepare(deleteMembershipsByEventIDsSQL); err != nil {
 		return
 	}

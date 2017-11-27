@@ -23,8 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
-	// Import the postgres database driver.
-	_ "github.com/lib/pq"
 )
 
 // Database represents an account database
@@ -47,6 +45,12 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if db, err = sql.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
+
+	err = common.DoMigrations(db, "accounts")
+	if err != nil {
+		return nil, err
+	}
+
 	partitions := common.PartitionOffsetStatements{}
 	if err = partitions.Prepare(db, "account"); err != nil {
 		return nil, err

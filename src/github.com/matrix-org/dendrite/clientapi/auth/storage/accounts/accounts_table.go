@@ -24,20 +24,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const accountsSchema = `
--- Stores data about accounts.
-CREATE TABLE IF NOT EXISTS account_accounts (
-    -- The Matrix user ID localpart for this account
-    localpart TEXT NOT NULL PRIMARY KEY,
-    -- When this account was first created, as a unix timestamp (ms resolution).
-    created_ts BIGINT NOT NULL,
-    -- The password hash for this account. Can be NULL if this is a passwordless account.
-    password_hash TEXT
-    -- TODO:
-    -- is_guest, is_admin, appservice_id, upgraded_ts, devices, any email reset stuff?
-);
-`
-
 const insertAccountSQL = "" +
 	"INSERT INTO account_accounts(localpart, created_ts, password_hash) VALUES ($1, $2, $3)"
 
@@ -57,10 +43,6 @@ type accountsStatements struct {
 }
 
 func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
-	_, err = db.Exec(accountsSchema)
-	if err != nil {
-		return
-	}
 	if s.insertAccountStmt, err = db.Prepare(insertAccountSQL); err != nil {
 		return
 	}

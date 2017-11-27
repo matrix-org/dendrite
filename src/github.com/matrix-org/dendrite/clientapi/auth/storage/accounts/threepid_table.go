@@ -23,22 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
-const threepidSchema = `
--- Stores data about third party identifiers
-CREATE TABLE IF NOT EXISTS account_threepid (
-	-- The third party identifier
-	threepid TEXT NOT NULL,
-	-- The 3PID medium
-	medium TEXT NOT NULL DEFAULT 'email',
-	-- The localpart of the Matrix user ID associated to this 3PID
-	localpart TEXT NOT NULL,
-
-	PRIMARY KEY(threepid, medium)
-);
-
-CREATE INDEX IF NOT EXISTS account_threepid_localpart ON account_threepid(localpart);
-`
-
 const selectLocalpartForThreePIDSQL = "" +
 	"SELECT localpart FROM account_threepid WHERE threepid = $1 AND medium = $2"
 
@@ -59,10 +43,6 @@ type threepidStatements struct {
 }
 
 func (s *threepidStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(threepidSchema)
-	if err != nil {
-		return
-	}
 	if s.selectLocalpartForThreePIDStmt, err = db.Prepare(selectLocalpartForThreePIDSQL); err != nil {
 		return
 	}

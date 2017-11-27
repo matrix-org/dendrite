@@ -21,22 +21,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const filterSchema = `
--- Stores data about filters
-CREATE TABLE IF NOT EXISTS account_filter (
-	-- The filter
-	filter TEXT NOT NULL,
-	-- The ID
-	id SERIAL UNIQUE,
-	-- The localpart of the Matrix user ID associated to this filter
-	localpart TEXT NOT NULL,
-
-	PRIMARY KEY(id, localpart)
-);
-
-CREATE INDEX IF NOT EXISTS account_filter_localpart ON account_filter(localpart);
-`
-
 const selectFilterSQL = "" +
 	"SELECT filter FROM account_filter WHERE localpart = $1 AND id = $2"
 
@@ -53,10 +37,6 @@ type filterStatements struct {
 }
 
 func (s *filterStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(filterSchema)
-	if err != nil {
-		return
-	}
 	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
 		return
 	}
