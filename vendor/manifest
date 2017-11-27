@@ -151,6 +151,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/mattes/migrate",
+			"repository": "https://github.com/mattes/migrate",
+			"revision": "69472d5f5cdca0fb2766d8d86f63cb2e78e1d869",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/matttproud/golang_protobuf_extensions/pbutil",
 			"repository": "https://github.com/matttproud/golang_protobuf_extensions",
 			"revision": "c12348ce28de40eed0136aa2b644d0ee0650e56c",
