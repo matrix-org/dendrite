@@ -425,18 +425,21 @@ func checkFlows(a []authtypes.LoginType, b []authtypes.LoginType) bool {
 	sort.Slice(a, func(i, j int) bool { return a[i] < a[j] })
 	sort.Slice(b, func(i, j int) bool { return b[i] < b[j] })
 
-	// Account for any extra stages a user may unnecessarily do.
-	extraStages := len(a) - len(b)
-	for i := range b {
-		if extraStages < 0 {
-			// The provided flow has run out of possible extraneous stages.
+	// Iterate through each slice, going to the next allowed slice only once
+	// we've found a match.
+	i, j := 0, 0
+	for j < len(b) {
+		// Exit if we've reached the end of our input without being able to
+		// match all of the allowed stages.
+		if i >= len(a) {
 			return false
 		}
-		if a[i] != b[i] {
-			// Wasn't a match, drop an extraneous stage.
-			extraStages--
-			continue
+
+		// If we've found a stage we want, move on to the next allowed stage.
+		if a[i] == b[j] {
+			j++
 		}
+		i++
 	}
 	return true
 }

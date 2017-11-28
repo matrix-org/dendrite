@@ -109,3 +109,26 @@ func TestFlowCheckingUnorderedAndExtraneous(t *testing.T) {
 		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be true.")
 	}
 }
+
+// Should return false as we're providing less stages than are required.
+func TestFlowCheckingShortIncorrectInput(t *testing.T) {
+	testFlow := []authtypes.LoginType{
+		authtypes.LoginType("stage8"),
+	}
+	if checkFlowCompleted(testFlow, allowedFlows) {
+		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+	}
+}
+
+// Should return false as we're providing less stages than are required.
+func TestFlowCheckingExtraneousIncorrectInput(t *testing.T) {
+	testFlow := []authtypes.LoginType{
+		authtypes.LoginType("stage8"),
+		authtypes.LoginType("stage9"),
+		authtypes.LoginType("stage10"),
+		authtypes.LoginType("stage11"),
+	}
+	if checkFlowCompleted(testFlow, allowedFlows) {
+		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+	}
+}
