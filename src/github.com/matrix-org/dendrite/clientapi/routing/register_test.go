@@ -97,7 +97,7 @@ func TestFlowCheckingInvalidStage(t *testing.T) {
 
 // Should return true as we complete all stages of an allowed flow, though out
 // of order, as well as extraneous stages.
-func TestFlowCheckingUnorderedAndExtraneous(t *testing.T) {
+func TestFlowCheckingExtraneousUnordered(t *testing.T) {
 	testFlow := []authtypes.LoginType{
 		authtypes.LoginType("stage5"),
 		authtypes.LoginType("stage4"),
@@ -110,7 +110,7 @@ func TestFlowCheckingUnorderedAndExtraneous(t *testing.T) {
 	}
 }
 
-// Should return false as we're providing less stages than are required.
+// Should return false as we're providing fewer stages than are required.
 func TestFlowCheckingShortIncorrectInput(t *testing.T) {
 	testFlow := []authtypes.LoginType{
 		authtypes.LoginType("stage8"),
@@ -120,7 +120,7 @@ func TestFlowCheckingShortIncorrectInput(t *testing.T) {
 	}
 }
 
-// Should return false as we're providing less stages than are required.
+// Should return false as we're providing different stages than are required.
 func TestFlowCheckingExtraneousIncorrectInput(t *testing.T) {
 	testFlow := []authtypes.LoginType{
 		authtypes.LoginType("stage8"),
