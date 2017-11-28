@@ -252,7 +252,7 @@ func handleRegistrationFlow(
 	}
 
 	// Check if the user's registration flow has been completed successfully
-	if !checkFlowCompleted(authtypes.Flow{sessions[sessionID]}, cfg.Derived.Registration.Flows) {
+	if !checkFlowCompleted(sessions[sessionID], cfg.Derived.Registration.Flows) {
 		// There are still more stages to complete.
 		// Return the flows and those that have been completed.
 		return util.JSONResponse{
@@ -441,13 +441,13 @@ func checkFlows(a []authtypes.LoginType, b []authtypes.LoginType) bool {
 	return true
 }
 
-// checkFlowCompleted checks if a registration flow complies with any flow
+// checkFlowCompleted checks if a registration flow complies with any allowed flow
 // dictated by the server. Order of stages does not matter. A user may complete
 // extra stages as long as the required stages of at least one flow is met.
-func checkFlowCompleted(flow authtypes.Flow, derivedFlows []authtypes.Flow) bool {
+func checkFlowCompleted(flow []authtypes.LoginType, allowedFlows []authtypes.Flow) bool {
 	// Iterate through possible flows to check whether any have been fully completed.
-	for _, derivedFlow := range derivedFlows {
-		if checkFlows(flow.Stages, derivedFlow.Stages) {
+	for _, allowedFlow := range allowedFlows {
+		if checkFlows(flow, allowedFlow.Stages) {
 			return true
 		}
 	}
