@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
-	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
 
@@ -43,9 +43,14 @@ const (
 	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
 	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
+	sessionIDLength   = 24
 )
 
-var validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
+var (
+	// TODO: Remove old sessions. Need to do so on a session-specific timeout.
+	sessions           = make(map[string][]authtypes.LoginType) // Sessions and completed flow stages
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
+)
 
 // registerRequest represents the submitted registration request.
 // It can be broken down into 2 sections: the auth dictionary and registration parameters.
@@ -68,21 +73,16 @@ type authDict struct {
 	Type    authtypes.LoginType         `json:"type"`
 	Session string                      `json:"session"`
 	Mac     gomatrixserverlib.HexString `json:"mac"`
+
 	// TODO: Lots of custom keys depending on the type
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
 type userInteractiveResponse struct {
-	Flows     []authFlow             `json:"flows"`
+	Flows     []authtypes.Flow       `json:"flows"`
 	Completed []authtypes.LoginType  `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
 	Session   string                 `json:"session"`
-}
-
-// authFlow represents one possible way that the client can authenticate a request.
-// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
-type authFlow struct {
-	Stages []authtypes.LoginType `json:"stages"`
 }
 
 // legacyRegisterRequest represents the submitted registration request for v1 API.
@@ -94,9 +94,15 @@ type legacyRegisterRequest struct {
 	Mac      gomatrixserverlib.HexString `json:"mac"`
 }
 
-func newUserInteractiveResponse(sessionID string, fs []authFlow) userInteractiveResponse {
+// newUserInteractiveResponse will return a struct to be sent back to the client
+// during registration.
+func newUserInteractiveResponse(
+	sessionID string,
+	fs []authtypes.Flow,
+	params map[string]interface{},
+) userInteractiveResponse {
 	return userInteractiveResponse{
-		fs, []authtypes.LoginType{}, make(map[string]interface{}), sessionID,
+		fs, sessions[sessionID], params, sessionID,
 	}
 }
 
@@ -154,22 +160,26 @@ func Register(
 	deviceDB *devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
+
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
 
-	// All registration requests must specify what auth they are using to perform this request
+	// Retrieve or generate the sessionID
+	sessionID := r.Auth.Session
+	if sessionID == "" {
+		// Generate a new, random session ID
+		sessionID = util.RandomString(sessionIDLength)
+	}
+
+	// If no auth type is specified by the client, send back the list of available flows
 	if r.Auth.Type == "" {
 		return util.JSONResponse{
 			Code: 401,
-			// TODO: Hard-coded 'dummy' auth for now with a bogus session ID.
-			//       Server admins should be able to change things around (eg enable captcha)
-			JSON: newUserInteractiveResponse(time.Now().String(), []authFlow{
-				{[]authtypes.LoginType{authtypes.LoginTypeDummy}},
-				{[]authtypes.LoginType{authtypes.LoginTypeSharedSecret}},
-			}),
+			JSON: newUserInteractiveResponse(sessionID,
+				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 		}
 	}
 
@@ -187,6 +197,19 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
+	return handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
+}
+
+// handleRegistrationFlow will direct and complete registration flow stages
+// that the client has requested.
+func handleRegistrationFlow(
+	req *http.Request,
+	r registerRequest,
+	sessionID string,
+	cfg *config.Dendrite,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: AS API registration
 	// TODO: Enable registration config flag
@@ -202,7 +225,8 @@ func Register(
 			return util.MessageResponse(400, "Shared secret registration is disabled")
 		}
 
-		valid, err := isValidMacLogin(r.Username, r.Password, r.Admin, r.Auth.Mac, cfg.Matrix.RegistrationSharedSecret)
+		valid, err := isValidMacLogin(r.Username, r.Password, r.Admin,
+			r.Auth.Mac, cfg.Matrix.RegistrationSharedSecret)
 
 		if err != nil {
 			return httputil.LogThenError(req, err)
@@ -212,16 +236,34 @@ func Register(
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, r.InitialDisplayName)
+		// Add SharedSecret to the list of completed registration stages
+		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeSharedSecret)
+
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, r.InitialDisplayName)
+		// Add Dummy to the list of completed registration stages
+		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeDummy)
+
 	default:
 		return util.JSONResponse{
 			Code: 501,
 			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
 		}
 	}
+
+	// Check if the user's registration flow has been completed successfully
+	if !checkFlowCompleted(sessions[sessionID], cfg.Derived.Registration.Flows) {
+		// There are still more stages to complete.
+		// Return the flows and those that have been completed.
+		return util.JSONResponse{
+			Code: 401,
+			JSON: newUserInteractiveResponse(sessionID,
+				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
+		}
+	}
+
+	return completeRegistration(req.Context(), accountDB, deviceDB,
+		r.Username, r.Password, r.InitialDisplayName)
 }
 
 // LegacyRegister process register requests from the legacy v1 API
@@ -348,7 +390,7 @@ func isValidMacLogin(
 	givenMac []byte,
 	sharedSecret string,
 ) (bool, error) {
-	// Double check that username/passowrd don't contain the HMAC delimiters. We should have
+	// Double check that username/password don't contain the HMAC delimiters. We should have
 	// already checked this.
 	if strings.Contains(username, "\x00") {
 		return false, errors.New("Username contains invalid character")
@@ -376,11 +418,60 @@ func isValidMacLogin(
 	return hmac.Equal(givenMac, expectedMAC), nil
 }
 
+// checkFlows checks a single completed flow against another required one. If
+// one contains at least all of the stages that the other does, checkFlows
+// returns true.
+func checkFlows(
+	completedStages []authtypes.LoginType,
+	requiredStages []authtypes.LoginType,
+) bool {
+	// Create temporary slices so they originals will not be modified on sorting
+	completed := make([]authtypes.LoginType, len(completedStages))
+	required := make([]authtypes.LoginType, len(requiredStages))
+	copy(completed, completedStages)
+	copy(required, requiredStages)
+
+	// Sort the slices for simple comparison
+	sort.Slice(completed, func(i, j int) bool { return completed[i] < completed[j] })
+	sort.Slice(required, func(i, j int) bool { return required[i] < required[j] })
+
+	// Iterate through each slice, going to the next required slice only once
+	// we've found a match.
+	i, j := 0, 0
+	for j < len(required) {
+		// Exit if we've reached the end of our input without being able to
+		// match all of the required stages.
+		if i >= len(completed) {
+			return false
+		}
+
+		// If we've found a stage we want, move on to the next required stage.
+		if completed[i] == required[j] {
+			j++
+		}
+		i++
+	}
+	return true
+}
+
+// checkFlowCompleted checks if a registration flow complies with any allowed flow
+// dictated by the server. Order of stages does not matter. A user may complete
+// extra stages as long as the required stages of at least one flow is met.
+func checkFlowCompleted(flow []authtypes.LoginType, allowedFlows []authtypes.Flow) bool {
+	// Iterate through possible flows to check whether any have been fully completed.
+	for _, allowedFlow := range allowedFlows {
+		if checkFlows(flow, allowedFlow.Stages) {
+			return true
+		}
+	}
+	return false
+}
+
 type availableResponse struct {
 	Available bool `json:"available"`
 }
 
-// RegisterAvailable checks if the username is already taken or invalid
+// RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
 	accountDB *accounts.Database,

@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
@@ -189,6 +190,21 @@ type Dendrite struct {
 		// The config for the jaeger opentracing reporter.
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	}
+
+	// Any information derived from the configuration options for later use.
+	Derived struct {
+		Registration struct {
+			// Flows is a slice of flows, which represent one possible way that the client can authenticate a request.
+			// http://matrix.org/docs/spec/HEAD/client_server/r0.3.0.html#user-interactive-authentication-api
+			// As long as the generated flows only rely on config file options,
+			// we can generate them on startup and store them until needed
+			Flows []authtypes.Flow `json:"flows"`
+
+			// Params that need to be returned to the client during
+			// registration in order to complete registration stages.
+			Params map[string]interface{} `json:"params"`
+		}
+	}
 }
 
 // A Path on the filesystem.
@@ -305,9 +321,28 @@ func loadConfig(
 
 	config.Media.AbsBasePath = Path(absPath(basePath, config.Media.BasePath))
 
+	// Generate data from config options
+	config.derive()
+
 	return &config, nil
 }
 
+// derive generates data that is derived from various values provided in
+// the config file.
+func (config *Dendrite) derive() {
+	// Determine registrations flows based off config values
+
+	config.Derived.Registration.Params = make(map[string]interface{})
+
+	// TODO: Add email auth type
+	// TODO: Add MSISDN auth type
+	// TODO: Add Recaptcha auth type
+
+	config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
+		authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeDummy}})
+}
+
+// setDefaults sets default config values if they are not explicitly set.
 func (config *Dendrite) setDefaults() {
 	if config.Matrix.KeyValidityPeriod == 0 {
 		config.Matrix.KeyValidityPeriod = 24 * time.Hour
@@ -327,6 +362,8 @@ func (config *Dendrite) setDefaults() {
 	}
 }
 
+// Error returns a string detailing how many errors were contained within an
+// Error type.
 func (e Error) Error() string {
 	if len(e.Problems) == 1 {
 		return e.Problems[0]
@@ -336,6 +373,8 @@ func (e Error) Error() string {
 	)
 }
 
+// check returns an error type containing all errors found within the config
+// file.
 func (config *Dendrite) check(monolithic bool) error {
 	var problems []string
 
@@ -420,6 +459,7 @@ func (config *Dendrite) check(monolithic bool) error {
 	return nil
 }
 
+// absPath returns the absolute path for a given relative or absolute path.
 func absPath(dir string, path Path) string {
 	if filepath.IsAbs(string(path)) {
 		// filepath.Join cleans the path so we should clean the absolute paths as well for consistency.
