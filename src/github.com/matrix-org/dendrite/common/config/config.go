@@ -83,6 +83,9 @@ type Dendrite struct {
 		// If set, allows registration by anyone who also has the shared
 		// secret, even if registration is otherwise disabled.
 		RegistrationSharedSecret string `yaml:"registration_shared_secret"`
+		// If set disables new users from registering (excpet via shared
+		// secrets)
+		RegistrationDisabled bool `yaml:"registration_disabled"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.

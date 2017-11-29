@@ -219,6 +219,11 @@ func handleRegistrationFlow(
 	// TODO: Handle mapping registrationRequest parameters into session parameters
 
 	// TODO: email / msisdn / recaptcha auth types.
+
+	if cfg.Matrix.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
+		return util.MessageResponse(403, "Registration has been disabled")
+	}
+
 	switch r.Auth.Type {
 	case authtypes.LoginTypeSharedSecret:
 		if cfg.Matrix.RegistrationSharedSecret == "" {
@@ -297,6 +302,10 @@ func LegacyRegister(
 			Code: 400,
 			JSON: jsonerror.BadJSON("invalid type"),
 		}
+	}
+
+	if cfg.Matrix.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
+		return util.MessageResponse(403, "Registration has been disabled")
 	}
 
 	switch r.Type {
