@@ -57,7 +57,7 @@ func BuildEvent(
 	return &event, nil
 }
 
-// AddPrevEventsToEvent fills out the prev_events and auth_events fields in EventBuilder
+// AddPrevEventsToEvent fills out the prev_events and auth_events fields in builder
 func AddPrevEventsToEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder,
