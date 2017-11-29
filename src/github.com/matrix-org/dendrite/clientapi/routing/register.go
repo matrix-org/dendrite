@@ -304,7 +304,7 @@ func LegacyRegister(
 		}
 	}
 
-	if cfg.Matrix.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
+	if cfg.Matrix.RegistrationDisabled && r.Type != authtypes.LoginTypeSharedSecret {
 		return util.MessageResponse(403, "Registration has been disabled")
 	}
 
