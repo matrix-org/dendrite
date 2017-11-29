@@ -279,14 +279,8 @@ func LegacyRegister(
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var r legacyRegisterRequest
-	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	resErr := parseAndValidateLegacyLogin(req, &r)
 	if resErr != nil {
-		return *resErr
-	}
-	if resErr = validateUserName(r.Username); resErr != nil {
-		return *resErr
-	}
-	if resErr = validatePassword(r.Password); resErr != nil {
 		return *resErr
 	}
 
@@ -295,14 +289,6 @@ func LegacyRegister(
 		"username":  r.Username,
 		"auth.type": r.Type,
 	}).Info("Processing registration request")
-
-	// All registration requests must specify what auth they are using to perform this request
-	if r.Type == "" {
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.BadJSON("invalid type"),
-		}
-	}
 
 	if cfg.Matrix.RegistrationDisabled && r.Type != authtypes.LoginTypeSharedSecret {
 		return util.MessageResponse(403, "Registration has been disabled")
@@ -333,6 +319,31 @@ func LegacyRegister(
 			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
 		}
 	}
+}
+
+// parseAndValidateLegacyLogin parses the request into r and checks that the
+// request is valid (e.g. valid user names, etc)
+func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *util.JSONResponse {
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return resErr
+	}
+	if resErr = validateUserName(r.Username); resErr != nil {
+		return resErr
+	}
+	if resErr = validatePassword(r.Password); resErr != nil {
+		return resErr
+	}
+
+	// All registration requests must specify what auth they are using to perform this request
+	if r.Type == "" {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("invalid type"),
+		}
+	}
+
+	return nil
 }
 
 func completeRegistration(
