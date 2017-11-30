@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -44,7 +46,9 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
     -- if there is no delta.
     add_state_ids TEXT[],
-    remove_state_ids TEXT[]
+	remove_state_ids TEXT[],
+	device_id TEXT,  -- The local device that sent the event, if any
+	transaction_id TEXT  -- The transaction id used to send the event, if any
 );
 -- for event selection
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(event_id);
@@ -52,14 +56,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_ev
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
-	" room_id, event_id, event_json, add_state_ids, remove_state_ids" +
-	") VALUES ($1, $2, $3, $4, $5) RETURNING id"
+	" room_id, event_id, event_json, add_state_ids, remove_state_ids, device_id, transaction_id" +
+	") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"
 
 const selectEventsSQL = "" +
 	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectRecentEventsSQL = "" +
-	"SELECT id, event_json FROM syncapi_output_room_events" +
+	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
@@ -164,7 +168,10 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 		}
 		stateNeeded[ev.RoomID()] = needSet
 
-		eventIDToEvent[ev.EventID()] = streamEvent{ev, types.StreamPosition(streamPos)}
+		eventIDToEvent[ev.EventID()] = streamEvent{
+			Event:          ev,
+			streamPosition: types.StreamPosition(streamPos),
+		}
 	}
 
 	return stateNeeded, eventIDToEvent, nil
@@ -190,7 +197,14 @@ func (s *outputRoomEventsStatements) selectMaxEventID(
 func (s *outputRoomEventsStatements) insertEvent(
 	ctx context.Context, txn *sql.Tx,
 	event *gomatrixserverlib.Event, addState, removeState []string,
+	transactionID *api.TransactionID,
 ) (streamPos int64, err error) {
+	var deviceID, txnID *string
+	if transactionID != nil {
+		deviceID = &transactionID.DeviceID
+		txnID = &transactionID.TransactionID
+	}
+
 	stmt := common.TxStmt(txn, s.insertEventStmt)
 	err = stmt.QueryRowContext(
 		ctx,
@@ -199,6 +213,8 @@ func (s *outputRoomEventsStatements) insertEvent(
 		event.JSON(),
 		pq.StringArray(addState),
 		pq.StringArray(removeState),
+		deviceID,
+		txnID,
 	).Scan(&streamPos)
 	return
 }
@@ -241,10 +257,13 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 	var result []streamEvent
 	for rows.Next() {
 		var (
-			streamPos  int64
-			eventBytes []byte
+			streamPos     int64
+			eventBytes    []byte
+			deviceID      *string
+			txnID         *string
+			transactionID *api.TransactionID
 		)
-		if err := rows.Scan(&streamPos, &eventBytes); err != nil {
+		if err := rows.Scan(&streamPos, &eventBytes, &deviceID, &txnID); err != nil {
 			return nil, err
 		}
 		// TODO: Handle redacted events
@@ -252,7 +271,19 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, streamEvent{ev, types.StreamPosition(streamPos)})
+
+		if deviceID != nil && txnID != nil {
+			transactionID = &api.TransactionID{
+				DeviceID:      *deviceID,
+				TransactionID: *txnID,
+			}
+		}
+
+		result = append(result, streamEvent{
+			Event:          ev,
+			streamPosition: types.StreamPosition(streamPos),
+			transactionID:  transactionID,
+		})
 	}
 	return result, nil
 }
