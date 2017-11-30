@@ -214,7 +214,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	}
 
 	// send events to the room server
-	err = producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName)
+	err = producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

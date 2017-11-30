@@ -92,7 +92,7 @@ func SendEvent(
 
 	// pass the new event to the roomserver
 	if err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName,
+		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, nil,
 	); err != nil {
 		return httputil.LogThenError(req, err)
 	}

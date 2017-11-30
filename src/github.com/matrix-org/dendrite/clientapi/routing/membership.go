@@ -98,7 +98,7 @@ func SendMembership(
 	}
 
 	if err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName,
+		req.Context(), []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName, nil,
 	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
