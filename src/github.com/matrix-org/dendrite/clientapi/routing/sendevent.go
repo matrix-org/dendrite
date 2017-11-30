@@ -41,7 +41,7 @@ type sendEventResponse struct {
 func SendEvent(
 	req *http.Request,
 	device *authtypes.Device,
-	roomID, eventType string, _, stateKey *string,
+	roomID, eventType string, txnID, stateKey *string,
 	cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
@@ -90,9 +90,17 @@ func SendEvent(
 		}
 	}
 
+	var txnAndDeviceID *api.TransactionID
+	if txnID != nil {
+		txnAndDeviceID = &api.TransactionID{
+			TransactionID: *txnID,
+			DeviceID:      device.ID,
+		}
+	}
+
 	// pass the new event to the roomserver
 	if err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, nil,
+		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndDeviceID,
 	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
