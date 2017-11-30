@@ -123,7 +123,7 @@ func (n *Notifier) GetListener(req syncRequest) UserStreamListener {
 
 	n.removeEmptyUserStreams()
 
-	return n.fetchUserStream(req.userID, true).GetListener(req.ctx)
+	return n.fetchUserStream(req.device.UserID, true).GetListener(req.ctx)
 }
 
 // Load the membership states required to notify users correctly.
