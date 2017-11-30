@@ -387,7 +387,8 @@ func main() {
 			"adds_state_event_ids":["$1463671337126266wrSBX:matrix.org", "$1463671339126270PnVwC:matrix.org"],
 			"removes_state_event_ids":null,
 			"last_sent_event_id":"",
-			"send_as_server":""
+			"send_as_server":"",
+			"transaction_id": null
 		}}`,
 	}
 
