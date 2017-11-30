@@ -107,6 +107,9 @@ type OutputNewRoomEvent struct {
 	// We encode the server name that the event should be sent using here to
 	// future proof the API for virtual hosting.
 	SendAsServer string `json:"send_as_server"`
+	// The transaction ID of the send request if sent by a local user and one
+	// was specified
+	TransactionID *TransactionID `json:"transaction_id"`
 }
 
 // An OutputNewInviteEvent is written whenever an invite becomes active.
