@@ -275,10 +275,17 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 	ore.SendAsServer = u.sendAsServer
 
-	return &api.OutputEvent{
+	oe := api.OutputEvent{
 		Type:         api.OutputTypeNewRoomEvent,
 		NewRoomEvent: &ore,
-	}, nil
+	}
+
+	err = oe.AddSpanFromContext(u.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &oe, nil
 }
 
 type eventNIDSorter []types.EventNID

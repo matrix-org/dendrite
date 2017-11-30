@@ -77,7 +77,7 @@ func updateMemberships(
 				ae = &ev.Event
 			}
 		}
-		if updates, err = updateMembership(updater, targetUserNID, re, ae, updates); err != nil {
+		if updates, err = updateMembership(ctx, updater, targetUserNID, re, ae, updates); err != nil {
 			return nil, err
 		}
 	}
@@ -85,6 +85,7 @@ func updateMemberships(
 }
 
 func updateMembership(
+	ctx context.Context,
 	updater types.RoomRecentEventsUpdater, targetUserNID types.EventStateKeyNID,
 	remove, add *gomatrixserverlib.Event,
 	updates []api.OutputEvent,
@@ -119,11 +120,11 @@ func updateMembership(
 
 	switch new {
 	case invite:
-		return updateToInviteMembership(mu, add, updates)
+		return updateToInviteMembership(ctx, mu, add, updates)
 	case join:
-		return updateToJoinMembership(mu, add, updates)
+		return updateToJoinMembership(ctx, mu, add, updates)
 	case leave, ban:
-		return updateToLeaveMembership(mu, add, new, updates)
+		return updateToLeaveMembership(ctx, mu, add, new, updates)
 	default:
 		panic(fmt.Errorf(
 			"input: membership %q is not one of the allowed values", new,
@@ -132,7 +133,7 @@ func updateMembership(
 }
 
 func updateToInviteMembership(
-	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	ctx context.Context, mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	// We may have already sent the invite to the user, either because we are
 	// reprocessing this event, or because the we received this invite from a
@@ -151,16 +152,24 @@ func updateToInviteMembership(
 		onie := api.OutputNewInviteEvent{
 			Event: *add,
 		}
-		updates = append(updates, api.OutputEvent{
+
+		oe := api.OutputEvent{
 			Type:           api.OutputTypeNewInviteEvent,
 			NewInviteEvent: &onie,
-		})
+		}
+
+		err = oe.AddSpanFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		updates = append(updates, oe)
 	}
 	return updates, nil
 }
 
 func updateToJoinMembership(
-	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	ctx context.Context, mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	// If the user is already marked as being joined, we call SetToJoin to update
 	// the event ID then we can return immediately. Retired is ignored as there
@@ -187,15 +196,24 @@ func updateToJoinMembership(
 			RetiredByEventID: add.EventID(),
 			TargetUserID:     *add.StateKey(),
 		}
-		updates = append(updates, api.OutputEvent{
+
+		oe := api.OutputEvent{
 			Type:              api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &orie,
-		})
+		}
+
+		err = oe.AddSpanFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		updates = append(updates, oe)
 	}
 	return updates, nil
 }
 
 func updateToLeaveMembership(
+	ctx context.Context,
 	mu types.MembershipUpdater, add *gomatrixserverlib.Event,
 	newMembership string, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
@@ -219,10 +237,18 @@ func updateToLeaveMembership(
 			RetiredByEventID: add.EventID(),
 			TargetUserID:     *add.StateKey(),
 		}
-		updates = append(updates, api.OutputEvent{
+
+		oe := api.OutputEvent{
 			Type:              api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &orie,
-		})
+		}
+
+		err = oe.AddSpanFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		updates = append(updates, oe)
 	}
 	return updates, nil
 }

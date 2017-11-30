@@ -15,7 +15,11 @@
 package api
 
 import (
+	"context"
+
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 )
 
 // An OutputType is a type of roomserver output.
@@ -41,6 +45,43 @@ type OutputEvent struct {
 	NewInviteEvent *OutputNewInviteEvent `json:"new_invite_event,omitempty"`
 	// The content of event with type OutputTypeRetireInviteEvent
 	RetireInviteEvent *OutputRetireInviteEvent `json:"retire_invite_event,omitempty"`
+	// Serialized span context
+	OpentracingCarrier opentracing.TextMapCarrier `json:"opentracing_carrier"`
+}
+
+// AddSpanFromContext fills out the OpentracingCarrier field from the given context
+func (o *OutputEvent) AddSpanFromContext(ctx context.Context) error {
+	span := opentracing.SpanFromContext(ctx)
+	ext.SpanKindProducer.Set(span)
+	var carrier opentracing.TextMapCarrier
+	tracer := opentracing.GlobalTracer()
+
+	err := tracer.Inject(span.Context(), opentracing.TextMap, carrier)
+	if err != nil {
+		return err
+	}
+
+	o.OpentracingCarrier = carrier
+
+	return nil
+}
+
+func (o *OutputEvent) StartSpanAndReplaceContext(
+	ctx context.Context,
+) (context.Context, opentracing.Span) {
+	tracer := opentracing.GlobalTracer()
+	producerContext, err := tracer.Extract(opentracing.TextMap, o.OpentracingCarrier)
+
+	var span opentracing.Span
+	if err == nil {
+		// Default to a span without reference to producer context.
+		span = tracer.StartSpan("room_event_consumer")
+	} else {
+		// Set the producer context.
+		span = tracer.StartSpan("room_event_consumer", opentracing.FollowsFrom(producerContext))
+	}
+
+	return opentracing.ContextWithSpan(ctx, span), span
 }
 
 // An OutputNewRoomEvent is written when the roomserver receives a new event.

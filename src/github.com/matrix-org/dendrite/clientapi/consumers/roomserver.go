@@ -77,6 +77,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
+	ctx, span := output.StartSpanAndReplaceContext(context.Background())
+	defer span.Finish()
+
 	if output.Type != api.OutputTypeNewRoomEvent {
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -96,7 +99,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
-	return s.db.UpdateMemberships(context.TODO(), events, output.NewRoomEvent.RemovesStateEventIDs)
+	return s.db.UpdateMemberships(ctx, events, output.NewRoomEvent.RemovesStateEventIDs)
 }
 
 // lookupStateEvents looks up the state events that are added by a new event.
