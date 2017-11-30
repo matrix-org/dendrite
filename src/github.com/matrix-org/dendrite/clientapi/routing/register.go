@@ -183,6 +183,9 @@ func Register(
 		}
 	}
 
+	// Squash username to all lowercase letters
+	r.Username = strings.ToLower(r.Username)
+
 	if resErr = validateUserName(r.Username); resErr != nil {
 		return *resErr
 	}
