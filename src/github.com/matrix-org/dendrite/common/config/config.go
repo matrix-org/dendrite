@@ -205,13 +205,17 @@ type Dendrite struct {
 
 	// Any information derived from the configuration options for later use.
 	Derived struct {
-		// Flows for registration. As long as they given flows only relies on config file options,
-		// we can generate them on startup and store them until needed
-		Flows []authtypes.Flow `json:"flows"`
+		Registration struct {
+			// Flows is a slice of flows, which represent one possible way that the client can authenticate a request.
+			// http://matrix.org/docs/spec/HEAD/client_server/r0.3.0.html#user-interactive-authentication-api
+			// As long as the generated flows only rely on config file options,
+			// we can generate them on startup and store them until needed
+			Flows []authtypes.Flow `json:"flows"`
 
-		// Params for registration. Data that is returned to the client while registering and
-		// that which is necessary to complete certain registration flow stages
-		Params map[string]interface{} `json:"params"`
+			// Params that need to be returned to the client during
+			// registration in order to complete registration stages.
+			Params map[string]interface{} `json:"params"`
+		}
 	}
 }
 
@@ -336,26 +340,26 @@ func loadConfig(
 }
 
 // derive generates data that is derived from various values provided in
-// the config file
+// the config file.
 func (config *Dendrite) derive() {
 	// Determine registrations flows based off config values
 
-	config.Derived.Params = make(map[string]interface{})
+	config.Derived.Registration.Params = make(map[string]interface{})
 
 	// TODO: Add email auth type
 	// TODO: Add MSISDN auth type
 
 	if config.Matrix.RecaptchaEnabled {
-		config.Derived.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.Matrix.RecaptchaPublicKey}
-		config.Derived.Flows = append(config.Derived.Flows,
+		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.Matrix.RecaptchaPublicKey}
+		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
 	} else {
-		config.Derived.Flows = append(config.Derived.Flows,
+		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeDummy}})
 	}
 }
 
-// setDefaults sets default config values if they are not explicitly set
+// setDefaults sets default config values if they are not explicitly set.
 func (config *Dendrite) setDefaults() {
 	if config.Matrix.KeyValidityPeriod == 0 {
 		config.Matrix.KeyValidityPeriod = 24 * time.Hour
@@ -376,7 +380,7 @@ func (config *Dendrite) setDefaults() {
 }
 
 // Error returns a string detailing how many errors were contained within an
-// Error type
+// Error type.
 func (e Error) Error() string {
 	if len(e.Problems) == 1 {
 		return e.Problems[0]
@@ -387,7 +391,7 @@ func (e Error) Error() string {
 }
 
 // check returns an error type containing all errors found within the config
-// file
+// file.
 func (config *Dendrite) check(monolithic bool) error {
 	var problems []string
 
@@ -472,7 +476,7 @@ func (config *Dendrite) check(monolithic bool) error {
 	return nil
 }
 
-// absPath returns the absolute path for a given relative or absolute path
+// absPath returns the absolute path for a given relative or absolute path.
 func absPath(dir string, path Path) string {
 	if filepath.IsAbs(string(path)) {
 		// filepath.Join cleans the path so we should clean the absolute paths as well for consistency.

@@ -135,7 +135,7 @@
 		{
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
-			"revision": "076933f95312aae3a9476e78d6b4118e1b45d542",
+			"revision": "8540d3dfc13c797cd3200640bc06e0286ab355aa",
 			"branch": "master"
 		},
 		{
@@ -273,6 +273,24 @@
 			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
 			"branch": "master",
 			"path": "/require"
+		},
+		{
+			"importpath": "github.com/tidwall/gjson",
+			"repository": "https://github.com/tidwall/gjson",
+			"revision": "67e2a63ac70d273b6bc7589f12f07180bc9fc189",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/tidwall/match",
+			"repository": "https://github.com/tidwall/match",
+			"revision": "1731857f09b1f38450e2c12409748407822dc6be",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/tidwall/sjson",
+			"repository": "https://github.com/tidwall/sjson",
+			"revision": "6a22caf2fd45d5e2119bfc3717e984f15a7eb7ee",
+			"branch": "master"
 		},
 		{
 			"importpath": "github.com/tj/go-debug",

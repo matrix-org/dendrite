@@ -23,10 +23,8 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"net/url"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -53,6 +51,7 @@ const (
 )
 
 var (
+	// TODO: Remove old sessions. Need to do so on a session-specific timeout.
 	sessions           = make(map[string][]authtypes.LoginType) // Sessions and completed flow stages
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
 )
@@ -79,7 +78,7 @@ type authDict struct {
 	Session string                      `json:"session"`
 	Mac     gomatrixserverlib.HexString `json:"mac"`
 
-	// ReCaptcha
+	// Recaptcha
 	Response string `json:"response"`
 	// TODO: Lots of custom keys depending on the type
 }
@@ -101,6 +100,8 @@ type legacyRegisterRequest struct {
 	Mac      gomatrixserverlib.HexString `json:"mac"`
 }
 
+// newUserInteractiveResponse will return a struct to be sent back to the client
+// during registration.
 func newUserInteractiveResponse(
 	sessionID string,
 	fs []authtypes.Flow,
@@ -119,7 +120,7 @@ type registerResponse struct {
 	DeviceID    string                       `json:"device_id"`
 }
 
-// recaptchaResponse represents the HTTP response from a Google ReCaptcha server
+// recaptchaResponse represents the HTTP response from a Google Recaptcha server
 type recaptchaResponse struct {
 	Success     bool      `json:"success"`
 	ChallengeTS time.Time `json:"challenge_ts"`
@@ -225,9 +226,6 @@ func validateRecaptcha(
 	return nil
 }
 
-// TODO: Create flows in config.go so that they're cached. Always show msisdn flows as long as flows only depend on config-file options.
-// Store it just like the config does in a struct and keep it there.
-
 // Register processes a /register request. http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
@@ -246,7 +244,7 @@ func Register(
 	sessionID := r.Auth.Session
 	if sessionID == "" {
 		// Generate a new, random session ID
-		sessionID = RandString(sessionIDLength)
+		sessionID = util.RandomString(sessionIDLength)
 	}
 
 	// If no auth type is specified by the client, send back the list of available flows
@@ -254,7 +252,7 @@ func Register(
 		return util.JSONResponse{
 			Code: 401,
 			JSON: newUserInteractiveResponse(sessionID,
-				cfg.Derived.Flows, cfg.Derived.Params),
+				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 		}
 	}
 
@@ -346,21 +344,19 @@ func handleRegistrationFlow(
 		}
 	}
 
-	// Check if a registration flow has been completed successfully
-	for _, flow := range cfg.Derived.Flows {
-		if checkFlowsEqual(flow, authtypes.Flow{sessions[sessionID]}) {
-			return completeRegistration(req.Context(), accountDB, deviceDB,
-				r.Username, r.Password, r.InitialDisplayName)
+	// Check if the user's registration flow has been completed successfully
+	if !checkFlowCompleted(sessions[sessionID], cfg.Derived.Registration.Flows) {
+		// There are still more stages to complete.
+		// Return the flows and those that have been completed.
+		return util.JSONResponse{
+			Code: 401,
+			JSON: newUserInteractiveResponse(sessionID,
+				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 		}
 	}
 
-	// There are still more stages to complete.
-	// Return the flows and those that have been completed.
-	return util.JSONResponse{
-		Code: 401,
-		JSON: newUserInteractiveResponse(sessionID,
-			cfg.Derived.Flows, cfg.Derived.Params),
-	}
+	return completeRegistration(req.Context(), accountDB, deviceDB,
+		r.Username, r.Password, r.InitialDisplayName)
 }
 
 // LegacyRegister process register requests from the legacy v1 API
@@ -487,7 +483,7 @@ func isValidMacLogin(
 	givenMac []byte,
 	sharedSecret string,
 ) (bool, error) {
-	// Double check that username/passowrd don't contain the HMAC delimiters. We should have
+	// Double check that username/password don't contain the HMAC delimiters. We should have
 	// already checked this.
 	if strings.Contains(username, "\x00") {
 		return false, errors.New("Username contains invalid character")
@@ -515,67 +511,60 @@ func isValidMacLogin(
 	return hmac.Equal(givenMac, expectedMAC), nil
 }
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const (
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
-)
+// checkFlows checks a single completed flow against another required one. If
+// one contains at least all of the stages that the other does, checkFlows
+// returns true.
+func checkFlows(
+	completedStages []authtypes.LoginType,
+	requiredStages []authtypes.LoginType,
+) bool {
+	// Create temporary slices so they originals will not be modified on sorting
+	completed := make([]authtypes.LoginType, len(completedStages))
+	required := make([]authtypes.LoginType, len(requiredStages))
+	copy(completed, completedStages)
+	copy(required, requiredStages)
 
-var src = rand.NewSource(time.Now().UnixNano())
+	// Sort the slices for simple comparison
+	sort.Slice(completed, func(i, j int) bool { return completed[i] < completed[j] })
+	sort.Slice(required, func(i, j int) bool { return required[i] < required[j] })
 
-// RandString returns a random string of characters with a given length.
-// Do note that it is not thread-safe in its current form.
-// https://stackoverflow.com/a/31832326
-func RandString(n int) string {
-	b := make([]byte, n)
-
-	// A src.Int63() generates 63 random bits
-	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = src.Int63(), letterIdxMax
+	// Iterate through each slice, going to the next required slice only once
+	// we've found a match.
+	i, j := 0, 0
+	for j < len(required) {
+		// Exit if we've reached the end of our input without being able to
+		// match all of the required stages.
+		if i >= len(completed) {
+			return false
 		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			b[i] = letterBytes[idx]
-			i--
+
+		// If we've found a stage we want, move on to the next required stage.
+		if completed[i] == required[j] {
+			j++
 		}
-		cache >>= letterIdxBits
-		remain--
+		i++
 	}
-
-	return string(b)
+	return true
 }
 
-// checkFlowsEqual checks if two registration flows have the same stages
-// within them. Order of stages does not matter.
-func checkFlowsEqual(aFlow, bFlow authtypes.Flow) bool {
-	a := aFlow.Stages
-	b := bFlow.Stages
-	if len(a) != len(b) {
-		return false
+// checkFlowCompleted checks if a registration flow complies with any allowed flow
+// dictated by the server. Order of stages does not matter. A user may complete
+// extra stages as long as the required stages of at least one flow is met.
+func checkFlowCompleted(flow []authtypes.LoginType, allowedFlows []authtypes.Flow) bool {
+	// Iterate through possible flows to check whether any have been fully completed.
+	for _, allowedFlow := range allowedFlows {
+		if checkFlows(flow, allowedFlow.Stages) {
+			return true
+		}
 	}
-
-	aCopy := make([]string, len(a))
-	bCopy := make([]string, len(b))
-
-	for loginType := range a {
-		aCopy = append(aCopy, string(loginType))
-	}
-	for loginType := range b {
-		bCopy = append(bCopy, string(loginType))
-	}
-
-	sort.Strings(aCopy)
-	sort.Strings(bCopy)
-
-	return reflect.DeepEqual(aCopy, bCopy)
+	return false
 }
 
 type availableResponse struct {
 	Available bool `json:"available"`
 }
 
-// RegisterAvailable checks if the username is already taken or invalid
+// RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
 	accountDB *accounts.Database,

@@ -59,10 +59,10 @@ func Setup(
 	}
 	r0mux.Handle("/download/{serverName}/{mediaId}",
 		makeDownloadAPI("download", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 }
 
 func makeDownloadAPI(

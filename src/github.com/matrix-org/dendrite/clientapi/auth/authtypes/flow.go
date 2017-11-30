@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright Andrew Morgan <andrew@amorgan.xyz>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 package authtypes
 
 // Flow represents one possible way that the client can authenticate a request.
-// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
+// https://matrix.org/docs/spec/client_server/r0.3.0.html#user-interactive-authentication-api
 type Flow struct {
 	Stages []LoginType `json:"stages"`
 }

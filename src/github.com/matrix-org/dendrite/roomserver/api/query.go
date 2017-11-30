@@ -155,6 +155,33 @@ type QueryServerAllowedToSeeEventResponse struct {
 	AllowedToSeeEvent bool `json:"can_see_event"`
 }
 
+// QueryStateAndAuthChainRequest is a request to QueryStateAndAuthChain
+type QueryStateAndAuthChainRequest struct {
+	// The room ID to query the state in.
+	RoomID string `json:"room_id"`
+	// The list of prev events for the event. Used to calculate the state at
+	// the event
+	PrevEventIDs []string `json:"prev_event_ids"`
+	// The list of auth events for the event. Used to calculate the auth chain
+	AuthEventIDs []string `json:"auth_event_ids"`
+}
+
+// QueryStateAndAuthChainResponse is a response to QueryStateAndAuthChain
+type QueryStateAndAuthChainResponse struct {
+	// Copy of the request for debugging.
+	QueryStateAndAuthChainRequest
+	// Does the room exist on this roomserver?
+	// If the room doesn't exist this will be false and StateEvents will be empty.
+	RoomExists bool `json:"room_exists"`
+	// Do all the previous events exist on this roomserver?
+	// If some of previous events do not exist this will be false and StateEvents will be empty.
+	PrevEventsExist bool `json:"prev_events_exist"`
+	// The state and auth chain events that were requested.
+	// The lists will be in an arbitrary order.
+	StateEvents     []gomatrixserverlib.Event `json:"state_events"`
+	AuthChainEvents []gomatrixserverlib.Event `json:"auth_chain_events"`
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -198,6 +225,15 @@ type RoomserverQueryAPI interface {
 		request *QueryServerAllowedToSeeEventRequest,
 		response *QueryServerAllowedToSeeEventResponse,
 	) error
+
+	// Query to get state and auth chain for a (potentially hypothetical) event.
+	// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
+	// the state and auth chain to return.
+	QueryStateAndAuthChain(
+		ctx context.Context,
+		request *QueryStateAndAuthChainRequest,
+		response *QueryStateAndAuthChainResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -217,6 +253,9 @@ const RoomserverQueryInvitesForUserPath = "/api/roomserver/queryInvitesForUser"
 
 // RoomserverQueryServerAllowedToSeeEventPath is the HTTP path for the QueryServerAllowedToSeeEvent API
 const RoomserverQueryServerAllowedToSeeEventPath = "/api/roomserver/queryServerAllowedToSeeEvent"
+
+// RoomserverQueryStateAndAuthChainPath is the HTTP path for the QueryStateAndAuthChain API
+const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthChain"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -307,6 +346,19 @@ func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryStateAndAuthChain implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) QueryStateAndAuthChain(
+	ctx context.Context,
+	request *QueryStateAndAuthChainRequest,
+	response *QueryStateAndAuthChainResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryStateAndAuthChain")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryStateAndAuthChainPath
 	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

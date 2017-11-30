@@ -63,7 +63,7 @@ func Setup(
 				}},
 			}
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	v1mux := apiMux.PathPrefix(pathPrefixV1).Subrouter()
@@ -131,14 +131,14 @@ func Setup(
 
 	r0mux.Handle("/register/available", common.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
 		return RegisterAvailable(req, accountDB)
-	})).Methods("GET")
+	})).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI)
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -152,7 +152,7 @@ func Setup(
 			vars := mux.Vars(req)
 			return RemoveLocalAlias(req, device, vars["roomAlias"], aliasAPI)
 		}),
-	).Methods("DELETE")
+	).Methods("DELETE", "OPTIONS")
 
 	r0mux.Handle("/logout",
 		common.MakeAuthAPI("logout", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -191,7 +191,7 @@ func Setup(
 				JSON: &res,
 			}
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/user/{userId}/filter",
 		common.MakeAuthAPI("put_filter", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -205,7 +205,7 @@ func Setup(
 			vars := mux.Vars(req)
 			return GetFilter(req, device, accountDB, vars["userId"], vars["filterId"])
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	// Riot user settings
 
@@ -214,14 +214,14 @@ func Setup(
 			vars := mux.Vars(req)
 			return GetProfile(req, accountDB, vars["userID"])
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		common.MakeExternalAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return GetAvatarURL(req, accountDB, vars["userID"])
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		common.MakeAuthAPI("profile_avatar_url", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -237,7 +237,7 @@ func Setup(
 			vars := mux.Vars(req)
 			return GetDisplayName(req, accountDB, vars["userID"])
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/profile/{userID}/displayname",
 		common.MakeAuthAPI("profile_displayname", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -252,7 +252,7 @@ func Setup(
 		common.MakeAuthAPI("account_3pid", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return GetAssociated3PIDs(req, accountDB, device)
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/account/3pid",
 		common.MakeAuthAPI("account_3pid", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -287,7 +287,7 @@ func Setup(
 		common.MakeAuthAPI("turn_server", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return RequestTurnServer(req, device, cfg)
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	unstableMux.Handle("/thirdparty/protocols",
 		common.MakeExternalAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
@@ -297,7 +297,7 @@ func Setup(
 				JSON: struct{}{},
 			}
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/initialSync",
 		common.MakeExternalAPI("rooms_initial_sync", func(req *http.Request) util.JSONResponse {
@@ -307,7 +307,7 @@ func Setup(
 				JSON: jsonerror.GuestAccessForbidden("Guest access not implemented"),
 			}
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/user/{userID}/account_data/{type}",
 		common.MakeAuthAPI("user_account_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -328,14 +328,14 @@ func Setup(
 			vars := mux.Vars(req)
 			return GetMemberships(req, device, vars["roomID"], false, cfg, queryAPI)
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/joined_members",
 		common.MakeAuthAPI("rooms_members", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return GetMemberships(req, device, vars["roomID"], true, cfg, queryAPI)
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/rooms/{roomID}/read_markers",
 		common.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
@@ -355,14 +355,14 @@ func Setup(
 		common.MakeAuthAPI("get_devices", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return GetDevicesByLocalpart(req, deviceDB, device)
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/device/{deviceID}",
 		common.MakeAuthAPI("get_device", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return GetDeviceByID(req, deviceDB, device, vars["deviceID"])
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/devices/{deviceID}",
 		common.MakeAuthAPI("device_data", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -380,7 +380,7 @@ func Setup(
 				"end":   "",
 			}}
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 
 	r0mux.Handle("/initialSync",
 		common.MakeExternalAPI("initial_sync", func(req *http.Request) util.JSONResponse {
@@ -388,5 +388,5 @@ func Setup(
 				"end": "",
 			}}
 		}),
-	).Methods("GET")
+	).Methods("GET", "OPTIONS")
 }
