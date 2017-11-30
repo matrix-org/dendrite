@@ -85,6 +85,10 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		)
 		return nil
 	}
+
+	ctx, span := output.StartSpanAndReplaceContext(context.Background())
+	defer span.Finish()
+
 	ev := &output.NewRoomEvent.Event
 	log.WithFields(log.Fields{
 		"event_id":       ev.EventID(),
@@ -92,7 +96,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		"send_as_server": output.NewRoomEvent.SendAsServer,
 	}).Info("received event from roomserver")
 
-	if err := s.processMessage(*output.NewRoomEvent); err != nil {
+	if err := s.processMessage(ctx, *output.NewRoomEvent); err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
@@ -108,8 +112,10 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
-func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
-	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ore.Event)
+func (s *OutputRoomEventConsumer) processMessage(
+	ctx context.Context, ore api.OutputNewRoomEvent,
+) error {
+	addsStateEvents, err := s.lookupStateEvents(ctx, ore.AddsStateEventIDs, ore.Event)
 	if err != nil {
 		return err
 	}
@@ -123,7 +129,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 	// TODO(#290): handle EventIDMismatchError and recover the current state by
 	// talking to the roomserver
 	oldJoinedHosts, err := s.db.UpdateRoom(
-		context.TODO(),
+		ctx,
 		ore.Event.RoomID(),
 		ore.LastSentEventID,
 		ore.Event.EventID(),
@@ -148,7 +154,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 	}
 
 	// Work out which hosts were joined at the event itself.
-	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, oldJoinedHosts)
+	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ctx, ore, oldJoinedHosts)
 	if err != nil {
 		return err
 	}
@@ -169,7 +175,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 // events from the room server.
 // Returns an error if there was a problem talking to the room server.
 func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
-	ore api.OutputNewRoomEvent, oldJoinedHosts []types.JoinedHost,
+	ctx context.Context, ore api.OutputNewRoomEvent, oldJoinedHosts []types.JoinedHost,
 ) ([]gomatrixserverlib.ServerName, error) {
 	// Combine the delta into a single delta so that the adds and removes can
 	// cancel each other out. This should reduce the number of times we need
@@ -178,7 +184,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		ore.AddsStateEventIDs, ore.RemovesStateEventIDs,
 		ore.StateBeforeAddsEventIDs, ore.StateBeforeRemovesEventIDs,
 	)
-	combinedAddsEvents, err := s.lookupStateEvents(combinedAdds, ore.Event)
+	combinedAddsEvents, err := s.lookupStateEvents(ctx, combinedAdds, ore.Event)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +294,7 @@ func combineDeltas(adds1, removes1, adds2, removes2 []string) (adds, removes []s
 
 // lookupStateEvents looks up the state events that are added by a new event.
 func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.Event,
+	ctx context.Context, addsStateEventIDs []string, event gomatrixserverlib.Event,
 ) ([]gomatrixserverlib.Event, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
@@ -321,7 +327,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	// from the roomserver using the query API.
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
 	var eventResp api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
+	if err := s.query.QueryEventsByID(ctx, &eventReq, &eventResp); err != nil {
 		return nil, err
 	}
 

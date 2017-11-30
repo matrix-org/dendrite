@@ -77,6 +77,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
+	ctx, span := output.StartSpanAndReplaceContext(context.Background())
+	defer span.Finish()
+
 	ev := output.NewRoomEvent.Event
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
@@ -86,17 +89,17 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 	addQueryReq := api.QueryEventsByIDRequest{EventIDs: output.NewRoomEvent.AddsStateEventIDs}
 	var addQueryRes api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &addQueryReq, &addQueryRes); err != nil {
+	if err := s.query.QueryEventsByID(ctx, &addQueryReq, &addQueryRes); err != nil {
 		log.Warn(err)
 		return err
 	}
 
 	remQueryReq := api.QueryEventsByIDRequest{EventIDs: output.NewRoomEvent.RemovesStateEventIDs}
 	var remQueryRes api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &remQueryReq, &remQueryRes); err != nil {
+	if err := s.query.QueryEventsByID(ctx, &remQueryReq, &remQueryRes); err != nil {
 		log.Warn(err)
 		return err
 	}
 
-	return s.db.UpdateRoomFromEvents(context.TODO(), addQueryRes.Events, remQueryRes.Events)
+	return s.db.UpdateRoomFromEvents(ctx, addQueryRes.Events, remQueryRes.Events)
 }

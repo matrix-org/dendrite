@@ -53,7 +53,7 @@ type OutputEvent struct {
 func (o *OutputEvent) AddSpanFromContext(ctx context.Context) error {
 	span := opentracing.SpanFromContext(ctx)
 	ext.SpanKindProducer.Set(span)
-	var carrier opentracing.TextMapCarrier
+	carrier := make(opentracing.TextMapCarrier)
 	tracer := opentracing.GlobalTracer()
 
 	err := tracer.Inject(span.Context(), opentracing.TextMap, carrier)
@@ -73,12 +73,12 @@ func (o *OutputEvent) StartSpanAndReplaceContext(
 	producerContext, err := tracer.Extract(opentracing.TextMap, o.OpentracingCarrier)
 
 	var span opentracing.Span
-	if err == nil {
+	if err != nil {
 		// Default to a span without reference to producer context.
-		span = tracer.StartSpan("room_event_consumer")
+		span = tracer.StartSpan("output_event_consumer")
 	} else {
 		// Set the producer context.
-		span = tracer.StartSpan("room_event_consumer", opentracing.FollowsFrom(producerContext))
+		span = tracer.StartSpan("output_event_consumer", opentracing.FollowsFrom(producerContext))
 	}
 
 	return opentracing.ContextWithSpan(ctx, span), span
