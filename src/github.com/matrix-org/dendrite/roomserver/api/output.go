@@ -66,6 +66,8 @@ func (o *OutputEvent) AddSpanFromContext(ctx context.Context) error {
 	return nil
 }
 
+// StartSpanAndReplaceContext produces a context and opentracing span from the
+// info embedded in OutputEvent
 func (o *OutputEvent) StartSpanAndReplaceContext(
 	ctx context.Context,
 ) (context.Context, opentracing.Span) {
