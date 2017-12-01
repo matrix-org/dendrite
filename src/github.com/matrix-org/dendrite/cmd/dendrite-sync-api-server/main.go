@@ -105,7 +105,7 @@ func main() {
 
 	api := mux.NewRouter()
 	routing.Setup(api, sync.NewRequestPool(db, n, adb), db, deviceDB)
-	common.SetupHTTPAPI(http.DefaultServeMux, api)
+	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(api))
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.SyncAPI), nil))
 }

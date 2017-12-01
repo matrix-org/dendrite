@@ -85,7 +85,7 @@ func main() {
 
 	api := mux.NewRouter()
 	routing.Setup(api, deviceDB, db)
-	common.SetupHTTPAPI(http.DefaultServeMux, api)
+	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(api))
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.PublicRoomsAPI), nil))
 }
