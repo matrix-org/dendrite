@@ -103,7 +103,7 @@ func main() {
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		log.Info("Listening on ", *httpBindAddr)
-		log.Fatal(http.ListenAndServe(*httpBindAddr, m.api))
+		log.Fatal(http.ListenAndServe(*httpBindAddr, common.WrapHandlerInCORS(m.api)))
 	}()
 	// Handle HTTPS if certificate and key are provided
 	go func() {

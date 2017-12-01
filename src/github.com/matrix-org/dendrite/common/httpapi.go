@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -87,8 +86,25 @@ func MakeFedAPI(
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
 // listener.
-func SetupHTTPAPI(servMux *http.ServeMux, apiMux *mux.Router) {
+func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler) {
 	// This is deprecated.
 	servMux.Handle("/metrics", prometheus.Handler()) // nolint: megacheck, staticcheck
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
+}
+
+// WrapHandlerInCORS adds CORS headers to all responses, including all error
+// responses.
+// Handles OPTIONS requests directly.
+func WrapHandlerInCORS(h http.Handler) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
+
+		if r.Method == "OPTIONS" && r.Header.Get("Access-Control-Request-Method") != "" {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			h.ServeHTTP(w, r)
+		}
+	})
 }
