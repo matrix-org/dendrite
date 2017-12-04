@@ -68,6 +68,16 @@ type InputRoomEvent struct {
 	// The server name to use to push this event to other servers.
 	// Or empty if this event shouldn't be pushed to other servers.
 	SendAsServer string `json:"send_as_server"`
+	// The transaction ID of the send request if sent by a local user and one
+	// was specified
+	TransactionID *TransactionID `json:"transaction_id"`
+}
+
+// TransactionID contains the transaction ID sent by a client when sending an
+// event, along with the ID of that device.
+type TransactionID struct {
+	DeviceID      string `json:"device_id"`
+	TransactionID string `json:"id"`
 }
 
 // InputInviteEvent is a matrix invite event received over federation without

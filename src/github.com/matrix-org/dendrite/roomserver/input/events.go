@@ -129,7 +129,7 @@ func processRoomEvent(
 	}
 
 	// Update the extremities of the event graph for the room
-	return updateLatestEvents(ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer)
+	return updateLatestEvents(ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID)
 }
 
 func processInviteEvent(

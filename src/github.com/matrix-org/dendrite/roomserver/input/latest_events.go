@@ -50,6 +50,7 @@ func updateLatestEvents(
 	stateAtEvent types.StateAtEvent,
 	event gomatrixserverlib.Event,
 	sendAsServer string,
+	transactionID *api.TransactionID,
 ) (err error) {
 	updater, err := db.GetLatestEventsForUpdate(ctx, roomNID)
 	if err != nil {
@@ -61,6 +62,7 @@ func updateLatestEvents(
 	u := latestEventsUpdater{
 		ctx: ctx, db: db, updater: updater, ow: ow, roomNID: roomNID,
 		stateAtEvent: stateAtEvent, event: event, sendAsServer: sendAsServer,
+		transactionID: transactionID,
 	}
 	if err = u.doUpdateLatestEvents(); err != nil {
 		return err
@@ -75,13 +77,14 @@ func updateLatestEvents(
 // The state could be passed using function arguments, but it becomes impractical
 // when there are so many variables to pass around.
 type latestEventsUpdater struct {
-	ctx          context.Context
-	db           RoomEventDatabase
-	updater      types.RoomRecentEventsUpdater
-	ow           OutputRoomEventWriter
-	roomNID      types.RoomNID
-	stateAtEvent types.StateAtEvent
-	event        gomatrixserverlib.Event
+	ctx           context.Context
+	db            RoomEventDatabase
+	updater       types.RoomRecentEventsUpdater
+	ow            OutputRoomEventWriter
+	roomNID       types.RoomNID
+	stateAtEvent  types.StateAtEvent
+	event         gomatrixserverlib.Event
+	transactionID *api.TransactionID
 	// Which server to send this event as.
 	sendAsServer string
 	// The eventID of the event that was processed before this one.
@@ -241,6 +244,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		Event:           u.event,
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
+		TransactionID:   u.transactionID,
 	}
 
 	var stateEventNIDs []types.EventNID

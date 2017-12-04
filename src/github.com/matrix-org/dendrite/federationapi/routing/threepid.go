@@ -81,7 +81,7 @@ func CreateInvitesFrom3PIDInvites(
 	}
 
 	// Send all the events
-	if err := producer.SendEvents(req.Context(), evs, cfg.Matrix.ServerName); err != nil {
+	if err := producer.SendEvents(req.Context(), evs, cfg.Matrix.ServerName, nil); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -154,7 +154,7 @@ func ExchangeThirdPartyInvite(
 
 	// Send the event to the roomserver
 	if err = producer.SendEvents(
-		httpReq.Context(), []gomatrixserverlib.Event{signedEvent.Event}, cfg.Matrix.ServerName,
+		httpReq.Context(), []gomatrixserverlib.Event{signedEvent.Event}, cfg.Matrix.ServerName, nil,
 	); err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}

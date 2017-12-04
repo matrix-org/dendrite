@@ -95,6 +95,9 @@ type Dendrite struct {
 		// HTTP API endpoint used to verify whether the captcha response
 		// was successful
 		RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
+		// If set disables new users from registering (except via shared
+		// secrets)
+		RegistrationDisabled bool `yaml:"registration_disabled"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.

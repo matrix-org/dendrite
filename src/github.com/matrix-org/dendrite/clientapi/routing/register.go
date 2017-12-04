@@ -53,7 +53,7 @@ const (
 var (
 	// TODO: Remove old sessions. Need to do so on a session-specific timeout.
 	sessions           = make(map[string][]authtypes.LoginType) // Sessions and completed flow stages
-	validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-./]+$`)
 )
 
 // registerRequest represents the submitted registration request.
@@ -173,6 +173,13 @@ func validateRecaptcha(
 	response string,
 	clientip string,
 ) *util.JSONResponse {
+	if !cfg.Matrix.RecaptchaEnabled {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("Captcha registration is disabled"),
+		}
+	}
+
 	if response == "" {
 		return &util.JSONResponse{
 			Code: 400,
@@ -256,6 +263,9 @@ func Register(
 		}
 	}
 
+	// Squash username to all lowercase letters
+	r.Username = strings.ToLower(r.Username)
+
 	if resErr = validateUserName(r.Username); resErr != nil {
 		return *resErr
 	}
@@ -292,18 +302,13 @@ func handleRegistrationFlow(
 	// TODO: Handle mapping registrationRequest parameters into session parameters
 
 	// TODO: email / msisdn auth types.
+
+	if cfg.Matrix.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
+		return util.MessageResponse(403, "Registration has been disabled")
+	}
+
 	switch r.Auth.Type {
 	case authtypes.LoginTypeRecaptcha:
-		if !cfg.Matrix.RecaptchaEnabled {
-			return util.MessageResponse(400, "Captcha registration is disabled")
-		}
-
-		logger := util.GetLogger(req.Context())
-		logger.WithFields(log.Fields{
-			"clientip": req.RemoteAddr,
-			"response": r.Auth.Response,
-		}).Info("Submitting recaptcha response")
-
 		// Check given captcha response
 		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
 		if resErr != nil {
@@ -314,18 +319,12 @@ func handleRegistrationFlow(
 		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeRecaptcha)
 
 	case authtypes.LoginTypeSharedSecret:
-		if cfg.Matrix.RegistrationSharedSecret == "" {
-			return util.MessageResponse(400, "Shared secret registration is disabled")
-		}
-
-		valid, err := isValidMacLogin(r.Username, r.Password, r.Admin,
-			r.Auth.Mac, cfg.Matrix.RegistrationSharedSecret)
+		// Check shared secret against config
+		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Auth.Mac)
 
 		if err != nil {
 			return httputil.LogThenError(req, err)
-		}
-
-		if !valid {
+		} else if !valid {
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
@@ -367,14 +366,8 @@ func LegacyRegister(
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var r legacyRegisterRequest
-	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	resErr := parseAndValidateLegacyLogin(req, &r)
 	if resErr != nil {
-		return *resErr
-	}
-	if resErr = validateUserName(r.Username); resErr != nil {
-		return *resErr
-	}
-	if resErr = validatePassword(r.Password); resErr != nil {
 		return *resErr
 	}
 
@@ -384,12 +377,8 @@ func LegacyRegister(
 		"auth.type": r.Type,
 	}).Info("Processing registration request")
 
-	// All registration requests must specify what auth they are using to perform this request
-	if r.Type == "" {
-		return util.JSONResponse{
-			Code: 400,
-			JSON: jsonerror.BadJSON("invalid type"),
-		}
+	if cfg.Matrix.RegistrationDisabled && r.Type != authtypes.LoginTypeSharedSecret {
+		return util.MessageResponse(403, "Registration has been disabled")
 	}
 
 	switch r.Type {
@@ -398,7 +387,7 @@ func LegacyRegister(
 			return util.MessageResponse(400, "Shared secret registration is disabled")
 		}
 
-		valid, err := isValidMacLogin(r.Username, r.Password, r.Admin, r.Mac, cfg.Matrix.RegistrationSharedSecret)
+		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Mac)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -417,6 +406,35 @@ func LegacyRegister(
 			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
 		}
 	}
+}
+
+// parseAndValidateLegacyLogin parses the request into r and checks that the
+// request is valid (e.g. valid user names, etc)
+func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *util.JSONResponse {
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return resErr
+	}
+
+	// Squash username to all lowercase letters
+	r.Username = strings.ToLower(r.Username)
+
+	if resErr = validateUserName(r.Username); resErr != nil {
+		return resErr
+	}
+	if resErr = validatePassword(r.Password); resErr != nil {
+		return resErr
+	}
+
+	// All registration requests must specify what auth they are using to perform this request
+	if r.Type == "" {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("invalid type"),
+		}
+	}
+
+	return nil
 }
 
 func completeRegistration(
@@ -478,11 +496,18 @@ func completeRegistration(
 // Used for shared secret registration.
 // Checks if the username, password and isAdmin flag matches the given mac.
 func isValidMacLogin(
+	cfg *config.Dendrite,
 	username, password string,
 	isAdmin bool,
 	givenMac []byte,
-	sharedSecret string,
 ) (bool, error) {
+	sharedSecret := cfg.Matrix.RegistrationSharedSecret
+
+	// Check that shared secret registration isn't disabled.
+	if cfg.Matrix.RegistrationSharedSecret == "" {
+		return false, errors.New("Shared secret registration is disabled")
+	}
+
 	// Double check that username/password don't contain the HMAC delimiters. We should have
 	// already checked this.
 	if strings.Contains(username, "\x00") {
@@ -570,6 +595,9 @@ func RegisterAvailable(
 	accountDB *accounts.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
+
+	// Squash username to all lowercase letters
+	username = strings.ToLower(username)
 
 	if err := validateUserName(username); err != nil {
 		return *err

@@ -217,7 +217,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 	var queryRes api.QueryLatestEventsAndStateResponse
 	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.queryAPI, &queryRes)
 	if err == nil {
-		if err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName); err != nil {
+		if err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName, nil); err != nil {
 			return httputil.LogThenError(r.req, err)
 		}
 		return util.JSONResponse{
