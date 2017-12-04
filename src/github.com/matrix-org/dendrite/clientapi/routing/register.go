@@ -49,7 +49,7 @@ const (
 var (
 	// TODO: Remove old sessions. Need to do so on a session-specific timeout.
 	sessions           = make(map[string][]authtypes.LoginType) // Sessions and completed flow stages
-	validUsernameRegex = regexp.MustCompile(`^[0-9a-zA-Z_\-./]+$`)
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-./]+$`)
 )
 
 // registerRequest represents the submitted registration request.
@@ -182,6 +182,9 @@ func Register(
 				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 		}
 	}
+
+	// Squash username to all lowercase letters
+	r.Username = strings.ToLower(r.Username)
 
 	if resErr = validateUserName(r.Username); resErr != nil {
 		return *resErr
@@ -328,6 +331,10 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 	if resErr != nil {
 		return resErr
 	}
+
+	// Squash username to all lowercase letters
+	r.Username = strings.ToLower(r.Username)
+
 	if resErr = validateUserName(r.Username); resErr != nil {
 		return resErr
 	}
@@ -497,6 +504,9 @@ func RegisterAvailable(
 	accountDB *accounts.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
+
+	// Squash username to all lowercase letters
+	username = strings.ToLower(username)
 
 	if err := validateUserName(username); err != nil {
 		return *err
