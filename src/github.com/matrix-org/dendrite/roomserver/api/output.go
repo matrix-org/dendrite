@@ -69,9 +69,8 @@ func (o *OutputEvent) AddSpanFromContext(ctx context.Context) error {
 // StartSpanAndReplaceContext produces a context and opentracing span from the
 // info embedded in OutputEvent
 func (o *OutputEvent) StartSpanAndReplaceContext(
-	ctx context.Context,
+	ctx context.Context, tracer opentracing.Tracer,
 ) (context.Context, opentracing.Span) {
-	tracer := opentracing.GlobalTracer()
 	producerContext, err := tracer.Extract(opentracing.TextMap, o.OpentracingCarrier)
 
 	var span opentracing.Span

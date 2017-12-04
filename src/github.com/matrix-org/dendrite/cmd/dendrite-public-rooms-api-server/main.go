@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
@@ -47,20 +49,22 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	closer, err := cfg.SetupTracing("DendritePublicRoomsAPI")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	err = tracers.InitGlobalTracer("Dendrite - Public Rooms API")
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to start tracer")
 	}
-	defer closer.Close() // nolint: errcheck
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 
-	db, err := storage.NewPublicRoomsServerDatabase(string(cfg.Database.PublicRoomsAPI))
+	db, err := storage.NewPublicRoomsServerDatabase(tracers, string(cfg.Database.PublicRoomsAPI))
 	if err != nil {
 		log.Panicf("startup: failed to create public rooms server database with data source %s : %s", cfg.Database.PublicRoomsAPI, err)
 	}
 
-	deviceDB, err := devices.NewDatabase(string(cfg.Database.Device), cfg.Matrix.ServerName)
+	deviceDB, err := devices.NewDatabase(tracers, string(cfg.Database.Device), cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("startup: failed to create device database with data source %s : %s", cfg.Database.Device, err)
 	}
@@ -73,7 +77,7 @@ func main() {
 		}).Panic("Failed to setup kafka consumers")
 	}
 
-	roomConsumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, db, queryAPI)
+	roomConsumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, db, queryAPI, opentracing.GlobalTracer())
 	if err != nil {
 		log.Panicf("startup: failed to create room server consumer: %s", err)
 	}
@@ -84,7 +88,7 @@ func main() {
 	log.Info("Starting public rooms server on ", cfg.Listen.PublicRoomsAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, deviceDB, db)
+	routing.Setup(api, deviceDB, db, opentracing.GlobalTracer())
 	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(api))
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.PublicRoomsAPI), nil))

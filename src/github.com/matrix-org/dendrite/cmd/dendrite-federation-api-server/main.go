@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -50,22 +51,24 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	closer, err := cfg.SetupTracing("DendriteFederationAPI")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	err = tracers.InitGlobalTracer("Dendrite - FenderationAPI")
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to start tracer")
 	}
-	defer closer.Close() // nolint: errcheck
 
 	federation := gomatrixserverlib.NewFederationClient(
 		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
-	keyDB, err := keydb.NewDatabase(string(cfg.Database.ServerKey))
+	keyDB, err := keydb.NewDatabase(tracers, string(cfg.Database.ServerKey))
 	if err != nil {
 		log.Panicf("Failed to setup key database(%q): %s", cfg.Database.ServerKey, err.Error())
 	}
 
-	accountDB, err := accounts.NewDatabase(string(cfg.Database.Account), cfg.Matrix.ServerName)
+	accountDB, err := accounts.NewDatabase(tracers, string(cfg.Database.Account), cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("Failed to setup account database(%q): %s", cfg.Database.Account, err.Error())
 	}
@@ -91,7 +94,7 @@ func main() {
 	log.Info("Starting federation API server on ", cfg.Listen.FederationAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, *cfg, queryAPI, aliasAPI, roomserverProducer, keyRing, federation, accountDB)
+	routing.Setup(api, *cfg, queryAPI, aliasAPI, roomserverProducer, keyRing, federation, accountDB, opentracing.GlobalTracer())
 	common.SetupHTTPAPI(http.DefaultServeMux, api)
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.FederationAPI), nil))

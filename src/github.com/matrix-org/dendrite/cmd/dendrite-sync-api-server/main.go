@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
@@ -51,25 +53,27 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	closer, err := cfg.SetupTracing("DendriteSyncAPI")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	err = tracers.InitGlobalTracer("Dendrite - SyncAPI")
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to start tracer")
 	}
-	defer closer.Close() // nolint: errcheck
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 
-	db, err := storage.NewSyncServerDatabase(string(cfg.Database.SyncAPI))
+	db, err := storage.NewSyncServerDatabase(tracers, string(cfg.Database.SyncAPI))
 	if err != nil {
 		log.Panicf("startup: failed to create sync server database with data source %s : %s", cfg.Database.SyncAPI, err)
 	}
 
-	deviceDB, err := devices.NewDatabase(string(cfg.Database.Device), cfg.Matrix.ServerName)
+	deviceDB, err := devices.NewDatabase(tracers, string(cfg.Database.Device), cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("startup: failed to create device database with data source %s : %s", cfg.Database.Device, err)
 	}
 
-	adb, err := accounts.NewDatabase(string(cfg.Database.Account), cfg.Matrix.ServerName)
+	adb, err := accounts.NewDatabase(tracers, string(cfg.Database.Account), cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("startup: failed to create account database with data source %s : %s", cfg.Database.Account, err)
 	}
@@ -92,7 +96,7 @@ func main() {
 		}).Panic("Failed to setup kafka consumers")
 	}
 
-	roomConsumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, n, db, queryAPI)
+	roomConsumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, n, db, queryAPI, opentracing.GlobalTracer())
 	if err = roomConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer: %s", err)
 	}
@@ -104,7 +108,7 @@ func main() {
 	log.Info("Starting sync server on ", cfg.Listen.SyncAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, sync.NewRequestPool(db, n, adb), db, deviceDB)
+	routing.Setup(api, sync.NewRequestPool(db, n, adb), db, deviceDB, opentracing.GlobalTracer())
 	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(api))
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.SyncAPI), nil))

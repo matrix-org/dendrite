@@ -14,7 +14,7 @@ import (
 )
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which checks the access token in the request.
-func MakeAuthAPI(metricsName string, deviceDB auth.DeviceDatabase, f func(*http.Request, *authtypes.Device) util.JSONResponse) http.Handler {
+func MakeAuthAPI(tracer opentracing.Tracer, metricsName string, deviceDB auth.DeviceDatabase, f func(*http.Request, *authtypes.Device) util.JSONResponse) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
 		device, resErr := auth.VerifyAccessToken(req, deviceDB)
 		if resErr != nil {
@@ -22,15 +22,15 @@ func MakeAuthAPI(metricsName string, deviceDB auth.DeviceDatabase, f func(*http.
 		}
 		return f(req, device)
 	}
-	return MakeExternalAPI(metricsName, h)
+	return MakeExternalAPI(tracer, metricsName, h)
 }
 
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.
 // This is used for APIs that are called from the internet.
-func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+func MakeExternalAPI(tracer opentracing.Tracer, metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
-		span := opentracing.StartSpan(metricsName)
+		span := tracer.StartSpan(metricsName)
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
 		h.ServeHTTP(w, req)
@@ -43,11 +43,10 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 // This is used for APIs that are internal to dendrite.
 // If we are passed a tracing context in the request headers then we use that
 // as the parent of any tracing spans we create.
-func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+func MakeInternalAPI(tracer opentracing.Tracer, metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		carrier := opentracing.HTTPHeadersCarrier(req.Header)
-		tracer := opentracing.GlobalTracer()
 		clientContext, err := tracer.Extract(opentracing.HTTPHeaders, carrier)
 		var span opentracing.Span
 		if err == nil {
@@ -67,6 +66,7 @@ func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 
 // MakeFedAPI makes an http.Handler that checks matrix federation authentication.
 func MakeFedAPI(
+	tracer opentracing.Tracer,
 	metricsName string,
 	serverName gomatrixserverlib.ServerName,
 	keyRing gomatrixserverlib.KeyRing,
@@ -81,7 +81,7 @@ func MakeFedAPI(
 		}
 		return f(req, fedReq)
 	}
-	return MakeExternalAPI(metricsName, h)
+	return MakeExternalAPI(tracer, metricsName, h)
 }
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics

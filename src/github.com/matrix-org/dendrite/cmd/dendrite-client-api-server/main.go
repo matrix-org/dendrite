@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
@@ -51,11 +53,13 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	closer, err := cfg.SetupTracing("DendriteClientAPI")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	err = tracers.InitGlobalTracer("Dendrite - ClientAPI")
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to start tracer")
 	}
-	defer closer.Close() // nolint: errcheck
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
@@ -85,15 +89,15 @@ func main() {
 		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
-	accountDB, err := accounts.NewDatabase(string(cfg.Database.Account), cfg.Matrix.ServerName)
+	accountDB, err := accounts.NewDatabase(tracers, string(cfg.Database.Account), cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("Failed to setup account database(%q): %s", cfg.Database.Account, err.Error())
 	}
-	deviceDB, err := devices.NewDatabase(string(cfg.Database.Device), cfg.Matrix.ServerName)
+	deviceDB, err := devices.NewDatabase(tracers, string(cfg.Database.Device), cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("Failed to setup device database(%q): %s", cfg.Database.Device, err.Error())
 	}
-	keyDB, err := keydb.NewDatabase(string(cfg.Database.ServerKey))
+	keyDB, err := keydb.NewDatabase(tracers, string(cfg.Database.ServerKey))
 	if err != nil {
 		log.Panicf("Failed to setup key database(%q): %s", cfg.Database.ServerKey, err.Error())
 	}
@@ -108,7 +112,7 @@ func main() {
 		}).Panic("Failed to setup kafka consumers")
 	}
 
-	consumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, accountDB, queryAPI)
+	consumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, accountDB, queryAPI, opentracing.GlobalTracer())
 	if err = consumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer")
 	}
@@ -120,6 +124,7 @@ func main() {
 		api, *cfg, roomserverProducer,
 		queryAPI, aliasAPI, accountDB, deviceDB, federation, keyRing,
 		userUpdateProducer, syncProducer,
+		opentracing.GlobalTracer(),
 	)
 	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(api))
 

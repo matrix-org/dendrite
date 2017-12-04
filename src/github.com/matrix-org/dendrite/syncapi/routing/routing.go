@@ -24,29 +24,33 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/util"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup configures the given mux with sync-server listeners
-func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database) {
+func Setup(
+	apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database,
+	tracer opentracing.Tracer,
+) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
-	r0mux.Handle("/sync", common.MakeAuthAPI("sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/sync", common.MakeAuthAPI(tracer, "sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
 	})).Methods("GET", "OPTIONS")
 
-	r0mux.Handle("/rooms/{roomID}/state", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/rooms/{roomID}/state", common.MakeAuthAPI(tracer, "room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
 		return OnIncomingStateRequest(req, syncDB, vars["roomID"])
 	})).Methods("GET", "OPTIONS")
 
-	r0mux.Handle("/rooms/{roomID}/state/{type}", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/rooms/{roomID}/state/{type}", common.MakeAuthAPI(tracer, "room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], "")
 	})).Methods("GET", "OPTIONS")
 
-	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", common.MakeAuthAPI("room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", common.MakeAuthAPI(tracer, "room_state", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		vars := mux.Vars(req)
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], vars["stateKey"])
 	})).Methods("GET", "OPTIONS")

@@ -35,10 +35,10 @@ type PublicRoomsServerDatabase struct {
 type attributeValue interface{}
 
 // NewPublicRoomsServerDatabase creates a new public rooms server database.
-func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerDatabase, error) {
+func NewPublicRoomsServerDatabase(tracers *common.Tracers, dataSourceName string) (*PublicRoomsServerDatabase, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if db, err = common.OpenPostgresWithTracing(tracers, "publicrooms", dataSourceName); err != nil {
 		return nil, err
 	}
 	partitions := common.PartitionOffsetStatements{}

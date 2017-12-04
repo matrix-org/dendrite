@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
@@ -47,11 +48,13 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	closer, err := cfg.SetupTracing("DendriteFederationSender")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	err = tracers.InitGlobalTracer("Dendrite - Federation Sender")
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to start tracer")
 	}
-	defer closer.Close() // nolint: errcheck
 
 	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
 	if err != nil {
@@ -63,7 +66,7 @@ func main() {
 
 	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
 
-	db, err := storage.NewDatabase(string(cfg.Database.FederationSender))
+	db, err := storage.NewDatabase(tracers, string(cfg.Database.FederationSender))
 	if err != nil {
 		log.Panicf("startup: failed to create federation sender database with data source %s : %s", cfg.Database.FederationSender, err)
 	}
@@ -74,7 +77,7 @@ func main() {
 
 	queues := queue.NewOutgoingQueues(cfg.Matrix.ServerName, federation)
 
-	consumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, queues, db, queryAPI)
+	consumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, queues, db, queryAPI, opentracing.GlobalTracer())
 	if err = consumer.Start(); err != nil {
 		log.WithError(err).Panicf("startup: failed to start room server consumer")
 	}

@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
@@ -84,13 +86,15 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	closer, err := cfg.SetupTracing("DendriteMonolith")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	err = tracers.InitGlobalTracer("DendriteMonolith")
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to start tracer")
 	}
-	defer closer.Close() // nolint: errcheck
 
-	m := newMonolith(cfg)
+	m := newMonolith(cfg, tracers)
 	m.setupDatabases()
 	m.setupFederation()
 	m.setupKafka()
@@ -136,8 +140,8 @@ type monolith struct {
 	federation *gomatrixserverlib.FederationClient
 	keyRing    gomatrixserverlib.KeyRing
 
-	inputAPI *roomserver_input.RoomserverInputAPI
-	queryAPI *roomserver_query.RoomserverQueryAPI
+	inputAPI *roomserver_input.InProcessRoomServerInput
+	queryAPI *roomserver_query.InProcessRoomServerQueryAPI
 	aliasAPI *roomserver_alias.RoomserverAliasAPI
 
 	naffka        *naffka.Naffka
@@ -148,43 +152,61 @@ type monolith struct {
 	syncProducer       *producers.SyncAPIProducer
 
 	syncAPINotifier *syncapi_sync.Notifier
+
+	tracers              *common.Tracers
+	clientAPITracer      opentracing.Tracer
+	syncAPITracer        opentracing.Tracer
+	mediaAPITracer       opentracing.Tracer
+	federationAPITracer  opentracing.Tracer
+	publicRoomsAPITracer opentracing.Tracer
+	roomServerTracer     opentracing.Tracer
 }
 
-func newMonolith(cfg *config.Dendrite) *monolith {
-	return &monolith{cfg: cfg, api: mux.NewRouter()}
+func newMonolith(cfg *config.Dendrite, tracers *common.Tracers) *monolith {
+	return &monolith{
+		cfg:                  cfg,
+		api:                  mux.NewRouter(),
+		tracers:              tracers,
+		clientAPITracer:      tracers.SetupNewTracer("ClientAPI"),
+		syncAPITracer:        tracers.SetupNewTracer("SyncAPI"),
+		mediaAPITracer:       tracers.SetupNewTracer("MediaAPI"),
+		federationAPITracer:  tracers.SetupNewTracer("FederationAPI"),
+		publicRoomsAPITracer: tracers.SetupNewTracer("PublicRooms"),
+		roomServerTracer:     tracers.SetupNewTracer("RoomServer"),
+	}
 }
 
 func (m *monolith) setupDatabases() {
 	var err error
-	m.roomServerDB, err = roomserver_storage.Open(string(m.cfg.Database.RoomServer))
+	m.roomServerDB, err = roomserver_storage.Open(m.tracers, string(m.cfg.Database.RoomServer))
 	if err != nil {
 		panic(err)
 	}
-	m.accountDB, err = accounts.NewDatabase(string(m.cfg.Database.Account), m.cfg.Matrix.ServerName)
+	m.accountDB, err = accounts.NewDatabase(m.tracers, string(m.cfg.Database.Account), m.cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("Failed to setup account database(%q): %s", m.cfg.Database.Account, err.Error())
 	}
-	m.deviceDB, err = devices.NewDatabase(string(m.cfg.Database.Device), m.cfg.Matrix.ServerName)
+	m.deviceDB, err = devices.NewDatabase(m.tracers, string(m.cfg.Database.Device), m.cfg.Matrix.ServerName)
 	if err != nil {
 		log.Panicf("Failed to setup device database(%q): %s", m.cfg.Database.Device, err.Error())
 	}
-	m.keyDB, err = keydb.NewDatabase(string(m.cfg.Database.ServerKey))
+	m.keyDB, err = keydb.NewDatabase(m.tracers, string(m.cfg.Database.ServerKey))
 	if err != nil {
 		log.Panicf("Failed to setup key database(%q): %s", m.cfg.Database.ServerKey, err.Error())
 	}
-	m.mediaAPIDB, err = mediaapi_storage.Open(string(m.cfg.Database.MediaAPI))
+	m.mediaAPIDB, err = mediaapi_storage.Open(m.tracers, string(m.cfg.Database.MediaAPI))
 	if err != nil {
 		log.Panicf("Failed to setup sync api database(%q): %s", m.cfg.Database.MediaAPI, err.Error())
 	}
-	m.syncAPIDB, err = syncapi_storage.NewSyncServerDatabase(string(m.cfg.Database.SyncAPI))
+	m.syncAPIDB, err = syncapi_storage.NewSyncServerDatabase(m.tracers, string(m.cfg.Database.SyncAPI))
 	if err != nil {
 		log.Panicf("Failed to setup sync api database(%q): %s", m.cfg.Database.SyncAPI, err.Error())
 	}
-	m.federationSenderDB, err = federationsender_storage.NewDatabase(string(m.cfg.Database.FederationSender))
+	m.federationSenderDB, err = federationsender_storage.NewDatabase(m.tracers, string(m.cfg.Database.FederationSender))
 	if err != nil {
 		log.Panicf("startup: failed to create federation sender database with data source %s : %s", m.cfg.Database.FederationSender, err)
 	}
-	m.publicRoomsAPIDB, err = publicroomsapi_storage.NewPublicRoomsServerDatabase(string(m.cfg.Database.PublicRoomsAPI))
+	m.publicRoomsAPIDB, err = publicroomsapi_storage.NewPublicRoomsServerDatabase(m.tracers, string(m.cfg.Database.PublicRoomsAPI))
 	if err != nil {
 		log.Panicf("startup: failed to setup public rooms api database with data source %s : %s", m.cfg.Database.PublicRoomsAPI, err)
 	}
@@ -249,15 +271,22 @@ func (m *monolith) kafkaConsumer() sarama.Consumer {
 }
 
 func (m *monolith) setupRoomServer() {
-	m.inputAPI = &roomserver_input.RoomserverInputAPI{
-		DB:                   m.roomServerDB,
-		Producer:             m.kafkaProducer,
-		OutputRoomEventTopic: string(m.cfg.Kafka.Topics.OutputRoomEvent),
-	}
+	m.inputAPI = roomserver_input.NewInProcessRoomServerInput(
+		roomserver_input.RoomserverInputAPI{
+			DB:                   m.roomServerDB,
+			Producer:             m.kafkaProducer,
+			OutputRoomEventTopic: string(m.cfg.Kafka.Topics.OutputRoomEvent),
+		},
+		m.roomServerTracer,
+	)
 
-	m.queryAPI = &roomserver_query.RoomserverQueryAPI{
-		DB: m.roomServerDB,
-	}
+	q := roomserver_query.NewInProcessRoomServerQueryAPI(
+		roomserver_query.RoomserverQueryAPI{
+			DB: m.roomServerDB,
+		},
+		m.roomServerTracer,
+	)
+	m.queryAPI = &q
 
 	m.aliasAPI = &roomserver_alias.RoomserverAliasAPI{
 		DB:       m.roomServerDB,
@@ -296,6 +325,7 @@ func (m *monolith) setupConsumers() {
 
 	clientAPIConsumer := clientapi_consumers.NewOutputRoomEventConsumer(
 		m.cfg, m.kafkaConsumer(), m.accountDB, m.queryAPI,
+		m.clientAPITracer,
 	)
 	if err = clientAPIConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer: %s", err)
@@ -303,6 +333,7 @@ func (m *monolith) setupConsumers() {
 
 	syncAPIRoomConsumer := syncapi_consumers.NewOutputRoomEventConsumer(
 		m.cfg, m.kafkaConsumer(), m.syncAPINotifier, m.syncAPIDB, m.queryAPI,
+		m.syncAPITracer,
 	)
 	if err = syncAPIRoomConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer: %s", err)
@@ -316,7 +347,7 @@ func (m *monolith) setupConsumers() {
 	}
 
 	publicRoomsAPIConsumer := publicroomsapi_consumers.NewOutputRoomEventConsumer(
-		m.cfg, m.kafkaConsumer(), m.publicRoomsAPIDB, m.queryAPI,
+		m.cfg, m.kafkaConsumer(), m.publicRoomsAPIDB, m.queryAPI, m.publicRoomsAPITracer,
 	)
 	if err = publicRoomsAPIConsumer.Start(); err != nil {
 		log.Panicf("startup: failed to start room server consumer: %s", err)
@@ -326,6 +357,7 @@ func (m *monolith) setupConsumers() {
 
 	federationSenderRoomConsumer := federationsender_consumers.NewOutputRoomEventConsumer(
 		m.cfg, m.kafkaConsumer(), federationSenderQueues, m.federationSenderDB, m.queryAPI,
+		m.federationAPITracer,
 	)
 	if err = federationSenderRoomConsumer.Start(); err != nil {
 		log.WithError(err).Panicf("startup: failed to start room server consumer")
@@ -337,20 +369,22 @@ func (m *monolith) setupAPIs() {
 		m.api, *m.cfg, m.roomServerProducer,
 		m.queryAPI, m.aliasAPI, m.accountDB, m.deviceDB, m.federation, m.keyRing,
 		m.userUpdateProducer, m.syncProducer,
+		m.clientAPITracer,
 	)
 
 	mediaapi_routing.Setup(
 		m.api, m.cfg, m.mediaAPIDB, m.deviceDB, &m.federation.Client,
+		m.mediaAPITracer,
 	)
 
 	syncapi_routing.Setup(m.api, syncapi_sync.NewRequestPool(
 		m.syncAPIDB, m.syncAPINotifier, m.accountDB,
-	), m.syncAPIDB, m.deviceDB)
+	), m.syncAPIDB, m.deviceDB, m.syncAPITracer)
 
 	federationapi_routing.Setup(
 		m.api, *m.cfg, m.queryAPI, m.aliasAPI, m.roomServerProducer, m.keyRing, m.federation,
-		m.accountDB,
+		m.accountDB, m.federationAPITracer,
 	)
 
-	publicroomsapi_routing.Setup(m.api, m.deviceDB, m.publicRoomsAPIDB)
+	publicroomsapi_routing.Setup(m.api, m.deviceDB, m.publicRoomsAPIDB, m.publicRoomsAPITracer)
 }

@@ -20,6 +20,8 @@ import (
 	_ "net/http/pprof"
 	"os"
 
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/alias"
@@ -49,13 +51,15 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	closer, err := cfg.SetupTracing("DendriteRoomServer")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	err = tracers.InitGlobalTracer("Dendrite - RoomServer")
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to start tracer")
 	}
-	defer closer.Close() // nolint: errcheck
 
-	db, err := storage.Open(string(cfg.Database.RoomServer))
+	db, err := storage.Open(tracers, string(cfg.Database.RoomServer))
 	if err != nil {
 		panic(err)
 	}
@@ -71,11 +75,11 @@ func main() {
 		OutputRoomEventTopic: string(cfg.Kafka.Topics.OutputRoomEvent),
 	}
 
-	inputAPI.SetupHTTP(http.DefaultServeMux)
+	inputAPI.SetupHTTP(http.DefaultServeMux, opentracing.GlobalTracer())
 
 	queryAPI := query.RoomserverQueryAPI{DB: db}
 
-	queryAPI.SetupHTTP(http.DefaultServeMux)
+	queryAPI.SetupHTTP(http.DefaultServeMux, opentracing.GlobalTracer())
 
 	aliasAPI := alias.RoomserverAliasAPI{
 		DB:       db,
@@ -84,7 +88,7 @@ func main() {
 		QueryAPI: &queryAPI,
 	}
 
-	aliasAPI.SetupHTTP(http.DefaultServeMux)
+	aliasAPI.SetupHTTP(http.DefaultServeMux, opentracing.GlobalTracer())
 
 	// This is deprecated, but prometheus are still arguing on what to replace
 	// it with. Alternatively we could set it up manually.

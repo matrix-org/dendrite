@@ -16,6 +16,13 @@ package common
 
 import (
 	"database/sql"
+	"fmt"
+
+	"github.com/matrix-org/util"
+
+	"github.com/gchaincl/sqlhooks"
+	"github.com/gchaincl/sqlhooks/hooks/othooks"
+	"github.com/lib/pq"
 )
 
 // A Transaction is something that can be committed or rolledback.
@@ -65,4 +72,19 @@ func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 		statement = transaction.Stmt(statement)
 	}
 	return statement
+}
+
+// OpenPostgresWithTracing creates a new DB instance where calls will be
+// traced with the given tracer
+func OpenPostgresWithTracing(tracers *Tracers, databaseName, connstr string) (*sql.DB, error) {
+	tracer := tracers.SetupNewTracer("sql: " + databaseName)
+
+	hooks := othooks.New(tracer)
+
+	// This is a hack to get around the fact that you can't directly open
+	// a sql.DB with a given driver, you *have* to register it.
+	registrationName := fmt.Sprintf("postgres-ot-%s", util.RandomString(5))
+	sql.Register(registrationName, sqlhooks.Wrap(&pq.Driver{}, hooks))
+
+	return sql.Open(registrationName, connstr)
 }

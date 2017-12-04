@@ -16,8 +16,8 @@ package keydb
 
 import (
 	"context"
-	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -31,8 +31,8 @@ type Database struct {
 // It creates the necessary tables if they don't already exist.
 // It prepares all the SQL statements that it will use.
 // Returns an error if there was a problem talking to the database.
-func NewDatabase(dataSourceName string) (*Database, error) {
-	db, err := sql.Open("postgres", dataSourceName)
+func NewDatabase(tracers *common.Tracers, dataSourceName string) (*Database, error) {
+	db, err := common.OpenPostgresWithTracing(tracers, "keys", dataSourceName)
 	if err != nil {
 		return nil, err
 	}

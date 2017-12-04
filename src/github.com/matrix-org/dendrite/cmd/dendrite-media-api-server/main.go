@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -48,18 +49,20 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	closer, err := cfg.SetupTracing("DendriteMediaAPI")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	err = tracers.InitGlobalTracer("Dendrite - MediaAPI")
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to start tracer")
 	}
-	defer closer.Close() // nolint: errcheck
 
-	db, err := storage.Open(string(cfg.Database.MediaAPI))
+	db, err := storage.Open(tracers, string(cfg.Database.MediaAPI))
 	if err != nil {
 		log.WithError(err).Panic("Failed to open database")
 	}
 
-	deviceDB, err := devices.NewDatabase(string(cfg.Database.Device), cfg.Matrix.ServerName)
+	deviceDB, err := devices.NewDatabase(tracers, string(cfg.Database.Device), cfg.Matrix.ServerName)
 	if err != nil {
 		log.WithError(err).Panicf("Failed to setup device database(%q)", cfg.Database.Device)
 	}
@@ -69,7 +72,7 @@ func main() {
 	log.Info("Starting media API server on ", cfg.Listen.MediaAPI)
 
 	api := mux.NewRouter()
-	routing.Setup(api, cfg, db, deviceDB, client)
+	routing.Setup(api, cfg, db, deviceDB, client, opentracing.GlobalTracer())
 	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(api))
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.MediaAPI), nil))

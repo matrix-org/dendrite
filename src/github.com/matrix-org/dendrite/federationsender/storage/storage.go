@@ -31,10 +31,10 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (*Database, error) {
+func NewDatabase(tracers *common.Tracers, dataSourceName string) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if result.db, err = common.OpenPostgresWithTracing(tracers, "federationsender", dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {

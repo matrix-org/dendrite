@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -63,7 +64,7 @@ func main() {
 
 	serverName := gomatrixserverlib.ServerName(*serverNameStr)
 
-	accountDB, err := accounts.NewDatabase(*database, serverName)
+	accountDB, err := accounts.NewDatabase(common.NoopTracers(), *database, serverName)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -75,7 +76,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	deviceDB, err := devices.NewDatabase(*database, serverName)
+	deviceDB, err := devices.NewDatabase(common.NoopTracers(), *database, serverName)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

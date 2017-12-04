@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
@@ -36,6 +37,7 @@ type OutputRoomEventConsumer struct {
 	db                 *storage.Database
 	queues             *queue.OutgoingQueues
 	query              api.RoomserverQueryAPI
+	tracer             opentracing.Tracer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -45,6 +47,7 @@ func NewOutputRoomEventConsumer(
 	queues *queue.OutgoingQueues,
 	store *storage.Database,
 	queryAPI api.RoomserverQueryAPI,
+	tracer opentracing.Tracer,
 ) *OutputRoomEventConsumer {
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
@@ -56,6 +59,7 @@ func NewOutputRoomEventConsumer(
 		db:                 store,
 		queues:             queues,
 		query:              queryAPI,
+		tracer:             tracer,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -86,7 +90,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	ctx, span := output.StartSpanAndReplaceContext(context.Background())
+	ctx, span := output.StartSpanAndReplaceContext(context.Background(), s.tracer)
 	defer span.Finish()
 
 	ev := &output.NewRoomEvent.Event

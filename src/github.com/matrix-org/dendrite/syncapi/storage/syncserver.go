@@ -19,7 +19,7 @@ import (
 	"database/sql"
 	"fmt"
 	// Import the postgres database driver.
-	_ "github.com/lib/pq"
+
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -51,10 +51,10 @@ type SyncServerDatabase struct {
 }
 
 // NewSyncServerDatabase creates a new sync server database
-func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
+func NewSyncServerDatabase(tracers *common.Tracers, dataSourceName string) (*SyncServerDatabase, error) {
 	var d SyncServerDatabase
 	var err error
-	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if d.db, err = common.OpenPostgresWithTracing(tracers, "sync", dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
