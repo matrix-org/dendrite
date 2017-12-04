@@ -36,14 +36,16 @@ func NewRoomserverProducer(inputAPI api.RoomserverInputAPI) *RoomserverProducer 
 // SendEvents writes the given events to the roomserver input log. The events are written with KindNew.
 func (c *RoomserverProducer) SendEvents(
 	ctx context.Context, events []gomatrixserverlib.Event, sendAsServer gomatrixserverlib.ServerName,
+	txnID *api.TransactionID,
 ) error {
 	ires := make([]api.InputRoomEvent, len(events))
 	for i, event := range events {
 		ires[i] = api.InputRoomEvent{
-			Kind:         api.KindNew,
-			Event:        event,
-			AuthEventIDs: event.AuthEventIDs(),
-			SendAsServer: string(sendAsServer),
+			Kind:          api.KindNew,
+			Event:         event,
+			AuthEventIDs:  event.AuthEventIDs(),
+			SendAsServer:  string(sendAsServer),
+			TransactionID: txnID,
 		}
 	}
 	return c.SendInputRoomEvents(ctx, ires)
