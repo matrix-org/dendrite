@@ -19,12 +19,16 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
 
@@ -74,6 +78,8 @@ type authDict struct {
 	Session string                      `json:"session"`
 	Mac     gomatrixserverlib.HexString `json:"mac"`
 
+	// Recaptcha
+	Response string `json:"response"`
 	// TODO: Lots of custom keys depending on the type
 }
 
@@ -114,6 +120,14 @@ type registerResponse struct {
 	DeviceID    string                       `json:"device_id"`
 }
 
+// recaptchaResponse represents the HTTP response from a Google Recaptcha server
+type recaptchaResponse struct {
+	Success     bool      `json:"success"`
+	ChallengeTS time.Time `json:"challenge_ts"`
+	Hostname    string    `json:"hostname"`
+	ErrorCodes  []int     `json:"error-codes"`
+}
+
 // validateUserName returns an error response if the username is invalid
 func validateUserName(username string) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
@@ -148,6 +162,72 @@ func validatePassword(password string) *util.JSONResponse {
 		return &util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
+		}
+	}
+	return nil
+}
+
+// validateRecaptcha returns an error response if the captcha response is invalid
+func validateRecaptcha(
+	cfg *config.Dendrite,
+	response string,
+	clientip string,
+) *util.JSONResponse {
+	if !cfg.Matrix.RecaptchaEnabled {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("Captcha registration is disabled"),
+		}
+	}
+
+	if response == "" {
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("Captcha response is required"),
+		}
+	}
+
+	// Make a POST request to Google's API to check the captcha response
+	resp, err := http.PostForm(cfg.Matrix.RecaptchaSiteVerifyAPI,
+		url.Values{
+			"secret":   {cfg.Matrix.RecaptchaPrivateKey},
+			"response": {response},
+			"remoteip": {clientip},
+		},
+	)
+
+	if err != nil {
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.BadJSON("Error in requesting validation of captcha response"),
+		}
+	}
+
+	// Close the request once we're finishing reading from it
+	defer resp.Body.Close() // nolint: errcheck
+
+	// Grab the body of the response from the captcha server
+	var r recaptchaResponse
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.BadJSON("Error in contacting captcha server" + err.Error()),
+		}
+	}
+	err = json.Unmarshal(body, &r)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()),
+		}
+	}
+
+	// Check that we received a "success"
+	if !r.Success {
+		return &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.BadJSON("Invalid captcha response. Please try again."),
 		}
 	}
 	return nil
@@ -221,26 +301,30 @@ func handleRegistrationFlow(
 	// TODO: Handle loading of previous session parameters from database.
 	// TODO: Handle mapping registrationRequest parameters into session parameters
 
-	// TODO: email / msisdn / recaptcha auth types.
+	// TODO: email / msisdn auth types.
 
 	if cfg.Matrix.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
 		return util.MessageResponse(403, "Registration has been disabled")
 	}
 
 	switch r.Auth.Type {
-	case authtypes.LoginTypeSharedSecret:
-		if cfg.Matrix.RegistrationSharedSecret == "" {
-			return util.MessageResponse(400, "Shared secret registration is disabled")
+	case authtypes.LoginTypeRecaptcha:
+		// Check given captcha response
+		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
+		if resErr != nil {
+			return *resErr
 		}
 
-		valid, err := isValidMacLogin(r.Username, r.Password, r.Admin,
-			r.Auth.Mac, cfg.Matrix.RegistrationSharedSecret)
+		// Add Recaptcha to the list of completed registration stages
+		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeRecaptcha)
+
+	case authtypes.LoginTypeSharedSecret:
+		// Check shared secret against config
+		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Auth.Mac)
 
 		if err != nil {
 			return httputil.LogThenError(req, err)
-		}
-
-		if !valid {
+		} else if !valid {
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
@@ -303,7 +387,7 @@ func LegacyRegister(
 			return util.MessageResponse(400, "Shared secret registration is disabled")
 		}
 
-		valid, err := isValidMacLogin(r.Username, r.Password, r.Admin, r.Mac, cfg.Matrix.RegistrationSharedSecret)
+		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Mac)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -412,11 +496,18 @@ func completeRegistration(
 // Used for shared secret registration.
 // Checks if the username, password and isAdmin flag matches the given mac.
 func isValidMacLogin(
+	cfg *config.Dendrite,
 	username, password string,
 	isAdmin bool,
 	givenMac []byte,
-	sharedSecret string,
 ) (bool, error) {
+	sharedSecret := cfg.Matrix.RegistrationSharedSecret
+
+	// Check that shared secret registration isn't disabled.
+	if cfg.Matrix.RegistrationSharedSecret == "" {
+		return false, errors.New("Shared secret registration is disabled")
+	}
+
 	// Double check that username/password don't contain the HMAC delimiters. We should have
 	// already checked this.
 	if strings.Contains(username, "\x00") {

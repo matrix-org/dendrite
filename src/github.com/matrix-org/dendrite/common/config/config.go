@@ -83,6 +83,18 @@ type Dendrite struct {
 		// If set, allows registration by anyone who also has the shared
 		// secret, even if registration is otherwise disabled.
 		RegistrationSharedSecret string `yaml:"registration_shared_secret"`
+		// This Home Server's ReCAPTCHA public key.
+		RecaptchaPublicKey string `yaml:"recaptcha_public_key"`
+		// This Home Server's ReCAPTCHA private key.
+		RecaptchaPrivateKey string `yaml:"recaptcha_private_key"`
+		// Boolean stating whether catpcha registration is enabled
+		// and required
+		RecaptchaEnabled bool `yaml:"enable_registration_captcha"`
+		// Secret used to bypass the captcha registration entirely
+		RecaptchaBypassSecret string `yaml:"captcha_bypass_secret"`
+		// HTTP API endpoint used to verify whether the captcha response
+		// was successful
+		RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
 		// If set disables new users from registering (except via shared
 		// secrets)
 		RegistrationDisabled bool `yaml:"registration_disabled"`
@@ -339,10 +351,15 @@ func (config *Dendrite) derive() {
 
 	// TODO: Add email auth type
 	// TODO: Add MSISDN auth type
-	// TODO: Add Recaptcha auth type
 
-	config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-		authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeDummy}})
+	if config.Matrix.RecaptchaEnabled {
+		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.Matrix.RecaptchaPublicKey}
+		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
+			authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
+	} else {
+		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
+			authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeDummy}})
+	}
 }
 
 // setDefaults sets default config values if they are not explicitly set.
