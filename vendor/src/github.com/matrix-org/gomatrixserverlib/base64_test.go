@@ -18,6 +18,8 @@ package gomatrixserverlib
 import (
 	"encoding/json"
 	"testing"
+
+	"gopkg.in/yaml.v2"
 )
 
 func TestMarshalBase64(t *testing.T) {
@@ -91,5 +93,60 @@ func TestMarshalBase64Slice(t *testing.T) {
 	}
 	if string(got) != want {
 		t.Fatalf("json.Marshal(%v): wanted %q got %q", input, want, string(got))
+	}
+}
+
+func TestMarshalYAMLBase64(t *testing.T) {
+	input := Base64String("this\xffis\xffa\xfftest")
+	want := "dGhpc/9pc/9h/3Rlc3Q\n"
+	got, err := yaml.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Fatalf("yaml.Marshal(%v): wanted %q got %q", input, want, string(got))
+	}
+}
+
+func TestMarshalYAMLBase64Struct(t *testing.T) {
+	input := struct{ Value Base64String }{Base64String("this\xffis\xffa\xfftest")}
+	want := "value: dGhpc/9pc/9h/3Rlc3Q\n"
+	got, err := yaml.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Fatalf("yaml.Marshal(%v): wanted %q got %q", input, want, string(got))
+	}
+}
+
+func TestUnmarshalYAMLBase64(t *testing.T) {
+	input := []byte("dGhpc/9pc/9h/3Rlc3Q")
+	want := Base64String("this\xffis\xffa\xfftest")
+	var got Base64String
+	err := yaml.Unmarshal(input, &got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("yaml.Unmarshal(%q): wanted %q got %q", string(input), want, string(got))
+	}
+}
+
+func TestUnmarshalYAMLBase64Struct(t *testing.T) {
+	// var u yaml.Unmarshaler
+	u := Base64String("this\xffis\xffa\xfftest")
+
+	input := []byte(`value: dGhpc/9pc/9h/3Rlc3Q`)
+	want := struct{ Value Base64String }{u}
+	result := struct {
+		Value Base64String `yaml:"value"`
+	}{}
+	err := yaml.Unmarshal(input, &result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(result.Value) != string(want.Value) {
+		t.Fatalf("yaml.Unmarshal(%v): wanted %q got %q", input, want, result)
 	}
 }
