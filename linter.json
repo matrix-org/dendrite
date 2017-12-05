@@ -9,7 +9,6 @@
         "golint",
         "varcheck",
         "structcheck",
-        "maligned",
         "ineffassign",
         "gas",
         "misspell",
