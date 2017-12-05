@@ -33,7 +33,7 @@ Component 3                                  |<─ SQL ─>|
 
 This is achieved by serializing span information during all communication
 between components. For HTTP requests, this is achieved by the sender
-serializing the sapn into a HTTP header, and the receiver deserializing the span
+serializing the span into a HTTP header, and the receiver deserializing the span
 on receipt. (Generally a new span is then immediately created with the
 deserialized span as the parent).
 
