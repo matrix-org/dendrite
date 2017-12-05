@@ -85,3 +85,28 @@ parent span cannot complete until all child spans are completed.
 A second relation type is `followsFrom`, where the parent has no dependence on
 the child span. This usually indicates some sort of fire and forget behaviour,
 e.g. adding a message to a pipeline or inserting into a kafka topic.
+
+
+Jaeger
+------
+
+Opentracing is just a framework. We use
+[jaeger](https://github.com/jaegertracing/jaeger) as the actual implementation.
+
+Jaeger is responsible for recording, sending and saving traces, as well as
+giving a UI for viewing and interacting with traces.
+
+To enable jaeger a `Tracer` object must be instansiated from the config (as well
+as having a jaeger server running somewhere, usually locally). A `Tracer` does
+several things:
+- Decides which traces to save and send to the server. There are multiple
+  schemes for doing this, with a simple example being to save a certain fraction
+  of traces.
+- Communicating with the jaeger backend. If not explicitly specified uses the
+  default port on localhost.
+- Associates a service name to all spans created by the tracer. This service
+  name equates to a logical component, e.g. spans created by clientapi will have
+  a different service name than ones created by the syncapi. Database access
+  will also typically use a different service name.
+
+  This means that there is a tracer per service name/component.
