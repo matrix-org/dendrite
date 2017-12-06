@@ -355,10 +355,10 @@ func (config *Dendrite) derive() {
 	if config.Matrix.RecaptchaEnabled {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.Matrix.RecaptchaPublicKey}
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
+			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
 	} else {
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{[]authtypes.LoginType{authtypes.LoginTypeDummy}})
+			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
 	}
 }
 
