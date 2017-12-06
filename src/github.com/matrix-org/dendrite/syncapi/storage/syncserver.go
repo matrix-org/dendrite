@@ -624,7 +624,7 @@ func streamEventsToEvents(device *authtypes.Device, in []streamEvent) []gomatrix
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].Event
 		if device != nil && in[i].transactionID != nil {
-			if device.ID == in[i].transactionID.DeviceID {
+			if device.UserID == in[i].Sender() && device.ID == in[i].transactionID.DeviceID {
 				// TODO: Don't clobber unsigned
 				ev, err := out[i].SetUnsigned(map[string]string{
 					"transaction_id": in[i].transactionID.TransactionID,
