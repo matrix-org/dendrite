@@ -87,12 +87,16 @@ func (d *SyncServerDatabase) AllJoinedUsersInRooms(ctx context.Context) (map[str
 // Events lookups a list of event by their event ID.
 // Returns a list of events matching the requested IDs found in the database.
 // If an event is not found in the database then it will be omitted from the list.
-// Returns an error if there was a problem talking with the database
+// Returns an error if there was a problem talking with the database.
+// Does not include any transaction IDs in the returned events.
 func (d *SyncServerDatabase) Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
 	streamEvents, err := d.events.selectEvents(ctx, nil, eventIDs)
 	if err != nil {
 		return nil, err
 	}
+
+	// We don't include a device here as we only include transaction IDs in
+	// incremental syncs.
 	return streamEventsToEvents(nil, streamEvents), nil
 }
 
@@ -209,7 +213,11 @@ func (d *SyncServerDatabase) syncStreamPositionTx(
 	return types.StreamPosition(maxID), nil
 }
 
-// IncrementalSync returns all the data needed in order to create an incremental sync response.
+// IncrementalSync returns all the data needed in order to create an incremental
+// sync response for the given device. If the device has a deviceID events
+// returned will include any client transaction IDs associated with the device.
+// These transaction IDs come from when the device sent the event via an API
+// that included a transaction ID.
 func (d *SyncServerDatabase) IncrementalSync(
 	ctx context.Context,
 	device *authtypes.Device,
@@ -293,6 +301,9 @@ func (d *SyncServerDatabase) CompleteSync(
 		if err != nil {
 			return nil, err
 		}
+
+		// We don't include a device here as we don't need to send down
+		// transaction IDs for complete syncs
 		recentEvents := streamEventsToEvents(nil, recentStreamEvents)
 
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
@@ -605,6 +616,9 @@ func (d *SyncServerDatabase) getStateDeltas(
 	return deltas, nil
 }
 
+// streamEventsToEvents converts streamEvent to Event. If device is non-nil and
+// matches the streamevent.transactionID device then the transaction ID gets
+// added to the unsigned section of the output event.
 func streamEventsToEvents(device *authtypes.Device, in []streamEvent) []gomatrixserverlib.Event {
 	out := make([]gomatrixserverlib.Event, len(in))
 	for i := 0; i < len(in); i++ {
