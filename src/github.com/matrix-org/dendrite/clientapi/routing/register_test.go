@@ -22,15 +22,15 @@ import (
 
 var (
 	// Registration Flows that the server allows.
-	allowedFlows []authtypes.Flow = []authtypes.Flow{
+	allowedFlows = []authtypes.Flow{
 		{
-			[]authtypes.LoginType{
+			Stages: []authtypes.LoginType{
 				authtypes.LoginType("stage1"),
 				authtypes.LoginType("stage2"),
 			},
 		},
 		{
-			[]authtypes.LoginType{
+			Stages: []authtypes.LoginType{
 				authtypes.LoginType("stage1"),
 				authtypes.LoginType("stage3"),
 			},

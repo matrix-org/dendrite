@@ -46,9 +46,9 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
     -- if there is no delta.
     add_state_ids TEXT[],
-	remove_state_ids TEXT[],
-	device_id TEXT,  -- The local device that sent the event, if any
-	transaction_id TEXT  -- The transaction id used to send the event, if any
+    remove_state_ids TEXT[],
+    device_id TEXT,  -- The local device that sent the event, if any
+    transaction_id TEXT  -- The transaction id used to send the event, if any
 );
 -- for event selection
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(event_id);
