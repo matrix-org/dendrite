@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	// Import the postgres database driver.
@@ -625,12 +627,13 @@ func streamEventsToEvents(device *authtypes.Device, in []streamEvent) []gomatrix
 		out[i] = in[i].Event
 		if device != nil && in[i].transactionID != nil {
 			if device.UserID == in[i].Sender() && device.ID == in[i].transactionID.DeviceID {
-				// TODO: Don't clobber unsigned
-				ev, err := out[i].SetUnsigned(map[string]string{
-					"transaction_id": in[i].transactionID.TransactionID,
-				})
-				if err == nil {
-					out[i] = ev
+				err := out[i].SetUnsignedField(
+					"transaction_id", in[i].transactionID.TransactionID,
+				)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						"event_id": out[i].EventID(),
+					}).WithError(err).Warnf("Failed to add transaction ID to event")
 				}
 			}
 		}
