@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -38,6 +40,7 @@ type stateDelta struct {
 type streamEvent struct {
 	gomatrixserverlib.Event
 	streamPosition types.StreamPosition
+	transactionID  *api.TransactionID
 }
 
 // SyncServerDatabase represents a sync server database
@@ -100,10 +103,11 @@ func (d *SyncServerDatabase) WriteEvent(
 	ev *gomatrixserverlib.Event,
 	addStateEvents []gomatrixserverlib.Event,
 	addStateEventIDs, removeStateEventIDs []string,
+	transactionID *api.TransactionID,
 ) (streamPos types.StreamPosition, returnErr error) {
 	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
-		pos, err := d.events.insertEvent(ctx, txn, ev, addStateEventIDs, removeStateEventIDs)
+		pos, err := d.events.insertEvent(ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID)
 		if err != nil {
 			return err
 		}
@@ -565,7 +569,7 @@ func (d *SyncServerDatabase) getStateDeltas(
 					}
 					s := make([]streamEvent, len(allState))
 					for i := 0; i < len(s); i++ {
-						s[i] = streamEvent{allState[i], types.StreamPosition(0)}
+						s[i] = streamEvent{Event: allState[i], streamPosition: types.StreamPosition(0)}
 					}
 					state[roomID] = s
 					continue // we'll add this room in when we do joined rooms

@@ -132,6 +132,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		addsStateEvents,
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
+		msg.TransactionID,
 	)
 	if err != nil {
 		return err
