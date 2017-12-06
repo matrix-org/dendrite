@@ -121,7 +121,7 @@ func main() {
 		queryAPI, aliasAPI, accountDB, deviceDB, federation, keyRing,
 		userUpdateProducer, syncProducer,
 	)
-	common.SetupHTTPAPI(http.DefaultServeMux, api)
+	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(api))
 
 	log.Fatal(http.ListenAndServe(string(cfg.Listen.ClientAPI), nil))
 }
