@@ -10,10 +10,10 @@ import (
 
 func TestSortedIssues(t *testing.T) {
 	actual := []*Issue{
-		{Path: "b.go", Line: 5, Col: 1},
-		{Path: "a.go", Line: 3, Col: 2},
-		{Path: "b.go", Line: 1, Col: 3},
-		{Path: "a.go", Line: 1, Col: 4},
+		{Path: newIssuePath("", "b.go"), Line: 5, Col: 1},
+		{Path: newIssuePath("", "a.go"), Line: 3, Col: 2},
+		{Path: newIssuePath("", "b.go"), Line: 1, Col: 3},
+		{Path: newIssuePath("", "a.go"), Line: 1, Col: 4},
 	}
 	issues := &sortedIssues{
 		issues: actual,
@@ -21,18 +21,18 @@ func TestSortedIssues(t *testing.T) {
 	}
 	sort.Sort(issues)
 	expected := []*Issue{
-		{Path: "a.go", Line: 1, Col: 4},
-		{Path: "a.go", Line: 3, Col: 2},
-		{Path: "b.go", Line: 1, Col: 3},
-		{Path: "b.go", Line: 5, Col: 1},
+		{Path: newIssuePath("", "a.go"), Line: 1, Col: 4},
+		{Path: newIssuePath("", "a.go"), Line: 3, Col: 2},
+		{Path: newIssuePath( "", "b.go"), Line: 1, Col: 3},
+		{Path: newIssuePath( "", "b.go"), Line: 5, Col: 1},
 	}
 	require.Equal(t, expected, actual)
 }
 
 func TestCompareOrderWithMessage(t *testing.T) {
 	order := []string{"path", "line", "column", "message"}
-	issueM := Issue{Path: "file.go", Message: "message"}
-	issueU := Issue{Path: "file.go", Message: "unknown"}
+	issueM := Issue{Path: newIssuePath("", "file.go"), Message: "message"}
+	issueU := Issue{Path: newIssuePath("", "file.go"), Message: "unknown"}
 
 	assert.True(t, CompareIssue(issueM, issueU, order))
 	assert.False(t, CompareIssue(issueU, issueM, order))

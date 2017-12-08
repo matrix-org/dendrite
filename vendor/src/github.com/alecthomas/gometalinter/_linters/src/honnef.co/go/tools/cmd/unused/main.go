@@ -70,5 +70,9 @@ func main() {
 
 	checker := newChecker(mode)
 	l := unused.NewLintChecker(checker)
-	lintutil.ProcessFlagSet(l, fs)
+	cfg := lintutil.CheckerConfig{
+		Checker:     l,
+		ExitNonZero: true,
+	}
+	lintutil.ProcessFlagSet([]lintutil.CheckerConfig{cfg}, fs)
 }

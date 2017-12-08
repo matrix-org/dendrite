@@ -235,7 +235,7 @@ var defaultLinters = map[string]LinterConfig{
 		Command:           `gas -fmt=csv`,
 		Pattern:           `^(?P<path>.*?\.go),(?P<line>\d+),(?P<message>[^,]+,[^,]+,[^,]+)`,
 		InstallFrom:       "github.com/GoASTScanner/gas",
-		PartitionStrategy: partitionPathsAsDirectories,
+		PartitionStrategy: partitionPathsAsFiles,
 		defaultEnabled:    true,
 		IsFast:            true,
 	},
@@ -328,7 +328,7 @@ var defaultLinters = map[string]LinterConfig{
 		defaultEnabled:    true,
 	},
 	"misspell": {
-		Command:           `misspell -j 1`,
+		Command:           `misspell -j 1 --locale "{misspelllocale}"`,
 		Pattern:           `PATH:LINE:COL:MESSAGE`,
 		InstallFrom:       "github.com/client9/misspell/cmd/misspell",
 		PartitionStrategy: partitionPathsAsFiles,

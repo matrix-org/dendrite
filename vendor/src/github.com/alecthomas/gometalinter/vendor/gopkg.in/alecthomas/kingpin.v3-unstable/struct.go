@@ -174,7 +174,7 @@ func (c *cmdMixin) fromStruct(clause *CmdClause, v interface{}) error { // nolin
 					case reflect.Uint:
 						clause.UintsVar(ptr.(*[]uint))
 					case reflect.Uint8:
-						clause.Uint8ListVar(ptr.(*[]uint8))
+						clause.HexBytesVar(ptr.(*[]byte))
 					case reflect.Uint16:
 						clause.Uint16ListVar(ptr.(*[]uint16))
 					case reflect.Uint32:
