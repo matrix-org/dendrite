@@ -38,6 +38,7 @@ type Config struct { // nolint: maligned
 	Vendor          bool
 	Cyclo           int
 	LineLength      int
+	MisspellLocale  string
 	MinConfidence   float64
 	MinOccurrences  int
 	MinConstLength  int
@@ -128,6 +129,7 @@ var config = &Config{
 	Concurrency:     runtime.NumCPU(),
 	Cyclo:           10,
 	LineLength:      80,
+	MisspellLocale:  "",
 	MinConfidence:   0.8,
 	MinOccurrences:  3,
 	MinConstLength:  3,

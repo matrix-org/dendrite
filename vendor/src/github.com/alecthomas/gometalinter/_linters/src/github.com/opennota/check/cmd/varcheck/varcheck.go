@@ -102,6 +102,9 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 		for _, val := range node.Values {
 			ast.Walk(v, val)
 		}
+		if node.Type != nil {
+			ast.Walk(v, node.Type)
+		}
 		return nil
 
 	case *ast.FuncDecl:

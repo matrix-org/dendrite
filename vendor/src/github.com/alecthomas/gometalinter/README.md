@@ -110,6 +110,21 @@ Here is an example configuration file:
 }
 ```
 
+#### `Format` key
+
+The default `Format` key places the different fields of an `Issue` into a template. this
+corresponds to the `--format` option command-line flag.
+
+Default `Format`:
+```
+Format: "{{.Path}}:{{.Line}}:{{if .Col}}{{.Col}}{{end}}:{{.Severity}}: {{.Message}} ({{.Linter}})"
+```
+
+#### Format Methods
+
+* `{{.Path.Relative}}` - equivalent to `{{.Path}}` which outputs a relative path to the file
+* `{{.Path.Abs}}` - outputs an absolute path to the file
+
 ### Adding Custom linters
 
 Linters can be added and customized from the config file using the `Linters` field.

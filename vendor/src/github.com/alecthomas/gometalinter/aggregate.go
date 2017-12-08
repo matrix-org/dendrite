@@ -25,7 +25,7 @@ func AggregateIssueChan(issues chan *Issue) chan *Issue {
 	go func() {
 		for issue := range issues {
 			key := issueKey{
-				path:    issue.Path,
+				path:    issue.Path.String(),
 				line:    issue.Line,
 				col:     issue.Col,
 				message: issue.Message,

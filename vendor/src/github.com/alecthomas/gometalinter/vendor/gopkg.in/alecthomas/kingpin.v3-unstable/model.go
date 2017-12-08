@@ -13,6 +13,15 @@ type FlagGroupModel struct {
 	Flags []*ClauseModel
 }
 
+func (f *FlagGroupModel) FlagByName(name string) *ClauseModel {
+	for _, flag := range f.Flags {
+		if flag.Name == name {
+			return flag
+		}
+	}
+	return nil
+}
+
 func (f *FlagGroupModel) FlagSummary() string {
 	out := []string{}
 	count := 0
@@ -39,7 +48,6 @@ type ClauseModel struct {
 	Help        string
 	Short       rune
 	Default     []string
-	Envar       string
 	PlaceHolder string
 	Required    bool
 	Hidden      bool
@@ -106,6 +114,9 @@ type CmdGroupModel struct {
 
 func (c *CmdGroupModel) FlattenedCommands() (out []*CmdModel) {
 	for _, cmd := range c.Commands {
+		if cmd.OptionalSubcommands {
+			out = append(out, cmd)
+		}
 		if len(cmd.Commands) == 0 {
 			out = append(out, cmd)
 		}
@@ -115,13 +126,14 @@ func (c *CmdGroupModel) FlattenedCommands() (out []*CmdModel) {
 }
 
 type CmdModel struct {
-	Name    string
-	Aliases []string
-	Help    string
-	Depth   int
-	Hidden  bool
-	Default bool
-	Parent  *CmdModel
+	Name                string
+	Aliases             []string
+	Help                string
+	Depth               int
+	Hidden              bool
+	Default             bool
+	OptionalSubcommands bool
+	Parent              *CmdModel
 	*FlagGroupModel
 	*ArgGroupModel
 	*CmdGroupModel
@@ -242,7 +254,6 @@ func (f *Clause) Model() *ClauseModel {
 		Help:        f.help,
 		Short:       f.shorthand,
 		Default:     f.defaultValues,
-		Envar:       f.envar,
 		PlaceHolder: f.placeholder,
 		Required:    f.required,
 		Hidden:      f.hidden,
@@ -265,15 +276,16 @@ func (c *CmdClause) Model(parent *CmdModel) *CmdModel {
 		depth++
 	}
 	cmd := &CmdModel{
-		Name:           c.name,
-		Parent:         parent,
-		Aliases:        c.aliases,
-		Help:           c.help,
-		Depth:          depth,
-		Hidden:         c.hidden,
-		Default:        c.isDefault,
-		FlagGroupModel: c.flagGroup.Model(),
-		ArgGroupModel:  c.argGroup.Model(),
+		Name:                c.name,
+		Parent:              parent,
+		Aliases:             c.aliases,
+		Help:                c.help,
+		Depth:               depth,
+		Hidden:              c.hidden,
+		Default:             c.isDefault,
+		OptionalSubcommands: c.optionalSubcommands,
+		FlagGroupModel:      c.flagGroup.Model(),
+		ArgGroupModel:       c.argGroup.Model(),
 	}
 	cmd.CmdGroupModel = c.cmdGroup.Model(cmd)
 	return cmd

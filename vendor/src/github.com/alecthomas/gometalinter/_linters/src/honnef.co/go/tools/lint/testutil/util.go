@@ -91,7 +91,7 @@ func TestAll(t *testing.T, c lint.Checker, dir string) {
 	for version, fis := range files {
 		l := &lint.Linter{Checker: c, GoVersion: version}
 
-		res := l.Lint(lprog)
+		res := l.Lint(lprog, conf)
 		for _, fi := range fis {
 			name := fi.Name()
 			src := sources[name]
@@ -101,8 +101,7 @@ func TestAll(t *testing.T, c lint.Checker, dir string) {
 			for _, in := range ins {
 				ok := false
 				for i, p := range res {
-					pos := lprog.Fset.Position(p.Position)
-					if pos.Line != in.Line || filepath.Base(pos.Filename) != name {
+					if p.Position.Line != in.Line || filepath.Base(p.Position.Filename) != name {
 						continue
 					}
 					if in.Match.MatchString(p.Text) {
@@ -121,11 +120,10 @@ func TestAll(t *testing.T, c lint.Checker, dir string) {
 			}
 		}
 		for _, p := range res {
-			pos := lprog.Fset.Position(p.Position)
-			name := filepath.Base(pos.Filename)
+			name := filepath.Base(p.Position.Filename)
 			for _, fi := range fis {
 				if name == fi.Name() {
-					t.Errorf("Unexpected problem at %s: %v", pos, p.Text)
+					t.Errorf("Unexpected problem at %s: %v", p.Position, p.Text)
 					break
 				}
 			}
@@ -149,7 +147,7 @@ func parseInstructions(t *testing.T, filename string, src []byte) []instruction 
 	}
 	var ins []instruction
 	for _, cg := range f.Comments {
-		ln := fset.Position(cg.Pos()).Line
+		ln := fset.PositionFor(cg.Pos(), false).Line
 		raw := cg.Text()
 		for _, line := range strings.Split(raw, "\n") {
 			if line == "" || strings.HasPrefix(line, "#") {

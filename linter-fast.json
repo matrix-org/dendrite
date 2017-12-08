@@ -7,7 +7,6 @@
         "deadcode",
         "gocyclo",
         "ineffassign",
-        "gas",
         "misspell",
         "errcheck",
         "vet",

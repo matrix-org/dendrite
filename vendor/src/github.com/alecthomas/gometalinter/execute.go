@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -82,6 +81,7 @@ func runLinters(linters map[string]*Linter, paths []string, concurrency int, exc
 		"duplthreshold":    fmt.Sprintf("%d", config.DuplThreshold),
 		"mincyclo":         fmt.Sprintf("%d", config.Cyclo),
 		"maxlinelength":    fmt.Sprintf("%d", config.LineLength),
+		"misspelllocale":   fmt.Sprintf("%s", config.MisspellLocale),
 		"min_confidence":   fmt.Sprintf("%f", config.MinConfidence),
 		"min_occurrences":  fmt.Sprintf("%d", config.MinOccurrences),
 		"min_const_length": fmt.Sprintf("%d", config.MinConstLength),
@@ -237,8 +237,10 @@ func processOutput(dbg debugFunction, state *linterState, out []byte) {
 			}
 			switch name {
 			case "path":
-				issue.Path = relativePath(cwd, part)
-
+				issue.Path, err = newIssuePathFromAbsPath(cwd, part)
+				if err != nil {
+					warning("failed to make %s a relative path: %s", part, err)
+				}
 			case "line":
 				n, err := strconv.ParseInt(part, 10, 32)
 				kingpin.FatalIfError(err, "line matched invalid integer")
@@ -271,37 +273,6 @@ func processOutput(dbg debugFunction, state *linterState, out []byte) {
 		}
 		state.issues <- issue
 	}
-}
-
-func relativePath(root, path string) string {
-	fallback := path
-	root = resolvePath(root)
-	path = resolvePath(path)
-	var err error
-	path, err = filepath.Rel(root, path)
-	if err != nil {
-		warning("failed to make %s a relative path: %s", fallback, err)
-		return fallback
-	}
-	return path
-}
-
-func resolvePath(path string) string {
-	var err error
-	fallback := path
-	if !filepath.IsAbs(path) {
-		path, err = filepath.Abs(path)
-		if err != nil {
-			warning("failed to make %s an absolute path: %s", fallback, err)
-			return fallback
-		}
-	}
-	path, err = filepath.EvalSymlinks(path)
-	if err != nil {
-		warning("failed to resolve symlinks in %s: %s", fallback, err)
-		return fallback
-	}
-	return path
 }
 
 func maybeSortIssues(issues chan *Issue) chan *Issue {

@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
@@ -21,13 +23,59 @@ const (
 	Warning Severity = "warning"
 )
 
+type IssuePath struct {
+	root string
+	path string
+}
+
+func (i IssuePath) String() string {
+	return i.Relative()
+}
+
+func (i IssuePath) Relative() string {
+	return i.path
+}
+
+func (i IssuePath) Abs() string {
+	return filepath.Join(i.root, i.path)
+}
+
+func (i IssuePath) MarshalJSON() ([]byte, error) {
+	return json.Marshal(i.String())
+}
+
+func newIssuePath(root, path string) IssuePath {
+	return IssuePath{root: root, path: path}
+}
+
+// newIssuePathFromAbsPath returns a new issuePath from a path that may be
+// an absolute path. root must be an absolute path.
+func newIssuePathFromAbsPath(root, path string) (IssuePath, error) {
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return newIssuePath(root, path), err
+	}
+
+	resolvedPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return newIssuePath(root, path), err
+	}
+
+	if !filepath.IsAbs(path) {
+		return newIssuePath(resolvedRoot, resolvedPath), nil
+	}
+
+	relPath, err := filepath.Rel(resolvedRoot, resolvedPath)
+	return newIssuePath(resolvedRoot, relPath), err
+}
+
 type Issue struct {
-	Linter     string   `json:"linter"`
-	Severity   Severity `json:"severity"`
-	Path       string   `json:"path"`
-	Line       int      `json:"line"`
-	Col        int      `json:"col"`
-	Message    string   `json:"message"`
+	Linter     string    `json:"linter"`
+	Severity   Severity  `json:"severity"`
+	Path       IssuePath `json:"path"`
+	Line       int       `json:"line"`
+	Col        int       `json:"col"`
+	Message    string    `json:"message"`
 	formatTmpl *template.Template
 }
 
@@ -50,7 +98,11 @@ func (i *Issue) String() string {
 		if i.Col != 0 {
 			col = fmt.Sprintf("%d", i.Col)
 		}
-		return fmt.Sprintf("%s:%d:%s:%s: %s (%s)", strings.TrimSpace(i.Path), i.Line, col, i.Severity, strings.TrimSpace(i.Message), i.Linter)
+		return fmt.Sprintf("%s:%d:%s:%s: %s (%s)",
+			strings.TrimSpace(i.Path.Relative()),
+			i.Line, col, i.Severity,
+			strings.TrimSpace(i.Message),
+			i.Linter)
 	}
 	buf := new(bytes.Buffer)
 	_ = i.formatTmpl.Execute(buf, i)
@@ -76,7 +128,7 @@ func CompareIssue(l, r Issue, order []string) bool {
 	for _, key := range order {
 		switch {
 		case key == "path" && l.Path != r.Path:
-			return l.Path < r.Path
+			return l.Path.String() < r.Path.String()
 		case key == "line" && l.Line != r.Line:
 			return l.Line < r.Line
 		case key == "column" && l.Col != r.Col:

@@ -10,7 +10,6 @@
         "varcheck",
         "structcheck",
         "ineffassign",
-        "gas",
         "misspell",
         "unparam",
         "errcheck",
