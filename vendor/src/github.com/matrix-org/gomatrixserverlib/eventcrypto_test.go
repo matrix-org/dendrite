@@ -272,8 +272,10 @@ func (v *StubVerifier) VerifyJSONs(ctx context.Context, requests []VerifyJSONReq
 	return v.results, nil
 }
 
-func TestVerifyEventSignatures(t *testing.T) {
-	verifier := StubVerifier{}
+func TestVerifyAllEventSignatures(t *testing.T) {
+	verifier := StubVerifier{
+		results: make([]VerifyJSONResult, 2),
+	}
 
 	eventJSON := []byte(`{
 		"type": "m.room.name",
@@ -295,7 +297,7 @@ func TestVerifyEventSignatures(t *testing.T) {
 	event.eventJSON = eventJSON
 
 	events := []Event{event}
-	if err := VerifyEventSignatures(context.Background(), events, &verifier); err != nil {
+	if err := VerifyAllEventSignatures(context.Background(), events, &verifier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -329,8 +331,10 @@ func TestVerifyEventSignatures(t *testing.T) {
 	}
 }
 
-func TestVerifyEventSignaturesForInvite(t *testing.T) {
-	verifier := StubVerifier{}
+func TestVerifyAllEventSignaturesForInvite(t *testing.T) {
+	verifier := StubVerifier{
+		results: make([]VerifyJSONResult, 2),
+	}
 
 	eventJSON := []byte(`{
 		"type": "m.room.member",
@@ -352,7 +356,7 @@ func TestVerifyEventSignaturesForInvite(t *testing.T) {
 	event.eventJSON = eventJSON
 
 	events := []Event{event}
-	if err := VerifyEventSignatures(context.Background(), events, &verifier); err != nil {
+	if err := VerifyAllEventSignatures(context.Background(), events, &verifier); err != nil {
 		t.Fatal(err)
 	}
 

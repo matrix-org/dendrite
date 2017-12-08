@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 	"golang.org/x/crypto/ed25519"
 )
@@ -304,6 +305,33 @@ func (e Event) SetUnsigned(unsigned interface{}) (Event, error) {
 	result.eventJSON = eventJSON
 	result.fields.Unsigned = unsignedJSON
 	return result, nil
+}
+
+// SetUnsignedField takes a path and value to insert into the unsigned dict of
+// the event.
+// path is a dot separated path into the unsigned dict (see gjson package
+// for details on format). In particular some characters like '.' and '*' must
+// be escaped.
+func (e *Event) SetUnsignedField(path string, value interface{}) error {
+	// The safest way is to change the unsigned json and then reparse the
+	// event fully. But since we are only changing the unsigned section,
+	// which doesn't affect the signatures or hashes, we can cheat and
+	// just fiddle those bits directly.
+
+	path = "unsigned." + path
+	eventJSON, err := sjson.SetBytes(e.eventJSON, path, value)
+	if err != nil {
+		return err
+	}
+	eventJSON = CanonicalJSONAssumeValid(eventJSON)
+
+	res := gjson.GetBytes(eventJSON, "unsigned")
+	unsigned := rawJSONFromResult(res, eventJSON)
+
+	e.eventJSON = eventJSON
+	e.fields.Unsigned = unsigned
+
+	return nil
 }
 
 // EventReference returns an EventReference for the event.

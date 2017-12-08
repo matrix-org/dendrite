@@ -53,6 +53,12 @@ func (b64 Base64String) MarshalJSON() ([]byte, error) {
 	return json.Marshal(b64.Encode())
 }
 
+// MarshalYAML implements yaml.Marshaller
+// It just encodes the bytes as base64, which is a valid YAML string
+func (b64 Base64String) MarshalYAML() (interface{}, error) {
+	return b64.Encode(), nil
+}
+
 // UnmarshalJSON decodes a JSON string and then decodes the resulting base64.
 // This takes a pointer receiver because it needs to write the result of decoding.
 func (b64 *Base64String) UnmarshalJSON(raw []byte) (err error) {
@@ -60,6 +66,17 @@ func (b64 *Base64String) UnmarshalJSON(raw []byte) (err error) {
 	// directly on the raw JSON if the JSON didn't contain any escapes.
 	var str string
 	if err = json.Unmarshal(raw, &str); err != nil {
+		return
+	}
+	err = b64.Decode(str)
+	return
+}
+
+// UnmarshalYAML implements yaml.Unmarshaller
+// it unmarshals the input as a yaml string and then base64-decodes the result
+func (b64 *Base64String) UnmarshalYAML(unmarshal func(interface{}) error) (err error) {
+	var str string
+	if err = unmarshal(&str); err != nil {
 		return
 	}
 	err = b64.Decode(str)

@@ -80,7 +80,7 @@ func newFederationTripper() *federationTripper {
 					ServerName: "",
 					// TODO: We should be checking that the TLS certificate we see here matches
 					//       one of the allowed SHA-256 fingerprints for the server.
-					InsecureSkipVerify: true,
+					InsecureSkipVerify: true, // nolint: gas
 				})
 				if err := conn.Handshake(); err != nil {
 					return nil, err

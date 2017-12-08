@@ -179,12 +179,21 @@ func verifyEventSignature(signingName string, keyID KeyID, publicKey ed25519.Pub
 
 // VerifyEventSignatures checks that each event in a list of events has valid
 // signatures from the server that sent it.
-func VerifyEventSignatures(ctx context.Context, events []Event, keyRing JSONVerifier) error { // nolint: gocyclo
-	var toVerify []VerifyJSONRequest
-	for _, event := range events {
+//
+// returns an array with either an error or nil for each event.
+func VerifyEventSignatures(ctx context.Context, events []Event, keyRing JSONVerifier) ([]error, error) { // nolint: gocyclo
+	// we will end up doing at least as many verifications as we have events.
+	// some events require multiple verifications, as they are signed by multiple
+	// servers.
+	toVerify := make([]VerifyJSONRequest, 0, len(events))
+
+	// for each entry in 'events', a list of corresponding indexes in toVerify
+	verificationMap := make([][]int, len(events))
+
+	for evtIdx, event := range events {
 		redactedJSON, err := redactEvent(event.eventJSON)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		domains := make(map[ServerName]bool)
@@ -203,7 +212,7 @@ func VerifyEventSignatures(ctx context.Context, events []Event, keyRing JSONVeri
 		//
 		senderDomain, err := domainFromID(event.Sender())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		domains[ServerName(senderDomain)] = true
 
@@ -212,12 +221,12 @@ func VerifyEventSignatures(ctx context.Context, events []Event, keyRing JSONVeri
 		if event.Type() == MRoomMember && event.StateKey() != nil {
 			targetDomain, err := domainFromID(*event.StateKey())
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if ServerName(targetDomain) != event.Origin() {
 				c, err := newMemberContentFromEvent(event)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				if c.Membership == invite {
 					domains[ServerName(targetDomain)] = true
@@ -231,22 +240,45 @@ func VerifyEventSignatures(ctx context.Context, events []Event, keyRing JSONVeri
 				AtTS:       event.OriginServerTS(),
 				ServerName: domain,
 			}
+			verificationMap[evtIdx] = append(verificationMap[evtIdx], len(toVerify))
 			toVerify = append(toVerify, v)
 		}
 	}
 
 	results, err := keyRing.VerifyJSONs(ctx, toVerify)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Check that all the event JSON was correctly signed.
-	for _, result := range results {
-		if result.Error != nil {
-			return result.Error
+	// Check that all the event JSON was correctly signed
+	verificationErrors := make([]error, len(events))
+	for evtIdx := range events {
+		for _, verificationIdx := range verificationMap[evtIdx] {
+			result := results[verificationIdx]
+			if result.Error != nil {
+				verificationErrors[evtIdx] = result.Error
+				break // break inner loop; continue with outer
+			}
 		}
 	}
 
-	// Everything was okay.
+	return verificationErrors, nil
+}
+
+// VerifyAllEventSignatures checks that each event in a list of events has valid
+// signatures from the server that sent it.
+//
+// returns an error if any event fails verifications
+func VerifyAllEventSignatures(ctx context.Context, events []Event, keyRing JSONVerifier) error {
+	verificationErrors, err := VerifyEventSignatures(ctx, events, keyRing)
+	if err != nil {
+		return err
+	}
+	for idx := range events {
+		ve := verificationErrors[idx]
+		if ve != nil {
+			return ve
+		}
+	}
 	return nil
 }

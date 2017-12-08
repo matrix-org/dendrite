@@ -110,8 +110,10 @@ func FetchKeysDirect(serverName ServerName, addr, sni string) (*ServerKeys, *tls
 	}
 	defer tcpconn.Close() // nolint: errcheck
 	tlsconn := tls.Client(tcpconn, &tls.Config{
-		ServerName:         sni,
-		InsecureSkipVerify: true, // This must be specified even though the TLS library will ignore it.
+		ServerName: sni,
+
+		// This must be specified even though the TLS library will ignore it.
+		InsecureSkipVerify: true, // nolint: gas
 	})
 	if err = tlsconn.Handshake(); err != nil {
 		return nil, nil, err
