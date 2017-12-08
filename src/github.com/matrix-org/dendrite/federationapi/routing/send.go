@@ -81,7 +81,7 @@ type txnReq struct {
 
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	// Check the event signatures
-	if err := gomatrixserverlib.VerifyEventSignatures(t.context, t.PDUs, t.keys); err != nil {
+	if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, t.PDUs, t.keys); err != nil {
 		return nil, err
 	}
 
