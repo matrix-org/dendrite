@@ -457,6 +457,19 @@ func completeRegistration(
 		}
 	}
 
+	avail, err := accountDB.CheckAccountAvailability(ctx, username)
+	if err == nil && avail == false {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+		}
+	} else if err != nil {
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Failed to check account availability: " + err.Error()),
+		}
+	}
+
 	acc, err := accountDB.CreateAccount(ctx, username, password)
 	if err != nil {
 		return util.JSONResponse{
