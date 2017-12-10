@@ -103,7 +103,7 @@ func InvalidUsername(msg string) *MatrixError {
 	return &MatrixError{"M_INVALID_USERNAME", msg}
 }
 
-// InvalidUsername is an error returned when the client tries to register an
+// UserInUse is an error returned when the client tries to register an
 // username that already exists
 func UserInUse(msg string) *MatrixError {
 	return &MatrixError{"M_USER_IN_USE", msg}

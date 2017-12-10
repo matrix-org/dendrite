@@ -458,7 +458,7 @@ func completeRegistration(
 	}
 
 	avail, err := accountDB.CheckAccountAvailability(ctx, username)
-	if err == nil && avail == false {
+	if err == nil && !avail {
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.UserInUse("Desired user ID is already taken."),
