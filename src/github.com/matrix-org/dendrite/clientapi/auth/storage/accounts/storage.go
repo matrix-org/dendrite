@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	// Import the postgres database driver.
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 // Database represents an account database
@@ -118,7 +118,8 @@ func (d *Database) SetDisplayName(
 }
 
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
-// for this account. If no password is supplied, the account will be a passwordless account.
+// for this account. If no password is supplied, the account will be a passwordless account. If the
+// account already exists, it will return nil, nil.
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword string,
 ) (*authtypes.Account, error) {
@@ -127,6 +128,12 @@ func (d *Database) CreateAccount(
 		return nil, err
 	}
 	if err := d.profiles.insertProfile(ctx, localpart); err != nil {
+		if err, ok := err.(*pq.Error); ok {
+			if err.Code.Class() == "23" {
+				// 23 => unique_violation => Account already exists
+				return nil, nil
+			}
+		}
 		return nil, err
 	}
 	return d.accounts.insertAccount(ctx, localpart, hash)
