@@ -11,10 +11,15 @@
 #   when running the linters, speeding them up but using much more memory.
 
 
-set -eu
+set -eux
+
+cd `dirname $0`/..
 
 export GOPATH="$(pwd):$(pwd)/vendor"
-export PATH="$PATH:$(pwd)/bin"
+
+# prefer the versions of gometalinter and the linters that we install
+# to anythign that ends up on the PATH.
+export PATH="$(pwd)/bin:$PATH"
 
 args=""
 if [ ${1:-""} = "fast" ]
