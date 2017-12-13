@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	// Import the postgres database driver.
-	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 )
 
 // Database represents an account database
@@ -128,11 +128,8 @@ func (d *Database) CreateAccount(
 		return nil, err
 	}
 	if err := d.profiles.insertProfile(ctx, localpart); err != nil {
-		if err, ok := err.(*pq.Error); ok {
-			if err.Code.Class() == "23" {
-				// 23 => unique_violation => Account already exists
-				return nil, nil
-			}
+		if common.IsUniqueConstraintViolationErr(err) {
+			return nil, nil
 		}
 		return nil, err
 	}

@@ -16,6 +16,8 @@ package common
 
 import (
 	"database/sql"
+
+	"github.com/lib/pq"
 )
 
 // A Transaction is something that can be committed or rolledback.
@@ -65,4 +67,10 @@ func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 		statement = transaction.Stmt(statement)
 	}
 	return statement
+}
+
+// IsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation error
+func IsUniqueConstraintViolationErr(err error) bool {
+	pqErr, ok := err.(*pq.Error)
+	return ok && pqErr.Code == "23505"
 }
