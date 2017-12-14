@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -43,8 +42,9 @@ type createRoomRequest struct {
 	Topic           string                 `json:"topic"`
 	Preset          string                 `json:"preset"`
 	CreationContent map[string]interface{} `json:"creation_content"`
-	InitialState    json.RawMessage        `json:"initial_state"` // TODO
+	InitialState    []fledglingEvent       `json:"initial_state"`
 	RoomAliasName   string                 `json:"room_alias_name"`
+	GuestCanJoin    bool                   `json:"guest_can_join"`
 }
 
 func (r createRoomRequest) Validate() *util.JSONResponse {
@@ -70,6 +70,16 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 			}
 		}
 	}
+	switch r.Preset {
+	case "private_chat", "trusted_private_chat", "public_chat":
+		break
+	default:
+		return &util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
+		}
+	}
+
 	return nil
 }
 
@@ -81,9 +91,9 @@ type createRoomResponse struct {
 
 // fledglingEvent is a helper representation of an event used when creating many events in succession.
 type fledglingEvent struct {
-	Type     string
-	StateKey string
-	Content  interface{}
+	Type     string      `json:"type"`
+	StateKey string      `json:"state_key"`
+	Content  interface{} `json:"content"`
 }
 
 // CreateRoom implements /createRoom
@@ -141,6 +151,20 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		AvatarURL:   profile.AvatarURL,
 	}
 
+	var joinRules, historyVisibility string
+	switch r.Preset {
+	case "private_chat":
+		joinRules = "invite"
+		historyVisibility = "shared"
+	case "trusted_private_chat":
+		joinRules = "invite"
+		historyVisibility = "shared"
+		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
+	case "public_chat":
+		joinRules = "public"
+		historyVisibility = "shared"
+	}
+
 	var builtEvents []gomatrixserverlib.Event
 
 	// send events into the room in order of:
@@ -151,7 +175,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	//  5- m.room.join_rules
 	//  6- m.room.history_visibility
 	//  7- m.room.guest_access (opt)
-	//  8- other initial state items TODO
+	//  8- other initial state items
 	//  9- m.room.name (opt)
 	//  10- m.room.topic (opt)
 	//  11- invite events (opt) - with is_direct flag if applicable TODO
@@ -166,16 +190,26 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		{"m.room.member", userID, membershipContent},
 		{"m.room.power_levels", "", common.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
-		{"m.room.join_rules", "", common.JoinRulesContent{JoinRule: "public"}},                          // FIXME: Allow this to be changed
-		{"m.room.history_visibility", "", common.HistoryVisibilityContent{HistoryVisibility: "joined"}}, // FIXME: Allow this to be changed
-		{"m.room.guest_access", "", common.GuestAccessContent{GuestAccess: "can_join"}},                 // FIXME: Allow this to be changed
-		// TODO: Other initial state items
-		{"m.room.name", "", common.NameContent{Name: r.Name}}, // FIXME: Only send the name event if a name is supplied, to avoid sending a false room name removal event
-		{"m.room.topic", "", common.TopicContent{Topic: r.Topic}},
-		// TODO: invite events
-		// TODO: 3pid invite events
-		// TODO: m.room.aliases
+		{"m.room.join_rules", "", common.JoinRulesContent{JoinRule: joinRules}},
+		{"m.room.history_visibility", "", common.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
 	}
+	if r.GuestCanJoin {
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.guest_access", "", common.GuestAccessContent{GuestAccess: "can_join"}})
+	}
+	for _, initStateEv := range r.InitialState {
+		eventsToMake = append(eventsToMake, initStateEv)
+	}
+	if r.Name != "" {
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.name", "", common.NameContent{Name: r.Name}})
+	}
+	if r.Topic != "" {
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.topic", "", common.TopicContent{Topic: r.Topic}})
+	}
+	// eventsToMake = append(eventsToMake,
+	// 	// TODO: invite events
+	// 	// TODO: 3pid invite events
+	// 	// TODO: m.room.aliases
+	// )
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
