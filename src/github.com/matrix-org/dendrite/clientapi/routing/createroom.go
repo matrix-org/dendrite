@@ -47,6 +47,25 @@ type createRoomRequest struct {
 	GuestCanJoin    bool                   `json:"guest_can_join"`
 }
 
+const (
+	presetPrivateChat        = "private_chat"
+	presetTrustedPrivateChat = "trusted_private_chat"
+	presetPublicChat         = "public_chat"
+)
+
+const (
+	joinRulePublic = "public"
+	// joinRuleCanJoin = "can_join"
+	joinRuleInvite = "invite"
+	// joinRuleKnock   = "knock"
+	// joinRulePrivate = "private"
+)
+const (
+	historyVisibilityShared = "shared"
+	// historyVisibilityWorldReadable = "world_readable"
+	// historyVisibilityInvited       = "invited"
+)
+
 func (r createRoomRequest) Validate() *util.JSONResponse {
 	whitespace := "\t\n\x0b\x0c\r " // https://docs.python.org/2/library/string.html#string.whitespace
 	// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/handlers/room.py#L81
@@ -71,7 +90,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		}
 	}
 	switch r.Preset {
-	case "private_chat", "trusted_private_chat", "public_chat":
+	case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat:
 		break
 	default:
 		return &util.JSONResponse{
@@ -153,16 +172,16 @@ func createRoom(req *http.Request, device *authtypes.Device,
 
 	var joinRules, historyVisibility string
 	switch r.Preset {
-	case "private_chat":
-		joinRules = "invite"
-		historyVisibility = "shared"
-	case "trusted_private_chat":
-		joinRules = "invite"
-		historyVisibility = "shared"
+	case presetPrivateChat:
+		joinRules = joinRuleInvite
+		historyVisibility = historyVisibilityShared
+	case presetTrustedPrivateChat:
+		joinRules = joinRuleInvite
+		historyVisibility = historyVisibilityShared
 		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
-	case "public_chat":
-		joinRules = "public"
-		historyVisibility = "shared"
+	case presetPublicChat:
+		joinRules = joinRulePublic
+		historyVisibility = historyVisibilityShared
 	}
 
 	var builtEvents []gomatrixserverlib.Event
@@ -196,9 +215,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	if r.GuestCanJoin {
 		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.guest_access", "", common.GuestAccessContent{GuestAccess: "can_join"}})
 	}
-	for _, initStateEv := range r.InitialState {
-		eventsToMake = append(eventsToMake, initStateEv)
-	}
+	eventsToMake = append(eventsToMake, r.InitialState...)
 	if r.Name != "" {
 		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.name", "", common.NameContent{Name: r.Name}})
 	}
