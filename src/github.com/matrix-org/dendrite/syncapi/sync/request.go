@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -31,7 +33,7 @@ const defaultTimelineLimit = 20
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
 	ctx           context.Context
-	userID        string
+	device        authtypes.Device
 	limit         int
 	timeout       time.Duration
 	since         *types.StreamPosition // nil means that no since token was supplied
@@ -39,7 +41,7 @@ type syncRequest struct {
 	log           *log.Entry
 }
 
-func newSyncRequest(req *http.Request, userID string) (*syncRequest, error) {
+func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
@@ -50,7 +52,7 @@ func newSyncRequest(req *http.Request, userID string) (*syncRequest, error) {
 	// TODO: Additional query params: set_presence, filter
 	return &syncRequest{
 		ctx:           req.Context(),
-		userID:        userID,
+		device:        device,
 		timeout:       timeout,
 		since:         since,
 		wantFullState: wantFullState,

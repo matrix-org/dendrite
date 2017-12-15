@@ -19,6 +19,9 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -86,13 +89,17 @@ func (d *SyncServerDatabase) AllJoinedUsersInRooms(ctx context.Context) (map[str
 // Events lookups a list of event by their event ID.
 // Returns a list of events matching the requested IDs found in the database.
 // If an event is not found in the database then it will be omitted from the list.
-// Returns an error if there was a problem talking with the database
+// Returns an error if there was a problem talking with the database.
+// Does not include any transaction IDs in the returned events.
 func (d *SyncServerDatabase) Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
 	streamEvents, err := d.events.selectEvents(ctx, nil, eventIDs)
 	if err != nil {
 		return nil, err
 	}
-	return streamEventsToEvents(streamEvents), nil
+
+	// We don't include a device here as we only include transaction IDs in
+	// incremental syncs.
+	return streamEventsToEvents(nil, streamEvents), nil
 }
 
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
@@ -208,10 +215,14 @@ func (d *SyncServerDatabase) syncStreamPositionTx(
 	return types.StreamPosition(maxID), nil
 }
 
-// IncrementalSync returns all the data needed in order to create an incremental sync response.
+// IncrementalSync returns all the data needed in order to create an incremental
+// sync response for the given user. Events returned will include any client
+// transaction IDs associated with the given device. These transaction IDs come
+// from when the device sent the event via an API that included a transaction
+// ID.
 func (d *SyncServerDatabase) IncrementalSync(
 	ctx context.Context,
-	userID string,
+	device authtypes.Device,
 	fromPos, toPos types.StreamPosition,
 	numRecentEventsPerRoom int,
 ) (*types.Response, error) {
@@ -226,21 +237,21 @@ func (d *SyncServerDatabase) IncrementalSync(
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 stream positions.
 	// This works out what the 'state' key should be for each room as well as which membership block
 	// to put the room into.
-	deltas, err := d.getStateDeltas(ctx, txn, fromPos, toPos, userID)
+	deltas, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
 	if err != nil {
 		return nil, err
 	}
 
 	res := types.NewResponse(toPos)
 	for _, delta := range deltas {
-		err = d.addRoomDeltaToResponse(ctx, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
+		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// TODO: This should be done in getStateDeltas
-	if err = d.addInvitesToResponse(ctx, txn, userID, fromPos, toPos, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, device.UserID, fromPos, toPos, res); err != nil {
 		return nil, err
 	}
 
@@ -292,7 +303,10 @@ func (d *SyncServerDatabase) CompleteSync(
 		if err != nil {
 			return nil, err
 		}
-		recentEvents := streamEventsToEvents(recentStreamEvents)
+
+		// We don't include a device here as we don't need to send down
+		// transaction IDs for complete syncs
+		recentEvents := streamEventsToEvents(nil, recentStreamEvents)
 
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
@@ -390,7 +404,9 @@ func (d *SyncServerDatabase) addInvitesToResponse(
 
 // addRoomDeltaToResponse adds a room state delta to a sync response
 func (d *SyncServerDatabase) addRoomDeltaToResponse(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
+	device *authtypes.Device,
+	txn *sql.Tx,
 	fromPos, toPos types.StreamPosition,
 	delta stateDelta,
 	numRecentEventsPerRoom int,
@@ -412,7 +428,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 	if err != nil {
 		return err
 	}
-	recentEvents := streamEventsToEvents(recentStreamEvents)
+	recentEvents := streamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 
 	// Don't bother appending empty room entries
@@ -529,7 +545,7 @@ func (d *SyncServerDatabase) fetchMissingStateEvents(
 }
 
 func (d *SyncServerDatabase) getStateDeltas(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
 	fromPos, toPos types.StreamPosition, userID string,
 ) ([]stateDelta, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
@@ -578,7 +594,7 @@ func (d *SyncServerDatabase) getStateDeltas(
 				deltas = append(deltas, stateDelta{
 					membership:    membership,
 					membershipPos: ev.streamPosition,
-					stateEvents:   streamEventsToEvents(stateStreamEvents),
+					stateEvents:   streamEventsToEvents(device, stateStreamEvents),
 					roomID:        roomID,
 				})
 				break
@@ -594,7 +610,7 @@ func (d *SyncServerDatabase) getStateDeltas(
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, stateDelta{
 			membership:  "join",
-			stateEvents: streamEventsToEvents(state[joinedRoomID]),
+			stateEvents: streamEventsToEvents(device, state[joinedRoomID]),
 			roomID:      joinedRoomID,
 		})
 	}
@@ -602,10 +618,25 @@ func (d *SyncServerDatabase) getStateDeltas(
 	return deltas, nil
 }
 
-func streamEventsToEvents(in []streamEvent) []gomatrixserverlib.Event {
+// streamEventsToEvents converts streamEvent to Event. If device is non-nil and
+// matches the streamevent.transactionID device then the transaction ID gets
+// added to the unsigned section of the output event.
+func streamEventsToEvents(device *authtypes.Device, in []streamEvent) []gomatrixserverlib.Event {
 	out := make([]gomatrixserverlib.Event, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].Event
+		if device != nil && in[i].transactionID != nil {
+			if device.UserID == in[i].Sender() && device.ID == in[i].transactionID.DeviceID {
+				err := out[i].SetUnsignedField(
+					"transaction_id", in[i].transactionID.TransactionID,
+				)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						"event_id": out[i].EventID(),
+					}).WithError(err).Warnf("Failed to add transaction ID to event")
+				}
+			}
+		}
 	}
 	return out
 }

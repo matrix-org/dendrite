@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -262,7 +264,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.StreamPosition, error) {
 	select {
 	case <-time.After(5 * time.Second):
 		return types.StreamPosition(0), fmt.Errorf(
-			"waitForEvents timed out waiting for %s (pos=%d)", req.userID, req.since,
+			"waitForEvents timed out waiting for %s (pos=%d)", req.device.UserID, req.since,
 		)
 	case <-listener.GetNotifyChannel(*req.since):
 		p := listener.GetStreamPosition()
@@ -280,7 +282,7 @@ func waitForBlocking(s *UserStream, numBlocking uint) {
 
 func newTestSyncRequest(userID string, since types.StreamPosition) syncRequest {
 	return syncRequest{
-		userID:        userID,
+		device:        authtypes.Device{UserID: userID},
 		timeout:       1 * time.Minute,
 		since:         &since,
 		wantFullState: false,

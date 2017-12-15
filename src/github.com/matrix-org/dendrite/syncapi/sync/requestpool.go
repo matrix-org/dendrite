@@ -48,7 +48,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	// Extract values from request
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
-	syncReq, err := newSyncRequest(req, userID)
+	syncReq, err := newSyncRequest(req, *device)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
@@ -122,16 +122,16 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == nil {
-		res, err = rp.db.CompleteSync(req.ctx, req.userID, req.limit)
+		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.userID, *req.since, currentPos, req.limit)
+		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, currentPos, req.limit)
 	}
 
 	if err != nil {
 		return
 	}
 
-	res, err = rp.appendAccountData(res, req.userID, req, currentPos)
+	res, err = rp.appendAccountData(res, req.device.UserID, req, currentPos)
 	return
 }
 
