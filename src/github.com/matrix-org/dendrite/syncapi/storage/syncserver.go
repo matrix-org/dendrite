@@ -216,10 +216,10 @@ func (d *SyncServerDatabase) syncStreamPositionTx(
 }
 
 // IncrementalSync returns all the data needed in order to create an incremental
-// sync response for the given device. If the device has a deviceID events
-// returned will include any client transaction IDs associated with the device.
-// These transaction IDs come from when the device sent the event via an API
-// that included a transaction ID.
+// sync response for tshe given user. Events returned will include any client
+// transaction IDs associated with the given device. These transaction IDs come
+// from when the device sent the event via an API that included a transaction
+// ID.
 func (d *SyncServerDatabase) IncrementalSync(
 	ctx context.Context,
 	device *authtypes.Device,
