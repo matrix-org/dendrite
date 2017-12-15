@@ -222,7 +222,7 @@ func (d *SyncServerDatabase) syncStreamPositionTx(
 // ID.
 func (d *SyncServerDatabase) IncrementalSync(
 	ctx context.Context,
-	device *authtypes.Device,
+	device authtypes.Device,
 	fromPos, toPos types.StreamPosition,
 	numRecentEventsPerRoom int,
 ) (*types.Response, error) {
@@ -237,14 +237,14 @@ func (d *SyncServerDatabase) IncrementalSync(
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 stream positions.
 	// This works out what the 'state' key should be for each room as well as which membership block
 	// to put the room into.
-	deltas, err := d.getStateDeltas(ctx, device, txn, fromPos, toPos, device.UserID)
+	deltas, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
 	if err != nil {
 		return nil, err
 	}
 
 	res := types.NewResponse(toPos)
 	for _, delta := range deltas {
-		err = d.addRoomDeltaToResponse(ctx, device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
+		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
 		if err != nil {
 			return nil, err
 		}

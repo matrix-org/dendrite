@@ -124,7 +124,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.Stre
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, &req.device, *req.since, currentPos, req.limit)
+		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, currentPos, req.limit)
 	}
 
 	if err != nil {
