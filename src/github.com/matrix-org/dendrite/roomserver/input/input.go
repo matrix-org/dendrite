@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -33,6 +34,8 @@ type RoomserverInputAPI struct {
 	// The kafkaesque topic to output new room events to.
 	// This is the name used in kafka to identify the stream to write events to.
 	OutputRoomEventTopic string
+	// Protects calls to processRoomEvent
+	mutex sync.Mutex
 }
 
 // WriteOutputEvents implements OutputRoomEventWriter
@@ -59,6 +62,10 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 	response *api.InputRoomEventsResponse,
 ) error {
 	for i := range request.InputRoomEvents {
+		// We lock as processRoomEvent can ony be called once at a time
+		r.mutex.Lock()
+		defer r.mutex.Unlock()
+
 		if err := processRoomEvent(ctx, r.DB, r, request.InputRoomEvents[i]); err != nil {
 			return err
 		}

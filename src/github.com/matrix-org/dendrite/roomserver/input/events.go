@@ -69,6 +69,11 @@ type OutputRoomEventWriter interface {
 	WriteOutputEvents(roomID string, updates []api.OutputEvent) error
 }
 
+// processRoomEvent can only be called once at a time
+//
+// TODO(#375): This should be rewritten to allow concurrent calls. The
+// difficulty is in ensuring that we correctly annotate events with the correct
+// state deltas when sending to kafka streams
 func processRoomEvent(
 	ctx context.Context,
 	db RoomEventDatabase,
