@@ -109,7 +109,7 @@
 			"importpath": "github.com/opennota/check",
 			"repository": "https://github.com/opennota/check",
 			"vcs": "git",
-			"revision": "11e2eec79ec4f789607e3efbf405cdca2504d4cb",
+			"revision": "0ec6d92e97559edf84eebe7c51b069953d4b522c",
 			"branch": "master",
 			"notests": true
 		},
@@ -309,120 +309,20 @@
 			"notests": true
 		},
 		{
-			"importpath": "honnef.co/go/tools/callgraph",
-			"repository": "https://github.com/dominikh/go-tools",
+			"importpath": "golang.org/x/tools/refactor/importgraph",
+			"repository": "https://go.googlesource.com/tools",
 			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
+			"revision": "9c477bae194915bfd4bc8c314e90e28b9ec1c831",
 			"branch": "master",
-			"path": "callgraph",
+			"path": "/refactor/importgraph",
 			"notests": true
 		},
 		{
-			"importpath": "honnef.co/go/tools/cmd/gosimple",
+			"importpath": "honnef.co/go/tools",
 			"repository": "https://github.com/dominikh/go-tools",
 			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "/cmd/gosimple",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/cmd/megacheck",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "/cmd/megacheck",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/cmd/staticcheck",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "/cmd/staticcheck",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/cmd/unused",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "/cmd/unused",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/functions",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "functions",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/gcsizes",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "gcsizes",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/internal/sharedcheck",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "/internal/sharedcheck",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/lint",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "lint",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/simple",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "simple",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/ssa",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "ssa",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/staticcheck",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "staticcheck",
-			"notests": true
-		},
-		{
-			"importpath": "honnef.co/go/tools/unused",
-			"repository": "https://github.com/dominikh/go-tools",
-			"vcs": "git",
-			"revision": "49f44f893d933fd08cd7d67d65ccefa5d7c23329",
-			"branch": "master",
-			"path": "unused",
+			"revision": "50914165a1ae448f1608c6c325d052313396182e",
+			"branch": "HEAD",
 			"notests": true
 		},
 		{

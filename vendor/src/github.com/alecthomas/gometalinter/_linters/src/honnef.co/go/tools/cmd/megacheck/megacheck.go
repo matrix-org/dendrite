@@ -4,42 +4,23 @@ package main // import "honnef.co/go/tools/cmd/megacheck"
 import (
 	"os"
 
-	"honnef.co/go/tools/lint"
 	"honnef.co/go/tools/lint/lintutil"
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/unused"
 )
 
-type Checker struct {
-	Checkers []lint.Checker
-}
-
-func (c *Checker) Init(prog *lint.Program) {
-	for _, cc := range c.Checkers {
-		cc.Init(prog)
-	}
-}
-
-func (c *Checker) Funcs() map[string]lint.Func {
-	fns := map[string]lint.Func{}
-	for _, cc := range c.Checkers {
-		for k, v := range cc.Funcs() {
-			fns[k] = v
-		}
-	}
-	return fns
-}
-
 func main() {
 	var flags struct {
 		staticcheck struct {
-			enabled   bool
-			generated bool
+			enabled     bool
+			generated   bool
+			exitNonZero bool
 		}
 		gosimple struct {
-			enabled   bool
-			generated bool
+			enabled     bool
+			generated   bool
+			exitNonZero bool
 		}
 		unused struct {
 			enabled      bool
@@ -51,6 +32,7 @@ func main() {
 			debug        string
 			wholeProgram bool
 			reflection   bool
+			exitNonZero  bool
 		}
 	}
 	fs := lintutil.FlagSet("megacheck")
@@ -58,11 +40,15 @@ func main() {
 		"simple.enabled", true, "Run gosimple")
 	fs.BoolVar(&flags.gosimple.generated,
 		"simple.generated", false, "Check generated code")
+	fs.BoolVar(&flags.gosimple.exitNonZero,
+		"simple.exit-non-zero", false, "Exit non-zero if any problems were found")
 
 	fs.BoolVar(&flags.staticcheck.enabled,
 		"staticcheck.enabled", true, "Run staticcheck")
 	fs.BoolVar(&flags.staticcheck.generated,
 		"staticcheck.generated", false, "Check generated code (only applies to a subset of checks)")
+	fs.BoolVar(&flags.staticcheck.exitNonZero,
+		"staticcheck.exit-non-zero", true, "Exit non-zero if any problems were found")
 
 	fs.BoolVar(&flags.unused.enabled,
 		"unused.enabled", true, "Run unused")
@@ -78,22 +64,31 @@ func main() {
 		"unused.vars", true, "Report unused variables")
 	fs.BoolVar(&flags.unused.wholeProgram,
 		"unused.exported", false, "Treat arguments as a program and report unused exported identifiers")
-	fs.BoolVar(&flags.unused.reflection, "unused.reflect", true, "Consider identifiers as used when it's likely they'll be accessed via reflection")
+	fs.BoolVar(&flags.unused.reflection,
+		"unused.reflect", true, "Consider identifiers as used when it's likely they'll be accessed via reflection")
+	fs.BoolVar(&flags.unused.exitNonZero,
+		"unused.exit-non-zero", true, "Exit non-zero if any problems were found")
 
 	fs.Parse(os.Args[1:])
 
-	c := &Checker{}
+	var checkers []lintutil.CheckerConfig
 
 	if flags.staticcheck.enabled {
 		sac := staticcheck.NewChecker()
 		sac.CheckGenerated = flags.staticcheck.generated
-		c.Checkers = append(c.Checkers, sac)
+		checkers = append(checkers, lintutil.CheckerConfig{
+			Checker:     sac,
+			ExitNonZero: flags.staticcheck.exitNonZero,
+		})
 	}
 
 	if flags.gosimple.enabled {
 		sc := simple.NewChecker()
 		sc.CheckGenerated = flags.gosimple.generated
-		c.Checkers = append(c.Checkers, sc)
+		checkers = append(checkers, lintutil.CheckerConfig{
+			Checker:     sc,
+			ExitNonZero: flags.gosimple.exitNonZero,
+		})
 	}
 
 	if flags.unused.enabled {
@@ -116,8 +111,12 @@ func main() {
 		uc := unused.NewChecker(mode)
 		uc.WholeProgram = flags.unused.wholeProgram
 		uc.ConsiderReflection = flags.unused.reflection
-		c.Checkers = append(c.Checkers, unused.NewLintChecker(uc))
+		checkers = append(checkers, lintutil.CheckerConfig{
+			Checker:     unused.NewLintChecker(uc),
+			ExitNonZero: flags.unused.exitNonZero,
+		})
+
 	}
 
-	lintutil.ProcessFlagSet(c, fs)
+	lintutil.ProcessFlagSet(checkers, fs)
 }

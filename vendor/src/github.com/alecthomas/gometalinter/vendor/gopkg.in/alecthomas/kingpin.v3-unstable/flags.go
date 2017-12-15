@@ -31,14 +31,11 @@ func (f *flagGroup) Flag(name, help string) *Clause {
 	return flag
 }
 
-func (f *flagGroup) init(defaultEnvarPrefix string) error {
+func (f *flagGroup) init() error {
 	if err := f.checkDuplicates(); err != nil {
 		return err
 	}
 	for _, flag := range f.long {
-		if defaultEnvarPrefix != "" && !flag.noEnvar && flag.envar == "" {
-			flag.envar = envarTransform(defaultEnvarPrefix + "_" + flag.name)
-		}
 		if err := flag.init(); err != nil {
 			return err
 		}

@@ -10,7 +10,7 @@
 		{
 			"importpath": "github.com/alecthomas/gometalinter",
 			"repository": "https://github.com/alecthomas/gometalinter",
-			"revision": "0262fb20957a4c2d3bb7c834a6a125ae3884a2c6",
+			"revision": "b8b1f84ae8cb72e7870785840eab2d6c6355aa9f",
 			"branch": "master"
 		},
 		{
@@ -135,7 +135,7 @@
 		{
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
-			"revision": "b2704c7d9af54b68a4cf07cf6663ee98174a786c",
+			"revision": "afa71391f946312c40639a419045e06b8ff2309a",
 			"branch": "master"
 		},
 		{

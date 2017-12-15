@@ -130,16 +130,6 @@ func newCmdGroup(app *Application) *cmdGroup {
 	}
 }
 
-func (c *cmdGroup) flattenedCommands() (out []*CmdClause) {
-	for _, cmd := range c.commandOrder {
-		if len(cmd.commands) == 0 {
-			out = append(out, cmd)
-		}
-		out = append(out, cmd.flattenedCommands()...)
-	}
-	return
-}
-
 func (c *cmdGroup) addCommand(name, help string) *CmdClause {
 	cmd := newCommand(c.app, name, help)
 	c.commands[name] = cmd
@@ -187,14 +177,15 @@ type CmdClauseValidator func(*CmdClause) error
 // and either subcommands or positional arguments.
 type CmdClause struct {
 	cmdMixin
-	app            *Application
-	name           string
-	aliases        []string
-	help           string
-	isDefault      bool
-	validator      CmdClauseValidator
-	hidden         bool
-	completionAlts []string
+	app                 *Application
+	name                string
+	aliases             []string
+	help                string
+	isDefault           bool
+	validator           CmdClauseValidator
+	hidden              bool
+	completionAlts      []string
+	optionalSubcommands bool
 }
 
 func newCommand(app *Application, name, help string) *CmdClause {
@@ -271,6 +262,12 @@ func (c *CmdClause) Command(name, help string) *CmdClause {
 	return cmd
 }
 
+// OptionalSubcommands makes subcommands optional
+func (c *CmdClause) OptionalSubcommands() *CmdClause {
+	c.optionalSubcommands = true
+	return c
+}
+
 // Default makes this command the default if commands don't match.
 func (c *CmdClause) Default() *CmdClause {
 	c.isDefault = true
@@ -302,7 +299,7 @@ func (c *cmdMixin) checkArgCommandMixing() error {
 }
 
 func (c *CmdClause) init() error {
-	if err := c.flagGroup.init(c.app.defaultEnvarPrefix()); err != nil {
+	if err := c.flagGroup.init(); err != nil {
 		return err
 	}
 	if err := c.checkArgCommandMixing(); err != nil {

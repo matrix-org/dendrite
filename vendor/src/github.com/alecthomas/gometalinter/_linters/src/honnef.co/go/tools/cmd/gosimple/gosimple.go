@@ -13,6 +13,9 @@ func main() {
 	fs.Parse(os.Args[1:])
 	c := simple.NewChecker()
 	c.CheckGenerated = *gen
-
-	lintutil.ProcessFlagSet(c, fs)
+	cfg := lintutil.CheckerConfig{
+		Checker:     c,
+		ExitNonZero: true,
+	}
+	lintutil.ProcessFlagSet([]lintutil.CheckerConfig{cfg}, fs)
 }
