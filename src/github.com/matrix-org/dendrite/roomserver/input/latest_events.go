@@ -42,6 +42,7 @@ import (
 //      |
 //      7 <----- latest
 //
+// Can only be called once at a time
 func updateLatestEvents(
 	ctx context.Context,
 	db RoomEventDatabase,
