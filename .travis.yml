@@ -25,10 +25,3 @@ install:
 script:
  - ./scripts/travis-test.sh
 
-notifications:
-    webhooks:
-        urls:
-            - "https://scalar.vector.im/api/neb/services/hooks/dHJhdmlzLWNpLyU0MGtlZ2FuJTNBbWF0cml4Lm9yZy8lMjFhWmthbkFuV0VkeGNSSVFrV24lM0FtYXRyaXgub3Jn"
-        on_success: change  # always|never|change
-        on_failure: always
-        on_start: never
