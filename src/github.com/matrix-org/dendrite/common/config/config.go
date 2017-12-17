@@ -206,6 +206,13 @@ type Dendrite struct {
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	}
 
+	// Application Services
+	// https://matrix.org/docs/spec/application_service/unstable.html
+	ApplicationService struct {
+		// Configuration files for various application services
+		ConfigFiles []string `yaml:"app_service_config_files"`
+	}
+
 	// Any information derived from the configuration options for later use.
 	Derived struct {
 		Registration struct {
@@ -219,6 +226,10 @@ type Dendrite struct {
 			// registration in order to complete registration stages.
 			Params map[string]interface{} `json:"params"`
 		}
+
+		// Application Services parsed from their config files
+		// The paths of which were given above in the main config file
+		ApplicationServices []ApplicationService
 	}
 }
 
@@ -359,6 +370,14 @@ func (config *Dendrite) derive() {
 	} else {
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+	}
+
+	// Load application service configuration files
+	fmt.Println(config.ApplicationService.ConfigFiles)
+	if len(config.ApplicationService.ConfigFiles) > 0 {
+		if err := loadAppservices(config); err != nil {
+			fmt.Println("Error loading AS config: ", err)
+		}
 	}
 }
 
