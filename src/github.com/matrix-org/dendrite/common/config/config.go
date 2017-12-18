@@ -206,6 +206,15 @@ type Dendrite struct {
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	}
 
+	// The config for logging informations
+	Logging struct {
+		// The path to the log file
+		FPath Path `yaml:"path"`
+
+		// The logging level
+		Level string `yaml:"level"`
+	} `yaml:"logging"`
+
 	// Any information derived from the configuration options for later use.
 	Derived struct {
 		Registration struct {
@@ -219,6 +228,9 @@ type Dendrite struct {
 			// registration in order to complete registration stages.
 			Params map[string]interface{} `json:"params"`
 		}
+
+		// The logrus level used for logging configuration
+		LogLevel logrus.Level
 	}
 }
 
@@ -470,6 +482,12 @@ func (config *Dendrite) check(monolithic bool) error {
 		checkNotEmpty("listen.federation_api", string(config.Listen.FederationAPI))
 		checkNotEmpty("listen.sync_api", string(config.Listen.SyncAPI))
 		checkNotEmpty("listen.room_server", string(config.Listen.RoomServer))
+	}
+
+	if level, err := logrus.ParseLevel(config.Logging.Level); err != nil {
+		problems = append(problems, fmt.Sprintf("Invalid value for key logging.level: %s", config.Logging.Level))
+	} else {
+		config.Derived.LogLevel = level
 	}
 
 	if problems != nil {

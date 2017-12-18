@@ -117,6 +117,13 @@ listen:
 tracing:
     # Config for the jaeger opentracing reporter.
     # See https://godoc.org/github.com/uber/jaeger-client-go/config#Configuration
-    # for documtation.
+    # for documentation.
     jaeger:
         disabled: true
+
+# The configuration for logs of dendrite
+logging:
+    # The logging level, must be one of debug, info, warn, error, fatal, panic.
+    level: "info"
+    # The file on which save logs. If commented, logs won't be saved by dendrite and only printed to stdout
+    # path: /var/log/dendrite.log
