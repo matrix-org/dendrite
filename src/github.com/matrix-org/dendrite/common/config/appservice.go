@@ -44,7 +44,7 @@ type ApplicationService struct {
 	// Localpart of application service user
 	SenderLocalpart string `yaml:"sender_localpart"`
 	// Information about an application service's namespaces
-	Namespaces map[string][]interface{} `yaml:"namespaces"`
+	Namespaces map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
 }
 
 func loadAppservices(config *Dendrite) error {

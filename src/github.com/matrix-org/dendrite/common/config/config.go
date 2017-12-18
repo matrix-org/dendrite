@@ -334,7 +334,8 @@ func loadConfig(
 
 	for _, certPath := range config.Matrix.FederationCertificatePaths {
 		absCertPath := absPath(basePath, certPath)
-		pemData, err := readFile(absCertPath)
+		var pemData []byte
+		pemData, err = readFile(absCertPath)
 		if err != nil {
 			return nil, err
 		}
@@ -348,14 +349,17 @@ func loadConfig(
 	config.Media.AbsBasePath = Path(absPath(basePath, config.Media.BasePath))
 
 	// Generate data from config options
-	config.derive()
+	err = config.derive()
+	if err != nil {
+		return nil, err
+	}
 
 	return &config, nil
 }
 
 // derive generates data that is derived from various values provided in
 // the config file.
-func (config *Dendrite) derive() {
+func (config *Dendrite) derive() error {
 	// Determine registrations flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
@@ -373,12 +377,13 @@ func (config *Dendrite) derive() {
 	}
 
 	// Load application service configuration files
-	fmt.Println(config.ApplicationService.ConfigFiles)
 	if len(config.ApplicationService.ConfigFiles) > 0 {
 		if err := loadAppservices(config); err != nil {
-			fmt.Println("Error loading AS config: ", err)
+			return err
 		}
 	}
+
+	return nil
 }
 
 // setDefaults sets default config values if they are not explicitly set.

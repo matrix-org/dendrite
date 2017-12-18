@@ -123,4 +123,4 @@ tracing:
 
 # A list of application service config files to use
 applicationservice:
-    app_service_config_files:
+    app_service_config_files: []
