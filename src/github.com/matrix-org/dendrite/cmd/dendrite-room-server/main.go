@@ -18,7 +18,6 @@ import (
 	"flag"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -32,12 +31,11 @@ import (
 )
 
 var (
-	logDir     = os.Getenv("LOG_DIR")
 	configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 )
 
 func main() {
-	common.SetupLogging(logDir)
+	common.SetupStdLogging()
 
 	flag.Parse()
 
@@ -48,6 +46,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Invalid config file: %s", err)
 	}
+
+	common.SetupFileLogging(string(cfg.Logging.FPath), cfg.Derived.LogLevel)
 
 	closer, err := cfg.SetupTracing("DendriteRoomServer")
 	if err != nil {

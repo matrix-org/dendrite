@@ -16,7 +16,7 @@ package common
 
 import (
 	"os"
-	"path/filepath"
+	"path"
 
 	"github.com/matrix-org/dugong"
 	"github.com/sirupsen/logrus"
@@ -31,8 +31,8 @@ func (f utcFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return f.Formatter.Format(entry)
 }
 
-// SetupLogging configures the logging format and destination(s).
-func SetupLogging(logDir string) {
+// SetupStdLogging configures the logging format to standard output. Typically, it is called when the config is not yet loaded.
+func SetupStdLogging() {
 	logrus.SetFormatter(&utcFormatter{
 		&logrus.TextFormatter{
 			TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
@@ -42,12 +42,15 @@ func SetupLogging(logDir string) {
 			DisableSorting:   false,
 		},
 	})
-	if logDir != "" {
-		_ = os.Mkdir(logDir, os.ModePerm)
+}
+
+// SetupFileLogging configures the logging format to a file.
+func SetupFileLogging(logFile string, logLevel logrus.Level) {
+	logrus.SetLevel(logLevel)
+	if logFile != "" {
+		_ = os.MkdirAll(path.Dir(logFile), os.ModePerm)
 		logrus.AddHook(dugong.NewFSHook(
-			filepath.Join(logDir, "info.log"),
-			filepath.Join(logDir, "warn.log"),
-			filepath.Join(logDir, "error.log"),
+			logFile,
 			&utcFormatter{
 				&logrus.TextFormatter{
 					TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",

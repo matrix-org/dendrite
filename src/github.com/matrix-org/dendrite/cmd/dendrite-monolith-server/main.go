@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"flag"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -63,7 +62,6 @@ import (
 )
 
 var (
-	logDir        = os.Getenv("LOG_DIR")
 	configPath    = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
 	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
@@ -72,7 +70,7 @@ var (
 )
 
 func main() {
-	common.SetupLogging(logDir)
+	common.SetupStdLogging()
 
 	flag.Parse()
 
@@ -83,6 +81,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Invalid config file: %s", err)
 	}
+
+	common.SetupFileLogging(string(cfg.Logging.FPath), cfg.Derived.LogLevel)
 
 	closer, err := cfg.SetupTracing("DendriteMonolith")
 	if err != nil {
