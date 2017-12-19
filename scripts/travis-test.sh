@@ -40,6 +40,12 @@ function travis_end {
     echo -en "travis_fold:end:$name\r"
 }
 
+function kill_kafka {
+    echo "killing kafka"
+    # sometimes kafka doesn't die on a SIGTERM so we SIGKILL it.
+    killall -9 -v java
+}
+
 if [ "${TEST_SUITE:-lint}" == "lint" ]; then
     ./scripts/find-lint.sh
 fi
@@ -77,6 +83,11 @@ if [ "${TEST_SUITE:-integ-test}" == "integ-test" ]; then
     travis_start kafka "Installing kafka"
     ./scripts/install-local-kafka.sh
     travis_end
+
+    # make sure we kill off zookeeper/kafka on exit, because it stops the
+    # travis container being cleaned up (cf
+    # https://github.com/travis-ci/travis-ci/issues/8082)
+    trap kill_kafka EXIT
 
     # Run the integration tests
     for i in roomserver syncserver mediaapi; do
