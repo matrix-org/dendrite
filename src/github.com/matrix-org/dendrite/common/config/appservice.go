@@ -49,7 +49,7 @@ type ApplicationService struct {
 
 func loadAppservices(config *Dendrite) error {
 	// Iterate through and return all the Application Services
-	for _, configPath := range config.ApplicationService.ConfigFiles {
+	for _, configPath := range config.ApplicationServices.ConfigFiles {
 		// Create a new application service
 		var appservice ApplicationService
 

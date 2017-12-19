@@ -122,5 +122,5 @@ tracing:
         disabled: true
 
 # A list of application service config files to use
-applicationservice:
-    app_service_config_files: []
+application_services:
+    config_files: []

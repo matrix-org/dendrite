@@ -208,10 +208,10 @@ type Dendrite struct {
 
 	// Application Services
 	// https://matrix.org/docs/spec/application_service/unstable.html
-	ApplicationService struct {
+	ApplicationServices struct {
 		// Configuration files for various application services
-		ConfigFiles []string `yaml:"app_service_config_files"`
-	} `yaml:"applicationservice"`
+		ConfigFiles []string `yaml:"config_files"`
+	} `yaml:"application_services"`
 
 	// Any information derived from the configuration options for later use.
 	Derived struct {
