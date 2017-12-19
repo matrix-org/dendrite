@@ -55,13 +55,11 @@ const (
 
 const (
 	joinRulePublic = "public"
-	// joinRuleCanJoin = "can_join"
 	joinRuleInvite = "invite"
-	// joinRuleKnock   = "knock"
-	// joinRulePrivate = "private"
 )
 const (
 	historyVisibilityShared = "shared"
+	// TODO: These should be implemented once history visibility is implemented
 	// historyVisibilityWorldReadable = "world_readable"
 	// historyVisibilityInvited       = "invited"
 )
@@ -222,11 +220,9 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	if r.Topic != "" {
 		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.topic", "", common.TopicContent{Topic: r.Topic}})
 	}
-	// eventsToMake = append(eventsToMake,
-	// 	// TODO: invite events
-	// 	// TODO: 3pid invite events
-	// 	// TODO: m.room.aliases
-	// )
+	// TODO: invite events
+	// TODO: 3pid invite events
+	// TODO: m.room.aliases
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
