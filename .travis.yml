@@ -19,9 +19,16 @@ addons:
 services:
   - postgresql
 
+cache:
+  directories:
+    - .downloads
+
 install:
  - go get github.com/constabulary/gb/...
 
 script:
  - ./scripts/travis-test.sh
 
+# we only need the latest git commit
+git:
+  depth: 1
