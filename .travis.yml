@@ -25,3 +25,6 @@ install:
 script:
  - ./scripts/travis-test.sh
 
+# we only need the latest git commit
+git:
+  depth: 1
