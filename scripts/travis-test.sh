@@ -15,6 +15,31 @@ export DENDRITE_LINT_DISABLE_GC=1
 export GOPATH="$(pwd):$(pwd)/vendor"
 export PATH="$PATH:$(pwd)/bin"
 
+# starts a travis fold section. The first argument is the name of the fold
+# section (which appears on the RHS) and may contain no spaces. Remaining
+# arguments are echoed in yellow on the LHS as the header line of the fold
+# section.
+travis_sections=()
+function travis_start {
+    name="$1"
+    shift
+    echo -en "travis_fold:start:$name\r"
+    travis_sections+=($name)
+
+    # yellow/bold
+    echo -en "\e[33;1m"
+    echo "$@"
+    # normal
+    echo -en "\e[0m"
+}
+
+# ends a travis fold section
+function travis_end {
+    name=${travis_sections[-1]}
+    unset 'travis_sections[-1]'
+    echo -en "travis_fold:end:$name\r"
+}
+
 if [ "${TEST_SUITE:-lint}" == "lint" ]; then
     ./scripts/find-lint.sh
 fi
@@ -24,8 +49,10 @@ if [ "${TEST_SUITE:-unit-test}" == "unit-test" ]; then
 fi
 
 if [ "${TEST_SUITE:-integ-test}" == "integ-test" ]; then
+    travis_start gb-build "Building dendrite and integ tests"
     gb build
-
+    travis_end
+    
     # Check that all the packages can build.
     # When `go build` is given multiple packages it won't output anything, and just
     # checks that everything builds. This seems to do a better job of handling
@@ -43,13 +70,18 @@ if [ "${TEST_SUITE:-integ-test}" == "integ-test" ]; then
     gb build github.com/matrix-org/dendrite/cmd/client-api-proxy
 
     # Create necessary certificates and keys to run dendrite
-    echo "Generating certs..."
-    time openssl req -x509 -newkey rsa:512 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
-    echo "Installing kafka..."
-    time ./scripts/install-local-kafka.sh
+    travis_start certs "Building SSL certs"
+    openssl req -x509 -newkey rsa:512 -keyout server.key -out server.crt -days 365 -nodes -subj /CN=localhost
+    travis_end
+
+    travis_start kafka "Installing kafka"
+    ./scripts/install-local-kafka.sh
+    travis_end
 
     # Run the integration tests
-    bin/roomserver-integration-tests
-    bin/syncserver-integration-tests
-    bin/mediaapi-integration-tests
+    for i in roomserver syncserver mediaapi; do
+        travis_start "$i-integration-tests" "Running integration tests for $i"
+        bin/$i-integration-tests
+        travis_end
+    done
 fi
