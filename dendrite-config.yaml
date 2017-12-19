@@ -120,3 +120,7 @@ tracing:
     # for documtation.
     jaeger:
         disabled: true
+
+# A list of application service config files to use
+application_services:
+    config_files: []

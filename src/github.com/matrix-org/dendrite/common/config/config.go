@@ -186,7 +186,7 @@ type Dendrite struct {
 		// Hardcoded Username and Password
 		Username string `yaml:"turn_username"`
 		Password string `yaml:"turn_password"`
-	}
+	} `yaml:"turn"`
 
 	// The internal addresses the components will listen on.
 	// These should not be exposed externally as they expose metrics and debugging APIs.
@@ -204,7 +204,14 @@ type Dendrite struct {
 	Tracing struct {
 		// The config for the jaeger opentracing reporter.
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
-	}
+	} `yaml:"tracing"`
+
+	// Application Services
+	// https://matrix.org/docs/spec/application_service/unstable.html
+	ApplicationServices struct {
+		// Configuration files for various application services
+		ConfigFiles []string `yaml:"config_files"`
+	} `yaml:"application_services"`
 
 	// Any information derived from the configuration options for later use.
 	Derived struct {
@@ -219,7 +226,11 @@ type Dendrite struct {
 			// registration in order to complete registration stages.
 			Params map[string]interface{} `json:"params"`
 		}
-	}
+
+		// Application Services parsed from their config files
+		// The paths of which were given above in the main config file
+		ApplicationServices []ApplicationService
+	} `yaml:"-"`
 }
 
 // A Path on the filesystem.
@@ -323,7 +334,8 @@ func loadConfig(
 
 	for _, certPath := range config.Matrix.FederationCertificatePaths {
 		absCertPath := absPath(basePath, certPath)
-		pemData, err := readFile(absCertPath)
+		var pemData []byte
+		pemData, err = readFile(absCertPath)
 		if err != nil {
 			return nil, err
 		}
@@ -337,14 +349,17 @@ func loadConfig(
 	config.Media.AbsBasePath = Path(absPath(basePath, config.Media.BasePath))
 
 	// Generate data from config options
-	config.derive()
+	err = config.derive()
+	if err != nil {
+		return nil, err
+	}
 
 	return &config, nil
 }
 
 // derive generates data that is derived from various values provided in
 // the config file.
-func (config *Dendrite) derive() {
+func (config *Dendrite) derive() error {
 	// Determine registrations flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
@@ -360,6 +375,13 @@ func (config *Dendrite) derive() {
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
 	}
+
+	// Load application service configuration files
+	if err := loadAppservices(config); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // setDefaults sets default config values if they are not explicitly set.
