@@ -33,15 +33,15 @@ func (f utcFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return f.Formatter.Format(entry)
 }
 
-// Wrapper hook which allows to filter entries according to their level.
-// Dendrite supports multiples levels of logging at the same time, hence it is not
-// possible to just use logrus.SetLevel to control that.
+// Logrus hook which wraps another hook and filters log entries according to their level.
+// (Note that we cannot use solely logrus.SetLevel, because Dendrite supports multiple
+// levels of logging at the same time.)
 type logLevelHook struct {
 	level logrus.Level
 	logrus.Hook
 }
 
-// All the levels supported by this hook.
+// Levels returns all the levels supported by this hook.
 func (h *logLevelHook) Levels() []logrus.Level {
 	levels := make([]logrus.Level, 0)
 
@@ -70,14 +70,27 @@ func SetupStdLogging() {
 // SetupHookLogging configures the logging hooks defined in the configuration.
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
-func SetupHookLogging(hooks []config.Hook, componentName string) {
+func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 	for _, hook := range hooks {
+
+		// Ensures we received a proper logging level
+		level, err := logrus.ParseLevel(hook.Level)
+		if err != nil {
+			logrus.Fatalf("Unrecognized logging level %s: %q", hook.Level, err)
+		}
+
+		// Perform a first filter on the logs according to the lowest level of all
+		// (Ex: If we have hook for info and above, prevent logrus from processing debug logs)
+		if logrus.GetLevel() < level {
+			logrus.SetLevel(level)
+		}
+
 		switch hook.Type {
 		case "file":
 			checkFileHookParams(hook.Params)
-			setupFileHook(hook, componentName)
+			setupFileHook(hook, level, componentName)
 		default:
-			logrus.Fatalf("Unrecognized hook type: %s", hook.Type)
+			logrus.Fatalf("Unrecognized logging hook type: %s", hook.Type)
 		}
 	}
 }
@@ -95,7 +108,7 @@ func checkFileHookParams(params map[string]interface{}) {
 }
 
 // Add a new FSHook to the logger. Each component will log in its own file
-func setupFileHook(hook config.Hook, componentName string) {
+func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName string) {
 	dirPath := (hook.Params["path"]).(string)
 	fullPath := filepath.Join(dirPath, componentName+".log")
 
@@ -104,7 +117,7 @@ func setupFileHook(hook config.Hook, componentName string) {
 	}
 
 	logrus.AddHook(&logLevelHook{
-		hook.Level,
+		level,
 		dugong.NewFSHook(
 			fullPath,
 			&utcFormatter{

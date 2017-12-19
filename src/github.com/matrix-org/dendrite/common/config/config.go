@@ -207,7 +207,7 @@ type Dendrite struct {
 	}
 
 	// The config for logging informations. Each hook will be added to logrus.
-	Logging []Hook `yaml:"logging"`
+	Logging []LogrusHook `yaml:"logging"`
 
 	// Any information derived from the configuration options for later use.
 	Derived struct {
@@ -252,50 +252,18 @@ type ThumbnailSize struct {
 	ResizeMethod string `yaml:"method,omitempty"`
 }
 
-// Hook represents a single logrus hook. At this point, only parsing and
+// LogrusHook represents a single logrus hook. At this point, only parsing and
 // verification of the proper values for type and level are done.
 // Validity/integrity checks on the parameters are done when configuring logrus.
-type Hook struct {
+type LogrusHook struct {
 	// The type of hook, currently only "file" is supported.
-	// Yaml key is "type"
-	Type string
+	Type string `yaml:"type"`
 
 	// The level of the logs to produce. Will output only this level and above.
-	//Yaml key is "level"
-	Level logrus.Level
+	Level string `yaml:"level"`
 
 	// The parameters for this hook.
-	// Yaml key is "params"
-	Params map[string]interface{}
-}
-
-// UnmarshalYAML performs type coercion for a logrus hook. Additionally,
-// it ensures the type is one supported.
-func (hook *Hook) UnmarshalYAML(unmarshaler func(interface{}) error) error {
-	var tmp struct {
-		Type   string                 `yaml:"type"`
-		Level  string                 `yaml:"level"`
-		Params map[string]interface{} `yaml:"params"`
-	}
-
-	if err := unmarshaler(&tmp); err != nil {
-		return err
-	}
-
-	if tmp.Type != "file" {
-		return fmt.Errorf("Unknown value for %q: %s, want one of [file]", "logging.type", tmp.Type)
-	}
-
-	level, err := logrus.ParseLevel(tmp.Level)
-	if err != nil {
-		return fmt.Errorf("Unknown value for %q: %s, want one of [debug,info,warn,error,fatal,panic]", "logging.level", tmp.Level)
-	}
-
-	hook.Type = tmp.Type
-	hook.Level = level
-	hook.Params = tmp.Params
-
-	return nil
+	Params map[string]interface{} `yaml:"params"`
 }
 
 // Load a yaml config file for a server run as multiple processes.
@@ -444,6 +412,7 @@ func (e Error) Error() string {
 
 // check returns an error type containing all errors found within the config
 // file.
+// nolint: gocyclo
 func (config *Dendrite) check(monolithic bool) error {
 	var problems []string
 
@@ -519,6 +488,11 @@ func (config *Dendrite) check(monolithic bool) error {
 		checkNotEmpty("listen.federation_api", string(config.Listen.FederationAPI))
 		checkNotEmpty("listen.sync_api", string(config.Listen.SyncAPI))
 		checkNotEmpty("listen.room_server", string(config.Listen.RoomServer))
+	}
+
+	for _, logrusHook := range config.Logging {
+		checkNotEmpty("logging.type", string(logrusHook.Type))
+		checkNotEmpty("logging.level", string(logrusHook.Level))
 	}
 
 	if problems != nil {
