@@ -206,14 +206,8 @@ type Dendrite struct {
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	}
 
-	// The config for logging informations
-	Logging struct {
-		// The path to the log file
-		FPath Path `yaml:"path"`
-
-		// The logging level
-		Level string `yaml:"level"`
-	} `yaml:"logging"`
+	// The config for logging informations. Each hook will be added to logrus.
+	Logging []Hook `yaml:"logging"`
 
 	// Any information derived from the configuration options for later use.
 	Derived struct {
@@ -228,9 +222,6 @@ type Dendrite struct {
 			// registration in order to complete registration stages.
 			Params map[string]interface{} `json:"params"`
 		}
-
-		// The logrus level used for logging configuration
-		LogLevel logrus.Level
 	}
 }
 
@@ -259,6 +250,52 @@ type ThumbnailSize struct {
 	// crop scales to fill the requested dimensions and crops the excess.
 	// scale scales to fit the requested dimensions and one dimension may be smaller than requested.
 	ResizeMethod string `yaml:"method,omitempty"`
+}
+
+// Hook represents a single logrus hook. At this point, only parsing and
+// verification of the proper values for type and level are done.
+// Validity/integrity checks on the parameters are done when configuring logrus.
+type Hook struct {
+	// The type of hook, currently only "file" is supported.
+	// Yaml key is "type"
+	Type string
+
+	// The level of the logs to produce. Will output only this level and above.
+	//Yaml key is "level"
+	Level logrus.Level
+
+	// The parameters for this hook.
+	// Yaml key is "params"
+	Params map[string]interface{}
+}
+
+// UnmarshalYAML performs type coercion for a logrus hook. Additionally,
+// it ensures the type is one supported.
+func (hook *Hook) UnmarshalYAML(unmarshaler func(interface{}) error) error {
+	var tmp struct {
+		Type   string                 `yaml:"type"`
+		Level  string                 `yaml:"level"`
+		Params map[string]interface{} `yaml:"params"`
+	}
+
+	if err := unmarshaler(&tmp); err != nil {
+		return err
+	}
+
+	if tmp.Type != "file" {
+		return fmt.Errorf("Unknown value for %q: %s, want one of [file]", "logging.type", tmp.Type)
+	}
+
+	level, err := logrus.ParseLevel(tmp.Level)
+	if err != nil {
+		return fmt.Errorf("Unknown value for %q: %s, want one of [debug,info,warn,error,fatal,panic]", "logging.level", tmp.Level)
+	}
+
+	hook.Type = tmp.Type
+	hook.Level = level
+	hook.Params = tmp.Params
+
+	return nil
 }
 
 // Load a yaml config file for a server run as multiple processes.
@@ -482,12 +519,6 @@ func (config *Dendrite) check(monolithic bool) error {
 		checkNotEmpty("listen.federation_api", string(config.Listen.FederationAPI))
 		checkNotEmpty("listen.sync_api", string(config.Listen.SyncAPI))
 		checkNotEmpty("listen.room_server", string(config.Listen.RoomServer))
-	}
-
-	if level, err := logrus.ParseLevel(config.Logging.Level); err != nil {
-		problems = append(problems, fmt.Sprintf("Invalid value for key logging.level: %s", config.Logging.Level))
-	} else {
-		config.Derived.LogLevel = level
 	}
 
 	if problems != nil {

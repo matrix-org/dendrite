@@ -121,9 +121,19 @@ tracing:
     jaeger:
         disabled: true
 
-# The configuration for logs of dendrite
+# The configuration for dendrite logs
 logging:
-    # The logging level, must be one of debug, info, warn, error, fatal, panic.
-    level: "info"
-    # The file on which save logs. If commented, logs won't be saved by dendrite and only printed to stdout
-    # path: /var/log/dendrite.log
+    # The logging type, only "file" is supported at the moment
+    - type: "file"
+      # The logging level, must be one of debug, info, warn, error, fatal, panic.
+      level: "info"
+      # Parameters for this type of log
+      params:
+        # File logging must be given a path to a directory. Each component will write to a different file. Logs are rotated each day and gzipped
+        path: "/var/log/dendrite"
+    # It is possible to have multiple logging hooks at the same time.
+    # To save only errors in a different directory, uncomment the following.
+    # - type: "file"
+    #   level: "error"
+    #   params:
+    #     path: "/var/log/dendrite/errors"
