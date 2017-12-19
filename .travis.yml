@@ -19,6 +19,10 @@ addons:
 services:
   - postgresql
 
+cache:
+  directories:
+    - .downloads
+
 install:
  - go get github.com/constabulary/gb/...
 
