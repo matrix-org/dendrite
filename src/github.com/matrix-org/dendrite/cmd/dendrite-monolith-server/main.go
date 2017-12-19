@@ -61,6 +61,8 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
+const componentName = "monolith"
+
 var (
 	configPath    = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
@@ -82,7 +84,7 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	common.SetupFileLogging(string(cfg.Logging.FPath), cfg.Derived.LogLevel)
+	common.SetupHookLogging(cfg.Logging, componentName)
 
 	closer, err := cfg.SetupTracing("DendriteMonolith")
 	if err != nil {

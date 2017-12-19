@@ -35,6 +35,8 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
+const componentName = "syncapi"
+
 var configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 
 func main() {
@@ -50,7 +52,7 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	common.SetupFileLogging(string(cfg.Logging.FPath), cfg.Derived.LogLevel)
+	common.SetupHookLogging(cfg.Logging, componentName)
 
 	closer, err := cfg.SetupTracing("DendriteSyncAPI")
 	if err != nil {

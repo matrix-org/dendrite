@@ -17,7 +17,9 @@ package common
 import (
 	"os"
 	"path"
+	"path/filepath"
 
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dugong"
 	"github.com/sirupsen/logrus"
 )
@@ -29,6 +31,27 @@ type utcFormatter struct {
 func (f utcFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	entry.Time = entry.Time.UTC()
 	return f.Formatter.Format(entry)
+}
+
+// Wrapper hook which allows to filter entries according to their level.
+// Dendrite supports multiples levels of logging at the same time, hence it is not
+// possible to just use logrus.SetLevel to control that.
+type logLevelHook struct {
+	level logrus.Level
+	logrus.Hook
+}
+
+// All the levels supported by this hook.
+func (h *logLevelHook) Levels() []logrus.Level {
+	levels := make([]logrus.Level, 0)
+
+	for _, level := range logrus.AllLevels {
+		if level <= h.level {
+			levels = append(levels, level)
+		}
+	}
+
+	return levels
 }
 
 // SetupStdLogging configures the logging format to standard output. Typically, it is called when the config is not yet loaded.
@@ -44,13 +67,46 @@ func SetupStdLogging() {
 	})
 }
 
-// SetupFileLogging configures the logging format to a file.
-func SetupFileLogging(logFile string, logLevel logrus.Level) {
-	logrus.SetLevel(logLevel)
-	if logFile != "" {
-		_ = os.MkdirAll(path.Dir(logFile), os.ModePerm)
-		logrus.AddHook(dugong.NewFSHook(
-			logFile,
+// SetupHookLogging configures the logging hooks defined in the configuration.
+// If something fails here it means that the logging was improperly configured,
+// so we just exit with the error
+func SetupHookLogging(hooks []config.Hook, componentName string) {
+	for _, hook := range hooks {
+		switch hook.Type {
+		case "file":
+			checkFileHookParams(hook.Params)
+			setupFileHook(hook, componentName)
+		default:
+			logrus.Fatalf("Unrecognized hook type: %s", hook.Type)
+		}
+	}
+}
+
+// File type hooks should be provided a path to a directory to store log files
+func checkFileHookParams(params map[string]interface{}) {
+	path, ok := params["path"]
+	if !ok {
+		logrus.Fatalf("Expecting a parameter \"path\" for logging hook of type \"file\"")
+	}
+
+	if _, ok := path.(string); !ok {
+		logrus.Fatalf("Parameter \"path\" for logging hook of type \"file\" should be a string")
+	}
+}
+
+// Add a new FSHook to the logger. Each component will log in its own file
+func setupFileHook(hook config.Hook, componentName string) {
+	dirPath := (hook.Params["path"]).(string)
+	fullPath := filepath.Join(dirPath, componentName+".log")
+
+	if err := os.MkdirAll(path.Dir(fullPath), os.ModePerm); err != nil {
+		logrus.Fatalf("Couldn't create directory %s: %q", path.Dir(fullPath), err)
+	}
+
+	logrus.AddHook(&logLevelHook{
+		hook.Level,
+		dugong.NewFSHook(
+			fullPath,
 			&utcFormatter{
 				&logrus.TextFormatter{
 					TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
@@ -60,6 +116,6 @@ func SetupFileLogging(logFile string, logLevel logrus.Level) {
 				},
 			},
 			&dugong.DailyRotationSchedule{GZip: true},
-		))
-	}
+		),
+	})
 }

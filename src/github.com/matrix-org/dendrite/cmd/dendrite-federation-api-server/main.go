@@ -31,6 +31,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const componentName = "federationapi"
+
 var (
 	configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 )
@@ -48,7 +50,7 @@ func main() {
 		log.Fatalf("Invalid config file: %s", err)
 	}
 
-	common.SetupFileLogging(string(cfg.Logging.FPath), cfg.Derived.LogLevel)
+	common.SetupHookLogging(cfg.Logging, componentName)
 
 	closer, err := cfg.SetupTracing("DendriteFederationAPI")
 	if err != nil {
