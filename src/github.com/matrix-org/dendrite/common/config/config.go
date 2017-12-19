@@ -186,7 +186,7 @@ type Dendrite struct {
 		// Hardcoded Username and Password
 		Username string `yaml:"turn_username"`
 		Password string `yaml:"turn_password"`
-	}
+	} `yaml:"turn"`
 
 	// The internal addresses the components will listen on.
 	// These should not be exposed externally as they expose metrics and debugging APIs.
@@ -204,14 +204,14 @@ type Dendrite struct {
 	Tracing struct {
 		// The config for the jaeger opentracing reporter.
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
-	}
+	} `yaml:"tracing"`
 
 	// Application Services
 	// https://matrix.org/docs/spec/application_service/unstable.html
 	ApplicationService struct {
 		// Configuration files for various application services
 		ConfigFiles []string `yaml:"app_service_config_files"`
-	}
+	} `yaml:"applicationservice"`
 
 	// Any information derived from the configuration options for later use.
 	Derived struct {
@@ -230,7 +230,7 @@ type Dendrite struct {
 		// Application Services parsed from their config files
 		// The paths of which were given above in the main config file
 		ApplicationServices []ApplicationService
-	}
+	} `yaml:"-"`
 }
 
 // A Path on the filesystem.
@@ -377,10 +377,8 @@ func (config *Dendrite) derive() error {
 	}
 
 	// Load application service configuration files
-	if len(config.ApplicationService.ConfigFiles) > 0 {
-		if err := loadAppservices(config); err != nil {
-			return err
-		}
+	if err := loadAppservices(config); err != nil {
+		return err
 	}
 
 	return nil
