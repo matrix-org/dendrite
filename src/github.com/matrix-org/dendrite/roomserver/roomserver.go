@@ -17,6 +17,8 @@ package roomserver
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
+
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/alias"
 	"github.com/matrix-org/dendrite/roomserver/input"
@@ -25,24 +27,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SetupRoomServerComponent sets up and registers HTTP handlers for the RoomServer
-// component.
+// SetupRoomServerComponent sets up and registers HTTP handlers for the
+// RoomServer component. Returns instances of the various roomserver APIs,
+// allowing other components running in the same process to hit the query the
+// APIs directly instead of having to use HTTP.
 func SetupRoomServerComponent(
 	base *basecomponent.BaseDendrite,
-) {
+) (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
 	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	SetupRoomServerComponentWithDB(base, roomserverDB)
-}
-
-// SetupRoomServerComponentWithDB sets up and registers HTTP handlers for the RoomServer
-// component, reusing the given room server database instance.
-func SetupRoomServerComponentWithDB(
-	base *basecomponent.BaseDendrite, roomserverDB *storage.Database,
-) {
 	inputAPI := input.RoomserverInputAPI{
 		DB:                   roomserverDB,
 		Producer:             base.KafkaProducer,
@@ -63,4 +59,6 @@ func SetupRoomServerComponentWithDB(
 	}
 
 	aliasAPI.SetupHTTP(http.DefaultServeMux)
+
+	return &aliasAPI, &inputAPI, &queryAPI
 }

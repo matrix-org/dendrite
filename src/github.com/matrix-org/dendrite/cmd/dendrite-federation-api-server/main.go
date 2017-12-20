@@ -21,7 +21,8 @@ import (
 )
 
 func main() {
-	base := basecomponent.NewBaseDendrite("FederationAPI")
+	cfg := basecomponent.ParseFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -29,8 +30,11 @@ func main() {
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
+	alias, input, query := base.CreateHTTPRoomserverAPIs()
+
 	federationapi.SetupFederationAPIComponent(
 		base, accountDB, federation, &keyRing,
+		alias, input, query,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationAPI))

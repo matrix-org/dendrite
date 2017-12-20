@@ -22,7 +22,8 @@ import (
 )
 
 func main() {
-	base := basecomponent.NewBaseDendrite("RoomServerAPI")
+	cfg := basecomponent.ParseFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "RoomServerAPI")
 	defer base.Close() // nolint: errcheck
 
 	roomserver.SetupRoomServerComponent(base)

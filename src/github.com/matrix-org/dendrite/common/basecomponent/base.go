@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2017 New Vector Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package basecomponent
 
 import (
 	"database/sql"
-	"flag"
 	"io"
 	"net/http"
 	"os"
@@ -29,11 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
 
-	roomserver_alias "github.com/matrix-org/dendrite/roomserver/alias"
-	roomserver_input "github.com/matrix-org/dendrite/roomserver/input"
-	roomserver_query "github.com/matrix-org/dendrite/roomserver/query"
-	roomserver_storage "github.com/matrix-org/dendrite/roomserver/storage"
-
 	"github.com/gorilla/mux"
 	sarama "gopkg.in/Shopify/sarama.v1"
 
@@ -41,8 +35,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/sirupsen/logrus"
 )
-
-var configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 
 // BaseDendrite is a base for creating new instances of dendrite. It parses
 // command line flags and config, and exposes methods for creating various
@@ -52,10 +44,6 @@ var configPath = flag.String("config", "dendrite.yaml", "The path to the config 
 type BaseDendrite struct {
 	componentName string
 	tracerCloser  io.Closer
-	queryAPI      api.RoomserverQueryAPI
-	inputAPI      api.RoomserverInputAPI
-	aliasAPI      api.RoomserverAliasAPI
-	monolith      bool
 
 	// APIMux should be used to register new public matrix api endpoints
 	APIMux        *mux.Router
@@ -64,59 +52,11 @@ type BaseDendrite struct {
 	KafkaProducer sarama.SyncProducer
 }
 
-// NewBaseDendrite creates a new instance to be used by a component. If running
-// as a monolith then `NewBaseDendriteMonolith` should be used.
+// NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
-func NewBaseDendrite(componentName string) *BaseDendrite {
-	base := newBaseDendrite(componentName, false)
-
-	// We're not a monolith so we can only use the HTTP versions
-	base.useHTTPRoomserverAPIs()
-
-	return base
-}
-
-// NewBaseDendriteMonolith is the same NewBaseDendrite, but indicates that all
-// components will be in the same process. Allows using naffka and in-process
-// roomserver APIs.
-//
-// It also connects to the room server databsae so that the monolith can use
-// in-process versions of QueryAPI and co.
-func NewBaseDendriteMonolith(componentName string) (*BaseDendrite, *roomserver_storage.Database) {
-	base := newBaseDendrite(componentName, true)
-
-	roomserverDB, err := roomserver_storage.Open(string(base.Cfg.Database.RoomServer))
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to room server db")
-	}
-
-	base.useInProcessRoomserverAPIs(roomserverDB)
-
-	return base, roomserverDB
-}
-
-// newBaseDendrite does the bulk of the work of NewBaseDendrite*, except setting
-// up the roomserver APIs, which must be done by the callers.
-func newBaseDendrite(componentName string, monolith bool) *BaseDendrite {
+func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 	common.SetupLogging(os.Getenv("LOG_DIR"))
-
-	flag.Parse()
-
-	if *configPath == "" {
-		logrus.Fatal("--config must be supplied")
-	}
-
-	var cfg *config.Dendrite
-	var err error
-	if monolith {
-		cfg, err = config.LoadMonolithic(*configPath)
-	} else {
-		cfg, err = config.Load(*configPath)
-	}
-	if err != nil {
-		logrus.Fatalf("Invalid config file: %s", err)
-	}
 
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
@@ -132,7 +72,6 @@ func newBaseDendrite(componentName string, monolith bool) *BaseDendrite {
 		APIMux:        mux.NewRouter(),
 		KafkaConsumer: kafkaConsumer,
 		KafkaProducer: kafkaProducer,
-		monolith:      monolith,
 	}
 }
 
@@ -141,65 +80,13 @@ func (b *BaseDendrite) Close() error {
 	return b.tracerCloser.Close()
 }
 
-// useInProcessRoomserverAPIs sets up the AliasAPI, InputAPI and QueryAPI to hit
-// the functions directly, rather than going through an RPC mechanism. Can only
-// be used in a monolith set up.
-func (b *BaseDendrite) useInProcessRoomserverAPIs(roomserverDB *roomserver_storage.Database) {
-	if !b.monolith {
-		logrus.Panic("Can only use in-process roomserver APIs if running as a monolith")
-	}
-
-	b.inputAPI = &roomserver_input.RoomserverInputAPI{
-		DB:                   roomserverDB,
-		Producer:             b.KafkaProducer,
-		OutputRoomEventTopic: string(b.Cfg.Kafka.Topics.OutputRoomEvent),
-	}
-
-	b.queryAPI = &roomserver_query.RoomserverQueryAPI{
-		DB: roomserverDB,
-	}
-
-	b.aliasAPI = &roomserver_alias.RoomserverAliasAPI{
-		DB:       roomserverDB,
-		Cfg:      b.Cfg,
-		InputAPI: b.inputAPI,
-		QueryAPI: b.queryAPI,
-	}
-}
-
-// useHTTPRoomserverAPIs sets up the AliasAPI, InputAPI and QueryAPI to hit the
-// roomserver over HTTP.
-func (b *BaseDendrite) useHTTPRoomserverAPIs() {
-	b.queryAPI = api.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
-	b.inputAPI = api.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), nil)
-	b.aliasAPI = api.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), nil)
-}
-
-// QueryAPI gets an implementation of RoomserverQueryAPI
-func (b *BaseDendrite) QueryAPI() api.RoomserverQueryAPI {
-	if b.queryAPI == nil {
-		logrus.Panic("RoomserverAPIs not created")
-	}
-
-	return b.queryAPI
-}
-
-// AliasAPI gets an implementation of RoomserverAliasAPI
-func (b *BaseDendrite) AliasAPI() api.RoomserverAliasAPI {
-	if b.aliasAPI == nil {
-		logrus.Panic("RoomserverAPIs not created")
-	}
-
-	return b.aliasAPI
-}
-
-// InputAPI gets an implementation of RoomserverInputAPI
-func (b *BaseDendrite) InputAPI() api.RoomserverInputAPI {
-	if b.inputAPI == nil {
-		logrus.Panic("RoomserverAPIs not created")
-	}
-
-	return b.inputAPI
+// CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI to hit
+// the roomserver over HTTP.
+func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
+	alias := api.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), nil)
+	input := api.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), nil)
+	query := api.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
+	return alias, input, query
 }
 
 // CreateDeviceDB creates a new instance of the device database. Should only be

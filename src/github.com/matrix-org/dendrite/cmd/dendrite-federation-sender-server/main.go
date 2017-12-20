@@ -20,13 +20,16 @@ import (
 )
 
 func main() {
-	base := basecomponent.NewBaseDendrite("FederationSender")
+	cfg := basecomponent.ParseFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "FederationSender")
 	defer base.Close() // nolint: errcheck
 
 	federation := base.CreateFederationClient()
 
+	_, _, query := base.CreateHTTPRoomserverAPIs()
+
 	federationsender.SetupFederationSenderComponent(
-		base, federation,
+		base, federation, query,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationSender))

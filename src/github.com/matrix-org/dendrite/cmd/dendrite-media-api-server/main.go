@@ -20,7 +20,8 @@ import (
 )
 
 func main() {
-	base := basecomponent.NewBaseDendrite("MediaAPI")
+	cfg := basecomponent.ParseFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "MediaAPI")
 	defer base.Close() // nolint: errcheck
 
 	deviceDB := base.CreateDeviceDB()

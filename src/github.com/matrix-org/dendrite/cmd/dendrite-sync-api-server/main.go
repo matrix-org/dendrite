@@ -20,13 +20,16 @@ import (
 )
 
 func main() {
-	base := basecomponent.NewBaseDendrite("SyncAPI")
+	cfg := basecomponent.ParseFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "SyncAPI")
 	defer base.Close() // nolint: errcheck
 
 	deviceDB := base.CreateDeviceDB()
 	accountDB := base.CreateAccountsDB()
 
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB)
+	_, _, query := base.CreateHTTPRoomserverAPIs()
+
+	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.SyncAPI))
 }

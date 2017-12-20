@@ -40,7 +40,8 @@ var (
 )
 
 func main() {
-	base, roomserverDB := basecomponent.NewBaseDendriteMonolith("Monolith")
+	cfg := basecomponent.ParseMonolithFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -49,13 +50,14 @@ func main() {
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
-	clientapi.SetupClientAPIComponent(base, deviceDB, accountDB, federation, &keyRing)
-	federationapi.SetupFederationAPIComponent(base, accountDB, federation, &keyRing)
-	federationsender.SetupFederationSenderComponent(base, federation)
+	alias, input, query := roomserver.SetupRoomServerComponent(base)
+
+	clientapi.SetupClientAPIComponent(base, deviceDB, accountDB, federation, &keyRing, alias, input, query)
+	federationapi.SetupFederationAPIComponent(base, accountDB, federation, &keyRing, alias, input, query)
+	federationsender.SetupFederationSenderComponent(base, federation, query)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
-	roomserver.SetupRoomServerComponentWithDB(base, roomserverDB)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB)
+	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 

@@ -19,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -28,6 +29,7 @@ import (
 func SetupFederationSenderComponent(
 	base *basecomponent.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
+	queryAPI api.RoomserverQueryAPI,
 ) {
 	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
 	if err != nil {
@@ -38,7 +40,7 @@ func SetupFederationSenderComponent(
 
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,
-		federationSenderDB, base.QueryAPI(),
+		federationSenderDB, queryAPI,
 	)
 	if err = consumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
