@@ -121,6 +121,10 @@ tracing:
     jaeger:
         disabled: true
 
+# A list of application service config files to use
+application_services:
+    config_files: []
+
 # The configuration for dendrite logs
 logging:
     # The logging type, only "file" is supported at the moment

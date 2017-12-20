@@ -463,6 +463,11 @@ func completeRegistration(
 			Code: 500,
 			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
 		}
+	} else if acc == nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+		}
 	}
 
 	token, err := auth.GenerateAccessToken()

@@ -103,6 +103,12 @@ func InvalidUsername(msg string) *MatrixError {
 	return &MatrixError{"M_INVALID_USERNAME", msg}
 }
 
+// UserInUse is an error returned when the client tries to register an
+// username that already exists
+func UserInUse(msg string) *MatrixError {
+	return &MatrixError{"M_USER_IN_USE", msg}
+}
+
 // GuestAccessForbidden is an error which is returned when the client is
 // forbidden from accessing a resource as a guest.
 func GuestAccessForbidden(msg string) *MatrixError {

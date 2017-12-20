@@ -118,7 +118,8 @@ func (d *Database) SetDisplayName(
 }
 
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
-// for this account. If no password is supplied, the account will be a passwordless account.
+// for this account. If no password is supplied, the account will be a passwordless account. If the
+// account already exists, it will return nil, nil.
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword string,
 ) (*authtypes.Account, error) {
@@ -127,6 +128,9 @@ func (d *Database) CreateAccount(
 		return nil, err
 	}
 	if err := d.profiles.insertProfile(ctx, localpart); err != nil {
+		if common.IsUniqueConstraintViolationErr(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return d.accounts.insertAccount(ctx, localpart, hash)
