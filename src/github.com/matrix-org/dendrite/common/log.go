@@ -73,14 +73,14 @@ func SetupStdLogging() {
 func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 	for _, hook := range hooks {
 
-		// Ensures we received a proper logging level
+		// Check we received a proper logging level
 		level, err := logrus.ParseLevel(hook.Level)
 		if err != nil {
 			logrus.Fatalf("Unrecognized logging level %s: %q", hook.Level, err)
 		}
 
 		// Perform a first filter on the logs according to the lowest level of all
-		// (Ex: If we have hook for info and above, prevent logrus from processing debug logs)
+		// (Eg: If we have hook for info and above, prevent logrus from processing debug logs)
 		if logrus.GetLevel() < level {
 			logrus.SetLevel(level)
 		}
