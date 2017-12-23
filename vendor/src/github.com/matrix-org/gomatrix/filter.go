@@ -14,6 +14,8 @@
 
 package gomatrix
 
+import "errors"
+
 //Filter is used by clients to specify how the server should filter responses to e.g. sync requests
 //Specified by: https://matrix.org/docs/spec/client_server/r0.2.0.html#filtering
 type Filter struct {
@@ -40,4 +42,11 @@ type FilterPart struct {
 	NotTypes   []string `json:"not_types,omitempty"`
 	Senders    []string `json:"senders,omitempty"`
 	Types      []string `json:"types,omitempty"`
+}
+
+func (filter *Filter) Validate() error {
+	if filter.EventFormat != "client" && filter.EventFormat != "federation" {
+		return errors.New("Bad event_format value. Must be any of [\"client\", \"federation\"]")
+	}
+	return nil
 }

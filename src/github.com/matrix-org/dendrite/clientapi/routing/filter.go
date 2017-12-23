@@ -49,7 +49,7 @@ func GetFilter(
 		return httputil.LogThenError(req, err)
 	}
 
-	res, err := accountDB.GetFilter(req.Context(), localpart, filterID)
+	filter, err := accountDB.GetFilter(req.Context(), localpart, filterID)
 	if err != nil {
 		//TODO better error handling. This error message is *probably* right,
 		// but if there are obscure db errors, this will also be returned,
@@ -59,15 +59,15 @@ func GetFilter(
 			JSON: jsonerror.NotFound("No such filter"),
 		}
 	}
-	filter := gomatrix.Filter{}
-	err = json.Unmarshal(res, &filter)
+
+	filterJSON, err := json.Marshal(filter)
 	if err != nil {
-		httputil.LogThenError(req, err)
+		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: filter,
+		JSON: filterJSON,
 	}
 }
 
@@ -103,15 +103,14 @@ func PutFilter(
 		return *reqErr
 	}
 
-	filterArray, err := json.Marshal(filter)
-	if err != nil {
+	if err = filter.Validate(); err != nil {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.BadJSON("Filter is malformed"),
+			JSON: jsonerror.BadJSON("Invalid filter: " + err.Error()),
 		}
 	}
 
-	filterID, err := accountDB.PutFilter(req.Context(), localpart, filterArray)
+	filterID, err := accountDB.PutFilter(req.Context(), localpart, &filter)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
