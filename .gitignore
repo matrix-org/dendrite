@@ -34,3 +34,8 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+# Generated keys
+*.pem
+*.key
+*.crt
