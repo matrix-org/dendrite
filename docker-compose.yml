@@ -172,8 +172,10 @@ services:
   postgres:
     container_name: dendrite_postgres
     hostname: postgres
-    build: ./docker/postgres
+    image: postgres:9.5
     restart: always
+    volumes:
+      - ./docker/postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
     environment:
       POSTGRES_PASSWORD: itsasecret
       POSTGRES_USER: dendrite
