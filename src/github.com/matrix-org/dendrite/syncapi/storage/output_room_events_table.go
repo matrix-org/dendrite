@@ -65,7 +65,7 @@ const selectEventsSQL = "" +
 const selectRecentEventsSQL = "" +
 	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id DESC LIMIT $4"
+	" ORDER BY id ASC LIMIT $4"
 
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
@@ -234,9 +234,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	if err != nil {
 		return nil, err
 	}
-	// reverse the order because [0] is the newest event due to the ORDER BY in SQL-land. The reverse order makes [0] the oldest event,
-	// which is correct for /sync responses.
-	return reverseEvents(events), nil
+	return events, nil
 }
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
@@ -286,11 +284,4 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 		})
 	}
 	return result, nil
-}
-
-func reverseEvents(input []streamEvent) (output []streamEvent) {
-	for i := len(input) - 1; i >= 0; i-- {
-		output = append(output, input[i])
-	}
-	return
 }
