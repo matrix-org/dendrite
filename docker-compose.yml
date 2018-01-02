@@ -4,7 +4,7 @@ services:
     container_name: dendrite_monolith
     hostname: monolith
     entrypoint: ["bash", "./docker/services/monolith.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -21,7 +21,7 @@ services:
     container_name: dendrite_client_api_proxy
     hostname: client_api_proxy
     entrypoint: ["bash", "./docker/services/client-api-proxy.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -41,7 +41,7 @@ services:
     container_name: dendrite_client_api
     hostname: client_api
     entrypoint: ["bash", "./docker/services/client-api.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -58,7 +58,7 @@ services:
     container_name: dendrite_media_api
     hostname: media_api
     entrypoint: ["bash", "./docker/services/media-api.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -74,7 +74,7 @@ services:
     container_name: dendrite_public_rooms_api
     hostname: public_rooms_api
     entrypoint: ["bash", "./docker/services/public-rooms-api.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -90,7 +90,7 @@ services:
     container_name: dendrite_sync_api
     hostname: sync_api
     entrypoint: ["bash", "./docker/services/sync-api.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -106,7 +106,7 @@ services:
     container_name: dendrite_room_server
     hostname: room_server
     entrypoint: ["bash", "./docker/services/room-server.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -122,7 +122,7 @@ services:
     container_name: dendrite_federation_api_proxy
     hostname: federation_api_proxy
     entrypoint: ["bash", "./docker/services/federation-api-proxy.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -141,7 +141,7 @@ services:
     container_name: dendrite_federation_api
     hostname: federation_api
     entrypoint: ["bash", "./docker/services/federation-api.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
@@ -157,7 +157,7 @@ services:
     container_name: dendrite_federation_sender
     hostname: federation_sender
     entrypoint: ["bash", "./docker/services/federation-sender.sh"]
-    build: ./
+    build: ./docker
     volumes:
       - type: bind
         source: ./
