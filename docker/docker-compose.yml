@@ -1,0 +1,173 @@
+version: "3.4"
+services:
+  monolith:
+    container_name: dendrite_monolith
+    hostname: monolith
+    entrypoint: ["bash", "./docker/services/monolith.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    networks:
+      - internal
+    depends_on:
+      - postgres
+    ports:
+      - "8008:8008"
+      - "8448:8448"
+
+  client_api_proxy:
+    container_name: dendrite_client_api_proxy
+    hostname: client_api_proxy
+    entrypoint: ["bash", "./docker/services/client-api-proxy.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    networks:
+      - internal
+    depends_on:
+      - postgres
+      - sync_api
+      - client_api
+      - media_api
+      - public_rooms_api
+    ports:
+      - "8008:8008"
+
+  client_api:
+    container_name: dendrite_client_api
+    hostname: client_api
+    entrypoint: ["bash", "./docker/services/client-api.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+      - room_server
+    networks:
+      - internal
+
+  media_api:
+    container_name: dendrite_media_api
+    hostname: media_api
+    entrypoint: ["bash", "./docker/services/media-api.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+    networks:
+      - internal
+
+  public_rooms_api:
+    container_name: dendrite_public_rooms_api
+    hostname: public_rooms_api
+    entrypoint: ["bash", "./docker/services/public-rooms-api.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+    networks:
+      - internal
+
+  sync_api:
+    container_name: dendrite_sync_api
+    hostname: sync_api
+    entrypoint: ["bash", "./docker/services/sync-api.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+    networks:
+      - internal
+
+  room_server:
+    container_name: dendrite_room_server
+    hostname: room_server
+    entrypoint: ["bash", "./docker/services/room-server.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+    networks:
+      - internal
+
+  federation_api_proxy:
+    container_name: dendrite_federation_api_proxy
+    hostname: federation_api_proxy
+    entrypoint: ["bash", "./docker/services/federation-api-proxy.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+      - federation_api
+      - federation_sender
+      - media_api
+    networks:
+      - internal
+    ports:
+      - "8448:8448"
+
+  federation_api:
+    container_name: dendrite_federation_api
+    hostname: federation_api
+    entrypoint: ["bash", "./docker/services/federation-api.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+    networks:
+      - internal
+
+  federation_sender:
+    container_name: dendrite_federation_sender
+    hostname: federation_sender
+    entrypoint: ["bash", "./docker/services/federation-sender.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+    networks:
+      - internal
+
+  postgres:
+    container_name: dendrite_postgres
+    hostname: postgres
+    image: postgres:9.5
+    restart: always
+    volumes:
+      - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
+    environment:
+      POSTGRES_PASSWORD: itsasecret
+      POSTGRES_USER: dendrite
+    networks:
+      - internal
+
+  zookeeper:
+    container_name: dendrite_zk
+    hostname: zookeeper
+    image: zookeeper
+    networks:
+      - internal
+
+  kafka:
+    container_name: dendrite_kafka
+    hostname: kafka
+    image: wurstmeister/kafka
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: "kafka"
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+    depends_on:
+      - zookeeper
+    networks:
+      - internal
+
+networks:
+  internal:
+    attachable: true
