@@ -15,74 +15,22 @@
 package main
 
 import (
-	"flag"
-	"net/http"
-	"os"
-
-	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/federationsender/consumers"
-	"github.com/matrix-org/dendrite/federationsender/queue"
-	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
-
-	log "github.com/sirupsen/logrus"
-	sarama "gopkg.in/Shopify/sarama.v1"
+	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/federationsender"
 )
 
-var configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
-
 func main() {
-	common.SetupLogging(os.Getenv("LOG_DIR"))
+	cfg := basecomponent.ParseFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "FederationSender")
+	defer base.Close() // nolint: errcheck
 
-	flag.Parse()
+	federation := base.CreateFederationClient()
 
-	if *configPath == "" {
-		log.Fatal("--config must be supplied")
-	}
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		log.Fatalf("Invalid config file: %s", err)
-	}
+	_, _, query := base.CreateHTTPRoomserverAPIs()
 
-	closer, err := cfg.SetupTracing("DendriteFederationSender")
-	if err != nil {
-		log.WithError(err).Fatalf("Failed to start tracer")
-	}
-	defer closer.Close() // nolint: errcheck
-
-	kafkaConsumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
-	if err != nil {
-		log.WithFields(log.Fields{
-			log.ErrorKey: err,
-			"addresses":  cfg.Kafka.Addresses,
-		}).Panic("Failed to setup kafka consumers")
-	}
-
-	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
-
-	db, err := storage.NewDatabase(string(cfg.Database.FederationSender))
-	if err != nil {
-		log.Panicf("startup: failed to create federation sender database with data source %s : %s", cfg.Database.FederationSender, err)
-	}
-
-	federation := gomatrixserverlib.NewFederationClient(
-		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+	federationsender.SetupFederationSenderComponent(
+		base, federation, query,
 	)
 
-	queues := queue.NewOutgoingQueues(cfg.Matrix.ServerName, federation)
-
-	consumer := consumers.NewOutputRoomEventConsumer(cfg, kafkaConsumer, queues, db, queryAPI)
-	if err = consumer.Start(); err != nil {
-		log.WithError(err).Panicf("startup: failed to start room server consumer")
-	}
-
-	api := mux.NewRouter()
-	common.SetupHTTPAPI(http.DefaultServeMux, api)
-
-	if err := http.ListenAndServe(string(cfg.Listen.FederationSender), nil); err != nil {
-		panic(err)
-	}
+	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationSender))
 }
