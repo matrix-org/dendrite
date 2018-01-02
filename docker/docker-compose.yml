@@ -6,9 +6,7 @@ services:
     entrypoint: ["bash", "./docker/services/monolith.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     networks:
       - internal
     depends_on:
@@ -23,9 +21,7 @@ services:
     entrypoint: ["bash", "./docker/services/client-api-proxy.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     networks:
       - internal
     depends_on:
@@ -43,16 +39,12 @@ services:
     entrypoint: ["bash", "./docker/services/client-api.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - postgres
       - room_server
     networks:
       - internal
-    ports:
-      - 7771
 
   media_api:
     container_name: dendrite_media_api
@@ -60,15 +52,11 @@ services:
     entrypoint: ["bash", "./docker/services/media-api.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - postgres
     networks:
       - internal
-    ports:
-      - 7774
 
   public_rooms_api:
     container_name: dendrite_public_rooms_api
@@ -76,15 +64,11 @@ services:
     entrypoint: ["bash", "./docker/services/public-rooms-api.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - postgres
     networks:
       - internal
-    ports:
-      - 7775
 
   sync_api:
     container_name: dendrite_sync_api
@@ -92,15 +76,11 @@ services:
     entrypoint: ["bash", "./docker/services/sync-api.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - postgres
     networks:
       - internal
-    ports:
-      - 7773
 
   room_server:
     container_name: dendrite_room_server
@@ -108,15 +88,11 @@ services:
     entrypoint: ["bash", "./docker/services/room-server.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - postgres
     networks:
       - internal
-    ports:
-      - 7770
 
   federation_api_proxy:
     container_name: dendrite_federation_api_proxy
@@ -124,9 +100,7 @@ services:
     entrypoint: ["bash", "./docker/services/federation-api-proxy.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - postgres
       - federation_api
@@ -143,15 +117,11 @@ services:
     entrypoint: ["bash", "./docker/services/federation-api.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - postgres
     networks:
       - internal
-    ports:
-      - 7772
 
   federation_sender:
     container_name: dendrite_federation_sender
@@ -159,15 +129,11 @@ services:
     entrypoint: ["bash", "./docker/services/federation-sender.sh"]
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - postgres
     networks:
       - internal
-    ports:
-      - 7776
 
   postgres:
     container_name: dendrite_postgres
@@ -179,8 +145,6 @@ services:
     environment:
       POSTGRES_PASSWORD: itsasecret
       POSTGRES_USER: dendrite
-    ports:
-      - 5432
     networks:
       - internal
 
@@ -188,8 +152,6 @@ services:
     container_name: dendrite_zk
     hostname: zookeeper
     image: zookeeper
-    ports:
-      - 2181
     networks:
       - internal
 
@@ -203,8 +165,6 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
     depends_on:
       - zookeeper
-    ports:
-      - 9092
     networks:
       - internal
 

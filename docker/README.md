@@ -92,14 +92,9 @@ For more information refer to the official docker-compose [documentation](https:
     # Use the common Dockerfile for all the dendrite components.
     build: ./
     volumes:
-      - type: bind
-        source: ../
-        target: /build
+      - ..:/build
     depends_on:
       - another_component
     networks:
       - internal
-    # Define which ports to expose to the internal network.
-    ports:
-      - 1234
 ```
