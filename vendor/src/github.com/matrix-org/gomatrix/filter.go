@@ -74,7 +74,7 @@ func defaultFilterPart() FilterPart {
 	return FilterPart{
 		NotRooms:   nil,
 		Rooms:      nil,
-		Limit:      100, //TODO check this on synapse
+		Limit:      20,
 		NotSenders: nil,
 		NotTypes:   nil,
 		Senders:    nil,

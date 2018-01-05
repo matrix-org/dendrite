@@ -31,7 +31,6 @@ import (
 )
 
 const defaultSyncTimeout = time.Duration(30) * time.Second
-const defaultTimelineLimit = 20
 
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {

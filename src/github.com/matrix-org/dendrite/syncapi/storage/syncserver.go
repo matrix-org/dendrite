@@ -245,9 +245,11 @@ func (d *SyncServerDatabase) IncrementalSync(
 
 	res := types.NewResponse(toPos)
 	for _, delta := range deltas {
-		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, filter, res)
-		if err != nil {
-			return nil, err
+		if !isRoomFiltered(delta.roomID, filter, &filter.Room.Timeline) {
+			err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, filter, res)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -295,7 +297,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		jr := types.NewJoinResponse()
 
 		//Join response should contain events only if room isn't filtered
-		if !isRoomFiltered(filter, roomID) {
+		if !isRoomFiltered(roomID, filter, &filter.Room.Timeline) {
 			// Timeline events
 			var recentStreamEvents []streamEvent
 			var limited bool
