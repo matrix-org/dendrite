@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrix"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -224,7 +225,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 	ctx context.Context,
 	device authtypes.Device,
 	fromPos, toPos types.StreamPosition,
-	numRecentEventsPerRoom int,
+	filter *gomatrix.Filter,
 ) (*types.Response, error) {
 	txn, err := d.db.BeginTx(ctx, &txReadOnlySnapshot)
 	if err != nil {
@@ -244,7 +245,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 
 	res := types.NewResponse(toPos)
 	for _, delta := range deltas {
-		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
+		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, filter, res)
 		if err != nil {
 			return nil, err
 		}
@@ -261,7 +262,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 
 // CompleteSync a complete /sync API response for the given user.
 func (d *SyncServerDatabase) CompleteSync(
-	ctx context.Context, userID string, numRecentEventsPerRoom int,
+	ctx context.Context, userID string, filter *gomatrix.Filter,
 ) (*types.Response, error) {
 	// This needs to be all done in a transaction as we need to do multiple SELECTs, and we need to have
 	// a consistent view of the database throughout. This includes extracting the sync stream position.
@@ -275,7 +276,8 @@ func (d *SyncServerDatabase) CompleteSync(
 	defer common.EndTransaction(txn, &succeeded)
 
 	// Get the current stream position which we will base the sync response on.
-	pos, err := d.syncStreamPositionTx(ctx, txn)
+	posFrom := types.StreamPosition(0)
+	posTo, err := d.syncStreamPositionTx(ctx, txn)
 	if err != nil {
 		return nil, err
 	}
@@ -287,38 +289,52 @@ func (d *SyncServerDatabase) CompleteSync(
 	}
 
 	// Build up a /sync response. Add joined rooms.
-	res := types.NewResponse(pos)
+	res := types.NewResponse(posTo)
 	for _, roomID := range roomIDs {
-		var stateEvents []gomatrixserverlib.Event
-		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
-		if err != nil {
-			return nil, err
-		}
-		// TODO: When filters are added, we may need to call this multiple times to get enough events.
-		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-		var recentStreamEvents []streamEvent
-		recentStreamEvents, err = d.events.selectRecentEvents(
-			ctx, txn, roomID, types.StreamPosition(0), pos, numRecentEventsPerRoom,
-		)
-		if err != nil {
-			return nil, err
-		}
 
-		// We don't include a device here as we don't need to send down
-		// transaction IDs for complete syncs
-		recentEvents := streamEventsToEvents(nil, recentStreamEvents)
-
-		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
-		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = true
-		jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
+
+		//Join response should contain events only if room isn't filtered
+		if !isRoomFiltered(filter, roomID) {
+			// Timeline events
+			var recentStreamEvents []streamEvent
+			var limited bool
+			recentStreamEvents, limited, err = d.events.selectRoomRecentEvents(
+				ctx, txn, roomID, posFrom, posTo, &filter.Room.Timeline)
+			if err != nil {
+				return nil, err
+			}
+			jr.Timeline.Limited = limited
+
+			recentEvents := streamEventsToEvents(nil, recentStreamEvents)
+			jr.Timeline.Events = gomatrixserverlib.ToClientEvents(
+				recentEvents,
+				gomatrixserverlib.FormatSync)
+
+			// State events
+			var stateEvents []gomatrixserverlib.Event
+			stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
+			if err != nil {
+				return nil, err
+			}
+			stateEvents = removeDuplicates(stateEvents, recentEvents)
+			jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
+
+			//TODO AccountData events
+			//TODO Ephemeral events
+		}
+
+		//TODO Handle jr.Timeline.prev_batch
+
 		res.Rooms.Join[roomID] = *jr
 	}
 
-	if err = d.addInvitesToResponse(ctx, txn, userID, 0, pos, res); err != nil {
+	//TODO: filter Invite events
+	if err = d.addInvitesToResponse(ctx, txn, userID, 0, posTo, res); err != nil {
 		return nil, err
 	}
+
+	//TODO handle res.Room[roomID].Leave
 
 	succeeded = true
 	return res, err
@@ -409,7 +425,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 	txn *sql.Tx,
 	fromPos, toPos types.StreamPosition,
 	delta stateDelta,
-	numRecentEventsPerRoom int,
+	filter *gomatrix.Filter,
 	res *types.Response,
 ) error {
 	endPos := toPos
@@ -422,8 +438,8 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
 		endPos = delta.membershipPos
 	}
-	recentStreamEvents, err := d.events.selectRecentEvents(
-		ctx, txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom,
+	recentStreamEvents, limited, err := d.events.selectRoomRecentEvents(
+		ctx, txn, delta.roomID, fromPos, endPos, &filter.Room.Timeline,
 	)
 	if err != nil {
 		return err
@@ -440,7 +456,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 	case "join":
 		jr := types.NewJoinResponse()
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.roomID] = *jr
 	case "leave":
@@ -450,7 +466,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+		lr.Timeline.Limited = limited
 		lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Leave[delta.roomID] = *lr
 	}

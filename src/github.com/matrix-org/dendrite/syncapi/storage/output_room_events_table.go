@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrix"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -39,10 +40,10 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
     -- The event ID for the event
     event_id TEXT NOT NULL,
-    -- The 'room_id' key for the event.
+    -- The 'room_id' key for the event. TODO Duplicate of (event_json->>'room_id')
     room_id TEXT NOT NULL,
-    -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
-    event_json TEXT NOT NULL,
+    -- The JSON for the event. Stored as JSON
+    event_json JSON NOT NULL,
     -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
     -- if there is no delta.
     add_state_ids TEXT[],
@@ -51,7 +52,11 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     transaction_id TEXT  -- The transaction id used to send the event, if any
 );
 -- for event selection
-CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(event_id);
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(
+	event_id,
+	room_id,
+	(event_json->>'type'),
+	(event_json->>'sender'));
 `
 
 const insertEventSQL = "" +
@@ -62,10 +67,15 @@ const insertEventSQL = "" +
 const selectEventsSQL = "" +
 	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
-const selectRecentEventsSQL = "" +
+const selectRoomRecentEventsSQL = "" +
 	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC LIMIT $4"
+	" WHERE room_id=$1 " +
+	" AND id > $2 AND id <= $3" +
+	" AND ( $4::text[] IS NULL OR     (event_json->>'sender') = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT((event_json->>'sender') = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     (event_json->>'type')   = ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT((event_json->>'type')   = ANY($7)) )" +
+	" ORDER BY id DESC LIMIT $8"
 
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
@@ -78,11 +88,11 @@ const selectStateInRangeSQL = "" +
 	" ORDER BY id ASC"
 
 type outputRoomEventsStatements struct {
-	insertEventStmt        *sql.Stmt
-	selectEventsStmt       *sql.Stmt
-	selectMaxEventIDStmt   *sql.Stmt
-	selectRecentEventsStmt *sql.Stmt
-	selectStateInRangeStmt *sql.Stmt
+	insertEventStmt            *sql.Stmt
+	selectEventsStmt           *sql.Stmt
+	selectMaxEventIDStmt       *sql.Stmt
+	selectRoomRecentEventsStmt *sql.Stmt
+	selectStateInRangeStmt     *sql.Stmt
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
@@ -99,7 +109,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectMaxEventIDStmt, err = db.Prepare(selectMaxEventIDSQL); err != nil {
 		return
 	}
-	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
+	if s.selectRoomRecentEventsStmt, err = db.Prepare(selectRoomRecentEventsSQL); err != nil {
 		return
 	}
 	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
@@ -219,22 +229,29 @@ func (s *outputRoomEventsStatements) insertEvent(
 	return
 }
 
-// RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
-func (s *outputRoomEventsStatements) selectRecentEvents(
+func (s *outputRoomEventsStatements) selectRoomRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
-) ([]streamEvent, error) {
-	stmt := common.TxStmt(txn, s.selectRecentEventsStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	roomID string, fromPos, toPos types.StreamPosition, timelineFilter *gomatrix.FilterPart,
+) ([]streamEvent, bool, error) {
+
+	stmt := common.TxStmt(txn, s.selectRoomRecentEventsStmt)
+	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos,
+		pq.StringArray(timelineFilter.Senders),
+		pq.StringArray(timelineFilter.NotSenders),
+		pq.StringArray(timelineFilter.Types),
+		pq.StringArray(timelineFilter.NotTypes),
+		timelineFilter.Limit, // TODO: limit abusive values?
+	)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close() // nolint: errcheck
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return events, nil
+
+	return events, len(events) == timelineFilter.Limit, nil // TODO: len(events) == timelineFilter.Limit not accurate
 }
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing

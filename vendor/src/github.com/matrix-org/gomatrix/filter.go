@@ -23,21 +23,23 @@ type Filter struct {
 	EventFields []string   `json:"event_fields,omitempty"`
 	EventFormat string     `json:"event_format,omitempty"`
 	Presence    FilterPart `json:"presence,omitempty"`
-	Room        struct {
-		AccountData  FilterPart `json:"account_data,omitempty"`
-		Ephemeral    FilterPart `json:"ephemeral,omitempty"`
-		IncludeLeave bool       `json:"include_leave,omitempty"`
-		NotRooms     []string   `json:"not_rooms,omitempty"`
-		Rooms        []string   `json:"rooms,omitempty"`
-		State        FilterPart `json:"state,omitempty"`
-		Timeline     FilterPart `json:"timeline,omitempty"`
-	} `json:"room,omitempty"`
+	Room        FilterRoom `json:"room,omitempty"`
+}
+
+type FilterRoom struct {
+	AccountData  FilterPart `json:"account_data,omitempty"`
+	Ephemeral    FilterPart `json:"ephemeral,omitempty"`
+	IncludeLeave bool       `json:"include_leave,omitempty"`
+	NotRooms     []string   `json:"not_rooms,omitempty"`
+	Rooms        []string   `json:"rooms,omitempty"`
+	State        FilterPart `json:"state,omitempty"`
+	Timeline     FilterPart `json:"timeline,omitempty"`
 }
 
 type FilterPart struct {
 	NotRooms   []string `json:"not_rooms,omitempty"`
 	Rooms      []string `json:"rooms,omitempty"`
-	Limit      *int     `json:"limit,omitempty"`
+	Limit      int      `json:"limit,omitempty"`
 	NotSenders []string `json:"not_senders,omitempty"`
 	NotTypes   []string `json:"not_types,omitempty"`
 	Senders    []string `json:"senders,omitempty"`
@@ -49,4 +51,33 @@ func (filter *Filter) Validate() error {
 		return errors.New("Bad event_format value. Must be any of [\"client\", \"federation\"]")
 	}
 	return nil
+}
+
+func DefaultFilter() Filter {
+	return Filter{
+		AccountData: defaultFilterPart(),
+		EventFields: nil,
+		EventFormat: "client",
+		Presence:    defaultFilterPart(),
+		Room: FilterRoom{
+			AccountData:  defaultFilterPart(),
+			Ephemeral:    defaultFilterPart(),
+			IncludeLeave: false, //TODO check default value on synapse
+			NotRooms:     nil,
+			Rooms:        nil,
+			State:        defaultFilterPart(),
+			Timeline:     defaultFilterPart(),
+		},
+	}
+}
+func defaultFilterPart() FilterPart {
+	return FilterPart{
+		NotRooms:   nil,
+		Rooms:      nil,
+		Limit:      100, //TODO check this on synapse
+		NotSenders: nil,
+		NotTypes:   nil,
+		Senders:    nil,
+		Types:      nil,
+	}
 }

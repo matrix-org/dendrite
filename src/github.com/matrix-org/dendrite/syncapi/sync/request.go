@@ -16,11 +16,14 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/gomatrix"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/util"
@@ -34,11 +37,11 @@ const defaultTimelineLimit = 20
 type syncRequest struct {
 	ctx           context.Context
 	device        authtypes.Device
-	limit         int
 	timeout       time.Duration
 	since         *types.StreamPosition // nil means that no since token was supplied
 	wantFullState bool
 	log           *log.Entry
+	filter        gomatrix.Filter
 }
 
 func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, error) {
@@ -49,15 +52,37 @@ func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, e
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Additional query params: set_presence, filter
+
+	filterStr := req.URL.Query().Get("filter")
+	var filter gomatrix.Filter
+	if filterStr != "" {
+		if filterStr[0] == '{' {
+			// Inline filter
+			filter = gomatrix.DefaultFilter()
+			err = json.Unmarshal([]byte(filterStr), &filter)
+			if err != nil {
+				return nil, err
+			}
+			err = filter.Validate()
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Filter ID
+			// TODO retrieve filter from DB
+			return nil, errors.New("Filter ID retrieval not implemented")
+		}
+	}
+
+	// TODO: Additional query params: set_presence
 	return &syncRequest{
 		ctx:           req.Context(),
 		device:        device,
 		timeout:       timeout,
 		since:         since,
 		wantFullState: wantFullState,
-		limit:         defaultTimelineLimit, // TODO: read from filter
 		log:           util.GetLogger(req.Context()),
+		filter:        filter,
 	}, nil
 }
 
