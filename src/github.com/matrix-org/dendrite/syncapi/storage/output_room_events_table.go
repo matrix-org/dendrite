@@ -40,10 +40,14 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
     -- The event ID for the event
     event_id TEXT NOT NULL,
-    -- The 'room_id' key for the event. TODO Duplicate of (event_json->>'room_id')
+    -- The 'room_id' key for the event.
     room_id TEXT NOT NULL,
-    -- The JSON for the event. Stored as JSON
-    event_json JSON NOT NULL,
+    -- The 'type' property for the event.
+    type TEXT NOT NULL,
+    -- The 'sender' property for the event.
+    sender TEXT NOT NULL,
+    -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
+    event_json TEXT NOT NULL,
     -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
     -- if there is no delta.
     add_state_ids TEXT[],
@@ -55,14 +59,14 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(
 	event_id,
 	room_id,
-	(event_json->>'type'),
-	(event_json->>'sender'));
+	type,
+	sender);
 `
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
-	" room_id, event_id, event_json, add_state_ids, remove_state_ids, device_id, transaction_id" +
-	") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"
+	" room_id, event_id, type, sender, event_json, add_state_ids, remove_state_ids, device_id, transaction_id" +
+	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id"
 
 const selectEventsSQL = "" +
 	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
@@ -71,10 +75,10 @@ const selectRoomRecentEventsSQL = "" +
 	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id=$1 " +
 	" AND id > $2 AND id <= $3" +
-	" AND ( $4::text[] IS NULL OR     (event_json->>'sender') = ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT((event_json->>'sender') = ANY($5)) )" +
-	" AND ( $6::text[] IS NULL OR     (event_json->>'type')   = ANY($6)  )" +
-	" AND ( $7::text[] IS NULL OR NOT((event_json->>'type')   = ANY($7)) )" +
+	" AND ( $4::text[] IS NULL OR     sender = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type   = ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type   = ANY($7)) )" +
 	" ORDER BY id DESC LIMIT $8"
 
 const selectMaxEventIDSQL = "" +
@@ -220,6 +224,8 @@ func (s *outputRoomEventsStatements) insertEvent(
 		ctx,
 		event.RoomID(),
 		event.EventID(),
+		event.Type(),
+		event.Sender(),
 		event.JSON(),
 		pq.StringArray(addState),
 		pq.StringArray(removeState),
