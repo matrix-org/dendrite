@@ -246,7 +246,7 @@ func (s *outputRoomEventsStatements) selectRoomRecentEvents(
 		pq.StringArray(timelineFilter.NotSenders),
 		pq.StringArray(timelineFilter.Types),
 		pq.StringArray(timelineFilter.NotTypes),
-		timelineFilter.Limit, // TODO: limit abusive values?
+		timelineFilter.Limit+1, // TODO: limit abusive values? This can also be done in gomatrix.Filter.Validate
 	)
 	if err != nil {
 		return nil, false, err
@@ -257,7 +257,13 @@ func (s *outputRoomEventsStatements) selectRoomRecentEvents(
 		return nil, false, err
 	}
 
-	return events, len(events) == timelineFilter.Limit, nil // TODO: len(events) == timelineFilter.Limit not accurate
+	limited := false
+	if len(events) > timelineFilter.Limit {
+		limited = true
+		events = events[:len(events)-1]
+	}
+
+	return events, limited, nil
 }
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
