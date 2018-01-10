@@ -55,22 +55,22 @@ func (filter *Filter) Validate() error {
 
 func DefaultFilter() Filter {
 	return Filter{
-		AccountData: defaultFilterPart(),
+		AccountData: DefaultFilterPart(),
 		EventFields: nil,
 		EventFormat: "client",
-		Presence:    defaultFilterPart(),
+		Presence:    DefaultFilterPart(),
 		Room: FilterRoom{
-			AccountData:  defaultFilterPart(),
-			Ephemeral:    defaultFilterPart(),
+			AccountData:  DefaultFilterPart(),
+			Ephemeral:    DefaultFilterPart(),
 			IncludeLeave: false, //TODO check default value on synapse
 			NotRooms:     nil,
 			Rooms:        nil,
-			State:        defaultFilterPart(),
-			Timeline:     defaultFilterPart(),
+			State:        DefaultFilterPart(),
+			Timeline:     DefaultFilterPart(),
 		},
 	}
 }
-func defaultFilterPart() FilterPart {
+func DefaultFilterPart() FilterPart {
 	return FilterPart{
 		NotRooms:   nil,
 		Rooms:      nil,

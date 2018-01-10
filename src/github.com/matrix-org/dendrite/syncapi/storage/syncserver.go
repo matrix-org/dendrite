@@ -178,10 +178,11 @@ func (d *SyncServerDatabase) GetStateEvent(
 // Returns an empty slice if no state events could be found for this room.
 // Returns an error if there was an issue with the retrieval.
 func (d *SyncServerDatabase) GetStateEventsForRoom(
-	ctx context.Context, roomID string,
+	ctx context.Context, roomID string, stateFilter *gomatrix.FilterPart,
 ) (stateEvents []gomatrixserverlib.Event, err error) {
+
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
+		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilter)
 		return err
 	})
 	return
@@ -238,7 +239,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 stream positions.
 	// This works out what the 'state' key should be for each room as well as which membership block
 	// to put the room into.
-	deltas, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
+	deltas, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID, &filter.Room.State)
 	if err != nil {
 		return nil, err
 	}
@@ -297,31 +298,37 @@ func (d *SyncServerDatabase) CompleteSync(
 		jr := types.NewJoinResponse()
 
 		//Join response should contain events only if room isn't filtered
-		if !isRoomFiltered(roomID, filter, &filter.Room.Timeline) {
+		if !isRoomFiltered(roomID, filter, nil) {
 			// Timeline events
-			var recentStreamEvents []streamEvent
-			var limited bool
-			recentStreamEvents, limited, err = d.events.selectRoomRecentEvents(
-				ctx, txn, roomID, posFrom, posTo, &filter.Room.Timeline)
-			if err != nil {
-				return nil, err
-			}
-			jr.Timeline.Limited = limited
+			var recentEvents []gomatrixserverlib.Event
+			if !isRoomFiltered(roomID, nil, &filter.Room.Timeline) {
+				var recentStreamEvents []streamEvent
+				var limited bool
+				recentStreamEvents, limited, err = d.events.selectRoomRecentEvents(
+					ctx, txn, roomID, posFrom, posTo, &filter.Room.Timeline)
+				if err != nil {
+					return nil, err
+				}
+				recentEvents = streamEventsToEvents(nil, recentStreamEvents)
 
-			recentEvents := streamEventsToEvents(nil, recentStreamEvents)
-			jr.Timeline.Events = gomatrixserverlib.ToClientEvents(
-				recentEvents,
-				gomatrixserverlib.FormatSync)
+				jr.Timeline.Limited = limited
+				jr.Timeline.Events = gomatrixserverlib.ToClientEvents(
+					recentEvents,
+					gomatrixserverlib.FormatSync)
+			}
 
 			// State events
-			var stateEvents []gomatrixserverlib.Event
-			stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
-			if err != nil {
-				return nil, err
+			if !isRoomFiltered(roomID, nil, &filter.Room.State) {
+				var stateEvents []gomatrixserverlib.Event
+				stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, &filter.Room.State)
+				if err != nil {
+					return nil, err
+				}
+				if recentEvents != nil {
+					stateEvents = removeDuplicates(stateEvents, recentEvents)
+				}
+				jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 			}
-			stateEvents = removeDuplicates(stateEvents, recentEvents)
-			jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
-
 			//TODO AccountData events
 			//TODO Ephemeral events
 		}
@@ -564,7 +571,7 @@ func (d *SyncServerDatabase) fetchMissingStateEvents(
 
 func (d *SyncServerDatabase) getStateDeltas(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
-	fromPos, toPos types.StreamPosition, userID string,
+	fromPos, toPos types.StreamPosition, userID string, stateFilter *gomatrix.FilterPart,
 ) ([]stateDelta, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
@@ -597,7 +604,7 @@ func (d *SyncServerDatabase) getStateDeltas(
 				if membership == "join" {
 					// send full room state down instead of a delta
 					var allState []gomatrixserverlib.Event
-					allState, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
+					allState, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilter)
 					if err != nil {
 						return nil, err
 					}

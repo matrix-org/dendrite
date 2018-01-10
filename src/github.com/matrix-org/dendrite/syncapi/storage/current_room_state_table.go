@@ -20,6 +20,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -32,6 +33,8 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     event_id TEXT NOT NULL,
     -- The state event type e.g 'm.room.member'
     type TEXT NOT NULL,
+    -- The 'sender' property for the event.
+    sender TEXT NOT NULL,
     -- The state_key value for this state event e.g ''
     state_key TEXT NOT NULL,
     -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
@@ -46,16 +49,17 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     CONSTRAINT syncapi_room_state_unique UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
-CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_state(event_id);
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_state(event_id, room_id, type, sender);
 -- for querying membership states of users
 CREATE INDEX IF NOT EXISTS syncapi_membership_idx ON syncapi_current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
+
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, state_key, event_json, membership, added_at)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
+	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, state_key, event_json, membership, added_at)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, 8)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_room_state_unique" +
-	" DO UPDATE SET event_id = $2, event_json = $5, membership = $6, added_at = $7"
+	" DO UPDATE SET event_id = $2, sender=$4, event_json = $6, membership = $7, added_at = $8"
 
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
@@ -64,7 +68,12 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectCurrentStateSQL = "" +
-	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1"
+	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1" +
+	" AND ( $2::text[] IS NULL OR     sender = ANY($2)  )" +
+	" AND ( $3::text[] IS NULL OR NOT(sender = ANY($3)) )" +
+	" AND ( $4::text[] IS NULL OR     type   = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(type   = ANY($5)) )" +
+	" LIMIT $6"
 
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
@@ -165,10 +174,23 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 
 // CurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) selectCurrentState(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string, stateFilter *gomatrix.FilterPart,
 ) ([]gomatrixserverlib.Event, error) {
+
+	var filter gomatrix.FilterPart
+	if stateFilter == nil {
+		filter = gomatrix.DefaultFilterPart()
+	} else {
+		filter = *stateFilter
+	}
+
 	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
-	rows, err := stmt.QueryContext(ctx, roomID)
+	rows, err := stmt.QueryContext(ctx, roomID,
+		pq.StringArray(filter.Senders),
+		pq.StringArray(filter.NotSenders),
+		pq.StringArray(filter.Types),
+		pq.StringArray(filter.NotTypes),
+		filter.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +217,7 @@ func (s *currentRoomStateStatements) upsertRoomState(
 		event.RoomID(),
 		event.EventID(),
 		event.Type(),
+		event.Sender(),
 		*event.StateKey(),
 		event.JSON(),
 		membership,
