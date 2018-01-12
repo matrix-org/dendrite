@@ -48,7 +48,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	// Extract values from request
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
-	syncReq, err := newSyncRequest(req, *device)
+	syncReq, err := newSyncRequest(req, *device, rp.accountDB)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,

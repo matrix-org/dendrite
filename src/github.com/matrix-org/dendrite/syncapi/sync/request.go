@@ -17,13 +17,14 @@ package sync
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/util"
@@ -43,7 +44,7 @@ type syncRequest struct {
 	filter        gomatrix.Filter
 }
 
-func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, error) {
+func newSyncRequest(req *http.Request, device authtypes.Device, accountDB *accounts.Database) (*syncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
@@ -68,8 +69,19 @@ func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, e
 			}
 		} else {
 			// Filter ID
-			// TODO retrieve filter from DB
-			return nil, errors.New("Filter ID retrieval not implemented")
+			filterID, err := strconv.Atoi(filterStr)
+			if err != nil {
+				return nil, err
+			}
+			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+			if err != nil {
+				return nil, err
+			}
+			recvFilter, err := accountDB.GetFilter(req.Context(), localpart, strconv.Itoa(filterID)) //TODO GetFilter should receive filterID as an int
+			if err != nil {
+				return nil, err
+			}
+			filter = *recvFilter
 		}
 	}
 
