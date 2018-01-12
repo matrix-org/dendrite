@@ -75,10 +75,10 @@ const selectRoomRecentEventsSQL = "" +
 	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id=$1 " +
 	" AND id > $2 AND id <= $3" +
-	" AND ( $4::text[] IS NULL OR     sender = ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(sender = ANY($5)) )" +
-	" AND ( $6::text[] IS NULL OR     type   = ANY($6)  )" +
-	" AND ( $7::text[] IS NULL OR NOT(type   = ANY($7)) )" +
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id DESC LIMIT $8"
 
 const selectMaxEventIDSQL = "" +
@@ -244,8 +244,8 @@ func (s *outputRoomEventsStatements) selectRoomRecentEvents(
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos,
 		pq.StringArray(timelineFilter.Senders),
 		pq.StringArray(timelineFilter.NotSenders),
-		pq.StringArray(timelineFilter.Types),
-		pq.StringArray(timelineFilter.NotTypes),
+		pq.StringArray(filterConvertWildcardToSQL(timelineFilter.Types)),
+		pq.StringArray(filterConvertWildcardToSQL(timelineFilter.NotTypes)),
 		timelineFilter.Limit+1, // TODO: limit abusive values? This can also be done in gomatrix.Filter.Validate
 	)
 	if err != nil {

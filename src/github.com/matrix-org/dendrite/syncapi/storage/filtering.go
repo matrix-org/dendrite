@@ -15,6 +15,8 @@
 package storage
 
 import (
+	"strings"
+
 	"github.com/matrix-org/gomatrix"
 )
 
@@ -45,4 +47,12 @@ func hasValue(value string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func filterConvertWildcardToSQL(values []string) []string {
+	ret := make([]string, len(values))
+	for i := range values {
+		ret[i] = strings.Replace(values[i], "*", "%", -1)
+	}
+	return ret
 }
