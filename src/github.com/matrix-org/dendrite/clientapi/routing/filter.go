@@ -17,8 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"encoding/json"
-
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -60,14 +58,9 @@ func GetFilter(
 		}
 	}
 
-	filterJSON, err := json.Marshal(filter)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
 	return util.JSONResponse{
 		Code: 200,
-		JSON: filterJSON,
+		JSON: filter,
 	}
 }
 
