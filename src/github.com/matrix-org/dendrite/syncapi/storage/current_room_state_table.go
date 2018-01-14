@@ -72,7 +72,8 @@ const selectCurrentStateSQL = "" +
 	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
 	" AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) )" +
 	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )"
+	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
+	" LIMIT $6"
 
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
@@ -188,7 +189,9 @@ func (s *currentRoomStateStatements) selectCurrentState(
 		pq.StringArray(filter.Senders),
 		pq.StringArray(filter.NotSenders),
 		pq.StringArray(filterConvertWildcardToSQL(filter.Types)),
-		pq.StringArray(filterConvertWildcardToSQL(filter.NotTypes)))
+		pq.StringArray(filterConvertWildcardToSQL(filter.NotTypes)),
+		stateFilter.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
