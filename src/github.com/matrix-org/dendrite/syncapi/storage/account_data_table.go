@@ -18,7 +18,9 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/gomatrix"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -38,16 +40,17 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
     room_id TEXT NOT NULL,
     -- Type of the data
     type TEXT NOT NULL,
+	sender TEXT NOT NULL,
 
     -- We don't want two entries of the same type for the same user
     CONSTRAINT syncapi_account_data_unique UNIQUE (user_id, room_id, type)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id);
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id, type, sender);
 `
 
 const insertAccountDataSQL = "" +
-	"INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($1, $2, $3)" +
+	"INSERT INTO syncapi_account_data_type (user_id, room_id, type, sender) VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_account_data_unique" +
 	" DO UPDATE SET id = EXCLUDED.id" +
 	" RETURNING id"
@@ -55,7 +58,11 @@ const insertAccountDataSQL = "" +
 const selectAccountDataInRangeSQL = "" +
 	"SELECT room_id, type FROM syncapi_account_data_type" +
 	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC"
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" ORDER BY id ASC LIMIT $8"
 
 const selectMaxAccountDataIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_account_data_type"
@@ -85,16 +92,16 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 
 func (s *accountDataStatements) insertAccountData(
 	ctx context.Context,
-	userID, roomID, dataType string,
+	userID, roomID, dataType, sender string,
 ) (pos int64, err error) {
-	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
+	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType, sender).Scan(&pos)
 	return
 }
 
 func (s *accountDataStatements) selectAccountDataInRange(
 	ctx context.Context,
 	userID string,
-	oldPos, newPos types.StreamPosition,
+	oldPos, newPos types.StreamPosition, accountDataFilterPart *gomatrix.FilterPart,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
@@ -105,7 +112,13 @@ func (s *accountDataStatements) selectAccountDataInRange(
 		oldPos--
 	}
 
-	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos)
+	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos,
+		pq.StringArray(filterConvertWildcardToSQL(accountDataFilterPart.Types)),
+		pq.StringArray(filterConvertWildcardToSQL(accountDataFilterPart.NotTypes)),
+		pq.StringArray(accountDataFilterPart.Senders),
+		pq.StringArray(accountDataFilterPart.NotSenders),
+		accountDataFilterPart.Limit,
+	)
 	if err != nil {
 		return
 	}

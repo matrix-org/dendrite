@@ -170,7 +170,7 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, *req.since, currentPos)
+	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, *req.since, currentPos, &req.filter.AccountData)
 	if err != nil {
 		return nil, err
 	}

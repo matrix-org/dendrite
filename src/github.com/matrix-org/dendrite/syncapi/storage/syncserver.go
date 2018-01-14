@@ -364,9 +364,9 @@ var txReadOnlySnapshot = sql.TxOptions{
 // If no data is retrieved, returns an empty map
 // If there was an issue with the retrieval, returns an error
 func (d *SyncServerDatabase) GetAccountDataInRange(
-	ctx context.Context, userID string, oldPos, newPos types.StreamPosition,
+	ctx context.Context, userID string, oldPos, newPos types.StreamPosition, accountDataFilterPart *gomatrix.FilterPart,
 ) (map[string][]string, error) {
-	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos)
+	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos, accountDataFilterPart)
 }
 
 // UpsertAccountData keeps track of new or updated account data, by saving the type
@@ -376,9 +376,9 @@ func (d *SyncServerDatabase) GetAccountDataInRange(
 // creates a new row, else update the existing one
 // Returns an error if there was an issue with the upsert
 func (d *SyncServerDatabase) UpsertAccountData(
-	ctx context.Context, userID, roomID, dataType string,
+	ctx context.Context, userID, roomID, dataType, sender string,
 ) (types.StreamPosition, error) {
-	pos, err := d.accountData.insertAccountData(ctx, userID, roomID, dataType)
+	pos, err := d.accountData.insertAccountData(ctx, userID, roomID, dataType, sender)
 	return types.StreamPosition(pos), err
 }
 

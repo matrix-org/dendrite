@@ -79,7 +79,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 	}).Info("received data from client API server")
 
 	syncStreamPos, err := s.db.UpsertAccountData(
-		context.TODO(), string(msg.Key), output.RoomID, output.Type,
+		context.TODO(), string(msg.Key), output.RoomID, output.Type, output.Sender,
 	)
 	if err != nil {
 		log.WithFields(log.Fields{
