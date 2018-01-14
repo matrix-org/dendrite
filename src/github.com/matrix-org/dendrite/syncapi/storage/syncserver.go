@@ -255,7 +255,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 	}
 
 	// TODO: This should be done in getStateDeltas
-	if err = d.addInvitesToResponse(ctx, txn, device.UserID, fromPos, toPos, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, device.UserID, fromPos, toPos, filter, res); err != nil {
 		return nil, err
 	}
 
@@ -338,8 +338,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		res.Rooms.Join[roomID] = *jr
 	}
 
-	//TODO: filter Invite events
-	if err = d.addInvitesToResponse(ctx, txn, userID, 0, posTo, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, userID, 0, posTo, filter, res); err != nil {
 		return nil, err
 	}
 
@@ -408,10 +407,11 @@ func (d *SyncServerDatabase) addInvitesToResponse(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
 	fromPos, toPos types.StreamPosition,
+	filter *gomatrix.Filter,
 	res *types.Response,
 ) error {
 	invites, err := d.invites.selectInviteEventsInRange(
-		ctx, txn, userID, int64(fromPos), int64(toPos),
+		ctx, txn, userID, int64(fromPos), int64(toPos), filter,
 	)
 	if err != nil {
 		return err
