@@ -75,7 +75,7 @@ const insertEventSQL = "" +
 const selectEventsSQL = "" +
 	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
-const selectRoomRecentEventsSQL = "" +
+const selectRecentEventsSQL = "" +
 	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id=$1 " +
 	" AND id > $2 AND id <= $3" +
@@ -97,11 +97,11 @@ const selectStateInRangeSQL = "" +
 	" ORDER BY id ASC"
 
 type outputRoomEventsStatements struct {
-	insertEventStmt            *sql.Stmt
-	selectEventsStmt           *sql.Stmt
-	selectMaxEventIDStmt       *sql.Stmt
-	selectRoomRecentEventsStmt *sql.Stmt
-	selectStateInRangeStmt     *sql.Stmt
+	insertEventStmt        *sql.Stmt
+	selectEventsStmt       *sql.Stmt
+	selectMaxEventIDStmt   *sql.Stmt
+	selectRecentEventsStmt *sql.Stmt
+	selectStateInRangeStmt *sql.Stmt
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
@@ -118,7 +118,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectMaxEventIDStmt, err = db.Prepare(selectMaxEventIDSQL); err != nil {
 		return
 	}
-	if s.selectRoomRecentEventsStmt, err = db.Prepare(selectRoomRecentEventsSQL); err != nil {
+	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
 		return
 	}
 	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
@@ -247,12 +247,12 @@ func (s *outputRoomEventsStatements) insertEvent(
 	return
 }
 
-func (s *outputRoomEventsStatements) selectRoomRecentEvents(
+func (s *outputRoomEventsStatements) selectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, fromPos, toPos types.StreamPosition, timelineFilter *gomatrix.FilterPart,
 ) ([]streamEvent, bool, error) {
 
-	stmt := common.TxStmt(txn, s.selectRoomRecentEventsStmt)
+	stmt := common.TxStmt(txn, s.selectRecentEventsStmt)
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos,
 		pq.StringArray(timelineFilter.Senders),
 		pq.StringArray(timelineFilter.NotSenders),

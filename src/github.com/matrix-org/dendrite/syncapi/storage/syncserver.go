@@ -304,7 +304,7 @@ func (d *SyncServerDatabase) CompleteSync(
 			if !isRoomFiltered(roomID, nil, &filter.Room.Timeline) {
 				var recentStreamEvents []streamEvent
 				var limited bool
-				recentStreamEvents, limited, err = d.events.selectRoomRecentEvents(
+				recentStreamEvents, limited, err = d.events.selectRecentEvents(
 					ctx, txn, roomID, posFrom, posTo, &filter.Room.Timeline)
 				if err != nil {
 					return nil, err
@@ -447,7 +447,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
 		endPos = delta.membershipPos
 	}
-	recentStreamEvents, limited, err := d.events.selectRoomRecentEvents(
+	recentStreamEvents, limited, err := d.events.selectRecentEvents(
 		ctx, txn, delta.roomID, fromPos, endPos, &filter.Room.Timeline,
 	)
 	if err != nil {
