@@ -37,13 +37,14 @@ type FilterRoom struct {
 }
 
 type FilterPart struct {
-	NotRooms   []string `json:"not_rooms,omitempty"`
-	Rooms      []string `json:"rooms,omitempty"`
-	Limit      int      `json:"limit,omitempty"`
-	NotSenders []string `json:"not_senders,omitempty"`
-	NotTypes   []string `json:"not_types,omitempty"`
-	Senders    []string `json:"senders,omitempty"`
-	Types      []string `json:"types,omitempty"`
+	NotRooms    []string `json:"not_rooms,omitempty"`
+	Rooms       []string `json:"rooms,omitempty"`
+	Limit       int      `json:"limit,omitempty"`
+	NotSenders  []string `json:"not_senders,omitempty"`
+	NotTypes    []string `json:"not_types,omitempty"`
+	Senders     []string `json:"senders,omitempty"`
+	Types       []string `json:"types,omitempty"`
+	ContainsURL *bool    `json:"contains_url,omitempty"`
 }
 
 func (filter *Filter) Validate() error {
