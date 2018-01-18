@@ -85,9 +85,11 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 func (s *inviteEventsStatements) insertInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.Event,
 ) (streamPos int64, err error) {
+	var containsURL bool
 	var content map[string]interface{}
-	json.Unmarshal(inviteEvent.Content(), content)
-	_, containsURL := content["url"]
+	if json.Unmarshal(inviteEvent.Content(), &content) != nil {
+		_, containsURL = content["url"]
+	}
 
 	err = s.insertInviteEventStmt.QueryRowContext(
 		ctx,

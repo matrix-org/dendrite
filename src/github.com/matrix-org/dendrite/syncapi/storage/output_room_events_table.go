@@ -224,9 +224,11 @@ func (s *outputRoomEventsStatements) insertEvent(
 		txnID = &transactionID.TransactionID
 	}
 
+	var containsURL bool
 	var content map[string]interface{}
-	json.Unmarshal(event.Content(), content)
-	_, containsURL := content["url"]
+	if json.Unmarshal(event.Content(), &content) != nil {
+		_, containsURL = content["url"]
+	}
 
 	stmt := common.TxStmt(txn, s.insertEventStmt)
 	err = stmt.QueryRowContext(

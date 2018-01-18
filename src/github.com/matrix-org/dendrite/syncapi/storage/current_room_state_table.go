@@ -217,9 +217,11 @@ func (s *currentRoomStateStatements) upsertRoomState(
 	ctx context.Context, txn *sql.Tx,
 	event gomatrixserverlib.Event, membership *string, addedAt int64,
 ) error {
+	var containsURL bool
 	var content map[string]interface{}
-	json.Unmarshal(event.Content(), content)
-	_, containsURL := content["url"]
+	if json.Unmarshal(event.Content(), &content) != nil {
+		_, containsURL = content["url"]
+	}
 
 	stmt := common.TxStmt(txn, s.upsertRoomStateStmt)
 	_, err := stmt.ExecContext(
