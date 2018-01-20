@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     -- The password hash for this account. Can be NULL if this is a passwordless account.
     password_hash TEXT,
     -- Identifies which Application Service this account belongs to.
-    appservice_id TEXT,
+    appservice_id TEXT
     -- TODO:
     -- is_guest, is_admin, upgraded_ts, devices, any email reset stuff?
 );
@@ -84,7 +84,7 @@ func (s *accountsStatements) insertAccount(
 ) (*authtypes.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := s.insertAccountStmt
-	if _, err := stmt.ExecContext(ctx, localpart, createdTimeMS, hash); err != nil {
+	if _, err := stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID); err != nil {
 		return nil, err
 	}
 	return &authtypes.Account{

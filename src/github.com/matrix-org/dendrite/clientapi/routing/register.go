@@ -245,40 +245,49 @@ func UsernameIsWithinApplicationServiceNamespace(
 	cfg *config.Dendrite,
 	username string,
 	appservice *config.ApplicationService,
-) (bool, *util.JSONResponse) {
+) bool {
 	if appservice != nil {
 		// Loop through given Application Service's namespaces and see if any match
-		for _, namespace := range appservice.Namespaces["users"] {
-			match, err := regexp.MatchString(namespace.Regex, username)
-			if err != nil {
-				return false, &util.JSONResponse{
-					Code: 401,
-					JSON: jsonerror.BadJSON("Supplied Application Service namespace" + namespace.Regex + "is invalid."),
-				}
-			}
-			if match {
-				return true, nil
+		for _, namespace := range appservice.NamespaceMap["users"] {
+			// AS namespaces are checked for validity in config
+			if namespace.RegexpObject.MatchString(username) {
+				return true
 			}
 		}
-		return false, nil
+		return false
 	}
 
 	// Loop through all known Application Service's namespaces and see if any match
 	for _, knownAppservice := range cfg.Derived.ApplicationServices {
-		for _, namespace := range knownAppservice.Namespaces["users"] {
-			match, err := regexp.MatchString(namespace.Regex, username)
-			if err != nil {
-				return false, &util.JSONResponse{
-					Code: 401,
-					JSON: jsonerror.BadJSON("Supplied Application Service namespace" + namespace.Regex + "is invalid."),
-				}
-			}
-			if match {
-				return true, nil
+		for _, namespace := range knownAppservice.NamespaceMap["users"] {
+			// AS namespaces are checked for validity in config
+			if namespace.RegexpObject.MatchString(username) {
+				return true
 			}
 		}
 	}
-	return false, nil
+	return false
+}
+
+// UsernameMatchesMultipleExclusiveNamespaces will check if a given username matches
+// more than one exclusive namespace. More than one is not allowed
+func UsernameMatchesMultipleExclusiveNamespaces(
+	cfg *config.Dendrite,
+	username string,
+) bool {
+	// Check namespaces and see if more than one match
+	matchCount := 0
+	for _, appservice := range cfg.Derived.ApplicationServices {
+		for _, namespaceSlice := range appservice.NamespaceMap {
+			for _, namespace := range namespaceSlice {
+				// Check if we have a match on this username
+				if namespace.RegexpObject.MatchString(username) {
+					matchCount++
+				}
+			}
+		}
+	}
+	return matchCount > 1
 }
 
 // validateApplicationService checks if a provided application service token
@@ -308,13 +317,8 @@ func validateApplicationService(
 	}
 
 	// Ensure the desired username is within at least one of the application service's namespaces.
-	matched, err := UsernameIsWithinApplicationServiceNamespace(cfg, username, matchedApplicationService)
-	if err != nil {
-		return "", err
-	}
-
-	// If we didn't find any matches, return M_EXCLUSIVE
-	if !matched {
+	if !UsernameIsWithinApplicationServiceNamespace(cfg, username, matchedApplicationService) {
+		// If we didn't find any matches, return M_EXCLUSIVE
 		return "", &util.JSONResponse{
 			Code: 401,
 			JSON: jsonerror.Exclusive("Supplied username " + username +
@@ -322,11 +326,21 @@ func validateApplicationService(
 		}
 	}
 
+	// Check this user does not fit multiple application service namespaces
+	if UsernameMatchesMultipleExclusiveNamespaces(cfg, username) {
+		return "", &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.Exclusive("Supplied username " + username +
+				" matches multiple exclusive application service namespaces. Only 1 match allowed"),
+		}
+	}
+
 	// No errors, registration valid
 	return matchedApplicationService.ID, nil
 }
 
-// Register processes a /register request. http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
+// Register processes a /register request.
+// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
 	accountDB *accounts.Database,
@@ -364,6 +378,16 @@ func Register(
 	}
 	if resErr = validatePassword(r.Password); resErr != nil {
 		return *resErr
+	}
+
+	// Make sure normal user isn't registering under an exclusive application
+	// service namespace
+	if r.Auth.Type != "m.login.application_service" &&
+		cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(r.Username) {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Exclusive("This username is registered by an application service."),
+		}
 	}
 
 	logger := util.GetLogger(req.Context())

@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -230,6 +231,13 @@ type Dendrite struct {
 		// Application Services parsed from their config files
 		// The paths of which were given above in the main config file
 		ApplicationServices []ApplicationService
+
+		// A meta-regex compiled from all exclusive Application Service
+		// Regexes. When a user registers, we check that their username
+		// does not match any exclusive Application Service namespaces
+		ExclusiveApplicationServicesUsernameRegexp *regexp.Regexp
+
+		// TODO: Exclusive alias, room regexp's
 	} `yaml:"-"`
 }
 
