@@ -109,6 +109,12 @@ func UserInUse(msg string) *MatrixError {
 	return &MatrixError{"M_USER_IN_USE", msg}
 }
 
+// Exclusive is an error returned when an application service tries to register
+// an username that is outside of its registered namespace
+func Exclusive(msg string) *MatrixError {
+	return &MatrixError{"M_EXCLUSIVE", msg}
+}
+
 // GuestAccessForbidden is an error which is returned when the client is
 // forbidden from accessing a resource as a guest.
 func GuestAccessForbidden(msg string) *MatrixError {

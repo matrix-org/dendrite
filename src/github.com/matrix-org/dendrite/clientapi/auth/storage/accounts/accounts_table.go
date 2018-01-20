@@ -32,14 +32,16 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     -- When this account was first created, as a unix timestamp (ms resolution).
     created_ts BIGINT NOT NULL,
     -- The password hash for this account. Can be NULL if this is a passwordless account.
-    password_hash TEXT
+    password_hash TEXT,
+    -- Identifies which Application Service this account belongs to.
+    appservice_id TEXT,
     -- TODO:
-    -- is_guest, is_admin, appservice_id, upgraded_ts, devices, any email reset stuff?
+    -- is_guest, is_admin, upgraded_ts, devices, any email reset stuff?
 );
 `
 
 const insertAccountSQL = "" +
-	"INSERT INTO account_accounts(localpart, created_ts, password_hash) VALUES ($1, $2, $3)"
+	"INSERT INTO account_accounts(localpart, created_ts, password_hash, appservice_id) VALUES ($1, $2, $3, $4)"
 
 const selectAccountByLocalpartSQL = "" +
 	"SELECT localpart FROM account_accounts WHERE localpart = $1"
@@ -78,7 +80,7 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
 func (s *accountsStatements) insertAccount(
-	ctx context.Context, localpart, hash string,
+	ctx context.Context, localpart, hash, appserviceID string,
 ) (*authtypes.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := s.insertAccountStmt
@@ -86,9 +88,10 @@ func (s *accountsStatements) insertAccount(
 		return nil, err
 	}
 	return &authtypes.Account{
-		Localpart:  localpart,
-		UserID:     makeUserID(localpart, s.serverName),
-		ServerName: s.serverName,
+		Localpart:    localpart,
+		UserID:       makeUserID(localpart, s.serverName),
+		ServerName:   s.serverName,
+		AppServiceID: appserviceID,
 	}, nil
 }
 

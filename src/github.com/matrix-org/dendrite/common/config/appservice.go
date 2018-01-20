@@ -47,8 +47,9 @@ type ApplicationService struct {
 	Namespaces map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
 }
 
+// loadAppservices iterates through all application service config files
+// and loads their data into the config object for later access.
 func loadAppservices(config *Dendrite) error {
-	// Iterate through and return all the Application Services
 	for _, configPath := range config.ApplicationServices.ConfigFiles {
 		// Create a new application service
 		var appservice ApplicationService
@@ -74,6 +75,19 @@ func loadAppservices(config *Dendrite) error {
 		config.Derived.ApplicationServices = append(
 			config.Derived.ApplicationServices, appservice)
 	}
+
+	// Check for any errors in the loaded application services
+	return checkErrors(config)
+}
+
+// checkErrors checks for any configuration errors amongst the loaded
+// application services according to the application service spec.
+func checkErrors(config *Dendrite) error {
+	// TODO: Check that no two app services have the same as_token or id
+
+	// TODO: Check that namespace(s) are valid regex
+
+	// TODO: Check that exclusive namespaces are actually exclusive
 
 	return nil
 }

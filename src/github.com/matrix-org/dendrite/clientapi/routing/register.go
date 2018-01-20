@@ -63,7 +63,7 @@ var (
 // remembered. If ANY parameters are supplied, the server should REPLACE all knowledge of
 // previous parameters with the ones supplied. This mean you cannot "build up" request params.
 type registerRequest struct {
-	// registration parameters.
+	// registration parameters
 	Password string `json:"password"`
 	Username string `json:"username"`
 	Admin    bool   `json:"admin"`
@@ -71,6 +71,10 @@ type registerRequest struct {
 	Auth authDict `json:"auth"`
 
 	InitialDisplayName *string `json:"initial_device_display_name"`
+
+	// Application Services place Type in the root of their registration
+	// request, whereas clients place it in the authDict struct.
+	Type authtypes.LoginType `json:"type"`
 }
 
 type authDict struct {
@@ -233,6 +237,95 @@ func validateRecaptcha(
 	return nil
 }
 
+// UsernameIsWithinApplicationServiceNamespace checks to see if a username falls
+// within any of the namespaces of a given Application Service. If no
+// Application Service is given, it will check to see if it matches any
+// Application Service's namespace.
+func UsernameIsWithinApplicationServiceNamespace(
+	cfg *config.Dendrite,
+	username string,
+	appservice *config.ApplicationService,
+) (bool, *util.JSONResponse) {
+	if appservice != nil {
+		// Loop through given Application Service's namespaces and see if any match
+		for _, namespace := range appservice.Namespaces["users"] {
+			match, err := regexp.MatchString(namespace.Regex, username)
+			if err != nil {
+				return false, &util.JSONResponse{
+					Code: 401,
+					JSON: jsonerror.BadJSON("Supplied Application Service namespace" + namespace.Regex + "is invalid."),
+				}
+			}
+			if match {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	// Loop through all known Application Service's namespaces and see if any match
+	for _, knownAppservice := range cfg.Derived.ApplicationServices {
+		for _, namespace := range knownAppservice.Namespaces["users"] {
+			match, err := regexp.MatchString(namespace.Regex, username)
+			if err != nil {
+				return false, &util.JSONResponse{
+					Code: 401,
+					JSON: jsonerror.BadJSON("Supplied Application Service namespace" + namespace.Regex + "is invalid."),
+				}
+			}
+			if match {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// validateApplicationService checks if a provided application service token
+// corresponds to one that is registered. If so, then it checks if the desired
+// username is within that application service's namespace. As long as these
+// two requirements are met, no error will be returned.
+func validateApplicationService(
+	cfg *config.Dendrite,
+	req *http.Request,
+	username string,
+) (string, *util.JSONResponse) {
+	// Check if the token if the application service is valid with one we have
+	// registered in the config.
+	accessToken := req.URL.Query().Get("access_token")
+	var matchedApplicationService *config.ApplicationService
+	for _, appservice := range cfg.Derived.ApplicationServices {
+		if appservice.ASToken == accessToken {
+			matchedApplicationService = &appservice
+			break
+		}
+	}
+	if matchedApplicationService != nil {
+		return "", &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.BadJSON("Supplied access_token does not match any known application service"),
+		}
+	}
+
+	// Ensure the desired username is within at least one of the application service's namespaces.
+	matched, err := UsernameIsWithinApplicationServiceNamespace(cfg, username, matchedApplicationService)
+	if err != nil {
+		return "", err
+	}
+
+	// If we didn't find any matches, return M_EXCLUSIVE
+	if !matched {
+		return "", &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.Exclusive("Supplied username " + username +
+				" did not match any namespaces for application service ID: " + matchedApplicationService.ID),
+		}
+	}
+
+	// No errors, registration valid
+	return matchedApplicationService.ID, nil
+}
+
 // Register processes a /register request. http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
@@ -294,7 +387,6 @@ func handleRegistrationFlow(
 	deviceDB *devices.Database,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
-	// TODO: AS API registration
 	// TODO: Enable registration config flag
 	// TODO: Guest account upgrading
 
@@ -331,6 +423,21 @@ func handleRegistrationFlow(
 		// Add SharedSecret to the list of completed registration stages
 		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeSharedSecret)
 
+	case authtypes.LoginTypeApplicationService:
+		// Check Application Service register user request is valid.
+		// The application service's ID is returned if so.
+		appserviceID, err := validateApplicationService(cfg, req, r.Username)
+
+		if err != nil {
+			return *err
+		}
+
+		// If no error, application service was successfully validated.
+		// Don't need to worry about appending to registration stages as
+		// application service registration is entirely separate.
+		return completeRegistration(req.Context(), accountDB, deviceDB,
+			r.Username, "", appserviceID, r.InitialDisplayName)
+
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
@@ -355,7 +462,7 @@ func handleRegistrationFlow(
 	}
 
 	return completeRegistration(req.Context(), accountDB, deviceDB,
-		r.Username, r.Password, r.InitialDisplayName)
+		r.Username, r.Password, "", r.InitialDisplayName)
 }
 
 // LegacyRegister process register requests from the legacy v1 API
@@ -396,10 +503,10 @@ func LegacyRegister(
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
 	default:
 		return util.JSONResponse{
 			Code: 501,
@@ -441,7 +548,7 @@ func completeRegistration(
 	ctx context.Context,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
-	username, password string,
+	username, password, appserviceID string,
 	displayName *string,
 ) util.JSONResponse {
 	if username == "" {
@@ -450,14 +557,15 @@ func completeRegistration(
 			JSON: jsonerror.BadJSON("missing username"),
 		}
 	}
-	if password == "" {
+	// Blank passwords are only allowed by registered application services
+	if password == "" && appserviceID == "" {
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.BadJSON("missing password"),
 		}
 	}
 
-	acc, err := accountDB.CreateAccount(ctx, username, password)
+	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 500,
