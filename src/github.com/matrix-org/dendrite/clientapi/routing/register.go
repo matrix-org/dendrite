@@ -451,18 +451,36 @@ func handleRegistrationFlow(
 	}
 
 	// Check if the user's registration flow has been completed successfully
-	if !checkFlowCompleted(sessions[sessionID], cfg.Derived.Registration.Flows) {
-		// There are still more stages to complete.
-		// Return the flows and those that have been completed.
-		return util.JSONResponse{
-			Code: 401,
-			JSON: newUserInteractiveResponse(sessionID,
-				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
-		}
+	// A response with current registration flow and remaining available methods
+	// will be returned if a flow has not been successfully completed yet
+	return checkAndCompleteFlow(sessions[sessionID], req, r, sessionID, cfg, accountDB, deviceDB)
+}
+
+// checkAndCompleteFlow checks if a given registration flow is completed given
+// a set of allowed flows. If so, registration is completed, otherwise a
+// response with
+func checkAndCompleteFlow(
+	flow []authtypes.LoginType,
+	req *http.Request,
+	r registerRequest,
+	sessionID string,
+	cfg *config.Dendrite,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+) util.JSONResponse {
+	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
+		// This flow was completed, registration can continue
+		return completeRegistration(req.Context(), accountDB, deviceDB,
+			r.Username, r.Password, "", r.InitialDisplayName)
 	}
 
-	return completeRegistration(req.Context(), accountDB, deviceDB,
-		r.Username, r.Password, "", r.InitialDisplayName)
+	// There are still more stages to complete.
+	// Return the flows and those that have been completed.
+	return util.JSONResponse{
+		Code: 401,
+		JSON: newUserInteractiveResponse(sessionID,
+			cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
+	}
 }
 
 // LegacyRegister process register requests from the legacy v1 API
@@ -688,7 +706,10 @@ func checkFlows(
 // checkFlowCompleted checks if a registration flow complies with any allowed flow
 // dictated by the server. Order of stages does not matter. A user may complete
 // extra stages as long as the required stages of at least one flow is met.
-func checkFlowCompleted(flow []authtypes.LoginType, allowedFlows []authtypes.Flow) bool {
+func checkFlowCompleted(
+	flow []authtypes.LoginType,
+	allowedFlows []authtypes.Flow,
+) bool {
 	// Iterate through possible flows to check whether any have been fully completed.
 	for _, allowedFlow := range allowedFlows {
 		if checkFlows(flow, allowedFlow.Stages) {
