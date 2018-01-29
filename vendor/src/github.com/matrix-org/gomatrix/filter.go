@@ -63,7 +63,7 @@ func DefaultFilter() Filter {
 		Room: FilterRoom{
 			AccountData:  DefaultFilterPart(),
 			Ephemeral:    DefaultFilterPart(),
-			IncludeLeave: false, //TODO check default value on synapse
+			IncludeLeave: false,
 			NotRooms:     nil,
 			Rooms:        nil,
 			State:        DefaultFilterPart(),
