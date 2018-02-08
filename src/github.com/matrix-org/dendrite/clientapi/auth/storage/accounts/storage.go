@@ -121,11 +121,17 @@ func (d *Database) SetDisplayName(
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, nil.
 func (d *Database) CreateAccount(
-	ctx context.Context, localpart, plaintextPassword string,
+	ctx context.Context, localpart, plaintextPassword, appserviceID string,
 ) (*authtypes.Account, error) {
-	hash, err := hashPassword(plaintextPassword)
-	if err != nil {
-		return nil, err
+	var err error
+
+	// Generate a password hash if this is not a password-less user
+	hash := ""
+	if plaintextPassword != "" {
+		hash, err = hashPassword(plaintextPassword)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := d.profiles.insertProfile(ctx, localpart); err != nil {
 		if common.IsUniqueConstraintViolationErr(err) {
@@ -133,7 +139,7 @@ func (d *Database) CreateAccount(
 		}
 		return nil, err
 	}
-	return d.accounts.insertAccount(ctx, localpart, hash)
+	return d.accounts.insertAccount(ctx, localpart, hash, appserviceID)
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
