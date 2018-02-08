@@ -312,7 +312,7 @@ func validateApplicationService(
 	if matchedApplicationService != nil {
 		return "", &util.JSONResponse{
 			Code: 401,
-			JSON: jsonerror.BadJSON("Supplied access_token does not match any known application service"),
+			JSON: jsonerror.UnknownToken("Supplied access_token does not match any known application service"),
 		}
 	}
 
@@ -321,8 +321,8 @@ func validateApplicationService(
 		// If we didn't find any matches, return M_EXCLUSIVE
 		return "", &util.JSONResponse{
 			Code: 401,
-			JSON: jsonerror.Exclusive("Supplied username " + username +
-				" did not match any namespaces for application service ID: " + matchedApplicationService.ID),
+			JSON: jsonerror.ASExclusive(fmt.Sprintf(
+				"Supplied username %s did not match any namespaces for application service ID: %s", username, matchedApplicationService.ID)),
 		}
 	}
 
@@ -330,8 +330,8 @@ func validateApplicationService(
 	if UsernameMatchesMultipleExclusiveNamespaces(cfg, username) {
 		return "", &util.JSONResponse{
 			Code: 401,
-			JSON: jsonerror.Exclusive("Supplied username " + username +
-				" matches multiple exclusive application service namespaces. Only 1 match allowed"),
+			JSON: jsonerror.ASExclusive(fmt.Sprintf(
+				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", username)),
 		}
 	}
 
@@ -386,7 +386,7 @@ func Register(
 		cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(r.Username) {
 		return util.JSONResponse{
 			Code: 400,
-			JSON: jsonerror.Exclusive("This username is registered by an application service."),
+			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
 		}
 	}
 

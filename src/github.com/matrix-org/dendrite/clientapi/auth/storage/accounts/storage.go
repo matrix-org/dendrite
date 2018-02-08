@@ -127,7 +127,7 @@ func (d *Database) CreateAccount(
 
 	// Generate a password hash if this is not a password-less user
 	hash := ""
-	if appserviceID == "" && plaintextPassword != "" {
+	if plaintextPassword != "" {
 		hash, err = hashPassword(plaintextPassword)
 		if err != nil {
 			return nil, err

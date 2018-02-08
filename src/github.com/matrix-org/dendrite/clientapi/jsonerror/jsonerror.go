@@ -86,7 +86,7 @@ func MissingToken(msg string) *MatrixError {
 }
 
 // UnknownToken is an error when the client tries to access a resource which
-// requires authentication and supplies a valid, but out-of-date token.
+// requires authentication and supplies an unrecognized token
 func UnknownToken(msg string) *MatrixError {
 	return &MatrixError{"M_UNKNOWN_TOKEN", msg}
 }
@@ -109,9 +109,10 @@ func UserInUse(msg string) *MatrixError {
 	return &MatrixError{"M_USER_IN_USE", msg}
 }
 
-// Exclusive is an error returned when an application service tries to register
-// an username that is outside of its registered namespace
-func Exclusive(msg string) *MatrixError {
+// ASExclusive is an error returned when an application service tries to
+// register an username that is outside of its registered namespace, or if a
+// user attempts to register a username within an exclusive namespace
+func ASExclusive(msg string) *MatrixError {
 	return &MatrixError{"M_EXCLUSIVE", msg}
 }
 
