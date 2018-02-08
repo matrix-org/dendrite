@@ -84,9 +84,17 @@ func (s *accountsStatements) insertAccount(
 ) (*authtypes.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := s.insertAccountStmt
-    if _, err := stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID ? appserviceID : nil); err != nil {
+
+	var err error
+	if appserviceID == "" {
+		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil)
+	} else {
+		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID)
+	}
+	if err != nil {
 		return nil, err
 	}
+
 	return &authtypes.Account{
 		Localpart:    localpart,
 		UserID:       makeUserID(localpart, s.serverName),
