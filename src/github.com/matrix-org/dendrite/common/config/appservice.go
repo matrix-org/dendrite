@@ -113,6 +113,12 @@ func setupRegexps(cfg *Dendrite) {
 	// regex and deny access if it isn't from an application service
 	exclusiveUsernames := strings.Join(exclusiveUsernameStrings, "|")
 
+	// If there are no exclusive username regexes, compile string so that it
+	// will not match any valid usernames
+	if exclusiveUsernames == "" {
+		exclusiveUsernames = "^$"
+	}
+
 	// TODO: Aliases and rooms. Needed?
 	//exclusiveAliases := strings.Join(exclusiveAliasStrings, "|")
 	//exclusiveRooms := strings.Join(exclusiveRoomStrings, "|")

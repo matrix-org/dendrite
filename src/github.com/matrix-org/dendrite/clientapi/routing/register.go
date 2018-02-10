@@ -381,8 +381,9 @@ func Register(
 	}
 
 	// Make sure normal user isn't registering under an exclusive application
-	// service namespace
+	// service namespace. Skip this check if no app services are registered.
 	if r.Auth.Type != "m.login.application_service" &&
+		len(cfg.Derived.ApplicationServices) != 0 &&
 		cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(r.Username) {
 		return util.JSONResponse{
 			Code: 400,
