@@ -115,6 +115,13 @@ func Setup(
 		},
 	)).Methods("GET")
 
+	v1fedmux.Handle("/query/client_keys", common.MakeFedAPI(
+		"federation_query_client_keys", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			return LocalKeys(cfg)
+		},
+	)).Methods("GET")
+
 	v1fedmux.Handle("/query/profile", common.MakeFedAPI(
 		"federation_query_profile", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
