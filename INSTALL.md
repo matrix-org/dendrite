@@ -52,6 +52,21 @@ kafka/bin/zookeeper-server-start.sh -daemon kafka/config/zookeeper.properties
 kafka/bin/kafka-server-start.sh -daemon kafka/config/server.properties
 ```
 
+On MacOS, you can use [homebrew](https://brew.sh/) for easier setup of kafka
+
+```bash
+brew install kafka
+brew services start zookeeper
+brew services start kafka
+```
+
+You can stop Kafka service by running
+
+```bash
+brew services stop zookeeper
+brew services stop kafka
+```
+
 ## Configuration
 
 ### Postgres database setup
