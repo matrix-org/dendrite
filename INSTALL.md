@@ -62,10 +62,23 @@ Dendrite requires a postgres database engine, version 9.5 or later.
   ```bash
   sudo -u postgres createuser -P dendrite     # prompts for password
   ```
+
+On macOS you need to run:
+```bash
+createuser -P dendrite
+```
+
 * Create databases:
   ```bash
   for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
+  done
+  ```
+
+On macOS you need to run:
+  ```bash
+  for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi naffka; do
+     createdb -O dendrite dendrite_$i
   done
   ```
 
