@@ -17,6 +17,8 @@ package routing
 import (
 	"html/template"
 	"net/http"
+
+	"github.com/matrix-org/dendrite/common/config"
 )
 
 // RecaptchaTemplate is template for recaptcha auth
@@ -87,14 +89,18 @@ if (window.onAuthDone) {
 `
 
 // AuthFallback implements GET on /auth/{authType}/fallback/web?session={sessionID}
-func AuthFallback(w http.ResponseWriter, req *http.Request, authType string, sessionID string) {
+// TODO: Handle POST requests too
+func AuthFallback(
+	w http.ResponseWriter, req *http.Request, authType string, sessionID string,
+	cfg config.Dendrite,
+) {
 	if req.Method == "GET" {
 		t := template.Must(template.New("response").Parse(RECAPTCHA_TEMPLATE))
 
 		data := map[string]string{
-			"MyUrl":   "TODO",
-			"Session": "TODO",
-			"SiteKey": "TODO",
+			"MyUrl":   req.URL.String(),
+			"Session": sessionID,
+			"SiteKey": cfg.Matrix.RecaptchaPublicKey,
 		}
 
 		if err := t.Execute(w, data); err != nil {
