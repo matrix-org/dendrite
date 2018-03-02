@@ -39,6 +39,19 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	return prometheus.InstrumentHandler(metricsName, http.HandlerFunc(withSpan))
 }
 
+// MakeHTMLAPI adds Span metrics to the HTML Handler function
+// This is used to serve HTML template
+func MakeHtmlAPI(metricsName string, f func(w http.ResponseWriter, *http.Request)) http.Handler {
+	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		span := opentracing.StartSpan(metricsName)
+		defer span.Finish()
+		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
+		f(w, req)
+	}
+
+	return prometheus.InstrumentHandler(metricsName, http.HandlerFunc(withSpan))
+}
+
 // MakeInternalAPI turns a util.JSONRequestHandler function into an http.Handler.
 // This is used for APIs that are internal to dendrite.
 // If we are passed a tracing context in the request headers then we use that
