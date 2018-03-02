@@ -109,7 +109,7 @@ func Login(
 			// but that would leak the existence of the user.
 			return util.JSONResponse{
 				Code: 403,
-				JSON: jsonerror.Forbidden("username or password was incorrect, or the accouqnt does not exist"),
+				JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
 			}
 		}
 
