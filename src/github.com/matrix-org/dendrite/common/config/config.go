@@ -525,6 +525,9 @@ func readKeyPEM(path string, data []byte) (gomatrixserverlib.KeyID, ed25519.Priv
 		if data == nil {
 			return "", nil, fmt.Errorf("no matrix private key PEM data in %q", path)
 		}
+		if keyBlock == nil {
+			return "", nil, fmt.Errorf("keyBlock is nil %q", path)
+		}
 		if keyBlock.Type == "MATRIX PRIVATE KEY" {
 			keyID := keyBlock.Headers["Key-ID"]
 			if keyID == "" {
