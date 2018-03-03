@@ -50,9 +50,26 @@ const (
 	sessionIDLength   = 24
 )
 
+type sessionsDict struct {
+	sessions map[string][]authtypes.LoginType
+}
+
+func (d sessionsDict) Get(key string) []authtypes.LoginType {
+	if v, ok := d.sessions[key]; ok {
+		return v
+	}
+	return make([]authtypes.LoginType, 0)
+}
+
+func (d *sessionsDict) Set(key string, v []authtypes.LoginType) {
+	d.sessions[key] = v
+}
+
 var (
 	// TODO: Remove old sessions. Need to do so on a session-specific timeout.
-	sessions           = make(map[string][]authtypes.LoginType) // Sessions and completed flow stages
+	sessions = sessionsDict{ // Sessions and completed flow stages
+		sessions: make(map[string][]authtypes.LoginType),
+	}
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-./]+$`)
 )
 
@@ -112,7 +129,7 @@ func newUserInteractiveResponse(
 	params map[string]interface{},
 ) userInteractiveResponse {
 	return userInteractiveResponse{
-		fs, sessions[sessionID], params, sessionID,
+		fs, sessions.Get(sessionID), params, sessionID,
 	}
 }
 
@@ -433,7 +450,7 @@ func handleRegistrationFlow(
 		}
 
 		// Add Recaptcha to the list of completed registration stages
-		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeRecaptcha)
+		sessions.Set(sessionID, append(sessions.Get(sessionID), authtypes.LoginTypeRecaptcha))
 
 	case authtypes.LoginTypeSharedSecret:
 		// Check shared secret against config
@@ -446,7 +463,7 @@ func handleRegistrationFlow(
 		}
 
 		// Add SharedSecret to the list of completed registration stages
-		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeSharedSecret)
+		sessions.Set(sessionID, append(sessions.Get(sessionID), authtypes.LoginTypeSharedSecret))
 
 	case authtypes.LoginTypeApplicationService:
 		// Check Application Service register user request is valid.
@@ -466,7 +483,7 @@ func handleRegistrationFlow(
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
-		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeDummy)
+		sessions.Set(sessionID, append(sessions.Get(sessionID), authtypes.LoginTypeDummy))
 
 	default:
 		return util.JSONResponse{
@@ -478,7 +495,7 @@ func handleRegistrationFlow(
 	// Check if the user's registration flow has been completed successfully
 	// A response with current registration flow and remaining available methods
 	// will be returned if a flow has not been successfully completed yet
-	return checkAndCompleteFlow(sessions[sessionID], req, r, sessionID, cfg, accountDB, deviceDB)
+	return checkAndCompleteFlow(sessions.Get(sessionID), req, r, sessionID, cfg, accountDB, deviceDB)
 }
 
 // checkAndCompleteFlow checks if a given registration flow is completed given
