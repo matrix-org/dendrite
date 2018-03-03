@@ -19,8 +19,10 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/clientapi/auth/tokens"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
@@ -37,24 +39,26 @@ type flow struct {
 	Stages []string `json:"stages"`
 }
 
-type passwordRequest struct {
-	User               string  `json:"user"`
-	Password           string  `json:"password"`
-	InitialDisplayName *string `json:"initial_device_display_name"`
-}
-
-type loginResponse struct {
-	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token"`
-	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id"`
-}
-
-func passwordLogin() loginFlows {
+func defaultPasswordLogin() loginFlows {
 	f := loginFlows{}
-	s := flow{"m.login.password", []string{"m.login.password"}}
+	s := flow{string(authtypes.LoginTypePassword), []string{string(authtypes.LoginTypePassword)}}
 	f.Flows = append(f.Flows, s)
 	return f
+}
+
+// GetLocalpartDomainFromUserid extracts localpart & domain of server from userID
+// Returns JSON error in case of invalid username.
+func GetLocalpartDomainFromUserid(userID string) (
+	string, gomatrixserverlib.ServerName, *util.JSONResponse) {
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return localpart, domain, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername("Invalid username"),
+		}
+	}
+
+	return localpart, domain, nil
 }
 
 // Login implements GET and POST /login
@@ -62,85 +66,188 @@ func Login(
 	req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database,
 	cfg config.Dendrite,
 ) util.JSONResponse {
-	if req.Method == http.MethodGet { // TODO: support other forms of login other than password, depending on config options
+	if req.Method == http.MethodGet {
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: passwordLogin(),
+			JSON: defaultPasswordLogin(),
 		}
 	} else if req.Method == http.MethodPost {
-		var r passwordRequest
+		var r authtypes.LoginRequest
+
 		resErr := httputil.UnmarshalJSONRequest(req, &r)
 		if resErr != nil {
 			return *resErr
 		}
-		if r.User == "" {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("'user' must be supplied."),
-			}
-		}
 
 		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
 
-		// r.User can either be a user ID or just the localpart... or other things maybe.
-		localpart := r.User
-		if strings.HasPrefix(r.User, "@") {
-			var domain gomatrixserverlib.ServerName
-			var err error
-			localpart, domain, err = gomatrixserverlib.SplitID('@', r.User)
-			if err != nil {
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("Invalid username"),
-				}
-			}
-
-			if domain != cfg.Matrix.ServerName {
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("User ID not ours"),
-				}
-			}
-		}
-
-		acc, err := accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
-		if err != nil {
-			// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
-			// but that would leak the existence of the user.
+		switch r.Type {
+		case authtypes.LoginTypePassword:
+			return handlePasswordLogin(r, accountDB, deviceDB, req, cfg)
+		case authtypes.LoginTypeToken:
+			return handleTokenLogin(r, deviceDB, req, cfg)
+		default:
 			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+				Code: http.StatusNotImplemented,
+				JSON: jsonerror.Unknown("Unknown login type"),
 			}
-		}
-
-		token, err := auth.GenerateAccessToken()
-		if err != nil {
-			httputil.LogThenError(req, err)
-		}
-
-		// TODO: Use the device ID in the request
-		dev, err := deviceDB.CreateDevice(
-			req.Context(), acc.Localpart, nil, token, r.InitialDisplayName,
-		)
-		if err != nil {
-			return util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
-			}
-		}
-
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: loginResponse{
-				UserID:      dev.UserID,
-				AccessToken: dev.AccessToken,
-				HomeServer:  cfg.Matrix.ServerName,
-				DeviceID:    dev.ID,
-			},
 		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),
+	}
+}
+
+func handlePasswordLogin(
+	r authtypes.LoginRequest, accountDB *accounts.Database, deviceDB *devices.Database,
+	req *http.Request, cfg config.Dendrite) util.JSONResponse {
+
+	if r.User == "" {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("'user' must be supplied."),
+		}
+	}
+
+	// r.User can either be a user ID or just the localpart... or other things maybe.
+	localpart := r.User
+
+	if strings.HasPrefix(r.User, "@") {
+		var domain gomatrixserverlib.ServerName
+		var err *util.JSONResponse
+
+		localpart, domain, err = GetLocalpartDomainFromUserid(r.User)
+		if err != nil {
+			return *err
+		}
+
+		if domain != cfg.Matrix.ServerName {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidUsername("User ID not ours"),
+			}
+		}
+	}
+
+	_, err := accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
+
+	if err != nil {
+		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+		// but that would leak the existence of the user.
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+		}
+	}
+
+	var token string
+	token, err = tokens.GenerateLoginToken(tokens.TokenOptions{
+		ServerMacaroonSecret: []byte(string(cfg.Matrix.PrivateKey)),
+		ServerName:           string(cfg.Matrix.ServerName),
+		UserID:               r.User,
+	})
+
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotImplemented,
+			JSON: jsonerror.Unknown("Token generation failed"),
+		}
+	}
+
+	util.GetLogger(req.Context()).WithField("user", r.User).Info(token)
+
+	return completeLogin(r, localpart, deviceDB, req, cfg)
+}
+
+func handleTokenLogin(
+	r authtypes.LoginRequest, deviceDB *devices.Database,
+	req *http.Request, cfg config.Dendrite) util.JSONResponse {
+	if r.Token == "" {
+		return util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.MissingToken("Missing login token"),
+		}
+	}
+
+	// UserID may be left empty for token based login
+	userID := r.User
+
+	if userID == "" {
+		var err error
+		userID, err = tokens.GetUserFromToken(r.Token)
+
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.UnknownToken(err.Error()),
+			}
+		}
+	}
+
+	// r.User can either be a user ID or just the localpart... or other things maybe.
+	localpart := userID
+
+	if strings.HasPrefix(userID, "@") {
+		var domain gomatrixserverlib.ServerName
+		var resErr *util.JSONResponse
+
+		localpart, domain, resErr = GetLocalpartDomainFromUserid(r.User)
+		if resErr != nil {
+			return *resErr
+		}
+
+		if domain != cfg.Matrix.ServerName {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidUsername("User ID not ours"),
+			}
+		}
+	}
+
+	tokenOptions := tokens.TokenOptions{
+		ServerMacaroonSecret: []byte(string(cfg.Matrix.PrivateKey)),
+		ServerName:           string(cfg.Matrix.ServerName),
+		UserID:               userID,
+	}
+
+	resErr := tokens.ValidateToken(tokenOptions, r.Token)
+
+	if resErr != nil {
+		return *resErr
+	}
+
+	return completeLogin(r, localpart, deviceDB, req, cfg)
+}
+
+// completeLogin completes the login process after the client request has been
+// authenticated by one of the supported methods.
+func completeLogin(r authtypes.LoginRequest, localpart string,
+	deviceDB *devices.Database, req *http.Request, cfg config.Dendrite,
+) util.JSONResponse {
+	accessToken, err := auth.GenerateAccessToken()
+	if err != nil {
+		httputil.LogThenError(req, err)
+	}
+
+	// TODO: Use the device ID in the request
+	dev, err := deviceDB.CreateDevice(
+		req.Context(), localpart, nil, accessToken, r.InitialDisplayName,
+	)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: authtypes.LoginResponse{
+			UserID:      dev.UserID,
+			AccessToken: dev.AccessToken,
+			HomeServer:  cfg.Matrix.ServerName,
+			DeviceID:    dev.ID,
+		},
 	}
 }
