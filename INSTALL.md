@@ -69,6 +69,8 @@ Dendrite requires a postgres database engine, version 9.5 or later.
   done
   ```
 
+(On macOS, omit `sudo -u postgres` from the above commands.)
+
 ### Crypto key generation
 
 Generate the keys:

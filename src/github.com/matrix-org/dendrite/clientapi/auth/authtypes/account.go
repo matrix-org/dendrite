@@ -20,10 +20,11 @@ import (
 
 // Account represents a Matrix account on this home server.
 type Account struct {
-	UserID     string
-	Localpart  string
-	ServerName gomatrixserverlib.ServerName
-	Profile    *Profile
+	UserID       string
+	Localpart    string
+	ServerName   gomatrixserverlib.ServerName
+	Profile      *Profile
+	AppServiceID string
 	// TODO: Other flags like IsAdmin, IsGuest
 	// TODO: Devices
 	// TODO: Associations (e.g. with application services)

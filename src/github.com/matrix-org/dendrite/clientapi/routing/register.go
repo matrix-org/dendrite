@@ -63,7 +63,7 @@ var (
 // remembered. If ANY parameters are supplied, the server should REPLACE all knowledge of
 // previous parameters with the ones supplied. This mean you cannot "build up" request params.
 type registerRequest struct {
-	// registration parameters.
+	// registration parameters
 	Password string `json:"password"`
 	Username string `json:"username"`
 	Admin    bool   `json:"admin"`
@@ -71,6 +71,10 @@ type registerRequest struct {
 	Auth authDict `json:"auth"`
 
 	InitialDisplayName *string `json:"initial_device_display_name"`
+
+	// Application Services place Type in the root of their registration
+	// request, whereas clients place it in the authDict struct.
+	Type authtypes.LoginType `json:"type"`
 }
 
 type authDict struct {
@@ -233,7 +237,110 @@ func validateRecaptcha(
 	return nil
 }
 
-// Register processes a /register request. http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
+// UsernameIsWithinApplicationServiceNamespace checks to see if a username falls
+// within any of the namespaces of a given Application Service. If no
+// Application Service is given, it will check to see if it matches any
+// Application Service's namespace.
+func UsernameIsWithinApplicationServiceNamespace(
+	cfg *config.Dendrite,
+	username string,
+	appservice *config.ApplicationService,
+) bool {
+	if appservice != nil {
+		// Loop through given Application Service's namespaces and see if any match
+		for _, namespace := range appservice.NamespaceMap["users"] {
+			// AS namespaces are checked for validity in config
+			if namespace.RegexpObject.MatchString(username) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Loop through all known Application Service's namespaces and see if any match
+	for _, knownAppservice := range cfg.Derived.ApplicationServices {
+		for _, namespace := range knownAppservice.NamespaceMap["users"] {
+			// AS namespaces are checked for validity in config
+			if namespace.RegexpObject.MatchString(username) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// UsernameMatchesMultipleExclusiveNamespaces will check if a given username matches
+// more than one exclusive namespace. More than one is not allowed
+func UsernameMatchesMultipleExclusiveNamespaces(
+	cfg *config.Dendrite,
+	username string,
+) bool {
+	// Check namespaces and see if more than one match
+	matchCount := 0
+	for _, appservice := range cfg.Derived.ApplicationServices {
+		for _, namespaceSlice := range appservice.NamespaceMap {
+			for _, namespace := range namespaceSlice {
+				// Check if we have a match on this username
+				if namespace.RegexpObject.MatchString(username) {
+					matchCount++
+				}
+			}
+		}
+	}
+	return matchCount > 1
+}
+
+// validateApplicationService checks if a provided application service token
+// corresponds to one that is registered. If so, then it checks if the desired
+// username is within that application service's namespace. As long as these
+// two requirements are met, no error will be returned.
+func validateApplicationService(
+	cfg *config.Dendrite,
+	req *http.Request,
+	username string,
+) (string, *util.JSONResponse) {
+	// Check if the token if the application service is valid with one we have
+	// registered in the config.
+	accessToken := req.URL.Query().Get("access_token")
+	var matchedApplicationService *config.ApplicationService
+	for _, appservice := range cfg.Derived.ApplicationServices {
+		if appservice.ASToken == accessToken {
+			matchedApplicationService = &appservice
+			break
+		}
+	}
+	if matchedApplicationService != nil {
+		return "", &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.UnknownToken("Supplied access_token does not match any known application service"),
+		}
+	}
+
+	// Ensure the desired username is within at least one of the application service's namespaces.
+	if !UsernameIsWithinApplicationServiceNamespace(cfg, username, matchedApplicationService) {
+		// If we didn't find any matches, return M_EXCLUSIVE
+		return "", &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.ASExclusive(fmt.Sprintf(
+				"Supplied username %s did not match any namespaces for application service ID: %s", username, matchedApplicationService.ID)),
+		}
+	}
+
+	// Check this user does not fit multiple application service namespaces
+	if UsernameMatchesMultipleExclusiveNamespaces(cfg, username) {
+		return "", &util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.ASExclusive(fmt.Sprintf(
+				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", username)),
+		}
+	}
+
+	// No errors, registration valid
+	return matchedApplicationService.ID, nil
+}
+
+// Register processes a /register request.
+// http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
 	accountDB *accounts.Database,
@@ -273,6 +380,17 @@ func Register(
 		return *resErr
 	}
 
+	// Make sure normal user isn't registering under an exclusive application
+	// service namespace. Skip this check if no app services are registered.
+	if r.Auth.Type != "m.login.application_service" &&
+		len(cfg.Derived.ApplicationServices) != 0 &&
+		cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(r.Username) {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
+		}
+	}
+
 	logger := util.GetLogger(req.Context())
 	logger.WithFields(log.Fields{
 		"username":   r.Username,
@@ -294,7 +412,6 @@ func handleRegistrationFlow(
 	deviceDB *devices.Database,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
-	// TODO: AS API registration
 	// TODO: Enable registration config flag
 	// TODO: Guest account upgrading
 
@@ -331,6 +448,21 @@ func handleRegistrationFlow(
 		// Add SharedSecret to the list of completed registration stages
 		sessions[sessionID] = append(sessions[sessionID], authtypes.LoginTypeSharedSecret)
 
+	case authtypes.LoginTypeApplicationService:
+		// Check Application Service register user request is valid.
+		// The application service's ID is returned if so.
+		appserviceID, err := validateApplicationService(cfg, req, r.Username)
+
+		if err != nil {
+			return *err
+		}
+
+		// If no error, application service was successfully validated.
+		// Don't need to worry about appending to registration stages as
+		// application service registration is entirely separate.
+		return completeRegistration(req.Context(), accountDB, deviceDB,
+			r.Username, "", appserviceID, r.InitialDisplayName)
+
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
@@ -344,18 +476,36 @@ func handleRegistrationFlow(
 	}
 
 	// Check if the user's registration flow has been completed successfully
-	if !checkFlowCompleted(sessions[sessionID], cfg.Derived.Registration.Flows) {
-		// There are still more stages to complete.
-		// Return the flows and those that have been completed.
-		return util.JSONResponse{
-			Code: 401,
-			JSON: newUserInteractiveResponse(sessionID,
-				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
-		}
+	// A response with current registration flow and remaining available methods
+	// will be returned if a flow has not been successfully completed yet
+	return checkAndCompleteFlow(sessions[sessionID], req, r, sessionID, cfg, accountDB, deviceDB)
+}
+
+// checkAndCompleteFlow checks if a given registration flow is completed given
+// a set of allowed flows. If so, registration is completed, otherwise a
+// response with
+func checkAndCompleteFlow(
+	flow []authtypes.LoginType,
+	req *http.Request,
+	r registerRequest,
+	sessionID string,
+	cfg *config.Dendrite,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+) util.JSONResponse {
+	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
+		// This flow was completed, registration can continue
+		return completeRegistration(req.Context(), accountDB, deviceDB,
+			r.Username, r.Password, "", r.InitialDisplayName)
 	}
 
-	return completeRegistration(req.Context(), accountDB, deviceDB,
-		r.Username, r.Password, r.InitialDisplayName)
+	// There are still more stages to complete.
+	// Return the flows and those that have been completed.
+	return util.JSONResponse{
+		Code: 401,
+		JSON: newUserInteractiveResponse(sessionID,
+			cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
+	}
 }
 
 // LegacyRegister process register requests from the legacy v1 API
@@ -396,10 +546,10 @@ func LegacyRegister(
 			return util.MessageResponse(403, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
 	default:
 		return util.JSONResponse{
 			Code: 501,
@@ -441,7 +591,7 @@ func completeRegistration(
 	ctx context.Context,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
-	username, password string,
+	username, password, appserviceID string,
 	displayName *string,
 ) util.JSONResponse {
 	if username == "" {
@@ -450,14 +600,15 @@ func completeRegistration(
 			JSON: jsonerror.BadJSON("missing username"),
 		}
 	}
-	if password == "" {
+	// Blank passwords are only allowed by registered application services
+	if password == "" && appserviceID == "" {
 		return util.JSONResponse{
 			Code: 400,
 			JSON: jsonerror.BadJSON("missing password"),
 		}
 	}
 
-	acc, err := accountDB.CreateAccount(ctx, username, password)
+	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 500,
@@ -580,7 +731,10 @@ func checkFlows(
 // checkFlowCompleted checks if a registration flow complies with any allowed flow
 // dictated by the server. Order of stages does not matter. A user may complete
 // extra stages as long as the required stages of at least one flow is met.
-func checkFlowCompleted(flow []authtypes.LoginType, allowedFlows []authtypes.Flow) bool {
+func checkFlowCompleted(
+	flow []authtypes.LoginType,
+	allowedFlows []authtypes.Flow,
+) bool {
 	// Iterate through possible flows to check whether any have been fully completed.
 	for _, allowedFlow := range allowedFlows {
 		if checkFlows(flow, allowedFlow.Stages) {

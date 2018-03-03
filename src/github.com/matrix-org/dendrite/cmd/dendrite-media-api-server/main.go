@@ -15,64 +15,18 @@
 package main
 
 import (
-	"flag"
-	"net/http"
-
-	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/mediaapi/routing"
-	"github.com/matrix-org/dendrite/mediaapi/storage"
-	"github.com/matrix-org/gomatrixserverlib"
-
-	log "github.com/sirupsen/logrus"
-)
-
-const componentName = "mediaapi"
-
-var (
-	configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
+	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/mediaapi"
 )
 
 func main() {
-	common.SetupStdLogging()
+	cfg := basecomponent.ParseFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "MediaAPI")
+	defer base.Close() // nolint: errcheck
 
-	flag.Parse()
+	deviceDB := base.CreateDeviceDB()
 
-	if *configPath == "" {
-		log.Fatal("--config must be supplied")
-	}
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		log.Fatalf("Invalid config file: %s", err)
-	}
+	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 
-	common.SetupHookLogging(cfg.Logging, componentName)
-
-	closer, err := cfg.SetupTracing("DendriteMediaAPI")
-	if err != nil {
-		log.WithError(err).Fatalf("Failed to start tracer")
-	}
-	defer closer.Close() // nolint: errcheck
-
-	db, err := storage.Open(string(cfg.Database.MediaAPI))
-	if err != nil {
-		log.WithError(err).Panic("Failed to open database")
-	}
-
-	deviceDB, err := devices.NewDatabase(string(cfg.Database.Device), cfg.Matrix.ServerName)
-	if err != nil {
-		log.WithError(err).Panicf("Failed to setup device database(%q)", cfg.Database.Device)
-	}
-
-	client := gomatrixserverlib.NewClient()
-
-	log.Info("Starting media API server on ", cfg.Listen.MediaAPI)
-
-	api := mux.NewRouter()
-	routing.Setup(api, cfg, db, deviceDB, client)
-	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(api))
-
-	log.Fatal(http.ListenAndServe(string(cfg.Listen.MediaAPI), nil))
+	base.SetupAndServeHTTP(string(base.Cfg.Listen.MediaAPI))
 }

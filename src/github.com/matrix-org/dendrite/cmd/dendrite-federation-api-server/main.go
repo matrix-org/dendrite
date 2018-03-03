@@ -15,86 +15,27 @@
 package main
 
 import (
-	"flag"
-	"net/http"
-
-	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/federationapi/routing"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
-
-	log "github.com/sirupsen/logrus"
-)
-
-const componentName = "federationapi"
-
-var (
-	configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
+	"github.com/matrix-org/dendrite/federationapi"
 )
 
 func main() {
-	common.SetupStdLogging()
+	cfg := basecomponent.ParseFlags()
+	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI")
+	defer base.Close() // nolint: errcheck
 
-	flag.Parse()
+	accountDB := base.CreateAccountsDB()
+	keyDB := base.CreateKeyDB()
+	federation := base.CreateFederationClient()
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
-	if *configPath == "" {
-		log.Fatal("--config must be supplied")
-	}
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		log.Fatalf("Invalid config file: %s", err)
-	}
+	alias, input, query := base.CreateHTTPRoomserverAPIs()
 
-	common.SetupHookLogging(cfg.Logging, componentName)
-
-	closer, err := cfg.SetupTracing("DendriteFederationAPI")
-	if err != nil {
-		log.WithError(err).Fatalf("Failed to start tracer")
-	}
-	defer closer.Close() // nolint: errcheck
-
-	federation := gomatrixserverlib.NewFederationClient(
-		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+	federationapi.SetupFederationAPIComponent(
+		base, accountDB, federation, &keyRing,
+		alias, input, query,
 	)
 
-	keyDB, err := keydb.NewDatabase(string(cfg.Database.ServerKey))
-	if err != nil {
-		log.Panicf("Failed to setup key database(%q): %s", cfg.Database.ServerKey, err.Error())
-	}
-
-	accountDB, err := accounts.NewDatabase(string(cfg.Database.Account), cfg.Matrix.ServerName)
-	if err != nil {
-		log.Panicf("Failed to setup account database(%q): %s", cfg.Database.Account, err.Error())
-	}
-
-	keyRing := gomatrixserverlib.KeyRing{
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			// TODO: Use perspective key fetchers for production.
-			&gomatrixserverlib.DirectKeyFetcher{Client: federation.Client},
-		},
-		KeyDatabase: keyDB,
-	}
-
-	queryAPI := api.NewRoomserverQueryAPIHTTP(cfg.RoomServerURL(), nil)
-	inputAPI := api.NewRoomserverInputAPIHTTP(cfg.RoomServerURL(), nil)
-	aliasAPI := api.NewRoomserverAliasAPIHTTP(cfg.RoomServerURL(), nil)
-
-	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
-
-	if err != nil {
-		log.Panicf("Failed to setup kafka producers(%s): %s", cfg.Kafka.Addresses, err)
-	}
-
-	log.Info("Starting federation API server on ", cfg.Listen.FederationAPI)
-
-	api := mux.NewRouter()
-	routing.Setup(api, *cfg, queryAPI, aliasAPI, roomserverProducer, keyRing, federation, accountDB)
-	common.SetupHTTPAPI(http.DefaultServeMux, api)
-
-	log.Fatal(http.ListenAndServe(string(cfg.Listen.FederationAPI), nil))
+	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationAPI))
 }
