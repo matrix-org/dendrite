@@ -32,8 +32,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const componentName = "monolith"
-
 var (
 	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
 	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
