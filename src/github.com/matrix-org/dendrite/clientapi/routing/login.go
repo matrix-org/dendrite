@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -27,14 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-)
-
-type loginType string
-
-// https://matrix.org/docs/spec/client_server/r0.3.0.html#login
-const (
-	PasswordBased loginType = "m.login.password"
-	TokenBased    loginType = "m.login.token"
 )
 
 type loginFlows struct {
@@ -46,42 +39,23 @@ type flow struct {
 	Stages []string `json:"stages"`
 }
 
-type loginRequest struct {
-	Type               loginType `json:"type"`
-	User               string    `json:"user"`
-	Medium             string    `json:"medium"`
-	Address            string    `json:"address"`
-	Password           string    `json:"password"`
-	Token              string    `json:"token"`
-	DeviceID           string    `json:"device_id"`
-	InitialDisplayName *string   `json:"initial_device_display_name"`
-}
-
-type loginResponse struct {
-	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token"`
-	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id"`
-}
-
 func defaultPasswordLogin() loginFlows {
 	f := loginFlows{}
-	s := flow{string(PasswordBased), []string{string(PasswordBased)}}
+	s := flow{string(authtypes.LoginTypePassword), []string{string(authtypes.LoginTypePassword)}}
 	f.Flows = append(f.Flows, s)
 	return f
 }
 
 func handlePasswordLogin(
-	r loginRequest, accountDB *accounts.Database, deviceDB *devices.Database,
-	req *http.Request, cfg config.Dendrite) *util.JSONResponse {
+	r authtypes.LoginRequest, localpart string, accountDB *accounts.Database,
+	deviceDB *devices.Database, req *http.Request, cfg config.Dendrite) util.JSONResponse {
 
-	localpart := r.User
 	acc, err := accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
 
 	if err != nil {
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 		// but that would leak the existence of the user.
-		return &util.JSONResponse{
+		return util.JSONResponse{
 			Code: 403,
 			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
 		}
@@ -97,15 +71,15 @@ func handlePasswordLogin(
 		req.Context(), acc.Localpart, nil, token, r.InitialDisplayName,
 	)
 	if err != nil {
-		return &util.JSONResponse{
+		return util.JSONResponse{
 			Code: 500,
 			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
 		}
 	}
 
-	return &util.JSONResponse{
+	return util.JSONResponse{
 		Code: 200,
-		JSON: loginResponse{
+		JSON: authtypes.LoginResponse{
 			UserID:      dev.UserID,
 			AccessToken: dev.AccessToken,
 			HomeServer:  cfg.Matrix.ServerName,
@@ -115,41 +89,41 @@ func handlePasswordLogin(
 }
 
 func handleTokenLogin(
-	r loginRequest, deviceDB *devices.Database,
-	req *http.Request, cfg config.Dendrite) *util.JSONResponse {
+	r authtypes.LoginRequest, deviceDB *devices.Database,
+	req *http.Request, cfg config.Dendrite) util.JSONResponse {
 	if r.Token == "" {
-		return &util.JSONResponse{
+		return util.JSONResponse{
 			Code: 401,
-			JSON: jsonerror.MissingToken("missing access token"),
+			JSON: jsonerror.MissingToken("Missing access token"),
 		}
 	}
 
 	dev, err := deviceDB.GetDeviceByAccessToken(req.Context(), r.Token)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return &util.JSONResponse{
+			return util.JSONResponse{
 				Code: 401,
 				JSON: jsonerror.UnknownToken("Unknown token"),
 			}
 		}
-		return &util.JSONResponse{
-			Code: 401,
-			JSON: jsonerror.Unknown("Unexpected Server error occurred"),
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Unexpected server error occurred"),
 		}
 	}
 
 	if dev.ID != r.DeviceID {
 		// The access token specified in the request was generated for a
 		// different device.
-		return &util.JSONResponse{
+		return util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden("The access token was generated for a different device."),
+			JSON: jsonerror.Forbidden("Access token not valid for this device"),
 		}
 	}
 
-	return &util.JSONResponse{
+	return util.JSONResponse{
 		Code: 200,
-		JSON: loginResponse{
+		JSON: authtypes.LoginResponse{
 			UserID:      dev.UserID,
 			AccessToken: dev.AccessToken,
 			HomeServer:  cfg.Matrix.ServerName,
@@ -169,7 +143,7 @@ func Login(
 			JSON: defaultPasswordLogin(),
 		}
 	} else if req.Method == "POST" {
-		var r loginRequest
+		var r authtypes.LoginRequest
 		resErr := httputil.UnmarshalJSONRequest(req, &r)
 		if resErr != nil {
 			return *resErr
@@ -183,10 +157,13 @@ func Login(
 
 		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
 
+		// r.User can either be a user ID or just the localpart... or other things maybe.
+		localpart := r.User
+
 		if strings.HasPrefix(r.User, "@") {
 			var domain gomatrixserverlib.ServerName
 			var err error
-			_, domain, err = gomatrixserverlib.SplitID('@', r.User)
+			localpart, domain, err = gomatrixserverlib.SplitID('@', r.User)
 			if err != nil {
 				return util.JSONResponse{
 					Code: 400,
@@ -202,10 +179,18 @@ func Login(
 			}
 		}
 
-		if r.Type == PasswordBased {
-			return *handleTokenLogin(r, deviceDB, req, cfg)
+		switch r.Type {
+		case authtypes.LoginTypePassword:
+			return handlePasswordLogin(r, localpart, accountDB, deviceDB, req, cfg)
+		case authtypes.LoginTypeToken:
+			return handleTokenLogin(r, deviceDB, req, cfg)
+		default:
+			return util.JSONResponse{
+				Code: 501,
+				JSON: jsonerror.Unknown("Unknown login type"),
+			}
 		}
-		return *handlePasswordLogin(r, accountDB, deviceDB, req, cfg)
+
 	}
 	return util.JSONResponse{
 		Code: 405,
