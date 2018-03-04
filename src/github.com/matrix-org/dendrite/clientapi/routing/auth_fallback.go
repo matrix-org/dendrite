@@ -18,7 +18,10 @@ import (
 	"html/template"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/util"
 )
 
 // RecaptchaTemplate is template for recaptcha auth
@@ -88,25 +91,42 @@ if (window.onAuthDone) {
 </html>
 `
 
+// ServeTemplate fills data in template and serves it in http.ResponseWriter
+func ServeTemplate(w http.ResponseWriter, templateHTML string, data map[string]string) {
+	t := template.Must(template.New("response").Parse(templateHTML))
+	if err := t.Execute(w, data); err != nil {
+		panic(err)
+	}
+}
+
 // AuthFallback implements GET on /auth/{authType}/fallback/web?session={sessionID}
-// TODO: Handle POST requests too
 func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string, sessionID string,
 	cfg config.Dendrite,
-) {
+) util.JSONRespose {
 	if req.Method == "GET" {
-		t := template.Must(template.New("response").Parse(RECAPTCHA_TEMPLATE))
-
-		data := map[string]string{
-			"MyUrl":   req.URL.String(),
-			"Session": sessionID,
-			"SiteKey": cfg.Matrix.RecaptchaPublicKey,
+		// Handle Recaptcha
+		if authType == authtypes.LoginTypeRecaptcha {
+			data := map[string]string{
+				"MyUrl":   req.URL.String(),
+				"Session": sessionID,
+				"SiteKey": cfg.Matrix.RecaptchaPublicKey,
+			}
+			ServeTemplate(w, RecaptchaTemplate, data)
+			return nil
 		}
-
-		if err := t.Execute(w, data); err != nil {
-			panic(err)
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("Unknown auth stage type"),
 		}
-		// TODO: Handle rest of flow
+	} else if req.Method == "POST" {
+		// TODO: Handle POST requests too
+		// Check Recaptcha
+		// Serve success
+		// Else serve Recaptcha again
 	}
-	// TODO: Handle invalid request
+	return util.JSONResponse{
+		Code: 405,
+		JSON: jsonerror.NotFound("Bad method"),
+	}
 }

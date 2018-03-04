@@ -46,7 +46,7 @@ func MakeHTMLAPI(metricsName string, f func(http.ResponseWriter, *http.Request) 
 		span := opentracing.StartSpan(metricsName)
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
-		if err := f(w, req); err {
+		if err := f(w, req); err != nil {
 			h := util.MakeJSONAPI(util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
 				return err
 			}))
