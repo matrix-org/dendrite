@@ -41,12 +41,17 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 
 // MakeHTMLAPI adds Span metrics to the HTML Handler function
 // This is used to serve HTML template
-func MakeHtmlAPI(metricsName string, f func(w http.ResponseWriter, *http.Request)) http.Handler {
+func MakeHTMLAPI(metricsName string, f func(http.ResponseWriter, *http.Request) util.JSONResponse) http.Handler {
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		span := opentracing.StartSpan(metricsName)
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
-		f(w, req)
+		if err := f(w, req); err {
+			h := util.MakeJSONAPI(util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+				return err
+			}))
+			h.ServeHTTP(w, req)
+		}
 	}
 
 	return prometheus.InstrumentHandler(metricsName, http.HandlerFunc(withSpan))
