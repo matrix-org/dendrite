@@ -61,8 +61,8 @@ func (d sessionsDict) Get(key string) []authtypes.LoginType {
 	return make([]authtypes.LoginType, 0)
 }
 
-func (d *sessionsDict) Set(key string, v []authtypes.LoginType) {
-	d.sessions[key] = v
+func (d *sessionsDict) AddCompletedStage(key string, v authtypes.LoginType) {
+	d.sessions[key] = append(d.Get(key), v)
 }
 
 var (
@@ -450,7 +450,7 @@ func handleRegistrationFlow(
 		}
 
 		// Add Recaptcha to the list of completed registration stages
-		sessions.Set(sessionID, append(sessions.Get(sessionID), authtypes.LoginTypeRecaptcha))
+		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeRecaptcha)
 
 	case authtypes.LoginTypeSharedSecret:
 		// Check shared secret against config
@@ -463,7 +463,7 @@ func handleRegistrationFlow(
 		}
 
 		// Add SharedSecret to the list of completed registration stages
-		sessions.Set(sessionID, append(sessions.Get(sessionID), authtypes.LoginTypeSharedSecret))
+		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeSharedSecret)
 
 	case authtypes.LoginTypeApplicationService:
 		// Check Application Service register user request is valid.
@@ -483,7 +483,7 @@ func handleRegistrationFlow(
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
-		sessions.Set(sessionID, append(sessions.Get(sessionID), authtypes.LoginTypeDummy))
+		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeDummy)
 
 	default:
 		return util.JSONResponse{
