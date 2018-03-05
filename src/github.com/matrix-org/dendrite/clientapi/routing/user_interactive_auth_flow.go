@@ -227,9 +227,9 @@ func validateApplicationService(
 		return "", &util.JSONResponse{
 			Code: 401,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
-				"Supplied username %s did not match any namespaces for application service ID: %s",
-				username,
-				matchedApplicationService.ID)),
+			"Supplied username %s did not match any namespaces for application service ID: %s",
+			username,
+			matchedApplicationService.ID)),
 		}
 	}
 
