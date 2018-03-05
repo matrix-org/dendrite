@@ -202,7 +202,7 @@ func Register(
 
 	// TODO: Handle loading of previous session parameters from database.
 	// TODO: Handle mapping registrationRequest parameters into session parameters
-	
+
 	return HandleUserInteractiveFlow(req, r.userInteractiveFlowRequest, sessionID, cfg,
 		userInteractiveResponse{
 		// passing the list of allowed Flows and Params
