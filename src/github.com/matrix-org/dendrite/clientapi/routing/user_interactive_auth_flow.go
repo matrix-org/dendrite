@@ -247,9 +247,8 @@ func validateApplicationService(
 	return matchedApplicationService.ID, nil
 }
 
-// handleUIAAFlow will direct and complete UIAA flow stages
-// that the client has requested.
-func HandleUserInteractiveFlow (
+// HandleUserInteractiveFlow will direct and complete UIAA flow stages that the client has requested.
+func HandleUserInteractiveFlow(
 	req *http.Request,
 
 //the list of allowed flows and params
@@ -257,8 +256,6 @@ func HandleUserInteractiveFlow (
 
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
 	res userInteractiveResponse,
 	responseHandler userInteractiveResponseHandler,
 ) util.JSONResponse {
