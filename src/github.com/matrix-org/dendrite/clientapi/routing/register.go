@@ -309,7 +309,7 @@ func validateApplicationService(
 			break
 		}
 	}
-	if matchedApplicationService != nil {
+	if matchedApplicationService == nil {
 		return "", &util.JSONResponse{
 			Code: 401,
 			JSON: jsonerror.UnknownToken("Supplied access_token does not match any known application service"),
