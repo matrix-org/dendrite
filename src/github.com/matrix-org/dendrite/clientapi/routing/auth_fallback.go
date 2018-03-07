@@ -51,7 +51,7 @@ function captchaDone() {
         <p>
         Please verify that you're not a robot.
         </p>
-        <input type="hidden" name="session" value="{{.Session}}" />
+		<input type="hidden" name="session" value="{{.Session}}" />
         <div class="g-recaptcha"
             data-sitekey="{{.SiteKey}}"
             data-callback="captchaDone">
@@ -103,29 +103,43 @@ func ServeTemplate(w http.ResponseWriter, templateHTML string, data map[string]s
 func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string, sessionID string,
 	cfg config.Dendrite,
-) util.JSONRespose {
+) *util.JSONResponse {
+	ServeRecaptcha = func(){
+		data := map[string]string{
+			"MyUrl":   req.URL.String(),
+			"Session": sessionID,
+			"SiteKey": cfg.Matrix.RecaptchaPublicKey,
+		}
+		ServeTemplate(w, RecaptchaTemplate, data)
+	}
+
+	ServeSuccess = func(){
+		data := map[string]string{}
+		ServeTemplate(w, SuccessTemplate, data)
+	}
+
 	if req.Method == "GET" {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			data := map[string]string{
-				"MyUrl":   req.URL.String(),
-				"Session": sessionID,
-				"SiteKey": cfg.Matrix.RecaptchaPublicKey,
-			}
-			ServeTemplate(w, RecaptchaTemplate, data)
+			ServeRecaptcha()
 			return nil
 		}
-		return util.JSONResponse{
+		return &util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound("Unknown auth stage type"),
 		}
 	} else if req.Method == "POST" {
-		// TODO: Handle POST requests too
-		// Check Recaptcha
-		// Serve success
-		// Else serve Recaptcha again
+		clientIP := req.RemoteAddr
+		response := req.Form.Get("g-recaptcha-response")
+		if err = validateRecaptcha(cfg, response, clientIP), if resErr != nil {
+			ServeRecaptcha()
+			return nil
+		}
+
+		ServeSuccess()
+		return nil
 	}
-	return util.JSONResponse{
+	return &util.JSONResponse{
 		Code: 405,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
