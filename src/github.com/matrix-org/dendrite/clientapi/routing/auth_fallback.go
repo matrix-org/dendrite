@@ -104,7 +104,7 @@ func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string, sessionID string,
 	cfg config.Dendrite,
 ) *util.JSONResponse {
-	ServeRecaptcha = func(){
+	ServeRecaptcha := func() {
 		data := map[string]string{
 			"MyUrl":   req.URL.String(),
 			"Session": sessionID,
@@ -113,7 +113,7 @@ func AuthFallback(
 		ServeTemplate(w, RecaptchaTemplate, data)
 	}
 
-	ServeSuccess = func(){
+	ServeSuccess := func() {
 		data := map[string]string{}
 		ServeTemplate(w, SuccessTemplate, data)
 	}
@@ -131,7 +131,7 @@ func AuthFallback(
 	} else if req.Method == "POST" {
 		clientIP := req.RemoteAddr
 		response := req.Form.Get("g-recaptcha-response")
-		if err = validateRecaptcha(cfg, response, clientIP), if resErr != nil {
+		if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
 			ServeRecaptcha()
 			return nil
 		}
