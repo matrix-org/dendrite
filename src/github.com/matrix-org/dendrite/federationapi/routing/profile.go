@@ -37,7 +37,7 @@ func GetProfile(
 	// httpReq.FormValue will return an empty string if value is not found
 	if userID == "" {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("The request body did not contain required argument 'user_id'."),
 		}
 	}
@@ -57,7 +57,7 @@ func GetProfile(
 	}
 
 	var res interface{}
-	code := 200
+	code := http.StatusOK
 
 	if field != "" {
 		switch field {
@@ -70,7 +70,7 @@ func GetProfile(
 				AvatarURL: profile.AvatarURL,
 			}
 		default:
-			code = 400
+			code = http.StatusBadRequest
 			res = jsonerror.InvalidArgumentValue("The request body did not contain an allowed value of argument 'field'. Allowed values are either: 'avatar_url', 'displayname'.")
 		}
 	} else {

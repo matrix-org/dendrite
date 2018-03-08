@@ -54,7 +54,7 @@ func GetDeviceByID(
 	dev, err := deviceDB.GetDeviceByID(ctx, localpart, deviceID)
 	if err == sql.ErrNoRows {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Unknown device"),
 		}
 	} else if err != nil {
@@ -62,7 +62,7 @@ func GetDeviceByID(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: deviceJSON{
 			DeviceID: dev.ID,
 			UserID:   dev.UserID,
@@ -96,7 +96,7 @@ func GetDevicesByLocalpart(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: res,
 	}
 }
@@ -106,9 +106,9 @@ func UpdateDeviceByID(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 	deviceID string,
 ) util.JSONResponse {
-	if req.Method != "PUT" {
+	if req.Method != http.MethodPut {
 		return util.JSONResponse{
-			Code: 405,
+			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.NotFound("Bad Method"),
 		}
 	}
@@ -122,7 +122,7 @@ func UpdateDeviceByID(
 	dev, err := deviceDB.GetDeviceByID(ctx, localpart, deviceID)
 	if err == sql.ErrNoRows {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Unknown device"),
 		}
 	} else if err != nil {
@@ -131,7 +131,7 @@ func UpdateDeviceByID(
 
 	if dev.UserID != device.UserID {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("device not owned by current user"),
 		}
 	}
@@ -149,7 +149,7 @@ func UpdateDeviceByID(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

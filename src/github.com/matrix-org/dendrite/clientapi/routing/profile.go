@@ -35,9 +35,9 @@ import (
 func GetProfile(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method != "GET" {
+	if req.Method != http.MethodGet {
 		return util.JSONResponse{
-			Code: 405,
+			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
@@ -55,7 +55,7 @@ func GetProfile(
 		DisplayName: profile.DisplayName,
 	}
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: res,
 	}
 }
@@ -77,7 +77,7 @@ func GetAvatarURL(
 		AvatarURL: profile.AvatarURL,
 	}
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: res,
 	}
 }
@@ -90,7 +90,7 @@ func SetAvatarURL(
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("userID does not match the current user"),
 		}
 	}
@@ -103,7 +103,7 @@ func SetAvatarURL(
 	}
 	if r.AvatarURL == "" {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("'avatar_url' must be supplied."),
 		}
 	}
@@ -147,7 +147,7 @@ func SetAvatarURL(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }
@@ -169,7 +169,7 @@ func GetDisplayName(
 		DisplayName: profile.DisplayName,
 	}
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: res,
 	}
 }
@@ -182,7 +182,7 @@ func SetDisplayName(
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("userID does not match the current user"),
 		}
 	}
@@ -195,7 +195,7 @@ func SetDisplayName(
 	}
 	if r.DisplayName == "" {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("'displayname' must be supplied."),
 		}
 	}
@@ -239,7 +239,7 @@ func SetDisplayName(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

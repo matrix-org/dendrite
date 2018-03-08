@@ -37,14 +37,14 @@ func RoomAliasToID(
 	roomAlias := httpReq.FormValue("alias")
 	if roomAlias == "" {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Must supply room alias parameter."),
 		}
 	}
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
@@ -67,7 +67,7 @@ func RoomAliasToID(
 		} else {
 			// If the response doesn't contain a non-empty string, return an error
 			return util.JSONResponse{
-				Code: 404,
+				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound(fmt.Sprintf("Room alias %s not found", roomAlias)),
 			}
 		}
@@ -76,9 +76,9 @@ func RoomAliasToID(
 		if err != nil {
 			switch x := err.(type) {
 			case gomatrix.HTTPError:
-				if x.Code == 404 {
+				if x.Code == http.StatusNotFound {
 					return util.JSONResponse{
-						Code: 404,
+						Code: http.StatusNotFound,
 						JSON: jsonerror.NotFound("Room alias not found"),
 					}
 				}
@@ -90,7 +90,7 @@ func RoomAliasToID(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: resp,
 	}
 }

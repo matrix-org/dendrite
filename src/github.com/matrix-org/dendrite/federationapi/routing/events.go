@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
@@ -48,7 +49,7 @@ func GetEvent(
 	}
 
 	if !authResponse.AllowedToSeeEvent {
-		return util.MessageResponse(403, "server not allowed to see event")
+		return util.MessageResponse(http.StatusForbidden, "server not allowed to see event")
 	}
 
 	var eventsResponse api.QueryEventsByIDResponse
@@ -62,8 +63,8 @@ func GetEvent(
 	}
 
 	if len(eventsResponse.Events) == 0 {
-		return util.JSONResponse{Code: 404, JSON: nil}
+		return util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	return util.JSONResponse{Code: 200, JSON: &eventsResponse.Events[0]}
+	return util.JSONResponse{Code: http.StatusOK, JSON: &eventsResponse.Events[0]}
 }

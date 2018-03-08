@@ -137,17 +137,17 @@ func validateUserName(username string) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	if len(username) > maxUsernameLength {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
 		}
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("User ID can only contain characters a-z, 0-9, or '_-./'"),
 		}
 	} else if username[0] == '_' { // Regex checks its not a zero length string
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("User ID can't start with a '_'"),
 		}
 	}
@@ -159,12 +159,12 @@ func validatePassword(password string) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	if len(password) > maxPasswordLength {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
 		}
 	} else if len(password) > 0 && len(password) < minPasswordLength {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
 		}
 	}
@@ -179,14 +179,14 @@ func validateRecaptcha(
 ) *util.JSONResponse {
 	if !cfg.Matrix.RecaptchaEnabled {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Captcha registration is disabled"),
 		}
 	}
 
 	if response == "" {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Captcha response is required"),
 		}
 	}
@@ -202,7 +202,7 @@ func validateRecaptcha(
 
 	if err != nil {
 		return &util.JSONResponse{
-			Code: 500,
+			Code: http.StatusInternalServerError,
 			JSON: jsonerror.BadJSON("Error in requesting validation of captcha response"),
 		}
 	}
@@ -215,14 +215,14 @@ func validateRecaptcha(
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return &util.JSONResponse{
-			Code: 500,
+			Code: http.StatusInternalServerError,
 			JSON: jsonerror.BadJSON("Error in contacting captcha server" + err.Error()),
 		}
 	}
 	err = json.Unmarshal(body, &r)
 	if err != nil {
 		return &util.JSONResponse{
-			Code: 500,
+			Code: http.StatusInternalServerError,
 			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()),
 		}
 	}
@@ -230,7 +230,7 @@ func validateRecaptcha(
 	// Check that we received a "success"
 	if !r.Success {
 		return &util.JSONResponse{
-			Code: 401,
+			Code: http.StatusUnauthorized,
 			JSON: jsonerror.BadJSON("Invalid captcha response. Please try again."),
 		}
 	}
@@ -311,7 +311,7 @@ func validateApplicationService(
 	}
 	if matchedApplicationService != nil {
 		return "", &util.JSONResponse{
-			Code: 401,
+			Code: http.StatusUnauthorized,
 			JSON: jsonerror.UnknownToken("Supplied access_token does not match any known application service"),
 		}
 	}
@@ -320,7 +320,7 @@ func validateApplicationService(
 	if !UsernameIsWithinApplicationServiceNamespace(cfg, username, matchedApplicationService) {
 		// If we didn't find any matches, return M_EXCLUSIVE
 		return "", &util.JSONResponse{
-			Code: 401,
+			Code: http.StatusUnauthorized,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
 				"Supplied username %s did not match any namespaces for application service ID: %s", username, matchedApplicationService.ID)),
 		}
@@ -329,7 +329,7 @@ func validateApplicationService(
 	// Check this user does not fit multiple application service namespaces
 	if UsernameMatchesMultipleExclusiveNamespaces(cfg, username) {
 		return "", &util.JSONResponse{
-			Code: 401,
+			Code: http.StatusUnauthorized,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
 				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", username)),
 		}
@@ -364,7 +364,7 @@ func Register(
 	// If no auth type is specified by the client, send back the list of available flows
 	if r.Auth.Type == "" {
 		return util.JSONResponse{
-			Code: 401,
+			Code: http.StatusUnauthorized,
 			JSON: newUserInteractiveResponse(sessionID,
 				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 		}
@@ -386,7 +386,7 @@ func Register(
 		len(cfg.Derived.ApplicationServices) != 0 &&
 		cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(r.Username) {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
 		}
 	}
@@ -421,7 +421,7 @@ func handleRegistrationFlow(
 	// TODO: email / msisdn auth types.
 
 	if cfg.Matrix.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
-		return util.MessageResponse(403, "Registration has been disabled")
+		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
 	}
 
 	switch r.Auth.Type {
@@ -442,7 +442,7 @@ func handleRegistrationFlow(
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		} else if !valid {
-			return util.MessageResponse(403, "HMAC incorrect")
+			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
 		// Add SharedSecret to the list of completed registration stages
@@ -470,7 +470,7 @@ func handleRegistrationFlow(
 
 	default:
 		return util.JSONResponse{
-			Code: 501,
+			Code: http.StatusNotImplemented,
 			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
 		}
 	}
@@ -502,7 +502,7 @@ func checkAndCompleteFlow(
 	// There are still more stages to complete.
 	// Return the flows and those that have been completed.
 	return util.JSONResponse{
-		Code: 401,
+		Code: http.StatusUnauthorized,
 		JSON: newUserInteractiveResponse(sessionID,
 			cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 	}
@@ -528,13 +528,13 @@ func LegacyRegister(
 	}).Info("Processing registration request")
 
 	if cfg.Matrix.RegistrationDisabled && r.Type != authtypes.LoginTypeSharedSecret {
-		return util.MessageResponse(403, "Registration has been disabled")
+		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
 	}
 
 	switch r.Type {
 	case authtypes.LoginTypeSharedSecret:
 		if cfg.Matrix.RegistrationSharedSecret == "" {
-			return util.MessageResponse(400, "Shared secret registration is disabled")
+			return util.MessageResponse(http.StatusBadRequest, "Shared secret registration is disabled")
 		}
 
 		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Mac)
@@ -543,7 +543,7 @@ func LegacyRegister(
 		}
 
 		if !valid {
-			return util.MessageResponse(403, "HMAC incorrect")
+			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
 		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
@@ -552,7 +552,7 @@ func LegacyRegister(
 		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
 	default:
 		return util.JSONResponse{
-			Code: 501,
+			Code: http.StatusNotImplemented,
 			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
 		}
 	}
@@ -579,7 +579,7 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 	// All registration requests must specify what auth they are using to perform this request
 	if r.Type == "" {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("invalid type"),
 		}
 	}
@@ -596,14 +596,14 @@ func completeRegistration(
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("missing username"),
 		}
 	}
 	// Blank passwords are only allowed by registered application services
 	if password == "" && appserviceID == "" {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("missing password"),
 		}
 	}
@@ -611,12 +611,12 @@ func completeRegistration(
 	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 500,
+			Code: http.StatusInternalServerError,
 			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
 		}
 	} else if acc == nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.UserInUse("Desired user ID is already taken."),
 		}
 	}
@@ -624,7 +624,7 @@ func completeRegistration(
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
 		return util.JSONResponse{
-			Code: 500,
+			Code: http.StatusInternalServerError,
 			JSON: jsonerror.Unknown("Failed to generate access token"),
 		}
 	}
@@ -633,13 +633,13 @@ func completeRegistration(
 	dev, err := deviceDB.CreateDevice(ctx, username, nil, token, displayName)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 500,
+			Code: http.StatusInternalServerError,
 			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
 		}
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: registerResponse{
 			UserID:      dev.UserID,
 			AccessToken: dev.AccessToken,
@@ -765,19 +765,19 @@ func RegisterAvailable(
 	availability, availabilityErr := accountDB.CheckAccountAvailability(req.Context(), username)
 	if availabilityErr != nil {
 		return util.JSONResponse{
-			Code: 500,
+			Code: http.StatusInternalServerError,
 			JSON: jsonerror.Unknown("failed to check availability: " + availabilityErr.Error()),
 		}
 	}
 	if !availability {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("A different user ID has already been registered for this session"),
 		}
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: availableResponse{
 			Available: true,
 		},

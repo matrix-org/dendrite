@@ -101,7 +101,7 @@ func WrapHandlerInCORS(h http.Handler) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
 
-		if r.Method == "OPTIONS" && r.Header.Get("Access-Control-Request-Method") != "" {
+		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 			// Its easiest just to always return a 200 OK for everything. Whether
 			// this is technically correct or not is a question, but in the end this
 			// is what a lot of other people do (including synapse) and the clients

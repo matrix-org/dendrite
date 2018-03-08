@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"net/http"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
@@ -31,7 +32,7 @@ func LocalKeys(cfg config.Dendrite) util.JSONResponse {
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	return util.JSONResponse{Code: 200, JSON: keys}
+	return util.JSONResponse{Code: http.StatusOK, JSON: keys}
 }
 
 func localKeys(cfg config.Dendrite, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {

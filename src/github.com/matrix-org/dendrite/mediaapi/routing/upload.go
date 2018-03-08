@@ -64,7 +64,7 @@ func Upload(req *http.Request, cfg *config.Dendrite, db *storage.Database, activ
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: uploadResponse{
 			ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.Matrix.ServerName, r.MediaMetadata.MediaID),
 		},
@@ -75,9 +75,9 @@ func Upload(req *http.Request, cfg *config.Dendrite, db *storage.Database, activ
 // all the metadata about the media being uploaded.
 // Returns either an uploadRequest or an error formatted as a util.JSONResponse
 func parseAndValidateRequest(req *http.Request, cfg *config.Dendrite) (*uploadRequest, *util.JSONResponse) {
-	if req.Method != "POST" {
+	if req.Method != http.MethodPost {
 		return nil, &util.JSONResponse{
-			Code: 405,
+			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.Unknown("HTTP request method must be POST."),
 		}
 	}
@@ -123,7 +123,7 @@ func (r *uploadRequest) doUpload(
 		}).Warn("Error while transferring file")
 		fileutils.RemoveDir(tmpDir, r.Logger)
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("Failed to upload"),
 		}
 	}
@@ -155,7 +155,7 @@ func (r *uploadRequest) doUpload(
 		r.MediaMetadata = mediaMetadata
 		fileutils.RemoveDir(tmpDir, r.Logger)
 		return &util.JSONResponse{
-			Code: 200,
+			Code: http.StatusOK,
 			JSON: uploadResponse{
 				ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.Matrix.ServerName, r.MediaMetadata.MediaID),
 			},
@@ -172,26 +172,26 @@ func (r *uploadRequest) doUpload(
 func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JSONResponse {
 	if r.MediaMetadata.FileSizeBytes < 1 {
 		return &util.JSONResponse{
-			Code: 411,
+			Code: http.StatusLengthRequired,
 			JSON: jsonerror.Unknown("HTTP Content-Length request header must be greater than zero."),
 		}
 	}
 	if maxFileSizeBytes > 0 && r.MediaMetadata.FileSizeBytes > types.FileSizeBytes(maxFileSizeBytes) {
 		return &util.JSONResponse{
-			Code: 413,
+			Code: http.StatusRequestEntityTooLarge,
 			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
 		}
 	}
 	// TODO: Check if the Content-Type is a valid type?
 	if r.MediaMetadata.ContentType == "" {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("HTTP Content-Type request header must be set."),
 		}
 	}
 	if strings.HasPrefix(string(r.MediaMetadata.UploadName), "~") {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("File name must not begin with '~'."),
 		}
 	}
@@ -204,7 +204,7 @@ func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JS
 		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
 		if _, _, err := gomatrixserverlib.SplitID('@', string(r.MediaMetadata.UserID)); err != nil {
 			return &util.JSONResponse{
-				Code: 400,
+				Code: http.StatusBadRequest,
 				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),
 			}
 		}
@@ -230,7 +230,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to move file.")
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("Failed to upload"),
 		}
 	}
@@ -247,7 +247,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 			fileutils.RemoveDir(types.Path(path.Dir(string(finalPath))), r.Logger)
 		}
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("Failed to upload"),
 		}
 	}

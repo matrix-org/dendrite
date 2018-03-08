@@ -53,17 +53,17 @@ func SendMembership(
 	)
 	if err == threepid.ErrMissingParameter {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(err.Error()),
 		}
 	} else if err == threepid.ErrNotTrusted {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotTrusted(body.IDServer),
 		}
 	} else if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),
 		}
 	} else if err != nil {
@@ -75,7 +75,7 @@ func SendMembership(
 	// emit a m.room.member one.
 	if inviteStored {
 		return util.JSONResponse{
-			Code: 200,
+			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
@@ -85,12 +85,12 @@ func SendMembership(
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(err.Error()),
 		}
 	} else if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),
 		}
 	} else if err != nil {
@@ -104,7 +104,7 @@ func SendMembership(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

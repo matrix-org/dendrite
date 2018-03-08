@@ -52,17 +52,17 @@ func Setup(
 		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
 			return Upload(req, cfg, db, activeThumbnailGeneration)
 		},
-	)).Methods("POST", "OPTIONS")
+	)).Methods(http.MethodPost, http.MethodOptions)
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
 	r0mux.Handle("/download/{serverName}/{mediaId}",
 		makeDownloadAPI("download", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
-	).Methods("GET", "OPTIONS")
+	).Methods(http.MethodGet, http.MethodOptions)
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
-	).Methods("GET", "OPTIONS")
+	).Methods(http.MethodGet, http.MethodOptions)
 }
 
 func makeDownloadAPI(

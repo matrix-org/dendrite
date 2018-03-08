@@ -41,7 +41,7 @@ func Invite(
 	var event gomatrixserverlib.Event
 	if err := json.Unmarshal(request.Content(), &event); err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
@@ -49,7 +49,7 @@ func Invite(
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
 		}
 	}
@@ -57,7 +57,7 @@ func Invite(
 	// Check that the event ID is correct.
 	if event.EventID() != eventID {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
 		}
 	}
@@ -65,7 +65,7 @@ func Invite(
 	// Check that the event is from the server sending the request.
 	if event.Origin() != request.Origin() {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("The invite must be sent by the server it originated on"),
 		}
 	}
@@ -82,7 +82,7 @@ func Invite(
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("The invite must be signed by the server it originated on"),
 		}
 	}
@@ -100,7 +100,7 @@ func Invite(
 	// Return the signed event to the originating server, it should then tell
 	// the other servers in the room that we have been invited.
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: gomatrixserverlib.RespInvite{Event: signedEvent},
 	}
 }
