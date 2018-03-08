@@ -142,6 +142,20 @@ func (d *Database) CreateAccount(
 	return d.accounts.insertAccount(ctx, localpart, hash, appserviceID)
 }
 
+// UpdatePassword Implements /password
+func (d *Database) UpdatePassword(
+	ctx context.Context, plaintextPassword, localpart string,
+) (err error) {
+	// Generate a password hash
+	var hash string
+	hash, err = hashPassword(plaintextPassword)
+	if err != nil {
+		return
+	}
+	err = d.accounts.updatePasswordHash(ctx, hash, localpart)
+	return
+}
+
 // SaveMembership saves the user matching a given localpart as a member of a given
 // room. It also stores the ID of the membership event and a flag on whether the user
 // is still in the room.

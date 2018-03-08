@@ -121,6 +121,10 @@ func Setup(
 		}),
 	).Methods("PUT", "OPTIONS")
 
+	r0mux.Handle("/password", common.MakeExternalAPI("password", func(req *http.Request) util.JSONResponse {
+		return ChangePassword(req, accountDB, &cfg)
+	})).Methods("POST", "OPTIONS")
+
 	r0mux.Handle("/register", common.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
 		return Register(req, accountDB, deviceDB, &cfg)
 	})).Methods("POST", "OPTIONS")

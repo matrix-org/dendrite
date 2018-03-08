@@ -49,12 +49,14 @@ const selectAccountByLocalpartSQL = "" +
 const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1"
 
-// TODO: Update password
+const updatePasswordHashSQL = "" +
+	"UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
 
 type accountsStatements struct {
 	insertAccountStmt            *sql.Stmt
 	selectAccountByLocalpartStmt *sql.Stmt
 	selectPasswordHashStmt       *sql.Stmt
+	updatePasswordHashStmt       *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
 }
 
@@ -70,6 +72,9 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 		return
 	}
 	if s.selectPasswordHashStmt, err = db.Prepare(selectPasswordHashSQL); err != nil {
+		return
+	}
+	if s.updatePasswordHashStmt, err = db.Prepare(updatePasswordHashSQL); err != nil {
 		return
 	}
 	s.serverName = server
@@ -121,6 +126,14 @@ func (s *accountsStatements) selectAccountByLocalpart(
 		acc.ServerName = s.serverName
 	}
 	return &acc, err
+}
+
+func (s *accountsStatements) updatePasswordHash(
+	ctx context.Context, hash, localpart string,
+) error {
+	stmt := s.updatePasswordHashStmt
+	_, err := stmt.ExecContext(ctx, hash, localpart)
+	return err
 }
 
 func makeUserID(localpart string, server gomatrixserverlib.ServerName) string {
