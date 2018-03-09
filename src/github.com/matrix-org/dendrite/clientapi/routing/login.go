@@ -15,10 +15,12 @@
 package routing
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -37,24 +39,97 @@ type flow struct {
 	Stages []string `json:"stages"`
 }
 
-type passwordRequest struct {
-	User               string  `json:"user"`
-	Password           string  `json:"password"`
-	InitialDisplayName *string `json:"initial_device_display_name"`
-}
-
-type loginResponse struct {
-	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token"`
-	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id"`
-}
-
-func passwordLogin() loginFlows {
+func defaultPasswordLogin() loginFlows {
 	f := loginFlows{}
-	s := flow{"m.login.password", []string{"m.login.password"}}
+	s := flow{string(authtypes.LoginTypePassword), []string{string(authtypes.LoginTypePassword)}}
 	f.Flows = append(f.Flows, s)
 	return f
+}
+
+func handlePasswordLogin(
+	r authtypes.LoginRequest, localpart string, accountDB *accounts.Database,
+	deviceDB *devices.Database, req *http.Request, cfg config.Dendrite) util.JSONResponse {
+
+	acc, err := accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
+
+	if err != nil {
+		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+		// but that would leak the existence of the user.
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+		}
+	}
+
+	token, err := auth.GenerateAccessToken()
+	if err != nil {
+		httputil.LogThenError(req, err)
+	}
+
+	// TODO: Use the device ID in the request
+	dev, err := deviceDB.CreateDevice(
+		req.Context(), acc.Localpart, nil, token, r.InitialDisplayName,
+	)
+	if err != nil {
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: authtypes.LoginResponse{
+			UserID:      dev.UserID,
+			AccessToken: dev.AccessToken,
+			HomeServer:  cfg.Matrix.ServerName,
+			DeviceID:    dev.ID,
+		},
+	}
+}
+
+func handleTokenLogin(
+	r authtypes.LoginRequest, deviceDB *devices.Database,
+	req *http.Request, cfg config.Dendrite) util.JSONResponse {
+	if r.Token == "" {
+		return util.JSONResponse{
+			Code: 401,
+			JSON: jsonerror.MissingToken("Missing access token"),
+		}
+	}
+
+	dev, err := deviceDB.GetDeviceByAccessToken(req.Context(), r.Token)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return util.JSONResponse{
+				Code: 401,
+				JSON: jsonerror.UnknownToken("Unknown token"),
+			}
+		}
+		return util.JSONResponse{
+			Code: 500,
+			JSON: jsonerror.Unknown("Unexpected server error occurred"),
+		}
+	}
+
+	if dev.ID != r.DeviceID {
+		// The access token specified in the request was generated for a
+		// different device.
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("Access token not valid for this device"),
+		}
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: authtypes.LoginResponse{
+			UserID:      dev.UserID,
+			AccessToken: dev.AccessToken,
+			HomeServer:  cfg.Matrix.ServerName,
+			DeviceID:    dev.ID,
+		},
+	}
 }
 
 // Login implements GET and POST /login
@@ -62,13 +137,13 @@ func Login(
 	req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database,
 	cfg config.Dendrite,
 ) util.JSONResponse {
-	if req.Method == "GET" { // TODO: support other forms of login other than password, depending on config options
+	if req.Method == "GET" {
 		return util.JSONResponse{
 			Code: 200,
-			JSON: passwordLogin(),
+			JSON: defaultPasswordLogin(),
 		}
 	} else if req.Method == "POST" {
-		var r passwordRequest
+		var r authtypes.LoginRequest
 		resErr := httputil.UnmarshalJSONRequest(req, &r)
 		if resErr != nil {
 			return *resErr
@@ -84,6 +159,7 @@ func Login(
 
 		// r.User can either be a user ID or just the localpart... or other things maybe.
 		localpart := r.User
+
 		if strings.HasPrefix(r.User, "@") {
 			var domain gomatrixserverlib.ServerName
 			var err error
@@ -103,41 +179,18 @@ func Login(
 			}
 		}
 
-		acc, err := accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
-		if err != nil {
-			// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
-			// but that would leak the existence of the user.
+		switch r.Type {
+		case authtypes.LoginTypePassword:
+			return handlePasswordLogin(r, localpart, accountDB, deviceDB, req, cfg)
+		case authtypes.LoginTypeToken:
+			return handleTokenLogin(r, deviceDB, req, cfg)
+		default:
 			return util.JSONResponse{
-				Code: 403,
-				JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+				Code: 501,
+				JSON: jsonerror.Unknown("Unknown login type"),
 			}
 		}
 
-		token, err := auth.GenerateAccessToken()
-		if err != nil {
-			httputil.LogThenError(req, err)
-		}
-
-		// TODO: Use the device ID in the request
-		dev, err := deviceDB.CreateDevice(
-			req.Context(), acc.Localpart, nil, token, r.InitialDisplayName,
-		)
-		if err != nil {
-			return util.JSONResponse{
-				Code: 500,
-				JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
-			}
-		}
-
-		return util.JSONResponse{
-			Code: 200,
-			JSON: loginResponse{
-				UserID:      dev.UserID,
-				AccessToken: dev.AccessToken,
-				HomeServer:  cfg.Matrix.ServerName,
-				DeviceID:    dev.ID,
-			},
-		}
 	}
 	return util.JSONResponse{
 		Code: 405,
