@@ -17,8 +17,10 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrix"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -41,6 +43,12 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     event_id TEXT NOT NULL,
     -- The 'room_id' key for the event.
     room_id TEXT NOT NULL,
+    -- The 'type' property for the event.
+    type TEXT NOT NULL,
+    -- The 'sender' property for the event.
+    sender TEXT NOT NULL,
+	-- true if the event content contains a url key
+    contains_url BOOL NOT NULL,
     -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
     event_json TEXT NOT NULL,
     -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
@@ -51,21 +59,32 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     transaction_id TEXT  -- The transaction id used to send the event, if any
 );
 -- for event selection
-CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(event_id);
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(
+	event_id,
+	room_id,
+	type,
+	sender,
+	contains_url);
 `
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
-	" room_id, event_id, event_json, add_state_ids, remove_state_ids, device_id, transaction_id" +
-	") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"
+	" room_id, event_id, type, sender, contains_url, event_json, add_state_ids, remove_state_ids, device_id, transaction_id" +
+	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id"
 
 const selectEventsSQL = "" +
 	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectRecentEventsSQL = "" +
 	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC LIMIT $4"
+	" WHERE room_id=$1 " +
+	" AND id > $2 AND id <= $3" +
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" AND ( $8::bool IS NULL   OR     contains_url = $8  )" +
+	" ORDER BY id DESC LIMIT $9"
 
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
@@ -205,11 +224,20 @@ func (s *outputRoomEventsStatements) insertEvent(
 		txnID = &transactionID.TransactionID
 	}
 
+	var containsURL bool
+	var content map[string]interface{}
+	if json.Unmarshal(event.Content(), &content) != nil {
+		_, containsURL = content["url"]
+	}
+
 	stmt := common.TxStmt(txn, s.insertEventStmt)
 	err = stmt.QueryRowContext(
 		ctx,
 		event.RoomID(),
 		event.EventID(),
+		event.Type(),
+		event.Sender(),
+		containsURL,
 		event.JSON(),
 		pq.StringArray(addState),
 		pq.StringArray(removeState),
@@ -219,22 +247,36 @@ func (s *outputRoomEventsStatements) insertEvent(
 	return
 }
 
-// RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
 func (s *outputRoomEventsStatements) selectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
-) ([]streamEvent, error) {
+	roomID string, fromPos, toPos types.StreamPosition, timelineFilter *gomatrix.FilterPart,
+) ([]streamEvent, bool, error) {
+
 	stmt := common.TxStmt(txn, s.selectRecentEventsStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos,
+		pq.StringArray(timelineFilter.Senders),
+		pq.StringArray(timelineFilter.NotSenders),
+		pq.StringArray(filterConvertWildcardToSQL(timelineFilter.Types)),
+		pq.StringArray(filterConvertWildcardToSQL(timelineFilter.NotTypes)),
+		timelineFilter.ContainsURL,
+		timelineFilter.Limit+1, // TODO: limit abusive values? This can also be done in gomatrix.Filter.Validate
+	)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close() // nolint: errcheck
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return events, nil
+
+	limited := false
+	if len(events) > timelineFilter.Limit {
+		limited = true
+		events = events[:len(events)-1]
+	}
+
+	return events, limited, nil
 }
 
 // Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing

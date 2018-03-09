@@ -16,11 +16,15 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/util"
@@ -28,20 +32,19 @@ import (
 )
 
 const defaultSyncTimeout = time.Duration(30) * time.Second
-const defaultTimelineLimit = 20
 
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
 	ctx           context.Context
 	device        authtypes.Device
-	limit         int
 	timeout       time.Duration
 	since         *types.StreamPosition // nil means that no since token was supplied
 	wantFullState bool
 	log           *log.Entry
+	filter        gomatrix.Filter
 }
 
-func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, error) {
+func newSyncRequest(req *http.Request, device authtypes.Device, accountDB *accounts.Database) (*syncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
@@ -49,15 +52,48 @@ func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, e
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Additional query params: set_presence, filter
+
+	filterStr := req.URL.Query().Get("filter")
+	var filter gomatrix.Filter
+	if filterStr != "" {
+		if filterStr[0] == '{' {
+			// Inline filter
+			filter = gomatrix.DefaultFilter()
+			err = json.Unmarshal([]byte(filterStr), &filter)
+			if err != nil {
+				return nil, err
+			}
+			err = filter.Validate()
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Filter ID
+			filterID, err := strconv.Atoi(filterStr)
+			if err != nil {
+				return nil, err
+			}
+			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+			if err != nil {
+				return nil, err
+			}
+			recvFilter, err := accountDB.GetFilter(req.Context(), localpart, strconv.Itoa(filterID)) //TODO GetFilter should receive filterID as an int
+			if err != nil {
+				return nil, err
+			}
+			filter = *recvFilter
+		}
+	}
+
+	// TODO: Additional query params: set_presence
 	return &syncRequest{
 		ctx:           req.Context(),
 		device:        device,
 		timeout:       timeout,
 		since:         since,
 		wantFullState: wantFullState,
-		limit:         defaultTimelineLimit, // TODO: read from filter
 		log:           util.GetLogger(req.Context()),
+		filter:        filter,
 	}, nil
 }
 

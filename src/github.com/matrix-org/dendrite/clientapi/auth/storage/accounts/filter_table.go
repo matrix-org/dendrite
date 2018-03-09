@@ -17,8 +17,9 @@ package accounts
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrix"
 )
 
 const filterSchema = `
@@ -71,20 +72,29 @@ func (s *filterStatements) prepare(db *sql.DB) (err error) {
 
 func (s *filterStatements) selectFilter(
 	ctx context.Context, localpart string, filterID string,
-) (filter []byte, err error) {
-	err = s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filter)
-	return
+) (*gomatrix.Filter, error) {
+	var filterData []byte
+	err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
+	if err != nil {
+		return nil, err
+	}
+
+	var filter gomatrix.Filter
+	if err = json.Unmarshal(filterData, &filter); err != nil {
+		return nil, err
+	}
+	return &filter, err
 }
 
 func (s *filterStatements) insertFilter(
-	ctx context.Context, filter []byte, localpart string,
+	ctx context.Context, filter *gomatrix.Filter, localpart string,
 ) (filterID string, err error) {
 	var existingFilterID string
 
 	// This can result in a race condition when two clients try to insert the
 	// same filter and localpart at the same time, however this is not a
 	// problem as both calls will result in the same filterID
-	filterJSON, err := gomatrixserverlib.CanonicalJSON(filter)
+	filterJSON, err := json.Marshal(filter)
 	if err != nil {
 		return "", err
 	}

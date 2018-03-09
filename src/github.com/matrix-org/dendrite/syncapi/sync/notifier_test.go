@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/gomatrix"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -286,8 +287,8 @@ func newTestSyncRequest(userID string, since types.StreamPosition) syncRequest {
 		timeout:       1 * time.Minute,
 		since:         &since,
 		wantFullState: false,
-		limit:         defaultTimelineLimit,
 		log:           util.GetLogger(context.TODO()),
 		ctx:           context.TODO(),
+		filter:        gomatrix.DefaultFilter(),
 	}
 }

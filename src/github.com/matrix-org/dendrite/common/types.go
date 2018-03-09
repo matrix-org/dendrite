@@ -19,6 +19,7 @@ package common
 type AccountData struct {
 	RoomID string `json:"room_id"`
 	Type   string `json:"type"`
+	Sender string `json:"sender"`
 }
 
 // ProfileResponse is a struct containing all known user profile data

@@ -48,7 +48,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	// Extract values from request
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
-	syncReq, err := newSyncRequest(req, *device)
+	syncReq, err := newSyncRequest(req, *device, rp.accountDB)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,
@@ -122,9 +122,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == nil {
-		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
+		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, &req.filter)
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, currentPos, req.limit)
+		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, currentPos, &req.filter)
 	}
 
 	if err != nil {
@@ -170,7 +170,7 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, *req.since, currentPos)
+	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, *req.since, currentPos, &req.filter.AccountData)
 	if err != nil {
 		return nil, err
 	}

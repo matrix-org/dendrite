@@ -44,7 +44,7 @@ func OnIncomingStateRequest(req *http.Request, db *storage.SyncServerDatabase, r
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 
-	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID)
+	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
