@@ -1,5 +1,5 @@
 // Copyright 2017 Vector Creations Ltd
-// Copyright 2017 New Vector Ltd
+// Copyright 2018 New Vector Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,9 +30,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// registerRequest represents the submitted registration request.
-// It can be broken down into 2 sections: the auth dictionary and registration parameters.
-// Registration parameters vary depending on the request, and will need to remembered across
+// changePasswordRequest represents the submitted request from client side.
+// It can be broken down into 2 sections: the userInteractiveFlow parameters and
+// password change parameters. the 1st set is for calling UIAA handler while
+// change password parameters vary depending on the request, and will need to remembered across
 // sessions. If no parameters are supplied, the server should use the parameters previously
 // remembered. If ANY parameters are supplied, the server should REPLACE all knowledge of
 // previous parameters with the ones supplied. This mean you cannot "build up" request params.
@@ -107,31 +108,9 @@ func ChangePassword(
 	}).Info("Processing password request")
 
 	// Todo go through User Interactive Auth uncomment references in #413  and
-	// authflows defined in cfg.derieved like that for registration
+	// authflows defined in cfg.Derived like that for registration
 
-	//jsonRes := HandleUserInteractiveFlow(req, r.userInteractiveFlowRequest, sessionID, cfg,
-	//	userInteractiveResponse{
-	//		// passing the list of allowed Flows and Params
-	//		cfg.Derived.Password.Flows,
-	//		nil,
-	//		cfg.Derived.Password.Params,
-	//		"",
-	//	})
-	//if jsonRes.Code == 200 {
-	//	// cast JSON to userInteractiveHandlerResponse
-	//	res := jsonRes.JSON.(userInteractiveHandlerResponse)
-	//
-	//	return completeUpdation(
-	//		req.Context(),
-	//		accountDB,
-	//		r.Username,
-	//		r.Password,
-	//		res.AppserviceID,
-	//		r.InitialDisplayName)
-	//}
-	//return jsonRes
-
-	//// Todo appservice ID is to be returned by UIAA handler use that.
+	// Todo appservice ID is to be returned by UIAA handler use that.
 	token, err := auth.ExtractAccessToken(req)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -144,11 +123,11 @@ func ChangePassword(
 			break
 		}
 	}
-	// return the final updation function after auth flow
-	return completeUpdation(req.Context(), accountDB, r.Username, r.NewPassword, appServiceID)
+	// return the final update function after auth flow
+	return completeUpdate(req.Context(), accountDB, r.Username, r.NewPassword, appServiceID)
 }
 
-func completeUpdation(
+func completeUpdate(
 	ctx context.Context,
 	accountDB *accounts.Database,
 	username, password, appserviceID string,
