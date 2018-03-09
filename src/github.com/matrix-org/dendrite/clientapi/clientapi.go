@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
+	"github.com/matrix-org/dendrite/clientapi/transactions"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -37,6 +38,7 @@ func SetupClientAPIComponent(
 	aliasAPI api.RoomserverAliasAPI,
 	inputAPI api.RoomserverInputAPI,
 	queryAPI api.RoomserverQueryAPI,
+	transactionsCache *transactions.Cache,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 
@@ -62,5 +64,6 @@ func SetupClientAPIComponent(
 		queryAPI, aliasAPI, accountsDB, deviceDB,
 		federation, *keyRing,
 		userUpdateProducer, syncProducer,
+		transactionsCache,
 	)
 }

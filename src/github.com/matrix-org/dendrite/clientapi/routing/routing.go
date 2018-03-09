@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/clientapi/transactions"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -48,6 +49,7 @@ func Setup(
 	keyRing gomatrixserverlib.KeyRing,
 	userUpdateProducer *producers.UserUpdateProducer,
 	syncProducer *producers.SyncAPIProducer,
+	transactionsCache *transactions.Cache,
 ) {
 
 	apiMux.Handle("/_matrix/client/versions",
@@ -91,14 +93,14 @@ func Setup(
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, queryAPI, producer)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, queryAPI, producer, nil)
 		}),
 	).Methods("POST", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			txnID := vars["txnID"]
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID, nil, cfg, queryAPI, producer)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID, nil, cfg, queryAPI, producer, transactionsCache)
 		}),
 	).Methods("PUT", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
@@ -110,14 +112,14 @@ func Setup(
 			if strings.HasSuffix(eventType, "/") {
 				eventType = eventType[:len(eventType)-1]
 			}
-			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, queryAPI, producer)
+			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, queryAPI, producer, nil)
 		}),
 	).Methods("PUT", "OPTIONS")
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
 		common.MakeAuthAPI("send_message", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			stateKey := vars["stateKey"]
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, queryAPI, producer)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, queryAPI, producer, nil)
 		}),
 	).Methods("PUT", "OPTIONS")
 
