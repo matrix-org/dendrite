@@ -104,12 +104,18 @@ func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string,
 	cfg config.Dendrite,
 ) *util.JSONResponse {
-	sessionID := req.Form.Get("session")
+	sessionID := req.URL.Query().Get("session")
+
+	if sessionID == "" {
+		w.Write([]byte("Session ID not provided"))
+		return nil
+	}
+
 	ServeRecaptcha := func() {
 		data := map[string]string{
 			"MyUrl":   req.URL.String(),
 			"Session": sessionID,
-			"SiteKey": cfg.Matrix.RecaptchaPublicKey,
+			"SiteKey": cfg.Matrix.RecaptchaPrivateKey,
 		}
 		ServeTemplate(w, RecaptchaTemplate, data)
 	}
@@ -122,6 +128,11 @@ func AuthFallback(
 	if req.Method == "GET" {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
+			if cfg.Matrix.RecaptchaPrivateKey == "" {
+				w.Write([]byte("Homeserver doesn't have a recaptcha public key"))
+				return nil
+			}
+
 			ServeRecaptcha()
 			return nil
 		}
