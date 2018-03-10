@@ -101,9 +101,10 @@ func ServeTemplate(w http.ResponseWriter, templateHTML string, data map[string]s
 
 // AuthFallback implements GET on /auth/{authType}/fallback/web?session={sessionID}
 func AuthFallback(
-	w http.ResponseWriter, req *http.Request, authType string, sessionID string,
+	w http.ResponseWriter, req *http.Request, authType string,
 	cfg config.Dendrite,
 ) *util.JSONResponse {
+	sessionID := req.Form.Get("session")
 	ServeRecaptcha := func() {
 		data := map[string]string{
 			"MyUrl":   req.URL.String(),

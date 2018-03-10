@@ -174,10 +174,10 @@ func Setup(
 		}),
 	).Methods("GET", "POST", "OPTIONS")
 
-	r0mux.Handle("/auth/{authType}/fallback/web?session={sessionID}",
+	r0mux.Handle("/auth/{authType}/fallback/web",
 		common.MakeHTMLAPI("authfallback", func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
 			vars := mux.Vars(req)
-			return AuthFallback(w, req, vars["authType"], vars["sessionID"], cfg)
+			return AuthFallback(w, req, vars["authType"], cfg)
 		}),
 	).Methods("GET", "POST", "OPTIONS")
 
