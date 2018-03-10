@@ -84,8 +84,8 @@ if (window.onAuthDone) {
 </head>
 <body>
     <div>
-        <p>Thank you</p>
-        <p>You may now close this window and return to the application</p>
+        <p>Thank you!</p>
+        <p>You may now close this window and return to the application.</p>
     </div>
 </body>
 </html>
@@ -115,7 +115,7 @@ func AuthFallback(
 		data := map[string]string{
 			"MyUrl":   req.URL.String(),
 			"Session": sessionID,
-			"SiteKey": cfg.Matrix.RecaptchaPrivateKey,
+			"SiteKey": cfg.Matrix.RecaptchaPublicKey,
 		}
 		ServeTemplate(w, RecaptchaTemplate, data)
 	}
@@ -128,8 +128,8 @@ func AuthFallback(
 	if req.Method == "GET" {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			if cfg.Matrix.RecaptchaPrivateKey == "" {
-				w.Write([]byte("Homeserver doesn't have a recaptcha public key"))
+			if cfg.Matrix.RecaptchaPublicKey == "" {
+				w.Write([]byte("This Homeserver doesn't have a recaptcha public key"))
 				return nil
 			}
 
@@ -142,6 +142,7 @@ func AuthFallback(
 		}
 	} else if req.Method == "POST" {
 		clientIP := req.RemoteAddr
+		req.ParseForm()
 		response := req.Form.Get("g-recaptcha-response")
 		if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
 			ServeRecaptcha()
