@@ -20,7 +20,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -29,16 +28,19 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/util"
 )
+
+type membershipAccountsData interface {
+	GetProfileByLocalpart(context.Context, string) (*authtypes.Profile, error)
+}
 
 var errMissingUserID = errors.New("'user_id' must be supplied")
 
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
 func SendMembership(
-	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB membershipAccountsData, device *authtypes.Device,
 	roomID string, membership string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
 ) util.JSONResponse {
@@ -111,7 +113,7 @@ func SendMembership(
 
 func buildMembershipEvent(
 	ctx context.Context,
-	body threepid.MembershipRequest, accountDB *accounts.Database,
+	body threepid.MembershipRequest, accountDB membershipAccountsData,
 	device *authtypes.Device, membership string, roomID string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) (*gomatrixserverlib.Event, error) {
@@ -156,7 +158,7 @@ func buildMembershipEvent(
 // Returns an error if the retrieval failed or if the first parameter isn't a
 // valid Matrix ID.
 func loadProfile(
-	ctx context.Context, userID string, cfg config.Dendrite, accountDB *accounts.Database,
+	ctx context.Context, userID string, cfg config.Dendrite, accountDB membershipAccountsData,
 ) (*authtypes.Profile, error) {
 	localpart, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {

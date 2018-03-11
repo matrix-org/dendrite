@@ -15,17 +15,24 @@
 package routing
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
+
+// interface to Database layer
+type deviceData interface {
+	GetDevicesByLocalpart(context.Context, string) ([]authtypes.Device, error)
+	GetDeviceByID(ctx context.Context, localpart, deviceID string) (*authtypes.Device, error)
+	UpdateDevice(context.Context, string, string, *string) error
+}
 
 type deviceJSON struct {
 	DeviceID string `json:"device_id"`
@@ -42,7 +49,7 @@ type deviceUpdateJSON struct {
 
 // GetDeviceByID handles /device/{deviceID}
 func GetDeviceByID(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB deviceData, device *authtypes.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -72,7 +79,7 @@ func GetDeviceByID(
 
 // GetDevicesByLocalpart handles /devices
 func GetDevicesByLocalpart(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB deviceData, device *authtypes.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
@@ -103,7 +110,7 @@ func GetDevicesByLocalpart(
 
 // UpdateDeviceByID handles PUT on /devices/{deviceID}
 func UpdateDeviceByID(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB deviceData, device *authtypes.Device,
 	deviceID string,
 ) util.JSONResponse {
 	if req.Method != "PUT" {

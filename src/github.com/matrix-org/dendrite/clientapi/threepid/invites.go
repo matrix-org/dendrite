@@ -25,13 +25,16 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
+
+type invitesAccountsData interface {
+	GetProfileByLocalpart(context.Context, string) (*authtypes.Profile, error)
+}
 
 // MembershipRequest represents the body of an incoming POST request
 // on /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
@@ -87,7 +90,7 @@ var (
 func CheckAndProcessInvite(
 	ctx context.Context,
 	device *authtypes.Device, body *MembershipRequest, cfg config.Dendrite,
-	queryAPI api.RoomserverQueryAPI, db *accounts.Database,
+	queryAPI api.RoomserverQueryAPI, db invitesAccountsData,
 	producer *producers.RoomserverProducer, membership string, roomID string,
 ) (inviteStoredOnIDServer bool, err error) {
 	if membership != "invite" || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
@@ -134,7 +137,7 @@ func CheckAndProcessInvite(
 // Returns an error if a check or a request failed.
 func queryIDServer(
 	ctx context.Context,
-	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
+	db invitesAccountsData, cfg config.Dendrite, device *authtypes.Device,
 	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	if err = isTrusted(body.IDServer, cfg); err != nil {
@@ -203,7 +206,7 @@ func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServe
 // Returns an error if the request failed to send or if the response couldn't be parsed.
 func queryIDServerStoreInvite(
 	ctx context.Context,
-	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
+	db invitesAccountsData, cfg config.Dendrite, device *authtypes.Device,
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name

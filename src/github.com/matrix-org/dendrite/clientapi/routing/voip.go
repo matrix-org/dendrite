@@ -15,12 +15,11 @@
 package routing
 
 import (
-	"net/http"
-
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"

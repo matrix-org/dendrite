@@ -34,8 +34,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -55,6 +53,15 @@ var (
 	sessions           = make(map[string][]authtypes.LoginType) // Sessions and completed flow stages
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-./]+$`)
 )
+
+type registerAccountsData interface {
+	CreateAccount(context.Context, string, string, string) (*authtypes.Account, error)
+	CheckAccountAvailability(context.Context, string) (bool, error)
+}
+
+type registerDevicesData interface {
+	CreateDevice(context.Context, string, *string, string, *string) (*authtypes.Device, error)
+}
 
 // registerRequest represents the submitted registration request.
 // It can be broken down into 2 sections: the auth dictionary and registration parameters.
@@ -343,8 +350,8 @@ func validateApplicationService(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB registerAccountsData,
+	deviceDB registerDevicesData,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 
@@ -408,8 +415,8 @@ func handleRegistrationFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB registerAccountsData,
+	deviceDB registerDevicesData,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
@@ -490,8 +497,8 @@ func checkAndCompleteFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB registerAccountsData,
+	deviceDB registerDevicesData,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
@@ -511,8 +518,8 @@ func checkAndCompleteFlow(
 // LegacyRegister process register requests from the legacy v1 API
 func LegacyRegister(
 	req *http.Request,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB registerAccountsData,
+	deviceDB registerDevicesData,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var r legacyRegisterRequest
@@ -589,8 +596,8 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 
 func completeRegistration(
 	ctx context.Context,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB registerAccountsData,
+	deviceDB registerDevicesData,
 	username, password, appserviceID string,
 	displayName *string,
 ) util.JSONResponse {
@@ -751,7 +758,7 @@ type availableResponse struct {
 // RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
-	accountDB *accounts.Database,
+	accountDB registerAccountsData,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 

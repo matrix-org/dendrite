@@ -15,24 +15,28 @@
 package routing
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
+
+// interface to Database Layer
+type createRoomData interface {
+	GetProfileByLocalpart(context.Context, string) (*authtypes.Profile, error)
+}
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomRequest struct {
@@ -116,7 +120,7 @@ type fledglingEvent struct {
 // CreateRoom implements /createRoom
 func CreateRoom(req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
+	accountDB createRoomData, aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
@@ -128,7 +132,7 @@ func CreateRoom(req *http.Request, device *authtypes.Device,
 // nolint: gocyclo
 func createRoom(req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
+	accountDB createRoomData, aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID

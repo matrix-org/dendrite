@@ -15,19 +15,25 @@
 package routing
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
+//interface to devices database layer
+type logoutDevicesData interface {
+	RemoveDevice(context.Context, string, string) error
+	RemoveAllDevices(context.Context, string) error
+}
+
 // Logout handles POST /logout
 func Logout(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB logoutDevicesData, device *authtypes.Device,
 ) util.JSONResponse {
 	if req.Method != "POST" {
 		return util.JSONResponse{
@@ -53,7 +59,7 @@ func Logout(
 
 // LogoutAll handles POST /logout/all
 func LogoutAll(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB logoutDevicesData, device *authtypes.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {

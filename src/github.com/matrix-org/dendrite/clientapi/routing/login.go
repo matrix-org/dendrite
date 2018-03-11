@@ -15,18 +15,28 @@
 package routing
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
+
+// interface to accounts database layer
+type loginAccountsData interface {
+	GetAccountByPassword(context.Context, string, string) (*authtypes.Account, error)
+}
+
+// interface to devices database layer
+type loginDevicesData interface {
+	CreateDevice(context.Context, string, *string, string, *string) (dev *authtypes.Device, returnErr error)
+}
 
 type loginFlows struct {
 	Flows []flow `json:"flows"`
@@ -59,7 +69,7 @@ func passwordLogin() loginFlows {
 
 // Login implements GET and POST /login
 func Login(
-	req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database,
+	req *http.Request, accountDB loginAccountsData, deviceDB loginDevicesData,
 	cfg config.Dendrite,
 ) util.JSONResponse {
 	if req.Method == "GET" { // TODO: support other forms of login other than password, depending on config options

@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -27,13 +26,20 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/util"
 )
 
+// interface to accounts database layer
+type profileAccountsData interface {
+	GetProfileByLocalpart(context.Context, string) (*authtypes.Profile, error)
+	SetAvatarURL(context.Context, string, string) error
+	GetMembershipsByLocalpart(context.Context, string) (memberships []authtypes.Membership, err error)
+	SetDisplayName(context.Context, string, string) error
+}
+
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
-	req *http.Request, accountDB *accounts.Database, userID string,
+	req *http.Request, accountDB profileAccountsData, userID string,
 ) util.JSONResponse {
 	if req.Method != "GET" {
 		return util.JSONResponse{
@@ -62,7 +68,7 @@ func GetProfile(
 
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
-	req *http.Request, accountDB *accounts.Database, userID string,
+	req *http.Request, accountDB profileAccountsData, userID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -84,7 +90,7 @@ func GetAvatarURL(
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
-	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB profileAccountsData, device *authtypes.Device,
 	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
 	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
@@ -154,7 +160,7 @@ func SetAvatarURL(
 
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
-	req *http.Request, accountDB *accounts.Database, userID string,
+	req *http.Request, accountDB profileAccountsData, userID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -176,7 +182,7 @@ func GetDisplayName(
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
-	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB profileAccountsData, device *authtypes.Device,
 	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
 	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {

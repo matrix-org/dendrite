@@ -15,12 +15,11 @@
 package routing
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 
-	"encoding/json"
-
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrix"
@@ -28,9 +27,15 @@ import (
 	"github.com/matrix-org/util"
 )
 
+// interface to database layer
+type filterData interface {
+	GetFilter(context.Context, string, string) ([]byte, error)
+	PutFilter(context.Context, string, []byte) (string, error)
+}
+
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
 func GetFilter(
-	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string, filterID string,
+	req *http.Request, device *authtypes.Device, accountDB filterData, userID string, filterID string,
 ) util.JSONResponse {
 	if req.Method != http.MethodGet {
 		return util.JSONResponse{
@@ -77,7 +82,7 @@ type filterResponse struct {
 
 //PutFilter implements POST /_matrix/client/r0/user/{userId}/filter
 func PutFilter(
-	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string,
+	req *http.Request, device *authtypes.Device, accountDB filterData, userID string,
 ) util.JSONResponse {
 	if req.Method != http.MethodPost {
 		return util.JSONResponse{

@@ -15,13 +15,13 @@
 package routing
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -32,6 +32,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
+
+// interface to Database
+type joinRoomData interface {
+	GetProfileByLocalpart(context.Context, string) (*authtypes.Profile, error)
+}
 
 // JoinRoomByIDOrAlias implements the "/join/{roomIDOrAlias}" API.
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-join-roomidoralias
@@ -45,7 +50,7 @@ func JoinRoomByIDOrAlias(
 	queryAPI api.RoomserverQueryAPI,
 	aliasAPI api.RoomserverAliasAPI,
 	keyRing gomatrixserverlib.KeyRing,
-	accountDB *accounts.Database,
+	accountDB joinRoomData,
 ) util.JSONResponse {
 	var content map[string]interface{} // must be a JSON object
 	if resErr := httputil.UnmarshalJSONRequest(req, &content); resErr != nil {
