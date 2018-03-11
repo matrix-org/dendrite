@@ -49,12 +49,16 @@ const selectAccountByLocalpartSQL = "" +
 const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1"
 
+const selectAllLocalpartSQL = "" +
+	"SELECT localpart FROM account_accounts"
+
 // TODO: Update password
 
 type accountsStatements struct {
 	insertAccountStmt            *sql.Stmt
 	selectAccountByLocalpartStmt *sql.Stmt
 	selectPasswordHashStmt       *sql.Stmt
+	selectAllLocalpartStmt       *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
 }
 
@@ -70,6 +74,9 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 		return
 	}
 	if s.selectPasswordHashStmt, err = db.Prepare(selectPasswordHashSQL); err != nil {
+		return
+	}
+	if s.selectAllLocalpartStmt, err = db.Prepare(selectAllLocalpartSQL); err != nil {
 		return
 	}
 	s.serverName = server
@@ -121,6 +128,31 @@ func (s *accountsStatements) selectAccountByLocalpart(
 		acc.ServerName = s.serverName
 	}
 	return &acc, err
+}
+
+func (s *accountsStatements) selectAllLocalparts(ctx context.Context) ([]string, error) {
+	var localparts []string
+
+	stmt := s.selectAllLocalpartStmt
+	rows, err := stmt.QueryContext(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var t string
+		err := rows.Scan(&t)
+
+		if err != nil {
+			return nil, err
+		}
+
+		localparts = append(localparts, t)
+	}
+
+	// Ensure that rows is closed in case of error.
+	return localparts, rows.Close()
 }
 
 func makeUserID(localpart string, server gomatrixserverlib.ServerName) string {
