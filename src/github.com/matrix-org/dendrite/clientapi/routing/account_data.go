@@ -33,16 +33,16 @@ func SaveAccountData(
 	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
 	userID string, roomID string, dataType string, syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
-	if req.Method != "PUT" {
+	if req.Method != http.MethodPut {
 		return util.JSONResponse{
-			Code: 405,
+			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
 
 	if userID != device.UserID {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("userID does not match the current user"),
 		}
 	}
@@ -70,7 +70,7 @@ func SaveAccountData(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

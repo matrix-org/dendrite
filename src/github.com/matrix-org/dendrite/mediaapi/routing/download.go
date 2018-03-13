@@ -107,9 +107,9 @@ func Download(
 	}
 
 	// request validation
-	if req.Method != "GET" {
+	if req.Method != http.MethodGet {
 		dReq.jsonErrorResponse(w, util.JSONResponse{
-			Code: 405,
+			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.Unknown("request method must be GET"),
 		})
 		return
@@ -132,7 +132,7 @@ func Download(
 
 	if metadata == nil {
 		dReq.jsonErrorResponse(w, util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("File not found"),
 		})
 		return
@@ -146,7 +146,7 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to marshal JSONResponse")
 		// this should never fail to be marshalled so drop err to the floor
-		res = util.MessageResponse(500, "Internal Server Error")
+		res = util.MessageResponse(http.StatusInternalServerError, "Internal Server Error")
 		resBytes, _ = json.Marshal(res.JSON)
 	}
 
@@ -162,7 +162,7 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 func (r *downloadRequest) Validate() *util.JSONResponse {
 	if !mediaIDRegex.MatchString(string(r.MediaMetadata.MediaID)) {
 		return &util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(fmt.Sprintf("mediaId must be a non-empty string using only characters in %v", mediaIDCharacters)),
 		}
 	}
@@ -170,7 +170,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 	// or by a DNS SRV record lookup when creating a request for remote files
 	if r.MediaMetadata.Origin == "" {
 		return &util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("serverName must be a non-empty string"),
 		}
 	}
@@ -178,7 +178,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 	if r.IsThumbnailRequest {
 		if r.ThumbnailSize.Width <= 0 || r.ThumbnailSize.Height <= 0 {
 			return &util.JSONResponse{
-				Code: 400,
+				Code: http.StatusBadRequest,
 				JSON: jsonerror.Unknown("width and height must be greater than 0"),
 			}
 		}
@@ -188,7 +188,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 		}
 		if r.ThumbnailSize.ResizeMethod != types.Crop && r.ThumbnailSize.ResizeMethod != types.Scale {
 			return &util.JSONResponse{
-				Code: 400,
+				Code: http.StatusBadRequest,
 				JSON: jsonerror.Unknown("method must be one of crop or scale"),
 			}
 		}
@@ -685,8 +685,8 @@ func (r *downloadRequest) createRemoteRequest(
 		return nil, fmt.Errorf("file with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	}
 
-	if resp.StatusCode != 200 {
-		if resp.StatusCode == 404 {
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
 			return nil, nil
 		}
 		r.Logger.WithFields(log.Fields{

@@ -62,12 +62,12 @@ func Login(
 	req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database,
 	cfg config.Dendrite,
 ) util.JSONResponse {
-	if req.Method == "GET" { // TODO: support other forms of login other than password, depending on config options
+	if req.Method == http.MethodGet { // TODO: support other forms of login other than password, depending on config options
 		return util.JSONResponse{
-			Code: 200,
+			Code: http.StatusOK,
 			JSON: passwordLogin(),
 		}
-	} else if req.Method == "POST" {
+	} else if req.Method == http.MethodPost {
 		var r passwordRequest
 		resErr := httputil.UnmarshalJSONRequest(req, &r)
 		if resErr != nil {
@@ -75,7 +75,7 @@ func Login(
 		}
 		if r.User == "" {
 			return util.JSONResponse{
-				Code: 400,
+				Code: http.StatusBadRequest,
 				JSON: jsonerror.BadJSON("'user' must be supplied."),
 			}
 		}
@@ -90,14 +90,14 @@ func Login(
 			localpart, domain, err = gomatrixserverlib.SplitID('@', r.User)
 			if err != nil {
 				return util.JSONResponse{
-					Code: 400,
+					Code: http.StatusBadRequest,
 					JSON: jsonerror.InvalidUsername("Invalid username"),
 				}
 			}
 
 			if domain != cfg.Matrix.ServerName {
 				return util.JSONResponse{
-					Code: 400,
+					Code: http.StatusBadRequest,
 					JSON: jsonerror.InvalidUsername("User ID not ours"),
 				}
 			}
@@ -108,7 +108,7 @@ func Login(
 			// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 			// but that would leak the existence of the user.
 			return util.JSONResponse{
-				Code: 403,
+				Code: http.StatusForbidden,
 				JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
 			}
 		}
@@ -124,13 +124,13 @@ func Login(
 		)
 		if err != nil {
 			return util.JSONResponse{
-				Code: 500,
+				Code: http.StatusInternalServerError,
 				JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
 			}
 		}
 
 		return util.JSONResponse{
-			Code: 200,
+			Code: http.StatusOK,
 			JSON: loginResponse{
 				UserID:      dev.UserID,
 				AccessToken: dev.AccessToken,
@@ -140,7 +140,7 @@ func Login(
 		}
 	}
 	return util.JSONResponse{
-		Code: 405,
+		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
 }

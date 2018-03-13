@@ -48,13 +48,13 @@ func GetMemberships(
 
 	if !queryRes.HasBeenInRoom {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
 		}
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: response{queryRes.JoinEvents},
 	}
 }

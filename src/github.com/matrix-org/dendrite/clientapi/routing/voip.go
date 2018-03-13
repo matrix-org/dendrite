@@ -15,12 +15,11 @@
 package routing
 
 import (
-	"net/http"
-
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -38,7 +37,7 @@ func RequestTurnServer(req *http.Request, device *authtypes.Device, cfg config.D
 	// TODO Guest Support
 	if len(turnConfig.URIs) == 0 || turnConfig.UserLifetime == "" {
 		return util.JSONResponse{
-			Code: 200,
+			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
@@ -67,13 +66,13 @@ func RequestTurnServer(req *http.Request, device *authtypes.Device, cfg config.D
 		resp.Password = turnConfig.Password
 	} else {
 		return util.JSONResponse{
-			Code: 200,
+			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: resp,
 	}
 }

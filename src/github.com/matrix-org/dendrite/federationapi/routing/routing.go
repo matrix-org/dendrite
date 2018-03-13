@@ -55,8 +55,8 @@ func Setup(
 	// return that key.
 	// Even if we had more than one server key, we would probably still ignore the
 	// {keyID} argument and always return a response containing all of the keys.
-	v2keysmux.Handle("/server/{keyID}", localKeys).Methods("GET")
-	v2keysmux.Handle("/server/", localKeys).Methods("GET")
+	v2keysmux.Handle("/server/{keyID}", localKeys).Methods(http.MethodGet)
+	v2keysmux.Handle("/server/", localKeys).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/send/{txnID}/", common.MakeFedAPI(
 		"federation_send", cfg.Matrix.ServerName, keys,
@@ -67,7 +67,7 @@ func Setup(
 				cfg, query, producer, keys, federation,
 			)
 		},
-	)).Methods("PUT", "OPTIONS")
+	)).Methods(http.MethodPut, http.MethodOptions)
 
 	v1fedmux.Handle("/invite/{roomID}/{eventID}", common.MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, keys,
@@ -78,13 +78,13 @@ func Setup(
 				cfg, producer, keys,
 			)
 		},
-	)).Methods("PUT", "OPTIONS")
+	)).Methods(http.MethodPut, http.MethodOptions)
 
 	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
 			return CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
 		},
-	)).Methods("POST", "OPTIONS")
+	)).Methods(http.MethodPost, http.MethodOptions)
 
 	v1fedmux.Handle("/exchange_third_party_invite/{roomID}", common.MakeFedAPI(
 		"exchange_third_party_invite", cfg.Matrix.ServerName, keys,
@@ -94,7 +94,7 @@ func Setup(
 				httpReq, request, vars["roomID"], query, cfg, federation, producer,
 			)
 		},
-	)).Methods("PUT", "OPTIONS")
+	)).Methods(http.MethodPut, http.MethodOptions)
 
 	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
 		"federation_get_event", cfg.Matrix.ServerName, keys,
@@ -104,7 +104,7 @@ func Setup(
 				httpReq.Context(), request, cfg, query, time.Now(), keys, vars["eventID"],
 			)
 		},
-	)).Methods("GET")
+	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/query/directory/", common.MakeFedAPI(
 		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
@@ -113,7 +113,7 @@ func Setup(
 				httpReq, federation, cfg, aliasAPI,
 			)
 		},
-	)).Methods("GET")
+	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/query/profile", common.MakeFedAPI(
 		"federation_query_profile", cfg.Matrix.ServerName, keys,
@@ -122,7 +122,7 @@ func Setup(
 				httpReq, accountDB, cfg,
 			)
 		},
-	)).Methods("GET")
+	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/make_join/{roomID}/{userID}", common.MakeFedAPI(
 		"federation_make_join", cfg.Matrix.ServerName, keys,
@@ -134,7 +134,7 @@ func Setup(
 				httpReq.Context(), httpReq, request, cfg, query, roomID, userID,
 			)
 		},
-	)).Methods("GET")
+	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/send_join/{roomID}/{userID}", common.MakeFedAPI(
 		"federation_send_join", cfg.Matrix.ServerName, keys,
@@ -146,12 +146,12 @@ func Setup(
 				httpReq.Context(), httpReq, request, cfg, query, producer, keys, roomID, userID,
 			)
 		},
-	)).Methods("PUT")
+	)).Methods(http.MethodPut)
 
 	v1fedmux.Handle("/version", common.MakeExternalAPI(
 		"federation_version",
 		func(httpReq *http.Request) util.JSONResponse {
 			return Version()
 		},
-	)).Methods("GET")
+	)).Methods(http.MethodGet)
 }

@@ -534,7 +534,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.QueryLatestEventsAndState(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 	servMux.Handle(
@@ -548,7 +548,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.QueryStateAfterEvents(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 	servMux.Handle(
@@ -562,7 +562,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.QueryEventsByID(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 	servMux.Handle(
@@ -576,7 +576,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.QueryMembershipsForRoom(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 	servMux.Handle(
@@ -590,7 +590,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.QueryInvitesForUser(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 	servMux.Handle(
@@ -604,7 +604,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.QueryServerAllowedToSeeEvent(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 	servMux.Handle(
@@ -618,7 +618,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.QueryStateAndAuthChain(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 }

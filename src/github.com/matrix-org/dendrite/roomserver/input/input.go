@@ -84,12 +84,12 @@ func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux) {
 			var request api.InputRoomEventsRequest
 			var response api.InputRoomEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(400, err.Error())
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := r.InputRoomEvents(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 }

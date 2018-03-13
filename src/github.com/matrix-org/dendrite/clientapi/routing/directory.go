@@ -38,7 +38,7 @@ func DirectoryRoom(
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
@@ -61,7 +61,7 @@ func DirectoryRoom(
 		} else {
 			// If the response doesn't contain a non-empty string, return an error
 			return util.JSONResponse{
-				Code: 404,
+				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("Room alias " + roomAlias + " not found."),
 			}
 		}
@@ -70,9 +70,9 @@ func DirectoryRoom(
 		if err != nil {
 			switch x := err.(type) {
 			case gomatrix.HTTPError:
-				if x.Code == 404 {
+				if x.Code == http.StatusNotFound {
 					return util.JSONResponse{
-						Code: 404,
+						Code: http.StatusNotFound,
 						JSON: jsonerror.NotFound("Room alias not found"),
 					}
 				}
@@ -84,7 +84,7 @@ func DirectoryRoom(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: resp,
 	}
 }
@@ -101,14 +101,14 @@ func SetLocalAlias(
 	_, domain, err := gomatrixserverlib.SplitID('#', alias)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
 
 	if domain != cfg.Matrix.ServerName {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("Alias must be on local homeserver"),
 		}
 	}
@@ -132,13 +132,13 @@ func SetLocalAlias(
 
 	if queryRes.AliasExists {
 		return util.JSONResponse{
-			Code: 409,
+			Code: http.StatusConflict,
 			JSON: jsonerror.Unknown("The alias " + alias + " already exists."),
 		}
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }
@@ -161,7 +161,7 @@ func RemoveLocalAlias(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

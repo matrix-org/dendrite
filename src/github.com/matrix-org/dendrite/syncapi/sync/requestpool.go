@@ -51,7 +51,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	syncReq, err := newSyncRequest(req, *device)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown(err.Error()),
 		}
 	}
@@ -70,7 +70,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			return httputil.LogThenError(req, err)
 		}
 		return util.JSONResponse{
-			Code: 200,
+			Code: http.StatusOK,
 			JSON: syncData,
 		}
 	}
@@ -92,7 +92,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// Or for timeout to expire
 		case <-timer.C:
 			return util.JSONResponse{
-				Code: 200,
+				Code: http.StatusOK,
 				JSON: types.NewResponse(currPos),
 			}
 		// Or for the request to be cancelled
@@ -111,7 +111,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		}
 		if !syncData.IsEmpty() {
 			return util.JSONResponse{
-				Code: 200,
+				Code: http.StatusOK,
 				JSON: syncData,
 			}
 		}

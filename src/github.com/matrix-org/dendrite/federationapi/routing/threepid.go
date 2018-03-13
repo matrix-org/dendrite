@@ -86,7 +86,7 @@ func CreateInvitesFrom3PIDInvites(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }
@@ -104,7 +104,7 @@ func ExchangeThirdPartyInvite(
 	var builder gomatrixserverlib.EventBuilder
 	if err := json.Unmarshal(request.Content(), &builder); err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
@@ -112,7 +112,7 @@ func ExchangeThirdPartyInvite(
 	// Check that the room ID is correct.
 	if builder.RoomID != roomID {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
 		}
 	}
@@ -121,7 +121,7 @@ func ExchangeThirdPartyInvite(
 	_, targetDomain, err := gomatrixserverlib.SplitID('@', *builder.StateKey)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The event's state key isn't a Matrix user ID"),
 		}
 	}
@@ -129,7 +129,7 @@ func ExchangeThirdPartyInvite(
 	// Check that the target user is from the requesting homeserver.
 	if targetDomain != request.Origin() {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The event's state key doesn't have the same domain as the request's origin"),
 		}
 	}
@@ -138,7 +138,7 @@ func ExchangeThirdPartyInvite(
 	event, err := buildMembershipEvent(httpReq.Context(), &builder, queryAPI, cfg)
 	if err == errNotInRoom {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Unknown room " + roomID),
 		}
 	} else if err != nil {
@@ -160,7 +160,7 @@ func ExchangeThirdPartyInvite(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

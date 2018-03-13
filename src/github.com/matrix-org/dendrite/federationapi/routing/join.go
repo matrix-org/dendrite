@@ -41,13 +41,13 @@ func MakeJoin(
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Invalid UserID"),
 		}
 	}
 	if domain != request.Origin() {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("The join must be sent by the server of the user"),
 		}
 	}
@@ -68,7 +68,7 @@ func MakeJoin(
 	event, err := common.BuildEvent(ctx, &builder, cfg, query, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
@@ -83,13 +83,13 @@ func MakeJoin(
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(*event, &provider); err != nil {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()),
 		}
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: map[string]interface{}{"event": builder},
 	}
 }
@@ -108,7 +108,7 @@ func SendJoin(
 	var event gomatrixserverlib.Event
 	if err := json.Unmarshal(request.Content(), &event); err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
@@ -116,7 +116,7 @@ func SendJoin(
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the join event JSON"),
 		}
 	}
@@ -124,7 +124,7 @@ func SendJoin(
 	// Check that the event ID is correct.
 	if event.EventID() != eventID {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the join event JSON"),
 		}
 	}
@@ -132,7 +132,7 @@ func SendJoin(
 	// Check that the event is from the server sending the request.
 	if event.Origin() != request.Origin() {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("The join must be sent by the server it originated on"),
 		}
 	}
@@ -149,7 +149,7 @@ func SendJoin(
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("The join must be signed by the server it originated on"),
 		}
 	}
@@ -175,7 +175,7 @@ func SendJoin(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: map[string]interface{}{
 			"state":      stateAndAuthChainRepsonse.StateEvents,
 			"auth_chain": stateAndAuthChainRepsonse.AuthChainEvents,

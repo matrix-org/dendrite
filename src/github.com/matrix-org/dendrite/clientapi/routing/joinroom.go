@@ -75,7 +75,7 @@ func JoinRoomByIDOrAlias(
 		return r.joinRoomByAlias(roomIDOrAlias)
 	}
 	return util.JSONResponse{
-		Code: 400,
+		Code: http.StatusBadRequest,
 		JSON: jsonerror.BadJSON("Invalid first character for room ID or alias"),
 	}
 }
@@ -114,7 +114,7 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 		// joinRoomUsingServers passing an empty list since joinRoomUserServers
 		// will check if we are already in the room first.
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("You are not invited to the room"),
 		}
 	}
@@ -140,7 +140,7 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Room alias must be in the form '#localpart:domain'"),
 		}
 	}
@@ -156,7 +156,7 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 		}
 		// If the response doesn't contain a non-empty string, return an error
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room alias " + roomAlias + " not found."),
 		}
 	}
@@ -171,9 +171,9 @@ func (r joinRoomReq) joinRoomByRemoteAlias(
 	if err != nil {
 		switch x := err.(type) {
 		case gomatrix.HTTPError:
-			if x.Code == 404 {
+			if x.Code == http.StatusNotFound {
 				return util.JSONResponse{
-					Code: 404,
+					Code: http.StatusNotFound,
 					JSON: jsonerror.NotFound("Room alias not found"),
 				}
 			}
@@ -221,7 +221,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 			return httputil.LogThenError(r.req, err)
 		}
 		return util.JSONResponse{
-			Code: 200,
+			Code: http.StatusOK,
 			JSON: struct {
 				RoomID string `json:"room_id"`
 			}{roomID},
@@ -233,7 +233,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 
 	if len(servers) == 0 {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("No candidate servers found for room"),
 		}
 	}
@@ -312,7 +312,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	}
 
 	return &util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		// TODO: Put the response struct somewhere common.
 		JSON: struct {
 			RoomID string `json:"room_id"`

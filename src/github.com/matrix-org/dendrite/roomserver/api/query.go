@@ -21,9 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-
-	"github.com/opentracing/opentracing-go"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -371,7 +370,7 @@ func postJSON(
 		return err
 	}
 
-	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(jsonBytes))
+	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBytes))
 	if err != nil {
 		return err
 	}
@@ -394,7 +393,7 @@ func postJSON(
 	if err != nil {
 		return err
 	}
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		var errorBody struct {
 			Message string `json:"message"`
 		}
