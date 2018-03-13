@@ -16,9 +16,10 @@ package devices
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 
-	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -93,7 +94,7 @@ func (d *Database) CreateDevice(
 		// We cap this at going round 5 times to ensure we don't spin forever
 		var newDeviceID string
 		for i := 1; i <= 5; i++ {
-			newDeviceID, returnErr = auth.GenerateDeviceID()
+			newDeviceID, returnErr = GenerateDeviceID()
 			if returnErr != nil {
 				return
 			}
@@ -109,6 +110,18 @@ func (d *Database) CreateDevice(
 		}
 	}
 	return
+}
+
+// generateDeviceID creates a new device id. Returns an error if failed to generate
+// random bytes.
+func generateDeviceID() (string, error) {
+	b := make([]byte, deviceIDByteLength)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	// url-safe no padding
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // UpdateDevice updates the given device with the display name.

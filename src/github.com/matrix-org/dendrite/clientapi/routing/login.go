@@ -16,13 +16,13 @@ package routing
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -82,24 +82,11 @@ func Login(
 
 		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
 
-		// r.User can either be a user ID or just the localpart... or other things maybe.
-		localpart := r.User
-		if strings.HasPrefix(r.User, "@") {
-			var domain gomatrixserverlib.ServerName
-			var err error
-			localpart, domain, err = gomatrixserverlib.SplitID('@', r.User)
-			if err != nil {
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("Invalid username"),
-				}
-			}
-
-			if domain != cfg.Matrix.ServerName {
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername("User ID not ours"),
-				}
+		localpart, err = common.GetLocalpartFromUsername(r.User)
+		if err != nil {
+			return &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidUsername(err.Error()),
 			}
 		}
 
