@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package userutil
 
 import (
 	"errors"
@@ -21,36 +21,28 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// GetLocalpartDomainFromUserID extracts localpart & domain of server from userID.
-// Returns error in case of invalid username.
-func GetLocalpartDomainFromUserID(userID string,
-) (string, gomatrixserverlib.ServerName, error) {
-	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
+// GetDomainFromUserID extracts the domain of server from userID.
+// Returns error in case of invalid userID.
+func GetDomainFromUserID(userID string,
+) (gomatrixserverlib.ServerName, error) {
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 
-	if err != nil {
-		return localpart, domain, err
-	}
-
-	return localpart, domain, nil
+	return domain, err
 }
 
-// GetLocalpartFromUsername extracts localpart from userID
-// userID can either be a user ID or just the localpart.
+// GetLocalpartFromUsername extracts localpart from username.
+// username can either be a user ID or just the localpart.
 // Returns error in case of invalid username.
-func GetLocalpartFromUsername(userID string,
-) (string, error) {
+func GetLocalpartFromUsername(userID string) (string, error) {
 	localpart := userID
 
 	if strings.HasPrefix(userID, "@") {
-		lp, domain, err := GetLocalpartDomainFromUserid(userID)
+		lp, _, err := gomatrixserverlib.SplitID('@', userID)
 
 		if err != nil {
 			return "", errors.New("Invalid username")
 		}
 
-		if domain != cfg.Matrix.ServerName {
-			return "", errors.New("User ID not ours")
-		}
 		localpart = lp
 	}
 	return localpart, nil

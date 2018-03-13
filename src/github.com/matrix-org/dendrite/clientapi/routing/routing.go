@@ -389,4 +389,10 @@ func Setup(
 			}}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/account/whoami",
+		common.MakeExternalAPI("whoami", func(req *http.Request) util.JSONResponse {
+			return Whoami(req, accountDB, deviceDB, &cfg)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }

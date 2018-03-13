@@ -25,6 +25,9 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// The length of generated device IDs
+var deviceIDByteLength = 6
+
 // Database represents a device database.
 type Database struct {
 	db      *sql.DB
@@ -94,7 +97,7 @@ func (d *Database) CreateDevice(
 		// We cap this at going round 5 times to ensure we don't spin forever
 		var newDeviceID string
 		for i := 1; i <= 5; i++ {
-			newDeviceID, returnErr = GenerateDeviceID()
+			newDeviceID, returnErr = generateDeviceID()
 			if returnErr != nil {
 				return
 			}

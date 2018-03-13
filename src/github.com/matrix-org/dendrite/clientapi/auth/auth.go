@@ -25,11 +25,9 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
 )
@@ -38,13 +36,16 @@ import (
 // 32 bytes => 256 bits
 var tokenByteLength = 32
 
-// The length of generated device IDs
-var deviceIDByteLength = 6
-
 // DeviceDatabase represents a device database.
 type DeviceDatabase interface {
 	// Look up the device matching the given access token.
 	GetDeviceByAccessToken(ctx context.Context, token string) (*authtypes.Device, error)
+}
+
+// AccountDatabase represents a account database.
+type AccountDatabase interface {
+	// Look up the account matching the given localpart.
+	GetAccountByLocalpart(ctx context.Context, localpart string) (*authtypes.Account, error)
 }
 
 // VerifyUserFromRequest authenticates the HTTP request,
@@ -52,8 +53,8 @@ type DeviceDatabase interface {
 // Finds local user or an application service user.
 // On failure returns an JSON error response which can be sent to the client.
 func VerifyUserFromRequest(
-	req *http.Request, accountDB *accounts.Database, deviceDB *devices.Database,
-	cfg *config.Dendrite,
+	req *http.Request, accountDB AccountDatabase, deviceDB DeviceDatabase,
+	applicationServices []config.ApplicationService,
 ) (string, *util.JSONResponse) {
 	// Try to find local user from device database
 	dev, devErr := VerifyAccessToken(req, deviceDB)
@@ -74,7 +75,7 @@ func VerifyUserFromRequest(
 
 	// Search for app service with given access_token
 	var appService *config.ApplicationService
-	for _, as := range cfg.Derived.ApplicationServices {
+	for _, as := range applicationServices {
 		if as.ASToken == token {
 			appService = &as
 			break
@@ -83,7 +84,7 @@ func VerifyUserFromRequest(
 
 	if appService != nil {
 		userID := req.URL.Query().Get("user_id")
-		localpart, err := common.GetLocalpartFromUsername(userID)
+		localpart, err := userutil.GetLocalpartFromUsername(userID)
 
 		if err != nil {
 			return "", &util.JSONResponse{

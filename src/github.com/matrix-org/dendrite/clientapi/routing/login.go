@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -22,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -82,9 +83,15 @@ func Login(
 
 		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
 
-		localpart, err = common.GetLocalpartFromUsername(r.User)
+		localpart, err := userutil.GetLocalpartFromUsername(r.User)
 		if err != nil {
-			return &util.JSONResponse{
+			// Check that domain matches this server. error should reflect a mismatch.
+			domain, domainErr := userutil.GetDomainFromUserID(r.User)
+
+			if domainErr == nil && domain != cfg.Matrix.ServerName {
+				err = errors.New("User ID not ours")
+			}
+			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidUsername(err.Error()),
 			}
