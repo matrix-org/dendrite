@@ -50,7 +50,7 @@ const (
 	sessionIDLength   = 24
 )
 
-// sessionsDict represents every sessions' completed flow stages.
+// sessionsDict keeps track of completed auth stages for each session.
 type sessionsDict struct {
 	sessions map[string][]authtypes.LoginType
 }
@@ -60,16 +60,15 @@ func (d sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType
 	if completedStages, ok := d.sessions[sessionID]; ok {
 		return completedStages
 	}
-	// Ensure that a empty slice is return and not nil. See gh #399.
+	// Ensure that a empty slice is returned and not nil. See #399.
 	return make([]authtypes.LoginType, 0)
 }
 
-// AddCompletedStage adds a completed stage to the session.
+// AAddCompletedStage records that a session has completed an auth stage.
 func (d *sessionsDict) AddCompletedStage(sessionID string, stage authtypes.LoginType) {
 	d.sessions[sessionID] = append(d.GetCompletedStages(sessionID), stage)
 }
 
-// newSessionsDict returns a sessionsDict whose contained map is initialized and empty.
 func newSessionsDict() *sessionsDict {
 	return &sessionsDict{
 		sessions: make(map[string][]authtypes.LoginType),
