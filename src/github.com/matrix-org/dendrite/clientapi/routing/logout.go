@@ -29,9 +29,9 @@ import (
 func Logout(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
-	if req.Method != "POST" {
+	if req.Method != http.MethodPost {
 		return util.JSONResponse{
-			Code: 405,
+			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
@@ -46,7 +46,7 @@ func Logout(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }
@@ -65,7 +65,7 @@ func LogoutAll(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

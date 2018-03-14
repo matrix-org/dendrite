@@ -82,7 +82,7 @@ func SendEvent(
 	e, err := common.BuildEvent(req.Context(), &builder, cfg, queryAPI, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
@@ -97,7 +97,7 @@ func SendEvent(
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(*e, &provider); err != nil {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
 		}
 	}
@@ -118,7 +118,7 @@ func SendEvent(
 	}
 
 	res := util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: sendEventResponse{e.EventID()},
 	}
 

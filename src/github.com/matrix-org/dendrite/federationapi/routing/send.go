@@ -50,7 +50,7 @@ func Send(
 	}
 	if err := json.Unmarshal(request.Content(), &t); err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
@@ -65,7 +65,7 @@ func Send(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: resp,
 	}
 }

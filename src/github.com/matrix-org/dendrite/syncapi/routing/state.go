@@ -75,7 +75,7 @@ func OnIncomingStateRequest(req *http.Request, db *storage.SyncServerDatabase, r
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: resp,
 	}
 }
@@ -102,7 +102,7 @@ func OnIncomingStateTypeRequest(req *http.Request, db *storage.SyncServerDatabas
 
 	if event == nil {
 		return util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("cannot find state"),
 		}
 	}
@@ -112,7 +112,7 @@ func OnIncomingStateTypeRequest(req *http.Request, db *storage.SyncServerDatabas
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: stateEvent.Content,
 	}
 }

@@ -16,6 +16,7 @@ package jsonerror
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/matrix-org/util"
 )
@@ -35,7 +36,7 @@ func (e *MatrixError) Error() string {
 // format.
 func InternalServerError() util.JSONResponse {
 	return util.JSONResponse{
-		Code: 500,
+		Code: http.StatusInternalServerError,
 		JSON: Unknown("Internal Server Error"),
 	}
 }

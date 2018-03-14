@@ -82,7 +82,7 @@ func GetPublicRooms(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: response,
 	}
 }
@@ -90,7 +90,7 @@ func GetPublicRooms(
 // fillPublicRoomsReq fills the Limit, Since and Filter attributes of a GET or POST request
 // on /publicRooms by parsing the incoming HTTP request
 func fillPublicRoomsReq(httpReq *http.Request, request *publicRoomReq) *util.JSONResponse {
-	if httpReq.Method == "GET" {
+	if httpReq.Method == http.MethodGet {
 		limit, err := strconv.Atoi(httpReq.FormValue("limit"))
 		// Atoi returns 0 and an error when trying to parse an empty string
 		// In that case, we want to assign 0 so we ignore the error
@@ -101,12 +101,12 @@ func fillPublicRoomsReq(httpReq *http.Request, request *publicRoomReq) *util.JSO
 		request.Limit = int16(limit)
 		request.Since = httpReq.FormValue("since")
 		return nil
-	} else if httpReq.Method == "POST" {
+	} else if httpReq.Method == http.MethodPost {
 		return httputil.UnmarshalJSONRequest(httpReq, request)
 	}
 
 	return &util.JSONResponse{
-		Code: 405,
+		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
 }

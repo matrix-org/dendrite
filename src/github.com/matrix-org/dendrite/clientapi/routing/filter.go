@@ -34,13 +34,13 @@ func GetFilter(
 ) util.JSONResponse {
 	if req.Method != http.MethodGet {
 		return util.JSONResponse{
-			Code: 405,
+			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
 	if userID != device.UserID {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("Cannot get filters for other users"),
 		}
 	}
@@ -55,7 +55,7 @@ func GetFilter(
 		// but if there are obscure db errors, this will also be returned,
 		// even though it is not correct.
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotFound("No such filter"),
 		}
 	}
@@ -66,7 +66,7 @@ func GetFilter(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: filter,
 	}
 }
@@ -81,13 +81,13 @@ func PutFilter(
 ) util.JSONResponse {
 	if req.Method != http.MethodPost {
 		return util.JSONResponse{
-			Code: 405,
+			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
 	if userID != device.UserID {
 		return util.JSONResponse{
-			Code: 403,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("Cannot create filters for other users"),
 		}
 	}
@@ -106,7 +106,7 @@ func PutFilter(
 	filterArray, err := json.Marshal(filter)
 	if err != nil {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Filter is malformed"),
 		}
 	}
@@ -117,7 +117,7 @@ func PutFilter(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: filterResponse{FilterID: filterID},
 	}
 }

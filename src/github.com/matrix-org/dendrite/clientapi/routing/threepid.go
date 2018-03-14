@@ -56,7 +56,7 @@ func RequestEmailToken(req *http.Request, accountDB *accounts.Database, cfg conf
 
 	if len(localpart) > 0 {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.MatrixError{
 				ErrCode: "M_THREEPID_IN_USE",
 				Err:     accounts.Err3PIDInUse.Error(),
@@ -67,7 +67,7 @@ func RequestEmailToken(req *http.Request, accountDB *accounts.Database, cfg conf
 	resp.SID, err = threepid.CreateSession(req.Context(), body, cfg)
 	if err == threepid.ErrNotTrusted {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotTrusted(body.IDServer),
 		}
 	} else if err != nil {
@@ -75,7 +75,7 @@ func RequestEmailToken(req *http.Request, accountDB *accounts.Database, cfg conf
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: resp,
 	}
 }
@@ -94,7 +94,7 @@ func CheckAndSave3PIDAssociation(
 	verified, address, medium, err := threepid.CheckAssociation(req.Context(), body.Creds, cfg)
 	if err == threepid.ErrNotTrusted {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotTrusted(body.Creds.IDServer),
 		}
 	} else if err != nil {
@@ -103,7 +103,7 @@ func CheckAndSave3PIDAssociation(
 
 	if !verified {
 		return util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.MatrixError{
 				ErrCode: "M_THREEPID_AUTH_FAILED",
 				Err:     "Failed to auth 3pid",
@@ -116,7 +116,7 @@ func CheckAndSave3PIDAssociation(
 		err = threepid.PublishAssociation(body.Creds, device.UserID, cfg)
 		if err == threepid.ErrNotTrusted {
 			return util.JSONResponse{
-				Code: 400,
+				Code: http.StatusBadRequest,
 				JSON: jsonerror.NotTrusted(body.Creds.IDServer),
 			}
 		} else if err != nil {
@@ -135,7 +135,7 @@ func CheckAndSave3PIDAssociation(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }
@@ -155,7 +155,7 @@ func GetAssociated3PIDs(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: threePIDsResponse{threepids},
 	}
 }
@@ -172,7 +172,7 @@ func Forget3PID(req *http.Request, accountDB *accounts.Database) util.JSONRespon
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

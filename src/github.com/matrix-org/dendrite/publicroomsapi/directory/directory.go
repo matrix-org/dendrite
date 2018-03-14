@@ -45,7 +45,7 @@ func GetVisibility(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: v,
 	}
 }
@@ -67,7 +67,7 @@ func SetVisibility(
 	}
 
 	return util.JSONResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
 }

@@ -67,7 +67,7 @@ func CreateSession(
 	data.Add("email", req.Email)
 	data.Add("send_attempt", strconv.Itoa(req.SendAttempt))
 
-	request, err := http.NewRequest("POST", postURL, strings.NewReader(data.Encode()))
+	request, err := http.NewRequest(http.MethodPost, postURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -108,7 +108,7 @@ func CheckAssociation(
 	}
 
 	url := fmt.Sprintf("https://%s/_matrix/identity/api/v1/3pid/getValidated3pid?sid=%s&client_secret=%s", creds.IDServer, creds.SID, creds.Secret)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return false, "", "", err
 	}
@@ -154,7 +154,7 @@ func PublishAssociation(creds Credentials, userID string, cfg config.Dendrite) e
 	data.Add("client_secret", creds.Secret)
 	data.Add("mxid", userID)
 
-	request, err := http.NewRequest("POST", postURL, strings.NewReader(data.Encode()))
+	request, err := http.NewRequest(http.MethodPost, postURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}

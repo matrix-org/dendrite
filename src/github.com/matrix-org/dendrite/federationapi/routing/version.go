@@ -15,6 +15,8 @@
 package routing
 
 import (
+	"net/http"
+
 	"github.com/matrix-org/util"
 )
 
@@ -29,5 +31,5 @@ type server struct {
 
 // Version returns the server version
 func Version() util.JSONResponse {
-	return util.JSONResponse{Code: 200, JSON: &version{server{"dev", "Dendrite"}}}
+	return util.JSONResponse{Code: http.StatusOK, JSON: &version{server{"dev", "Dendrite"}}}
 }

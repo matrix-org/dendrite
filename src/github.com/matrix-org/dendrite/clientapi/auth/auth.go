@@ -50,7 +50,7 @@ func VerifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *auth
 	token, err := extractAccessToken(req)
 	if err != nil {
 		resErr = &util.JSONResponse{
-			Code: 401,
+			Code: http.StatusUnauthorized,
 			JSON: jsonerror.MissingToken(err.Error()),
 		}
 		return
@@ -59,7 +59,7 @@ func VerifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *auth
 	if err != nil {
 		if err == sql.ErrNoRows {
 			resErr = &util.JSONResponse{
-				Code: 401,
+				Code: http.StatusUnauthorized,
 				JSON: jsonerror.UnknownToken("Unknown token"),
 			}
 		} else {

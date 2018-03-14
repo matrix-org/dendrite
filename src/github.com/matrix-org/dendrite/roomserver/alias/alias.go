@@ -225,7 +225,7 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.SetRoomAlias(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 	servMux.Handle(
@@ -239,7 +239,7 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.GetAliasRoomID(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 	servMux.Handle(
@@ -253,7 +253,7 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 			if err := r.RemoveRoomAlias(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
-			return util.JSONResponse{Code: 200, JSON: &response}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 }

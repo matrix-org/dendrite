@@ -31,7 +31,7 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 		// debugging because an error will be produced for both invalid/malformed JSON AND
 		// valid JSON with incorrect types for values.
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}

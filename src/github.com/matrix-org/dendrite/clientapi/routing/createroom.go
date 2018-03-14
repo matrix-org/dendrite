@@ -70,7 +70,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	// Synapse doesn't check for ':' but we will else it will break parsers badly which split things into 2 segments.
 	if strings.ContainsAny(r.RoomAliasName, whitespace+":") {
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("room_alias_name cannot contain whitespace"),
 		}
 	}
@@ -82,7 +82,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		// https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/types.py#L92
 		if _, _, err := gomatrixserverlib.SplitID('@', userID); err != nil {
 			return &util.JSONResponse{
-				Code: 400,
+				Code: http.StatusBadRequest,
 				JSON: jsonerror.BadJSON("user id must be in the form @localpart:domain"),
 			}
 		}
@@ -92,7 +92,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		break
 	default:
 		return &util.JSONResponse{
-			Code: 400,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
 		}
 	}
