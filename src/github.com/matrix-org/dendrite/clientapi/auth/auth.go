@@ -63,7 +63,7 @@ func VerifyUserFromRequest(
 		return dev.UserID, nil
 	}
 
-	// Try to find Application Service user
+	// Try to find the Application Service user
 	token, err := extractAccessToken(req)
 
 	if err != nil {
@@ -96,14 +96,8 @@ func VerifyUserFromRequest(
 		// Verify that the user is registered
 		account, accountErr := accountDB.GetAccountByLocalpart(req.Context(), localpart)
 
-		if accountErr != nil {
-			return "", &util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("Application service has not registered this user"),
-			}
-		}
-
-		if account.AppServiceID == appService.ID {
+		// Verify that account exists & appServiceID matches
+		if accountErr == nil && account.AppServiceID == appService.ID {
 			return userID, nil
 		}
 
