@@ -132,3 +132,16 @@ func TestFlowCheckingExtraneousIncorrectInput(t *testing.T) {
 		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
 	}
 }
+
+// Completed flows stages should always be a valid slice header.
+// TestEmptyCompletedFlows checks that sessionsDict returns a slice & not nil.
+func TestEmptyCompletedFlows(t *testing.T) {
+	fakeEmptySessions := newSessionsDict()
+	fakeSessionID := "aRandomSessionIDWhichDoesNotExist"
+	ret := fakeEmptySessions.GetCompletedStages(fakeSessionID)
+
+	// check for []
+	if ret == nil || len(ret) != 0 {
+		t.Error("Empty Completed Flow Stages should be a empty slice: returned ", ret, ". Should be []")
+	}
+}
