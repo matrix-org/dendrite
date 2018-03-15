@@ -46,9 +46,9 @@ func Setup(
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
 	}
 
+	// TODO: Add AS support
 	r0mux.Handle("/upload", common.MakeAuthAPI(
-		"upload",
-		deviceDB,
+		"upload", nil, deviceDB, nil,
 		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
 			return Upload(req, cfg, db, activeThumbnailGeneration)
 		},
