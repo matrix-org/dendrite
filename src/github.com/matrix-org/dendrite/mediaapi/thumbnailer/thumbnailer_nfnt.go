@@ -51,10 +51,10 @@ func GenerateThumbnails(
 		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
 		return false, err
 	}
-	for _, config := range configs {
+	for _, singleConfig := range configs {
 		// Note: createThumbnail does locking based on activeThumbnailGeneration
 		busy, err = createThumbnail(
-			ctx, src, img, types.ThumbnailSize(config), mediaMetadata,
+			ctx, src, img, types.ThumbnailSize(singleConfig), mediaMetadata,
 			activeThumbnailGeneration, maxThumbnailGenerators, db, logger,
 		)
 		if err != nil {

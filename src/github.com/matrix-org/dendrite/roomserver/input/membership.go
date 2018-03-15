@@ -91,22 +91,22 @@ func updateMembership(
 ) ([]api.OutputEvent, error) {
 	var err error
 	// Default the membership to Leave if no event was added or removed.
-	old := leave
-	new := leave
+	oldMembership := leave
+	newMembership := leave
 
 	if remove != nil {
-		old, err = remove.Membership()
+		oldMembership, err = remove.Membership()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if add != nil {
-		new, err = add.Membership()
+		newMembership, err = add.Membership()
 		if err != nil {
 			return nil, err
 		}
 	}
-	if old == new && new != join {
+	if oldMembership == newMembership && newMembership != join {
 		// If the membership is the same then nothing changed and we can return
 		// immediately, unless it's a Join update (e.g. profile update).
 		return updates, nil
@@ -117,16 +117,16 @@ func updateMembership(
 		return nil, err
 	}
 
-	switch new {
+	switch newMembership {
 	case invite:
 		return updateToInviteMembership(mu, add, updates)
 	case join:
 		return updateToJoinMembership(mu, add, updates)
 	case leave, ban:
-		return updateToLeaveMembership(mu, add, new, updates)
+		return updateToLeaveMembership(mu, add, newMembership, updates)
 	default:
 		panic(fmt.Errorf(
-			"input: membership %q is not one of the allowed values", new,
+			"input: membership %q is not one of the allowed values", newMembership,
 		))
 	}
 }
