@@ -141,7 +141,7 @@ func TestEmptyCompletedFlows(t *testing.T) {
 	ret := fakeEmptySessions.GetCompletedStages(fakeSessionID)
 
 	// check for []
-	if !(len(ret) == 0 && ret != nil) {
+	if ret == nil || len(ret) != 0 {
 		t.Error("Empty Completed Flow Stages should be a empty slice: returned ", ret, ". Should be []")
 	}
 }
