@@ -39,7 +39,7 @@ func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storag
 	).Methods(http.MethodGet, http.MethodOptions)
 	// TODO: Add AS support
 	r0mux.Handle("/directory/list/room/{roomID}",
-		common.MakeAuthAPI("directory_list", nil, deviceDB, nil, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("directory_list", nil, deviceDB, nil, func(req *http.Request, user string, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return directory.SetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),

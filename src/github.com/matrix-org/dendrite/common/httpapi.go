@@ -17,20 +17,20 @@ import (
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which checks the access token in the request.
 func MakeAuthAPI(
 	metricsName string, accountDB auth.AccountDatabase, deviceDB auth.DeviceDatabase,
-	appServices []config.ApplicationService, f func(*http.Request, *authtypes.Device) util.JSONResponse) http.Handler {
+	appServices []config.ApplicationService, f func(*http.Request, string, *authtypes.Device) util.JSONResponse) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		_, userErr := auth.VerifyUserFromRequest(req, accountDB, deviceDB, appServices)
+		user, userErr := auth.VerifyUserFromRequest(req, accountDB, deviceDB, appServices)
 
 		if userErr != nil {
 			return *userErr
 		}
 		device, resErr := auth.VerifyAccessToken(req, deviceDB)
 
-		// AS virtual user do not have a device in database
+		// AS virtual users do not have a device in database
 		if resErr != nil {
-			return f(req, nil)
+			return f(req, user, nil)
 		}
-		return f(req, device)
+		return f(req, user, device)
 	}
 	return MakeExternalAPI(metricsName, h)
 }
