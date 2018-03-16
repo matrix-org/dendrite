@@ -179,8 +179,8 @@ func validateRecaptcha(
 ) *util.JSONResponse {
 	if !cfg.Matrix.RecaptchaEnabled {
 		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Captcha registration is disabled"),
+			Code: http.StatusServiceUnavailable,
+			JSON: jsonerror.Unknown("Captcha registration is disabled"),
 		}
 	}
 
@@ -215,8 +215,8 @@ func validateRecaptcha(
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Error in contacting captcha server" + err.Error()),
+			Code: http.StatusGatewayTimeout,
+			JSON: jsonerror.Unknown("Error in contacting captcha server" + err.Error()),
 		}
 	}
 	err = json.Unmarshal(body, &r)
