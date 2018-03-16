@@ -141,22 +141,6 @@ func handlePasswordLogin(
 		}
 	}
 
-	var token string
-	token, err = tokens.GenerateLoginToken(tokens.TokenOptions{
-		ServerMacaroonSecret: []byte(string(cfg.Matrix.PrivateKey)),
-		ServerName:           string(cfg.Matrix.ServerName),
-		UserID:               r.User,
-	})
-
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusNotImplemented,
-			JSON: jsonerror.Unknown("Token generation failed"),
-		}
-	}
-
-	util.GetLogger(req.Context()).WithField("user", r.User).Info(token)
-
 	return completeLogin(r, localpart, deviceDB, req, cfg)
 }
 
@@ -206,15 +190,19 @@ func handleTokenLogin(
 	}
 
 	tokenOptions := tokens.TokenOptions{
-		ServerMacaroonSecret: []byte(string(cfg.Matrix.PrivateKey)),
+		// ServerMacaroonSecret should be a []byte
+		ServerMacaroonSecret: []byte(cfg.Matrix.PrivateKey),
 		ServerName:           string(cfg.Matrix.ServerName),
 		UserID:               userID,
 	}
 
-	resErr := tokens.ValidateToken(tokenOptions, r.Token)
+	err := tokens.ValidateToken(tokenOptions, r.Token)
 
-	if resErr != nil {
-		return *resErr
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.UnknownToken(err.Error()),
+		}
 	}
 
 	return completeLogin(r, localpart, deviceDB, req, cfg)

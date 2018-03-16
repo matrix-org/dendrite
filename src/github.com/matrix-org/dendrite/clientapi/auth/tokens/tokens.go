@@ -1,4 +1,4 @@
-// Copyright 2018 Vector Creations Ltd
+// Copyright 2018 New Vector Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,11 +26,11 @@ import (
 const (
 	macaroonVersion = macaroon.V2
 	defaultDuration = 2 * 60
-	// UserPrefix for user_id caveat
+	// UserPrefix is common prefix for every user_id caveat
 	UserPrefix = "user_id = "
-	// TimePrefix for expiry caveat
+	// TimePrefix is common prefix for every expiry caveat
 	TimePrefix = "time < "
-	// Gen represents an unique identifier used as a caveat
+	// Gen is a common caveat for every token
 	Gen = "gen = 1"
 )
 
@@ -61,14 +61,17 @@ func GenerateLoginToken(op TokenOptions) (string, error) {
 	if err != nil {
 		return "", macaroonError(err)
 	}
+	urlSafeEncode, err := SerializeMacaroon(*mac)
 
-	urlSafeEncode, err := serializeMacaroon(*mac)
-	return urlSafeEncode, macaroonError(err)
+	if err != nil {
+		return "", macaroonError(err)
+	}
+	return urlSafeEncode, nil
 }
 
-// generateBaseMacaroon generates a base macaroon common for accessToken & loginToken
+// generateBaseMacaroon generates a base macaroon common for accessToken & loginToken.
 // Returns a macaroon tied with userID,
-// returns formated error if something goes wrong.
+// returns an error if something goes wrong.
 func generateBaseMacaroon(
 	secret []byte, ServerName string, userID string,
 ) (*macaroon.Macaroon, error) {
@@ -94,9 +97,9 @@ func macaroonError(err error) error {
 	return fmt.Errorf("Macaroon creation failed: %s", err.Error())
 }
 
-// serializeMacaroon takes a macaroon to be serialized.
-// returns a base64 encoded string, URL safe, can be sent via web, email, etc.
-func serializeMacaroon(m macaroon.Macaroon) (string, error) {
+// SerializeMacaroon takes a macaroon to be serialized.
+// returns it's base64 encoded string, URL safe, which can be sent via web, email, etc.
+func SerializeMacaroon(m macaroon.Macaroon) (string, error) {
 	bin, err := m.MarshalBinary()
 
 	if err != nil {
@@ -107,19 +110,16 @@ func serializeMacaroon(m macaroon.Macaroon) (string, error) {
 	return urlSafeEncode, nil
 }
 
-// deserializeMacaroon takes a base64 encoded string to deserialized.
+// DeSerializeMacaroon takes a base64 encoded string (of a macaroon, hopefully) to de-serialized.
 // Returns a macaroon. On failure returns error with description.
-func deserializeMacaroon(urlSafeEncode string) (*macaroon.Macaroon, error) {
+func DeSerializeMacaroon(urlSafeEncode string) (*macaroon.Macaroon, error) {
 	bin, err := base64.RawURLEncoding.DecodeString(urlSafeEncode)
 
 	if err != nil {
 		return nil, err
 	}
-	var mac *macaroon.Macaroon
+	var mac macaroon.Macaroon
 	err = mac.UnmarshalBinary(bin)
 
-	if err != nil {
-		return nil, err
-	}
-	return mac, nil
+	return &mac, err
 }

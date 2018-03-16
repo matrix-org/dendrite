@@ -1,4 +1,4 @@
-// Copyright 2018 Vector Creations Ltd
+// Copyright 2018 New Vector Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,95 +19,93 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/util"
 )
 
 // GetUserFromToken returns the user associated with the token
 // Returns the error if something goes wrong.
 // Warning: Does not validate the token. Use ValidateToken for that.
 func GetUserFromToken(token string) (user string, err error) {
-	mac, err := deserializeMacaroon(token)
+	mac, err := DeSerializeMacaroon(token)
 
 	if err != nil {
 		return
 	}
+
+	// ID() returns a []byte, so convert it to string
 	user = string(mac.Id()[:])
 	return
 }
 
 // ValidateToken validates that the Token is understood and was signed by this server.
-// Returns nil if token is valid, otherwise returns a error response which can be sent to client.
-func ValidateToken(op TokenOptions, token string) *util.JSONResponse {
-	macaroon, err := deserializeMacaroon(token)
+// Returns nil if token is valid, otherwise returns an error/
+func ValidateToken(op TokenOptions, token string) error {
+	macaroon, err := DeSerializeMacaroon(token)
 
 	if err != nil {
-		return &util.JSONResponse{
-			Code: 401,
-			JSON: jsonerror.UnknownToken("Token does not represent a valid macaroon"),
-		}
+		return errors.New("Token does not represent a valid macaroon")
 	}
 
+	// VerifySignature returns all caveats in the macaroon
 	caveats, err := macaroon.VerifySignature(op.ServerMacaroonSecret, nil)
 
 	if err != nil {
-		return &util.JSONResponse{
-			Code: 401,
-			JSON: jsonerror.UnknownToken("Provided token was not issued by this server"),
-		}
+		return errors.New("Provided token was not issued by this server")
 	}
 
 	err = verifyCaveats(caveats, op.UserID)
 
 	if err != nil {
-		return &util.JSONResponse{
-			Code: 403,
-			JSON: jsonerror.Forbidden("Provided token not authorized"),
-		}
+		return errors.New("Provided token not authorized")
 	}
 	return nil
 }
 
-// verifyCaveats verifies caveats associated with a login token macaroon.
-// which are "gen = 1", "user_id = ...", "time < ..."
-// Returns nil on successful verification, else returns the error.
+// verifyCaveats verifies caveats associated with a login macaroon token.
+// Which are "gen = 1", "user_id = ...", "time < ..."
+// Returns nil on successful verification, else returns an error.
 func verifyCaveats(caveats []string, userID string) error {
-	// let last 4 bit be Uabc where,
-	// U: unknownCaveat
-	// a, b, c: 1st, 2nd & 3rd caveat to be verified respectively.
+	// verified is a bitmask
+	// let last 4 bit be uabc where,
+	// u denotes any unknownCaveat
+	// a, b, c denotes the three caveats to be verified respectively.
 	var verified uint8
 	now := time.Now().Second()
 
 	for _, caveat := range caveats {
 		switch {
 		case caveat == Gen:
+			// "gen = 1"
 			verified |= 1
 		case strings.HasPrefix(caveat, UserPrefix):
+			// "user_id = ..."
 			if caveat[len(UserPrefix):] == userID {
 				verified |= 2
 			}
 		case strings.HasPrefix(caveat, TimePrefix):
+			// "time < ..."
 			if verifyExpiry(caveat[len(TimePrefix):], now) {
 				verified |= 4
 			}
 		default:
+			// Unknown caveat
 			verified |= 8
-			break
 		}
 	}
 
-	// Check that all three caveats are verified and no extra caveats
-	// i.e. Uabc == 0111
-	if verified == 7 {
-		return nil
-	} else if verified >= 8 {
-		return errors.New("Unknown caveat present")
+	// Check that all three caveats are verified and no extra caveats are present
+	// i.e. uabc == 0111, which implies verified == 7
+	if verified != 7 {
+		if verified >= 8 {
+			return errors.New("Unknown caveat present")
+		}
+
+		return errors.New("Required caveats not present")
 	}
 
-	return errors.New("Required caveats not present")
+	return nil
 }
 
+// verifyExpiry verifies an expiry caveat
 func verifyExpiry(t string, now int) bool {
 	expiry, err := strconv.Atoi(t)
 
