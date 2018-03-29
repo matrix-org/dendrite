@@ -188,7 +188,7 @@ func processInviteEvent(
 		return nil
 	}
 
-	outputUpdates, err := updateToInviteMembership(updater, &input.Event, nil)
+	outputUpdates, err := updateToInviteMembership(ctx, updater, &input.Event, nil)
 	if err != nil {
 		return err
 	}
