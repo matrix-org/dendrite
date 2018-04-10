@@ -379,6 +379,12 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
+	r0mux.Handle("/account/whoami",
+		common.MakeAuthAPI("whoami", accountDB, deviceDB, cfg.Derived.ApplicationServices, func(req *http.Request, user string, device *authtypes.Device) util.JSONResponse {
+			return Whoami(req, user)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	// Stub implementations for sytest
 	r0mux.Handle("/events",
 		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {
