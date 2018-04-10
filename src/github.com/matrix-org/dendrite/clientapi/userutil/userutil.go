@@ -23,11 +23,11 @@ import (
 // usernameParam can either be a user ID or just the localpart/username.
 // If serverName is passed, it is verified against the domain obtained from usernameParam (if present)
 // Returns error in case of invalid usernameParam.
-func ParseUsernameParam(userID string, expectedServerName *gomatrixserverlib.ServerName) (string, error) {
-	localpart := userID
+func ParseUsernameParam(usernameParam string, expectedServerName *gomatrixserverlib.ServerName) (string, error) {
+	localpart := usernameParam
 
-	if strings.HasPrefix(userID, "@") {
-		lp, domain, err := gomatrixserverlib.SplitID('@', userID)
+	if strings.HasPrefix(usernameParam, "@") {
+		lp, domain, err := gomatrixserverlib.SplitID('@', usernameParam)
 
 		if err != nil {
 			return "", errors.New("Invalid username")
