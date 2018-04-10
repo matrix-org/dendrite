@@ -3,12 +3,13 @@ package dugong
 import (
 	"compress/gzip"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // RotationScheduler determines when files should be rotated.
@@ -41,6 +42,9 @@ func dayOffset(t time.Time, offsetDays int) time.Time {
 	)
 }
 
+// ShouldRotate compares the current time with the rotation schedule.
+// If the rotation should occur, returns (true, suffix) where suffix is the
+// suffix for the rotated file. Else, returns (false, "")
 func (rs *DailyRotationSchedule) ShouldRotate() (bool, string) {
 	now := currentTime()
 	if rs.rotateAfter == nil {
@@ -68,15 +72,13 @@ func (rs *DailyRotationSchedule) ShouldGZip() bool {
 // contains the messages with that severity or higher. If a formatter is
 // not specified, they will be logged using a JSON formatter. If a
 // RotationScheduler is set, the files will be cycled according to its rules.
-func NewFSHook(infoPath, warnPath, errorPath string, formatter log.Formatter, rotSched RotationScheduler) log.Hook {
+func NewFSHook(path string, formatter log.Formatter, rotSched RotationScheduler) log.Hook {
 	if formatter == nil {
 		formatter = &log.JSONFormatter{}
 	}
 	hook := &fsHook{
 		entries:   make(chan log.Entry, 1024),
-		infoPath:  infoPath,
-		warnPath:  warnPath,
-		errorPath: errorPath,
+		path:      path,
 		formatter: formatter,
 		scheduler: rotSched,
 	}
@@ -96,9 +98,7 @@ func NewFSHook(infoPath, warnPath, errorPath string, formatter log.Formatter, ro
 type fsHook struct {
 	entries   chan log.Entry
 	queueSize int32
-	infoPath  string
-	warnPath  string
-	errorPath string
+	path      string
 	formatter log.Formatter
 	scheduler RotationScheduler
 }
@@ -123,22 +123,8 @@ func (hook *fsHook) writeEntry(entry *log.Entry) error {
 		}
 	}
 
-	if entry.Level <= log.ErrorLevel {
-		if err := logToFile(hook.errorPath, msg); err != nil {
-			return err
-		}
-	}
-
-	if entry.Level <= log.WarnLevel {
-		if err := logToFile(hook.warnPath, msg); err != nil {
-			return err
-		}
-	}
-
-	if entry.Level <= log.InfoLevel {
-		if err := logToFile(hook.infoPath, msg); err != nil {
-			return err
-		}
+	if err := logToFile(hook.path, msg); err != nil {
+		return err
 	}
 
 	return nil
@@ -151,6 +137,7 @@ func (hook *fsHook) Levels() []log.Level {
 		log.ErrorLevel,
 		log.WarnLevel,
 		log.InfoLevel,
+		log.DebugLevel,
 	}
 }
 
@@ -161,17 +148,14 @@ func (hook *fsHook) Levels() []log.Level {
 // one which does the logging. Since we don't hold open a handle to the
 // file when writing, a simple Rename is all that is required.
 func (hook *fsHook) rotate(suffix string, gzip bool) error {
-	for _, fpath := range []string{hook.errorPath, hook.warnPath, hook.infoPath} {
-		logFilePath := fpath + suffix
-		if err := os.Rename(fpath, logFilePath); err != nil {
-			// e.g. because there were no errors in error.log for this day
-			fmt.Fprintf(os.Stderr, "Error rotating file %s: %v\n", fpath, err)
-			continue // don't try to gzip if we failed to rotate
-		}
-		if gzip {
-			if err := gzipFile(logFilePath); err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to gzip file %s: %v\n", logFilePath, err)
-			}
+	logFilePath := hook.path + suffix
+	if err := os.Rename(hook.path, logFilePath); err != nil {
+		// e.g. because there were no errors in error.log for this day
+		fmt.Fprintf(os.Stderr, "Error rotating file %s: %v\n", hook.path, err)
+	} else if gzip {
+		// Don't try to gzip if we failed to rotate
+		if err := gzipFile(logFilePath); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to gzip file %s: %v\n", logFilePath, err)
 		}
 	}
 	return nil

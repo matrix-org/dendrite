@@ -117,10 +117,27 @@ listen:
 tracing:
     # Config for the jaeger opentracing reporter.
     # See https://godoc.org/github.com/uber/jaeger-client-go/config#Configuration
-    # for documtation.
+    # for documentation.
     jaeger:
         disabled: true
 
 # A list of application service config files to use
 application_services:
     config_files: []
+
+# The configuration for dendrite logs
+logging:
+    # The logging type, only "file" is supported at the moment
+    - type: "file"
+      # The logging level, must be one of debug, info, warn, error, fatal, panic.
+      level: "info"
+      # Parameters for this type of log
+      params:
+        # File logging must be given a path to a directory. Each component will write to a different file. Logs are rotated each day and gzipped
+        path: "/var/log/dendrite"
+    # It is possible to have multiple logging hooks at the same time.
+    # To save only errors in a different directory, uncomment the following.
+    # - type: "file"
+    #   level: "error"
+    #   params:
+    #     path: "/var/log/dendrite/errors"

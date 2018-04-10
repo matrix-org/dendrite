@@ -154,14 +154,14 @@ func checkErrors(config *Dendrite) error {
 	for _, appservice := range config.Derived.ApplicationServices {
 		// Check if we've already seen this ID
 		if idMap[appservice.ID] {
-			return Error{[]string{fmt.Sprintf(
+			return configErrors([]string{fmt.Sprintf(
 				"Application Service ID %s must be unique", appservice.ID,
-			)}}
+			)})
 		}
 		if tokenMap[appservice.ASToken] {
-			return Error{[]string{fmt.Sprintf(
+			return configErrors([]string{fmt.Sprintf(
 				"Application Service Token %s must be unique", appservice.ASToken,
-			)}}
+			)})
 		}
 
 		// Add the id/token to their respective maps if we haven't already
@@ -175,9 +175,9 @@ func checkErrors(config *Dendrite) error {
 		for _, namespaceSlice := range appservice.NamespaceMap {
 			for _, namespace := range namespaceSlice {
 				if !IsValidRegex(namespace.Regex) {
-					return Error{[]string{fmt.Sprintf(
+					return configErrors([]string{fmt.Sprintf(
 						"Invalid regex string for Application Service %s", appservice.ID,
-					)}}
+					)})
 				}
 			}
 		}

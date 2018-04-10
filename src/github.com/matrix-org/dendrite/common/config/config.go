@@ -214,6 +214,9 @@ type Dendrite struct {
 		ConfigFiles []string `yaml:"config_files"`
 	} `yaml:"application_services"`
 
+	// The config for logging informations. Each hook will be added to logrus.
+	Logging []LogrusHook `yaml:"logging"`
+
 	// Any information derived from the configuration options for later use.
 	Derived struct {
 		Registration struct {
@@ -268,6 +271,24 @@ type ThumbnailSize struct {
 	ResizeMethod string `yaml:"method,omitempty"`
 }
 
+// LogrusHook represents a single logrus hook. At this point, only parsing and
+// verification of the proper values for type and level are done.
+// Validity/integrity checks on the parameters are done when configuring logrus.
+type LogrusHook struct {
+	// The type of hook, currently only "file" is supported.
+	Type string `yaml:"type"`
+
+	// The level of the logs to produce. Will output only this level and above.
+	Level string `yaml:"level"`
+
+	// The parameters for this hook.
+	Params map[string]interface{} `yaml:"params"`
+}
+
+// configErrors stores problems encountered when parsing a config file.
+// It implements the error interface.
+type configErrors []string
+
 // Load a yaml config file for a server run as multiple processes.
 // Checks the config to ensure that it is valid.
 // The checks are different if the server is run as a monolithic process instead
@@ -304,12 +325,6 @@ func LoadMonolithic(configPath string) (*Dendrite, error) {
 	// be mocked in the tests
 	monolithic := true
 	return loadConfig(basePath, configData, ioutil.ReadFile, monolithic)
-}
-
-// An Error indicates a problem parsing the config.
-type Error struct {
-	// List of problems encountered parsing the config.
-	Problems []string
 }
 
 func loadConfig(
@@ -412,100 +427,158 @@ func (config *Dendrite) setDefaults() {
 	}
 }
 
-// Error returns a string detailing how many errors were contained within an
-// Error type.
-func (e Error) Error() string {
-	if len(e.Problems) == 1 {
-		return e.Problems[0]
+// Error returns a string detailing how many errors were contained within a
+// configErrors type.
+func (errs configErrors) Error() string {
+	if len(errs) == 1 {
+		return errs[0]
 	}
 	return fmt.Sprintf(
-		"%s (and %d other problems)", e.Problems[0], len(e.Problems)-1,
+		"%s (and %d other problems)", errs[0], len(errs)-1,
 	)
+}
+
+// Add appends an error to the list of errors in this configErrors.
+// It is a wrapper to the builtin append and hides pointers from
+// the client code.
+// This method is safe to use with an uninitialized configErrors because
+// if it is nil, it will be properly allocated.
+func (errs *configErrors) Add(str string) {
+	*errs = append(*errs, str)
+}
+
+// checkNotEmpty verifies the given value is not empty in the configuration.
+// If it is, adds an error to the list.
+func checkNotEmpty(configErrs *configErrors, key, value string) {
+	if value == "" {
+		configErrs.Add(fmt.Sprintf("missing config key %q", key))
+	}
+}
+
+// checkNotZero verifies the given value is not zero in the configuration.
+// If it is, adds an error to the list.
+func checkNotZero(configErrs *configErrors, key string, value int64) {
+	if value == 0 {
+		configErrs.Add(fmt.Sprintf("missing config key %q", key))
+	}
+}
+
+// checkPositive verifies the given value is positive (zero included)
+// in the configuration. If it is not, adds an error to the list.
+func checkPositive(configErrs *configErrors, key string, value int64) {
+	if value < 0 {
+		configErrs.Add(fmt.Sprintf("invalid value for config key %q: %d", key, value))
+	}
+}
+
+// checkTurn verifies the parameters turn.* are valid.
+func (config *Dendrite) checkTurn(configErrs *configErrors) {
+	value := config.TURN.UserLifetime
+	if value != "" {
+		if _, err := time.ParseDuration(value); err != nil {
+			configErrs.Add(fmt.Sprintf("invalid duration for config key %q: %s", "turn.turn_user_lifetime", value))
+		}
+	}
+}
+
+// checkMatrix verifies the parameters matrix.* are valid.
+func (config *Dendrite) checkMatrix(configErrs *configErrors) {
+	checkNotEmpty(configErrs, "matrix.server_name", string(config.Matrix.ServerName))
+	checkNotEmpty(configErrs, "matrix.private_key", string(config.Matrix.PrivateKeyPath))
+	checkNotZero(configErrs, "matrix.federation_certificates", int64(len(config.Matrix.FederationCertificatePaths)))
+}
+
+// checkMedia verifies the parameters media.* are valid.
+func (config *Dendrite) checkMedia(configErrs *configErrors) {
+	checkNotEmpty(configErrs, "media.base_path", string(config.Media.BasePath))
+	checkPositive(configErrs, "media.max_file_size_bytes", int64(*config.Media.MaxFileSizeBytes))
+	checkPositive(configErrs, "media.max_thumbnail_generators", int64(config.Media.MaxThumbnailGenerators))
+
+	for i, size := range config.Media.ThumbnailSizes {
+		checkPositive(configErrs, fmt.Sprintf("media.thumbnail_sizes[%d].width", i), int64(size.Width))
+		checkPositive(configErrs, fmt.Sprintf("media.thumbnail_sizes[%d].height", i), int64(size.Height))
+	}
+}
+
+// checkKafka verifies the parameters kafka.* and the related
+// database.naffka are valid.
+func (config *Dendrite) checkKafka(configErrs *configErrors, monolithic bool) {
+
+	if config.Kafka.UseNaffka {
+		if !monolithic {
+			configErrs.Add(fmt.Sprintf("naffka can only be used in a monolithic server"))
+		}
+
+		checkNotEmpty(configErrs, "database.naffka", string(config.Database.Naffka))
+	} else {
+		// If we aren't using naffka then we need to have at least one kafka
+		// server to talk to.
+		checkNotZero(configErrs, "kafka.addresses", int64(len(config.Kafka.Addresses)))
+	}
+	checkNotEmpty(configErrs, "kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
+	checkNotEmpty(configErrs, "kafka.topics.output_client_data", string(config.Kafka.Topics.OutputClientData))
+	checkNotEmpty(configErrs, "kafka.topics.user_updates", string(config.Kafka.Topics.UserUpdates))
+}
+
+// checkDatabase verifies the parameters database.* are valid.
+func (config *Dendrite) checkDatabase(configErrs *configErrors) {
+	checkNotEmpty(configErrs, "database.account", string(config.Database.Account))
+	checkNotEmpty(configErrs, "database.device", string(config.Database.Device))
+	checkNotEmpty(configErrs, "database.server_key", string(config.Database.ServerKey))
+	checkNotEmpty(configErrs, "database.media_api", string(config.Database.MediaAPI))
+	checkNotEmpty(configErrs, "database.sync_api", string(config.Database.SyncAPI))
+	checkNotEmpty(configErrs, "database.room_server", string(config.Database.RoomServer))
+}
+
+// checkListen verifies the parameters listen.* are valid.
+func (config *Dendrite) checkListen(configErrs *configErrors) {
+	checkNotEmpty(configErrs, "listen.media_api", string(config.Listen.MediaAPI))
+	checkNotEmpty(configErrs, "listen.client_api", string(config.Listen.ClientAPI))
+	checkNotEmpty(configErrs, "listen.federation_api", string(config.Listen.FederationAPI))
+	checkNotEmpty(configErrs, "listen.sync_api", string(config.Listen.SyncAPI))
+	checkNotEmpty(configErrs, "listen.room_server", string(config.Listen.RoomServer))
+}
+
+// checkLogging verifies the parameters logging.* are valid.
+func (config *Dendrite) checkLogging(configErrs *configErrors) {
+	for _, logrusHook := range config.Logging {
+		checkNotEmpty(configErrs, "logging.type", string(logrusHook.Type))
+		checkNotEmpty(configErrs, "logging.level", string(logrusHook.Level))
+	}
 }
 
 // check returns an error type containing all errors found within the config
 // file.
 func (config *Dendrite) check(monolithic bool) error {
-	var problems []string
+	var configErrs configErrors
 
 	if config.Version != Version {
-		return Error{[]string{fmt.Sprintf(
+		configErrs.Add(fmt.Sprintf(
 			"unknown config version %q, expected %q", config.Version, Version,
-		)}}
+		))
+		return configErrs
 	}
 
-	checkNotEmpty := func(key string, value string) {
-		if value == "" {
-			problems = append(problems, fmt.Sprintf("missing config key %q", key))
-		}
-	}
-
-	checkNotZero := func(key string, value int64) {
-		if value == 0 {
-			problems = append(problems, fmt.Sprintf("missing config key %q", key))
-		}
-	}
-
-	checkPositive := func(key string, value int64) {
-		if value < 0 {
-			problems = append(problems, fmt.Sprintf("invalid value for config key %q: %d", key, value))
-		}
-	}
-
-	checkValidDuration := func(key, value string) {
-		if _, err := time.ParseDuration(config.TURN.UserLifetime); err != nil {
-			problems = append(problems, fmt.Sprintf("invalid duration for config key %q: %s", key, value))
-		}
-	}
-
-	checkNotEmpty("matrix.server_name", string(config.Matrix.ServerName))
-	checkNotEmpty("matrix.private_key", string(config.Matrix.PrivateKeyPath))
-	checkNotZero("matrix.federation_certificates", int64(len(config.Matrix.FederationCertificatePaths)))
-
-	if config.TURN.UserLifetime != "" {
-		checkValidDuration("turn.turn_user_lifetime", config.TURN.UserLifetime)
-	}
-
-	checkNotEmpty("media.base_path", string(config.Media.BasePath))
-	checkPositive("media.max_file_size_bytes", int64(*config.Media.MaxFileSizeBytes))
-	checkPositive("media.max_thumbnail_generators", int64(config.Media.MaxThumbnailGenerators))
-	for i, size := range config.Media.ThumbnailSizes {
-		checkPositive(fmt.Sprintf("media.thumbnail_sizes[%d].width", i), int64(size.Width))
-		checkPositive(fmt.Sprintf("media.thumbnail_sizes[%d].height", i), int64(size.Height))
-	}
-	if config.Kafka.UseNaffka {
-		if !monolithic {
-			problems = append(problems, fmt.Sprintf("naffka can only be used in a monolithic server"))
-		}
-
-		checkNotEmpty("database.naffka", string(config.Database.Naffka))
-	} else {
-		// If we aren't using naffka then we need to have at least one kafka
-		// server to talk to.
-		checkNotZero("kafka.addresses", int64(len(config.Kafka.Addresses)))
-	}
-	checkNotEmpty("kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
-	checkNotEmpty("kafka.topics.output_client_data", string(config.Kafka.Topics.OutputClientData))
-	checkNotEmpty("kafka.topics.user_updates", string(config.Kafka.Topics.UserUpdates))
-	checkNotEmpty("database.account", string(config.Database.Account))
-	checkNotEmpty("database.device", string(config.Database.Device))
-	checkNotEmpty("database.server_key", string(config.Database.ServerKey))
-	checkNotEmpty("database.media_api", string(config.Database.MediaAPI))
-	checkNotEmpty("database.sync_api", string(config.Database.SyncAPI))
-	checkNotEmpty("database.room_server", string(config.Database.RoomServer))
+	config.checkMatrix(&configErrs)
+	config.checkMedia(&configErrs)
+	config.checkTurn(&configErrs)
+	config.checkKafka(&configErrs, monolithic)
+	config.checkDatabase(&configErrs)
+	config.checkLogging(&configErrs)
 
 	if !monolithic {
-		checkNotEmpty("listen.media_api", string(config.Listen.MediaAPI))
-		checkNotEmpty("listen.client_api", string(config.Listen.ClientAPI))
-		checkNotEmpty("listen.federation_api", string(config.Listen.FederationAPI))
-		checkNotEmpty("listen.sync_api", string(config.Listen.SyncAPI))
-		checkNotEmpty("listen.room_server", string(config.Listen.RoomServer))
+		config.checkListen(&configErrs)
 	}
 
-	if problems != nil {
-		return Error{problems}
+	// Due to how Golang manages its interface types, this condition is not redundant.
+	// In order to get the proper behavior, it is necessary to return an explicit nil
+	// and not a nil configErrors.
+	// This is because the following equalities hold:
+	// error(nil) == nil
+	// error(configErrors(nil)) != nil
+	if configErrs != nil {
+		return configErrs
 	}
-
 	return nil
 }
 

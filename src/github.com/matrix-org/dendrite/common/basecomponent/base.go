@@ -18,7 +18,6 @@ import (
 	"database/sql"
 	"io"
 	"net/http"
-	"os"
 
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -56,7 +55,8 @@ type BaseDendrite struct {
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
 func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
-	common.SetupLogging(os.Getenv("LOG_DIR"))
+	common.SetupStdLogging()
+	common.SetupHookLogging(cfg.Logging, componentName)
 
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
