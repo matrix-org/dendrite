@@ -33,6 +33,12 @@ nonetheless fairly well-contained.
 We ask people who are familiar with Dendrite to leave the [good first issue](https://github.com/matrix-org/dendrite/labels/good%20first%20issue)
 issues so that there is always a way for new people to come and get involved.
 
+## Contributing to dependencies
+
+Dependencies are located in `vendor/src` and are managed by `gb`. If you need make some changes in those directories, you first need to open a PR in the dependency repository. Once your PR is merged, you need to run `gb vendor update $repo_url` (example: `gb vendor update github.com/matrix-org/gomatrix`) in dendrite repository to update the dependency.
+
+You can then commit the modified files and name the commit with the command you just ran.
+
 ## Getting Help
 
 For questions related to developing on Dendrite we have a dedicated room on
