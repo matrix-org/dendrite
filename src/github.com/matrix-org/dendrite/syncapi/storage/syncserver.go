@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrix"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -341,8 +342,9 @@ var txReadOnlySnapshot = sql.TxOptions{
 // If there was an issue with the retrieval, returns an error
 func (d *SyncServerDatabase) GetAccountDataInRange(
 	ctx context.Context, userID string, oldPos, newPos types.StreamPosition,
+	accountDataFilterPart *gomatrix.FilterPart,
 ) (map[string][]string, error) {
-	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos)
+	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos, accountDataFilterPart)
 }
 
 // UpsertAccountData keeps track of new or updated account data, by saving the type

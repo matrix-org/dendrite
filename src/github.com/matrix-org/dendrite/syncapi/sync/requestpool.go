@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -131,12 +132,14 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.Stre
 		return
 	}
 
-	res, err = rp.appendAccountData(res, req.device.UserID, req, currentPos)
+	accountDataFilter := gomatrix.DefaultFilterPart() // TODO: use filter provided in req instead
+	res, err = rp.appendAccountData(res, req.device.UserID, req, currentPos, &accountDataFilter)
 	return
 }
 
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
+	accountDataFilter *gomatrix.FilterPart,
 ) (*types.Response, error) {
 	// TODO: Account data doesn't have a sync position of its own, meaning that
 	// account data might be sent multiple time to the client if multiple account
@@ -170,7 +173,7 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, *req.since, currentPos)
+	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, *req.since, currentPos, accountDataFilter)
 	if err != nil {
 		return nil, err
 	}
