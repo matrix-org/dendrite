@@ -179,7 +179,7 @@ func validateRecaptcha(
 ) *util.JSONResponse {
 	if !cfg.Matrix.RecaptchaEnabled {
 		return &util.JSONResponse{
-			Code: http.StatusServiceUnavailable,
+			Code: http.StatusConflict,
 			JSON: jsonerror.Unknown("Captcha registration is disabled"),
 		}
 	}
