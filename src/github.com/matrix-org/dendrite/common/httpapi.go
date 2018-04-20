@@ -19,17 +19,12 @@ func MakeAuthAPI(
 	metricsName string, accountDB auth.AccountDatabase, deviceDB auth.DeviceDatabase,
 	appServices []config.ApplicationService, f func(*http.Request, string, *authtypes.Device) util.JSONResponse) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		user, userErr := auth.VerifyUserFromRequest(req, accountDB, deviceDB, appServices)
+		user, device, err := auth.VerifyUserFromRequest(req, accountDB, deviceDB, appServices)
 
-		if userErr != nil {
-			return *userErr
+		if err != nil {
+			return *err
 		}
-		device, resErr := auth.VerifyAccessToken(req, deviceDB)
-
-		// AS virtual users do not have a device in database
-		if resErr != nil {
-			return f(req, user, nil)
-		}
+		// device is nil for AS virtual users, as they do not have a device in database
 		return f(req, user, device)
 	}
 	return MakeExternalAPI(metricsName, h)

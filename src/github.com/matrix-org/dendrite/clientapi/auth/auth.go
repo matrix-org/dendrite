@@ -49,25 +49,26 @@ type AccountDatabase interface {
 }
 
 // VerifyUserFromRequest authenticates the HTTP request,
-// on success returns UserID of the requester.
+// on success returns UserID, Device of the requester.
 // Finds local user or an application service user.
+// Note: For an AS user, Device is not present.
 // On failure returns an JSON error response which can be sent to the client.
 func VerifyUserFromRequest(
 	req *http.Request, accountDB AccountDatabase, deviceDB DeviceDatabase,
 	applicationServices []config.ApplicationService,
-) (string, *util.JSONResponse) {
+) (string, *authtypes.Device, *util.JSONResponse) {
 	// Try to find local user from device database
-	dev, devErr := VerifyAccessToken(req, deviceDB)
+	dev, devErr := verifyAccessToken(req, deviceDB)
 
 	if devErr == nil {
-		return dev.UserID, nil
+		return dev.UserID, dev, nil
 	}
 
 	// Try to find the Application Service user
 	token, err := extractAccessToken(req)
 
 	if err != nil {
-		return "", &util.JSONResponse{
+		return "", nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: jsonerror.MissingToken(err.Error()),
 		}
@@ -87,7 +88,7 @@ func VerifyUserFromRequest(
 		localpart, err := userutil.ParseUsernameParam(userID, nil)
 
 		if err != nil {
-			return "", &util.JSONResponse{
+			return "", nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidUsername(err.Error()),
 			}
@@ -98,25 +99,25 @@ func VerifyUserFromRequest(
 
 		// Verify that account exists & appServiceID matches
 		if accountErr == nil && account.AppServiceID == appService.ID {
-			return userID, nil
+			return userID, nil, nil
 		}
 
-		return "", &util.JSONResponse{
+		return "", nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("Application service has not registered this user"),
 		}
 	}
 
-	return "", &util.JSONResponse{
+	return "", nil, &util.JSONResponse{
 		Code: http.StatusUnauthorized,
 		JSON: jsonerror.UnknownToken("Unrecognized access token"),
 	}
 }
 
-// VerifyAccessToken verifies that an access token was supplied in the given HTTP request
+// verifyAccessToken verifies that an access token was supplied in the given HTTP request
 // and returns the device it corresponds to. Returns resErr (an error response which can be
 // sent to the client) if the token is invalid or there was a problem querying the database.
-func VerifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *authtypes.Device, resErr *util.JSONResponse) {
+func verifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *authtypes.Device, resErr *util.JSONResponse) {
 	token, err := extractAccessToken(req)
 	if err != nil {
 		resErr = &util.JSONResponse{
