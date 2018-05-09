@@ -43,7 +43,7 @@ in the dendrite repository to update the dependency.
 
 You can then create a commit containing only the modified vendor files (along
 with the `vendor/manifest` file), name it with the command you just ran (ie
-_gb vendor update github.com/matrix-org/gomatrix_), and open a PR on Dendrite.
+`gb vendor update github.com/matrix-org/gomatrix`), and open a PR on Dendrite.
 
 ## Getting Help
 
