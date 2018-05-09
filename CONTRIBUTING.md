@@ -35,9 +35,15 @@ issues so that there is always a way for new people to come and get involved.
 
 ## Contributing to dependencies
 
-Dependencies are located in `vendor/src` and are managed by `gb`. If you need make some changes in those directories, you first need to open a PR in the dependency repository. Once your PR is merged, you need to run `gb vendor update $repo_url` (example: `gb vendor update github.com/matrix-org/gomatrix`) in dendrite repository to update the dependency.
+Dependencies are located in `vendor/src` and are managed by `gb`. If you need
+to make some changes in those directories, you first need to open a PR in the
+dependency repository. Once your PR is merged, you need to run `gb vendor
+update $repo_url` (example: `gb vendor update github.com/matrix-org/gomatrix`)
+in the dendrite repository to update the dependency.
 
-You can then commit the modified files and name the commit with the command you just ran.
+You can then create a commit containing only the modified vendor files (along
+with the `vendor/manifest` file), name it with the command you just ran (ie
+_gb vendor update github.com/matrix-org/gomatrix_), and open a PR on Dendrite.
 
 ## Getting Help
 
