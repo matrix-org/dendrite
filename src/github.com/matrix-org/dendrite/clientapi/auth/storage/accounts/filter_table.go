@@ -74,19 +74,19 @@ func (s *filterStatements) prepare(db *sql.DB) (err error) {
 func (s *filterStatements) selectFilter(
 	ctx context.Context, localpart string, filterID string,
 ) (*gomatrix.Filter, error) {
-	// Retrieve canonical JSON
+	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
 	err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse filter JSON
+	// Unmarshall JSON into Filter struct
 	var filter gomatrix.Filter
 	if err = json.Unmarshal(filterData, &filter); err != nil {
 		return nil, err
 	}
-	return &filter, err
+	return &filter, nil
 }
 
 func (s *filterStatements) insertFilter(
