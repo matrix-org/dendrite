@@ -19,12 +19,12 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// DefaultCleanupPeriod represents time in nanoseconds after which cacheCleanService runs.
+// DefaultCleanupPeriod represents the default time duration after which cacheCleanService runs.
 const DefaultCleanupPeriod time.Duration = 30 * time.Minute
 
 type txnsMap map[string]*util.JSONResponse
 
-// Cache represents a temporary store for entries.
+// Cache represents a temporary store for response entries.
 // Entries are evicted after a certain period, defined by cleanupPeriod.
 type Cache struct {
 	sync.RWMutex
@@ -50,6 +50,7 @@ func New(cleanupPeriodInMins int) *Cache {
 }
 
 // FetchTransaction looks up an entry for txnID in Cache.
+// Looks in both the txnMaps.
 // Returns (JSON response, true) if txnID is found, else the returned bool is false.
 func (t *Cache) FetchTransaction(txnID string) (*util.JSONResponse, bool) {
 	t.RLock()
@@ -64,6 +65,7 @@ func (t *Cache) FetchTransaction(txnID string) (*util.JSONResponse, bool) {
 }
 
 // AddTransaction adds an entry for txnID in Cache for later access.
+// Adds to the front txnMap.
 func (t *Cache) AddTransaction(txnID string, res *util.JSONResponse) {
 	t.Lock()
 	defer t.Unlock()
@@ -73,7 +75,6 @@ func (t *Cache) AddTransaction(txnID string, res *util.JSONResponse) {
 
 // cacheCleanService is responsible for cleaning up entries after cleanupPeriod.
 // It guarantees that an entry will be present in cache for at least cleanupPeriod & at most 2 * cleanupPeriod.
-// This works by
 func cacheCleanService(t *Cache) {
 	ticker := time.Tick(t.cleanupPeriod)
 	for range ticker {
