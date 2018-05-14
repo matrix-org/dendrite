@@ -13,75 +13,73 @@
 package transactions
 
 import (
-	"errors"
 	"sync"
 	"time"
 
 	"github.com/matrix-org/util"
 )
 
-// CleanupPeriod represents time in nanoseconds after which cacheCleanService runs.
-const CleanupPeriod time.Duration = 30 * time.Minute
+// DefaultCleanupPeriod represents time in nanoseconds after which cacheCleanService runs.
+const DefaultCleanupPeriod time.Duration = 30 * time.Minute
 
-type entry struct {
-	value     *util.JSONResponse
-	entryTime time.Time
-}
+type txnsMap map[string]*util.JSONResponse
 
 // Cache represents a temporary store for entries.
-// Entries are evicted after a certain period, defined by CleanupPeriod.
+// Entries are evicted after a certain period, defined by cleanupPeriod.
 type Cache struct {
 	sync.RWMutex
-	txns map[string]entry
+	txnsMaps      [2]txnsMap
+	cleanupPeriod time.Duration
 }
 
 // New creates a new Cache object, starts cacheCleanService.
-// Returns a referance to newly created Cache.
-func New() *Cache {
-	t := Cache{txns: make(map[string]entry)}
+// Takes cleanupPeriod (in minutes) as argument, in case of 0 DefaultCleanupPeriod is used instead.
+// Returns a reference to newly created Cache.
+func New(cleanupPeriodInMins int) *Cache {
+	t := Cache{txnsMaps: [2]txnsMap{make(txnsMap), make(txnsMap)}}
 
-	// Start cleanup service as the Cache is created
+	cleanupPeriod := time.Duration(cleanupPeriodInMins) * time.Minute
+	if cleanupPeriod == 0 {
+		cleanupPeriod = DefaultCleanupPeriod
+	}
+	t.cleanupPeriod = cleanupPeriod
+
+	// Start clean service as the Cache is created
 	go cacheCleanService(&t)
 	return &t
 }
 
 // FetchTransaction looks up an entry for txnID in Cache.
-// Returns a JSON response if txnID is found, else returns error.
-func (t *Cache) FetchTransaction(txnID string) (*util.JSONResponse, error) {
+// Returns (JSON response, true) if txnID is found, else the returned bool is false.
+func (t *Cache) FetchTransaction(txnID string) (*util.JSONResponse, bool) {
 	t.RLock()
-	res, ok := t.txns[txnID]
-	t.RUnlock()
-
-	if ok {
-		return res.value, nil
+	defer t.RUnlock()
+	for _, txns := range t.txnsMaps {
+		res, ok := txns[txnID]
+		if ok {
+			return res, true
+		}
 	}
-	return nil, errors.New("TxnID not present")
+	return nil, false
 }
 
-// AddTransaction adds a entry for txnID in Cache for later access.
+// AddTransaction adds an entry for txnID in Cache for later access.
 func (t *Cache) AddTransaction(txnID string, res *util.JSONResponse) {
 	t.Lock()
 	defer t.Unlock()
 
-	t.txns[txnID] = entry{value: res, entryTime: time.Now()}
+	t.txnsMaps[0][txnID] = res
 }
 
-// cacheCleanService is responsible for cleaning up transactions older than CleanupPeriod.
-// It guarantees that a transaction will be present in cache for at least CleanupPeriod & at most 2 * CleanupPeriod.
+// cacheCleanService is responsible for cleaning up entries after cleanupPeriod.
+// It guarantees that an entry will be present in cache for at least cleanupPeriod & at most 2 * cleanupPeriod.
+// This works by
 func cacheCleanService(t *Cache) {
-	for {
-		time.Sleep(CleanupPeriod)
-		go clean(t)
-	}
-}
-
-func clean(t *Cache) {
-	expire := time.Now().Add(-CleanupPeriod)
-	for key := range t.txns {
+	ticker := time.Tick(t.cleanupPeriod)
+	for range ticker {
 		t.Lock()
-		if t.txns[key].entryTime.Before(expire) {
-			delete(t.txns, key)
-		}
+		t.txnsMaps[1] = t.txnsMaps[0]
+		t.txnsMaps[0] = make(txnsMap)
 		t.Unlock()
 	}
 }

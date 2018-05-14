@@ -30,8 +30,7 @@ var (
 
 // TestCache creates a New Cache and tests AddTransaction & FetchTransaction
 func TestCache(t *testing.T) {
-
-	fakeTxnCache := New()
+	fakeTxnCache := New(0)
 	fakeTxnCache.AddTransaction(fakeTxnID, fakeResponse)
 
 	// Add entries for noise.
@@ -42,34 +41,10 @@ func TestCache(t *testing.T) {
 		)
 	}
 
-	testResponse, err := fakeTxnCache.FetchTransaction(fakeTxnID)
-	if err != nil {
+	testResponse, ok := fakeTxnCache.FetchTransaction(fakeTxnID)
+	if !ok {
 		t.Error("Failed to retrieve entry for txnID: ", fakeTxnID)
 	} else if testResponse.JSON != fakeResponse.JSON {
-		t.Error("Incorrect fetched response. Expected: ", fakeResponse.JSON, " got: ", testResponse.JSON)
-	}
-}
-
-// TestConcurentAccess provides some guarantee against corruption.
-func TestConcurentAccess(t *testing.T) {
-	fakeTxnCache := New()
-	// Signal that this test should run in parallel
-	t.Parallel()
-	// Add entries concurrently to test concurrent access.
-	for i := 1; i <= 1000; i++ {
-		go check(t, fakeTxnCache, i)
-	}
-}
-
-// Adds an entry and checks it is retrieved.
-func check(t *testing.T, fakeTxnCache *Cache, i int) {
-	fakeTxnCache.AddTransaction(
-		fakeTxnID+string(i),
-		&util.JSONResponse{Code: http.StatusOK, JSON: fakeType{ID: string(i)}},
-	)
-	_, err := fakeTxnCache.FetchTransaction(fakeTxnID + string(i))
-
-	if err != nil {
-		t.Error("Failed to retrieve entry for txnID: ", fakeTxnID+string(i))
+		t.Error("Fetched response incorrect. Expected: ", fakeResponse.JSON, " got: ", testResponse.JSON)
 	}
 }
