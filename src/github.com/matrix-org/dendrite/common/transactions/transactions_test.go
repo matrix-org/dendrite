@@ -30,7 +30,7 @@ var (
 
 // TestCache creates a New Cache and tests AddTransaction & FetchTransaction
 func TestCache(t *testing.T) {
-	fakeTxnCache := New(0)
+	fakeTxnCache := New()
 	fakeTxnCache.AddTransaction(fakeTxnID, fakeResponse)
 
 	// Add entries for noise.

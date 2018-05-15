@@ -26,22 +26,23 @@ type txnsMap map[string]*util.JSONResponse
 
 // Cache represents a temporary store for response entries.
 // Entries are evicted after a certain period, defined by cleanupPeriod.
+// This works by keeping two maps of entries, and cycling the maps after the cleanupPeriod.
 type Cache struct {
 	sync.RWMutex
 	txnsMaps      [2]txnsMap
 	cleanupPeriod time.Duration
 }
 
-// New creates a new Cache object, starts cacheCleanService.
-// Takes cleanupPeriod (in minutes) as argument, in case of 0 DefaultCleanupPeriod is used instead.
-// Returns a reference to newly created Cache.
-func New(cleanupPeriodInMins int) *Cache {
-	t := Cache{txnsMaps: [2]txnsMap{make(txnsMap), make(txnsMap)}}
+// New is a wrapper which calls NewWithCleanupPeriod with DefaultCleanupPeriod as argument.
+func New() *Cache {
+	return NewWithCleanupPeriod(DefaultCleanupPeriod)
+}
 
-	cleanupPeriod := time.Duration(cleanupPeriodInMins) * time.Minute
-	if cleanupPeriod == 0 {
-		cleanupPeriod = DefaultCleanupPeriod
-	}
+// NewWithCleanupPeriod creates a new Cache object, starts cacheCleanService.
+// Takes cleanupPeriod as argument.
+// Returns a reference to newly created Cache.
+func NewWithCleanupPeriod(cleanupPeriod time.Duration) *Cache {
+	t := Cache{txnsMaps: [2]txnsMap{make(txnsMap), make(txnsMap)}}
 	t.cleanupPeriod = cleanupPeriod
 
 	// Start clean service as the Cache is created
@@ -75,6 +76,7 @@ func (t *Cache) AddTransaction(txnID string, res *util.JSONResponse) {
 
 // cacheCleanService is responsible for cleaning up entries after cleanupPeriod.
 // It guarantees that an entry will be present in cache for at least cleanupPeriod & at most 2 * cleanupPeriod.
+// This cycles the txnMaps forward, i.e. back map is assigned the front and front is assigned an empty map.
 func cacheCleanService(t *Cache) {
 	ticker := time.Tick(t.cleanupPeriod)
 	for range ticker {
