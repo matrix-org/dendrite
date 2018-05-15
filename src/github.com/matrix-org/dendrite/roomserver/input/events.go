@@ -114,7 +114,7 @@ func processRoomEvent(
 			}
 
 			if stateAtEvent.BeforeStateSnapshotNID, err = db.AddState(ctx, roomNID, nil, entries); err != nil {
-				return nil
+				return err
 			}
 		} else {
 			// We haven't been told what the state at the event is so we need to calculate it from the prev_events
