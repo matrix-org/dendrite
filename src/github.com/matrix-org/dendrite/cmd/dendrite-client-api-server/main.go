@@ -18,6 +18,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
+	"github.com/matrix-org/dendrite/common/transactions"
 )
 
 func main() {
@@ -33,10 +34,11 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
+	cache := transactions.New()
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, &keyRing,
-		alias, input, query,
+		alias, input, query, cache,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.ClientAPI))

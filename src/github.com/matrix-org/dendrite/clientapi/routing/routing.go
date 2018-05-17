@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -48,6 +49,7 @@ func Setup(
 	keyRing gomatrixserverlib.KeyRing,
 	userUpdateProducer *producers.UserUpdateProducer,
 	syncProducer *producers.SyncAPIProducer,
+	transactionsCache *transactions.Cache,
 ) {
 
 	apiMux.Handle("/_matrix/client/versions",

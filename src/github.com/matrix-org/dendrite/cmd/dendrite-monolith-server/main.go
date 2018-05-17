@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common/keydb"
+	"github.com/matrix-org/dendrite/common/transactions"
 
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common"
@@ -52,7 +53,11 @@ func main() {
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
 
-	clientapi.SetupClientAPIComponent(base, deviceDB, accountDB, federation, &keyRing, alias, input, query)
+	clientapi.SetupClientAPIComponent(
+		base, deviceDB, accountDB,
+		federation, &keyRing, alias, input, query,
+		transactions.New(),
+	)
 	federationapi.SetupFederationAPIComponent(base, accountDB, federation, &keyRing, alias, input, query)
 	federationsender.SetupFederationSenderComponent(base, federation, query)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
