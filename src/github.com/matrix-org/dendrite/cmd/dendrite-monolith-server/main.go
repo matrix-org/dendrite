@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/common/keydb"
 
 	"github.com/matrix-org/dendrite/clientapi"
+	"github.com/matrix-org/dendrite/clientapi/transactions"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/federationapi"
@@ -51,8 +52,9 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
+	txnCache := transactions.CreateCache()
 
-	clientapi.SetupClientAPIComponent(base, deviceDB, accountDB, federation, &keyRing, alias, input, query)
+	clientapi.SetupClientAPIComponent(base, deviceDB, accountDB, federation, &keyRing, alias, input, query, txnCache)
 	federationapi.SetupFederationAPIComponent(base, accountDB, federation, &keyRing, alias, input, query)
 	federationsender.SetupFederationSenderComponent(base, federation, query)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
