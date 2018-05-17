@@ -81,7 +81,7 @@ func updateMemberships(
 			return nil, err
 		}
 	}
-	return nil, nil
+	return updates, nil
 }
 
 func updateMembership(
