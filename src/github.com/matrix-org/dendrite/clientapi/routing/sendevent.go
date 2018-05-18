@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -45,7 +46,15 @@ func SendEvent(
 	cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
+	txnCache *transactions.Cache,
 ) util.JSONResponse {
+	if txnID != nil {
+		// Try to fetch response from transactionsCache
+		if res, ok := txnCache.FetchTransaction(*txnID); ok {
+			return *res
+		}
+	}
+
 	// parse the incoming http request
 	userID := device.UserID
 	var r map[string]interface{} // must be a JSON object
@@ -105,8 +114,14 @@ func SendEvent(
 		return httputil.LogThenError(req, err)
 	}
 
-	return util.JSONResponse{
+	res := util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: sendEventResponse{e.EventID()},
 	}
+	// Add response to transactionsCache
+	if txnID != nil {
+		txnCache.AddTransaction(*txnID, &res)
+	}
+
+	return res
 }
