@@ -25,9 +25,9 @@ import (
 const (
 	macaroonVersion = macaroon.V2
 	defaultDuration = 2 * 60
-	// UserPrefix is common prefix for every user_id caveat
+	// UserPrefix is a common prefix for every user_id caveat
 	UserPrefix = "user_id = "
-	// TimePrefix is common prefix for every expiry caveat
+	// TimePrefix is a common prefix for every expiry caveat
 	TimePrefix = "time < "
 	// Gen is a common caveat for every token
 	Gen = "gen = 1"
@@ -107,7 +107,7 @@ func macaroonError(err error) error {
 }
 
 // serializeMacaroon takes a macaroon to be serialized.
-// returns it's base64 encoded string, URL safe, which can be sent via web, email, etc.
+// returns its base64 encoded string, URL safe, which can be sent via web, email, etc.
 func serializeMacaroon(m macaroon.Macaroon) (string, error) {
 	bin, err := m.MarshalBinary()
 	if err != nil {
