@@ -64,7 +64,7 @@ func (d sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType
 	return make([]authtypes.LoginType, 0)
 }
 
-// AAddCompletedStage records that a session has completed an auth stage.
+// AddCompletedStage records that a session has completed an auth stage.
 func (d *sessionsDict) AddCompletedStage(sessionID string, stage authtypes.LoginType) {
 	d.sessions[sessionID] = append(d.GetCompletedStages(sessionID), stage)
 }
