@@ -294,8 +294,8 @@
 		},
 		{
 			"importpath": "github.com/tj/go-debug",
-			"repository": "https://github.com/tj/go-debug",
-			"revision": "ff4a55a20a86994118644bbddc6a216da193cc13",
+			"repository": "https://github.com/visionmedia/go-debug",
+			"revision": "bfacf9d8a444b50f5d7ae47727544e775486966f",
 			"branch": "master"
 		},
 		{
@@ -460,6 +460,18 @@
 			"repository": "https://gopkg.in/yaml.v2",
 			"revision": "287cf08546ab5e7e37d55a84f7ed3fd1db036de5",
 			"branch": "v2"
-		}
+		},
+    {
+       "importpath": "github.com/prometheus/client_golang/prometheus",
+       "repository": "https://github.com/prometheus/client_golang",
+       "revision": "c51dc758d4bb30acacbef9eaa2b774969a135086",
+       "branch": "master"
+     },
+     {
+       "importpath": "github.com/prometheus/client_golang/prometheus/promhttp",
+       "repository": "https://github.com/prometheus/client_golang",
+       "revision": "c51dc758d4bb30acacbef9eaa2b774969a135086",
+       "branch": "master"
+     }
 	]
 }
