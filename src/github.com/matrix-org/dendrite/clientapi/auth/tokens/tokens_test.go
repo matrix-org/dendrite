@@ -64,12 +64,12 @@ func TestSerialization(t *testing.T) {
 		t.Errorf(serializationTestError(err))
 	}
 
-	fakeMacaroon, err := DeSerializeMacaroon(fakeToken)
+	fakeMacaroon, err := deSerializeMacaroon(fakeToken)
 	if err != nil {
 		t.Errorf(serializationTestError(err))
 	}
 
-	sameFakeToken, err := SerializeMacaroon(fakeMacaroon)
+	sameFakeToken, err := serializeMacaroon(fakeMacaroon)
 	if err != nil {
 		t.Errorf(serializationTestError(err))
 	}

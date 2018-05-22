@@ -63,7 +63,7 @@ func GenerateLoginToken(op TokenOptions) (string, error) {
 		return "", macaroonError(err)
 	}
 
-	urlSafeEncode, err := SerializeMacaroon(*mac)
+	urlSafeEncode, err := serializeMacaroon(*mac)
 	if err != nil {
 		return "", macaroonError(err)
 	}
@@ -106,9 +106,9 @@ func macaroonError(err error) error {
 	return fmt.Errorf("Macaroon creation failed: %s", err.Error())
 }
 
-// SerializeMacaroon takes a macaroon to be serialized.
+// serializeMacaroon takes a macaroon to be serialized.
 // returns it's base64 encoded string, URL safe, which can be sent via web, email, etc.
-func SerializeMacaroon(m macaroon.Macaroon) (string, error) {
+func serializeMacaroon(m macaroon.Macaroon) (string, error) {
 	bin, err := m.MarshalBinary()
 	if err != nil {
 		return "", err
@@ -118,9 +118,9 @@ func SerializeMacaroon(m macaroon.Macaroon) (string, error) {
 	return urlSafeEncode, nil
 }
 
-// DeSerializeMacaroon takes a base64 encoded string of a macaroon to be de-serialized.
+// deSerializeMacaroon takes a base64 encoded string of a macaroon to be de-serialized.
 // Returns a macaroon. On failure returns error with description.
-func DeSerializeMacaroon(urlSafeEncode string) (macaroon.Macaroon, error) {
+func deSerializeMacaroon(urlSafeEncode string) (macaroon.Macaroon, error) {
 	var mac macaroon.Macaroon
 	bin, err := base64.RawURLEncoding.DecodeString(urlSafeEncode)
 	if err != nil {
