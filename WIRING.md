@@ -2,12 +2,12 @@
 
 The diagram is incomplete. The following things aren't shown on the diagram:
 
- - [ ] Device Messages
- - [ ] User Profiles
- - [ ] Notification Counts
- - [ ] Sending federation.
- - [ ] Querying federation.
- - [ ] Other things that aren't shown on the diagram.
+* Device Messages
+* User Profiles
+* Notification Counts
+* Sending federation.
+* Querying federation.
+* Other things that aren't shown on the diagram.
 
 Diagram:
 
@@ -111,18 +111,18 @@ choke-point to implement ratelimiting and backoff correctly.
 
 ## Client Presence Setter
 
- * Handles puts to whatever the client API path for presence is?
+ * Handles puts to the [client API presence paths](https://matrix.org/docs/spec/client_server/unstable.html#id41).
  * Writes presence updates to logs.
 
 ## Client Typing Setter
 
- * Handles puts to whatever the client API path for typing is?
+ * Handles puts to the [client API typing paths](https://matrix.org/docs/spec/client_server/unstable.html#id32).
  * Writes typing updates to logs.
 
 ## Client Receipt Updater
 
- * Handles puts to whatever the client API path for receipts is?
- * Writes typing updates to logs.
+ * Handles puts to the [client API receipt paths](https://matrix.org/docs/spec/client_server/unstable.html#id36).
+ * Writes receipt updates to logs.
 
 ## Federation Backfill
 
@@ -138,7 +138,7 @@ choke-point to implement ratelimiting and backoff correctly.
  * Tracks the current state of the room and the state at each event.
  * Probably does auth checks on the incoming events.
  * Handles state resolution as part of working out the current state and the
- * state at each event.
+   state at each event.
  * Writes updates to the current state and new events to logs.
  * Shards by room ID.
 
