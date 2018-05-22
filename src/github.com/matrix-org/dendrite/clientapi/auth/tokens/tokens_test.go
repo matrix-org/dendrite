@@ -41,7 +41,6 @@ var (
 func TestGenerateLoginToken(t *testing.T) {
 	// Test valid
 	_, err := GenerateLoginToken(validTokenOp)
-
 	if err != nil {
 		t.Errorf("Token generation failed for valid TokenOptions with err: %s", err.Error())
 	}
@@ -49,7 +48,6 @@ func TestGenerateLoginToken(t *testing.T) {
 	// Test invalids
 	for missing, invalidTokenOp := range invalidTokenOps {
 		_, err := GenerateLoginToken(invalidTokenOp)
-
 		if err == nil {
 			t.Errorf("Token generation should fail for TokenOptions with missing %s", missing)
 		}
@@ -62,19 +60,16 @@ func serializationTestError(err error) string {
 
 func TestSerialization(t *testing.T) {
 	fakeToken, err := GenerateLoginToken(validTokenOp)
-
 	if err != nil {
 		t.Errorf(serializationTestError(err))
 	}
 
 	fakeMacaroon, err := DeSerializeMacaroon(fakeToken)
-
 	if err != nil {
 		t.Errorf(serializationTestError(err))
 	}
 
 	sameFakeToken, err := SerializeMacaroon(fakeMacaroon)
-
 	if err != nil {
 		t.Errorf(serializationTestError(err))
 	}

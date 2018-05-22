@@ -1,5 +1,3 @@
-// Copyright 2018 New Vector Ltd
-//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -46,13 +44,11 @@ type TokenOptions struct {
 // GenerateLoginToken generates a short term login token to be used as
 // token authentication ("m.login.token")
 func GenerateLoginToken(op TokenOptions) (string, error) {
-
 	if !isValidTokenOptions(op) {
 		return "", errors.New("The given TokenOptions is invalid")
 	}
 
 	mac, err := generateBaseMacaroon(op.ServerPrivateKey, op.ServerName, op.UserID)
-
 	if err != nil {
 		return "", err
 	}
@@ -63,12 +59,11 @@ func GenerateLoginToken(op TokenOptions) (string, error) {
 	now := time.Now().Second()
 	expiryCaveat := TimePrefix + strconv.Itoa(now+op.Duration)
 	err = mac.AddFirstPartyCaveat([]byte(expiryCaveat))
-
 	if err != nil {
 		return "", macaroonError(err)
 	}
-	urlSafeEncode, err := SerializeMacaroon(*mac)
 
+	urlSafeEncode, err := SerializeMacaroon(*mac)
 	if err != nil {
 		return "", macaroonError(err)
 	}
@@ -115,12 +110,11 @@ func macaroonError(err error) error {
 // returns it's base64 encoded string, URL safe, which can be sent via web, email, etc.
 func SerializeMacaroon(m macaroon.Macaroon) (string, error) {
 	bin, err := m.MarshalBinary()
-
 	if err != nil {
 		return "", err
 	}
-	urlSafeEncode := base64.RawURLEncoding.EncodeToString(bin)
 
+	urlSafeEncode := base64.RawURLEncoding.EncodeToString(bin)
 	return urlSafeEncode, nil
 }
 
@@ -129,11 +123,10 @@ func SerializeMacaroon(m macaroon.Macaroon) (string, error) {
 func DeSerializeMacaroon(urlSafeEncode string) (macaroon.Macaroon, error) {
 	var mac macaroon.Macaroon
 	bin, err := base64.RawURLEncoding.DecodeString(urlSafeEncode)
-
 	if err != nil {
 		return mac, err
 	}
-	err = mac.UnmarshalBinary(bin)
 
+	err = mac.UnmarshalBinary(bin)
 	return mac, err
 }
