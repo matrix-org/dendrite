@@ -78,6 +78,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/go-macaroon/macaroon",
+			"repository": "https://github.com/go-macaroon/macaroon",
+			"revision": "bed2a428da6e56d950bed5b41fcbae3141e5b0d0",
+			"branch": "HEAD"
+		},
+		{
 			"importpath": "github.com/golang/protobuf/proto",
 			"repository": "https://github.com/golang/protobuf",
 			"revision": "8ee79997227bf9b34611aee7946ae64735e6fd93",
@@ -368,6 +374,27 @@
 			"revision": "9419663f5a44be8b34ca85f08abc5fe1be11f8a3",
 			"branch": "master",
 			"path": "/ed25519"
+		},
+		{
+			"importpath": "golang.org/x/crypto/nacl/secretbox",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "d6449816ce06963d9d136eee5a56fca5b0616e7e",
+			"branch": "master",
+			"path": "/nacl/secretbox"
+		},
+		{
+			"importpath": "golang.org/x/crypto/poly1305",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "d6449816ce06963d9d136eee5a56fca5b0616e7e",
+			"branch": "master",
+			"path": "/poly1305"
+		},
+		{
+			"importpath": "golang.org/x/crypto/salsa20/salsa",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "d6449816ce06963d9d136eee5a56fca5b0616e7e",
+			"branch": "master",
+			"path": "/salsa20/salsa"
 		},
 		{
 			"importpath": "golang.org/x/crypto/ssh",
