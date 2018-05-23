@@ -41,6 +41,18 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
+
+var (
+	// Prometheus metrics
+	amtRegUsers = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "dendrite_clientapi_reg_users_total",
+			Help: "Total number of registered users",
+		},
+	)
 )
 
 const (
@@ -49,6 +61,11 @@ const (
 	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
 	sessionIDLength   = 24
 )
+
+func init() {
+	// Register prometheus metrics. They must be registered to be exposed.
+	prometheus.MustRegister(amtRegUsers)
+}
 
 // sessionsDict keeps track of completed auth stages for each session.
 type sessionsDict struct {
@@ -664,6 +681,9 @@ func completeRegistration(
 			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
 		}
 	}
+
+	// Increment prometheus counter for created users
+	amtRegUsers.Inc()
 
 	return util.JSONResponse{
 		Code: http.StatusOK,

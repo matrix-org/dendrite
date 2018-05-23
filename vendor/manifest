@@ -208,26 +208,18 @@
 			"branch": "master",
 			"path": "/difflib"
 		},
-		{
-			"importpath": "github.com/prometheus/client_golang",
-			"repository": "https://github.com/prometheus/client_golang",
-			"revision": "c317fb74746eac4fc65fe3909195f4cf67c5562a",
-			"branch": "master"
-		},
-		{
-			"importpath": "github.com/prometheus/client_model/go",
-			"repository": "https://github.com/prometheus/client_model",
-			"revision": "fa8ad6fec33561be4280a8f0514318c79d7f6cb6",
-			"branch": "master",
-			"path": "/go"
-		},
-		{
-			"importpath": "github.com/prometheus/common/expfmt",
-			"repository": "https://github.com/prometheus/common",
-			"revision": "dd2f054febf4a6c00f2343686efb775948a8bff4",
-			"branch": "master",
-			"path": "/expfmt"
-		},
+    {
+      "importpath": "github.com/prometheus/client_golang/prometheus",
+      "repository": "https://github.com/prometheus/client_golang",
+      "revision": "c51dc758d4bb30acacbef9eaa2b774969a135086",
+      "branch": "master"
+    },
+    {
+      "importpath": "github.com/prometheus/client_golang/prometheus/promhttp",
+      "repository": "https://github.com/prometheus/client_golang",
+      "revision": "c51dc758d4bb30acacbef9eaa2b774969a135086",
+      "branch": "master"
+    },
 		{
 			"importpath": "github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
 			"repository": "https://github.com/prometheus/common",
@@ -294,8 +286,8 @@
 		},
 		{
 			"importpath": "github.com/tj/go-debug",
-			"repository": "https://github.com/tj/go-debug",
-			"revision": "ff4a55a20a86994118644bbddc6a216da193cc13",
+			"repository": "https://github.com/visionmedia/go-debug",
+			"revision": "bfacf9d8a444b50f5d7ae47727544e775486966f",
 			"branch": "master"
 		},
 		{

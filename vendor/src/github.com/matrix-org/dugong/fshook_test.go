@@ -3,6 +3,7 @@ package dugong
 import (
 	"bufio"
 	"encoding/json"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,8 +12,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -20,7 +19,7 @@ const (
 	fieldValue = "my_value"
 )
 
-func TestFSHook(t *testing.T) {
+func TestFSHookInfo(t *testing.T) {
 	logger, hook, wait, teardown := setupLogHook(t)
 	defer teardown()
 
@@ -28,7 +27,32 @@ func TestFSHook(t *testing.T) {
 
 	wait()
 
-	checkLogFile(t, hook.path, "info")
+	checkLogFile(t, hook.infoPath, "info")
+}
+
+func TestFSHookWarn(t *testing.T) {
+	logger, hook, wait, teardown := setupLogHook(t)
+	defer teardown()
+
+	logger.WithField(fieldName, fieldValue).Warn("Warn message")
+
+	wait()
+
+	checkLogFile(t, hook.infoPath, "warning")
+	checkLogFile(t, hook.warnPath, "warning")
+}
+
+func TestFSHookError(t *testing.T) {
+	logger, hook, wait, teardown := setupLogHook(t)
+	defer teardown()
+
+	logger.WithField(fieldName, fieldValue).Error("Error message")
+
+	wait()
+
+	checkLogFile(t, hook.infoPath, "error")
+	checkLogFile(t, hook.warnPath, "error")
+	checkLogFile(t, hook.errorPath, "error")
 }
 
 func TestFsHookInterleaved(t *testing.T) {
@@ -43,7 +67,7 @@ func TestFsHookInterleaved(t *testing.T) {
 
 	wait()
 
-	file, err := os.Open(hook.path)
+	file, err := os.Open(hook.infoPath)
 	if err != nil {
 		t.Fatalf("Failed to open file: %v", err)
 	}
@@ -77,7 +101,7 @@ func TestFSHookMultiple(t *testing.T) {
 
 	wait()
 
-	file, err := os.Open(hook.path)
+	file, err := os.Open(hook.infoPath)
 	if err != nil {
 		t.Fatalf("Failed to open file: %v", err)
 	}
@@ -119,7 +143,7 @@ func TestFSHookConcurrent(t *testing.T) {
 	wg.Wait()
 	wait()
 
-	file, err := os.Open(hook.path)
+	file, err := os.Open(hook.infoPath)
 	if err != nil {
 		t.Fatalf("Failed to open file: %v", err)
 	}
@@ -152,7 +176,7 @@ func TestDailySchedule(t *testing.T) {
 	// Time ticks from 23:50 to 00:10 in 1 minute increments. Log each tick as 'counter'.
 	minutesGoneBy := 0
 	currentTime = func() time.Time {
-		minutesGoneBy++
+		minutesGoneBy += 1
 		return time.Date(2016, 10, 26, 23, 50+minutesGoneBy, 00, 0, loc)
 	}
 	for i := 0; i < 20; i++ {
@@ -162,11 +186,11 @@ func TestDailySchedule(t *testing.T) {
 
 	wait()
 
-	// fshook.log.2016-10-26 should have 0 -> 9
-	checkFileHasSequentialCounts(t, hook.path+".2016-10-26", 0, 9)
+	// info.log.2016-10-26 should have 0 -> 9
+	checkFileHasSequentialCounts(t, hook.infoPath+".2016-10-26", 0, 9)
 
-	// fshook.log should have 10 -> 19 inclusive
-	checkFileHasSequentialCounts(t, hook.path, 10, 19)
+	// info.log should have 10 -> 19 inclusive
+	checkFileHasSequentialCounts(t, hook.infoPath, 10, 19)
 }
 
 func TestDailyScheduleMultipleRotations(t *testing.T) {
@@ -186,7 +210,7 @@ func TestDailyScheduleMultipleRotations(t *testing.T) {
 		// Start from 10/29 01:37
 		return time.Date(2016, 10, 28, 13+hoursGoneBy, 37, 00, 0, loc)
 	}
-	// log 8 lines
+	// log 2 lines per file, to 4 files (so 8 log lines)
 	for i := 0; i < 8; i++ {
 		ts := time.Date(2016, 10, 28, 13+((i+1)*12), 37, 00, 0, loc)
 		logger.WithField("counter", i).Infof("The time is now %s", ts)
@@ -194,17 +218,17 @@ func TestDailyScheduleMultipleRotations(t *testing.T) {
 
 	wait()
 
-	// fshook.log.2016-10-29 should have 0-1
-	checkFileHasSequentialCounts(t, hook.path+".2016-10-29", 0, 1)
+	// info.log.2016-10-29 should have 0-1
+	checkFileHasSequentialCounts(t, hook.infoPath+".2016-10-29", 0, 1)
 
-	// fshook.log.2016-10-30 should have 2-3
-	checkFileHasSequentialCounts(t, hook.path+".2016-10-30", 2, 3)
+	// info.log.2016-10-30 should have 2-3
+	checkFileHasSequentialCounts(t, hook.infoPath+".2016-10-30", 2, 3)
 
-	// fshook.log.2016-10-31 should have 4-5
-	checkFileHasSequentialCounts(t, hook.path+".2016-10-31", 4, 5)
+	// info.log.2016-10-31 should have 4-5
+	checkFileHasSequentialCounts(t, hook.infoPath+".2016-10-31", 4, 5)
 
-	// fshook.log should have 6-7 (current day is 11/01)
-	checkFileHasSequentialCounts(t, hook.path, 6, 7)
+	// info.log should have 6-7 (current day is 11/01)
+	checkFileHasSequentialCounts(t, hook.infoPath, 6, 7)
 }
 
 // checkFileHasSequentialCounts based on a JSON "counter" key being a monotonically
@@ -247,9 +271,11 @@ func setupLogHook(t *testing.T) (logger *log.Logger, hook *fsHook, wait func(), 
 		t.Fatalf("Failed to make temporary directory: %v", err)
 	}
 
-	path := filepath.Join(dir, "fshook.log")
+	infoPath := filepath.Join(dir, "info.log")
+	warnPath := filepath.Join(dir, "warn.log")
+	errorPath := filepath.Join(dir, "error.log")
 
-	hook = NewFSHook(path, nil, nil).(*fsHook)
+	hook = NewFSHook(infoPath, warnPath, errorPath, nil, nil).(*fsHook)
 
 	logger = log.New()
 	logger.Hooks.Add(hook)
