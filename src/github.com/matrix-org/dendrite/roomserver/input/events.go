@@ -32,6 +32,7 @@ type RoomEventDatabase interface {
 	StoreEvent(
 		ctx context.Context,
 		event gomatrixserverlib.Event,
+		txnAndDeviceID *api.TransactionID,
 		authEventNIDs []types.EventNID,
 	) (types.RoomNID, types.StateAtEvent, error)
 	// Look up the state entries for a list of string event IDs
@@ -61,6 +62,13 @@ type RoomEventDatabase interface {
 	MembershipUpdater(
 		ctx context.Context, roomID, targerUserID string,
 	) (types.MembershipUpdater, error)
+	// Look up event ID by transaction's info.
+	// This is used to determine if the room event is processed/processing already.
+	// Returns an empty string if no such event exists.
+	GetTransactionEventID(
+		ctx context.Context, transactionID string,
+		deviceID string, userID string,
+	) (string, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -89,8 +97,23 @@ func processRoomEvent(
 		return err
 	}
 
+	if input.TransactionID != nil {
+		var eventID string
+		tdID := input.TransactionID
+		eventID, err = db.GetTransactionEventID(
+			ctx, tdID.TransactionID, tdID.DeviceID, input.Event.Sender(),
+		)
+		if err != nil {
+			return err
+		}
+
+		if eventID != "" {
+			return nil
+		}
+	}
+
 	// Store the event
-	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, authEventNIDs)
+	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
 		return err
 	}
