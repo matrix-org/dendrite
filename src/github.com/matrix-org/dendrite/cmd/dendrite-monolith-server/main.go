@@ -30,6 +30,8 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -66,16 +68,21 @@ func main() {
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 
+	// Set up the API endpoints we handle. /metrics is for prometheus, and is
+	// not wrapped by CORS, while everything else is
+	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/", httpHandler)
+
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		logrus.Info("Listening on ", *httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(*httpBindAddr, httpHandler))
+		logrus.Fatal(http.ListenAndServe(*httpBindAddr, nil))
 	}()
 	// Handle HTTPS if certificate and key are provided
 	go func() {
 		if *certFile != "" && *keyFile != "" {
 			logrus.Info("Listening on ", *httpsBindAddr)
-			logrus.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, httpHandler))
+			logrus.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, nil))
 		}
 	}()
 
