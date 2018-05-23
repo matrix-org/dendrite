@@ -27,7 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/gorilla/mux"
 	sarama "gopkg.in/Shopify/sarama.v1"
 
@@ -136,9 +135,6 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 func (b *BaseDendrite) SetupAndServeHTTP(addr string) {
 	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux))
 	logrus.Infof("Starting %s server on %s", b.componentName, addr)
-
-	http.Handle("/metrics", promhttp.Handler())
-	logrus.Infof("Starting %s Prometheus server at /metrics", b.componentName)
 
 	err := http.ListenAndServe(addr, nil)
 

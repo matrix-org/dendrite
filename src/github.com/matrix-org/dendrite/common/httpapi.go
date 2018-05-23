@@ -10,7 +10,7 @@ import (
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which checks the access token in the request.
@@ -87,8 +87,6 @@ func MakeFedAPI(
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
 // listener.
 func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler) {
-	// This is deprecated.
-	servMux.Handle("/metrics", prometheus.Handler()) // nolint: megacheck, staticcheck
 	servMux.Handle("/metrics", promhttp.Handler())
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
