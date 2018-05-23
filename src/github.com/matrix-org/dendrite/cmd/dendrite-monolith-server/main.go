@@ -16,7 +16,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common/keydb"
@@ -32,8 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/sirupsen/logrus"
-
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -81,10 +78,6 @@ func main() {
 			logrus.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, httpHandler))
 		}
 	}()
-
-	// Set up prometheus metrics
-	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(":8080", nil))
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
 	select {}

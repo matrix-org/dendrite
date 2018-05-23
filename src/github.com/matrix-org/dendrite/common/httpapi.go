@@ -89,6 +89,7 @@ func MakeFedAPI(
 func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler) {
 	// This is deprecated.
 	servMux.Handle("/metrics", prometheus.Handler()) // nolint: megacheck, staticcheck
+	servMux.Handle("/metrics", promhttp.Handler())
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
 
