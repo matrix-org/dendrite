@@ -422,13 +422,13 @@ func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string
 	return d.statements.insertRoomAlias(ctx, alias, roomID)
 }
 
-// GetRoomIDFromAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) GetRoomIDFromAlias(ctx context.Context, alias string) (string, error) {
+// GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
 	return d.statements.selectRoomIDFromAlias(ctx, alias)
 }
 
-// GetAliasesFromRoomID implements alias.RoomserverAliasAPIDB
-func (d *Database) GetAliasesFromRoomID(ctx context.Context, roomID string) ([]string, error) {
+// GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
+func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
 	return d.statements.selectAliasesFromRoomID(ctx, roomID)
 }
 

@@ -35,10 +35,10 @@ type RoomserverAliasAPIDatabase interface {
 	SetRoomAlias(ctx context.Context, alias string, roomID string) error
 	// Look up the room ID a given alias refers to.
 	// Returns an error if there was a problem talking to the database.
-	GetRoomIDFromAlias(ctx context.Context, alias string) (string, error)
+	GetRoomIDForAlias(ctx context.Context, alias string) (string, error)
 	// Look up all aliases referring to a given room ID.
 	// Returns an error if there was a problem talking to the database.
-	GetAliasesFromRoomID(ctx context.Context, roomID string) ([]string, error)
+	GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error)
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(ctx context.Context, alias string) error
@@ -59,7 +59,7 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	response *api.SetRoomAliasResponse,
 ) error {
 	// Check if the alias isn't already referring to a room
-	roomID, err := r.DB.GetRoomIDFromAlias(ctx, request.Alias)
+	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return err
 	}
@@ -82,19 +82,35 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID)
 }
 
-// GetAliasRoomID implements api.RoomserverAliasAPI
-func (r *RoomserverAliasAPI) GetAliasRoomID(
+// GetRoomIDForAlias implements api.RoomserverAliasAPI
+func (r *RoomserverAliasAPI) GetRoomIDForAlias(
 	ctx context.Context,
-	request *api.GetAliasRoomIDRequest,
-	response *api.GetAliasRoomIDResponse,
+	request *api.GetRoomIDForAliasRequest,
+	response *api.GetRoomIDForAliasResponse,
 ) error {
 	// Look up the room ID in the database
-	roomID, err := r.DB.GetRoomIDFromAlias(ctx, request.Alias)
+	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return err
 	}
 
 	response.RoomID = roomID
+	return nil
+}
+
+// GetAliasesForRoomID implements api.RoomserverAliasAPI
+func (r *RoomserverAliasAPI) GetAliasesForRoomID(
+	ctx context.Context,
+	request *api.GetAliasesForRoomIDRequest,
+	response *api.GetAliasesForRoomIDResponse,
+) error {
+	// Look up the aliases in the database for the given RoomID
+	aliases, err := r.DB.GetAliasesForRoomID(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+
+	response.Aliases = aliases
 	return nil
 }
 
@@ -105,7 +121,7 @@ func (r *RoomserverAliasAPI) RemoveRoomAlias(
 	response *api.RemoveRoomAliasResponse,
 ) error {
 	// Look up the room ID in the database
-	roomID, err := r.DB.GetRoomIDFromAlias(ctx, request.Alias)
+	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return err
 	}
@@ -142,7 +158,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 
 	// Retrieve the updated list of aliases, marhal it and set it as the
 	// event's content
-	aliases, err := r.DB.GetAliasesFromRoomID(ctx, roomID)
+	aliases, err := r.DB.GetAliasesForRoomID(ctx, roomID)
 	if err != nil {
 		return err
 	}
@@ -229,14 +245,14 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(
-		api.RoomserverGetAliasRoomIDPath,
-		common.MakeInternalAPI("getAliasRoomID", func(req *http.Request) util.JSONResponse {
-			var request api.GetAliasRoomIDRequest
-			var response api.GetAliasRoomIDResponse
+		api.RoomserverGetRoomIDForAliasPath,
+		common.MakeInternalAPI("GetRoomIDForAlias", func(req *http.Request) util.JSONResponse {
+			var request api.GetRoomIDForAliasRequest
+			var response api.GetRoomIDForAliasResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.GetAliasRoomID(req.Context(), &request, &response); err != nil {
+			if err := r.GetRoomIDForAlias(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

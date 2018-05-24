@@ -52,9 +52,9 @@ func RoomAliasToID(
 	var resp gomatrixserverlib.RespDirectory
 
 	if domain == cfg.Matrix.ServerName {
-		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
-		var queryRes api.GetAliasRoomIDResponse
-		if err = aliasAPI.GetAliasRoomID(httpReq.Context(), &queryReq, &queryRes); err != nil {
+		queryReq := api.GetRoomIDForAliasRequest{Alias: roomAlias}
+		var queryRes api.GetRoomIDForAliasResponse
+		if err = aliasAPI.GetRoomIDForAlias(httpReq.Context(), &queryReq, &queryRes); err != nil {
 			return httputil.LogThenError(httpReq, err)
 		}
 

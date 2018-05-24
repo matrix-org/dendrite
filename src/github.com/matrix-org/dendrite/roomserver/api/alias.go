@@ -37,16 +37,28 @@ type SetRoomAliasResponse struct {
 	AliasExists bool `json:"alias_exists"`
 }
 
-// GetAliasRoomIDRequest is a request to GetAliasRoomID
-type GetAliasRoomIDRequest struct {
+// GetRoomIDForAliasRequest is a request to GetRoomIDForAlias
+type GetRoomIDForAliasRequest struct {
 	// Alias we want to lookup
 	Alias string `json:"alias"`
 }
 
-// GetAliasRoomIDResponse is a response to GetAliasRoomID
-type GetAliasRoomIDResponse struct {
+// GetRoomIDForAliasResponse is a response to GetRoomIDForAlias
+type GetRoomIDForAliasResponse struct {
 	// The room ID the alias refers to
 	RoomID string `json:"room_id"`
+}
+
+// GetAliasesForRoomIDRequest is a request to GetAliasesForRoomID
+type GetAliasesForRoomIDRequest struct {
+	// The room ID we want to find aliases for
+	RoomID string `json:"room_id"`
+}
+
+// GetAliasesForRoomIDResponse is a response to GetAliasesForRoomID
+type GetAliasesForRoomIDResponse struct {
+	// The aliases the alias refers to
+	Aliases []string `json:"aliases"`
 }
 
 // RemoveRoomAliasRequest is a request to RemoveRoomAlias
@@ -70,10 +82,17 @@ type RoomserverAliasAPI interface {
 	) error
 
 	// Get the room ID for an alias
-	GetAliasRoomID(
+	GetRoomIDForAlias(
 		ctx context.Context,
-		req *GetAliasRoomIDRequest,
-		response *GetAliasRoomIDResponse,
+		req *GetRoomIDForAliasRequest,
+		response *GetRoomIDForAliasResponse,
+	) error
+
+	// Get all known aliases for a room ID
+	GetAliasesForRoomID(
+		ctx context.Context,
+		req *GetAliasesForRoomIDRequest,
+		response *GetAliasesForRoomIDResponse,
 	) error
 
 	// Remove a room alias
@@ -87,8 +106,11 @@ type RoomserverAliasAPI interface {
 // RoomserverSetRoomAliasPath is the HTTP path for the SetRoomAlias API.
 const RoomserverSetRoomAliasPath = "/api/roomserver/setRoomAlias"
 
-// RoomserverGetAliasRoomIDPath is the HTTP path for the GetAliasRoomID API.
-const RoomserverGetAliasRoomIDPath = "/api/roomserver/getAliasRoomID"
+// RoomserverGetRoomIDForAliasPath is the HTTP path for the GetRoomIDForAlias API.
+const RoomserverGetRoomIDForAliasPath = "/api/roomserver/GetRoomIDForAlias"
+
+// RoomserverGetAliasesForRoomIDPath is the HTTP path for the GetAliasesForRoomID API.
+const RoomserverGetAliasesForRoomIDPath = "/api/roomserver/GetAliasesForRoomID"
 
 // RoomserverRemoveRoomAliasPath is the HTTP path for the RemoveRoomAlias API.
 const RoomserverRemoveRoomAliasPath = "/api/roomserver/removeRoomAlias"
@@ -120,16 +142,29 @@ func (h *httpRoomserverAliasAPI) SetRoomAlias(
 	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// GetAliasRoomID implements RoomserverAliasAPI
-func (h *httpRoomserverAliasAPI) GetAliasRoomID(
+// GetRoomIDForAlias implements RoomserverAliasAPI
+func (h *httpRoomserverAliasAPI) GetRoomIDForAlias(
 	ctx context.Context,
-	request *GetAliasRoomIDRequest,
-	response *GetAliasRoomIDResponse,
+	request *GetRoomIDForAliasRequest,
+	response *GetRoomIDForAliasResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetAliasRoomID")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetRoomIDForAlias")
 	defer span.Finish()
 
-	apiURL := h.roomserverURL + RoomserverGetAliasRoomIDPath
+	apiURL := h.roomserverURL + RoomserverGetRoomIDForAliasPath
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// GetAliasesForRoomID implements RoomserverAliasAPI
+func (h *httpRoomserverAliasAPI) GetAliasesForRoomID(
+	ctx context.Context,
+	request *GetAliasesForRoomIDRequest,
+	response *GetAliasesForRoomIDResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetAliasesForRoomID")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverGetAliasesForRoomIDPath
 	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

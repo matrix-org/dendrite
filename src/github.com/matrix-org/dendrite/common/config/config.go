@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -235,12 +235,19 @@ type Dendrite struct {
 		// The paths of which were given above in the main config file
 		ApplicationServices []ApplicationService
 
-		// A meta-regex compiled from all exclusive Application Service
-		// Regexes. When a user registers, we check that their username
-		// does not match any exclusive Application Service namespaces
+		// Meta-regexes compiled from all exclusive Application Service
+		// Regexes.
+		//
+		// When a user registers, we check that their username does not match any
+		// exclusive Application Service namespaces
 		ExclusiveApplicationServicesUsernameRegexp *regexp.Regexp
-
-		// TODO: Exclusive alias, room regexp's
+		// When a user creates a room alias, we check that it isn't already
+		// reserved by an application service
+		ExclusiveApplicationServicesAliasRegexp *regexp.Regexp
+		// TODO: Huh? When a room ID is created, we block the client from
+		// creating it if it falls under an application service's exclusive
+		// roomID regex? But why tho
+		ExclusiveApplicationServicesRoomRegexp *regexp.Regexp
 	} `yaml:"-"`
 }
 

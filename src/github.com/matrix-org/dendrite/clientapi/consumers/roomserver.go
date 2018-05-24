@@ -17,7 +17,6 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/common"
@@ -86,7 +85,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	ev := output.NewRoomEvent.Event
-	fmt.Println("ClientAPI got an event:", ev)
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),

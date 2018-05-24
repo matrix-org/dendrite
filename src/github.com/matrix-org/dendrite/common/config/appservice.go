@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 // ApplicationServiceNamespace is the namespace that a specific application
@@ -79,7 +79,8 @@ func loadAppservices(config *Dendrite) error {
 
 		// Append the parsed application service to the global config
 		config.Derived.ApplicationServices = append(
-			config.Derived.ApplicationServices, appservice)
+			config.Derived.ApplicationServices, appservice,
+		)
 	}
 
 	// Check for any errors in the loaded application services
@@ -89,7 +90,7 @@ func loadAppservices(config *Dendrite) error {
 // setupRegexps will create regex objects for exclusive and non-exclusive
 // usernames, aliases and rooms of all application services, so that other
 // methods can quickly check if a particular string matches any of them.
-func setupRegexps(cfg *Dendrite) {
+func setupRegexps(cfg *Dendrite) (err error) {
 	// Combine all exclusive namespaces for later string checking
 	var exclusiveUsernameStrings, exclusiveAliasStrings, exclusiveRoomStrings []string
 
@@ -129,9 +130,17 @@ func setupRegexps(cfg *Dendrite) {
 	}
 
 	// Store compiled Regex
-	cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, _ = regexp.Compile(exclusiveUsernames)
-	cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, _ = regexp.Compile(exclusiveAliases)
-	cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, _ = regexp.Compile(exclusiveRooms)
+	if cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, err = regexp.Compile(exclusiveUsernames); err != nil {
+		return err
+	}
+	if cfg.Derived.ExclusiveApplicationServicesAliasRegexp, err = regexp.Compile(exclusiveAliases); err != nil {
+		return err
+	}
+	if cfg.Derived.ExclusiveApplicationServicesRoomRegexp, err = regexp.Compile(exclusiveRooms); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // appendExclusiveNamespaceRegexs takes a slice of strings and a slice of
@@ -140,7 +149,7 @@ func setupRegexps(cfg *Dendrite) {
 func appendExclusiveNamespaceRegexs(
 	exclusiveStrings *[]string, namespaces []ApplicationServiceNamespace,
 ) {
-	for _, namespace := range namespaces {
+	for index, namespace := range namespaces {
 		if namespace.Exclusive {
 			// We append parenthesis to later separate each regex when we compile
 			// i.e. "app1.*", "app2.*" -> "(app1.*)|(app2.*)"
@@ -148,13 +157,13 @@ func appendExclusiveNamespaceRegexs(
 		}
 
 		// Compile this regex into a Regexp object for later use
-		namespace.RegexpObject, _ = regexp.Compile(namespace.Regex)
+		namespaces[index].RegexpObject, _ = regexp.Compile(namespace.Regex)
 	}
 }
 
 // checkErrors checks for any configuration errors amongst the loaded
 // application services according to the application service spec.
-func checkErrors(config *Dendrite) error {
+func checkErrors(config *Dendrite) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
 
@@ -190,9 +199,9 @@ func checkErrors(config *Dendrite) error {
 			}
 		}
 	}
-	setupRegexps(config)
 
-	return nil
+	err = setupRegexps(config)
+	return err
 }
 
 // IsValidRegex returns true or false based on whether the
