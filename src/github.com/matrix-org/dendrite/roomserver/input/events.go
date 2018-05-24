@@ -87,42 +87,38 @@ func processRoomEvent(
 	db RoomEventDatabase,
 	ow OutputRoomEventWriter,
 	input api.InputRoomEvent,
-) error {
+) (eventID string, err error) {
 	// Parse and validate the event JSON
 	event := input.Event
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(ctx, db, event, input.AuthEventIDs)
 	if err != nil {
-		return err
+		return
 	}
 
 	if input.TransactionID != nil {
-		var eventID string
 		tdID := input.TransactionID
 		eventID, err = db.GetTransactionEventID(
 			ctx, tdID.TransactionID, tdID.DeviceID, input.Event.Sender(),
 		)
-		if err != nil {
-			return err
-		}
-
-		if eventID != "" {
-			return nil
+		// On error OR event with the transaction already processed/processesing
+		if err != nil || eventID != "" {
+			return
 		}
 	}
 
 	// Store the event
 	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
-		return err
+		return
 	}
 
 	if input.Kind == api.KindOutlier {
 		// For outliers we can stop after we've stored the event itself as it
 		// doesn't have any associated state to store and we don't need to
 		// notify anyone about it.
-		return nil
+		return event.EventID(), nil
 	}
 
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
@@ -130,7 +126,7 @@ func processRoomEvent(
 		// Lets calculate one.
 		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
@@ -140,7 +136,9 @@ func processRoomEvent(
 	}
 
 	// Update the extremities of the event graph for the room
-	return updateLatestEvents(ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID)
+	return event.EventID(), updateLatestEvents(
+		ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID,
+	)
 }
 
 func calculateAndSetState(

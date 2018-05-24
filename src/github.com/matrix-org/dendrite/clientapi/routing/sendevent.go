@@ -107,16 +107,18 @@ func SendEvent(
 		}
 	}
 
-	// pass the new event to the roomserver
-	if err := producer.SendEvents(
+	// pass the new event to the roomserver and receive the correct event ID
+	// event ID in case of duplicate transaction is discarded
+	eventID, err := producer.SendEvents(
 		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndDeviceID,
-	); err != nil {
+	)
+	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: sendEventResponse{e.EventID()},
+		JSON: sendEventResponse{eventID},
 	}
 	// Add response to transactionsCache
 	if txnID != nil {
