@@ -169,7 +169,7 @@ func SendJoin(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	err = producer.SendEvents(ctx, []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
+	_, err = producer.SendEvents(ctx, []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}

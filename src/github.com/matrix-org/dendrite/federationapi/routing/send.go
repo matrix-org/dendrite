@@ -170,7 +170,8 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	// TODO: Check that the event is allowed by its auth_events.
 
 	// pass the event to the roomserver
-	return t.producer.SendEvents(t.context, []gomatrixserverlib.Event{e}, api.DoNotSendToOtherServers, nil)
+	_, err := t.producer.SendEvents(t.context, []gomatrixserverlib.Event{e}, api.DoNotSendToOtherServers, nil)
+	return err
 }
 
 func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserverlib.Event) error {
@@ -206,13 +207,14 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 		return err
 	}
 	// Check that the returned state is valid.
-	if err := state.Check(t.context, t.keys); err != nil {
+	if err = state.Check(t.context, t.keys); err != nil {
 		return err
 	}
 	// Check that the event is allowed by the state.
-	if err := checkAllowedByState(e, state.StateEvents); err != nil {
+	if err = checkAllowedByState(e, state.StateEvents); err != nil {
 		return err
 	}
 	// pass the event along with the state to the roomserver
-	return t.producer.SendEventWithState(t.context, state, e)
+	_, err = t.producer.SendEventWithState(t.context, state, e)
+	return err
 }
