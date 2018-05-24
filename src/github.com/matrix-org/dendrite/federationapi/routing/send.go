@@ -207,14 +207,13 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 		return err
 	}
 	// Check that the returned state is valid.
-	if err = state.Check(t.context, t.keys); err != nil {
+	if err := state.Check(t.context, t.keys); err != nil {
 		return err
 	}
 	// Check that the event is allowed by the state.
-	if err = checkAllowedByState(e, state.StateEvents); err != nil {
+	if err := checkAllowedByState(e, state.StateEvents); err != nil {
 		return err
 	}
 	// pass the event along with the state to the roomserver
-	_, err = t.producer.SendEventWithState(t.context, state, e)
-	return err
+	return t.producer.SendEventWithState(t.context, state, e)
 }

@@ -304,7 +304,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, err
 	}
 
-	if _, err = r.producer.SendEventWithState(
+	if err = r.producer.SendEventWithState(
 		r.req.Context(), gomatrixserverlib.RespState(respSendJoin), event,
 	); err != nil {
 		res := httputil.LogThenError(r.req, err)

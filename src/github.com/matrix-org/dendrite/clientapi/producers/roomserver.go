@@ -55,10 +55,10 @@ func (c *RoomserverProducer) SendEvents(
 // with the state at the event as KindOutlier before it.
 func (c *RoomserverProducer) SendEventWithState(
 	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.Event,
-) (string, error) {
+) error {
 	outliers, err := state.Events()
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	ires := make([]api.InputRoomEvent, len(outliers)+1)
@@ -83,7 +83,8 @@ func (c *RoomserverProducer) SendEventWithState(
 		StateEventIDs: stateEventIDs,
 	}
 
-	return c.SendInputRoomEvents(ctx, ires)
+	_, err = c.SendInputRoomEvents(ctx, ires)
+	return err
 }
 
 // SendInputRoomEvents writes the given input room events to the roomserver input API.
