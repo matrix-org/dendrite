@@ -173,7 +173,7 @@ func (s *devicesStatements) selectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
 ) (*authtypes.Device, error) {
 	var dev authtypes.Device
-	var created int64
+	var created sql.NullInt64
 	stmt := s.selectDeviceByIDStmt
 	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&created)
 	if err == nil {

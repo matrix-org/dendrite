@@ -361,7 +361,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/device/{deviceID}",
+	r0mux.Handle("/devices/{deviceID}",
 		common.MakeAuthAPI("get_device", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return GetDeviceByID(req, deviceDB, device, vars["deviceID"])

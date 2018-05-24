@@ -40,7 +40,7 @@ type deviceUpdateJSON struct {
 	DisplayName *string `json:"display_name"`
 }
 
-// GetDeviceByID handles /device/{deviceID}
+// GetDeviceByID handles /devices/{deviceID}
 func GetDeviceByID(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 	deviceID string,
