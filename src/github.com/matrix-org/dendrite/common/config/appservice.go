@@ -48,7 +48,8 @@ type ApplicationService struct {
 	HSToken string `yaml:"hs_token"`
 	// Localpart of application service user
 	SenderLocalpart string `yaml:"sender_localpart"`
-	// Information about an application service's namespaces
+	// Information about an application service's namespaces. Key is either
+	// "users", "aliases" or "rooms"
 	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
 }
 
@@ -112,21 +113,28 @@ func setupRegexps(cfg *Dendrite) {
 	// Later we can check if a username or some other string matches any exclusive
 	// regex and deny access if it isn't from an application service
 	exclusiveUsernames := strings.Join(exclusiveUsernameStrings, "|")
+	exclusiveAliases := strings.Join(exclusiveAliasStrings, "|")
+	exclusiveRooms := strings.Join(exclusiveRoomStrings, "|")
 
-	// If there are no exclusive username regexes, compile string so that it
-	// will not match any valid usernames
+	// If there are no exclusive regexes, compile string so that it will not match
+	// any valid usernames/aliases/roomIDs
 	if exclusiveUsernames == "" {
 		exclusiveUsernames = "^$"
 	}
+	if exclusiveAliases == "" {
+		exclusiveAliases = "^$"
+	}
+	if exclusiveRooms == "" {
+		exclusiveRooms = "^$"
+	}
 
-	// TODO: Aliases and rooms. Needed?
-	//exclusiveAliases := strings.Join(exclusiveAliasStrings, "|")
-	//exclusiveRooms := strings.Join(exclusiveRoomStrings, "|")
-
+	// Store compiled Regex
 	cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, _ = regexp.Compile(exclusiveUsernames)
+	cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, _ = regexp.Compile(exclusiveAliases)
+	cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, _ = regexp.Compile(exclusiveRooms)
 }
 
-// concatenateExclusiveNamespaces takes a slice of strings and a slice of
+// appendExclusiveNamespaceRegexs takes a slice of strings and a slice of
 // namespaces and will append the regexes of only the exclusive namespaces
 // into the string slice
 func appendExclusiveNamespaceRegexs(
