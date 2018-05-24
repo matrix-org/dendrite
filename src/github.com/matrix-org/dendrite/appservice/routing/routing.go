@@ -32,11 +32,11 @@ const pathPrefixApp = "/_matrix/app/r0"
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
 func Setup(
-	apiMux *mux.Router, cfg config.Dendrite,
-	queryAPI api.RoomserverQueryAPI, aliasAPI api.RoomserverAliasAPI,
-	accountDB *accounts.Database,
-	federation *gomatrixserverlib.FederationClient,
-	transactionsCache *transactions.Cache,
+	apiMux *mux.Router, cfg config.Dendrite, // nolint: unparam
+	queryAPI api.RoomserverQueryAPI, aliasAPI api.RoomserverAliasAPI, // nolint: unparam
+	accountDB *accounts.Database, // nolint: unparam
+	federation *gomatrixserverlib.FederationClient, // nolint: unparam
+	transactionsCache *transactions.Cache, // nolint: unparam
 ) {
 	appMux := apiMux.PathPrefix(pathPrefixApp).Subrouter()
 
