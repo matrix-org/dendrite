@@ -108,8 +108,6 @@ func setupRegexps(cfg *Dendrite) (err error) {
 		}
 	}
 
-	fmt.Println(exclusiveUsernameStrings, exclusiveAliasStrings)
-
 	// Join the regexes together into one big regex.
 	// i.e. "app1.*", "app2.*" -> "(app1.*)|(app2.*)"
 	// Later we can check if a username or alias matches any exclusive regex and
@@ -167,13 +165,13 @@ func checkErrors(config *Dendrite) (err error) {
 		// can have the same ID or token.
 		if idMap[appservice.ID] {
 			return configErrors([]string{fmt.Sprintf(
-				"Application Service ID %s must be unique", appservice.ID,
+				"Application service ID %s must be unique", appservice.ID,
 			)})
 		}
 		// Check if we've already seen this token
 		if tokenMap[appservice.ASToken] {
 			return configErrors([]string{fmt.Sprintf(
-				"Application Service Token %s must be unique", appservice.ASToken,
+				"Application service Token %s must be unique", appservice.ASToken,
 			)})
 		}
 
@@ -189,7 +187,7 @@ func checkErrors(config *Dendrite) (err error) {
 				// namespace, which often ends up in an application service receiving events
 				// it doesn't want, as an empty regex will match all events.
 				return configErrors([]string{fmt.Sprintf(
-					"Application Service namespace can only contain a single regex tuple. Check your YAML.",
+					"Application service namespace can only contain a single regex tuple. Check your YAML.",
 				)})
 			}
 		}
@@ -201,7 +199,7 @@ func checkErrors(config *Dendrite) (err error) {
 			for _, namespace := range namespaceSlice {
 				if !IsValidRegex(namespace.Regex) {
 					return configErrors([]string{fmt.Sprintf(
-						"Invalid regex string for Application Service %s", appservice.ID,
+						"Invalid regex string for application service %s", appservice.ID,
 					)})
 				}
 			}

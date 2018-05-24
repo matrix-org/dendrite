@@ -17,8 +17,8 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
+	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -31,26 +31,32 @@ import (
 
 var (
 	appServices []config.ApplicationService
+	ecm         map[string]int
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *accounts.Database
+	asDB               *storage.Database
 	query              api.RoomserverQueryAPI
 	alias              api.RoomserverAliasAPI
 	serverName         string
 }
 
-// NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
+// NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call
+// Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	store *accounts.Database,
+	appserviceDB *storage.Database,
 	queryAPI api.RoomserverQueryAPI,
 	aliasAPI api.RoomserverAliasAPI,
+	eventCounterMap map[string]int,
 ) *OutputRoomEventConsumer {
 	appServices = cfg.Derived.ApplicationServices
+	ecm = eventCounterMap
 
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
@@ -60,6 +66,7 @@ func NewOutputRoomEventConsumer(
 	s := &OutputRoomEventConsumer{
 		roomServerConsumer: &consumer,
 		db:                 store,
+		asDB:               appserviceDB,
 		query:              queryAPI,
 		alias:              aliasAPI,
 		serverName:         string(cfg.Matrix.ServerName),
@@ -74,9 +81,10 @@ func (s *OutputRoomEventConsumer) Start() error {
 	return s.roomServerConsumer.Start()
 }
 
-// onMessage is called when the sync server receives a new event from the room server output log.
-// It is not safe for this function to be called from multiple goroutines, or else the
-// sync stream position may race and be incorrectly calculated.
+// onMessage is called when the sync server receives a new event from the room
+// server output log. It is not safe for this function to be called from
+// multiple goroutines, or else the sync stream position may race and be
+// incorrectly calculated.
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
@@ -165,13 +173,20 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 // each namespace of each registered application service, and if there is a
 // match, adds the event to the queue for events to be sent to a particular
 // application service.
-func (s *OutputRoomEventConsumer) filterRoomserverEvents(ctx context.Context, events []gomatrixserverlib.Event) error {
+func (s *OutputRoomEventConsumer) filterRoomserverEvents(
+	ctx context.Context,
+	events []gomatrixserverlib.Event,
+) error {
 	for _, event := range events {
 		for _, appservice := range appServices {
 			// Check if this event is interesting to this application service
 			if s.appserviceIsInterestedInEvent(ctx, event, appservice) {
-				// TODO: Queue this event to be sent off to the application service
-				fmt.Println(appservice.ID, "was interested in", event.Sender(), event.Type(), event.RoomID())
+				// Queue this event to be sent off to the application service
+				if err := s.asDB.StoreEvent(ctx, appservice.ID, event); err != nil {
+					log.WithError(err).Warn("failed to insert incoming event into appservices database")
+				} else {
+					ecm[appservice.ID]++
+				}
 			}
 		}
 	}

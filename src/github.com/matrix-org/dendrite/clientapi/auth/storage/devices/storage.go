@@ -138,9 +138,9 @@ func (d *Database) UpdateDevice(
 }
 
 // RemoveDevice revokes a device by deleting the entry in the database
-// matching with the given device ID and user ID localpart
+// matching with the given device ID and user ID localpart.
 // If the device doesn't exist, it will not return an error
-// If something went wrong during the deletion, it will return the SQL error
+// If something went wrong during the deletion, it will return the SQL error.
 func (d *Database) RemoveDevice(
 	ctx context.Context, deviceID, localpart string,
 ) error {

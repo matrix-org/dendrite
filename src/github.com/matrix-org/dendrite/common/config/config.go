@@ -162,6 +162,9 @@ type Dendrite struct {
 		// The FederationSender database stores information used by the FederationSender
 		// It is only accessed by the FederationSender.
 		FederationSender DataSource `yaml:"federation_sender"`
+		// The AppServices database stores information used by the AppService component.
+		// It is only accessed by the AppService component.
+		AppService DataSource `yaml:"appservice"`
 		// The PublicRoomsAPI database stores information used to compute the public
 		// room directory. It is only accessed by the PublicRoomsAPI server.
 		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
@@ -231,15 +234,15 @@ type Dendrite struct {
 			Params map[string]interface{} `json:"params"`
 		}
 
-		// Application Services parsed from their config files
+		// Application services parsed from their config files
 		// The paths of which were given above in the main config file
 		ApplicationServices []ApplicationService
 
-		// Meta-regexes compiled from all exclusive Application Service
+		// Meta-regexes compiled from all exclusive application service
 		// Regexes.
 		//
 		// When a user registers, we check that their username does not match any
-		// exclusive Application Service namespaces
+		// exclusive application service namespaces
 		ExclusiveApplicationServicesUsernameRegexp *regexp.Regexp
 		// When a user creates a room alias, we check that it isn't already
 		// reserved by an application service

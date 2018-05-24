@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     created_ts BIGINT NOT NULL,
     -- The password hash for this account. Can be NULL if this is a passwordless account.
     password_hash TEXT,
-    -- Identifies which Application Service this account belongs to, if any.
+    -- Identifies which application service this account belongs to, if any.
     appservice_id TEXT
     -- TODO:
     -- is_guest, is_admin, upgraded_ts, devices, any email reset stuff?
