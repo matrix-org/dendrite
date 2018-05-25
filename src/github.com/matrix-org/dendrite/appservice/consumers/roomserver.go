@@ -110,7 +110,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	// Check if any events need to passed on to external application services
-	return s.filterRoomserverEvents(events)
+	return s.filterRoomserverEvents(append(events, ev))
 }
 
 // lookupStateEvents looks up the state events that are added by a new event.
@@ -204,6 +204,8 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(event gomatrixse
 				}
 			}
 		}
+	} else {
+		log.WithError(err).Errorf("Unable to get aliases for Room with ID: %s", event.RoomID())
 	}
 
 	return false
