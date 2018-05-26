@@ -32,14 +32,12 @@ CREATE TABLE IF NOT EXISTS roomserver_transactions (
 	event_id TEXT NOT NULL,
 	-- A transaction ID is unique for a user and device
 	-- This automatically creates an index.
-	CONSTRAINT roomserver_transaction_unique PRIMARY KEY (transaction_id, device_id, user_id)
+	PRIMARY KEY (transaction_id, device_id, user_id)
 );
 `
 const insertTransactionSQL = "" +
 	"INSERT INTO roomserver_transactions (transaction_id, device_id, user_id, event_id)" +
-	" VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT ON CONSTRAINT roomserver_transaction_unique" +
-	" DO NOTHING"
+	" VALUES ($1, $2, $3, $4)"
 
 const selectTransactionEventIDSQL = "" +
 	"SELECT event_id FROM roomserver_transactions" +
