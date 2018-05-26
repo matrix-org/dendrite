@@ -32,6 +32,7 @@ type RoomEventDatabase interface {
 	StoreEvent(
 		ctx context.Context,
 		event gomatrixserverlib.Event,
+		txnAndDeviceID *api.TransactionID,
 		authEventNIDs []types.EventNID,
 	) (types.RoomNID, types.StateAtEvent, error)
 	// Look up the state entries for a list of string event IDs
@@ -61,6 +62,13 @@ type RoomEventDatabase interface {
 	MembershipUpdater(
 		ctx context.Context, roomID, targerUserID string,
 	) (types.MembershipUpdater, error)
+	// Look up event ID by transaction's info.
+	// This is used to determine if the room event is processed/processing already.
+	// Returns an empty string if no such event exists.
+	GetTransactionEventID(
+		ctx context.Context, transactionID string,
+		deviceID string, userID string,
+	) (string, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -79,52 +87,46 @@ func processRoomEvent(
 	db RoomEventDatabase,
 	ow OutputRoomEventWriter,
 	input api.InputRoomEvent,
-) error {
+) (eventID string, err error) {
 	// Parse and validate the event JSON
 	event := input.Event
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(ctx, db, event, input.AuthEventIDs)
 	if err != nil {
-		return err
+		return
+	}
+
+	if input.TransactionID != nil {
+		tdID := input.TransactionID
+		eventID, err = db.GetTransactionEventID(
+			ctx, tdID.TransactionID, tdID.DeviceID, input.Event.Sender(),
+		)
+		// On error OR event with the transaction already processed/processesing
+		if err != nil || eventID != "" {
+			return
+		}
 	}
 
 	// Store the event
-	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, authEventNIDs)
+	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
-		return err
+		return
 	}
 
 	if input.Kind == api.KindOutlier {
 		// For outliers we can stop after we've stored the event itself as it
 		// doesn't have any associated state to store and we don't need to
 		// notify anyone about it.
-		return nil
+		return event.EventID(), nil
 	}
 
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		if input.HasState {
-			// We've been told what the state at the event is so we don't need to calculate it.
-			// Check that those state events are in the database and store the state.
-			var entries []types.StateEntry
-			if entries, err = db.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
-				return err
-			}
-
-			if stateAtEvent.BeforeStateSnapshotNID, err = db.AddState(ctx, roomNID, nil, entries); err != nil {
-				return err
-			}
-		} else {
-			// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-			if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, db, event, roomNID); err != nil {
-				return err
-			}
-		}
-		err = db.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
+		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
@@ -134,7 +136,38 @@ func processRoomEvent(
 	}
 
 	// Update the extremities of the event graph for the room
-	return updateLatestEvents(ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID)
+	return event.EventID(), updateLatestEvents(
+		ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID,
+	)
+}
+
+func calculateAndSetState(
+	ctx context.Context,
+	db RoomEventDatabase,
+	input api.InputRoomEvent,
+	roomNID types.RoomNID,
+	stateAtEvent *types.StateAtEvent,
+	event gomatrixserverlib.Event,
+) error {
+	var err error
+	if input.HasState {
+		// We've been told what the state at the event is so we don't need to calculate it.
+		// Check that those state events are in the database and store the state.
+		var entries []types.StateEntry
+		if entries, err = db.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
+			return err
+		}
+
+		if stateAtEvent.BeforeStateSnapshotNID, err = db.AddState(ctx, roomNID, nil, entries); err != nil {
+			return err
+		}
+	} else {
+		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
+		if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, db, event, roomNID); err != nil {
+			return err
+		}
+	}
+	return db.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 }
 
 func processInviteEvent(

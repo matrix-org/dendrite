@@ -94,7 +94,9 @@ type InputRoomEventsRequest struct {
 }
 
 // InputRoomEventsResponse is a response to InputRoomEvents
-type InputRoomEventsResponse struct{}
+type InputRoomEventsResponse struct {
+	EventID string `json:"event_id"`
+}
 
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInputAPI interface {

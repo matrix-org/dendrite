@@ -138,7 +138,7 @@ func SetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
+	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -230,7 +230,7 @@ func SetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
-	if err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
+	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
