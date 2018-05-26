@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -279,6 +280,38 @@ func validateRecaptcha(
 	return nil
 }
 
+// generates username for registration if none provided.
+// Sequentially checks for available username and returns the lowest available one.
+func generateUsername(
+	ctx context.Context, accountDB *accounts.Database, cfg *config.Dendrite,
+) (string, error) {
+	numericLps := make(map[string]bool)
+
+	// re matches localparts with only digits
+	re := regexp.MustCompile(`\A\d+\z`)
+	localparts, err := accountDB.GetAllLocalparts(ctx)
+
+	if err != nil {
+		return "", err
+	}
+
+	for _, lp := range localparts {
+		if re.MatchString(lp) {
+			// Length == 2 implies there is a matched localpart
+			numericLps[lp] = true
+		}
+	}
+
+	for i := 1; ; i++ {
+		lp := strconv.Itoa(i)
+		if _, ok := numericLps[lp]; !ok && !UsernameMatchesExclusiveNamespace(
+			cfg, lp,
+		) {
+			return lp, nil
+		}
+	}
+}
+
 // UsernameIsWithinApplicationServiceNamespace checks to see if a username falls
 // within any of the namespaces of a given Application Service. If no
 // Application Service is given, it will check to see if it matches any
@@ -311,6 +344,17 @@ func UsernameIsWithinApplicationServiceNamespace(
 	return false
 }
 
+// UsernameMatchesExclusiveNamespace will check if a given username matches
+// an exclusive namespace. localpart should not match Application Service namespace.
+func UsernameMatchesExclusiveNamespace(
+	cfg *config.Dendrite,
+	username string,
+) bool {
+	// Check namespaces and see if there's a match
+	matchCount := countMatchingNamespaces(cfg, username)
+	return matchCount > 0
+}
+
 // UsernameMatchesMultipleExclusiveNamespaces will check if a given username matches
 // more than one exclusive namespace. More than one is not allowed
 func UsernameMatchesMultipleExclusiveNamespaces(
@@ -318,6 +362,15 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 	username string,
 ) bool {
 	// Check namespaces and see if more than one match
+	matchCount := countMatchingNamespaces(cfg, username)
+	return matchCount > 1
+}
+
+func countMatchingNamespaces(
+	cfg *config.Dendrite,
+	username string,
+) int {
+	// Check namespaces and count matches
 	matchCount := 0
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		for _, namespaceSlice := range appservice.NamespaceMap {
@@ -329,7 +382,7 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 			}
 		}
 	}
-	return matchCount > 1
+	return matchCount
 }
 
 // validateApplicationService checks if a provided application service token
@@ -401,6 +454,16 @@ func Register(
 	if sessionID == "" {
 		// Generate a new, random session ID
 		sessionID = util.RandomString(sessionIDLength)
+	}
+
+	// auto generate a numeric username if r.Username empty
+	if r.Username == "" {
+		var err error
+		r.Username, err = generateUsername(req.Context(), accountDB, cfg)
+
+		if err != nil {
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	// If no auth type is specified by the client, send back the list of available flows

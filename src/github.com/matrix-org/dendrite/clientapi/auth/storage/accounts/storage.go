@@ -358,3 +358,10 @@ func (d *Database) CheckAccountAvailability(ctx context.Context, localpart strin
 	}
 	return false, err
 }
+
+// GetAllLocalparts returns an slice header containing all localparts in database.
+// If no records exist it returns an empty slice.
+// Returns an error if something goes wrong.
+func (d *Database) GetAllLocalparts(ctx context.Context) ([]string, error) {
+	return d.accounts.selectAllLocalparts(ctx)
+}
