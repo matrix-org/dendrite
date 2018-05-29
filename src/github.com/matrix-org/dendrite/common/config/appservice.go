@@ -92,10 +92,11 @@ func loadAppservices(config *Dendrite) error {
 // methods can quickly check if a particular string matches any of them.
 func setupRegexps(cfg *Dendrite) (err error) {
 	// Combine all exclusive namespaces for later string checking
-	var exclusiveUsernameStrings, exclusiveAliasStrings, exclusiveRoomStrings []string
+	var exclusiveUsernameStrings, exclusiveAliasStrings []string
 
 	// If an application service's regex is marked as exclusive, add
-	// it's contents to the overall exlusive regex string
+	// its contents to the overall exlusive regex string. Room regex
+	// not necessary as we aren't denying exclusive room ID creation
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			switch key {
@@ -103,19 +104,18 @@ func setupRegexps(cfg *Dendrite) (err error) {
 				appendExclusiveNamespaceRegexs(&exclusiveUsernameStrings, namespaceSlice)
 			case "aliases":
 				appendExclusiveNamespaceRegexs(&exclusiveAliasStrings, namespaceSlice)
-			case "rooms":
-				appendExclusiveNamespaceRegexs(&exclusiveRoomStrings, namespaceSlice)
 			}
 		}
 	}
 
+	fmt.Println(exclusiveUsernameStrings, exclusiveAliasStrings)
+
 	// Join the regexes together into one big regex.
 	// i.e. "app1.*", "app2.*" -> "(app1.*)|(app2.*)"
-	// Later we can check if a username or some other string matches any exclusive
-	// regex and deny access if it isn't from an application service
+	// Later we can check if a username or alias matches any exclusive regex and
+	// deny access if it isn't from an application service
 	exclusiveUsernames := strings.Join(exclusiveUsernameStrings, "|")
 	exclusiveAliases := strings.Join(exclusiveAliasStrings, "|")
-	exclusiveRooms := strings.Join(exclusiveRoomStrings, "|")
 
 	// If there are no exclusive regexes, compile string so that it will not match
 	// any valid usernames/aliases/roomIDs
@@ -125,18 +125,12 @@ func setupRegexps(cfg *Dendrite) (err error) {
 	if exclusiveAliases == "" {
 		exclusiveAliases = "^$"
 	}
-	if exclusiveRooms == "" {
-		exclusiveRooms = "^$"
-	}
 
 	// Store compiled Regex
 	if cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, err = regexp.Compile(exclusiveUsernames); err != nil {
 		return err
 	}
 	if cfg.Derived.ExclusiveApplicationServicesAliasRegexp, err = regexp.Compile(exclusiveAliases); err != nil {
-		return err
-	}
-	if cfg.Derived.ExclusiveApplicationServicesRoomRegexp, err = regexp.Compile(exclusiveRooms); err != nil {
 		return err
 	}
 
@@ -167,14 +161,16 @@ func checkErrors(config *Dendrite) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
 
-	// Check that no two application services have the same as_token or id
+	// Check each application service for any config errors
 	for _, appservice := range config.Derived.ApplicationServices {
-		// Check if we've already seen this ID
+		// Check if we've already seen this ID. No two application services
+		// can have the same ID or token.
 		if idMap[appservice.ID] {
 			return configErrors([]string{fmt.Sprintf(
 				"Application Service ID %s must be unique", appservice.ID,
 			)})
 		}
+		// Check if we've already seen this token
 		if tokenMap[appservice.ASToken] {
 			return configErrors([]string{fmt.Sprintf(
 				"Application Service Token %s must be unique", appservice.ASToken,
@@ -185,6 +181,18 @@ func checkErrors(config *Dendrite) (err error) {
 		// seen them.
 		idMap[appservice.ID] = true
 		tokenMap[appservice.ID] = true
+
+		// Check if more than one regex exists per namespace
+		for _, namespace := range appservice.NamespaceMap {
+			if len(namespace) > 1 {
+				// It's quite easy to accidentally make multiple regex objects per
+				// namespace, which often ends up in an application service receiving events
+				// it doesn't want, as an empty regex will match all events.
+				return configErrors([]string{fmt.Sprintf(
+					"Application Service namespace can only contain a single regex tuple. Check your YAML.",
+				)})
+			}
+		}
 	}
 
 	// Check that namespace(s) are valid regex
@@ -200,8 +208,7 @@ func checkErrors(config *Dendrite) (err error) {
 		}
 	}
 
-	err = setupRegexps(config)
-	return err
+	return setupRegexps(config)
 }
 
 // IsValidRegex returns true or false based on whether the

@@ -105,12 +105,15 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
-	if err = s.db.UpdateMemberships(context.TODO(), events, output.NewRoomEvent.RemovesStateEventIDs); err != nil {
+	// Create a context to thread through the whole filtering process
+	ctx := context.TODO()
+
+	if err = s.db.UpdateMemberships(ctx, events, output.NewRoomEvent.RemovesStateEventIDs); err != nil {
 		return err
 	}
 
 	// Check if any events need to passed on to external application services
-	return s.filterRoomserverEvents(append(events, ev))
+	return s.filterRoomserverEvents(ctx, append(events, ev))
 }
 
 // lookupStateEvents looks up the state events that are added by a new event.
@@ -162,11 +165,11 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 // each namespace of each registered application service, and if there is a
 // match, adds the event to the queue for events to be sent to a particular
 // application service.
-func (s *OutputRoomEventConsumer) filterRoomserverEvents(events []gomatrixserverlib.Event) error {
+func (s *OutputRoomEventConsumer) filterRoomserverEvents(ctx context.Context, events []gomatrixserverlib.Event) error {
 	for _, event := range events {
 		for _, appservice := range appServices {
 			// Check if this event is interesting to this application service
-			if s.appserviceIsInterestedInEvent(event, appservice) {
+			if s.appserviceIsInterestedInEvent(ctx, event, appservice) {
 				// TODO: Queue this event to be sent off to the application service
 				fmt.Println(appservice.ID, "was interested in", event.Sender(), event.Type(), event.RoomID())
 			}
@@ -178,7 +181,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(events []gomatrixserver
 
 // appserviceIsInterestedInEvent returns a boolean depending on whether a given
 // event falls within one of a given application service's namespaces.
-func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(event gomatrixserverlib.Event, appservice config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event gomatrixserverlib.Event, appservice config.ApplicationService) bool {
 	// Check sender of the event
 	for _, userNamespace := range appservice.NamespaceMap["users"] {
 		if userNamespace.RegexpObject.MatchString(event.Sender()) {
@@ -196,7 +199,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(event gomatrixse
 	// Check all known room aliases of the room the event came from
 	queryReq := api.GetAliasesForRoomIDRequest{RoomID: event.RoomID()}
 	var queryRes api.GetAliasesForRoomIDResponse
-	if err := s.alias.GetAliasesForRoomID(context.TODO(), &queryReq, &queryRes); err == nil {
+	if err := s.alias.GetAliasesForRoomID(ctx, &queryReq, &queryRes); err == nil {
 		for _, alias := range queryRes.Aliases {
 			for _, aliasNamespace := range appservice.NamespaceMap["aliases"] {
 				if aliasNamespace.RegexpObject.MatchString(alias) {
@@ -205,7 +208,9 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(event gomatrixse
 			}
 		}
 	} else {
-		log.WithError(err).Errorf("Unable to get aliases for Room with ID: %s", event.RoomID())
+		log.WithFields(log.Fields{
+			"room_id": event.RoomID(),
+		}).WithError(err).Errorf("Unable to get aliases for room")
 	}
 
 	return false

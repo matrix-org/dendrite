@@ -244,10 +244,8 @@ type Dendrite struct {
 		// When a user creates a room alias, we check that it isn't already
 		// reserved by an application service
 		ExclusiveApplicationServicesAliasRegexp *regexp.Regexp
-		// TODO: Huh? When a room ID is created, we block the client from
-		// creating it if it falls under an application service's exclusive
-		// roomID regex? But why tho
-		ExclusiveApplicationServicesRoomRegexp *regexp.Regexp
+		// Note: An Exclusive Regex for room ID isn't necessary as we aren't blocking
+		// servers from creating RoomIDs in exclusive application service namespaces
 	} `yaml:"-"`
 }
 
