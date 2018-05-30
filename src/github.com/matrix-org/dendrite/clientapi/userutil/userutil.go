@@ -14,6 +14,7 @@ package userutil
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -40,4 +41,9 @@ func ParseUsernameParam(usernameParam string, expectedServerName *gomatrixserver
 		localpart = lp
 	}
 	return localpart, nil
+}
+
+// MakeUserID generates user ID from localpart & server name
+func MakeUserID(localpart string, server gomatrixserverlib.ServerName) string {
+	return fmt.Sprintf("@%s:%s", localpart, string(server))
 }
