@@ -36,10 +36,10 @@ func SetupAppServiceAPIComponent(
 	transactionsCache *transactions.Cache,
 ) {
 	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, queryAPI,
+		base.Cfg, base.KafkaConsumer, accountsDB, queryAPI, aliasAPI,
 	)
 	if err := consumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start app service's room server consumer")
+		logrus.WithError(err).Panicf("failed to start app service roomserver consumer")
 	}
 
 	// Set up HTTP Endpoints

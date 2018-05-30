@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 // ApplicationServiceNamespace is the namespace that a specific application
@@ -48,7 +48,8 @@ type ApplicationService struct {
 	HSToken string `yaml:"hs_token"`
 	// Localpart of application service user
 	SenderLocalpart string `yaml:"sender_localpart"`
-	// Information about an application service's namespaces
+	// Information about an application service's namespaces. Key is either
+	// "users", "aliases" or "rooms"
 	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
 }
 
@@ -78,7 +79,8 @@ func loadAppservices(config *Dendrite) error {
 
 		// Append the parsed application service to the global config
 		config.Derived.ApplicationServices = append(
-			config.Derived.ApplicationServices, appservice)
+			config.Derived.ApplicationServices, appservice,
+		)
 	}
 
 	// Check for any errors in the loaded application services
@@ -88,12 +90,13 @@ func loadAppservices(config *Dendrite) error {
 // setupRegexps will create regex objects for exclusive and non-exclusive
 // usernames, aliases and rooms of all application services, so that other
 // methods can quickly check if a particular string matches any of them.
-func setupRegexps(cfg *Dendrite) {
+func setupRegexps(cfg *Dendrite) (err error) {
 	// Combine all exclusive namespaces for later string checking
-	var exclusiveUsernameStrings, exclusiveAliasStrings, exclusiveRoomStrings []string
+	var exclusiveUsernameStrings, exclusiveAliasStrings []string
 
 	// If an application service's regex is marked as exclusive, add
-	// it's contents to the overall exlusive regex string
+	// its contents to the overall exlusive regex string. Room regex
+	// not necessary as we aren't denying exclusive room ID creation
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			switch key {
@@ -101,38 +104,46 @@ func setupRegexps(cfg *Dendrite) {
 				appendExclusiveNamespaceRegexs(&exclusiveUsernameStrings, namespaceSlice)
 			case "aliases":
 				appendExclusiveNamespaceRegexs(&exclusiveAliasStrings, namespaceSlice)
-			case "rooms":
-				appendExclusiveNamespaceRegexs(&exclusiveRoomStrings, namespaceSlice)
 			}
 		}
 	}
 
+	fmt.Println(exclusiveUsernameStrings, exclusiveAliasStrings)
+
 	// Join the regexes together into one big regex.
 	// i.e. "app1.*", "app2.*" -> "(app1.*)|(app2.*)"
-	// Later we can check if a username or some other string matches any exclusive
-	// regex and deny access if it isn't from an application service
+	// Later we can check if a username or alias matches any exclusive regex and
+	// deny access if it isn't from an application service
 	exclusiveUsernames := strings.Join(exclusiveUsernameStrings, "|")
+	exclusiveAliases := strings.Join(exclusiveAliasStrings, "|")
 
-	// If there are no exclusive username regexes, compile string so that it
-	// will not match any valid usernames
+	// If there are no exclusive regexes, compile string so that it will not match
+	// any valid usernames/aliases/roomIDs
 	if exclusiveUsernames == "" {
 		exclusiveUsernames = "^$"
 	}
+	if exclusiveAliases == "" {
+		exclusiveAliases = "^$"
+	}
 
-	// TODO: Aliases and rooms. Needed?
-	//exclusiveAliases := strings.Join(exclusiveAliasStrings, "|")
-	//exclusiveRooms := strings.Join(exclusiveRoomStrings, "|")
+	// Store compiled Regex
+	if cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, err = regexp.Compile(exclusiveUsernames); err != nil {
+		return err
+	}
+	if cfg.Derived.ExclusiveApplicationServicesAliasRegexp, err = regexp.Compile(exclusiveAliases); err != nil {
+		return err
+	}
 
-	cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, _ = regexp.Compile(exclusiveUsernames)
+	return nil
 }
 
-// concatenateExclusiveNamespaces takes a slice of strings and a slice of
+// appendExclusiveNamespaceRegexs takes a slice of strings and a slice of
 // namespaces and will append the regexes of only the exclusive namespaces
 // into the string slice
 func appendExclusiveNamespaceRegexs(
 	exclusiveStrings *[]string, namespaces []ApplicationServiceNamespace,
 ) {
-	for _, namespace := range namespaces {
+	for index, namespace := range namespaces {
 		if namespace.Exclusive {
 			// We append parenthesis to later separate each regex when we compile
 			// i.e. "app1.*", "app2.*" -> "(app1.*)|(app2.*)"
@@ -140,24 +151,26 @@ func appendExclusiveNamespaceRegexs(
 		}
 
 		// Compile this regex into a Regexp object for later use
-		namespace.RegexpObject, _ = regexp.Compile(namespace.Regex)
+		namespaces[index].RegexpObject, _ = regexp.Compile(namespace.Regex)
 	}
 }
 
 // checkErrors checks for any configuration errors amongst the loaded
 // application services according to the application service spec.
-func checkErrors(config *Dendrite) error {
+func checkErrors(config *Dendrite) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
 
-	// Check that no two application services have the same as_token or id
+	// Check each application service for any config errors
 	for _, appservice := range config.Derived.ApplicationServices {
-		// Check if we've already seen this ID
+		// Check if we've already seen this ID. No two application services
+		// can have the same ID or token.
 		if idMap[appservice.ID] {
 			return configErrors([]string{fmt.Sprintf(
 				"Application Service ID %s must be unique", appservice.ID,
 			)})
 		}
+		// Check if we've already seen this token
 		if tokenMap[appservice.ASToken] {
 			return configErrors([]string{fmt.Sprintf(
 				"Application Service Token %s must be unique", appservice.ASToken,
@@ -168,6 +181,18 @@ func checkErrors(config *Dendrite) error {
 		// seen them.
 		idMap[appservice.ID] = true
 		tokenMap[appservice.ID] = true
+
+		// Check if more than one regex exists per namespace
+		for _, namespace := range appservice.NamespaceMap {
+			if len(namespace) > 1 {
+				// It's quite easy to accidentally make multiple regex objects per
+				// namespace, which often ends up in an application service receiving events
+				// it doesn't want, as an empty regex will match all events.
+				return configErrors([]string{fmt.Sprintf(
+					"Application Service namespace can only contain a single regex tuple. Check your YAML.",
+				)})
+			}
+		}
 	}
 
 	// Check that namespace(s) are valid regex
@@ -182,9 +207,8 @@ func checkErrors(config *Dendrite) error {
 			}
 		}
 	}
-	setupRegexps(config)
 
-	return nil
+	return setupRegexps(config)
 }
 
 // IsValidRegex returns true or false based on whether the

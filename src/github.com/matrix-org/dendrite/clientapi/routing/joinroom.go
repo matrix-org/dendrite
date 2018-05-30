@@ -145,9 +145,9 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 		}
 	}
 	if domain == r.cfg.Matrix.ServerName {
-		queryReq := api.GetAliasRoomIDRequest{Alias: roomAlias}
-		var queryRes api.GetAliasRoomIDResponse
-		if err = r.aliasAPI.GetAliasRoomID(r.req.Context(), &queryReq, &queryRes); err != nil {
+		queryReq := api.GetRoomIDForAliasRequest{Alias: roomAlias}
+		var queryRes api.GetRoomIDForAliasResponse
+		if err = r.aliasAPI.GetRoomIDForAlias(r.req.Context(), &queryReq, &queryRes); err != nil {
 			return httputil.LogThenError(r.req, err)
 		}
 
