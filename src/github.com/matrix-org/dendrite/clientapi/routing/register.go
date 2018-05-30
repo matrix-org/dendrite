@@ -400,7 +400,7 @@ func Register(
 	// Retrieve or generate the sessionID
 	sessionID := r.Auth.Session
 	if sessionID == "" {
-		// Generate a new, random session ID`
+		// Generate a new, random session ID
 		sessionID = util.RandomString(sessionIDLength)
 	}
 
