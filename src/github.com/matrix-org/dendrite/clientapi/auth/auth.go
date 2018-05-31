@@ -42,7 +42,7 @@ type DeviceDatabase interface {
 	GetDeviceByAccessToken(ctx context.Context, token string) (*authtypes.Device, error)
 }
 
-// AccountDatabase represents a account database.
+// AccountDatabase represents an account database.
 type AccountDatabase interface {
 	// Look up the account matching the given localpart.
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*authtypes.Account, error)
