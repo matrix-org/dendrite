@@ -415,7 +415,7 @@ func Register(
 	if r.Username == "" {
 		id, err := accountDB.GetNewNumericLocalpart(req.Context())
 		if err != nil {
-			return jsonerror.InternalServerError()
+			return httputil.LogThenError(req, err)
 		}
 
 		r.Username = strconv.FormatInt(id, 10)
