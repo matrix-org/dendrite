@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -401,6 +402,23 @@ func Register(
 	if sessionID == "" {
 		// Generate a new, random session ID
 		sessionID = util.RandomString(sessionIDLength)
+	}
+
+	// Don't allow numeric usernames less than MAX_INT64.
+	if _, err := strconv.ParseInt(r.Username, 10, 64); err == nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
+		}
+	}
+	// Auto generate a numeric username if r.Username is empty
+	if r.Username == "" {
+		id, err := accountDB.GetNewNumericLocalpart(req.Context())
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+
+		r.Username = strconv.FormatInt(id, 10)
 	}
 
 	// If no auth type is specified by the client, send back the list of available flows

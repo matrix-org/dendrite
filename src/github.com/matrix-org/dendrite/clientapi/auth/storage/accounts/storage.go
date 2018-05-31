@@ -267,6 +267,13 @@ func (d *Database) GetAccountDataByType(
 	)
 }
 
+// GetNewNumericLocalpart generates and returns a new unused numeric localpart
+func (d *Database) GetNewNumericLocalpart(
+	ctx context.Context,
+) (int64, error) {
+	return d.accounts.selectNewNumericLocalpart(ctx)
+}
+
 func hashPassword(plaintext string) (hash string, err error) {
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcrypt.DefaultCost)
 	return string(hashBytes), err
