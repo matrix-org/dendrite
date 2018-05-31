@@ -44,7 +44,7 @@ const insertAccountSQL = "" +
 	"INSERT INTO account_accounts(localpart, created_ts, password_hash, appservice_id) VALUES ($1, $2, $3, $4)"
 
 const selectAccountByLocalpartSQL = "" +
-	"SELECT localpart FROM account_accounts WHERE localpart = $1"
+	"SELECT localpart, appservice_id FROM account_accounts WHERE localpart = $1"
 
 const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1"
@@ -112,13 +112,12 @@ func (s *accountsStatements) selectPasswordHash(
 
 func (s *accountsStatements) selectAccountByLocalpart(
 	ctx context.Context, localpart string,
-) (*authtypes.Account, error) {
-	var acc authtypes.Account
+) (acc *authtypes.Account, err error) {
 	stmt := s.selectAccountByLocalpartStmt
-	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart)
-	if err != nil {
-		acc.UserID = userutil.MakeUserID(localpart, s.serverName)
+	err = stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &acc.AppServiceID)
+	if err == nil {
+		acc.UserID = makeUserID(localpart, s.serverName)
 		acc.ServerName = s.serverName
 	}
-	return &acc, err
+	return
 }
