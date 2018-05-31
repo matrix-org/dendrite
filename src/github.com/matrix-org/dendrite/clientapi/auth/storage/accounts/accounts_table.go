@@ -116,7 +116,7 @@ func (s *accountsStatements) selectAccountByLocalpart(
 	stmt := s.selectAccountByLocalpartStmt
 	err = stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &acc.AppServiceID)
 	if err == nil {
-		acc.UserID = makeUserID(localpart, s.serverName)
+		acc.UserID = userutil.MakeUserID(localpart, s.serverName)
 		acc.ServerName = s.serverName
 	}
 	return
