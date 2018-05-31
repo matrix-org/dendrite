@@ -17,10 +17,10 @@ package accounts
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -97,7 +97,7 @@ func (s *accountsStatements) insertAccount(
 
 	return &authtypes.Account{
 		Localpart:    localpart,
-		UserID:       makeUserID(localpart, s.serverName),
+		UserID:       userutil.MakeUserID(localpart, s.serverName),
 		ServerName:   s.serverName,
 		AppServiceID: appserviceID,
 	}, nil
@@ -116,12 +116,8 @@ func (s *accountsStatements) selectAccountByLocalpart(
 	stmt := s.selectAccountByLocalpartStmt
 	err = stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &acc.AppServiceID)
 	if err == nil {
-		acc.UserID = makeUserID(localpart, s.serverName)
+		acc.UserID = userutil.MakeUserID(localpart, s.serverName)
 		acc.ServerName = s.serverName
 	}
 	return
-}
-
-func makeUserID(localpart string, server gomatrixserverlib.ServerName) string {
-	return fmt.Sprintf("@%s:%s", localpart, string(server))
 }

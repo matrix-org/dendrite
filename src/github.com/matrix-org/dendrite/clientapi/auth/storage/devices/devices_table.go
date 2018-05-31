@@ -17,12 +17,12 @@ package devices
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -126,7 +126,7 @@ func (s *devicesStatements) insertDevice(
 	}
 	return &authtypes.Device{
 		ID:          id,
-		UserID:      makeUserID(localpart, s.serverName),
+		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
 	}, nil
 }
@@ -163,7 +163,7 @@ func (s *devicesStatements) selectDeviceByToken(
 	stmt := s.selectDeviceByTokenStmt
 	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.ID, &localpart)
 	if err == nil {
-		dev.UserID = makeUserID(localpart, s.serverName)
+		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		dev.AccessToken = accessToken
 	}
 	return &dev, err
@@ -178,7 +178,7 @@ func (s *devicesStatements) selectDeviceByID(
 	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&created)
 	if err == nil {
 		dev.ID = deviceID
-		dev.UserID = makeUserID(localpart, s.serverName)
+		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 	}
 	return &dev, err
 }
@@ -200,13 +200,9 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 		if err != nil {
 			return devices, err
 		}
-		dev.UserID = makeUserID(localpart, s.serverName)
+		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		devices = append(devices, dev)
 	}
 
 	return devices, nil
-}
-
-func makeUserID(localpart string, server gomatrixserverlib.ServerName) string {
-	return fmt.Sprintf("@%s:%s", localpart, string(server))
 }
