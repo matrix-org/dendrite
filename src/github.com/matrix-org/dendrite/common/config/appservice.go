@@ -180,7 +180,7 @@ func checkErrors(config *Dendrite) (err error) {
 		// Add the id/token to their respective maps if we haven't already
 		// seen them.
 		idMap[appservice.ID] = true
-		tokenMap[appservice.ID] = true
+		tokenMap[appservice.ASToken] = true
 
 		// Check if more than one regex exists per namespace
 		for _, namespace := range appservice.NamespaceMap {
