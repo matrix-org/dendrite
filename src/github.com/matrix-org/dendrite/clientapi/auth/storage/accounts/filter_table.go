@@ -81,7 +81,7 @@ func (s *filterStatements) selectFilter(
 		return nil, err
 	}
 
-	// Unmarshall JSON into Filter struct
+	// Unmarshal JSON into Filter struct
 	var filter gomatrix.Filter
 	if err = json.Unmarshal(filterData, &filter); err != nil {
 		return nil, err
