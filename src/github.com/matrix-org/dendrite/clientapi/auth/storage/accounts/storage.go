@@ -365,3 +365,11 @@ func (d *Database) CheckAccountAvailability(ctx context.Context, localpart strin
 	}
 	return false, err
 }
+
+// GetAccountByLocalpart returns the account associated with the given localpart.
+// This function assumes the request is authenticated or the account data is used only internally.
+// Returns sql.ErrNoRows if no account exists which matches the given localpart.
+func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string,
+) (*authtypes.Account, error) {
+	return d.accounts.selectAccountByLocalpart(ctx, localpart)
+}
