@@ -104,7 +104,7 @@ func TestSignPutRequest(t *testing.T) {
 	request := NewFederationRequest(
 		"PUT", "localhost:44033", "/_matrix/federation/v1/send/1493385816575/",
 	)
-	if err := request.SetContent(rawJSON([]byte(examplePutContent))); err != nil {
+	if err := request.SetContent(RawJSON([]byte(examplePutContent))); err != nil {
 		t.Fatal(err)
 	}
 	if err := request.Sign("localhost:8800", "ed25519:a_Obwu", privateKey1); err != nil {

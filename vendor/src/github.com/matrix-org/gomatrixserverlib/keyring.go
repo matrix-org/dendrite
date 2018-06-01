@@ -10,8 +10,8 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-// A PublicKeyRequest is a request for a public key with a particular key ID.
-type PublicKeyRequest struct {
+// A PublicKeyLookupRequest is a request for a public key with a particular key ID.
+type PublicKeyLookupRequest struct {
 	// The server to fetch a key for.
 	ServerName ServerName
 	// The ID of the key to fetch.
@@ -60,7 +60,7 @@ type KeyFetcher interface {
 	// The result may have fewer (server name, key ID) pairs than were in the request.
 	// The result may have more (server name, key ID) pairs than were in the request.
 	// Returns an error if there was a problem fetching the keys.
-	FetchKeys(ctx context.Context, requests map[PublicKeyRequest]Timestamp) (map[PublicKeyRequest]PublicKeyLookupResult, error)
+	FetchKeys(ctx context.Context, requests map[PublicKeyLookupRequest]Timestamp) (map[PublicKeyLookupRequest]PublicKeyLookupResult, error)
 
 	// FetcherName returns the name of this fetcher, which can then be used for
 	// logging errors etc.
@@ -77,7 +77,7 @@ type KeyDatabase interface {
 	// to a concurrent FetchKeys(). This is acceptable since the database is
 	// only used as a cache for the keys, so if a FetchKeys() races with a
 	// StoreKeys() and some of the keys are missing they will be just be refetched.
-	StoreKeys(ctx context.Context, results map[PublicKeyRequest]PublicKeyLookupResult) error
+	StoreKeys(ctx context.Context, results map[PublicKeyLookupRequest]PublicKeyLookupResult) error
 }
 
 // A KeyRing stores keys for matrix servers and provides methods for verifying JSON messages.
@@ -202,15 +202,15 @@ func (k *KeyRing) isAlgorithmSupported(keyID KeyID) bool {
 
 func (k *KeyRing) publicKeyRequests(
 	requests []VerifyJSONRequest, results []VerifyJSONResult, keyIDs [][]KeyID,
-) map[PublicKeyRequest]Timestamp {
-	keyRequests := map[PublicKeyRequest]Timestamp{}
+) map[PublicKeyLookupRequest]Timestamp {
+	keyRequests := map[PublicKeyLookupRequest]Timestamp{}
 	for i := range requests {
 		if results[i].Error == nil {
 			// We've already verified this message, we don't need to refetch the keys for it.
 			continue
 		}
 		for _, keyID := range keyIDs[i] {
-			k := PublicKeyRequest{requests[i].ServerName, keyID}
+			k := PublicKeyLookupRequest{requests[i].ServerName, keyID}
 			// Grab the maximum neeeded TS for this server and key ID.
 			// This will default to 0 if the server and keyID weren't in the map.
 			maxTS := keyRequests[k]
@@ -228,7 +228,7 @@ func (k *KeyRing) publicKeyRequests(
 
 func (k *KeyRing) checkUsingKeys(
 	requests []VerifyJSONRequest, results []VerifyJSONResult, keyIDs [][]KeyID,
-	keys map[PublicKeyRequest]PublicKeyLookupResult,
+	keys map[PublicKeyLookupRequest]PublicKeyLookupResult,
 ) {
 	for i := range requests {
 		if results[i].Error == nil {
@@ -237,7 +237,7 @@ func (k *KeyRing) checkUsingKeys(
 			continue
 		}
 		for _, keyID := range keyIDs[i] {
-			serverKey, ok := keys[PublicKeyRequest{requests[i].ServerName, keyID}]
+			serverKey, ok := keys[PublicKeyLookupRequest{requests[i].ServerName, keyID}]
 			if !ok {
 				// No key for this key ID so we continue onto the next key ID.
 				continue
@@ -282,14 +282,14 @@ func (p PerspectiveKeyFetcher) FetcherName() string {
 
 // FetchKeys implements KeyFetcher
 func (p *PerspectiveKeyFetcher) FetchKeys(
-	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
-) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
+	ctx context.Context, requests map[PublicKeyLookupRequest]Timestamp,
+) (map[PublicKeyLookupRequest]PublicKeyLookupResult, error) {
 	serverKeys, err := p.Client.LookupServerKeys(ctx, p.PerspectiveServerName, requests)
 	if err != nil {
 		return nil, err
 	}
 
-	results := map[PublicKeyRequest]PublicKeyLookupResult{}
+	results := map[PublicKeyLookupRequest]PublicKeyLookupResult{}
 
 	for _, keys := range serverKeys {
 		var valid bool
@@ -347,19 +347,19 @@ func (d DirectKeyFetcher) FetcherName() string {
 
 // FetchKeys implements KeyFetcher
 func (d *DirectKeyFetcher) FetchKeys(
-	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
-) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
-	byServer := map[ServerName]map[PublicKeyRequest]Timestamp{}
+	ctx context.Context, requests map[PublicKeyLookupRequest]Timestamp,
+) (map[PublicKeyLookupRequest]PublicKeyLookupResult, error) {
+	byServer := map[ServerName]map[PublicKeyLookupRequest]Timestamp{}
 	for req, ts := range requests {
 		server := byServer[req.ServerName]
 		if server == nil {
-			server = map[PublicKeyRequest]Timestamp{}
+			server = map[PublicKeyLookupRequest]Timestamp{}
 			byServer[req.ServerName] = server
 		}
 		server[req] = ts
 	}
 
-	results := map[PublicKeyRequest]PublicKeyLookupResult{}
+	results := map[PublicKeyLookupRequest]PublicKeyLookupResult{}
 	for server := range byServer {
 		// TODO: make these requests in parallel
 		serverResults, err := d.fetchKeysForServer(ctx, server)
@@ -376,7 +376,7 @@ func (d *DirectKeyFetcher) FetchKeys(
 
 func (d *DirectKeyFetcher) fetchKeysForServer(
 	ctx context.Context, serverName ServerName,
-) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
+) (map[PublicKeyLookupRequest]PublicKeyLookupResult, error) {
 	keys, err := d.Client.GetServerKeys(ctx, serverName)
 	if err != nil {
 		return nil, err
@@ -387,7 +387,7 @@ func (d *DirectKeyFetcher) fetchKeysForServer(
 		return nil, fmt.Errorf("gomatrixserverlib: key response direct from %q failed checks", serverName)
 	}
 
-	results := map[PublicKeyRequest]PublicKeyLookupResult{}
+	results := map[PublicKeyLookupRequest]PublicKeyLookupResult{}
 
 	// TODO (matrix-org/dendrite#345): What happens if the same key ID
 	// appears in multiple responses? We should probably reject the response.
@@ -397,11 +397,11 @@ func (d *DirectKeyFetcher) fetchKeysForServer(
 }
 
 // mapServerKeysToPublicKeyLookupResult takes the (verified) result from a
-// /key/v2/query call and inserts it into a PublicKeyRequest->PublicKeyLookupResult
+// /key/v2/query call and inserts it into a PublicKeyLookupRequest->PublicKeyLookupResult
 // map.
-func mapServerKeysToPublicKeyLookupResult(serverKeys ServerKeys, results map[PublicKeyRequest]PublicKeyLookupResult) {
+func mapServerKeysToPublicKeyLookupResult(serverKeys ServerKeys, results map[PublicKeyLookupRequest]PublicKeyLookupResult) {
 	for keyID, key := range serverKeys.VerifyKeys {
-		results[PublicKeyRequest{
+		results[PublicKeyLookupRequest{
 			ServerName: serverKeys.ServerName,
 			KeyID:      keyID,
 		}] = PublicKeyLookupResult{
@@ -411,7 +411,7 @@ func mapServerKeysToPublicKeyLookupResult(serverKeys ServerKeys, results map[Pub
 		}
 	}
 	for keyID, key := range serverKeys.OldVerifyKeys {
-		results[PublicKeyRequest{
+		results[PublicKeyLookupRequest{
 			ServerName: serverKeys.ServerName,
 			KeyID:      keyID,
 		}] = PublicKeyLookupResult{

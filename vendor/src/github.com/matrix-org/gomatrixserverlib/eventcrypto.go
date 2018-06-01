@@ -31,7 +31,7 @@ import (
 // This hash is used to detect whether the unredacted content of the event is valid.
 // Returns the event JSON with a "hashes" key added to it.
 func addContentHashesToEvent(eventJSON []byte) ([]byte, error) {
-	var event map[string]rawJSON
+	var event map[string]RawJSON
 
 	if err := json.Unmarshal(eventJSON, &event); err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func addContentHashesToEvent(eventJSON []byte) ([]byte, error) {
 	if len(unsignedJSON) > 0 {
 		event["unsigned"] = unsignedJSON
 	}
-	event["hashes"] = rawJSON(hashesJSON)
+	event["hashes"] = RawJSON(hashesJSON)
 
 	return json.Marshal(event)
 }
@@ -105,7 +105,7 @@ func referenceOfEvent(eventJSON []byte) (EventReference, error) {
 		return EventReference{}, err
 	}
 
-	var event map[string]rawJSON
+	var event map[string]RawJSON
 	if err = json.Unmarshal(redactedJSON, &event); err != nil {
 		return EventReference{}, err
 	}
@@ -150,14 +150,14 @@ func signEvent(signingName string, keyID KeyID, privateKey ed25519.PrivateKey, e
 	}
 
 	var signedEvent struct {
-		Signatures rawJSON `json:"signatures"`
+		Signatures RawJSON `json:"signatures"`
 	}
 	if err := json.Unmarshal(signedJSON, &signedEvent); err != nil {
 		return nil, err
 	}
 
 	// Unmarshal the event JSON so that we can replace the signatures key.
-	var event map[string]rawJSON
+	var event map[string]RawJSON
 	if err := json.Unmarshal(eventJSON, &event); err != nil {
 		return nil, err
 	}

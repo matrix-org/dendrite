@@ -79,8 +79,8 @@ func (s *serverKeyStatements) prepare(db *sql.DB) (err error) {
 
 func (s *serverKeyStatements) bulkSelectServerKeys(
 	ctx context.Context,
-	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
-) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	var nameAndKeyIDs []string
 	for request := range requests {
 		nameAndKeyIDs = append(nameAndKeyIDs, nameAndKeyID(request))
@@ -91,7 +91,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
-	results := map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.PublicKeyLookupResult{}
+	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	for rows.Next() {
 		var serverName string
 		var keyID string
@@ -101,7 +101,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 		if err = rows.Scan(&serverName, &keyID, &validUntilTS, &expiredTS, &key); err != nil {
 			return nil, err
 		}
-		r := gomatrixserverlib.PublicKeyRequest{
+		r := gomatrixserverlib.PublicKeyLookupRequest{
 			ServerName: gomatrixserverlib.ServerName(serverName),
 			KeyID:      gomatrixserverlib.KeyID(keyID),
 		}
@@ -121,7 +121,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 
 func (s *serverKeyStatements) upsertServerKeys(
 	ctx context.Context,
-	request gomatrixserverlib.PublicKeyRequest,
+	request gomatrixserverlib.PublicKeyLookupRequest,
 	key gomatrixserverlib.PublicKeyLookupResult,
 ) error {
 	_, err := s.upsertServerKeysStmt.ExecContext(
@@ -136,6 +136,6 @@ func (s *serverKeyStatements) upsertServerKeys(
 	return err
 }
 
-func nameAndKeyID(request gomatrixserverlib.PublicKeyRequest) string {
+func nameAndKeyID(request gomatrixserverlib.PublicKeyLookupRequest) string {
 	return string(request.ServerName) + "\x1F" + string(request.KeyID)
 }

@@ -195,7 +195,7 @@ func (r RespSendJoin) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaller
 func (r *RespSendJoin) UnmarshalJSON(data []byte) error {
-	var tuple []rawJSON
+	var tuple []RawJSON
 	if err := json.Unmarshal(data, &tuple); err != nil {
 		return err
 	}
@@ -306,7 +306,7 @@ func (r RespInvite) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaller
 func (r *RespInvite) UnmarshalJSON(data []byte) error {
-	var tuple []rawJSON
+	var tuple []RawJSON
 	if err := json.Unmarshal(data, &tuple); err != nil {
 		return err
 	}

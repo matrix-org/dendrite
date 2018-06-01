@@ -30,6 +30,7 @@ import (
 
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Default HTTPS request timeout
@@ -207,7 +208,7 @@ func (fc *Client) GetServerKeys(
 // copy of the keys.
 // Returns the keys returned by the server, or an error if there was a problem talking to the server.
 func (fc *Client) LookupServerKeys(
-	ctx context.Context, matrixServer ServerName, keyRequests map[PublicKeyRequest]Timestamp,
+	ctx context.Context, matrixServer ServerName, keyRequests map[PublicKeyLookupRequest]Timestamp,
 ) ([]ServerKeys, error) {
 	url := url.URL{
 		Scheme: "matrix",
@@ -332,18 +333,26 @@ func (fc *Client) DoRequestAndParseResponse(
 //
 func (fc *Client) DoHTTPRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	reqID := util.RandomString(12)
-	logger := util.GetLogger(ctx).WithField("server", req.URL.Host).WithField("out.req.ID", reqID)
+	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
+		"out.req.ID":     reqID,
+		"out.req.method": req.Method,
+		"out.req.uri":    req.URL,
+	})
+	logger.Info("Outgoing request")
 	newCtx := util.ContextWithLogger(ctx, logger)
 
-	logger.Infof("Outgoing request %s %s", req.Method, req.URL)
+	start := time.Now()
 	resp, err := fc.client.Do(req.WithContext(newCtx))
 	if err != nil {
-		logger.Infof("Outgoing request %s %s failed with %v", req.Method, req.URL, err)
+		logger.WithField("error", err).Warn("Outgoing request failed")
 		return nil, err
 	}
 
 	// we haven't yet read the body, so this is slightly premature, but it's the easiest place.
-	logger.Infof("Response %d from %s %s", resp.StatusCode, req.Method, req.URL)
+	logger.WithFields(logrus.Fields{
+		"out.req.code":        resp.StatusCode,
+		"out.req.duration_ms": int(time.Since(start) / time.Millisecond),
+	}).Info("Outgoing request returned")
 
 	return resp, nil
 }

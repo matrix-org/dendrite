@@ -69,9 +69,9 @@ type EventBuilder struct {
 	// The create event has a depth of 1.
 	Depth int64 `json:"depth"`
 	// The JSON object for "content" key of the event.
-	Content rawJSON `json:"content"`
+	Content RawJSON `json:"content"`
 	// The JSON object for the "unsigned" key
-	Unsigned rawJSON `json:"unsigned,omitempty"`
+	Unsigned RawJSON `json:"unsigned,omitempty"`
 }
 
 // SetContent sets the JSON content key of the event.
@@ -102,12 +102,12 @@ type eventFields struct {
 	Sender         string           `json:"sender"`
 	Type           string           `json:"type"`
 	StateKey       *string          `json:"state_key"`
-	Content        rawJSON          `json:"content"`
+	Content        RawJSON          `json:"content"`
 	PrevEvents     []EventReference `json:"prev_events"`
 	AuthEvents     []EventReference `json:"auth_events"`
 	Redacts        string           `json:"redacts"`
 	Depth          int64            `json:"depth"`
-	Unsigned       rawJSON          `json:"unsigned"`
+	Unsigned       RawJSON          `json:"unsigned"`
 	OriginServerTS Timestamp        `json:"origin_server_ts"`
 	Origin         ServerName       `json:"origin"`
 }
@@ -284,7 +284,7 @@ func (e Event) Redact() Event {
 // SetUnsigned sets the unsigned key of the event.
 // Returns a copy of the event with the "unsigned" key set.
 func (e Event) SetUnsigned(unsigned interface{}) (Event, error) {
-	var eventAsMap map[string]rawJSON
+	var eventAsMap map[string]RawJSON
 	var err error
 	if err = json.Unmarshal(e.eventJSON, &eventAsMap); err != nil {
 		return Event{}, err
@@ -326,7 +326,7 @@ func (e *Event) SetUnsignedField(path string, value interface{}) error {
 	eventJSON = CanonicalJSONAssumeValid(eventJSON)
 
 	res := gjson.GetBytes(eventJSON, "unsigned")
-	unsigned := rawJSONFromResult(res, eventJSON)
+	unsigned := RawJSONFromResult(res, eventJSON)
 
 	e.eventJSON = eventJSON
 	e.fields.Unsigned = unsigned
@@ -617,7 +617,7 @@ func (e Event) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaller
 func (er *EventReference) UnmarshalJSON(data []byte) error {
-	var tuple []rawJSON
+	var tuple []RawJSON
 	if err := json.Unmarshal(data, &tuple); err != nil {
 		return err
 	}

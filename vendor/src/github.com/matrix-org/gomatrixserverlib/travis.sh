@@ -16,5 +16,6 @@ go get -u \
    github.com/tidwall/sjson \
    github.com/pkg/errors \
    gopkg.in/yaml.v2 \
-   
+   gopkg.in/macaroon.v2 \
+
 ./hooks/pre-commit

@@ -23,7 +23,7 @@ git checkout-index -a
 
 echo "Installing lint search engine..."
 go get github.com/alecthomas/gometalinter/
-gometalinter --config=linter.json --install --update
+gometalinter --config=linter.json --install --update --debug
 
 echo "Testing..."
 go test
