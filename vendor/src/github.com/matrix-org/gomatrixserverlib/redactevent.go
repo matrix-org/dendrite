@@ -19,16 +19,16 @@ import (
 	"encoding/json"
 )
 
-// rawJSON is a reimplementation of json.RawMessage that supports being used as a value type
+// RawJSON is a reimplementation of json.RawMessage that supports being used as a value type
 //
 // For example:
 //
 //  jsonBytes, _ := json.Marshal(struct{
 //		RawMessage json.RawMessage
-//		RawJSON rawJSON
+//		RawJSON RawJSON
 //	}{
 //		json.RawMessage(`"Hello"`),
-//		rawJSON(`"World"`),
+//		RawJSON(`"World"`),
 //	})
 //
 // Results in:
@@ -36,17 +36,17 @@ import (
 //  {"RawMessage":"IkhlbGxvIg==","RawJSON":"World"}
 //
 // See https://play.golang.org/p/FzhKIJP8-I for a full example.
-type rawJSON []byte
+type RawJSON []byte
 
 // MarshalJSON implements the json.Marshaller interface using a value receiver.
-// This means that rawJSON used as an embedded value will still encode correctly.
-func (r rawJSON) MarshalJSON() ([]byte, error) {
+// This means that RawJSON used as an embedded value will still encode correctly.
+func (r RawJSON) MarshalJSON() ([]byte, error) {
 	return []byte(r), nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface using a pointer receiver.
-func (r *rawJSON) UnmarshalJSON(data []byte) error {
-	*r = rawJSON(data)
+func (r *RawJSON) UnmarshalJSON(data []byte) error {
+	*r = RawJSON(data)
 	return nil
 }
 
@@ -58,45 +58,45 @@ func redactEvent(eventJSON []byte) ([]byte, error) {
 	// Create events need to keep the creator.
 	// (In an ideal world they would keep the m.federate flag see matrix-org/synapse#1831)
 	type createContent struct {
-		Creator rawJSON `json:"creator,omitempty"`
+		Creator RawJSON `json:"creator,omitempty"`
 	}
 
 	// joinRulesContent keeps the fields needed in a m.room.join_rules event.
 	// Join rules events need to keep the join_rule key.
 	type joinRulesContent struct {
-		JoinRule rawJSON `json:"join_rule,omitempty"`
+		JoinRule RawJSON `json:"join_rule,omitempty"`
 	}
 
 	// powerLevelContent keeps the fields needed in a m.room.power_levels event.
 	// Power level events need to keep all the levels.
 	type powerLevelContent struct {
-		Users         rawJSON `json:"users,omitempty"`
-		UsersDefault  rawJSON `json:"users_default,omitempty"`
-		Events        rawJSON `json:"events,omitempty"`
-		EventsDefault rawJSON `json:"events_default,omitempty"`
-		StateDefault  rawJSON `json:"state_default,omitempty"`
-		Ban           rawJSON `json:"ban,omitempty"`
-		Kick          rawJSON `json:"kick,omitempty"`
-		Redact        rawJSON `json:"redact,omitempty"`
+		Users         RawJSON `json:"users,omitempty"`
+		UsersDefault  RawJSON `json:"users_default,omitempty"`
+		Events        RawJSON `json:"events,omitempty"`
+		EventsDefault RawJSON `json:"events_default,omitempty"`
+		StateDefault  RawJSON `json:"state_default,omitempty"`
+		Ban           RawJSON `json:"ban,omitempty"`
+		Kick          RawJSON `json:"kick,omitempty"`
+		Redact        RawJSON `json:"redact,omitempty"`
 	}
 
 	// memberContent keeps the fields needed in a m.room.member event.
 	// Member events keep the membership.
 	// (In an ideal world they would keep the third_party_invite see matrix-org/synapse#1831)
 	type memberContent struct {
-		Membership rawJSON `json:"membership,omitempty"`
+		Membership RawJSON `json:"membership,omitempty"`
 	}
 
 	// aliasesContent keeps the fields needed in a m.room.aliases event.
 	// TODO: Alias events probably don't need to keep the aliases key, but we need to match synapse here.
 	type aliasesContent struct {
-		Aliases rawJSON `json:"aliases,omitempty"`
+		Aliases RawJSON `json:"aliases,omitempty"`
 	}
 
 	// historyVisibilityContent keeps the fields needed in a m.room.history_visibility event
 	// History visibility events need to keep the history_visibility key.
 	type historyVisibilityContent struct {
-		HistoryVisibility rawJSON `json:"history_visibility,omitempty"`
+		HistoryVisibility RawJSON `json:"history_visibility,omitempty"`
 	}
 
 	// allContent keeps the union of all the content fields needed across all the event types.
@@ -114,21 +114,21 @@ func redactEvent(eventJSON []byte) ([]byte, error) {
 	// (In an ideal world they would include the "redacts" key for m.room.redaction events, see matrix-org/synapse#1831)
 	// See https://github.com/matrix-org/synapse/blob/v0.18.7/synapse/events/utils.py#L42-L56 for the list of fields
 	type eventFields struct {
-		EventID        rawJSON    `json:"event_id,omitempty"`
-		Sender         rawJSON    `json:"sender,omitempty"`
-		RoomID         rawJSON    `json:"room_id,omitempty"`
-		Hashes         rawJSON    `json:"hashes,omitempty"`
-		Signatures     rawJSON    `json:"signatures,omitempty"`
+		EventID        RawJSON    `json:"event_id,omitempty"`
+		Sender         RawJSON    `json:"sender,omitempty"`
+		RoomID         RawJSON    `json:"room_id,omitempty"`
+		Hashes         RawJSON    `json:"hashes,omitempty"`
+		Signatures     RawJSON    `json:"signatures,omitempty"`
 		Content        allContent `json:"content"`
 		Type           string     `json:"type"`
-		StateKey       rawJSON    `json:"state_key,omitempty"`
-		Depth          rawJSON    `json:"depth,omitempty"`
-		PrevEvents     rawJSON    `json:"prev_events,omitempty"`
-		PrevState      rawJSON    `json:"prev_state,omitempty"`
-		AuthEvents     rawJSON    `json:"auth_events,omitempty"`
-		Origin         rawJSON    `json:"origin,omitempty"`
-		OriginServerTS rawJSON    `json:"origin_server_ts,omitempty"`
-		Membership     rawJSON    `json:"membership,omitempty"`
+		StateKey       RawJSON    `json:"state_key,omitempty"`
+		Depth          RawJSON    `json:"depth,omitempty"`
+		PrevEvents     RawJSON    `json:"prev_events,omitempty"`
+		PrevState      RawJSON    `json:"prev_state,omitempty"`
+		AuthEvents     RawJSON    `json:"auth_events,omitempty"`
+		Origin         RawJSON    `json:"origin,omitempty"`
+		OriginServerTS RawJSON    `json:"origin_server_ts,omitempty"`
+		Membership     RawJSON    `json:"membership,omitempty"`
 	}
 
 	var event eventFields

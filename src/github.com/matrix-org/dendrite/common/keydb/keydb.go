@@ -52,15 +52,15 @@ func (d Database) FetcherName() string {
 // FetchKeys implements gomatrixserverlib.KeyDatabase
 func (d *Database) FetchKeys(
 	ctx context.Context,
-	requests map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.Timestamp,
-) (map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	return d.statements.bulkSelectServerKeys(ctx, requests)
 }
 
 // StoreKeys implements gomatrixserverlib.KeyDatabase
 func (d *Database) StoreKeys(
 	ctx context.Context,
-	keyMap map[gomatrixserverlib.PublicKeyRequest]gomatrixserverlib.PublicKeyLookupResult,
+	keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
 	// TODO: Inserting all the keys within a single transaction may
 	// be more efficient since the transaction overhead can be quite

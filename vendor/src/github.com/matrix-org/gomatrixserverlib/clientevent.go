@@ -28,7 +28,7 @@ const (
 
 // ClientEvent is an event which is fit for consumption by clients, in accordance with the specification.
 type ClientEvent struct {
-	Content        rawJSON   `json:"content"`
+	Content        RawJSON   `json:"content"`
 	EventID        string    `json:"event_id"`
 	OriginServerTS Timestamp `json:"origin_server_ts"`
 	// RoomID is omitted on /sync responses
@@ -36,7 +36,7 @@ type ClientEvent struct {
 	Sender   string  `json:"sender"`
 	StateKey *string `json:"state_key,omitempty"`
 	Type     string  `json:"type"`
-	Unsigned rawJSON `json:"unsigned,omitempty"`
+	Unsigned RawJSON `json:"unsigned,omitempty"`
 }
 
 // ToClientEvents converts server events to client events.
@@ -51,11 +51,11 @@ func ToClientEvents(serverEvs []Event, format EventFormat) []ClientEvent {
 // ToClientEvent converts a single server event to a client event.
 func ToClientEvent(se Event, format EventFormat) ClientEvent {
 	ce := ClientEvent{
-		Content:        rawJSON(se.Content()),
+		Content:        RawJSON(se.Content()),
 		Sender:         se.Sender(),
 		Type:           se.Type(),
 		StateKey:       se.StateKey(),
-		Unsigned:       rawJSON(se.Unsigned()),
+		Unsigned:       RawJSON(se.Unsigned()),
 		OriginServerTS: se.OriginServerTS(),
 		EventID:        se.EventID(),
 	}

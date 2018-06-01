@@ -21,7 +21,7 @@ type FederationRequest struct {
 	// fields implement the JSON format needed for signing
 	// specified in https://matrix.org/docs/spec/server_server/unstable.html#request-authentication
 	fields struct {
-		Content     rawJSON                         `json:"content,omitempty"`
+		Content     RawJSON                         `json:"content,omitempty"`
 		Destination ServerName                      `json:"destination"`
 		Method      string                          `json:"method"`
 		Origin      ServerName                      `json:"origin"`
@@ -56,7 +56,7 @@ func (r *FederationRequest) SetContent(content interface{}) error {
 	if err != nil {
 		return err
 	}
-	r.fields.Content = rawJSON(data)
+	r.fields.Content = RawJSON(data)
 	return nil
 }
 
@@ -252,7 +252,7 @@ func readHTTPRequest(req *http.Request) (*FederationRequest, error) { // nolint:
 				req.Header.Get("Content-Type"),
 			)
 		}
-		result.fields.Content = rawJSON(content)
+		result.fields.Content = RawJSON(content)
 	}
 
 	for _, authorization := range req.Header["Authorization"] {

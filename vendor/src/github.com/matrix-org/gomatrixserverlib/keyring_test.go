@@ -41,12 +41,12 @@ func (db testKeyDatabase) FetcherName() string {
 }
 
 func (db *testKeyDatabase) FetchKeys(
-	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
-) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
-	results := map[PublicKeyRequest]PublicKeyLookupResult{}
+	ctx context.Context, requests map[PublicKeyLookupRequest]Timestamp,
+) (map[PublicKeyLookupRequest]PublicKeyLookupResult, error) {
+	results := map[PublicKeyLookupRequest]PublicKeyLookupResult{}
 
-	req1 := PublicKeyRequest{"localhost:8800", "ed25519:old"}
-	req2 := PublicKeyRequest{"localhost:8800", "ed25519:a_Obwu"}
+	req1 := PublicKeyLookupRequest{"localhost:8800", "ed25519:old"}
+	req2 := PublicKeyLookupRequest{"localhost:8800", "ed25519:a_Obwu"}
 
 	for req := range requests {
 		if req == req1 {
@@ -79,7 +79,7 @@ func (db *testKeyDatabase) FetchKeys(
 }
 
 func (db *testKeyDatabase) StoreKeys(
-	ctx context.Context, requests map[PublicKeyRequest]PublicKeyLookupResult,
+	ctx context.Context, requests map[PublicKeyLookupRequest]PublicKeyLookupResult,
 ) error {
 	return nil
 }
@@ -161,13 +161,13 @@ func (e erroringKeyDatabase) FetcherName() string {
 }
 
 func (e *erroringKeyDatabase) FetchKeys(
-	ctx context.Context, requests map[PublicKeyRequest]Timestamp,
-) (map[PublicKeyRequest]PublicKeyLookupResult, error) {
+	ctx context.Context, requests map[PublicKeyLookupRequest]Timestamp,
+) (map[PublicKeyLookupRequest]PublicKeyLookupResult, error) {
 	return nil, &testErrorFetch
 }
 
 func (e *erroringKeyDatabase) StoreKeys(
-	ctx context.Context, keys map[PublicKeyRequest]PublicKeyLookupResult,
+	ctx context.Context, keys map[PublicKeyLookupRequest]PublicKeyLookupResult,
 ) error {
 	return &testErrorStore
 }

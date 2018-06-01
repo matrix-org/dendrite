@@ -52,7 +52,7 @@ func stateNeededEquals(a, b StateNeeded) bool {
 type testEventList []Event
 
 func (tel *testEventList) UnmarshalJSON(data []byte) error {
-	var eventJSONs []rawJSON
+	var eventJSONs []RawJSON
 	var events []Event
 	if err := json.Unmarshal([]byte(data), &eventJSONs); err != nil {
 		return err
@@ -997,7 +997,7 @@ func TestRedactAllowed(t *testing.T) {
 }
 
 func TestAuthEvents(t *testing.T) {
-	power, err := NewEventFromTrustedJSON(rawJSON(`{
+	power, err := NewEventFromTrustedJSON(RawJSON(`{
 		"type": "m.room.power_levels",
 		"state_key": "",
 		"sender": "@u1:a",
@@ -1018,7 +1018,7 @@ func TestAuthEvents(t *testing.T) {
 	if e, err = a.PowerLevels(); err != nil || e != &power {
 		t.Errorf("TestAuthEvents: failed to get same power_levels event")
 	}
-	create, err := NewEventFromTrustedJSON(rawJSON(`{
+	create, err := NewEventFromTrustedJSON(RawJSON(`{
 		"type": "m.room.create",
 		"state_key": "",
 		"sender": "@u1:a",

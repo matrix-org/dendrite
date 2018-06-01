@@ -17,10 +17,10 @@ package gomatrixserverlib
 
 import (
 	"encoding/binary"
+	"fmt"
 	"sort"
 	"unicode/utf8"
 
-	"github.com/pkg/errors"
 	"github.com/tidwall/gjson"
 )
 
@@ -29,7 +29,7 @@ import (
 // https://matrix.org/docs/spec/server_server/unstable.html#canonical-json
 func CanonicalJSON(input []byte) ([]byte, error) {
 	if !gjson.Valid(string(input)) {
-		return nil, errors.Errorf("invalid json")
+		return nil, fmt.Errorf("invalid json")
 	}
 
 	return CanonicalJSONAssumeValid(input), nil
@@ -47,8 +47,8 @@ func CanonicalJSONAssumeValid(input []byte) []byte {
 func SortJSON(input, output []byte) []byte {
 	result := gjson.ParseBytes(input)
 
-	rawJSON := rawJSONFromResult(result, input)
-	return sortJSONValue(result, rawJSON, output)
+	RawJSON := RawJSONFromResult(result, input)
+	return sortJSONValue(result, RawJSON, output)
 }
 
 // sortJSONValue takes a gjson.Result and sorts it. inputJSON must be the
@@ -77,8 +77,8 @@ func sortJSONArray(input gjson.Result, inputJSON, output []byte) []byte {
 		output = append(output, sep)
 		sep = ','
 
-		rawJSON := rawJSONFromResult(value, inputJSON)
-		output = sortJSONValue(value, rawJSON, output)
+		RawJSON := RawJSONFromResult(value, inputJSON)
+		output = sortJSONValue(value, RawJSON, output)
 
 		return true // keep iterating
 	})
@@ -110,7 +110,7 @@ func sortJSONObject(input gjson.Result, inputJSON, output []byte) []byte {
 	input.ForEach(func(key, value gjson.Result) bool {
 		entries = append(entries, entry{
 			key:    key.String(),
-			rawKey: rawJSONFromResult(key, inputJSON),
+			rawKey: RawJSONFromResult(key, inputJSON),
 			value:  value,
 		})
 		return true // keep iterating
@@ -131,9 +131,9 @@ func sortJSONObject(input gjson.Result, inputJSON, output []byte) []byte {
 		output = append(output, entry.rawKey...)
 		output = append(output, ':')
 
-		rawJSON := rawJSONFromResult(entry.value, inputJSON)
+		RawJSON := RawJSONFromResult(entry.value, inputJSON)
 
-		output = sortJSONValue(entry.value, rawJSON, output)
+		output = sortJSONValue(entry.value, RawJSON, output)
 	}
 	if sep == '{' {
 		// If sep is still '{' then the object was empty and we never wrote the
@@ -263,17 +263,17 @@ func readHexDigits(input []byte) uint32 {
 	return hex & 0xFFFF
 }
 
-// rawJSONFromResult extracts the raw JSON bytes pointed to by result.
+// RawJSONFromResult extracts the raw JSON bytes pointed to by result.
 // input must be the json bytes that were used to generate result
-func rawJSONFromResult(result gjson.Result, input []byte) (rawJSON []byte) {
+func RawJSONFromResult(result gjson.Result, input []byte) (RawJSON []byte) {
 	// This is lifted from gjson README. Basically, result.Raw is a copy of
 	// the bytes we want, but its more efficient to take a slice.
 	// If Index is 0 then for some reason we can't extract it from the original
 	// JSON bytes.
 	if result.Index > 0 {
-		rawJSON = input[result.Index : result.Index+len(result.Raw)]
+		RawJSON = input[result.Index : result.Index+len(result.Raw)]
 	} else {
-		rawJSON = []byte(result.Raw)
+		RawJSON = []byte(result.Raw)
 	}
 
 	return
