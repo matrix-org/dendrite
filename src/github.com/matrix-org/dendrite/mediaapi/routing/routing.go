@@ -17,6 +17,7 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 
 	"github.com/gorilla/mux"
@@ -45,11 +46,12 @@ func Setup(
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
 	}
+	authData := auth.Data{nil, deviceDB, nil}
 
 	// TODO: Add AS support
 	r0mux.Handle("/upload", common.MakeAuthAPI(
-		"upload", nil, deviceDB, nil,
-		func(req *http.Request, _ string, _ *authtypes.Device) util.JSONResponse {
+		"upload", authData,
+		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
 			return Upload(req, cfg, db, activeThumbnailGeneration)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
