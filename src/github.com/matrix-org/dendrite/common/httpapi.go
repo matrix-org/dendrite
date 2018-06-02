@@ -6,7 +6,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -14,18 +13,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which checks the access token in the request.
+// MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
-	metricsName string, accountDB auth.AccountDatabase, deviceDB auth.DeviceDatabase,
-	appServices []config.ApplicationService, f func(*http.Request, string, *authtypes.Device) util.JSONResponse) http.Handler {
+	metricsName string, data auth.Data,
+	f func(*http.Request, *authtypes.Device) util.JSONResponse,
+) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		user, device, err := auth.VerifyUserFromRequest(req, accountDB, deviceDB, appServices)
-
+		device, err := auth.VerifyUserFromRequest(req, data)
 		if err != nil {
 			return *err
 		}
-		// device is nil for AS virtual users, as they do not have a device in database
-		return f(req, user, device)
+
+		return f(req, device)
 	}
 	return MakeExternalAPI(metricsName, h)
 }

@@ -48,17 +48,24 @@ type AccountDatabase interface {
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*authtypes.Account, error)
 }
 
+// Data contains information required to authenticate a request.
+type Data struct {
+	AccountDB AccountDatabase
+	DeviceDB  DeviceDatabase
+	// AppServices is the list of all registered AS
+	AppServices []config.ApplicationService
+}
+
 // VerifyUserFromRequest authenticates the HTTP request,
 // on success returns UserID, Device of the requester.
 // Finds local user or an application service user.
 // Note: For an AS user, AS dummy device is returned.
 // On failure returns an JSON error response which can be sent to the client.
 func VerifyUserFromRequest(
-	req *http.Request, accountDB AccountDatabase, deviceDB DeviceDatabase,
-	applicationServices []config.ApplicationService,
+	req *http.Request, data Data,
 ) (*authtypes.Device, *util.JSONResponse) {
 	// Try to find local user from device database
-	dev, devErr := verifyAccessToken(req, deviceDB)
+	dev, devErr := verifyAccessToken(req, data.DeviceDB)
 	if devErr == nil {
 		return dev, nil
 	}
@@ -74,7 +81,7 @@ func VerifyUserFromRequest(
 
 	// Search for app service with given access_token
 	var appService *config.ApplicationService
-	for _, as := range applicationServices {
+	for _, as := range data.AppServices {
 		if as.ASToken == token {
 			appService = &as
 			break
@@ -92,13 +99,14 @@ func VerifyUserFromRequest(
 		}
 
 		// Verify that the user is registered
-		account, accountErr := accountDB.GetAccountByLocalpart(req.Context(), localpart)
+		account, err := data.AccountDB.GetAccountByLocalpart(req.Context(), localpart)
+
 		// Verify that account exists & appServiceID matches
-		if accountErr == nil && account.AppServiceID == appService.ID {
+		if err == nil && account.AppServiceID == appService.ID {
 			// Create a dummy device for AS user
 			dev := authtypes.Device{
-				// AS_Device signifies a AS dummy device
-				ID: "ASDEVICE",
+				// Use AS dummy device ID
+				ID: "AS_Device",
 				// User the AS is masquerading as.
 				UserID: userID,
 				// AS dummy device has AS's token.
