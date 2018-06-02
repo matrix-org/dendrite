@@ -57,7 +57,7 @@ type Data struct {
 }
 
 // VerifyUserFromRequest authenticates the HTTP request,
-// on success returns UserID, Device of the requester.
+// on success returns Device of the requester.
 // Finds local user or an application service user.
 // Note: For an AS user, AS dummy device is returned.
 // On failure returns an JSON error response which can be sent to the client.
