@@ -51,24 +51,22 @@ type AccountDatabase interface {
 // VerifyUserFromRequest authenticates the HTTP request,
 // on success returns UserID, Device of the requester.
 // Finds local user or an application service user.
-// Note: For an AS user, Device is not present.
+// Note: For an AS user, AS dummy device is returned.
 // On failure returns an JSON error response which can be sent to the client.
 func VerifyUserFromRequest(
 	req *http.Request, accountDB AccountDatabase, deviceDB DeviceDatabase,
 	applicationServices []config.ApplicationService,
-) (string, *authtypes.Device, *util.JSONResponse) {
+) (*authtypes.Device, *util.JSONResponse) {
 	// Try to find local user from device database
 	dev, devErr := verifyAccessToken(req, deviceDB)
-
 	if devErr == nil {
-		return dev.UserID, dev, nil
+		return dev, nil
 	}
 
 	// Try to find the Application Service user
 	token, err := extractAccessToken(req)
-
 	if err != nil {
-		return "", nil, &util.JSONResponse{
+		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: jsonerror.MissingToken(err.Error()),
 		}
@@ -86,9 +84,8 @@ func VerifyUserFromRequest(
 	if appService != nil {
 		userID := req.URL.Query().Get("user_id")
 		localpart, err := userutil.ParseUsernameParam(userID, nil)
-
 		if err != nil {
-			return "", nil, &util.JSONResponse{
+			return nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidUsername(err.Error()),
 			}
@@ -96,19 +93,28 @@ func VerifyUserFromRequest(
 
 		// Verify that the user is registered
 		account, accountErr := accountDB.GetAccountByLocalpart(req.Context(), localpart)
-
 		// Verify that account exists & appServiceID matches
 		if accountErr == nil && account.AppServiceID == appService.ID {
-			return userID, nil, nil
+			// Create a dummy device for AS user
+			dev := authtypes.Device{
+				// AS_Device signifies a AS dummy device
+				ID: "ASDEVICE",
+				// User the AS is masquerading as.
+				UserID: userID,
+				// AS dummy device has AS's token.
+				AccessToken: token,
+			}
+
+			return &dev, nil
 		}
 
-		return "", nil, &util.JSONResponse{
+		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("Application service has not registered this user"),
 		}
 	}
 
-	return "", nil, &util.JSONResponse{
+	return nil, &util.JSONResponse{
 		Code: http.StatusUnauthorized,
 		JSON: jsonerror.UnknownToken("Unrecognized access token"),
 	}
