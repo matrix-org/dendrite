@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	// Import the postgres database driver.
@@ -343,7 +342,7 @@ func (d *Database) GetThreePIDsForLocalpart(
 // or if there was an error talking to the database.
 func (d *Database) GetFilter(
 	ctx context.Context, localpart string, filterID string,
-) (*gomatrix.Filter, error) {
+) (*gomatrixserverlib.Filter, error) {
 	return d.filter.selectFilter(ctx, localpart, filterID)
 }
 
@@ -351,7 +350,7 @@ func (d *Database) GetFilter(
 // Returns the filterID as a string. Otherwise returns an error if something
 // goes wrong.
 func (d *Database) PutFilter(
-	ctx context.Context, localpart string, filter *gomatrix.Filter,
+	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
 ) (string, error) {
 	return d.filter.insertFilter(ctx, filter, localpart)
 }

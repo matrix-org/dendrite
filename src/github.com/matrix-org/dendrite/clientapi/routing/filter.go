@@ -21,7 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -90,7 +89,7 @@ func PutFilter(
 		return httputil.LogThenError(req, err)
 	}
 
-	var filter gomatrix.Filter
+	var filter gomatrixserverlib.Filter
 
 	if reqErr := httputil.UnmarshalJSONRequest(req, &filter); reqErr != nil {
 		return *reqErr

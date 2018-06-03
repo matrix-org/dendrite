@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -73,7 +72,7 @@ func (s *filterStatements) prepare(db *sql.DB) (err error) {
 
 func (s *filterStatements) selectFilter(
 	ctx context.Context, localpart string, filterID string,
-) (*gomatrix.Filter, error) {
+) (*gomatrixserverlib.Filter, error) {
 	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
 	err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
@@ -82,7 +81,7 @@ func (s *filterStatements) selectFilter(
 	}
 
 	// Unmarshal JSON into Filter struct
-	var filter gomatrix.Filter
+	var filter gomatrixserverlib.Filter
 	if err = json.Unmarshal(filterData, &filter); err != nil {
 		return nil, err
 	}
@@ -90,7 +89,7 @@ func (s *filterStatements) selectFilter(
 }
 
 func (s *filterStatements) insertFilter(
-	ctx context.Context, filter *gomatrix.Filter, localpart string,
+	ctx context.Context, filter *gomatrixserverlib.Filter, localpart string,
 ) (filterID string, err error) {
 	var existingFilterID string
 
