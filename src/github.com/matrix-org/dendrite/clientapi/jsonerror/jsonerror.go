@@ -112,7 +112,8 @@ func UserInUse(msg string) *MatrixError {
 
 // ASExclusive is an error returned when an application service tries to
 // register an username that is outside of its registered namespace, or if a
-// user attempts to register a username within an exclusive namespace
+// user attempts to register a username or room alias within an exclusive
+// namespace.
 func ASExclusive(msg string) *MatrixError {
 	return &MatrixError{"M_EXCLUSIVE", msg}
 }

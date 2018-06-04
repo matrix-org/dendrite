@@ -113,6 +113,23 @@ func SetLocalAlias(
 		}
 	}
 
+	// Check that the alias does not fall within an exclusive namespace of an
+	// application service
+	for _, appservice := range cfg.Derived.ApplicationServices {
+		for key, namespaceMaps := range appservice.NamespaceMap {
+			if key == "aliases" {
+				for _, namespace := range namespaceMaps {
+					if namespace.Exclusive && namespace.RegexpObject.MatchString(alias) {
+						return util.JSONResponse{
+							Code: http.StatusBadRequest,
+							JSON: jsonerror.ASExclusive("Alias is reserved by an application service"),
+						}
+					}
+				}
+			}
+		}
+	}
+
 	var r struct {
 		RoomID string `json:"room_id"`
 	}
