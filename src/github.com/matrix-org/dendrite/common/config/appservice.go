@@ -31,6 +31,14 @@ type ApplicationServiceNamespace struct {
 	Exclusive bool `yaml:"exclusive"`
 	// A regex pattern that represents the namespace
 	Regex string `yaml:"regex"`
+	// The ID of an existing group that all users of this application service will
+	// be added to. This field is only relevant to the `users` namespace.
+	// Note that users who are joined to this group through an application service
+	// are not to be listed when querying for the group's members, however the
+	// group should be listed when querying an application service user's groups.
+	// This is to prevent making spamming all users of an application service
+	// trivial.
+	GroupID string `yaml:"group_id"`
 	// Regex object representing our pattern. Saves having to recompile every time
 	RegexpObject *regexp.Regexp
 }
@@ -51,6 +59,10 @@ type ApplicationService struct {
 	// Information about an application service's namespaces. Key is either
 	// "users", "aliases" or "rooms"
 	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
+	// Whether rate limiting is applied to each application service user
+	RateLimited bool `yaml:"rate_limited`
+	// Any custom protocols that this application service provides (e.g. IRC)
+	Protocols []string `yaml:"protocols"`
 }
 
 // loadAppservices iterates through all application service config files
@@ -163,6 +175,19 @@ func checkErrors(config *Dendrite) (err error) {
 
 	// Check each application service for any config errors
 	for _, appservice := range config.Derived.ApplicationServices {
+		// Check if GroupID is in the correct format
+		for _, userNamespace := range appservice.NamespaceMap["users"] {
+			if userNamespace.GroupID != "" {
+				correctFormat, err := regexp.MatchString("\\+.*:.*", userNamespace.GroupID)
+				if err != nil || !correctFormat {
+					return configErrors([]string{fmt.Sprintf(
+						"Invalid user group_id field for application service %s.",
+						appservice.ID,
+					)})
+				}
+			}
+		}
+
 		// Check if we've already seen this ID. No two application services
 		// can have the same ID or token.
 		if idMap[appservice.ID] {

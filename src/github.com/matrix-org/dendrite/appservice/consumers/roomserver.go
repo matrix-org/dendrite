@@ -182,6 +182,12 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(ctx context.Context, ev
 // appserviceIsInterestedInEvent returns a boolean depending on whether a given
 // event falls within one of a given application service's namespaces.
 func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event gomatrixserverlib.Event, appservice config.ApplicationService) bool {
+	// No reason to queue events if they'll never be sent to the application
+	// service
+	if appservice.URL == "" {
+		return false
+	}
+
 	// Check sender of the event
 	for _, userNamespace := range appservice.NamespaceMap["users"] {
 		if userNamespace.RegexpObject.MatchString(event.Sender()) {
