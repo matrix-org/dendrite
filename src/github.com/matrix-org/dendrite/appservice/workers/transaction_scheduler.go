@@ -69,7 +69,8 @@ func SetupTransactionWorkers(
 	return nil
 }
 
-// worker is a goroutine that
+// worker is a goroutine that sends any queued events to the application service
+// it is given.
 func worker(db *storage.Database, as config.ApplicationService, ecm map[string]int) {
 	// Initialize transaction ID counter
 	var err error
