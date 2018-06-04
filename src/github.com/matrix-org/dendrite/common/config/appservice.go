@@ -60,7 +60,7 @@ type ApplicationService struct {
 	// "users", "aliases" or "rooms"
 	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
 	// Whether rate limiting is applied to each application service user
-	RateLimited bool `yaml:"rate_limited`
+	RateLimited bool `yaml:"rate_limited"`
 	// Any custom protocols that this application service provides (e.g. IRC)
 	Protocols []string `yaml:"protocols"`
 }
@@ -173,17 +173,29 @@ func checkErrors(config *Dendrite) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
 
+	// Compile regexp object for checking groupIDs
+	groupIDRegexp := regexp.MustCompile(`\+.*:.*`)
+
 	// Check each application service for any config errors
 	for _, appservice := range config.Derived.ApplicationServices {
-		// Check if GroupID is in the correct format
-		for _, userNamespace := range appservice.NamespaceMap["users"] {
-			if userNamespace.GroupID != "" {
-				correctFormat, err := regexp.MatchString("\\+.*:.*", userNamespace.GroupID)
-				if err != nil || !correctFormat {
+		// Check that namespace(s) are valid regex
+		for key, namespaceSlice := range appservice.NamespaceMap {
+			for _, namespace := range namespaceSlice {
+				if !IsValidRegex(namespace.Regex) {
 					return configErrors([]string{fmt.Sprintf(
-						"Invalid user group_id field for application service %s.",
-						appservice.ID,
+						"Invalid regex string for Application Service %s", appservice.ID,
 					)})
+				}
+
+				// Check if GroupID for the users namespace is in the correct format
+				if key == "users" && namespace.GroupID != "" {
+					correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
+					if !correctFormat {
+						return configErrors([]string{fmt.Sprintf(
+							"Invalid user group_id field for application service %s.",
+							appservice.ID,
+						)})
+					}
 				}
 			}
 		}
@@ -216,19 +228,6 @@ func checkErrors(config *Dendrite) (err error) {
 				return configErrors([]string{fmt.Sprintf(
 					"Application Service namespace can only contain a single regex tuple. Check your YAML.",
 				)})
-			}
-		}
-	}
-
-	// Check that namespace(s) are valid regex
-	for _, appservice := range config.Derived.ApplicationServices {
-		for _, namespaceSlice := range appservice.NamespaceMap {
-			for _, namespace := range namespaceSlice {
-				if !IsValidRegex(namespace.Regex) {
-					return configErrors([]string{fmt.Sprintf(
-						"Invalid regex string for Application Service %s", appservice.ID,
-					)})
-				}
 			}
 		}
 	}
