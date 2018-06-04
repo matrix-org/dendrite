@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -45,7 +44,7 @@ func OnIncomingStateRequest(req *http.Request, db *storage.SyncServerDatabase, r
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 
-	stateFilterPart := gomatrix.DefaultFilterPart()
+	stateFilterPart := gomatrixserverlib.DefaultFilterPart()
 	// TODO: stateFilterPart should not limit the number of state events (or only limits abusive number of events)
 
 	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID, &stateFilterPart)

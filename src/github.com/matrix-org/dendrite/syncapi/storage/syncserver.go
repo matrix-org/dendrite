@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrix"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -178,7 +177,7 @@ func (d *SyncServerDatabase) GetStateEvent(
 // Returns an empty slice if no state events could be found for this room.
 // Returns an error if there was an issue with the retrieval.
 func (d *SyncServerDatabase) GetStateEventsForRoom(
-	ctx context.Context, roomID string, stateFilterPart *gomatrix.FilterPart,
+	ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.FilterPart,
 ) (stateEvents []gomatrixserverlib.Event, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
@@ -234,7 +233,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 	var succeeded bool
 	defer common.EndTransaction(txn, &succeeded)
 
-	stateFilterPart := gomatrix.DefaultFilterPart() // TODO: use filter provided in request
+	stateFilterPart := gomatrixserverlib.DefaultFilterPart() // TODO: use filter provided in request
 
 	// Work out which rooms to return in the response. This is done by getting not only the currently
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 stream positions.
@@ -289,7 +288,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		return nil, err
 	}
 
-	stateFilterPart := gomatrix.DefaultFilterPart() // TODO: use filter provided in request
+	stateFilterPart := gomatrixserverlib.DefaultFilterPart() // TODO: use filter provided in request
 
 	// Build up a /sync response. Add joined rooms.
 	res := types.NewResponse(pos)
@@ -552,7 +551,7 @@ func (d *SyncServerDatabase) fetchMissingStateEvents(
 func (d *SyncServerDatabase) getStateDeltas(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
 	fromPos, toPos types.StreamPosition, userID string,
-	stateFilterPart *gomatrix.FilterPart,
+	stateFilterPart *gomatrixserverlib.FilterPart,
 ) ([]stateDelta, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
