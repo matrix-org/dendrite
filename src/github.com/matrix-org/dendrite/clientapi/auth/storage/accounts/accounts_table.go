@@ -130,14 +130,15 @@ func (s *accountsStatements) selectAccountByLocalpart(
 	stmt := s.selectAccountByLocalpartStmt
 	err := stmt.QueryRowContext(ctx, localpart).Scan(&localpartPtr, &appserviceIDPtr)
 	if err != nil {
-		log.WithError(err).Error("Unable to retrieve user from the db")
+		switch err {
+		case sql.ErrNoRows:
+		default:
+			log.WithError(err).Error("Unable to retrieve user from the db")
+		}
 		return nil, err
 	}
 	if appserviceIDPtr.Valid {
 		acc.AppServiceID = appserviceIDPtr.String
-	}
-	if localpartPtr.Valid {
-		acc.Localpart = localpartPtr.String
 	}
 
 	acc.UserID = userutil.MakeUserID(localpart, s.serverName)
