@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -169,6 +170,7 @@ func appendExclusiveNamespaceRegexs(
 
 // checkErrors checks for any configuration errors amongst the loaded
 // application services according to the application service spec.
+// nolint: gocyclo
 func checkErrors(config *Dendrite) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
@@ -189,6 +191,9 @@ func checkErrors(config *Dendrite) (err error) {
 
 				// Check if GroupID for the users namespace is in the correct format
 				if key == "users" && namespace.GroupID != "" {
+					// TODO: Remove once group_id is implemented
+					log.Warn("WARNING: Application service option group_id is currently unimplemented")
+
 					correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 					if !correctFormat {
 						return configErrors([]string{fmt.Sprintf(
@@ -229,6 +234,15 @@ func checkErrors(config *Dendrite) (err error) {
 					"Application Service namespace can only contain a single regex tuple. Check your YAML.",
 				)})
 			}
+		}
+
+		// TODO: Remove once group_id is implemented
+		if appservice.RateLimited {
+			log.Warn("WARNING: Application service option rate_limited is currently unimplemented")
+		}
+		// TODO: Remove once protocols is implemented
+		if len(appservice.Protocols) > 0 {
+			log.Warn("WARNING: Application service option protocols is currently unimplemented")
 		}
 	}
 
