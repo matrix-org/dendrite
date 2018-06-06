@@ -124,11 +124,11 @@ func (s *accountsStatements) selectPasswordHash(
 func (s *accountsStatements) selectAccountByLocalpart(
 	ctx context.Context, localpart string,
 ) (*authtypes.Account, error) {
-	var localpartPtr, appserviceIDPtr sql.NullString
+	var appserviceIDPtr sql.NullString
 	var acc authtypes.Account
 
 	stmt := s.selectAccountByLocalpartStmt
-	err := stmt.QueryRowContext(ctx, localpart).Scan(&localpartPtr, &appserviceIDPtr)
+	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &appserviceIDPtr)
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
