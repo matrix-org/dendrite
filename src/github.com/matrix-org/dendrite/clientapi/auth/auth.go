@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -106,7 +107,7 @@ func VerifyUserFromRequest(
 			// Create a dummy device for AS user
 			dev := authtypes.Device{
 				// Use AS dummy device ID
-				ID: "AS_Device",
+				ID: types.AppServiceDeviceID,
 				// User the AS is masquerading as.
 				UserID: userID,
 				// AS dummy device has AS's token.
