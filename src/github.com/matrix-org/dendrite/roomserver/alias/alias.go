@@ -44,7 +44,7 @@ type RoomserverAliasAPIDatabase interface {
 	RemoveRoomAlias(ctx context.Context, alias string) error
 }
 
-// RoomserverAliasAPI is an implementation of api.RoomserverAliasAPI
+// RoomserverAliasAPI is an implementation of alias.RoomserverAliasAPI
 type RoomserverAliasAPI struct {
 	DB       RoomserverAliasAPIDatabase
 	Cfg      *config.Dendrite
@@ -52,7 +52,7 @@ type RoomserverAliasAPI struct {
 	QueryAPI api.RoomserverQueryAPI
 }
 
-// SetRoomAlias implements api.RoomserverAliasAPI
+// SetRoomAlias implements alias.RoomserverAliasAPI
 func (r *RoomserverAliasAPI) SetRoomAlias(
 	ctx context.Context,
 	request *api.SetRoomAliasRequest,
@@ -82,7 +82,7 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID)
 }
 
-// GetRoomIDForAlias implements api.RoomserverAliasAPI
+// GetRoomIDForAlias implements alias.RoomserverAliasAPI
 func (r *RoomserverAliasAPI) GetRoomIDForAlias(
 	ctx context.Context,
 	request *api.GetRoomIDForAliasRequest,
@@ -98,7 +98,7 @@ func (r *RoomserverAliasAPI) GetRoomIDForAlias(
 	return nil
 }
 
-// GetAliasesForRoomID implements api.RoomserverAliasAPI
+// GetAliasesForRoomID implements alias.RoomserverAliasAPI
 func (r *RoomserverAliasAPI) GetAliasesForRoomID(
 	ctx context.Context,
 	request *api.GetAliasesForRoomIDRequest,
@@ -114,7 +114,7 @@ func (r *RoomserverAliasAPI) GetAliasesForRoomID(
 	return nil
 }
 
-// RemoveRoomAlias implements api.RoomserverAliasAPI
+// RemoveRoomAlias implements alias.RoomserverAliasAPI
 func (r *RoomserverAliasAPI) RemoveRoomAlias(
 	ctx context.Context,
 	request *api.RemoveRoomAliasRequest,

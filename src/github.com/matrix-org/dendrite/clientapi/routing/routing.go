@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -29,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/transactions"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -42,8 +43,8 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 // to clients which need to make outbound HTTP requests.
 func Setup(
 	apiMux *mux.Router, cfg config.Dendrite,
-	producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
-	aliasAPI api.RoomserverAliasAPI,
+	producer *producers.RoomserverProducer, queryAPI roomserverAPI.RoomserverQueryAPI,
+	appserviceAPI appserviceAPI.AppServiceQueryAPI, aliasAPI roomserverAPI.RoomserverAliasAPI,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	federation *gomatrixserverlib.FederationClient,
@@ -142,9 +143,9 @@ func Setup(
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/directory/room/{roomAlias}",
-		common.MakeAuthAPI("directory_room", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeExternalAPI("directory_room", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI)
+			return DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI, appserviceAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

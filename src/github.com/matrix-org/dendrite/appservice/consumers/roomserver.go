@@ -185,6 +185,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		return false
 	}
 
+	// Check Room ID and Sender of the event
 	if appservice.IsInterestedInUserID(event.Sender()) ||
 		appservice.IsInterestedInRoomID(event.RoomID()) {
 		return true

@@ -18,15 +18,40 @@
 package api
 
 import (
+	"context"
 	"net/http"
+
+	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	opentracing "github.com/opentracing/opentracing-go"
 )
+
+// RoomAliasExistsRequest is a request to an application service
+// about whether a room alias exists
+type RoomAliasExistsRequest struct {
+	// Alias we want to lookup
+	Alias string `json:"alias"`
+}
+
+// RoomAliasExistsResponse is a response from an application service
+// about whether a room alias exists
+type RoomAliasExistsResponse struct {
+	AliasExists bool `json:"exists"`
+}
 
 // AppServiceQueryAPI is used to query user and room alias data from application
 // services
 type AppServiceQueryAPI interface {
-	// TODO: Check whether a room alias exists within any application service namespaces
+	// Check whether a room alias exists within any application service namespaces
+	RoomAliasExists(
+		ctx context.Context,
+		req *RoomAliasExistsRequest,
+		response *RoomAliasExistsResponse,
+	) error
 	// TODO: QueryUserIDExists
 }
+
+// AppServiceRoomAliasExistsPath is the HTTP path for the RoomAliasExists API
+const AppServiceRoomAliasExistsPath = "/api/appservice/RoomAliasExists"
 
 // httpAppServiceQueryAPI contains the URL to an appservice query API and a
 // reference to a httpClient used to reach it
@@ -46,4 +71,17 @@ func NewAppServiceQueryAPIHTTP(
 		httpClient = http.DefaultClient
 	}
 	return &httpAppServiceQueryAPI{appserviceURL, httpClient}
+}
+
+// RoomAliasExists implements AppServiceQueryAPI
+func (h *httpAppServiceQueryAPI) RoomAliasExists(
+	ctx context.Context,
+	request *RoomAliasExistsRequest,
+	response *RoomAliasExistsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "appserviceRoomAliasExists")
+	defer span.Finish()
+
+	apiURL := h.appserviceURL + AppServiceRoomAliasExistsPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

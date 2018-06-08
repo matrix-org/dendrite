@@ -58,9 +58,13 @@ func main() {
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
 	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 
+	asQuery := appservice.SetupAppServiceAPIComponent(
+		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
+	)
+
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
-		federation, &keyRing, alias, input, query, typingInputAPI,
+		federation, &keyRing, alias, input, query, typingInputAPI, asQuery,
 		transactions.New(),
 	)
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query)
@@ -68,7 +72,6 @@ func main() {
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
-	appservice.SetupAppServiceAPIComponent(base, accountDB, deviceDB, federation, alias, query, transactions.New())
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 
