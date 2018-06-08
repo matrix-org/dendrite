@@ -318,8 +318,8 @@ func UserIDIsWithinApplicationServiceNamespace(
 	}
 
 	// Loop through all known application service's namespaces and see if any match
-	for _, knownAppservice := range cfg.Derived.ApplicationServices {
-		for _, namespace := range knownAppservice.NamespaceMap["users"] {
+	for _, knownAppService := range cfg.Derived.ApplicationServices {
+		for _, namespace := range knownAppService.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
 			if namespace.RegexpObject.MatchString(userID) {
 				return true

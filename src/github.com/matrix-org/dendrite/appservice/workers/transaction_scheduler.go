@@ -65,7 +65,7 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 	}).Info("starting application service")
 	ctx := context.Background()
 
-	// Grab the HTTP client for sending requests to app services
+	// Create a HTTP client for sending requests to app services
 	client := &http.Client{
 		Timeout: transactionTimeout,
 		// TODO: Verify certificates

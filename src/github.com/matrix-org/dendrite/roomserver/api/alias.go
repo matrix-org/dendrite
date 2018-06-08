@@ -18,6 +18,7 @@ import (
 	"context"
 	"net/http"
 
+	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -139,7 +140,7 @@ func (h *httpRoomserverAliasAPI) SetRoomAlias(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // GetRoomIDForAlias implements RoomserverAliasAPI
@@ -152,7 +153,7 @@ func (h *httpRoomserverAliasAPI) GetRoomIDForAlias(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverGetRoomIDForAliasPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // GetAliasesForRoomID implements RoomserverAliasAPI
@@ -165,7 +166,7 @@ func (h *httpRoomserverAliasAPI) GetAliasesForRoomID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverGetAliasesForRoomIDPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // RemoveRoomAlias implements RoomserverAliasAPI
@@ -178,5 +179,5 @@ func (h *httpRoomserverAliasAPI) RemoveRoomAlias(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverRemoveRoomAliasPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

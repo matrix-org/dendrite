@@ -114,9 +114,9 @@ func (a *ApplicationService) IsInterestedInRoomAlias(
 	return false
 }
 
-// loadAppservices iterates through all application service config files
+// loadAppServices iterates through all application service config files
 // and loads their data into the config object for later access.
-func loadAppservices(config *Dendrite) error {
+func loadAppServices(config *Dendrite) error {
 	for _, configPath := range config.ApplicationServices.ConfigFiles {
 		// Create a new application service with default options
 		appservice := ApplicationService{

@@ -15,16 +15,12 @@
 package api
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 
-	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-
+	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -337,7 +333,7 @@ func (h *httpRoomserverQueryAPI) QueryLatestEventsAndState(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryLatestEventsAndStatePath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryStateAfterEvents implements RoomserverQueryAPI
@@ -350,7 +346,7 @@ func (h *httpRoomserverQueryAPI) QueryStateAfterEvents(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryEventsByID implements RoomserverQueryAPI
@@ -363,7 +359,7 @@ func (h *httpRoomserverQueryAPI) QueryEventsByID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryMembershipForUser implements RoomserverQueryAPI
@@ -376,7 +372,7 @@ func (h *httpRoomserverQueryAPI) QueryMembershipForUser(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMembershipForUserPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryMembershipsForRoom implements RoomserverQueryAPI
@@ -389,7 +385,7 @@ func (h *httpRoomserverQueryAPI) QueryMembershipsForRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryInvitesForUser implements RoomserverQueryAPI
@@ -402,7 +398,7 @@ func (h *httpRoomserverQueryAPI) QueryInvitesForUser(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryInvitesForUserPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryServerAllowedToSeeEvent implements RoomserverQueryAPI
@@ -415,7 +411,7 @@ func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryMissingEvents implements RoomServerQueryAPI
@@ -428,7 +424,7 @@ func (h *httpRoomserverQueryAPI) QueryMissingEvents(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMissingEventsPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryStateAndAuthChain implements RoomserverQueryAPI
@@ -441,49 +437,5 @@ func (h *httpRoomserverQueryAPI) QueryStateAndAuthChain(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryStateAndAuthChainPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-func postJSON(
-	ctx context.Context, span opentracing.Span, httpClient *http.Client,
-	apiURL string, request, response interface{},
-) error {
-	jsonBytes, err := json.Marshal(request)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBytes))
-	if err != nil {
-		return err
-	}
-
-	// Mark the span as being an RPC client.
-	ext.SpanKindRPCClient.Set(span)
-	carrier := opentracing.HTTPHeadersCarrier(req.Header)
-	tracer := opentracing.GlobalTracer()
-
-	if err = tracer.Inject(span.Context(), opentracing.HTTPHeaders, carrier); err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	res, err := httpClient.Do(req.WithContext(ctx))
-	if res != nil {
-		defer (func() { err = res.Body.Close() })()
-	}
-	if err != nil {
-		return err
-	}
-	if res.StatusCode != http.StatusOK {
-		var errorBody struct {
-			Message string `json:"message"`
-		}
-		if err = json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
-			return err
-		}
-		return fmt.Errorf("api: %d: %s", res.StatusCode, errorBody.Message)
-	}
-	return json.NewDecoder(res.Body).Decode(response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

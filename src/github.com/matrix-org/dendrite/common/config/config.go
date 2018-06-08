@@ -198,6 +198,7 @@ type Dendrite struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
 		FederationAPI    Address `yaml:"federation_api"`
+		AppServiceAPI    Address `yaml:"appservice_api"`
 		SyncAPI          Address `yaml:"sync_api"`
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
@@ -408,7 +409,7 @@ func (config *Dendrite) derive() error {
 	}
 
 	// Load application service configuration files
-	if err := loadAppservices(config); err != nil {
+	if err := loadAppServices(config); err != nil {
 		return err
 	}
 
@@ -638,6 +639,15 @@ func fingerprintPEM(data []byte) *gomatrixserverlib.TLSFingerprint {
 			return &gomatrixserverlib.TLSFingerprint{SHA256: digest[:]}
 		}
 	}
+}
+
+// AppServiceURL returns a HTTP URL for where the appservice component is listening.
+func (config *Dendrite) AppServiceURL() string {
+	// Hard code the roomserver to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.AppServiceAPI)
 }
 
 // RoomServerURL returns an HTTP URL for where the roomserver is listening.
