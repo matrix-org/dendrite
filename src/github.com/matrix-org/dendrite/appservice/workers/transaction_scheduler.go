@@ -146,7 +146,7 @@ func worker(db *storage.Database, as config.ApplicationService, ecm map[string]i
 			ecm[as.ID] -= eventsSent
 
 			// Remove sent events from the DB
-			err = db.RemoveEventsByID(ctx, eventIDs)
+			err = db.RemoveEventsBeforeAndIncludingID(ctx, eventIDs[len(eventIDs)-1])
 			if err != nil {
 				logrus.WithError(err).Errorf("unable to remove appservice events from the database for %s",
 					as.ID)

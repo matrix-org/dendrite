@@ -80,13 +80,13 @@ func (d *Database) CountEventsWithAppServiceID(
 	return d.events.countEventsByApplicationServiceID(ctx, appServiceID)
 }
 
-// RemoveEventsByID removes events from the database given a slice of their
+// RemoveEventsBeforeAndIncludingID removes events from the database given a slice of their
 // event IDs.
-func (d *Database) RemoveEventsByID(
+func (d *Database) RemoveEventsBeforeAndIncludingID(
 	ctx context.Context,
-	eventIDs []string,
+	eventID string,
 ) error {
-	return d.events.deleteEventsByID(ctx, eventIDs)
+	return d.events.deleteEventsBeforeAndIncludingID(ctx, eventID)
 }
 
 // GetTxnIDWithAppServiceID takes in an application service ID and returns the

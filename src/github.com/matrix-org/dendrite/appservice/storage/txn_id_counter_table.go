@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS txn_id_counter (
 `
 
 const selectTxnIDSQL = "" +
-	"SELECT txn_id FROM txn_id_counter WHERE as_id = $1 LIMIT 1"
+	"SELECT txn_id FROM txn_id_counter WHERE as_id = $1"
 
 const upsertTxnIDSQL = "" +
 	"INSERT INTO txn_id_counter(as_id, txn_id) VALUES ($1, $2) " +
@@ -64,15 +64,7 @@ func (s *txnStatements) selectTxnID(
 	ctx context.Context,
 	appServiceID string,
 ) (txnID int, err error) {
-	rows, err := s.selectTxnIDStmt.QueryContext(ctx, appServiceID)
-	if err != nil {
-		return
-	}
-	defer rows.Close() // nolint: errcheck
-
-	// Scan the TxnID from the database and return
-	rows.Next()
-	err = rows.Scan(&txnID)
+	err = s.selectTxnIDStmt.QueryRowContext(ctx, appServiceID).Scan(&txnID)
 	return
 }
 
