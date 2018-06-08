@@ -180,9 +180,10 @@ func checkErrors(config *Dendrite) (err error) {
 
 	// Check each application service for any config errors
 	for _, appservice := range config.Derived.ApplicationServices {
-		// Check that namespace(s) are valid regex
+		// Namespace-related checks
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			for _, namespace := range namespaceSlice {
+				// Check that namespace(s) are valid regex
 				if !IsValidRegex(namespace.Regex) {
 					return configErrors([]string{fmt.Sprintf(
 						"Invalid regex string for Application Service %s", appservice.ID,
@@ -236,7 +237,7 @@ func checkErrors(config *Dendrite) (err error) {
 			}
 		}
 
-		// TODO: Remove once group_id is implemented
+		// TODO: Remove once rate_limited is implemented
 		if appservice.RateLimited {
 			log.Warn("WARNING: Application service option rate_limited is currently unimplemented")
 		}
