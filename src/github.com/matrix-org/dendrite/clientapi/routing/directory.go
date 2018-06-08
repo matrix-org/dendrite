@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -29,12 +30,14 @@ import (
 )
 
 // DirectoryRoom looks up a room alias
+// nolint: gocyclo
 func DirectoryRoom(
 	req *http.Request,
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverAliasAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {

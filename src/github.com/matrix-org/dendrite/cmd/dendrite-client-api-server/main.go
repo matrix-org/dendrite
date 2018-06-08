@@ -37,10 +37,11 @@ func main() {
 
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
 	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	asQuery := base.CreateHTTPAppServiceAPIs()
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, &keyRing,
-		alias, input, query, typingInputAPI, transactions.New(),
+		alias, input, query, typingInputAPI, asQuery, transactions.New(),
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.ClientAPI))

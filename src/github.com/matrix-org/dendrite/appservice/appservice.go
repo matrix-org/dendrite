@@ -90,7 +90,7 @@ func SetupAppServiceAPIComponent(
 		roomserverQueryAPI, roomserverAliasAPI, workerStates,
 	)
 	if err := consumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start app service roomserver consumer")
+		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
 	}
 
 	// Create application service transaction workers
