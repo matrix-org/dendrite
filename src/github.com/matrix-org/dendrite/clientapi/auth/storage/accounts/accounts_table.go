@@ -130,9 +130,7 @@ func (s *accountsStatements) selectAccountByLocalpart(
 	stmt := s.selectAccountByLocalpartStmt
 	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &appserviceIDPtr)
 	if err != nil {
-		switch err {
-		case sql.ErrNoRows:
-		default:
+		if err != sql.ErrNoRows {
 			log.WithError(err).Error("Unable to retrieve user from the db")
 		}
 		return nil, err
