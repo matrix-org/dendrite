@@ -20,11 +20,14 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 )
 
-// ApplicationServiceWorkerState is a type that pairs and application service with a
-// lockable condition, allowing the roomserver to notify appservice workers when
-// there are events ready to send externally to application services.
+// ApplicationServiceWorkerState is a type that couples an application service,
+// a lockable condition as well as some other state variables, allowing the
+// roomserver to notify appservice workers when there are events ready to send
+// externally to application services.
 type ApplicationServiceWorkerState struct {
 	AppService  config.ApplicationService
 	Cond        *sync.Cond
 	EventsReady bool
+	// Backoff exponent (2^x secs). Max 6, aka 64s.
+	Backoff int
 }
