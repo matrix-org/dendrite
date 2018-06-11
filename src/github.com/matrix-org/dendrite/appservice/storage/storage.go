@@ -67,7 +67,7 @@ func (d *Database) GetEventsWithAppServiceID(
 	ctx context.Context,
 	appServiceID string,
 	limit int,
-) (int, []gomatrixserverlib.ApplicationServiceEvent, error) {
+) (int, int, []gomatrixserverlib.ApplicationServiceEvent, error) {
 	return d.events.selectEventsByApplicationServiceID(ctx, appServiceID, limit)
 }
 

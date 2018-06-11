@@ -50,8 +50,8 @@ CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_events(as_id);
 `
 
 const selectEventsByApplicationServiceIDSQL = "" +
-	"SELECT id, event_id, origin_server_ts, room_id, type, sender, event_content FROM appservice_events " +
-	"WHERE as_id = $1 ORDER BY id ASC LIMIT $2"
+	"SELECT id, event_id, origin_server_ts, room_id, type, sender, event_content, COUNT(id) OVER() AS full_count " +
+	"FROM appservice_events WHERE as_id = $1 ORDER BY id ASC LIMIT $2"
 
 const countEventsByApplicationServiceIDSQL = "" +
 	"SELECT COUNT(event_id) FROM appservice_events WHERE as_id = $1"
@@ -95,19 +95,21 @@ func (s *eventsStatements) prepare(db *sql.DB) (err error) {
 // selectEventsByApplicationServiceID takes in an application service ID and
 // returns a slice of events that need to be sent to that application service,
 // as well as an int later used to remove these same events from the database
-// once successfully sent to an application service.
+// once successfully sent to an application service. The total event count is
+// used by a worker to determine if more events need to be pulled from the DB
+// later.
 func (s *eventsStatements) selectEventsByApplicationServiceID(
 	ctx context.Context,
 	applicationServiceID string,
 	limit int,
 ) (
-	maxID int,
+	maxID, totalEvents int,
 	events []gomatrixserverlib.ApplicationServiceEvent,
 	err error,
 ) {
 	eventRows, err := s.selectEventsByApplicationServiceIDStmt.QueryContext(ctx, applicationServiceID, limit)
 	if err != nil {
-		return 0, nil, err
+		return 0, 0, nil, err
 	}
 	defer func() {
 		err = eventRows.Close()
@@ -130,9 +132,10 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 			&event.Type,
 			&event.UserID,
 			&eventContent,
+			&totalEvents,
 		)
 		if err != nil {
-			return 0, nil, err
+			return 0, 0, nil, err
 		}
 		if eventContent.Valid {
 			event.Content = gomatrixserverlib.RawJSON(eventContent.String)

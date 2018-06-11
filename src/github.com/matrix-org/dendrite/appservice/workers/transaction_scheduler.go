@@ -101,7 +101,7 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		ws.EventsReady = false
 		ws.Cond.L.Unlock()
 
-		maxID, events, err := db.GetEventsWithAppServiceID(ctx, ws.AppService.ID, transactionBatchSize)
+		maxID, totalEvents, events, err := db.GetEventsWithAppServiceID(ctx, ws.AppService.ID, transactionBatchSize)
 		if err != nil {
 			log.WithError(err).Errorf("appservice %s worker unable to read queued events from DB",
 				ws.AppService.ID)
@@ -146,7 +146,11 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 				ws.AppService.ID)
 			return
 		}
-		waitForEvents(&ws)
+
+		// Only wait for more events once we've sent all the events in the database
+		if totalEvents <= transactionBatchSize {
+			waitForEvents(&ws)
+		}
 	}
 }
 
