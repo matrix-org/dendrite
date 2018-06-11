@@ -67,7 +67,7 @@ func (d *Database) GetEventsWithAppServiceID(
 	ctx context.Context,
 	appServiceID string,
 	limit int,
-) ([]string, []gomatrixserverlib.ApplicationServiceEvent, error) {
+) (int, []gomatrixserverlib.ApplicationServiceEvent, error) {
 	return d.events.selectEventsByApplicationServiceID(ctx, appServiceID, limit)
 }
 
@@ -80,13 +80,14 @@ func (d *Database) CountEventsWithAppServiceID(
 	return d.events.countEventsByApplicationServiceID(ctx, appServiceID)
 }
 
-// RemoveEventsBeforeAndIncludingID removes events from the database given a slice of their
-// event IDs.
+// RemoveEventsBeforeAndIncludingID removes all events from the database that
+// are less than or equal to a given maximum ID. IDs here are implemented as a
+// serial, thus this should always delete events in chronological order.
 func (d *Database) RemoveEventsBeforeAndIncludingID(
 	ctx context.Context,
-	eventID string,
+	eventTableID int,
 ) error {
-	return d.events.deleteEventsBeforeAndIncludingID(ctx, eventID)
+	return d.events.deleteEventsBeforeAndIncludingID(ctx, eventTableID)
 }
 
 // GetTxnIDWithAppServiceID takes in an application service ID and returns the

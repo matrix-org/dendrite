@@ -101,7 +101,7 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		ws.EventsReady = false
 		ws.Cond.L.Unlock()
 
-		eventIDs, events, err := db.GetEventsWithAppServiceID(ctx, ws.AppService.ID, transactionBatchSize)
+		maxID, events, err := db.GetEventsWithAppServiceID(ctx, ws.AppService.ID, transactionBatchSize)
 		if err != nil {
 			log.WithError(err).Errorf("appservice %s worker unable to read queued events from DB",
 				ws.AppService.ID)
@@ -132,7 +132,7 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		ws.Backoff = 0
 
 		// Remove sent events from the DB
-		err = db.RemoveEventsBeforeAndIncludingID(ctx, eventIDs[len(eventIDs)-1])
+		err = db.RemoveEventsBeforeAndIncludingID(ctx, maxID)
 		if err != nil {
 			log.WithError(err).Fatalf("unable to remove appservice events from the database for %s",
 				ws.AppService.ID)
