@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 const appserviceEventsSchema = `
@@ -106,7 +107,13 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer eventRows.Close() // nolint: errcheck
+	defer func() {
+		err = eventRows.Close()
+		if err != nil {
+			log.WithError(err).Fatalf("Appservice %s unable to select new events to send",
+				applicationServiceID)
+		}
+	}()
 
 	// Iterate through each row and store event contents
 	for eventRows.Next() {
