@@ -175,15 +175,15 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 	for _, event := range events {
 		for _, ws := range s.workerStates {
 			// Check if this event is interesting to this application service
-			if s.appserviceIsInterestedInEvent(ctx, event, ws.AppService) {
+			if s.appserviceIsInterestedInEvent(ctx, &event, ws.AppService) {
 				// Queue this event to be sent off to the application service
-				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, event); err != nil {
+				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, &event); err != nil {
 					log.WithError(err).Warn("failed to insert incoming event into appservices database")
 				} else {
-					// Tell our worker to send out new messages by setting dirty bit for that
-					// worker to true, and waking them up with a broadcast
+					// Tell our worker to send out new messages by updating remaining message
+					// count and waking them up with a broadcast
 					ws.Cond.L.Lock()
-					ws.EventsReady = true
+					*ws.EventsReady++
 					ws.Cond.Broadcast()
 					ws.Cond.L.Unlock()
 				}
@@ -196,7 +196,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 
 // appserviceIsInterestedInEvent returns a boolean depending on whether a given
 // event falls within one of a given application service's namespaces.
-func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event gomatrixserverlib.Event, appservice config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *gomatrixserverlib.Event, appservice config.ApplicationService) bool {
 	// Check sender of the event
 	for _, userNamespace := range appservice.NamespaceMap["users"] {
 		if userNamespace.RegexpObject.MatchString(event.Sender()) {

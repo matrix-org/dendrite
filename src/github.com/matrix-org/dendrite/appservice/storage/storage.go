@@ -56,7 +56,7 @@ func (d *Database) prepare() error {
 func (d *Database) StoreEvent(
 	ctx context.Context,
 	appServiceID string,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 ) error {
 	return d.events.insertEvent(ctx, appServiceID, event)
 }
@@ -80,14 +80,26 @@ func (d *Database) CountEventsWithAppServiceID(
 	return d.events.countEventsByApplicationServiceID(ctx, appServiceID)
 }
 
+// UpdateTxnIDForEvents takes in an application service ID and a
+// and stores them in the DB, unless the pair already exists, in
+// which case it updates them.
+func (d *Database) UpdateTxnIDForEvents(
+	ctx context.Context,
+	appserviceID string,
+	maxID, txnID int,
+) error {
+	return d.events.updateTxnIDForEvents(ctx, appserviceID, maxID, txnID)
+}
+
 // RemoveEventsBeforeAndIncludingID removes all events from the database that
 // are less than or equal to a given maximum ID. IDs here are implemented as a
 // serial, thus this should always delete events in chronological order.
 func (d *Database) RemoveEventsBeforeAndIncludingID(
 	ctx context.Context,
+	appserviceID string,
 	eventTableID int,
 ) error {
-	return d.events.deleteEventsBeforeAndIncludingID(ctx, eventTableID)
+	return d.events.deleteEventsBeforeAndIncludingID(ctx, appserviceID, eventTableID)
 }
 
 // GetTxnIDWithAppServiceID takes in an application service ID and returns the

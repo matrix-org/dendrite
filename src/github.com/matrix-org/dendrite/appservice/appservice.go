@@ -51,10 +51,13 @@ func SetupAppServiceAPIComponent(
 	// events to be sent out.
 	workerStates := make([]types.ApplicationServiceWorkerState, len(base.Cfg.Derived.ApplicationServices))
 	for _, appservice := range base.Cfg.Derived.ApplicationServices {
+		eventCount := 0
+
 		m := sync.Mutex{}
 		ws := types.ApplicationServiceWorkerState{
-			AppService: appservice,
-			Cond:       sync.NewCond(&m),
+			AppService:  appservice,
+			Cond:        sync.NewCond(&m),
+			EventsReady: &eventCount,
 		}
 		workerStates = append(workerStates, ws)
 	}

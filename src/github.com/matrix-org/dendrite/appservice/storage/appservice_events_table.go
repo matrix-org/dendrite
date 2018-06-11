@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -43,15 +44,19 @@ CREATE TABLE IF NOT EXISTS appservice_events (
 	-- The JSON representation of the event's content. Text to avoid db JSON parsing
 	event_content TEXT,
 	-- The ID of the transaction that this event is a part of
-	txn_id INTEGER
+	txn_id BIGINT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_events(as_id);
 `
 
-const selectEventsByApplicationServiceIDSQL = "" +
-	"SELECT id, event_id, origin_server_ts, room_id, type, sender, event_content, COUNT(id) OVER() AS full_count " +
-	"FROM appservice_events WHERE as_id = $1 ORDER BY id ASC LIMIT $2"
+const selectPastEventsByApplicationServiceIDSQL = "" +
+	"SELECT id, event_id, origin_server_ts, room_id, type, sender, event_content, txn_id " +
+	"FROM appservice_events WHERE as_id = $1 AND txn_id > -1 LIMIT $2"
+
+const selectCurrEventsByApplicationServiceIDSQL = "" +
+	"SELECT id, event_id, origin_server_ts, room_id, type, sender, event_content, txn_id " +
+	"FROM appservice_events WHERE as_id = $1 AND txn_id = -1 LIMIT $2"
 
 const countEventsByApplicationServiceIDSQL = "" +
 	"SELECT COUNT(event_id) FROM appservice_events WHERE as_id = $1"
@@ -60,14 +65,19 @@ const insertEventSQL = "" +
 	"INSERT INTO appservice_events(as_id, event_id, origin_server_ts, room_id, type, sender, event_content, txn_id) " +
 	"VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
 
+const updateTxnIDForEventsSQL = "" +
+	"UPDATE appservice_events SET txn_id = $1 WHERE as_id = $2 AND id <= $3"
+
 const deleteEventsBeforeAndIncludingIDSQL = "" +
-	"DELETE FROM appservice_events WHERE id <= $1"
+	"DELETE FROM appservice_events WHERE as_id = $1 AND id <= $2"
 
 type eventsStatements struct {
-	selectEventsByApplicationServiceIDStmt *sql.Stmt
-	countEventsByApplicationServiceIDStmt  *sql.Stmt
-	insertEventStmt                        *sql.Stmt
-	deleteEventsBeforeAndIncludingIDStmt   *sql.Stmt
+	selectPastEventsByApplicationServiceIDStmt *sql.Stmt
+	selectCurrEventsByApplicationServiceIDStmt *sql.Stmt
+	countEventsByApplicationServiceIDStmt      *sql.Stmt
+	insertEventStmt                            *sql.Stmt
+	updateTxnIDForEventsStmt                   *sql.Stmt
+	deleteEventsBeforeAndIncludingIDStmt       *sql.Stmt
 }
 
 func (s *eventsStatements) prepare(db *sql.DB) (err error) {
@@ -76,13 +86,19 @@ func (s *eventsStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 
-	if s.selectEventsByApplicationServiceIDStmt, err = db.Prepare(selectEventsByApplicationServiceIDSQL); err != nil {
+	if s.selectPastEventsByApplicationServiceIDStmt, err = db.Prepare(selectPastEventsByApplicationServiceIDSQL); err != nil {
+		return
+	}
+	if s.selectCurrEventsByApplicationServiceIDStmt, err = db.Prepare(selectCurrEventsByApplicationServiceIDSQL); err != nil {
 		return
 	}
 	if s.countEventsByApplicationServiceIDStmt, err = db.Prepare(countEventsByApplicationServiceIDSQL); err != nil {
 		return
 	}
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
+		return
+	}
+	if s.updateTxnIDForEventsStmt, err = db.Prepare(updateTxnIDForEventsSQL); err != nil {
 		return
 	}
 	if s.deleteEventsBeforeAndIncludingIDStmt, err = db.Prepare(deleteEventsBeforeAndIncludingIDSQL); err != nil {
@@ -95,30 +111,57 @@ func (s *eventsStatements) prepare(db *sql.DB) (err error) {
 // selectEventsByApplicationServiceID takes in an application service ID and
 // returns a slice of events that need to be sent to that application service,
 // as well as an int later used to remove these same events from the database
-// once successfully sent to an application service. The total event count is
-// used by a worker to determine if more events need to be pulled from the DB
-// later.
+// once successfully sent to an application service.
 func (s *eventsStatements) selectEventsByApplicationServiceID(
 	ctx context.Context,
 	applicationServiceID string,
 	limit int,
 ) (
-	maxID, totalEvents int,
+	txnID, maxID int,
 	events []gomatrixserverlib.ApplicationServiceEvent,
 	err error,
 ) {
-	eventRows, err := s.selectEventsByApplicationServiceIDStmt.QueryContext(ctx, applicationServiceID, limit)
+	// First check to see if there are any events part of an old transaction
+	eventRowsPast, err := s.selectPastEventsByApplicationServiceIDStmt.QueryContext(ctx, applicationServiceID, limit)
 	if err != nil {
 		return 0, 0, nil, err
 	}
 	defer func() {
-		err = eventRows.Close()
+		err = eventRowsPast.Close()
+		if err != nil {
+			log.WithError(err).Fatalf("Appservice %s unable to select past events to send",
+				applicationServiceID)
+		}
+	}()
+	events, txnID, maxID, err = retrieveEvents(eventRowsPast)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	if len(events) > 0 {
+		return
+	}
+
+	// Else, if there are old events with existing transaction IDs, grab a batch of new events
+	eventRowsCurr, err := s.selectCurrEventsByApplicationServiceIDStmt.QueryContext(ctx, applicationServiceID, limit)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	defer func() {
+		err = eventRowsCurr.Close()
 		if err != nil {
 			log.WithError(err).Fatalf("Appservice %s unable to select new events to send",
 				applicationServiceID)
 		}
 	}()
+	events, _, maxID, err = retrieveEvents(eventRowsCurr)
+	if err != nil {
+		return 0, 0, nil, err
+	}
 
+	return -1, maxID, events, err
+}
+
+func retrieveEvents(eventRows *sql.Rows) (events []gomatrixserverlib.ApplicationServiceEvent, txnID, maxID int, err error) {
 	// Iterate through each row and store event contents
 	for eventRows.Next() {
 		var event gomatrixserverlib.ApplicationServiceEvent
@@ -132,10 +175,11 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 			&event.Type,
 			&event.UserID,
 			&eventContent,
-			&totalEvents,
+			&txnID,
 		)
 		if err != nil {
-			return 0, 0, nil, err
+			fmt.Println("Failed:", err.Error())
+			return nil, 0, 0, err
 		}
 		if eventContent.Valid {
 			event.Content = gomatrixserverlib.RawJSON(eventContent.String)
@@ -177,7 +221,7 @@ func (s *eventsStatements) countEventsByApplicationServiceID(
 func (s *eventsStatements) insertEvent(
 	ctx context.Context,
 	appServiceID string,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 ) (err error) {
 	_, err = s.insertEventStmt.ExecContext(
 		ctx,
@@ -188,16 +232,29 @@ func (s *eventsStatements) insertEvent(
 		event.Type(),
 		event.Sender(),
 		event.Content(),
-		nil,
+		-1,
 	)
+	return
+}
+
+// updateTxnIDForEvents sets the transactionID for a collection of events. Done
+// before sending them to an AppService. Referenced before sending to make sure
+// we aren't constructing multiple transactions with the same events.
+func (s *eventsStatements) updateTxnIDForEvents(
+	ctx context.Context,
+	appserviceID string,
+	maxID, txnID int,
+) (err error) {
+	_, err = s.updateTxnIDForEventsStmt.ExecContext(ctx, txnID, appserviceID, maxID)
 	return
 }
 
 // deleteEventsBeforeAndIncludingID removes events matching given IDs from the database.
 func (s *eventsStatements) deleteEventsBeforeAndIncludingID(
 	ctx context.Context,
+	appserviceID string,
 	eventTableID int,
 ) (err error) {
-	_, err = s.deleteEventsBeforeAndIncludingIDStmt.ExecContext(ctx, eventTableID)
-	return err
+	_, err = s.deleteEventsBeforeAndIncludingIDStmt.ExecContext(ctx, appserviceID, eventTableID)
+	return
 }

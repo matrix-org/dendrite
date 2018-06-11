@@ -32,11 +32,12 @@ import (
 )
 
 var (
-	// TODO: Expose these in the config?
 	// Maximum size of events sent in each transaction.
+	// Warning, if this is lowered and a number of events greater than the previous
+	// batch size were still to be sent, then a number of events equal to the
+	// difference will be ignored by the app service.
+	// TL;DR: Don't lower this number with any AS events still left in the database.
 	transactionBatchSize = 50
-	// Time to wait between checking for new events to send.
-	transactionBreakTime = time.Millisecond * 50
 	// Timeout for sending a single transaction to an application service.
 	transactionTimeout = time.Second * 15
 	// The current transaction ID. Increments after every successful transaction.
@@ -65,6 +66,7 @@ func SetupTransactionWorkers(
 // worker is a goroutine that sends any queued events to the application service
 // it is given.
 func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
+	log.Infof("Starting Application Service %s", ws.AppService.ID)
 	ctx := context.Background()
 
 	// Initialize transaction ID counter
@@ -88,40 +90,31 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 			ws.AppService.ID)
 		return
 	}
-
-	// Wait if there are no new events to go out
-	if eventCount == 0 {
-		waitForEvents(&ws)
-	}
+	ws.Cond.L.Lock()
+	*ws.EventsReady = eventCount
+	ws.Cond.L.Unlock()
 
 	// Loop forever and keep waiting for more events to send
 	for {
-		// Set EventsReady to false for some reason (we just sent events?)
-		ws.Cond.L.Lock()
-		ws.EventsReady = false
-		ws.Cond.L.Unlock()
-
-		maxID, totalEvents, events, err := db.GetEventsWithAppServiceID(ctx, ws.AppService.ID, transactionBatchSize)
-		if err != nil {
-			log.WithError(err).Errorf("appservice %s worker unable to read queued events from DB",
-				ws.AppService.ID)
-
-			// Wait a little bit for DB to possibly recover
-			time.Sleep(transactionBreakTime)
-			continue
+		// Wait for more events if we've sent all the events in the database
+		if *ws.EventsReady <= 0 {
+			fmt.Println("Waiting")
+			ws.Cond.L.Lock()
+			ws.Cond.Wait()
+			ws.Cond.L.Unlock()
 		}
 
 		// Batch events up into a transaction
-		transactionJSON, err := createTransaction(events)
+		eventsCount, maxEventID, transactionID, transactionJSON, err := createTransaction(ctx, db, ws.AppService.ID)
 		if err != nil {
-			log.WithError(err).Fatalf("appservice %s worker unable to marshal events",
+			log.WithError(err).Fatalf("appservice %s worker unable to create transaction",
 				ws.AppService.ID)
 
 			return
 		}
 
 		// Send the events off to the application service
-		err = send(client, ws.AppService, transactionJSON)
+		err = send(client, ws.AppService, transactionID, transactionJSON)
 		if err != nil {
 			// Backoff
 			backoff(err, &ws)
@@ -131,8 +124,12 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		// We sent successfully, hooray!
 		ws.Backoff = 0
 
+		ws.Cond.L.Lock()
+		*ws.EventsReady -= eventsCount
+		ws.Cond.L.Unlock()
+
 		// Remove sent events from the DB
-		err = db.RemoveEventsBeforeAndIncludingID(ctx, maxID)
+		err = db.RemoveEventsBeforeAndIncludingID(ctx, ws.AppService.ID, maxEventID)
 		if err != nil {
 			log.WithError(err).Fatalf("unable to remove appservice events from the database for %s",
 				ws.AppService.ID)
@@ -146,22 +143,7 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 				ws.AppService.ID)
 			return
 		}
-
-		// Only wait for more events once we've sent all the events in the database
-		if totalEvents <= transactionBatchSize {
-			waitForEvents(&ws)
-		}
 	}
-}
-
-// waitForEvents pauses the calling goroutine while it waits for a broadcast message
-func waitForEvents(ws *types.ApplicationServiceWorkerState) {
-	ws.Cond.L.Lock()
-	if !ws.EventsReady {
-		// Wait for a broadcast about new events
-		ws.Cond.Wait()
-	}
-	ws.Cond.L.Unlock()
 }
 
 // backoff pauses the calling goroutine for a 2^some backoff exponent seconds
@@ -169,6 +151,7 @@ func backoff(err error, ws *types.ApplicationServiceWorkerState) {
 	// Calculate how long to backoff for
 	backoffDuration := time.Duration(math.Pow(2, float64(ws.Backoff)))
 	backoffSeconds := time.Second * backoffDuration
+
 	log.WithError(err).Warnf("unable to send transactions to %s, backing off for %ds",
 		ws.AppService.ID, backoffDuration)
 
@@ -184,19 +167,47 @@ func backoff(err error, ws *types.ApplicationServiceWorkerState) {
 // createTransaction takes in a slice of AS events, stores them in an AS
 // transaction, and JSON-encodes the results.
 func createTransaction(
-	events []gomatrixserverlib.ApplicationServiceEvent,
-) ([]byte, error) {
-	// Create a transactions and store the events inside
+	ctx context.Context,
+	db *storage.Database,
+	appserviceID string,
+) (
+	eventsCount, maxID, txnID int,
+	transactionJSON []byte,
+	err error,
+) {
+	transactionID := currentTransactionID
+
+	// Retrieve the latest events from the DB (will return old events if they weren't successfully sent)
+	txnID, maxID, events, err := db.GetEventsWithAppServiceID(ctx, appserviceID, transactionBatchSize)
+	if err != nil {
+		log.WithError(err).Fatalf("appservice %s worker unable to read queued events from DB",
+			appserviceID)
+
+		return
+	}
+
+	// Check if these are old events we are resending. If so, reuse old transactionID
+	if txnID != -1 {
+		transactionID = txnID
+	} else {
+		// Mark new events with current transactionID
+		err := db.UpdateTxnIDForEvents(ctx, appserviceID, maxID, transactionID)
+		if err != nil {
+			return 0, 0, 0, nil, err
+		}
+	}
+
+	// Create a transaction and store the events inside
 	transaction := gomatrixserverlib.ApplicationServiceTransaction{
 		Events: events,
 	}
 
-	transactionJSON, err := json.Marshal(transaction)
+	transactionJSON, err = json.Marshal(transaction)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	return transactionJSON, nil
+	return len(events), maxID, transactionID, transactionJSON, nil
 }
 
 // send sends events to an application service. Returns an error if an OK was not
@@ -204,10 +215,11 @@ func createTransaction(
 func send(
 	client *http.Client,
 	appservice config.ApplicationService,
+	transactionID int,
 	transaction []byte,
 ) error {
-	// POST a transaction to our AS.
-	address := fmt.Sprintf("%s/transactions/%d", appservice.URL, currentTransactionID)
+	// POST a transaction to our AS
+	address := fmt.Sprintf("%s/transactions/%d", appservice.URL, transactionID)
 	resp, err := client.Post(address, "application/json", bytes.NewBuffer(transaction))
 	if err != nil {
 		return err

@@ -23,9 +23,10 @@ import (
 // roomserver to notify appservice workers when there are events ready to send
 // externally to application services.
 type ApplicationServiceWorkerState struct {
-	AppService  config.ApplicationService
-	Cond        *sync.Cond
-	EventsReady bool
+	AppService config.ApplicationService
+	Cond       *sync.Cond
+	// Events ready to be sent
+	EventsReady *int
 	// Backoff exponent (2^x secs). Max 6, aka 64s.
 	Backoff int
 }
