@@ -42,10 +42,10 @@ CREATE TABLE IF NOT EXISTS appservice_events (
 	-- The JSON representation of the event's content. Text to avoid db JSON parsing
 	event_content TEXT,
 	-- The ID of the transaction that this event is a part of
-	txn_id INTEGER NOT NULL
+	txn_id INTEGER
 );
 
-CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_event(as_id);
+CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_events(as_id);
 `
 
 const selectEventsByApplicationServiceIDSQL = "" +

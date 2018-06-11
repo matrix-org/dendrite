@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/appservice/storage"
+	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -29,11 +30,6 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
-var (
-	appServices []config.ApplicationService
-	ecm         map[string]int
-)
-
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
@@ -42,6 +38,7 @@ type OutputRoomEventConsumer struct {
 	query              api.RoomserverQueryAPI
 	alias              api.RoomserverAliasAPI
 	serverName         string
+	workerStates       []types.ApplicationServiceWorkerState
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call
@@ -53,11 +50,8 @@ func NewOutputRoomEventConsumer(
 	appserviceDB *storage.Database,
 	queryAPI api.RoomserverQueryAPI,
 	aliasAPI api.RoomserverAliasAPI,
-	eventCounterMap map[string]int,
+	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
-	appServices = cfg.Derived.ApplicationServices
-	ecm = eventCounterMap
-
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
@@ -70,6 +64,7 @@ func NewOutputRoomEventConsumer(
 		query:              queryAPI,
 		alias:              aliasAPI,
 		serverName:         string(cfg.Matrix.ServerName),
+		workerStates:       workerStates,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -178,14 +173,19 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 	events []gomatrixserverlib.Event,
 ) error {
 	for _, event := range events {
-		for _, appservice := range appServices {
+		for _, ws := range s.workerStates {
 			// Check if this event is interesting to this application service
-			if s.appserviceIsInterestedInEvent(ctx, event, appservice) {
+			if s.appserviceIsInterestedInEvent(ctx, event, ws.AppService) {
 				// Queue this event to be sent off to the application service
-				if err := s.asDB.StoreEvent(ctx, appservice.ID, event); err != nil {
+				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, event); err != nil {
 					log.WithError(err).Warn("failed to insert incoming event into appservices database")
 				} else {
-					ecm[appservice.ID]++
+					// Tell our worker to send out new messages by setting dirty bit for that
+					// worker to true, and waking them up with a broadcast
+					ws.Cond.L.Lock()
+					ws.EventsReady = true
+					ws.Cond.Broadcast()
+					ws.Cond.L.Unlock()
 				}
 			}
 		}

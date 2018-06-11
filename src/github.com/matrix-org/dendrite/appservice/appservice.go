@@ -15,9 +15,12 @@
 package appservice
 
 import (
+	"sync"
+
 	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/appservice/routing"
 	"github.com/matrix-org/dendrite/appservice/storage"
+	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/appservice/workers"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/common/basecomponent"
@@ -43,25 +46,29 @@ func SetupAppServiceAPIComponent(
 		logrus.WithError(err).Panicf("failed to connect to appservice db")
 	}
 
-	// Create a map that will keep a counter of events to be sent for each
-	// application service. This serves as an effective cache so that transaction
-	// workers do not need to query the database over and over in order to see
-	// whether there are events for them to send, but rather they can just check if
-	// their event counter is greater than zero. The counter for an application
-	// service is incremented when an event meant for them is inserted into the
-	// appservice database.
-	eventCounterMap := make(map[string]int)
+	// Wrap application services in a type that relates the application service and
+	// a sync.Cond object that can be used to notify workers when there are new
+	// events to be sent out.
+	workerStates := make([]types.ApplicationServiceWorkerState, len(base.Cfg.Derived.ApplicationServices))
+	for _, appservice := range base.Cfg.Derived.ApplicationServices {
+		m := sync.Mutex{}
+		ws := types.ApplicationServiceWorkerState{
+			AppService: appservice,
+			Cond:       sync.NewCond(&m),
+		}
+		workerStates = append(workerStates, ws)
+	}
 
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
-		queryAPI, aliasAPI, eventCounterMap,
+		queryAPI, aliasAPI, workerStates,
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start app service roomserver consumer")
 	}
 
 	// Create application service transaction workers
-	if err := workers.SetupTransactionWorkers(base.Cfg, appserviceDB, eventCounterMap); err != nil {
+	if err := workers.SetupTransactionWorkers(appserviceDB, workerStates); err != nil {
 		logrus.WithError(err).Panicf("failed to start app service transaction workers")
 	}
 
