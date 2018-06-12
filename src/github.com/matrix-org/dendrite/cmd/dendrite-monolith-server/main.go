@@ -61,7 +61,7 @@ func main() {
 		federation, &keyRing, alias, input, query,
 		transactions.New(),
 	)
-	federationapi.SetupFederationAPIComponent(base, accountDB, federation, &keyRing, alias, input, query)
+	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query)
 	federationsender.SetupFederationSenderComponent(base, federation, query)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)

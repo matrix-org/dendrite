@@ -26,6 +26,7 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
+	deviceDB := base.CreateDeviceDB()
 	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
@@ -33,7 +34,7 @@ func main() {
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
 
 	federationapi.SetupFederationAPIComponent(
-		base, accountDB, federation, &keyRing,
+		base, accountDB, deviceDB, federation, &keyRing,
 		alias, input, query,
 	)
 

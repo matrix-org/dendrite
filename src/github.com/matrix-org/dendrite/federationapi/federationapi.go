@@ -16,6 +16,7 @@ package federationapi
 
 import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	// TODO: Are we really wanting to pull in the producer from clientapi
@@ -29,6 +30,7 @@ import (
 func SetupFederationAPIComponent(
 	base *basecomponent.BaseDendrite,
 	accountsDB *accounts.Database,
+	deviceDB *devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
 	aliasAPI api.RoomserverAliasAPI,
@@ -39,6 +41,6 @@ func SetupFederationAPIComponent(
 
 	routing.Setup(
 		base.APIMux, *base.Cfg, queryAPI, aliasAPI,
-		roomserverProducer, *keyRing, federation, accountsDB,
+		roomserverProducer, *keyRing, federation, accountsDB, deviceDB,
 	)
 }
