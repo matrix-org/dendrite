@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common"
@@ -51,8 +52,9 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInRoomAlias(request.Alias) {
 			// The full path to the rooms API, includes hs token
-			apiURL := appservice.URL +
-				remoteAppServiceRoomAliasExistsPath + request.Alias + "?access_token=" + appservice.HSToken
+			URL, err := url.Parse(appservice.URL)
+			URL.Path += request.Alias
+			apiURL := URL.String() + "?access_token=" + appservice.HSToken
 
 			// Send a request to each application service. If one responds that it has
 			// created the room, immediately return.
