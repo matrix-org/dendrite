@@ -104,7 +104,7 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		}
 
 		// Batch events up into a transaction
-		eventsCount, maxEventID, transactionID, transactionJSON, err := createTransaction(ctx, db, ws.AppService.ID)
+		eventsCount, txnID, maxEventID, transactionJSON, err := createTransaction(ctx, db, ws.AppService.ID)
 		if err != nil {
 			log.WithError(err).Fatalf("appservice %s worker unable to create transaction",
 				ws.AppService.ID)
@@ -114,14 +114,11 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 
 		// Send the events off to the application service
 		// Backoff if the application service does not respond
-		for {
-			err = send(client, ws.AppService, transactionID, transactionJSON)
-			if err != nil {
-				// Backoff
-				backoff(&ws, err)
-				continue
-			}
-			break
+		err = send(client, ws.AppService, txnID, transactionJSON)
+		if err != nil {
+			// Backoff
+			backoff(&ws, err)
+			continue
 		}
 
 		// We sent successfully, hooray!
@@ -174,12 +171,10 @@ func createTransaction(
 	db *storage.Database,
 	appserviceID string,
 ) (
-	eventsCount, maxID, txnID int,
+	eventsCount, txnID, maxID int,
 	transactionJSON []byte,
 	err error,
 ) {
-	transactionID := currentTransactionID
-
 	// Retrieve the latest events from the DB (will return old events if they weren't successfully sent)
 	txnID, maxID, events, err := db.GetEventsWithAppServiceID(ctx, appserviceID, transactionBatchSize)
 	if err != nil {
@@ -189,12 +184,11 @@ func createTransaction(
 		return
 	}
 
-	// Check if these are old events we are resending. If so, reuse old transactionID
-	if txnID != -1 {
-		transactionID = txnID
-	} else {
+	// Check if these events already have a transaction ID
+	if txnID == -1 {
+		txnID = currentTransactionID
 		// Mark new events with current transactionID
-		err := db.UpdateTxnIDForEvents(ctx, appserviceID, maxID, transactionID)
+		err := db.UpdateTxnIDForEvents(ctx, appserviceID, maxID, currentTransactionID)
 		if err != nil {
 			return 0, 0, 0, nil, err
 		}
@@ -210,7 +204,8 @@ func createTransaction(
 		return
 	}
 
-	return len(events), maxID, transactionID, transactionJSON, nil
+	eventsCount = len(events)
+	return
 }
 
 // send sends events to an application service. Returns an error if an OK was not
@@ -218,11 +213,11 @@ func createTransaction(
 func send(
 	client *http.Client,
 	appservice config.ApplicationService,
-	transactionID int,
+	txnID int,
 	transaction []byte,
 ) error {
 	// POST a transaction to our AS
-	address := fmt.Sprintf("%s/transactions/%d", appservice.URL, transactionID)
+	address := fmt.Sprintf("%s/transactions/%d", appservice.URL, txnID)
 	resp, err := client.Post(address, "application/json", bytes.NewBuffer(transaction))
 	if err != nil {
 		return err

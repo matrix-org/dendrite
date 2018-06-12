@@ -125,15 +125,18 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 				applicationServiceID)
 		}
 	}()
-	events, _, maxID, err = retrieveEvents(eventRowsCurr)
+	events, maxID, txnID, err = retrieveEvents(eventRowsCurr)
 	if err != nil {
 		return 0, 0, nil, err
 	}
 
-	return -1, maxID, events, err
+	return
 }
 
-func retrieveEvents(eventRows *sql.Rows) (events []gomatrixserverlib.ApplicationServiceEvent, txnID, maxID int, err error) {
+func retrieveEvents(eventRows *sql.Rows) (events []gomatrixserverlib.ApplicationServiceEvent, maxID, txnID int, err error) {
+	// Get current time for use in calculating event age
+	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
+
 	// Iterate through each row and store event contents
 	// If txn_id changes dramatically, we've switched from collecting old events to
 	// new ones. Send back those events first.
@@ -172,8 +175,8 @@ func retrieveEvents(eventRows *sql.Rows) (events []gomatrixserverlib.Application
 		}
 
 		// Get age of the event from original timestamp and current time
-		ageMilli := time.Now().UnixNano() / int64(time.Millisecond)
-		event.Age = ageMilli - event.OriginServerTimestamp
+		// TODO: Consider removing age as not many app services use it
+		event.Age = nowMilli - event.OriginServerTimestamp
 
 		// TODO: Synapse does this. It's unnecessary to send Sender and UserID as the
 		// same value. Do app services really require this? :)
@@ -216,7 +219,7 @@ func (s *eventsStatements) insertEvent(
 		event.Type(),
 		event.Sender(),
 		event.Content(),
-		-1,
+		-1, // No transaction ID yet
 	)
 	return
 }
