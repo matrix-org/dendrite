@@ -39,7 +39,7 @@ var (
 	// TL;DR: Don't lower this number with any AS events still left in the database.
 	transactionBatchSize = 50
 	// Timeout for sending a single transaction to an application service.
-	transactionTimeout = time.Second * 15
+	transactionTimeout = time.Second * 60
 	// The current transaction ID. Increments after every successful transaction.
 	currentTransactionID = 0
 )
@@ -98,7 +98,6 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 	for {
 		// Wait for more events if we've sent all the events in the database
 		if *ws.EventsReady <= 0 {
-			fmt.Println("Waiting")
 			ws.Cond.L.Lock()
 			ws.Cond.Wait()
 			ws.Cond.L.Unlock()
@@ -114,11 +113,15 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		}
 
 		// Send the events off to the application service
-		err = send(client, ws.AppService, transactionID, transactionJSON)
-		if err != nil {
-			// Backoff
-			backoff(err, &ws)
-			continue
+		// Backoff if the application service does not respond
+		for {
+			err = send(client, ws.AppService, transactionID, transactionJSON)
+			if err != nil {
+				// Backoff
+				backoff(&ws, err)
+				continue
+			}
+			break
 		}
 
 		// We sent successfully, hooray!
@@ -147,7 +150,7 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 }
 
 // backoff pauses the calling goroutine for a 2^some backoff exponent seconds
-func backoff(err error, ws *types.ApplicationServiceWorkerState) {
+func backoff(ws *types.ApplicationServiceWorkerState, err error) {
 	// Calculate how long to backoff for
 	backoffDuration := time.Duration(math.Pow(2, float64(ws.Backoff)))
 	backoffSeconds := time.Second * backoffDuration
@@ -233,9 +236,8 @@ func send(
 
 	// Check the AS received the events correctly
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf(
-			"Non-OK status code %d returned from AS", resp.StatusCode,
-		)
+		// TODO: Handle non-200 error codes from application services
+		return fmt.Errorf("Non-OK status code %d returned from AS", resp.StatusCode)
 	}
 
 	return nil
