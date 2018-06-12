@@ -30,7 +30,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const remoteAppServiceRoomAliasExistsPath = "/rooms/"
+const roomAliasExistsPath = "/rooms/"
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
 type AppServiceQueryAPI struct {
@@ -52,7 +52,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInRoomAlias(request.Alias) {
 			// The full path to the rooms API, includes hs token
-			URL, err := url.Parse(appservice.URL)
+			URL, err := url.Parse(appservice.URL + roomAliasExistsPath)
 			URL.Path += request.Alias
 			apiURL := URL.String() + "?access_token=" + appservice.HSToken
 
