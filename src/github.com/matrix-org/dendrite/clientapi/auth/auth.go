@@ -90,6 +90,14 @@ func VerifyUserFromRequest(
 	}
 
 	if appService != nil {
+		// Create a dummy device for AS user
+		dev := authtypes.Device{
+			// Use AS dummy device ID
+			ID: types.AppServiceDeviceID,
+			// AS dummy device has AS's token.
+			AccessToken: token,
+		}
+
 		userID := req.URL.Query().Get("user_id")
 		localpart, err := userutil.ParseUsernameParam(userID, nil)
 		if err != nil {
@@ -99,28 +107,25 @@ func VerifyUserFromRequest(
 			}
 		}
 
-		// Verify that the user is registered
-		account, err := data.AccountDB.GetAccountByLocalpart(req.Context(), localpart)
-
-		// Verify that account exists & appServiceID matches
-		if err == nil && account.AppServiceID == appService.ID {
-			// Create a dummy device for AS user
-			dev := authtypes.Device{
-				// Use AS dummy device ID
-				ID: types.AppServiceDeviceID,
-				// User the AS is masquerading as.
-				UserID: userID,
-				// AS dummy device has AS's token.
-				AccessToken: token,
+		if localpart != "" { // AS is masquerading as another user
+			// Verify that the user is registered
+			account, err := data.AccountDB.GetAccountByLocalpart(req.Context(), localpart)
+			// Verify that account exists & appServiceID matches
+			if err == nil && account.AppServiceID == appService.ID {
+				// Set the userID of dummy device
+				dev.UserID = userID
+				return &dev, nil
 			}
 
-			return &dev, nil
+			return nil, &util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("Application service has not registered this user"),
+			}
 		}
 
-		return nil, &util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Application service has not registered this user"),
-		}
+		// AS is not masquerading as any user, so use AS's sender_localpart
+		dev.UserID = appService.SenderLocalpart
+		return &dev, nil
 	}
 
 	return nil, &util.JSONResponse{
