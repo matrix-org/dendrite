@@ -87,13 +87,15 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 			}
 		}
 	}
-	switch r.Preset {
-	case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat:
-		break
-	default:
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
+	if r.Preset != "" {
+		switch r.Preset {
+		case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat:
+			break
+		default:
+			return &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
+			}
 		}
 	}
 
