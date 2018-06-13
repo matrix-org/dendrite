@@ -52,7 +52,7 @@ CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_events(as_id);
 
 const selectEventsByApplicationServiceIDSQL = "" +
 	"SELECT id, event_id, origin_server_ts, room_id, type, sender, event_content, txn_id " +
-	"FROM appservice_events WHERE as_id = $1 ORDER BY txn_id DESC LIMIT $2"
+	"FROM appservice_events WHERE as_id = $1 ORDER BY txn_id DESC, id ASC LIMIT $2"
 
 const countEventsByApplicationServiceIDSQL = "" +
 	"SELECT COUNT(event_id) FROM appservice_events WHERE as_id = $1"
