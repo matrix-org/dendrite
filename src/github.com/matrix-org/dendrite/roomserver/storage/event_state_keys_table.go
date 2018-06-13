@@ -130,7 +130,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
-	var nIDs pq.Int64Array
+	nIDs := make(pq.Int64Array, len(eventStateKeyNIDs))
 	for i := range eventStateKeyNIDs {
 		nIDs[i] = int64(eventStateKeyNIDs[i])
 	}
