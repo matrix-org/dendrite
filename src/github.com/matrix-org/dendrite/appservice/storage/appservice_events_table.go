@@ -163,7 +163,7 @@ func retrieveEvents(eventRows *sql.Rows) (events []gomatrixserverlib.Application
 		// If txnID has changed on this event from the previous event, then we've
 		// reached the end of a transaction's events. Return only those events.
 		if lastTxnID > -2 && lastTxnID != txnID {
-			return
+			return events, maxID, lastTxnID, nil
 		}
 		lastTxnID = txnID
 
