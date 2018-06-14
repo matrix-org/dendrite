@@ -87,15 +87,12 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 			}
 		}
 	}
-	if r.Preset != "" {
-		switch r.Preset {
-		case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat:
-			break
-		default:
-			return &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
-			}
+	switch r.Preset {
+	case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat, "":
+	default:
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
 		}
 	}
 
@@ -172,7 +169,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 
 	var joinRules, historyVisibility string
 	switch r.Preset {
-	case presetPrivateChat:
+	case presetPrivateChat, "":
 		joinRules = joinRuleInvite
 		historyVisibility = historyVisibilityShared
 	case presetTrustedPrivateChat:
