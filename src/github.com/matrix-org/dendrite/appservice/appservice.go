@@ -15,6 +15,7 @@
 package appservice
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -27,7 +28,9 @@ import (
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/appservice/workers"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -39,6 +42,7 @@ import (
 func SetupAppServiceAPIComponent(
 	base *basecomponent.BaseDendrite,
 	accountsDB *accounts.Database,
+	deviceDB *devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	roomserverAliasAPI roomserverAPI.RoomserverAliasAPI,
 	roomserverQueryAPI roomserverAPI.RoomserverQueryAPI,
@@ -50,9 +54,6 @@ func SetupAppServiceAPIComponent(
 		logrus.WithError(err).Panicf("failed to connect to appservice db")
 	}
 
-	// Wrap application services in a type that relates the application service and
-	// a sync.Cond object that can be used to notify workers when there are new
-	// events to be sent out.
 	workerStates := make([]types.ApplicationServiceWorkerState, len(base.Cfg.Derived.ApplicationServices))
 	for i, appservice := range base.Cfg.Derived.ApplicationServices {
 		m := sync.Mutex{}
@@ -61,6 +62,13 @@ func SetupAppServiceAPIComponent(
 			Cond:       sync.NewCond(&m),
 		}
 		workerStates[i] = ws
+
+		// Create bot account for this AS if it doesn't already exist
+		if err = generateAppServiceAccount(accountsDB, deviceDB, appservice); err != nil {
+			logrus.WithFields(logrus.Fields{
+				"appservice": appservice.ID,
+			}).WithError(err).Panicf("failed to generate bot account for appservice")
+		}
 	}
 
 	// Create a HTTP client that this component will use for all outbound and
@@ -96,4 +104,28 @@ func SetupAppServiceAPIComponent(
 	)
 
 	return &appserviceQueryAPI
+}
+
+// generateAppServiceAccounts creates a dummy account based off the
+// `sender_localpart` field of each application service if it doesn't
+// exist already
+func generateAppServiceAccount(
+	accountsDB *accounts.Database,
+	deviceDB *devices.Database,
+	as config.ApplicationService,
+) error {
+	ctx := context.Background()
+
+	// Create an account for the application service
+	acc, err := accountsDB.CreateAccount(ctx, as.SenderLocalpart, "", as.ID)
+	if err != nil {
+		return err
+	} else if acc == nil {
+		// This account already exists
+		return nil
+	}
+
+	// Create a dummy device with a dummy token for the application service
+	_, err = deviceDB.CreateDevice(ctx, as.SenderLocalpart, nil, as.ASToken, &as.SenderLocalpart)
+	return err
 }
