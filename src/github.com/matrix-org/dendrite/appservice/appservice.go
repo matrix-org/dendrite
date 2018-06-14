@@ -50,7 +50,7 @@ func SetupAppServiceAPIComponent(
 	// a sync.Cond object that can be used to notify workers when there are new
 	// events to be sent out.
 	workerStates := make([]types.ApplicationServiceWorkerState, len(base.Cfg.Derived.ApplicationServices))
-	for _, appservice := range base.Cfg.Derived.ApplicationServices {
+	for i, appservice := range base.Cfg.Derived.ApplicationServices {
 		eventCount := 0
 
 		m := sync.Mutex{}
@@ -59,7 +59,7 @@ func SetupAppServiceAPIComponent(
 			Cond:        sync.NewCond(&m),
 			EventsReady: &eventCount,
 		}
-		workerStates = append(workerStates, ws)
+		workerStates[i] = ws
 	}
 
 	consumer := consumers.NewOutputRoomEventConsumer(

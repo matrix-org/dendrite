@@ -210,6 +210,12 @@ func (s *eventsStatements) insertEvent(
 	appServiceID string,
 	event *gomatrixserverlib.Event,
 ) (err error) {
+	// If event has no content, strip the json
+	content := event.Content()
+	if string(content) == "{\"disable\":true}" {
+		content = []byte("{}")
+	}
+
 	_, err = s.insertEventStmt.ExecContext(
 		ctx,
 		appServiceID,
@@ -218,7 +224,7 @@ func (s *eventsStatements) insertEvent(
 		event.RoomID(),
 		event.Type(),
 		event.Sender(),
-		event.Content(),
+		content,
 		-1, // No transaction ID yet
 	)
 	return

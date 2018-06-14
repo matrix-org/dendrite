@@ -116,6 +116,10 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	// Check if any events need to passed on to external application services
+	if len(events) > 0 {
+		// Check if this was a membership event
+		return s.filterRoomserverEvents(ctx, events)
+	}
 	return s.filterRoomserverEvents(ctx, append(events, ev))
 }
 
