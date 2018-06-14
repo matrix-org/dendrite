@@ -18,7 +18,6 @@ import (
 	"flag"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
@@ -58,13 +57,9 @@ func main() {
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
 	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 
-	asQuery := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
-	)
-
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
-		federation, &keyRing, alias, input, query, typingInputAPI, asQuery,
+		federation, &keyRing, alias, input, query, typingInputAPI,
 		transactions.New(),
 	)
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query)

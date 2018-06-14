@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -30,14 +29,12 @@ import (
 )
 
 // DirectoryRoom looks up a room alias
-// nolint: gocyclo
 func DirectoryRoom(
 	req *http.Request,
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverAliasAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
@@ -48,41 +45,18 @@ func DirectoryRoom(
 	}
 
 	if domain == cfg.Matrix.ServerName {
-		queryResp, err := getRoomIDForAlias(req, rsAPI, roomAlias)
-		if err != nil {
+		// Query the roomserver API to check if the alias exists locally
+		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
+		var queryRes roomserverAPI.GetRoomIDForAliasResponse
+		if err = rsAPI.GetRoomIDForAlias(req.Context(), &queryReq, &queryRes); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 
 		// List any roomIDs found associated with this alias
-		if len(queryResp.RoomID) > 0 {
+		if len(queryRes.RoomID) > 0 {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: queryResp,
-			}
-		}
-
-		// No rooms found locally, try our application services by making a call to
-		// the appservice component
-		aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: roomAlias}
-		var aliasResp appserviceAPI.RoomAliasExistsResponse
-		err = asAPI.RoomAliasExists(req.Context(), &aliasReq, &aliasResp)
-		if err != nil {
-			return httputil.LogThenError(req, err)
-		}
-
-		if aliasResp.AliasExists {
-			// Query the roomserver API again. We should have the room now
-			queryResp, err = getRoomIDForAlias(req, rsAPI, roomAlias)
-			if err != nil {
-				return httputil.LogThenError(req, err)
-			}
-
-			// List any roomIDs found associated with this alias
-			if len(queryResp.RoomID) > 0 {
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: queryResp,
-				}
+				JSON: queryRes,
 			}
 		}
 	} else {
@@ -111,25 +85,6 @@ func DirectoryRoom(
 			fmt.Sprintf("Room alias %s not found", roomAlias),
 		),
 	}
-}
-
-// getRoomIDForAlias queries the roomserver API and returns a Directory Response
-// on a successful query
-func getRoomIDForAlias(
-	req *http.Request,
-	rsAPI roomserverAPI.RoomserverAliasAPI,
-	roomAlias string,
-) (resp gomatrixserverlib.RespDirectory, err error) {
-	// Query the roomserver API to check if the alias exists locally
-	queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
-	var queryRes roomserverAPI.GetRoomIDForAliasResponse
-	if err = rsAPI.GetRoomIDForAlias(req.Context(), &queryReq, &queryRes); err != nil {
-		return
-	}
-	return gomatrixserverlib.RespDirectory{
-		RoomID:  queryRes.RoomID,
-		Servers: []gomatrixserverlib.ServerName{},
-	}, nil
 }
 
 // SetLocalAlias implements PUT /directory/room/{roomAlias}

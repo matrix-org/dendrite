@@ -15,7 +15,6 @@
 package clientapi
 
 import (
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/consumers"
@@ -41,7 +40,6 @@ func SetupClientAPIComponent(
 	inputAPI roomserverAPI.RoomserverInputAPI,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
 	typingInputAPI typingServerAPI.TypingServerInputAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
@@ -65,7 +63,7 @@ func SetupClientAPIComponent(
 	}
 
 	routing.Setup(
-		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, asAPI, aliasAPI,
+		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
 		syncProducer, typingProducer, transactionsCache,
 	)

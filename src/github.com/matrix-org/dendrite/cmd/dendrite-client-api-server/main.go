@@ -19,6 +19,8 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
+	"github.com/matrix-org/dendrite/typingserver"
+	"github.com/matrix-org/dendrite/typingserver/cache"
 )
 
 func main() {
@@ -34,13 +36,11 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
-	typingInputAPI := base.CreateHTTPTypingServerAPIs()
-	asQuery := base.CreateHTTPAppServiceAPIs()
-	cache := transactions.New()
+	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, &keyRing,
-		alias, input, query, typingInputAPI, asQuery, cache,
+		alias, input, query, typingInputAPI, transactions.New(),
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.ClientAPI))

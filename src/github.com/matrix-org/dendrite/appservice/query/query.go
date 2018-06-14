@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common"
@@ -47,6 +48,11 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 ) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceRoomAlias")
 	defer span.Finish()
+
+	// Create an HTTP client if one does not already exist
+	if a.HTTPClient == nil {
+		a.HTTPClient = makeHTTPClient()
+	}
 
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
@@ -94,6 +100,13 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 
 	response.AliasExists = false
 	return nil
+}
+
+// makeHTTPClient creates an HTTP client with certain options that will be used for all query requests to application services
+func makeHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: time.Second * 30,
+	}
 }
 
 // SetupHTTP adds the AppServiceQueryPAI handlers to the http.ServeMux. This
