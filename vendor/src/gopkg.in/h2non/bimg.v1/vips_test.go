@@ -33,7 +33,7 @@ func TestVipsSave(t *testing.T) {
 
 	for _, typ := range types {
 		image, _, _ := vipsRead(readImage("test.jpg"))
-		options := vipsSaveOptions{Quality: 95, Type: typ}
+		options := vipsSaveOptions{Quality: 95, Type: typ, StripMetadata: true}
 
 		buf, err := vipsSave(image, options)
 		if err != nil {
@@ -144,6 +144,13 @@ func TestVipsImageType(t *testing.T) {
 	}
 }
 
+func TestVipsImageTypeInvalid(t *testing.T) {
+	imgType := vipsImageType([]byte("vip"))
+	if imgType != UNKNOWN {
+		t.Fatal("Invalid image type")
+	}
+}
+
 func TestVipsMemory(t *testing.T) {
 	mem := VipsMemory()
 
@@ -156,7 +163,7 @@ func TestVipsMemory(t *testing.T) {
 }
 
 func readImage(file string) []byte {
-	img, _ := os.Open(path.Join("fixtures", file))
+	img, _ := os.Open(path.Join("testdata", file))
 	buf, _ := ioutil.ReadAll(img)
 	defer img.Close()
 	return buf

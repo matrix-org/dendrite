@@ -299,26 +299,20 @@
 			"branch": "master"
 		},
 		{
-			"importpath": "github.com/tj/go-debug",
-			"repository": "https://github.com/tj/go-debug",
-			"revision": "ff4a55a20a86994118644bbddc6a216da193cc13",
-			"branch": "master"
-		},
-		{
 			"importpath": "github.com/uber-go/atomic",
 			"repository": "https://github.com/uber-go/atomic",
 			"revision": "54f72d32435d760d5604f17a82e2435b28dc4ba5",
 			"branch": "master"
 		},
 		{
-			"importpath": "github.com/uber/jaeger-client-go",
-			"repository": "https://github.com/uber/jaeger-client-go",
+			"importpath": "github.com/jaegertracing/jaeger-client-go",
+			"repository": "https://github.com/jaegertracing/jaeger-client-go",
 			"revision": "3ad49a1d839b517923a6fdac36d81cbf7b744f37",
 			"branch": "master"
 		},
 		{
-			"importpath": "github.com/uber/jaeger-lib/metrics",
-			"repository": "https://github.com/uber/jaeger-lib",
+			"importpath": "github.com/jaegertracing/jaeger-lib/metrics",
+			"repository": "https://github.com/jaegertracing/jaeger-lib",
 			"revision": "21a3da6d66fe0e278072676fdc84cd4c9ccb9b67",
 			"branch": "master",
 			"path": "/metrics"
@@ -458,7 +452,7 @@
 		{
 			"importpath": "gopkg.in/h2non/bimg.v1",
 			"repository": "https://gopkg.in/h2non/bimg.v1",
-			"revision": "45f8993550e71ee7b8001d40c681c6c9fa822357",
+			"revision": "02e621739c77c791d8c153f240b7a1f75b07816f",
 			"branch": "master"
 		},
 		{
