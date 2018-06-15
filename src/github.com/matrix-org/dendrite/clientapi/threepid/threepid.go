@@ -81,7 +81,7 @@ func CreateSession(
 
 	// Error if the status isn't OK
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Could not create a session on the server %s", req.IDServer)
+		return "", fmt.Errorf("could not create a session on the server %s", req.IDServer)
 	}
 
 	// Extract the SID from the response and return it
@@ -168,7 +168,7 @@ func PublishAssociation(creds Credentials, userID string, cfg config.Dendrite) e
 
 	// Error if the status isn't OK
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Could not publish the association on the server %s", creds.IDServer)
+		return fmt.Errorf("could not publish the association on the server %s", creds.IDServer)
 	}
 
 	return nil

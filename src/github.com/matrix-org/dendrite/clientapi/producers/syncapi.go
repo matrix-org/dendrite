@@ -41,7 +41,7 @@ func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string
 		return err
 	}
 
-	m.Topic = string(p.Topic)
+	m.Topic = p.Topic
 	m.Key = sarama.StringEncoder(userID)
 	m.Value = sarama.ByteEncoder(value)
 

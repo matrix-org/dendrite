@@ -725,19 +725,19 @@ func isValidMacLogin(
 
 	// Check that shared secret registration isn't disabled.
 	if cfg.Matrix.RegistrationSharedSecret == "" {
-		return false, errors.New("Shared secret registration is disabled")
+		return false, errors.New("shared secret registration is disabled")
 	}
 
 	// Double check that username/password don't contain the HMAC delimiters. We should have
 	// already checked this.
 	if strings.Contains(username, "\x00") {
-		return false, errors.New("Username contains invalid character")
+		return false, errors.New("username contains invalid character")
 	}
 	if strings.Contains(password, "\x00") {
-		return false, errors.New("Password contains invalid character")
+		return false, errors.New("password contains invalid character")
 	}
 	if sharedSecret == "" {
-		return false, errors.New("Shared secret registration is disabled")
+		return false, errors.New("shared secret registration is disabled")
 	}
 
 	adminString := "notadmin"

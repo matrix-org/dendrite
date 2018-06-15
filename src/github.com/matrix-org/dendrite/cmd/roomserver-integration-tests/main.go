@@ -139,7 +139,7 @@ func runAndReadFromTopic(runCmd *exec.Cmd, readyURL string, doInput func(), topi
 	}()
 	go func() {
 		time.Sleep(timeout)
-		done <- result{nil, fmt.Errorf("Timeout reading %d messages from topic %q", count, topic)}
+		done <- result{nil, fmt.Errorf("timeout reading %d messages from topic %q", count, topic)}
 	}()
 
 	// Poll the HTTP listener of the process waiting for it to be ready to receive requests.
@@ -266,12 +266,12 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	}
 
 	if len(wantOutput) != len(gotOutput) {
-		panic(fmt.Errorf("Wanted %d lines of output got %d lines", len(wantOutput), len(gotOutput)))
+		panic(fmt.Errorf("wanted %d lines of output got %d lines", len(wantOutput), len(gotOutput)))
 	}
 
 	for i := range wantOutput {
 		if !equalJSON(wantOutput[i], gotOutput[i]) {
-			panic(fmt.Errorf("Wanted %q at index %d got %q", wantOutput[i], i, gotOutput[i]))
+			panic(fmt.Errorf("wanted %q at index %d got %q", wantOutput[i], i, gotOutput[i]))
 		}
 	}
 }
@@ -407,13 +407,13 @@ func main() {
 			panic(err)
 		}
 		if !response.RoomExists {
-			panic(fmt.Errorf(`Wanted room "!HCXfdvrfksxuYnIFiJ:matrix.org" to exist`))
+			panic(fmt.Errorf(`wanted room "!HCXfdvrfksxuYnIFiJ:matrix.org" to exist`))
 		}
 		if len(response.LatestEvents) != 1 || response.LatestEvents[0].EventID != "$1463671339126270PnVwC:matrix.org" {
-			panic(fmt.Errorf(`Wanted "$1463671339126270PnVwC:matrix.org" to be the latest event got %#v`, response.LatestEvents))
+			panic(fmt.Errorf(`wanted "$1463671339126270PnVwC:matrix.org" to be the latest event got %#v`, response.LatestEvents))
 		}
 		if len(response.StateEvents) != 1 || response.StateEvents[0].EventID() != "$1463671339126270PnVwC:matrix.org" {
-			panic(fmt.Errorf(`Wanted "$1463671339126270PnVwC:matrix.org" to be the state event got %#v`, response.StateEvents))
+			panic(fmt.Errorf(`wanted "$1463671339126270PnVwC:matrix.org" to be the state event got %#v`, response.StateEvents))
 		}
 	})
 

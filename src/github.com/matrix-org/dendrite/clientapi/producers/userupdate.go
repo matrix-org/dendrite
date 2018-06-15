@@ -42,7 +42,7 @@ func (p *UserUpdateProducer) SendUpdate(
 	var update profileUpdate
 	var m sarama.ProducerMessage
 
-	m.Topic = string(p.Topic)
+	m.Topic = p.Topic
 	m.Key = sarama.StringEncoder(userID)
 
 	update = profileUpdate{

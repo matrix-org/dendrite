@@ -387,8 +387,8 @@ func (r *downloadRequest) getThumbnailFile(
 		"FileSizeBytes": thumbnail.MediaMetadata.FileSizeBytes,
 		"ContentType":   thumbnail.MediaMetadata.ContentType,
 	})
-	thumbPath := string(thumbnailer.GetThumbnailPath(types.Path(filePath), thumbnail.ThumbnailSize))
-	thumbFile, err := os.Open(string(thumbPath))
+	thumbPath := string(thumbnailer.GetThumbnailPath(filePath, thumbnail.ThumbnailSize))
+	thumbFile, err := os.Open(thumbPath)
 	if err != nil {
 		thumbFile.Close() // nolint: errcheck
 		return nil, nil, errors.Wrap(err, "failed to open file")
@@ -661,7 +661,7 @@ func (r *downloadRequest) fetchRemoteFile(
 	// It's possible the bytesWritten to the temporary file is different to the reported Content-Length from the remote
 	// request's response. bytesWritten is therefore used as it is what would be sent to clients when reading from the local
 	// file.
-	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(bytesWritten)
+	r.MediaMetadata.FileSizeBytes = bytesWritten
 	r.MediaMetadata.Base64Hash = hash
 
 	// The database is the source of truth so we need to have moved the file first
@@ -674,7 +674,7 @@ func (r *downloadRequest) fetchRemoteFile(
 		// Continue on to store the metadata in the database
 	}
 
-	return types.Path(finalPath), duplicate, nil
+	return finalPath, duplicate, nil
 }
 
 func (r *downloadRequest) createRemoteRequest(

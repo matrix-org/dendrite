@@ -148,7 +148,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&ev, "", types.StreamPosition(syncStreamPos))
+	s.notifier.OnNewEvent(&ev, "", syncStreamPos)
 
 	return nil
 }

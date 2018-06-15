@@ -269,7 +269,7 @@ func (s *publicRoomsStatements) updateRoomAttribute(
 	case bool, string:
 		value = attrValue
 	default:
-		return errors.New("Unsupported attribute type, must be bool, string or []string")
+		return errors.New("unsupported attribute type, must be bool, string or []string")
 	}
 
 	_, err := stmt.ExecContext(ctx, value, roomID)

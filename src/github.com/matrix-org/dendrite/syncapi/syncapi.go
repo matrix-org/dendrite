@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
-	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 // SetupSyncAPIComponent sets up and registers HTTP handlers for the SyncAPI
@@ -49,7 +48,7 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to get stream position")
 	}
 
-	notifier := sync.NewNotifier(types.StreamPosition(pos))
+	notifier := sync.NewNotifier(pos)
 	err = notifier.Load(context.Background(), syncDB)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start notifier")

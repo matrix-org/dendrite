@@ -35,10 +35,10 @@ import (
 // For example, if Base64Hash is 'qwerty', the path will be 'q/w/erty/file'.
 func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath config.Path) (string, error) {
 	if len(base64Hash) < 3 {
-		return "", fmt.Errorf("Invalid filePath (Base64Hash too short - min 3 characters): %q", base64Hash)
+		return "", fmt.Errorf("invalid filePath (Base64Hash too short - min 3 characters): %q", base64Hash)
 	}
 	if len(base64Hash) > 255 {
-		return "", fmt.Errorf("Invalid filePath (Base64Hash too long - max 255 characters): %q", base64Hash)
+		return "", fmt.Errorf("invalid filePath (Base64Hash too long - max 255 characters): %q", base64Hash)
 	}
 
 	filePath, err := filepath.Abs(filepath.Join(
@@ -49,14 +49,14 @@ func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath config.Path)
 		"file",
 	))
 	if err != nil {
-		return "", fmt.Errorf("Unable to construct filePath: %q", err)
+		return "", fmt.Errorf("unable to construct filePath: %q", err)
 	}
 
 	// check if the absolute absBasePath is a prefix of the absolute filePath
 	// if so, no directory escape has occurred and the filePath is valid
 	// Note: absBasePath is already absolute
 	if !strings.HasPrefix(filePath, string(absBasePath)) {
-		return "", fmt.Errorf("Invalid filePath (not within absBasePath %v): %v", absBasePath, filePath)
+		return "", fmt.Errorf("invalid filePath (not within absBasePath %v): %v", absBasePath, filePath)
 	}
 
 	return filePath, nil
@@ -143,11 +143,11 @@ func moveFile(src types.Path, dst types.Path) error {
 
 	err := os.MkdirAll(dstDir, 0770)
 	if err != nil {
-		return fmt.Errorf("Failed to make directory: %q", err)
+		return fmt.Errorf("failed to make directory: %q", err)
 	}
 	err = os.Rename(string(src), string(dst))
 	if err != nil {
-		return fmt.Errorf("Failed to move directory: %q", err)
+		return fmt.Errorf("failed to move directory: %q", err)
 	}
 	return nil
 }
@@ -155,11 +155,11 @@ func moveFile(src types.Path, dst types.Path) error {
 func createTempFileWriter(absBasePath config.Path) (*bufio.Writer, *os.File, types.Path, error) {
 	tmpDir, err := createTempDir(absBasePath)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("Failed to create temp dir: %q", err)
+		return nil, nil, "", fmt.Errorf("failed to create temp dir: %q", err)
 	}
 	writer, tmpFile, err := createFileWriter(tmpDir)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("Failed to create file writer: %q", err)
+		return nil, nil, "", fmt.Errorf("failed to create file writer: %q", err)
 	}
 	return writer, tmpFile, tmpDir, nil
 }
@@ -168,11 +168,11 @@ func createTempFileWriter(absBasePath config.Path) (*bufio.Writer, *os.File, typ
 func createTempDir(baseDirectory config.Path) (types.Path, error) {
 	baseTmpDir := filepath.Join(string(baseDirectory), "tmp")
 	if err := os.MkdirAll(baseTmpDir, 0770); err != nil {
-		return "", fmt.Errorf("Failed to create base temp dir: %v", err)
+		return "", fmt.Errorf("failed to create base temp dir: %v", err)
 	}
 	tmpDir, err := ioutil.TempDir(baseTmpDir, "")
 	if err != nil {
-		return "", fmt.Errorf("Failed to create temp dir: %v", err)
+		return "", fmt.Errorf("failed to create temp dir: %v", err)
 	}
 	return types.Path(tmpDir), nil
 }
@@ -184,7 +184,7 @@ func createFileWriter(directory types.Path) (*bufio.Writer, *os.File, error) {
 	filePath := filepath.Join(string(directory), "content")
 	file, err := os.Create(filePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create file: %v", err)
+		return nil, nil, fmt.Errorf("failed to create file: %v", err)
 	}
 
 	return bufio.NewWriter(file), file, nil

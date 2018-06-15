@@ -281,7 +281,7 @@ func hashPassword(plaintext string) (hash string, err error) {
 
 // Err3PIDInUse is the error returned when trying to save an association involving
 // a third-party identifier which is already associated to a local user.
-var Err3PIDInUse = errors.New("This third-party identifier is already in use")
+var Err3PIDInUse = errors.New("this third-party identifier is already in use")
 
 // SaveThreePIDAssociation saves the association between a third party identifier
 // and a local Matrix user (identified by the user's ID's local part).

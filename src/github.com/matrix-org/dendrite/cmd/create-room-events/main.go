@@ -139,6 +139,6 @@ func writeEvent(event gomatrixserverlib.Event) {
 			panic(err)
 		}
 	} else {
-		panic(fmt.Errorf("Format %q is not valid, must be %q or %q", format, "InputRoomEvent", "Event"))
+		panic(fmt.Errorf("format %q is not valid, must be %q or %q", *format, "InputRoomEvent", "Event"))
 	}
 }

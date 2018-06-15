@@ -96,7 +96,7 @@ func LoadStateAtSnapshot(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("Corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+			panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
 		}
 		fullState = append(fullState, entries...)
 	}
@@ -167,7 +167,7 @@ func LoadCombinedStateAfterEvents(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("Corrupt DB: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
+			panic(fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
 		}
 
 		// Combine all the state entries for this snapshot.
@@ -178,7 +178,7 @@ func LoadCombinedStateAfterEvents(
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				panic(fmt.Errorf("Corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+				panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
 			}
 			fullState = append(fullState, entries...)
 		}
@@ -754,7 +754,7 @@ func resolveConflicts(
 	for _, resolvedEvent := range resolvedEvents {
 		entry, ok := eventIDMap[resolvedEvent.EventID()]
 		if !ok {
-			panic(fmt.Errorf("Missing state entry for event ID %q", resolvedEvent.EventID()))
+			panic(fmt.Errorf("missing state entry for event ID %q", resolvedEvent.EventID()))
 		}
 		notConflicted = append(notConflicted, entry)
 	}
@@ -826,7 +826,7 @@ func loadStateEvents(
 	for i := range entries {
 		event, ok := eventMap(events).lookup(entries[i].EventNID)
 		if !ok {
-			panic(fmt.Errorf("Corrupt DB: Missing event numeric ID %d", entries[i].EventNID))
+			panic(fmt.Errorf("corrupt DB: Missing event numeric ID %d", entries[i].EventNID))
 		}
 		result[i] = event.Event
 		eventIDMap[event.Event.EventID()] = entries[i]

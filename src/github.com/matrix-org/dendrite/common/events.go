@@ -29,7 +29,7 @@ import (
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
 // doesn't exist
-var ErrRoomNoExists = errors.New("Room does not exist")
+var ErrRoomNoExists = errors.New("room does not exist")
 
 // BuildEvent builds a Matrix event using the event builder and roomserver query
 // API client provided. If also fills roomserver query API response (if provided)

@@ -74,7 +74,7 @@ func (r *Request) Do() (err error) {
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, // nolint: gas
 			},
 		},
 	}

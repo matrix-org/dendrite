@@ -547,8 +547,8 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 // checkLogging verifies the parameters logging.* are valid.
 func (config *Dendrite) checkLogging(configErrs *configErrors) {
 	for _, logrusHook := range config.Logging {
-		checkNotEmpty(configErrs, "logging.type", string(logrusHook.Type))
-		checkNotEmpty(configErrs, "logging.level", string(logrusHook.Level))
+		checkNotEmpty(configErrs, "logging.type", logrusHook.Type)
+		checkNotEmpty(configErrs, "logging.level", logrusHook.Level)
 	}
 }
 
