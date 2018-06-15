@@ -8,12 +8,6 @@
 			"branch": "master"
 		},
 		{
-			"importpath": "github.com/alecthomas/gometalinter",
-			"repository": "https://github.com/alecthomas/gometalinter",
-			"revision": "b8b1f84ae8cb72e7870785840eab2d6c6355aa9f",
-			"branch": "master"
-		},
-		{
 			"importpath": "github.com/alecthomas/units",
 			"repository": "https://github.com/alecthomas/units",
 			"revision": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a",

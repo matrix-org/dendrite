@@ -17,7 +17,7 @@ gb build
 echo "Double checking it builds..."
 go build github.com/matrix-org/dendrite/cmd/...
 
-./scripts/find-lint.sh
+./scripts/find-lint-ci.sh
 
 echo "Testing..."
 gb test

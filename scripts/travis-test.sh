@@ -47,7 +47,7 @@ function kill_kafka {
 }
 
 if [ "${TEST_SUITE:-lint}" == "lint" ]; then
-    ./scripts/find-lint.sh
+    ./scripts/find-lint-ci.sh
 fi
 
 if [ "${TEST_SUITE:-unit-test}" == "unit-test" ]; then
@@ -58,7 +58,7 @@ if [ "${TEST_SUITE:-integ-test}" == "integ-test" ]; then
     travis_start gb-build "Building dendrite and integ tests"
     gb build
     travis_end
-    
+
     # Check that all the packages can build.
     # When `go build` is given multiple packages it won't output anything, and just
     # checks that everything builds. This seems to do a better job of handling
