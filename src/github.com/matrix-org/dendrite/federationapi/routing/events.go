@@ -17,9 +17,7 @@ package routing
 import (
 	"context"
 	"net/http"
-	"time"
 
-	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -29,10 +27,7 @@ import (
 func GetEvent(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	_ config.Dendrite,
 	query api.RoomserverQueryAPI,
-	_ time.Time,
-	_ gomatrixserverlib.KeyRing,
 	eventID string,
 ) util.JSONResponse {
 	var authResponse api.QueryServerAllowedToSeeEventResponse
