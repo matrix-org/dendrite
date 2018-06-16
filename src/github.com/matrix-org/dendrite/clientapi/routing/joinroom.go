@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -52,7 +53,7 @@ func JoinRoomByIDOrAlias(
 		return *resErr
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, err := userutil.ParseUsernameParam(device.UserID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

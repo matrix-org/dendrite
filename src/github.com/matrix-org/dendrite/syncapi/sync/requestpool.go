@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -143,7 +144,7 @@ func (rp *RequestPool) appendAccountData(
 	// data keys were set between two message. This isn't a huge issue since the
 	// duplicate data doesn't represent a huge quantity of data, but an optimisation
 	// here would be making sure each data is sent only once to the client.
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return nil, err
 	}

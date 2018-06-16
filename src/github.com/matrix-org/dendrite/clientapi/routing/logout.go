@@ -21,7 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/util"
 )
 
@@ -36,7 +36,7 @@ func Logout(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, err := userutil.ParseUsernameParam(device.UserID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -55,7 +55,7 @@ func Logout(
 func LogoutAll(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, err := userutil.ParseUsernameParam(device.UserID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

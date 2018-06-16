@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -41,7 +42,7 @@ func GetProfile(
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -64,7 +65,7 @@ func GetProfile(
 func GetAvatarURL(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -108,7 +109,7 @@ func SetAvatarURL(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -156,7 +157,7 @@ func SetAvatarURL(
 func GetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -200,7 +201,7 @@ func SetDisplayName(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
