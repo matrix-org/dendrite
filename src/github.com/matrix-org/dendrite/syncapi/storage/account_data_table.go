@@ -20,7 +20,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -99,7 +99,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	ctx context.Context,
 	userID string,
 	oldPos, newPos types.StreamPosition,
-	accountDataFilterPart *gomatrix.FilterPart,
+	accountDataFilterPart *gomatrixserverlib.FilterPart,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
