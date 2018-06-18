@@ -70,8 +70,10 @@ type ApplicationService struct {
 // and loads their data into the config object for later access.
 func loadAppservices(config *Dendrite) error {
 	for _, configPath := range config.ApplicationServices.ConfigFiles {
-		// Create a new application service
-		var appservice ApplicationService
+		// Create a new application service with default options
+		appservice := ApplicationService{
+			RateLimited: true,
+		}
 
 		// Create an absolute path from a potentially relative path
 		absPath, err := filepath.Abs(configPath)
