@@ -170,7 +170,6 @@ func appendExclusiveNamespaceRegexs(
 
 // checkErrors checks for any configuration errors amongst the loaded
 // application services according to the application service spec.
-// nolint: gocyclo
 func checkErrors(config *Dendrite) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
@@ -183,25 +182,8 @@ func checkErrors(config *Dendrite) (err error) {
 		// Namespace-related checks
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			for _, namespace := range namespaceSlice {
-				// Check that namespace(s) are valid regex
-				if !IsValidRegex(namespace.Regex) {
-					return configErrors([]string{fmt.Sprintf(
-						"Invalid regex string for Application Service %s", appservice.ID,
-					)})
-				}
-
-				// Check if GroupID for the users namespace is in the correct format
-				if key == "users" && namespace.GroupID != "" {
-					// TODO: Remove once group_id is implemented
-					log.Warn("WARNING: Application service option group_id is currently unimplemented")
-
-					correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
-					if !correctFormat {
-						return configErrors([]string{fmt.Sprintf(
-							"Invalid user group_id field for application service %s.",
-							appservice.ID,
-						)})
-					}
+				if err := validateNamespace(&appservice, key, &namespace, groupIDRegexp); err != nil {
+					return err
 				}
 			}
 		}
@@ -248,6 +230,39 @@ func checkErrors(config *Dendrite) (err error) {
 	}
 
 	return setupRegexps(config)
+}
+
+// validateNamespace returns nil or an error based on whether a given
+// application service namespace is valid. A namespace is valid if it has the
+// required fields, and its regex is correct.
+func validateNamespace(
+	appservice *ApplicationService,
+	key string,
+	namespace *ApplicationServiceNamespace,
+	groupIDRegexp *regexp.Regexp,
+) error {
+	// Check that namespace(s) are valid regex
+	if !IsValidRegex(namespace.Regex) {
+		return configErrors([]string{fmt.Sprintf(
+			"Invalid regex string for Application Service %s", appservice.ID,
+		)})
+	}
+
+	// Check if GroupID for the users namespace is in the correct format
+	if key == "users" && namespace.GroupID != "" {
+		// TODO: Remove once group_id is implemented
+		log.Warn("WARNING: Application service option group_id is currently unimplemented")
+
+		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
+		if !correctFormat {
+			return configErrors([]string{fmt.Sprintf(
+				"Invalid user group_id field for application service %s.",
+				appservice.ID,
+			)})
+		}
+	}
+
+	return nil
 }
 
 // IsValidRegex returns true or false based on whether the
