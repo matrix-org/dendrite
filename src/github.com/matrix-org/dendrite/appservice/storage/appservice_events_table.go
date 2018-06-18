@@ -174,9 +174,12 @@ func retrieveEvents(eventRows *sql.Rows) (events []gomatrixserverlib.Application
 			maxID = id
 		}
 
-		// Get age of the event from original timestamp and current time
-		// TODO: Consider removing age as not many app services use it
-		event.Age = nowMilli - event.OriginServerTimestamp
+		// Portion of the event that is unsigned due to rapid change
+		event.Unsigned = gomatrixserverlib.ApplicationServiceUnsigned{
+			// Get age of the event from original timestamp and current time
+			// TODO: Consider removing age as not many app services use it
+			Age: nowMilli - event.OriginServerTimestamp,
+		}
 
 		// TODO: Synapse does this. It's unnecessary to send Sender and UserID as the
 		// same value. Do app services really require this? :)
