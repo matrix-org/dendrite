@@ -16,8 +16,6 @@ bimg was heavily inspired in [sharp](https://github.com/lovell/sharp), its homol
 **v1 notice**: `bimg` introduces some minor breaking changes in `v1` release.
 If you're using `gopkg.in`, you can still rely in the `v0` without worrying about API breaking changes.
 
-`bimg` is currently maintained by [Kirill Danshin](https://github.com/kirillDanshin).
-
 ## Contents
 
 - [Supported image operations](#supported-image-operations)
@@ -35,18 +33,19 @@ If you're using `gopkg.in`, you can still rely in the `v0` without worrying abou
 
 - Resize
 - Enlarge
-- Crop (including smart crop support)
+- Crop (including smart crop support, libvips 8.5+)
 - Rotate (with auto-rotate based on EXIF orientation)
 - Flip (with auto-flip based on EXIF metadata)
 - Flop
 - Zoom
 - Thumbnail
 - Extract area
-- Watermark (text only)
+- Watermark (using text or image)
 - Gaussian blur effect
 - Custom output color space (RGB, grayscale...)
 - Format conversion (with additional quality/compression settings)
 - EXIF metadata (size, alpha channel, profile, orientation...)
+- Trim (libvips 8.6+)
 
 ## Prerequisites
 
@@ -132,7 +131,7 @@ if err != nil {
 }
 
 size, err := bimg.NewImage(newImage).Size()
-if size.Width == 400 && size.Height == 300 {
+if size.Width == 800 && size.Height == 600 {
   fmt.Println("The image size is valid")
 }
 

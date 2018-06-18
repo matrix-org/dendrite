@@ -1,4 +1,96 @@
 
+## v1.0.18 / 2017-12-22
+
+  * Merge pull request #216 from Bynder/master
+  * Merge pull request #208 from mikestead/feature/webp-lossless
+  * Remove go-debug usage
+  * refactor(docs): remove codesponsor :(
+  * fix(options): use float64 type in Options.Threshold
+  * Merge pull request #206 from tstm/add-trim-options
+  * Add lossless option for saving webp
+  * Set the test file to write its own file
+  * Add the option to use background and threshold options on trim
+
+## v1.0.17 / 2017-11-14
+
+  * refactor(resizer): remove fmt statement
+  * fix(type_test): use string formatting
+  * Merge pull request #207 from traum-ferienwohnungen/nearest-neighbour
+  * Add nearest-neighbour interpolation
+  * Merge pull request #203 from traum-ferienwohnungen/fix_icc_memory_leak
+  * Fix memory leak on icc_transform
+
+## v1.0.16 / 2017-10-30
+
+  * fix(travis): use install directive
+  * Merge branch 'master' of https://github.com/h2non/bimg
+  * feat: add Gopkg manifests, move fixtures to testdata, add vendor dependencies
+  * Merge pull request #202 from openskydoor/openskydoor/fix-build-tag
+  * fix build tag
+  * fix(#199): presinstall.sh tarball download URL
+
+## v1.0.15 / 2017-10-05
+
+  * Merge pull request #198 from greut/webpload
+  * Add shrink-on-load for webp.
+  * Merge pull request #197 from greut/typos
+  * Small typo.
+  * feat(docs): add codesponsor
+
+## v1.0.14 / 2017-09-12
+
+  * Merge pull request #192 from greut/trim
+  * Adding trim operation.
+  * Merge pull request #191 from greut/alpha4
+  * Update 8.6 to alpha4.
+
+## v1.0.13 / 2017-09-11
+
+  * Merge pull request #190 from greut/typos
+  * Fix typo and small cleanup.
+
+## v1.0.12 / 2017-09-10
+
+  * Merge branch '99designs-vips-reduce'
+  * fix(reduce): resolve conflicts with master
+  * Use vips reduce when downscaling
+
+## v1.0.11 / 2017-09-10
+
+  * feat(#189): allow strip image metadata via bimg.Options.StripMetadata = bool
+  * fix(resize): code format issue
+  * refactor(resize): add Go version comment
+  * refactor(tests): fix minor code formatting issues
+  * fix(#162): garbage collection fix. split Resize() implementation for Go runtime specific
+  * feat(travis): add go 1.9
+  * Merge pull request #183 from greut/autorotate
+  * Proper handling of the EXIF cases.
+  * Merge pull request #184 from greut/libvips858
+  * Merge branch 'master' into libvips858
+  * Merge pull request #185 from greut/libvips860
+  * Add libvips 8.6 pre-release
+  * Update to libvips 8.5.8
+  * fix(resize): runtime.KeepAlive is only Go
+  * fix(#159): prevent buf to be freed by the GC before resize function exits
+  * Merge pull request #171 from greut/fix-170
+  * Check the length before jumping into buffer.
+  * Merge pull request #168 from Traum-Ferienwohnungen/icc_transform
+  * Add option to convert embedded ICC profiles
+  * Merge pull request #166 from danjou-a/patch-1
+  * Fix Resize verification value
+  * Merge pull request #165 from greut/libvips846
+  * Testing using libvips8.4.6 from Github.
+
+## v1.0.10 / 2017-06-25
+
+  * Merge pull request #164 from greut/length
+  * Add Image.Length()
+  * Merge pull request #163 from greut/libvips856
+  * Run libvips 8.5.6 on Travis.
+  * Merge pull request #161 from henry-blip/master
+  * Expose vips cache memory management functions.
+  * feat(docs): add watermark image note in features
+
 ## v1.0.9 / 2017-05-25
 
   * Merge pull request #156 from Dynom/SmartCropToGravity

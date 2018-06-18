@@ -22,12 +22,14 @@ func TestDeterminateImageType(t *testing.T) {
 	}
 
 	for _, file := range files {
-		img, _ := os.Open(path.Join("fixtures", file.name))
+		img, _ := os.Open(path.Join("testdata", file.name))
 		buf, _ := ioutil.ReadAll(img)
 		defer img.Close()
 
-		if DetermineImageType(buf) != file.expected {
-			t.Fatal("Image type is not valid")
+		if VipsIsTypeSupported(file.expected) {
+			if DetermineImageType(buf) != file.expected {
+				t.Fatalf("Image type is not valid: %s != %s", file.name, ImageTypes[file.expected])
+			}
 		}
 	}
 }
@@ -47,12 +49,12 @@ func TestDeterminateImageTypeName(t *testing.T) {
 	}
 
 	for _, file := range files {
-		img, _ := os.Open(path.Join("fixtures", file.name))
+		img, _ := os.Open(path.Join("testdata", file.name))
 		buf, _ := ioutil.ReadAll(img)
 		defer img.Close()
 
 		if DetermineImageTypeName(buf) != file.expected {
-			t.Fatal("Image type is not valid")
+			t.Fatalf("Image type is not valid: %s != %s", file.name, file.expected)
 		}
 	}
 }
@@ -66,7 +68,7 @@ func TestIsTypeSupported(t *testing.T) {
 
 	for _, n := range types {
 		if IsTypeSupported(n.name) == false {
-			t.Fatalf("Image type %#v is not valid", ImageTypes[n.name])
+			t.Fatalf("Image type %s is not valid", ImageTypes[n.name])
 		}
 	}
 }
@@ -85,7 +87,7 @@ func TestIsTypeNameSupported(t *testing.T) {
 
 	for _, n := range types {
 		if IsTypeNameSupported(n.name) != n.expected {
-			t.Fatalf("Image type %#v is not valid", n.name)
+			t.Fatalf("Image type %s is not valid", n.name)
 		}
 	}
 }
@@ -102,7 +104,7 @@ func TestIsTypeSupportedSave(t *testing.T) {
 
 	for _, n := range types {
 		if IsTypeSupportedSave(n.name) == false {
-			t.Fatalf("Image type %#v is not valid", ImageTypes[n.name])
+			t.Fatalf("Image type %s is not valid", ImageTypes[n.name])
 		}
 	}
 }
@@ -122,7 +124,7 @@ func TestIsTypeNameSupportedSave(t *testing.T) {
 
 	for _, n := range types {
 		if IsTypeNameSupportedSave(n.name) != n.expected {
-			t.Fatalf("Image type %#v is not valid", n.name)
+			t.Fatalf("Image type %s is not valid", n.name)
 		}
 	}
 }
