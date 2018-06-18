@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -31,6 +32,14 @@ type ApplicationServiceNamespace struct {
 	Exclusive bool `yaml:"exclusive"`
 	// A regex pattern that represents the namespace
 	Regex string `yaml:"regex"`
+	// The ID of an existing group that all users of this application service will
+	// be added to. This field is only relevant to the `users` namespace.
+	// Note that users who are joined to this group through an application service
+	// are not to be listed when querying for the group's members, however the
+	// group should be listed when querying an application service user's groups.
+	// This is to prevent making spamming all users of an application service
+	// trivial.
+	GroupID string `yaml:"group_id"`
 	// Regex object representing our pattern. Saves having to recompile every time
 	RegexpObject *regexp.Regexp
 }
@@ -51,14 +60,20 @@ type ApplicationService struct {
 	// Information about an application service's namespaces. Key is either
 	// "users", "aliases" or "rooms"
 	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
+	// Whether rate limiting is applied to each application service user
+	RateLimited bool `yaml:"rate_limited"`
+	// Any custom protocols that this application service provides (e.g. IRC)
+	Protocols []string `yaml:"protocols"`
 }
 
 // loadAppservices iterates through all application service config files
 // and loads their data into the config object for later access.
 func loadAppservices(config *Dendrite) error {
 	for _, configPath := range config.ApplicationServices.ConfigFiles {
-		// Create a new application service
-		var appservice ApplicationService
+		// Create a new application service with default options
+		appservice := ApplicationService{
+			RateLimited: true,
+		}
 
 		// Create an absolute path from a potentially relative path
 		absPath, err := filepath.Abs(configPath)
@@ -161,8 +176,20 @@ func checkErrors(config *Dendrite) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
 
+	// Compile regexp object for checking groupIDs
+	groupIDRegexp := regexp.MustCompile(`\+.*:.*`)
+
 	// Check each application service for any config errors
 	for _, appservice := range config.Derived.ApplicationServices {
+		// Namespace-related checks
+		for key, namespaceSlice := range appservice.NamespaceMap {
+			for _, namespace := range namespaceSlice {
+				if err := validateNamespace(&appservice, key, &namespace, groupIDRegexp); err != nil {
+					return err
+				}
+			}
+		}
+
 		// Check if we've already seen this ID. No two application services
 		// can have the same ID or token.
 		if idMap[appservice.ID] {
@@ -193,22 +220,51 @@ func checkErrors(config *Dendrite) (err error) {
 				)})
 			}
 		}
-	}
 
-	// Check that namespace(s) are valid regex
-	for _, appservice := range config.Derived.ApplicationServices {
-		for _, namespaceSlice := range appservice.NamespaceMap {
-			for _, namespace := range namespaceSlice {
-				if !IsValidRegex(namespace.Regex) {
-					return configErrors([]string{fmt.Sprintf(
-						"Invalid regex string for Application Service %s", appservice.ID,
-					)})
-				}
-			}
+		// TODO: Remove once rate_limited is implemented
+		if appservice.RateLimited {
+			log.Warn("WARNING: Application service option rate_limited is currently unimplemented")
+		}
+		// TODO: Remove once protocols is implemented
+		if len(appservice.Protocols) > 0 {
+			log.Warn("WARNING: Application service option protocols is currently unimplemented")
 		}
 	}
 
 	return setupRegexps(config)
+}
+
+// validateNamespace returns nil or an error based on whether a given
+// application service namespace is valid. A namespace is valid if it has the
+// required fields, and its regex is correct.
+func validateNamespace(
+	appservice *ApplicationService,
+	key string,
+	namespace *ApplicationServiceNamespace,
+	groupIDRegexp *regexp.Regexp,
+) error {
+	// Check that namespace(s) are valid regex
+	if !IsValidRegex(namespace.Regex) {
+		return configErrors([]string{fmt.Sprintf(
+			"Invalid regex string for Application Service %s", appservice.ID,
+		)})
+	}
+
+	// Check if GroupID for the users namespace is in the correct format
+	if key == "users" && namespace.GroupID != "" {
+		// TODO: Remove once group_id is implemented
+		log.Warn("WARNING: Application service option group_id is currently unimplemented")
+
+		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
+		if !correctFormat {
+			return configErrors([]string{fmt.Sprintf(
+				"Invalid user group_id field for application service %s.",
+				appservice.ID,
+			)})
+		}
+	}
+
+	return nil
 }
 
 // IsValidRegex returns true or false based on whether the
