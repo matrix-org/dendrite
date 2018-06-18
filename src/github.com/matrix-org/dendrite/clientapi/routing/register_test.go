@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -160,17 +159,12 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error compiling regex: %s", regex)
 	}
+
 	fakeNamespace := config.ApplicationServiceNamespace{
 		Exclusive:    true,
 		Regex:        regex,
 		RegexpObject: regexp,
 	}
-	fakeNamespaceSlice := make([]config.ApplicationServiceNamespace, 1)
-	fakeNamespaceSlice[0] = fakeNamespace
-	fmt.Println(fakeNamespaceSlice[0].RegexpObject)
-	fakeNamespaceMap := make(map[string][]config.ApplicationServiceNamespace)
-	fakeNamespaceMap["users"] = fakeNamespaceSlice
-	fmt.Println(fakeNamespaceMap["users"][0].RegexpObject)
 
 	// Create a fake application service
 	fakeID := "FakeAS"
@@ -181,62 +175,55 @@ func TestValidationOfApplicationServices(t *testing.T) {
 		ASToken:         "1234",
 		HSToken:         "4321",
 		SenderLocalpart: fakeSenderLocalpart,
-		NamespaceMap:    fakeNamespaceMap,
+		NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+			"users": {fakeNamespace},
+		},
 	}
-
-	// Add application service to a slice to be placed in the config
-	fakeApplicationServices := make([]config.ApplicationService, 1)
-	fakeApplicationServices[0] = fakeApplicationService
 
 	// Set up a config
 	fakeConfig := config.Dendrite{}
 	fakeConfig.Matrix.ServerName = "localhost"
-	fakeConfig.Derived.ApplicationServices = fakeApplicationServices
+	fakeConfig.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
 
-	// Create a fake HTTP request which contains an access token and a user_id
+	// Access token is correct, user_id omitted so we are acting as SenderLocalpart
 	URL, _ := url.Parse("http://localhost/register?access_token=1234")
 	fakeHTTPRequest := http.Request{
 		Method: "POST",
 		URL:    URL,
 	}
-
-	// Access token is correct, user_id omitted so we are acting as SenderLocalpart
 	asID, resp := validateApplicationService(&fakeConfig, &fakeHTTPRequest, fakeSenderLocalpart)
 	if resp != nil || asID != fakeID {
 		t.Errorf("appservice should have validated and returned correct ID: %s", resp.JSON)
 	}
 
+	// Access token is incorrect, user_id omitted so we are acting as SenderLocalpart
 	URL, _ = url.Parse("http://localhost/register?access_token=xxxx")
 	fakeHTTPRequest = http.Request{
 		Method: "POST",
 		URL:    URL,
 	}
-
-	// Access token is incorrect, user_id omitted so we are acting as SenderLocalpart
 	asID, resp = validateApplicationService(&fakeConfig, &fakeHTTPRequest, fakeSenderLocalpart)
 	if resp == nil || asID == fakeID {
 		t.Errorf("access_token should have been marked as invalid")
 	}
 
+	// Access token is correct, acting as valid user_id
 	URL, _ = url.Parse("http://localhost/register?access_token=1234&user_id=@_appservice_bob:localhost")
 	fakeHTTPRequest = http.Request{
 		Method: "POST",
 		URL:    URL,
 	}
-
-	// Access token is correct, acting as valid user_id
 	asID, resp = validateApplicationService(&fakeConfig, &fakeHTTPRequest, "_appservice_bob")
 	if resp != nil || asID != fakeID {
 		t.Errorf("access_token and user_id should've been valid: %s", resp.JSON)
 	}
 
+	// Access token is correct, acting as invalid user_id
 	URL, _ = url.Parse("http://localhost/register?access_token=1234&user_id=@_something_else:localhost")
 	fakeHTTPRequest = http.Request{
 		Method: "POST",
 		URL:    URL,
 	}
-
-	// Access token is correct, acting as invalid user_id
 	asID, resp = validateApplicationService(&fakeConfig, &fakeHTTPRequest, "_something_else")
 	if resp == nil || asID == fakeID {
 		t.Errorf("user_id should not have been valid: %s",
