@@ -169,7 +169,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 
 	var joinRules, historyVisibility string
 	switch r.Preset {
-	case presetPrivateChat, "":
+	case presetPrivateChat:
 		joinRules = joinRuleInvite
 		historyVisibility = historyVisibilityShared
 	case presetTrustedPrivateChat:
@@ -178,6 +178,11 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
 	case presetPublicChat:
 		joinRules = joinRulePublic
+		historyVisibility = historyVisibilityShared
+	default:
+		// Default room rules, r.Preset was previously checked for valid values so
+		// only a request with no preset should end up here.
+		joinRules = joinRuleInvite
 		historyVisibility = historyVisibilityShared
 	}
 
