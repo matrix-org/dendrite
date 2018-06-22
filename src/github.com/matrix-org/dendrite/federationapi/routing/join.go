@@ -102,7 +102,6 @@ func SendJoin(
 	cfg config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
-	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
 	var event gomatrixserverlib.Event
@@ -137,27 +136,10 @@ func SendJoin(
 		}
 	}
 
-	// Check that the event is signed by the server sending the request.
-	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName: event.Origin(),
-		Message:    event.Redact().JSON(),
-		AtTS:       event.OriginServerTS(),
-	}}
-	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
-	if err != nil {
-		return httputil.LogThenError(httpReq, err)
-	}
-	if verifyResults[0].Error != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The join must be signed by the server it originated on"),
-		}
-	}
-
 	// Fetch the state and auth chain. We do this before we send the events
 	// on, in case this fails.
 	var stateAndAuthChainRepsonse api.QueryStateAndAuthChainResponse
-	err = query.QueryStateAndAuthChain(ctx, &api.QueryStateAndAuthChainRequest{
+	err := query.QueryStateAndAuthChain(ctx, &api.QueryStateAndAuthChainRequest{
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,

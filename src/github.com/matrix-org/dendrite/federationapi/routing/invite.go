@@ -34,7 +34,6 @@ func Invite(
 	eventID string,
 	cfg config.Dendrite,
 	producer *producers.RoomserverProducer,
-	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
 
 	// Decode the event JSON from the request.
@@ -70,30 +69,13 @@ func Invite(
 		}
 	}
 
-	// Check that the event is signed by the server sending the request.
-	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName: event.Origin(),
-		Message:    event.Redact().JSON(),
-		AtTS:       event.OriginServerTS(),
-	}}
-	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
-	if err != nil {
-		return httputil.LogThenError(httpReq, err)
-	}
-	if verifyResults[0].Error != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The invite must be signed by the server it originated on"),
-		}
-	}
-
 	// Sign the event so that other servers will know that we have received the invite.
 	signedEvent := event.Sign(
 		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
 	// Add the invite event to the roomserver.
-	if err = producer.SendInvite(httpReq.Context(), signedEvent); err != nil {
+	if err := producer.SendInvite(httpReq.Context(), signedEvent); err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
 
