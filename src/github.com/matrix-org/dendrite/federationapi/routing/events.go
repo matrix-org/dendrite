@@ -35,6 +35,22 @@ func GetEvent(
 	_ gomatrixserverlib.KeyRing,
 	eventID string,
 ) util.JSONResponse {
+	event, err := getEvent(ctx, request, query, eventID)
+	if err != nil {
+		return *err
+	}
+
+	return util.JSONResponse{Code: http.StatusOK, JSON: event}
+}
+
+// getEvent returns the requested event,
+// otherwise it returns an error response which can be sent to the client.
+func getEvent(
+	ctx context.Context,
+	request *gomatrixserverlib.FederationRequest,
+	query api.RoomserverQueryAPI,
+	eventID string,
+) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	var authResponse api.QueryServerAllowedToSeeEventResponse
 	err := query.QueryServerAllowedToSeeEvent(
 		ctx,
@@ -45,11 +61,13 @@ func GetEvent(
 		&authResponse,
 	)
 	if err != nil {
-		return util.ErrorResponse(err)
+		resErr := util.ErrorResponse(err)
+		return nil, &resErr
 	}
 
 	if !authResponse.AllowedToSeeEvent {
-		return util.MessageResponse(http.StatusForbidden, "server not allowed to see event")
+		resErr := util.MessageResponse(http.StatusForbidden, "server not allowed to see event")
+		return nil, &resErr
 	}
 
 	var eventsResponse api.QueryEventsByIDResponse
@@ -59,12 +77,13 @@ func GetEvent(
 		&eventsResponse,
 	)
 	if err != nil {
-		return util.ErrorResponse(err)
+		resErr := util.ErrorResponse(err)
+		return nil, &resErr
 	}
 
 	if len(eventsResponse.Events) == 0 {
-		return util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
+		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: &eventsResponse.Events[0]}
+	return &eventsResponse.Events[0], nil
 }

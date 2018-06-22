@@ -106,6 +106,28 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
+	v1fedmux.Handle("/state/{roomID}/{eventID}", common.MakeFedAPI(
+		"federation_get_event_auth", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return GetState(
+				httpReq.Context(), request, cfg, query, time.Now(),
+				keys, vars["roomID"], vars["eventID"],
+			)
+		},
+	)).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/state_ids/{roomID}/{eventID}", common.MakeFedAPI(
+		"federation_get_event_auth", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return GetStateIDs(
+				httpReq.Context(), request, cfg, query, time.Now(),
+				keys, vars["roomID"], vars["eventID"],
+			)
+		},
+	)).Methods(http.MethodGet)
+
 	v1fedmux.Handle("/query/directory/", common.MakeFedAPI(
 		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
