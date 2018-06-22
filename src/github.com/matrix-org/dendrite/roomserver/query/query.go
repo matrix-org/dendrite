@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -374,58 +375,29 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
 	request *api.QueryServerAllowedToSeeEventRequest,
 	response *api.QueryServerAllowedToSeeEventResponse,
-) error {
-	stateEntries, err := state.LoadStateAtEvent(ctx, r.DB, request.EventID)
+) (err error) {
+	response.AllowedToSeeEvent, err = r.checkServerAllowedToSeeEvent(
+		ctx, request.EventID, request.ServerName,
+	)
+	return
+}
+
+func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
+	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName,
+) (bool, error) {
+	stateEntries, err := state.LoadStateAtEvent(ctx, r.DB, eventID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// TODO: We probably want to make it so that we don't have to pull
 	// out all the state if possible.
 	stateAtEvent, err := r.loadStateEvents(ctx, stateEntries)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	// TODO: Should this be lifted out of here to a more general set of
-	// auth functions?
-
-	isInRoom := false
-	for _, ev := range stateAtEvent {
-		membership, err := ev.Membership()
-		if err != nil {
-			continue
-		}
-
-		if membership != "join" {
-			continue
-		}
-
-		stateKey := ev.StateKey()
-		if stateKey == nil {
-			continue
-		}
-
-		_, domain, err := gomatrixserverlib.SplitID('@', *stateKey)
-		if err != nil {
-			continue
-		}
-
-		if domain == request.ServerName {
-			isInRoom = true
-			break
-		}
-	}
-
-	if isInRoom {
-		response.AllowedToSeeEvent = true
-		return nil
-	}
-
-	// TODO: Check if history visibility is shared and if the server is currently in the room
-
-	response.AllowedToSeeEvent = false
-	return nil
+	return auth.IsServerAllowed(serverName, stateAtEvent), nil
 }
 
 // QueryMissingEvents implements api.RoomserverQueryAPI
@@ -434,7 +406,7 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	request *api.QueryMissingEventsRequest,
 	response *api.QueryMissingEventsResponse,
 ) error {
-	resultIDs := make([]types.EventNID, 0, request.Limit)
+	resultNIDs := make([]types.EventNID, 0, request.Limit)
 	var front []string
 	visited := make(map[string]bool, request.Limit) // request.Limit acts as a hint to size.
 	for _, id := range request.EarliestEvents {
@@ -448,7 +420,7 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	}
 
 BFSLoop:
-	for len(front) > 0 && len(resultIDs) <= request.Limit {
+	for len(front) > 0 {
 		var next []string
 		events, err := r.DB.EventsFromIDs(ctx, front)
 		if err != nil {
@@ -456,14 +428,23 @@ BFSLoop:
 		}
 
 		for _, ev := range events {
-			if len(resultIDs) > request.Limit {
+			if len(resultNIDs) > request.Limit {
 				break BFSLoop
 			}
-			resultIDs = append(resultIDs, ev.EventNID)
+			resultNIDs = append(resultNIDs, ev.EventNID)
 			for _, pre := range ev.PrevEventIDs() {
 				if !visited[pre] {
 					visited[pre] = true
-					next = append(next, pre)
+					allowed, err := r.checkServerAllowedToSeeEvent(
+						ctx, ev.EventID(), request.ServerName,
+					)
+					if err != nil {
+						return err
+					}
+
+					if allowed {
+						next = append(next, pre)
+					}
 				}
 			}
 		}
@@ -471,7 +452,7 @@ BFSLoop:
 	}
 
 	var err error
-	response.Events, err = r.loadEvents(ctx, resultIDs)
+	response.Events, err = r.loadEvents(ctx, resultNIDs)
 	return err
 }
 

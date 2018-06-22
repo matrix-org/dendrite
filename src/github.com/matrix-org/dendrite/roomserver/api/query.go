@@ -162,6 +162,8 @@ type QueryMissingEventsRequest struct {
 	LatestEvents []string `json:"latest_events"`
 	// Limit the number of events this query returns.
 	Limit int `json:"limit"`
+	// The server interested in the event
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
 }
 
 // QueryMissingEventsResponse is response to QueryMissingEvents

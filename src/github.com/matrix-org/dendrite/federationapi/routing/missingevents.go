@@ -24,8 +24,10 @@ import (
 )
 
 type getMissingEventRequest struct {
-	api.QueryMissingEventsRequest
-	MinDepth int64 `json:"min_depth"`
+	EarliestEvents []string `json:"earliest_events"`
+	LatestEvents   []string `json:"latest_events"`
+	Limit          int      `json:"limit"`
+	MinDepth       int64    `json:"min_depth"`
 }
 
 // GetMissingEvents returns missing event between earliest_events & latest_events.
@@ -50,23 +52,26 @@ func GetMissingEvents(
 			EarliestEvents: gme.EarliestEvents,
 			LatestEvents:   gme.LatestEvents,
 			Limit:          gme.Limit,
+			ServerName:     request.Origin(),
 		},
 		&eventsResponse,
 	); err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
 
-	eventsResponse.Events = filterEvents(eventsResponse.Events, gme.MinDepth)
+	eventsResponse.Events = filterEvents(eventsResponse.Events, gme.MinDepth, roomID)
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: eventsResponse,
 	}
 }
 
-func filterEvents(events []gomatrixserverlib.Event, minDepth int64) []gomatrixserverlib.Event {
+func filterEvents(
+	events []gomatrixserverlib.Event, minDepth int64, roomID string,
+) []gomatrixserverlib.Event {
 	ref := events[:0]
 	for _, ev := range events {
-		if ev.Depth() >= minDepth {
+		if ev.Depth() >= minDepth && ev.RoomID() == roomID {
 			ref = append(ref, ev)
 		}
 	}
