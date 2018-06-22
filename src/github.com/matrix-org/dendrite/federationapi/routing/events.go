@@ -43,8 +43,8 @@ func GetEvent(
 	return util.JSONResponse{Code: http.StatusOK, JSON: event}
 }
 
-// getEvent returns the requested event.
-// Or returns an error response which can be sent to the client.
+// getEvent returns the requested event,
+// otherwise it returns an error response which can be sent to the client.
 func getEvent(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
