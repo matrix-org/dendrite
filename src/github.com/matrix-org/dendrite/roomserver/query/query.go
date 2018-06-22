@@ -428,6 +428,53 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	return nil
 }
 
+// QueryMissingEvents implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryMissingEvents(
+	ctx context.Context,
+	request *api.QueryMissingEventsRequest,
+	response *api.QueryMissingEventsResponse,
+) error {
+	resultIDs := make([]types.EventNID, 0, request.Limit)
+	var front []string
+	visited := make(map[string]bool, request.Limit) // request.Limit acts as a hint to size.
+	for _, id := range request.EarliestEvents {
+		visited[id] = true
+	}
+
+	for _, id := range request.LatestEvents {
+		if !visited[id] {
+			front = append(front, id)
+		}
+	}
+
+BFSLoop:
+	for len(front) > 0 && len(resultIDs) <= request.Limit {
+		var next []string
+		events, err := r.DB.EventsFromIDs(ctx, front)
+		if err != nil {
+			return err
+		}
+
+		for _, ev := range events {
+			if len(resultIDs) > request.Limit {
+				break BFSLoop
+			}
+			resultIDs = append(resultIDs, ev.EventNID)
+			for _, pre := range ev.PrevEventIDs() {
+				if !visited[pre] {
+					visited[pre] = true
+					next = append(next, pre)
+				}
+			}
+		}
+		front = next
+	}
+
+	var err error
+	response.Events, err = r.loadEvents(ctx, resultIDs)
+	return err
+}
+
 // QueryStateAndAuthChain implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	ctx context.Context,
@@ -602,6 +649,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryServerAllowedToSeeEvent(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryMissingEventsPath,
+		common.MakeInternalAPI("queryMissingEvents", func(req *http.Request) util.JSONResponse {
+			var request api.QueryMissingEventsRequest
+			var response api.QueryMissingEventsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryMissingEvents(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

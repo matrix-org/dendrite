@@ -154,6 +154,22 @@ type QueryServerAllowedToSeeEventResponse struct {
 	AllowedToSeeEvent bool `json:"can_see_event"`
 }
 
+// QueryMissingEventsRequest is request to QueryMissingEvents
+type QueryMissingEventsRequest struct {
+	// Events which are known previous to the gap in timeline.
+	EarliestEvents []string `json:"earliest_events"`
+	// Latest known events.
+	LatestEvents []string `json:"latest_events"`
+	// Limit the number of events this query returns.
+	Limit int `json:"limit"`
+}
+
+// QueryMissingEventsResponse is response to QueryMissingEvents
+type QueryMissingEventsResponse struct {
+	// Missing events, arbritrary order.
+	Events []gomatrixserverlib.Event `json:"events"`
+}
+
 // QueryStateAndAuthChainRequest is a request to QueryStateAndAuthChain
 type QueryStateAndAuthChainRequest struct {
 	// The room ID to query the state in.
@@ -225,6 +241,13 @@ type RoomserverQueryAPI interface {
 		response *QueryServerAllowedToSeeEventResponse,
 	) error
 
+	// Query missing events for a room from roomserver
+	QueryMissingEvents(
+		ctx context.Context,
+		request *QueryMissingEventsRequest,
+		response *QueryMissingEventsResponse,
+	) error
+
 	// Query to get state and auth chain for a (potentially hypothetical) event.
 	// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
 	// the state and auth chain to return.
@@ -252,6 +275,9 @@ const RoomserverQueryInvitesForUserPath = "/api/roomserver/queryInvitesForUser"
 
 // RoomserverQueryServerAllowedToSeeEventPath is the HTTP path for the QueryServerAllowedToSeeEvent API
 const RoomserverQueryServerAllowedToSeeEventPath = "/api/roomserver/queryServerAllowedToSeeEvent"
+
+// RoomserverQueryMissingEventsPath is the HTTP path for the QueryMissingEvents API
+const RoomserverQueryMissingEventsPath = "/api/roomserver/queryMissingEvents"
 
 // RoomserverQueryStateAndAuthChainPath is the HTTP path for the QueryStateAndAuthChain API
 const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthChain"
@@ -345,6 +371,19 @@ func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryMissingEvents implements RoomServerQueryAPI
+func (h *httpRoomserverQueryAPI) QueryMissingEvents(
+	ctx context.Context,
+	request *QueryMissingEventsRequest,
+	response *QueryMissingEventsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMissingEvents")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryMissingEventsPath
 	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
