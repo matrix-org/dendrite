@@ -154,9 +154,9 @@ type QueryServerAllowedToSeeEventResponse struct {
 	AllowedToSeeEvent bool `json:"can_see_event"`
 }
 
-// QueryMissingEventsRequest is request to QueryMissingEvents
+// QueryMissingEventsRequest is a request to QueryMissingEvents
 type QueryMissingEventsRequest struct {
-	// Events which are known previous to the gap in timeline.
+	// Events which are known previous to the gap in the timeline.
 	EarliestEvents []string `json:"earliest_events"`
 	// Latest known events.
 	LatestEvents []string `json:"latest_events"`
@@ -166,7 +166,7 @@ type QueryMissingEventsRequest struct {
 	ServerName gomatrixserverlib.ServerName `json:"server_name"`
 }
 
-// QueryMissingEventsResponse is response to QueryMissingEvents
+// QueryMissingEventsResponse is a response to QueryMissingEvents
 type QueryMissingEventsResponse struct {
 	// Missing events, arbritrary order.
 	Events []gomatrixserverlib.Event `json:"events"`

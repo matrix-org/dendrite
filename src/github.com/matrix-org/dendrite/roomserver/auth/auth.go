@@ -14,12 +14,13 @@ package auth
 
 import "github.com/matrix-org/gomatrixserverlib"
 
-// IsServerAllowed checks if a server has a client as member in authEvents
+// IsServerAllowed returns true if there exists a event in authEvents
+// which allows server to view this event. That is true when a client on the server
+// can view the event. Otherwise returns false.
 func IsServerAllowed(
 	serverName gomatrixserverlib.ServerName,
 	authEvents []gomatrixserverlib.Event,
 ) bool {
-	isInRoom := false
 	for _, ev := range authEvents {
 		membership, err := ev.Membership()
 		if err != nil || membership != "join" {
@@ -37,11 +38,10 @@ func IsServerAllowed(
 		}
 
 		if domain == serverName {
-			isInRoom = true
-			break
+			return true
 		}
 	}
 
 	// TODO: Check if history visibility is shared and if the server is currently in the room
-	return isInRoom
+	return false
 }

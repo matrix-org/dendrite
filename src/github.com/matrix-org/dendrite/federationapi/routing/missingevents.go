@@ -30,8 +30,8 @@ type getMissingEventRequest struct {
 	MinDepth       int64    `json:"min_depth"`
 }
 
-// GetMissingEvents returns missing event between earliest_events & latest_events.
-// Events are fetched from room DAG starting from latest_events until we reach earliest_events or the limit
+// GetMissingEvents returns missing events between earliest_events & latest_events.
+// Events are fetched from room DAG starting from latest_events until we reach earliest_events or the limit.
 func GetMissingEvents(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
