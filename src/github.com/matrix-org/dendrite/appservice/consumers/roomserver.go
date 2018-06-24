@@ -76,10 +76,8 @@ func (s *OutputRoomEventConsumer) Start() error {
 	return s.roomServerConsumer.Start()
 }
 
-// onMessage is called when the sync server receives a new event from the room
-// server output log. It is not safe for this function to be called from
-// multiple goroutines, or else the sync stream position may race and be
-// incorrectly calculated.
+// onMessage is called when the appservice component receives a new event from
+// the room server output log.
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
@@ -186,10 +184,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 				} else {
 					// Tell our worker to send out new messages by updating remaining message
 					// count and waking them up with a broadcast
-					ws.Cond.L.Lock()
-					*ws.EventsReady++
-					ws.Cond.Broadcast()
-					ws.Cond.L.Unlock()
+					ws.NotifyNewEvent()
 				}
 			}
 		}

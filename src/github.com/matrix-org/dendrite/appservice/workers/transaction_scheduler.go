@@ -66,15 +66,18 @@ func SetupTransactionWorkers(
 // worker is a goroutine that sends any queued events to the application service
 // it is given.
 func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
-	log.Infof("Starting Application Service %s", ws.AppService.ID)
+	log.WithFields(log.Fields{
+		"appservice": ws.AppService.ID,
+	}).Info("starting application service")
 	ctx := context.Background()
 
 	// Initialize transaction ID counter
 	var err error
 	currentTransactionID, err = db.GetTxnIDWithAppServiceID(ctx, ws.AppService.ID)
 	if err != nil && err != sql.ErrNoRows {
-		log.WithError(err).Fatalf("appservice %s worker unable to get latest transaction ID from DB",
-			ws.AppService.ID)
+		log.WithFields(log.Fields{
+			"appservice": ws.AppService.ID,
+		}).WithError(err).Fatal("appservice worker unable to get latest transaction ID from DB")
 		return
 	}
 
@@ -86,8 +89,9 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 	// Initial check for any leftover events to send from last time
 	eventCount, err := db.CountEventsWithAppServiceID(ctx, ws.AppService.ID)
 	if err != nil {
-		log.WithError(err).Fatalf("appservice %s worker unable to read queued events from DB",
-			ws.AppService.ID)
+		log.WithFields(log.Fields{
+			"appservice": ws.AppService.ID,
+		}).WithError(err).Fatal("appservice worker unable to read queued events from DB")
 		return
 	}
 	ws.Cond.L.Lock()
@@ -97,17 +101,14 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 	// Loop forever and keep waiting for more events to send
 	for {
 		// Wait for more events if we've sent all the events in the database
-		if *ws.EventsReady <= 0 {
-			ws.Cond.L.Lock()
-			ws.Cond.Wait()
-			ws.Cond.L.Unlock()
-		}
+		ws.WaitForNewEvents()
 
 		// Batch events up into a transaction
 		eventsCount, txnID, maxEventID, transactionJSON, err := createTransaction(ctx, db, ws.AppService.ID)
 		if err != nil {
-			log.WithError(err).Fatalf("appservice %s worker unable to create transaction",
-				ws.AppService.ID)
+			log.WithFields(log.Fields{
+				"appservice": ws.AppService.ID,
+			}).WithError(err).Fatal("appservice worker unable to create transaction")
 
 			return
 		}
@@ -131,16 +132,18 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		// Remove sent events from the DB
 		err = db.RemoveEventsBeforeAndIncludingID(ctx, ws.AppService.ID, maxEventID)
 		if err != nil {
-			log.WithError(err).Fatalf("unable to remove appservice events from the database for %s",
-				ws.AppService.ID)
+			log.WithFields(log.Fields{
+				"appservice": ws.AppService.ID,
+			}).WithError(err).Fatal("unable to remove appservice events from the database")
 			return
 		}
 
 		// Update transactionID
 		currentTransactionID++
 		if err = db.UpsertTxnIDWithAppServiceID(ctx, ws.AppService.ID, currentTransactionID); err != nil {
-			log.WithError(err).Fatalf("unable to update transaction ID for %s",
-				ws.AppService.ID)
+			log.WithFields(log.Fields{
+				"appservice": ws.AppService.ID,
+			}).WithError(err).Fatal("unable to update transaction ID")
 			return
 		}
 	}
@@ -152,8 +155,10 @@ func backoff(ws *types.ApplicationServiceWorkerState, err error) {
 	backoffDuration := time.Duration(math.Pow(2, float64(ws.Backoff)))
 	backoffSeconds := time.Second * backoffDuration
 
-	log.WithError(err).Warnf("unable to send transactions to %s, backing off for %ds",
-		ws.AppService.ID, backoffDuration)
+	log.WithFields(log.Fields{
+		"appservice": ws.AppService.ID,
+	}).WithError(err).Warnf("unable to send transactions successfully, backing off for %ds",
+		backoffDuration)
 
 	ws.Backoff++
 	if ws.Backoff > 6 {
@@ -178,8 +183,9 @@ func createTransaction(
 	// Retrieve the latest events from the DB (will return old events if they weren't successfully sent)
 	txnID, maxID, events, err := db.GetEventsWithAppServiceID(ctx, appserviceID, transactionBatchSize)
 	if err != nil {
-		log.WithError(err).Fatalf("appservice %s worker unable to read queued events from DB",
-			appserviceID)
+		log.WithFields(log.Fields{
+			"appservice": appserviceID,
+		}).WithError(err).Fatalf("appservice worker unable to read queued events from DB")
 
 		return
 	}
@@ -225,14 +231,16 @@ func send(
 	defer func() {
 		err := resp.Body.Close()
 		if err != nil {
-			log.WithError(err).Errorf("Unable to close response body from application service %s", appservice.ID)
+			log.WithFields(log.Fields{
+				"appservice": appservice.ID,
+			}).WithError(err).Error("unable to close response body from application service")
 		}
 	}()
 
 	// Check the AS received the events correctly
 	if resp.StatusCode != http.StatusOK {
 		// TODO: Handle non-200 error codes from application services
-		return fmt.Errorf("Non-OK status code %d returned from AS", resp.StatusCode)
+		return fmt.Errorf("non-OK status code %d returned from AS", resp.StatusCode)
 	}
 
 	return nil

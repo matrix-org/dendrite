@@ -18,6 +18,11 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 )
 
+const (
+	// AppServiceDeviceID is the AS dummy device ID
+	AppServiceDeviceID = "AS_Device"
+)
+
 // ApplicationServiceWorkerState is a type that couples an application service,
 // a lockable condition as well as some other state variables, allowing the
 // roomserver to notify appservice workers when there are events ready to send
@@ -31,7 +36,22 @@ type ApplicationServiceWorkerState struct {
 	Backoff int
 }
 
-const (
-	// AppServiceDeviceID is the AS dummy device ID
-	AppServiceDeviceID = "AS_Device"
-)
+// NotifyNewEvent wakes up all waiting goroutines, notifying that a new event
+// has been placed into the event queue for this application service worker.
+// Additionally it increments EventsReady by one.
+func (a *ApplicationServiceWorkerState) NotifyNewEvent() {
+	a.Cond.L.Lock()
+	*a.EventsReady++
+	a.Cond.Broadcast()
+	a.Cond.L.Unlock()
+}
+
+// WaitForNewEvents causes the calling goroutine to wait on the worker state's
+// condition for a broadcast or similar wakeup, if there are no events ready.
+func (a *ApplicationServiceWorkerState) WaitForNewEvents() {
+	a.Cond.L.Lock()
+	if *a.EventsReady <= 0 {
+		a.Cond.Wait()
+	}
+	a.Cond.L.Unlock()
+}

@@ -17,7 +17,6 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -156,7 +155,6 @@ func retrieveEvents(eventRows *sql.Rows) (events []gomatrixserverlib.Application
 			&txnID,
 		)
 		if err != nil {
-			fmt.Println("Failed:", err.Error())
 			return nil, 0, 0, err
 		}
 
@@ -213,12 +211,6 @@ func (s *eventsStatements) insertEvent(
 	appServiceID string,
 	event *gomatrixserverlib.Event,
 ) (err error) {
-	// If event has no content, strip the json
-	content := event.Content()
-	if string(content) == "{\"disable\":true}" {
-		content = []byte("{}")
-	}
-
 	_, err = s.insertEventStmt.ExecContext(
 		ctx,
 		appServiceID,
@@ -227,7 +219,7 @@ func (s *eventsStatements) insertEvent(
 		event.RoomID(),
 		event.Type(),
 		event.Sender(),
-		content,
+		event.Content(),
 		-1, // No transaction ID yet
 	)
 	return
