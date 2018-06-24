@@ -33,10 +33,6 @@ import (
 
 var (
 	// Maximum size of events sent in each transaction.
-	// Warning, if this is lowered and a number of events greater than the previous
-	// batch size were still to be sent, then a number of events equal to the
-	// difference will be ignored by the app service.
-	// TL;DR: Don't lower this number with any AS events still left in the database.
 	transactionBatchSize = 50
 	// Timeout for sending a single transaction to an application service.
 	transactionTimeout = time.Second * 60
