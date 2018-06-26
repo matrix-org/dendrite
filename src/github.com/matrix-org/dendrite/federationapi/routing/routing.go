@@ -20,6 +20,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -43,6 +44,7 @@ func Setup(
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 	accountDB *accounts.Database,
+	deviceDB *devices.Database,
 ) {
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
@@ -142,6 +144,16 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return GetProfile(
 				httpReq, accountDB, cfg,
+			)
+		},
+	)).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/query/user_devices/{userID}", common.MakeFedAPI(
+		"federation_query_user_devices", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return GetUserDevices(
+				httpReq, deviceDB, vars["userID"],
 			)
 		},
 	)).Methods(http.MethodGet)
