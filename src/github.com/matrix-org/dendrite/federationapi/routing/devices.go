@@ -37,7 +37,7 @@ func GetUserDevices(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("Invalid userID"),
+			JSON: jsonerror.InvalidArgumentValue("Invalid user ID"),
 		}
 	}
 
