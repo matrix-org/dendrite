@@ -176,4 +176,12 @@ func Setup(
 			return Version()
 		},
 	)).Methods(http.MethodGet)
+
+	v1fedmux.Handle("get_missing_events/{roomID}", common.MakeFedAPI(
+		"federation_get_missing_events", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			return GetMissingEvents(httpReq, request, query, vars["roomID"])
+		},
+	)).Methods(http.MethodGet)
 }
