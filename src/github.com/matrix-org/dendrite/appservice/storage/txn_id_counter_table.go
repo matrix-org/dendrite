@@ -20,26 +20,14 @@ import (
 )
 
 const txnIDSchema = `
--- Keeps a count of the current transaction ID per application service 
-CREATE TABLE IF NOT EXISTS txn_id_counter (
-	-- The ID of the application service the this count belongs to
-	as_id TEXT NOT NULL PRIMARY KEY,
-	-- The last-used transaction ID
-	txn_id INTEGER NOT NULL
-);
+-- Keeps a count of the current transaction ID
+CREATE SEQUENCE IF NOT EXISTS txn_id_counter START 1;
 `
 
-const selectTxnIDSQL = "" +
-	"SELECT txn_id FROM txn_id_counter WHERE as_id = $1"
-
-const upsertTxnIDSQL = "" +
-	"INSERT INTO txn_id_counter(as_id, txn_id) VALUES ($1, $2) " +
-	"ON CONFLICT (as_id) DO UPDATE " +
-	"SET txn_id = $2"
+const selectTxnIDSQL = "SELECT nextval('txn_id_counter')"
 
 type txnStatements struct {
 	selectTxnIDStmt *sql.Stmt
-	upsertTxnIDStmt *sql.Stmt
 }
 
 func (s *txnStatements) prepare(db *sql.DB) (err error) {
@@ -51,30 +39,14 @@ func (s *txnStatements) prepare(db *sql.DB) (err error) {
 	if s.selectTxnIDStmt, err = db.Prepare(selectTxnIDSQL); err != nil {
 		return
 	}
-	if s.upsertTxnIDStmt, err = db.Prepare(upsertTxnIDSQL); err != nil {
-		return
-	}
 
 	return
 }
 
-// selectTxnID inserts a new transactionID mapped to its corresponding
-// application service ID into the db.
+// selectTxnID selects the latest ascending transaction ID
 func (s *txnStatements) selectTxnID(
 	ctx context.Context,
-	appServiceID string,
 ) (txnID int, err error) {
-	err = s.selectTxnIDStmt.QueryRowContext(ctx, appServiceID).Scan(&txnID)
-	return
-}
-
-// upsertTxnID inserts or updates on existing rows a new transactionID mapped to
-// its corresponding application service ID into the db.
-func (s *txnStatements) upsertTxnID(
-	ctx context.Context,
-	appServiceID string,
-	txnID int,
-) (err error) {
-	_, err = s.upsertTxnIDStmt.ExecContext(ctx, appServiceID, txnID)
+	err = s.selectTxnIDStmt.QueryRowContext(ctx).Scan(&txnID)
 	return
 }

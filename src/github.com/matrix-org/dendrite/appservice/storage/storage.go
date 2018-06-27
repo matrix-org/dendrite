@@ -102,22 +102,9 @@ func (d *Database) RemoveEventsBeforeAndIncludingID(
 	return d.events.deleteEventsBeforeAndIncludingID(ctx, appserviceID, eventTableID)
 }
 
-// GetTxnIDWithAppServiceID takes in an application service ID and returns the
-// last used transaction ID associated with it.
-func (d *Database) GetTxnIDWithAppServiceID(
+// GetLatestTxnID returns the latest available transaction id
+func (d *Database) GetLatestTxnID(
 	ctx context.Context,
-	appServiceID string,
 ) (int, error) {
-	return d.txnID.selectTxnID(ctx, appServiceID)
-}
-
-// UpsertTxnIDWithAppServiceID takes in an application service ID and a
-// transaction ID and stores them in the DB, unless the pair already exists, in
-// which case it updates them.
-func (d *Database) UpsertTxnIDWithAppServiceID(
-	ctx context.Context,
-	appServiceID string,
-	txnID int,
-) error {
-	return d.txnID.upsertTxnID(ctx, appServiceID, txnID)
+	return d.txnID.selectTxnID(ctx)
 }

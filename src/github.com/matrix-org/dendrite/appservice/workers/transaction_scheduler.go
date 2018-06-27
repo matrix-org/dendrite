@@ -17,7 +17,6 @@ package workers
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -36,8 +35,6 @@ var (
 	transactionBatchSize = 50
 	// Timeout for sending a single transaction to an application service.
 	transactionTimeout = time.Second * 60
-	// The current transaction ID. Increments after every successful transaction.
-	currentTransactionID = 0
 )
 
 // SetupTransactionWorkers spawns a separate goroutine for each application
@@ -66,16 +63,6 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		"appservice": ws.AppService.ID,
 	}).Info("starting application service")
 	ctx := context.Background()
-
-	// Initialize transaction ID counter
-	var err error
-	currentTransactionID, err = db.GetTxnIDWithAppServiceID(ctx, ws.AppService.ID)
-	if err != nil && err != sql.ErrNoRows {
-		log.WithFields(log.Fields{
-			"appservice": ws.AppService.ID,
-		}).WithError(err).Fatal("appservice worker unable to get latest transaction ID from DB")
-		return
-	}
 
 	// Grab the HTTP client for sending requests to app services
 	client := &http.Client{
@@ -133,15 +120,6 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 			}).WithError(err).Fatal("unable to remove appservice events from the database")
 			return
 		}
-
-		// Update transactionID
-		currentTransactionID++
-		if err = db.UpsertTxnIDWithAppServiceID(ctx, ws.AppService.ID, currentTransactionID); err != nil {
-			log.WithFields(log.Fields{
-				"appservice": ws.AppService.ID,
-			}).WithError(err).Fatal("unable to update transaction ID")
-			return
-		}
 	}
 }
 
@@ -186,12 +164,16 @@ func createTransaction(
 		return
 	}
 
-	// Check if these events already have a transaction ID
+	// Check if these events do not already have a transaction ID
 	if txnID == -1 {
-		txnID = currentTransactionID
-		// Mark new events with current transactionID
-		err := db.UpdateTxnIDForEvents(ctx, appserviceID, maxID, currentTransactionID)
+		// If not, grab next available ID from the DB
+		txnID, err = db.GetLatestTxnID(ctx)
 		if err != nil {
+			return 0, 0, 0, nil, err
+		}
+
+		// Mark new events with current transactionID
+		if err = db.UpdateTxnIDForEvents(ctx, appserviceID, maxID, txnID); err != nil {
 			return 0, 0, 0, nil, err
 		}
 	}
