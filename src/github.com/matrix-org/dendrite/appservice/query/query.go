@@ -173,6 +173,71 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	return nil
 }
 
+// UserIDExists performs a request to '/users/{userID}' on all known
+// handling application services until one admits to owning the room
+func (a *AppServiceQueryAPI) UserIDExists(
+	ctx context.Context,
+	request *api.UserIDExistsRequest,
+	response *api.UserIDExistsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceUserID")
+	defer span.Finish()
+
+	// Create an HTTP client if one does not already exist
+	if a.HTTPClient == nil {
+		a.HTTPClient = makeHTTPClient()
+	}
+
+	// Determine which application service should handle this request
+	for _, appservice := range a.Cfg.Derived.ApplicationServices {
+		if appservice.URL != "" && appservice.IsInterestedInUserID(request.UserID) {
+			// The full path to the rooms API, includes hs token
+			URL, err := url.Parse(appservice.URL + userIDExistsPath)
+			URL.Path += request.UserID
+			apiURL := URL.String() + "?access_token=" + appservice.HSToken
+
+			// Send a request to each application service. If one responds that it has
+			// created the user, immediately return.
+			req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+			if err != nil {
+				return err
+			}
+			resp, err := a.HTTPClient.Do(req.WithContext(ctx))
+			if resp != nil {
+				defer func() {
+					err = resp.Body.Close()
+					if err != nil {
+						log.WithFields(log.Fields{
+							"appservice_id": appservice.ID,
+							"status_code":   resp.StatusCode,
+						}).Error("Unable to close application service response body")
+					}
+				}()
+			}
+			if err != nil {
+				log.WithFields(log.Fields{
+					"appservice_id": appservice.ID,
+				}).WithError(err).Error("issue querying user ID on application service")
+				return err
+			}
+			if resp.StatusCode == http.StatusOK {
+				// StatusOK received from appservice. User ID exists
+				response.UserIDExists = true
+				return nil
+			}
+
+			// Log non OK
+			log.WithFields(log.Fields{
+				"appservice_id": appservice.ID,
+				"status_code":   resp.StatusCode,
+			}).Warn("application service responded with non-OK status code")
+		}
+	}
+
+	response.UserIDExists = false
+	return nil
+}
+
 // makeHTTPClient creates an HTTP client with certain options that will be used for all query requests to application services
 func makeHTTPClient() *http.Client {
 	return &http.Client{
