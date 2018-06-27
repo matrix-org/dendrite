@@ -19,7 +19,13 @@ package api
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"net/http"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -38,6 +44,27 @@ type RoomAliasExistsResponse struct {
 	AliasExists bool `json:"exists"`
 }
 
+// UserIDExistsRequest is a request to an application service about whether a
+// user ID exists
+type UserIDExistsRequest struct {
+	// UserID we want to lookup
+	UserID string `json:"user_id"`
+}
+
+// UserIDExistsRequestAccessToken is a request to an application service
+// about whether a user ID exists. Includes an access token
+type UserIDExistsRequestAccessToken struct {
+	// UserID we want to lookup
+	UserID      string `json:"user_id"`
+	AccessToken string `json:"access_token"`
+}
+
+// UserIDExistsResponse is a response from an application service about
+// whether a user ID exists
+type UserIDExistsResponse struct {
+	UserIDExists bool `json:"exists"`
+}
+
 // AppServiceQueryAPI is used to query user and room alias data from application
 // services
 type AppServiceQueryAPI interface {
@@ -45,13 +72,21 @@ type AppServiceQueryAPI interface {
 	RoomAliasExists(
 		ctx context.Context,
 		req *RoomAliasExistsRequest,
-		response *RoomAliasExistsResponse,
+		resp *RoomAliasExistsResponse,
 	) error
-	// TODO: QueryUserIDExists
+	// Check whether a user ID exists within any application service namespaces
+	UserIDExists(
+		ctx context.Context,
+		req *UserIDExistsRequest,
+		resp *UserIDExistsResponse,
+	) error
 }
 
 // AppServiceRoomAliasExistsPath is the HTTP path for the RoomAliasExists API
 const AppServiceRoomAliasExistsPath = "/api/appservice/RoomAliasExists"
+
+// AppServiceUserIDExistsPath is the HTTP path for the UserIDExists API
+const AppServiceUserIDExistsPath = "/api/appservice/UserIDExists"
 
 // httpAppServiceQueryAPI contains the URL to an appservice query API and a
 // reference to a httpClient used to reach it
@@ -84,4 +119,60 @@ func (h *httpAppServiceQueryAPI) RoomAliasExists(
 
 	apiURL := h.appserviceURL + AppServiceRoomAliasExistsPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// UserIDExists implements AppServiceQueryAPI
+func (h *httpAppServiceQueryAPI) UserIDExists(
+	ctx context.Context,
+	request *UserIDExistsRequest,
+	response *UserIDExistsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "appserviceUserIDExists")
+	defer span.Finish()
+
+	apiURL := h.appserviceURL + AppServiceUserIDExistsPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// RetreiveUserProfile is a wrapper that queries both the local database and
+// application services for a given user's profile
+func RetreiveUserProfile(
+	ctx context.Context,
+	userID string,
+	asAPI AppServiceQueryAPI,
+	accountDB *accounts.Database,
+) (*authtypes.Profile, error) {
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Try to query the user from the local database
+	profile, err := accountDB.GetProfileByLocalpart(ctx, localpart)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	} else if profile != nil {
+		return profile, nil
+	}
+
+	// Query the appservice component for the existence of an AS user
+	userReq := UserIDExistsRequest{UserID: userID}
+	var userResp UserIDExistsResponse
+	if err = asAPI.UserIDExists(ctx, &userReq, &userResp); err != nil {
+		return nil, err
+	}
+
+	// If no user exists, return
+	if !userResp.UserIDExists {
+		return nil, errors.New("no known profile for given user ID")
+	}
+
+	// Try to query the user from the local database again
+	profile, err = accountDB.GetProfileByLocalpart(ctx, localpart)
+	if err != nil {
+		return nil, err
+	}
+
+	// profile should not be nil at this point
+	return profile, nil
 }
