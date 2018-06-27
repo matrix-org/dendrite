@@ -41,15 +41,12 @@ func GetProfile(
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+
+	profile, err := getProfileByUserID(req, accountDB, userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		return *err
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
 	res := common.ProfileResponse{
 		AvatarURL:   profile.AvatarURL,
 		DisplayName: profile.DisplayName,
@@ -60,19 +57,40 @@ func GetProfile(
 	}
 }
 
-// GetAvatarURL implements GET /profile/{userID}/avatar_url
-func GetAvatarURL(
+func getProfileByUserID(
 	req *http.Request, accountDB *accounts.Database, userID string,
-) util.JSONResponse {
+) (*authtypes.Profile, *util.JSONResponse) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		resErr := httputil.LogThenError(req, err)
+		return nil, &resErr
 	}
 
 	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		resErr := httputil.LogThenError(req, err)
+		return nil, &resErr
 	}
+
+	if profile == nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("no profile information for this user or this user does not exist"),
+		}
+	}
+
+	return profile, nil
+}
+
+// GetAvatarURL implements GET /profile/{userID}/avatar_url
+func GetAvatarURL(
+	req *http.Request, accountDB *accounts.Database, userID string,
+) util.JSONResponse {
+	profile, err := getProfileByUserID(req, accountDB, userID)
+	if err != nil {
+		return *err
+	}
+
 	res := common.AvatarURL{
 		AvatarURL: profile.AvatarURL,
 	}
@@ -156,15 +174,11 @@ func SetAvatarURL(
 func GetDisplayName(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	profile, err := getProfileByUserID(req, accountDB, userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		return *err
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
 	res := common.DisplayName{
 		DisplayName: profile.DisplayName,
 	}
