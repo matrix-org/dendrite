@@ -35,9 +35,9 @@ func main() {
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
+	asQuery := base.CreateHTTPAppServiceAPIs()
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
 	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
-	asQuery := base.CreateHTTPAppServiceAPIs()
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, &keyRing,
