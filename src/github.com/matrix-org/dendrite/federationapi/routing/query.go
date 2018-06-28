@@ -34,7 +34,7 @@ func RoomAliasToID(
 	cfg config.Dendrite,
 	aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
-	roomAlias := httpReq.FormValue("alias")
+	roomAlias := httpReq.FormValue("room_alias")
 	if roomAlias == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -58,14 +58,14 @@ func RoomAliasToID(
 			return httputil.LogThenError(httpReq, err)
 		}
 
-		if queryRes.RoomID == "" {
+		if queryRes.RoomID != "" {
 			// TODO: List servers that are aware of this room alias
 			resp = gomatrixserverlib.RespDirectory{
 				RoomID:  queryRes.RoomID,
 				Servers: []gomatrixserverlib.ServerName{},
 			}
 		} else {
-			// If the response doesn't contain a non-empty string, return an error
+			// If no alias was found, return an error
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound(fmt.Sprintf("Room alias %s not found", roomAlias)),
