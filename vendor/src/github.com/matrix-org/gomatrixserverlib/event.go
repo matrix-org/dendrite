@@ -61,6 +61,8 @@ type EventBuilder struct {
 	StateKey *string `json:"state_key,omitempty"`
 	// The events that immediately preceded this event in the room history.
 	PrevEvents []EventReference `json:"prev_events"`
+	// TODO: A deprecated, empty but yet still expected key.
+	PrevState string `json:"prev_state"`
 	// The events needed to authenticate this event.
 	AuthEvents []EventReference `json:"auth_events"`
 	// The event ID of the event being redacted if this event is a "m.room.redaction".
