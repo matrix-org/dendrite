@@ -422,7 +422,12 @@ func Register(
 	}
 
 	// If no auth type is specified by the client, send back the list of available flows
-	if r.Auth.Type == "" {
+	if r.Auth.Type == "" && req.URL.Query().Get("access_token") != "" {
+		// Assume this is an application service registering a user if an empty login
+		// type was provided alongside an access token
+		r.Auth.Type = authtypes.LoginTypeApplicationService
+	} else if r.Auth.Type == "" {
+		// Not an access token, and no login type. Send back the flows
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: newUserInteractiveResponse(sessionID,
@@ -442,7 +447,7 @@ func Register(
 
 	// Make sure normal user isn't registering under an exclusive application
 	// service namespace. Skip this check if no app services are registered.
-	if r.Auth.Type != "m.login.application_service" &&
+	if r.Auth.Type != authtypes.LoginTypeApplicationService &&
 		len(cfg.Derived.ApplicationServices) != 0 &&
 		cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(r.Username) {
 		return util.JSONResponse{
