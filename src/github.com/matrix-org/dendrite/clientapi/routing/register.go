@@ -363,7 +363,7 @@ func validateApplicationService(
 	if !UsernameIsWithinApplicationServiceNamespace(cfg, username, matchedApplicationService) {
 		// If we didn't find any matches, return M_EXCLUSIVE
 		return "", &util.JSONResponse{
-			Code: http.StatusUnauthorized,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
 				"Supplied username %s did not match any namespaces for application service ID: %s", username, matchedApplicationService.ID)),
 		}
@@ -372,7 +372,7 @@ func validateApplicationService(
 	// Check this user does not fit multiple application service namespaces
 	if UsernameMatchesMultipleExclusiveNamespaces(cfg, username) {
 		return "", &util.JSONResponse{
-			Code: http.StatusUnauthorized,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
 				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", username)),
 		}

@@ -146,6 +146,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 	// TODO: visibility/presets/raw initial state/creation content
 
 	// TODO: Create room alias association
+	// Make sure this doesn't fall into an application service's namespace though!
 
 	logger.WithFields(log.Fields{
 		"userID": userID,
