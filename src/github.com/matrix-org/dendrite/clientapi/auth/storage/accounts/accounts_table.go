@@ -22,6 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const accountsSchema = `
@@ -121,14 +123,26 @@ func (s *accountsStatements) selectPasswordHash(
 
 func (s *accountsStatements) selectAccountByLocalpart(
 	ctx context.Context, localpart string,
-) (acc *authtypes.Account, err error) {
+) (*authtypes.Account, error) {
+	var appserviceIDPtr sql.NullString
+	var acc authtypes.Account
+
 	stmt := s.selectAccountByLocalpartStmt
-	err = stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &acc.AppServiceID)
-	if err == nil {
-		acc.UserID = userutil.MakeUserID(localpart, s.serverName)
-		acc.ServerName = s.serverName
+	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &appserviceIDPtr)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			log.WithError(err).Error("Unable to retrieve user from the db")
+		}
+		return nil, err
 	}
-	return
+	if appserviceIDPtr.Valid {
+		acc.AppServiceID = appserviceIDPtr.String
+	}
+
+	acc.UserID = userutil.MakeUserID(localpart, s.serverName)
+	acc.ServerName = s.serverName
+
+	return &acc, nil
 }
 
 func (s *accountsStatements) selectNewNumericLocalpart(
