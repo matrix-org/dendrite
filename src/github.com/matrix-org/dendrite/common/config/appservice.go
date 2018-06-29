@@ -207,18 +207,6 @@ func checkErrors(config *Dendrite) (err error) {
 		idMap[appservice.ID] = true
 		tokenMap[appservice.ASToken] = true
 
-		// Check if more than one regex exists per namespace
-		for _, namespace := range appservice.NamespaceMap {
-			if len(namespace) > 1 {
-				// It's quite easy to accidentally make multiple regex objects per
-				// namespace, which often ends up in an application service receiving events
-				// it doesn't want, as an empty regex will match all events.
-				return configErrors([]string{fmt.Sprintf(
-					"Application service namespace can only contain a single regex tuple. Check your YAML.",
-				)})
-			}
-		}
-
 		// TODO: Remove once rate_limited is implemented
 		if appservice.RateLimited {
 			log.Warn("WARNING: Application service option rate_limited is currently unimplemented")
