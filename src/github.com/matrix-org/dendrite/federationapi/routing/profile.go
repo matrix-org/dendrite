@@ -20,9 +20,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -42,12 +42,8 @@ func GetProfile(
 		}
 	}
 
-	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, &cfg.Matrix.ServerName)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
-	}
-
-	if domain != cfg.Matrix.ServerName {
 		return httputil.LogThenError(httpReq, err)
 	}
 

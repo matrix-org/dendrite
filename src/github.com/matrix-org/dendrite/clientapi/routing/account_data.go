@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 
 	"github.com/matrix-org/util"
 )
@@ -47,7 +47,7 @@ func SaveAccountData(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

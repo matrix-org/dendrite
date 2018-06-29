@@ -22,9 +22,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common/config"
 
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -125,7 +125,7 @@ func CheckAndSave3PIDAssociation(
 	}
 
 	// Save the association in the database
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, err := userutil.ParseUsernameParam(device.UserID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -144,7 +144,7 @@ func CheckAndSave3PIDAssociation(
 func GetAssociated3PIDs(
 	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, err := userutil.ParseUsernameParam(device.UserID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

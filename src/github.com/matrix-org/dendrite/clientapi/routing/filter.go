@@ -23,8 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -44,7 +44,7 @@ func GetFilter(
 			JSON: jsonerror.Forbidden("Cannot get filters for other users"),
 		}
 	}
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -92,7 +92,7 @@ func PutFilter(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

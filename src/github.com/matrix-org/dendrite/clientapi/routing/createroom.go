@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -153,7 +154,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		"roomID": roomID,
 	}).Info("Creating new room")
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
