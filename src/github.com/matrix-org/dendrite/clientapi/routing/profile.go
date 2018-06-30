@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -57,6 +58,7 @@ func GetProfile(
 	}
 }
 
+// getProfileByUserID returns the profile for userID, otherwise returns an error response
 func getProfileByUserID(
 	req *http.Request, accountDB *accounts.Database, userID string,
 ) (*authtypes.Profile, *util.JSONResponse) {
@@ -67,16 +69,14 @@ func getProfileByUserID(
 	}
 
 	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
-	if err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
-	}
-
-	if profile == nil {
+	if err == sql.ErrNoRows {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("no profile information for this user or this user does not exist"),
 		}
+	} else if err != nil {
+		resErr := httputil.LogThenError(req, err)
+		return nil, &resErr
 	}
 
 	return profile, nil

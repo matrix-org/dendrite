@@ -98,13 +98,7 @@ func (d *Database) GetAccountByPassword(
 func (d *Database) GetProfileByLocalpart(
 	ctx context.Context, localpart string,
 ) (*authtypes.Profile, error) {
-	profile, err := d.profiles.selectProfileByLocalpart(ctx, localpart)
-	// err == sql.ErrNoRows signifies that this profile is not in the db
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	return profile, nil
+	return d.profiles.selectProfileByLocalpart(ctx, localpart)
 }
 
 // SetAvatarURL updates the avatar URL of the profile associated with the given
