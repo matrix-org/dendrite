@@ -35,7 +35,7 @@ func GetState(
 	_ gomatrixserverlib.KeyRing,
 	roomID string,
 ) util.JSONResponse {
-	eventID, err := parseParams(request)
+	eventID, err := parseEventIDParam(request)
 	if err != nil {
 		return *err
 	}
@@ -58,7 +58,7 @@ func GetStateIDs(
 	_ gomatrixserverlib.KeyRing,
 	roomID string,
 ) util.JSONResponse {
-	eventID, err := parseParams(request)
+	eventID, err := parseEventIDParam(request)
 	if err != nil {
 		return *err
 	}
@@ -78,7 +78,7 @@ func GetStateIDs(
 	}
 }
 
-func parseParams(
+func parseEventIDParam(
 	request *gomatrixserverlib.FederationRequest,
 ) (eventID string, resErr *util.JSONResponse) {
 	URL, err := url.Parse(request.RequestURI())
