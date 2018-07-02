@@ -335,9 +335,10 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 	cfg *config.Dendrite,
 	username string,
 ) bool {
+	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+
 	// Check namespaces and see if more than one match
 	matchCount := 0
-	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		if appservice.IsInterestedInUserID(userID) {
 			if matchCount++; matchCount > 1 {
@@ -346,6 +347,16 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 		}
 	}
 	return false
+}
+
+// UsernameMatchesExclusiveNamespaces will check if a given username matches any
+// application service's exclusive users namespace
+func UsernameMatchesExclusiveNamespaces(
+	cfg *config.Dendrite,
+	username string,
+) bool {
+	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+	return cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(userID)
 }
 
 // validateApplicationService checks if a provided application service token
@@ -466,7 +477,7 @@ func Register(
 	// service namespace. Skip this check if no app services are registered.
 	if r.Auth.Type != "m.login.application_service" &&
 		len(cfg.Derived.ApplicationServices) != 0 &&
-		cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(r.Username) {
+		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
