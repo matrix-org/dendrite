@@ -115,9 +115,12 @@ func SetLocalAlias(
 
 	// Check that the alias does not fall within an exclusive namespace of an
 	// application service
+	// TODO: This code should eventually be refactored with:
+	// 1. The new method for checking for things matching an AS's namespace
+	// 2. Using an overall Regex object for all AS's just like we did for usernames
 	for _, appservice := range cfg.Derived.ApplicationServices {
-		if userNamespaces, ok := appservice.NamespaceMap["users"]; ok {
-			for _, namespace := range userNamespaces {
+		if aliasNamespaces, ok := appservice.NamespaceMap["aliases"]; ok {
+			for _, namespace := range aliasNamespaces {
 				if namespace.Exclusive && namespace.RegexpObject.MatchString(alias) {
 					return util.JSONResponse{
 						Code: http.StatusBadRequest,
