@@ -12,15 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package authtypes
+package types
 
-// Device represents a client's device (mobile, web, etc)
-type Device struct {
-	ID     string
-	UserID string
-	// The access_token granted to this device.
-	// This uniquely identifies the device from all other devices and clients.
-	AccessToken string
-	// TODO: display name, last used timestamp, keys, etc
-	DisplayName string
+type KeyHolder struct {
+	User_id,
+	Device_id,
+	Signature, key,
+	Key_algorithm,
+	Key_id,
+	Key,
+	Key_type string
+}
+type AlHolder struct {
+	User_id,
+	Device_id,
+	Supported_algorithm string
 }
