@@ -17,6 +17,7 @@ package workers
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -67,6 +68,12 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 	// Grab the HTTP client for sending requests to app services
 	client := &http.Client{
 		Timeout: transactionTimeout,
+		// TODO: Verify certificates
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, // nolint: gas
+			},
+		},
 	}
 
 	// Initial check for any leftover events to send from last time
