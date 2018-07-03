@@ -34,6 +34,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+	"github.com/matrix-org/dendrite/encryptoapi"
 )
 
 var (
@@ -55,6 +56,8 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
+
+	encryptoapi.SetupEcryptoapi(base, accountDB, deviceDB)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,

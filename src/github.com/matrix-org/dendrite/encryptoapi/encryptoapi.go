@@ -31,7 +31,6 @@ func SetupEcryptoapi(
 	base *basecomponent.BaseDendrite,
 	accountsDB *accounts.Database,
 	deviceDB *devices.Database,
-
 ) {
 
 	encryptionDB, err := storage.NewDatabase(string(base.Cfg.Database.EncryptAPI))
