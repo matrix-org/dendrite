@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2018 Vector Creations Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,13 +49,22 @@ type KeyNotifier struct {
 
 var keyProducer = &KeyNotifier{}
 
-func UploadPKeys(req *http.Request, encryptionDB *storage.Database, userID, deviceID string) util.JSONResponse {
+func UploadPKeys(
+	req *http.Request,
+	encryptionDB *storage.Database,
+	userID, deviceID string,
+) util.JSONResponse {
 	var keybody types.UploadEncrypt
-	if reqErr := httputil.UnmarshalJSONRequest(req, &keybody); reqErr != nil {
+	if reqErr := httputil.UnmarshalJSONRequest(req, &keybody);
+		reqErr != nil {
 		return *reqErr
 	}
 	keySpecific := turnSpecific(keybody)
-	err := persistKeys(encryptionDB, req.Context(), &keySpecific, userID, deviceID)
+	err := persistKeys(
+		encryptionDB,
+		req.Context(),
+		&keySpecific,
+		userID, deviceID)
 	numMap := (QueryOneTimeKeys(
 		TYPESUM,
 		userID,
@@ -78,17 +87,24 @@ func UploadPKeys(req *http.Request, encryptionDB *storage.Database, userID, devi
 	}
 }
 
-func QueryPKeys(req *http.Request, encryptionDB *storage.Database, userID, deviceID string, deviceDB *devices.Database) util.JSONResponse {
+func QueryPKeys(
+	req *http.Request,
+	encryptionDB *storage.Database,
+	userID, deviceID string,
+	deviceDB *devices.Database,
+) util.JSONResponse {
 	var queryRq types.QueryRequest
 	queryRp := types.QueryResponse{}
 	queryRp.Failure = make(map[string]interface{})
 	queryRp.DeviceKeys = make(map[string]map[string]types.DeviceKeysQuery)
-	if reqErr := httputil.UnmarshalJSONRequest(req, &queryRq); reqErr != nil {
+	if reqErr := httputil.UnmarshalJSONRequest(req, &queryRq);
+		reqErr != nil {
 		return *reqErr
 	}
 
 	/*
-		federation consideration: when user id is in federation, a query is needed to ask fed for keys
+		federation consideration: when user id is in federation, a
+		query is needed to ask fed for keys.
 		domain --------+ fed (keys)
 		domain +--tout-- timer
 	*/
@@ -166,7 +182,12 @@ func QueryPKeys(req *http.Request, encryptionDB *storage.Database, userID, devic
 	}
 }
 
-func ClaimOneTimeKeys(req *http.Request, encryptionDB *storage.Database, userID, deviceID string, deviceDB *devices.Database) util.JSONResponse {
+func ClaimOneTimeKeys(
+	req *http.Request,
+	encryptionDB *storage.Database,
+	userID, deviceID string,
+	deviceDB *devices.Database,
+) util.JSONResponse {
 	var claimRq types.ClaimRequest
 	claimRp := types.ClaimResponse{}
 	claimRp.Failures = make(map[string]interface{})
@@ -354,7 +375,9 @@ func persistKeys(
 	return err
 }
 
-func turnSpecific(cont types.UploadEncrypt) (spec types.UploadEncryptSpecific) {
+func turnSpecific(
+	cont types.UploadEncrypt,
+) (spec types.UploadEncryptSpecific) {
 	// both device keys are coordinate
 	spec.DeviceKeys = cont.DeviceKeys
 	spec.OneTimeKey.KeyString = make(map[string]string)
@@ -374,19 +397,32 @@ func turnSpecific(cont types.UploadEncrypt) (spec types.UploadEncryptSpecific) {
 	return
 }
 
-func persistAl(encryptDB storage.Database, ctx context.Context, uid, device string, al []string) (err error) {
+func persistAl(
+	encryptDB storage.Database,
+	ctx context.Context,
+	uid, device string,
+	al []string,
+) (err error) {
 	err = encryptDB.InsertAl(ctx, uid, device, al)
 	return
 }
 
-func takeAL(encryptDB storage.Database, ctx context.Context, uid, device string) (al []string, err error) {
+func takeAL(
+	encryptDB storage.Database,
+	ctx context.Context,
+	uid, device string,
+) (al []string, err error) {
 	al, err = encryptDB.SelectAl(ctx, uid, device)
 	return
 }
 
-func pickOne(encryptDB storage.Database, ctx context.Context, uid, device, al string) (key types.KeyHolder, err error) {
-	key, err = encryptDB.SelectOneTimeKeySingle(ctx, uid, device, al)
-	return
+func pickOne(
+	encryptDB storage.Database,
+	ctx context.Context,
+	uid, device, al string,
+) (key types.KeyHolder, err error) {
+key, err = encryptDB.SelectOneTimeKeySingle(ctx, uid, device, al)
+return
 }
 
 func upnotify(userID string) {

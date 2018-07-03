@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2018 Vector Creations Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,13 +30,13 @@ CREATE TABLE IF NOT EXISTS encrypt_algorithm (
     algorithms TEXT 			NOT NULL
 );
 `
-
 const insertalSQL = `
-INSERT INTO encrypt_algorithm (device_id, user_id, algorithms) VALUES ($1, $2, $3)
+INSERT INTO encrypt_algorithm (device_id, user_id, algorithms) 
+VALUES ($1, $2, $3)
 `
-
 const selectalSQL = `
-SELECT user_id, device_id, algorithms FROM encrypt_algorithm WHERE user_id = $1 AND device_id = $2
+SELECT user_id, device_id, algorithms FROM encrypt_algorithm 
+WHERE user_id = $1 AND device_id = $2
 `
 
 type alStatements struct {

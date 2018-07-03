@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2018 Vector Creations Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -86,7 +86,9 @@ func (d *Database) QueryInRange(
 	return
 }
 
-func (d *Database) InsertAl(ctx context.Context, uid, device string, al []string) (err error) {
+func (d *Database) InsertAl(
+	ctx context.Context, uid, device string, al []string,
+) (err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) (err error) {
 		d.alStatements.insertAl(ctx, txn, uid, device, strings.Join(al, ","))
 		return
@@ -94,7 +96,9 @@ func (d *Database) InsertAl(ctx context.Context, uid, device string, al []string
 	return
 }
 
-func (d *Database) SelectAl(ctx context.Context, uid, device string) (res []string, err error) {
+func (d *Database) SelectAl(
+	ctx context.Context, uid, device string,
+) (res []string, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) (err error) {
 		holder, err := d.alStatements.selectAl(ctx, txn, uid, device)
 		res = strings.Split(holder.Supported_algorithm, ",")

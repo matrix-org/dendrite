@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2018 Vector Creations Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,29 +35,29 @@ CREATE TABLE IF NOT EXISTS encrypt_keys (
     signature TEXT 				NOT NULL
 );
 `
-
 const insertkeySQL = `
 INSERT INTO encrypt_keys (device_id, user_id, key_id, key_type, key_info, algorithm, signature)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
-
 const selectkeySQL = `
-SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys WHERE user_id = $1 AND device_id = $2
+SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys 
+WHERE user_id = $1 AND device_id = $2
 `
-
 const deleteSinglekeySQL = `
-SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3
+SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys 
+WHERE user_id = $1 AND device_id = $2 AND algorithm = $3
 `
 const selectSinglekeySQL = `
-DELETE FROM encrypt_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 AND key_id = $4
+DELETE FROM encrypt_keys 
+WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 AND key_id = $4
 `
-
 const selectInkeysSQL = `
-SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys WHERE user_id = $1 AND key_type = 'device_key' AND device_id = ANY($2)
+SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys
+ WHERE user_id = $1 AND key_type = 'device_key' AND device_id = ANY($2)
 `
-
 const selectAllkeysSQL = `
-SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys WHERE user_id = $1 AND key_type = $2
+SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys 
+WHERE user_id = $1 AND key_type = $2
 `
 
 type keyStatements struct {
