@@ -18,6 +18,7 @@ package query
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -106,6 +107,12 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 func makeHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: time.Second * 30,
+		// TODO: Verify certificates
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, // nolint: gas
+			},
+		},
 	}
 }
 
