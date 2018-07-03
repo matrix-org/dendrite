@@ -120,8 +120,9 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 	defer func() {
 		err = eventRowsCurr.Close()
 		if err != nil {
-			log.WithError(err).Fatalf("Appservice %s unable to select new events to send",
-				applicationServiceID)
+			log.WithFields(log.Fields{
+				"appservice": applicationServiceID,
+			}).WithError(err).Fatalf("appservice unable to select new events to send")
 		}
 	}()
 	events, maxID, txnID, err = retrieveEvents(eventRowsCurr, limit)
