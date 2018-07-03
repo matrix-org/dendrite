@@ -95,6 +95,7 @@ func (s *keyStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
+// insert keys
 func (ks *keyStatements) insertKey(
 	ctx context.Context, txn *sql.Tx,
 	deviceID, userID, keyID, keyTyp, keyInfo, algorithm, signature string,
@@ -104,6 +105,7 @@ func (ks *keyStatements) insertKey(
 	return err
 }
 
+// select by user and device
 func (ks *keyStatements) selectKey(
 	ctx context.Context,
 	txn *sql.Tx,
@@ -131,6 +133,8 @@ func (ks *keyStatements) selectKey(
 	}
 	return holders, err
 }
+
+// select single one for claim usage
 func (ks *keyStatements) selectSingleKey(
 	ctx context.Context,
 	userID, deviceID, algorithm string,
@@ -156,6 +160,7 @@ func (ks *keyStatements) selectSingleKey(
 	return holder, err
 }
 
+// select details by given an array of devices
 func (ks *keyStatements) selectInKeys(
 	ctx context.Context,
 	userID string,

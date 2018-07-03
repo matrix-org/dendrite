@@ -47,6 +47,7 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 	return &Database{db: db, keyStatements: keyStatement, alStatements: alStatement}, nil
 }
 
+// insert device key
 func (d *Database) InsertKey(
 	ctx context.Context,
 	deviceID, userID, keyID, keyTyp, keyInfo, al, sig string,
@@ -57,6 +58,7 @@ func (d *Database) InsertKey(
 	return
 }
 
+// for key upload response usage a map from key algorithm to sum to counterpart
 func (d *Database) SelectOneTimeKeyCount(
 	ctx context.Context,
 	deviceID, userID string,
@@ -77,6 +79,7 @@ func (d *Database) SelectOneTimeKeyCount(
 	return
 }
 
+// query keys in a range of devices
 func (d *Database) QueryInRange(
 	ctx context.Context,
 	userID string,
@@ -86,6 +89,7 @@ func (d *Database) QueryInRange(
 	return
 }
 
+// persist algorithms
 func (d *Database) InsertAl(
 	ctx context.Context, uid, device string, al []string,
 ) (err error) {
@@ -96,6 +100,7 @@ func (d *Database) InsertAl(
 	return
 }
 
+// select algorithms
 func (d *Database) SelectAl(
 	ctx context.Context, uid, device string,
 ) (res []string, err error) {
@@ -107,6 +112,7 @@ func (d *Database) SelectAl(
 	return
 }
 
+// claim for one time key one for once
 func (d *Database) SelectOneTimeKeySingle(
 	ctx context.Context,
 	userID, deviceID, algorithm string,

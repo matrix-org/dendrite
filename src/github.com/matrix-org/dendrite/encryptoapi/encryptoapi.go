@@ -23,6 +23,10 @@ import (
 	"fmt"
 )
 
+// in order to gain key management capability
+// , CMD should involve this invoke into main function
+// , a setup need an assemble of i.e configs as base and
+// accountDB and deviceDB
 func SetupEcryptoapi(
 	base *basecomponent.BaseDendrite,
 	accountsDB *accounts.Database,

@@ -58,6 +58,7 @@ func (s *alStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
+// persist algorithms
 func (ks *alStatements) insertAl(
 	ctx context.Context, txn *sql.Tx,
 	userID, deviceID, algorithms string,
@@ -67,6 +68,7 @@ func (ks *alStatements) insertAl(
 	return err
 }
 
+// select algorithms
 func (ks *alStatements) selectAl(
 	ctx context.Context,
 	txn *sql.Tx,

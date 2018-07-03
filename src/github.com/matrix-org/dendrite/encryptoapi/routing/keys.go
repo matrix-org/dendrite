@@ -49,6 +49,8 @@ type KeyNotifier struct {
 
 var keyProducer = &KeyNotifier{}
 
+// this function is for user upload his device key, and one-time-key
+// to a limit at 50 set as default
 func UploadPKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
@@ -60,11 +62,13 @@ func UploadPKeys(
 		return *reqErr
 	}
 	keySpecific := turnSpecific(keybody)
+	// persist keys into encryptionDB
 	err := persistKeys(
 		encryptionDB,
 		req.Context(),
 		&keySpecific,
 		userID, deviceID)
+	// numMap is algorithm-num map
 	numMap := (QueryOneTimeKeys(
 		TYPESUM,
 		userID,
@@ -87,6 +91,7 @@ func UploadPKeys(
 	}
 }
 
+// this function is for user query other's device key
 func QueryPKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
@@ -127,15 +132,19 @@ func QueryPKeys(
 		}
 	}
 
+	// query one's device key from user corresponding to uid
 	for uid, arr := range queryRq.DeviceKeys {
 		queryRp.DeviceKeys[uid] = make(map[string]types.DeviceKeysQuery)
 		deviceKeysQueryMap := queryRp.DeviceKeys[uid]
 		// backward compatible to old interface
 		midArr := []string{}
+		// figure out device list from devices described as device which is actually deviceID
 		for device, _ := range arr.(map[string]interface{}) {
 			midArr = append(midArr, device)
 		}
+		// all device keys
 		dkeys, _ := encryptionDB.QueryInRange(req.Context(), uid, midArr)
+		// build response for them
 		for _, key := range dkeys {
 			// preset for complicated nested map struct
 			if _, ok := deviceKeysQueryMap[key.Device_id]; !ok {
@@ -182,6 +191,7 @@ func QueryPKeys(
 	}
 }
 
+// claim for one time key that may be used in session exchange in olm encryption
 func ClaimOneTimeKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
@@ -258,7 +268,8 @@ func LookUpChangedPKeys() util.JSONResponse {
 	}
 }
 
-// todo: check through interface for duplicate
+// todo: check through interface for duplicate and what type of request should it be
+// whether device or one time or both of them
 func checkUpload(req *types.UploadEncryptSpecific, typ int) bool {
 	if typ == BODYDEVICEKEY {
 		devicekey := req.DeviceKeys
@@ -292,6 +303,7 @@ func QueryOneTimeKeys(
 // when web client sign out, a clean should be processed, cause all keys would never been used from then on.
 func ClearUnused() {}
 
+// persist both device keys and one time keys
 func persistKeys(
 	database *storage.Database,
 	ctx context.Context,
@@ -300,6 +312,10 @@ func persistKeys(
 	deviceID string,
 ) (err error) {
 	// in order to persist keys , a check filtering duplicate should be processed
+	// true stands for counterparts are in request
+	// situation 1: only device keys
+	// situation 2: both device keys and one time keys
+	// situation 3: only one time keys
 	if checkUpload(body, BODYDEVICEKEY) {
 		deviceKeys := body.DeviceKeys
 		al := deviceKeys.Algorithm
@@ -375,6 +391,7 @@ func persistKeys(
 	return err
 }
 
+// make keys instantiated to specific struct from keybody interface{}
 func turnSpecific(
 	cont types.UploadEncrypt,
 ) (spec types.UploadEncryptSpecific) {
