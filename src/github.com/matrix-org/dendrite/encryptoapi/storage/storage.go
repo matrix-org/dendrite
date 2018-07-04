@@ -33,7 +33,7 @@ type Database struct {
 func NewDatabase(dataSourceName string) (*Database, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open("postgres_hook", dataSourceName); err != nil {
+	if db, err = sql.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
 	keyStatement := keyStatements{}
