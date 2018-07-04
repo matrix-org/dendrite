@@ -20,7 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/encryptoapi/routing"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/encryptoapi/storage"
-	"fmt"
+	"github.com/sirupsen/logrus"
 )
 
 // in order to gain key management capability
@@ -32,9 +32,10 @@ func SetupEcryptoapi(
 	accountsDB *accounts.Database,
 	deviceDB *devices.Database,
 ) {
-
 	encryptionDB, err := storage.NewDatabase(string(base.Cfg.Database.EncryptAPI))
-	fmt.Print(err)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to encryption db")
+	}
 	routing.Setup(
 		base.APIMux,
 		*base.Cfg,
@@ -43,5 +44,4 @@ func SetupEcryptoapi(
 		deviceDB,
 	)
 	routing.InitNotifier(base)
-
 }

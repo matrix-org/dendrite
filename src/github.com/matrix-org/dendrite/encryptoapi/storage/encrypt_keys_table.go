@@ -113,6 +113,7 @@ func (ks *keyStatements) selectKey(
 ) (holders []types.KeyHolder, err error) {
 	stmt := common.TxStmt(txn, ks.selectKeyStmt)
 	rows, err := stmt.QueryContext(ctx, userID, deviceID)
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -167,6 +168,7 @@ func (ks *keyStatements) selectInKeys(
 	arr []string,
 ) (holders []types.KeyHolder, err error) {
 	rows := &sql.Rows{}
+	defer rows.Close()
 	stmt := ks.selectAllKeyStmt
 	if len(arr) == 0 {
 		rows, err = stmt.QueryContext(ctx, userID, "device_key")
