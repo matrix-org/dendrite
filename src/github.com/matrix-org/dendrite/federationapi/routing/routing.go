@@ -189,7 +189,7 @@ func Setup(
 			roomID := vars["roomID"]
 			userID := vars["userID"]
 			return MakeLeave(
-				httpReq.Context(), httpReq, request, cfg, query, roomID, userID,
+				httpReq, request, cfg, query, roomID, userID,
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -201,7 +201,7 @@ func Setup(
 			roomID := vars["roomID"]
 			userID := vars["userID"]
 			return SendLeave(
-				httpReq.Context(), httpReq, request, cfg, producer, keys, roomID, userID,
+				httpReq, request, cfg, producer, keys, roomID, userID,
 			)
 		},
 	)).Methods(http.MethodPut)

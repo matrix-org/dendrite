@@ -13,7 +13,6 @@
 package routing
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
@@ -29,7 +28,6 @@ import (
 
 // MakeLeave implements the /make_leave API
 func MakeLeave(
-	ctx context.Context,
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
@@ -63,7 +61,7 @@ func MakeLeave(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(ctx, &builder, cfg, query, &queryRes)
+	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, query, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -94,7 +92,6 @@ func MakeLeave(
 
 // SendLeave implements the /send_leave API
 func SendLeave(
-	ctx context.Context,
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
@@ -140,7 +137,7 @@ func SendLeave(
 		Message:    event.Redact().JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
-	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
+	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
@@ -154,7 +151,7 @@ func SendLeave(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(ctx, []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
+	_, err = producer.SendEvents(httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
