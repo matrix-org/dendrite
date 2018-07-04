@@ -99,50 +99,37 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),
 		"type":     ev.Type(),
-	}).Info("appservice received event from roomserver")
+	}).Info("appservice received an event from roomserver")
 
-	events, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
+	missingEvents, err := s.lookupMissingStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
 	if err != nil {
 		return err
 	}
+	events := append(missingEvents, ev)
 
-	// Create a context to thread through the whole filtering process
-	ctx := context.TODO()
-
-	if err = s.db.UpdateMemberships(ctx, events, output.NewRoomEvent.RemovesStateEventIDs); err != nil {
-		return err
-	}
-
-	// Combine any state and non-state events and send them to the application service
-	return s.filterRoomserverEvents(ctx, ev)
+	// Send event to any relevant application services
+	return s.filterRoomserverEvents(context.TODO(), events)
 }
 
-// lookupStateEvents looks up the state events that are added by a new event.
-func (s *OutputRoomEventConsumer) lookupStateEvents(
+// lookupMissingStateEvents looks up the state events that are added by a new event,
+// and returns any not already present.
+func (s *OutputRoomEventConsumer) lookupMissingStateEvents(
 	addsStateEventIDs []string, event gomatrixserverlib.Event,
 ) ([]gomatrixserverlib.Event, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
-		// If the event is a membership update (e.g. for a profile update), it won't
-		// show up in AddsStateEventIDs, so we need to add it manually
-		if event.Type() == "m.room.member" {
-			return []gomatrixserverlib.Event{event}, nil
-		}
-		return nil, nil
+		return []gomatrixserverlib.Event{}, nil
 	}
 
 	// Fast path if the only state event added is the event itself.
 	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.Event{event}, nil
+		return []gomatrixserverlib.Event{}, nil
 	}
 
 	result := []gomatrixserverlib.Event{}
 	missing := []string{}
 	for _, id := range addsStateEventIDs {
-		// Append the current event in the results if its ID is in the events list
-		if id == event.EventID() {
-			result = append(result, event)
-		} else {
+		if id != event.EventID() {
 			// If the event isn't the current one, add it to the list of events
 			// to retrieve from the roomserver
 			missing = append(missing, id)
@@ -168,18 +155,20 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 // application service.
 func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 	ctx context.Context,
-	event gomatrixserverlib.Event,
+	events []gomatrixserverlib.Event,
 ) error {
 	for _, ws := range s.workerStates {
-		// Check if this event is interesting to this application service
-		if s.appserviceIsInterestedInEvent(ctx, event, ws.AppService) {
-			// Queue this event to be sent off to the application service
-			if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, &event); err != nil {
-				log.WithError(err).Warn("failed to insert incoming event into appservices database")
-			} else {
-				// Tell our worker to send out new messages by updating remaining message
-				// count and waking them up with a broadcast
-				ws.NotifyNewEvent()
+		for _, event := range events {
+			// Check if this event is interesting to this application service
+			if s.appserviceIsInterestedInEvent(ctx, event, ws.AppService) {
+				// Queue this event to be sent off to the application service
+				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, &event); err != nil {
+					log.WithError(err).Warn("failed to insert incoming event into appservices database")
+				} else {
+					// Tell our worker to send out new messages by updating remaining message
+					// count and waking them up with a broadcast
+					ws.NotifyNewEvent()
+				}
 			}
 		}
 	}
