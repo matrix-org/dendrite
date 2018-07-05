@@ -115,7 +115,7 @@ type registerRequest struct {
 
 	InitialDisplayName *string `json:"initial_device_display_name"`
 
-	// Application Services place Type in the root of their registration
+	// Application services place Type in the root of their registration
 	// request, whereas clients place it in the authDict struct.
 	Type authtypes.LoginType `json:"type"`
 }
@@ -281,16 +281,16 @@ func validateRecaptcha(
 }
 
 // UsernameIsWithinApplicationServiceNamespace checks to see if a username falls
-// within any of the namespaces of a given Application Service. If no
-// Application Service is given, it will check to see if it matches any
-// Application Service's namespace.
+// within any of the namespaces of a given application service. If no
+// application service is given, it will check to see if it matches any
+// application service's namespace.
 func UsernameIsWithinApplicationServiceNamespace(
 	cfg *config.Dendrite,
 	username string,
 	appservice *config.ApplicationService,
 ) bool {
 	if appservice != nil {
-		// Loop through given Application Service's namespaces and see if any match
+		// Loop through given application service's namespaces and see if any match
 		for _, namespace := range appservice.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
 			if namespace.RegexpObject.MatchString(username) {
@@ -300,7 +300,7 @@ func UsernameIsWithinApplicationServiceNamespace(
 		return false
 	}
 
-	// Loop through all known Application Service's namespaces and see if any match
+	// Loop through all known application service's namespaces and see if any match
 	for _, knownAppservice := range cfg.Derived.ApplicationServices {
 		for _, namespace := range knownAppservice.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
@@ -509,7 +509,7 @@ func handleRegistrationFlow(
 		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeSharedSecret)
 
 	case authtypes.LoginTypeApplicationService:
-		// Check Application Service register user request is valid.
+		// Check application service register user request is valid.
 		// The application service's ID is returned if so.
 		appserviceID, err := validateApplicationService(cfg, req, r.Username)
 

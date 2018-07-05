@@ -97,6 +97,7 @@ database:
     room_server: "postgres://dendrite:itsasecret@localhost/dendrite_roomserver?sslmode=disable"
     server_key: "postgres://dendrite:itsasecret@localhost/dendrite_serverkey?sslmode=disable"
     federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
+    appservice: "postgres://dendrite:itsasecret@localhost/dendrite_appservice?sslmode=disable"
     public_rooms_api: "postgres://dendrite:itsasecret@localhost/dendrite_publicroomsapi?sslmode=disable"
     # If using naffka you need to specify a naffka database
     # naffka: "postgres://dendrite:itsasecret@localhost/dendrite_naffka?sslmode=disable"
