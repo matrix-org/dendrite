@@ -16,6 +16,7 @@
 package routing
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/json"
@@ -555,7 +556,7 @@ func handleRegistrationFlow(
 		// Don't need to worry about appending to registration stages as
 		// application service registration is entirely separate.
 		return completeRegistration(
-			req, accountDB, deviceDB, r.Username, "", appserviceID,
+			req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
 			r.InhibitLogin, r.InitialDisplayName,
 		)
 
@@ -593,7 +594,7 @@ func checkAndCompleteFlow(
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req, accountDB, deviceDB, r.Username, r.Password, "",
+			req.Context(), accountDB, deviceDB, r.Username, r.Password, "",
 			r.InhibitLogin, r.InitialDisplayName,
 		)
 	}
@@ -645,10 +646,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req, accountDB, deviceDB, r.Username, r.Password, "", 0, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", 0, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req, accountDB, deviceDB, r.Username, r.Password, "", 0, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", 0, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -687,11 +688,12 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 }
 
 func completeRegistration(
-	req *http.Request,
+	ctx context.Context,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	username, password, appserviceID string,
-	inhibitLogin int, displayName *string,
+	inhibitLogin int,
+	displayName *string,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
@@ -707,7 +709,7 @@ func completeRegistration(
 		}
 	}
 
-	acc, err := accountDB.CreateAccount(req.Context(), username, password, appserviceID)
+	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -741,7 +743,7 @@ func completeRegistration(
 	}
 
 	// TODO: Use the device ID in the request.
-	dev, err := deviceDB.CreateDevice(req.Context(), username, nil, token, displayName)
+	dev, err := deviceDB.CreateDevice(ctx, username, nil, token, displayName)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
