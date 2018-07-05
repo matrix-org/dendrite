@@ -107,12 +107,13 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 ) (
 	txnID, maxID int,
 	events []gomatrixserverlib.Event,
+	eventsRemaining bool,
 	err error,
 ) {
 	// Retrieve events from the database. Unsuccessfully sent events first
 	eventRows, err := s.selectEventsByApplicationServiceIDStmt.QueryContext(ctx, applicationServiceID)
 	if err != nil {
-		return 0, 0, nil, err
+		return
 	}
 	defer func() {
 		err = eventRows.Close()
@@ -122,15 +123,15 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 			}).WithError(err).Fatalf("appservice unable to select new events to send")
 		}
 	}()
-	events, maxID, txnID, err = retrieveEvents(eventRows, limit)
+	events, maxID, txnID, eventsRemaining, err = retrieveEvents(eventRows, limit)
 	if err != nil {
-		return 0, 0, nil, err
+		return
 	}
 
 	return
 }
 
-func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.Event, maxID, txnID int, err error) {
+func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.Event, maxID, txnID int, eventsRemaining bool, err error) {
 	// Get current time for use in calculating event age
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 
@@ -148,18 +149,18 @@ func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.
 			&txnID,
 		)
 		if err != nil {
-			return nil, 0, 0, err
+			return nil, 0, 0, false, err
 		}
 
 		// Unmarshal eventJSON
 		if err = json.Unmarshal(eventJSON, &event); err != nil {
-			return nil, 0, 0, err
+			return nil, 0, 0, false, err
 		}
 
 		// If txnID has changed on this event from the previous event, then we've
 		// reached the end of a transaction's events. Return only those events.
 		if lastTxnID > invalidTxnID && lastTxnID != txnID {
-			return events, maxID, lastTxnID, nil
+			return events, maxID, lastTxnID, true, nil
 		}
 		lastTxnID = txnID
 
@@ -167,7 +168,7 @@ func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.
 		if txnID == -1 {
 			// Return if we've hit the limit
 			if eventsProcessed++; eventsProcessed > limit {
-				return events, maxID, lastTxnID, nil
+				return events, maxID, lastTxnID, true, nil
 			}
 		}
 
@@ -178,7 +179,7 @@ func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.
 		// Portion of the event that is unsigned due to rapid change
 		// TODO: Consider removing age as not many app services use it
 		if err = event.SetUnsignedField("age", nowMilli-int64(event.OriginServerTS())); err != nil {
-			return nil, 0, 0, err
+			return nil, 0, 0, false, err
 		}
 
 		events = append(events, event)

@@ -84,9 +84,9 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		}).WithError(err).Fatal("appservice worker unable to read queued events from DB")
 		return
 	}
-	ws.Cond.L.Lock()
-	*ws.EventsReady = eventCount
-	ws.Cond.L.Unlock()
+	if eventCount > 0 {
+		ws.NotifyNewEvents()
+	}
 
 	// Loop forever and keep waiting for more events to send
 	for {
@@ -94,7 +94,7 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		ws.WaitForNewEvents()
 
 		// Batch events up into a transaction
-		eventsCount, txnID, maxEventID, transactionJSON, err := createTransaction(ctx, db, ws.AppService.ID)
+		transactionJSON, txnID, maxEventID, eventsRemaining, err := createTransaction(ctx, db, ws.AppService.ID)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"appservice": ws.AppService.ID,
@@ -115,9 +115,11 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		// We sent successfully, hooray!
 		ws.Backoff = 0
 
-		ws.Cond.L.Lock()
-		*ws.EventsReady -= eventsCount
-		ws.Cond.L.Unlock()
+		// Transactions have a maximum event size, so there may still be some events
+		// left over to send. Keep sending until none are left
+		if !eventsRemaining {
+			ws.FinishEventProcessing()
+		}
 
 		// Remove sent events from the DB
 		err = db.RemoveEventsBeforeAndIncludingID(ctx, ws.AppService.ID, maxEventID)
@@ -157,12 +159,13 @@ func createTransaction(
 	db *storage.Database,
 	appserviceID string,
 ) (
-	eventsCount, txnID, maxID int,
 	transactionJSON []byte,
+	txnID, maxID int,
+	eventsRemaining bool,
 	err error,
 ) {
 	// Retrieve the latest events from the DB (will return old events if they weren't successfully sent)
-	txnID, maxID, events, err := db.GetEventsWithAppServiceID(ctx, appserviceID, transactionBatchSize)
+	txnID, maxID, events, eventsRemaining, err := db.GetEventsWithAppServiceID(ctx, appserviceID, transactionBatchSize)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"appservice": appserviceID,
@@ -176,12 +179,12 @@ func createTransaction(
 		// If not, grab next available ID from the DB
 		txnID, err = db.GetLatestTxnID(ctx)
 		if err != nil {
-			return 0, 0, 0, nil, err
+			return nil, 0, 0, false, err
 		}
 
 		// Mark new events with current transactionID
 		if err = db.UpdateTxnIDForEvents(ctx, appserviceID, maxID, txnID); err != nil {
-			return 0, 0, 0, nil, err
+			return nil, 0, 0, false, err
 		}
 	}
 
@@ -195,7 +198,6 @@ func createTransaction(
 		return
 	}
 
-	eventsCount = len(events)
 	return
 }
 

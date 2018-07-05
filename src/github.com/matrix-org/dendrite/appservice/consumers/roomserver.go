@@ -167,7 +167,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 				} else {
 					// Tell our worker to send out new messages by updating remaining message
 					// count and waking them up with a broadcast
-					ws.NotifyNewEvent()
+					ws.NotifyNewEvents()
 				}
 			}
 		}
