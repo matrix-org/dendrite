@@ -57,6 +57,12 @@ const updateTxnIDForEventsSQL = "" +
 const deleteEventsBeforeAndIncludingIDSQL = "" +
 	"DELETE FROM appservice_events WHERE as_id = $1 AND id <= $2"
 
+const (
+	// A transaction ID number that no transaction should ever have. Used for
+	// checking again the default value.
+	invalidTxnID = -2
+)
+
 type eventsStatements struct {
 	selectEventsByApplicationServiceIDStmt *sql.Stmt
 	countEventsByApplicationServiceIDStmt  *sql.Stmt
@@ -131,7 +137,6 @@ func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.
 	// Iterate through each row and store event contents
 	// If txn_id changes dramatically, we've switched from collecting old events to
 	// new ones. Send back those events first.
-	invalidTxnID := -2
 	lastTxnID := invalidTxnID
 	for eventsProcessed := 0; eventRows.Next(); {
 		var event gomatrixserverlib.Event
