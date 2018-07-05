@@ -15,11 +15,11 @@
 package storage
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/encryptoapi/types"
-	"github.com/lib/pq"
 )
 
 const keysSchema = `
@@ -96,104 +96,106 @@ func (s *keyStatements) prepare(db *sql.DB) (err error) {
 }
 
 // insert keys
-func (ks *keyStatements) insertKey(
+func (s *keyStatements) insertKey(
 	ctx context.Context, txn *sql.Tx,
 	deviceID, userID, keyID, keyTyp, keyInfo, algorithm, signature string,
 ) error {
-	stmt := common.TxStmt(txn, ks.insertKeyStmt)
+	stmt := common.TxStmt(txn, s.insertKeyStmt)
 	_, err := stmt.ExecContext(ctx, deviceID, userID, keyID, keyTyp, keyInfo, algorithm, signature)
 	return err
 }
 
 // select by user and device
-func (ks *keyStatements) selectKey(
+func (s *keyStatements) selectKey(
 	ctx context.Context,
 	txn *sql.Tx,
 	deviceID, userID string,
-) (holders []types.KeyHolder, err error) {
-	stmt := common.TxStmt(txn, ks.selectKeyStmt)
+) ([]types.KeyHolder, error) {
+	holders := []types.KeyHolder{}
+	stmt := common.TxStmt(txn, s.selectKeyStmt)
 	rows, err := stmt.QueryContext(ctx, userID, deviceID)
-	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		single := &types.KeyHolder{}
-		if err := rows.Scan(
-			&single.User_id,
-			&single.Device_id,
-			&single.Key_id,
-			&single.Key_type,
+		if err = rows.Scan(
+			&single.UserID,
+			&single.DeviceID,
+			&single.KeyID,
+			&single.KeyType,
 			&single.Key,
-			&single.Key_algorithm,
+			&single.KeyAlgorithm,
 			&single.Signature,
 		); err != nil {
 			return nil, err
 		}
 		holders = append(holders, *single)
 	}
+	err = rows.Close()
 	return holders, err
 }
 
 // select single one for claim usage
-func (ks *keyStatements) selectSingleKey(
+func (s *keyStatements) selectSingleKey(
 	ctx context.Context,
 	userID, deviceID, algorithm string,
 ) (holder types.KeyHolder, err error) {
-	stmt := ks.selectSingleKeyStmt
+	stmt := s.selectSingleKeyStmt
 	row := stmt.QueryRowContext(ctx, userID, deviceID, algorithm)
 	if err != nil {
 		return holder, err
 	}
-	if err := row.Scan(
-		&holder.User_id,
-		&holder.Device_id,
-		&holder.Key_id,
-		&holder.Key_type,
+	if err = row.Scan(
+		&holder.UserID,
+		&holder.DeviceID,
+		&holder.KeyID,
+		&holder.KeyType,
 		&holder.Key,
-		&holder.Key_algorithm,
+		&holder.KeyAlgorithm,
 		&holder.Signature,
 	); err != nil {
-		deleteStmt := ks.deleteSingleKeyStmt
-		deleteStmt.ExecContext(ctx, userID, deviceID, algorithm, holder.Key_id)
+		deleteStmt := s.deleteSingleKeyStmt
+		_, err = deleteStmt.ExecContext(ctx, userID, deviceID, algorithm, holder.KeyID)
 		return holder, err
 	}
 	return holder, err
 }
 
 // select details by given an array of devices
-func (ks *keyStatements) selectInKeys(
+func (s *keyStatements) selectInKeys(
 	ctx context.Context,
 	userID string,
 	arr []string,
 ) (holders []types.KeyHolder, err error) {
-	rows := &sql.Rows{}
-	defer rows.Close()
-	stmt := ks.selectAllKeyStmt
+	rows := sql.Rows{}
+	rowsP := &rows
+	stmt := s.selectAllKeyStmt
 	if len(arr) == 0 {
-		rows, err = stmt.QueryContext(ctx, userID, "device_key")
+		rowsP, err = stmt.QueryContext(ctx, userID, "device_key")
 	} else {
-		stmt = ks.selectInKeysStmt
+		stmt = s.selectInKeysStmt
 		list := pq.Array(arr)
-		rows, err = stmt.QueryContext(ctx, userID, list)
+		rowsP, err = stmt.QueryContext(ctx, userID, list)
 	}
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		single := &types.KeyHolder{}
-		if err := rows.Scan(
-			&single.User_id,
-			&single.Device_id,
-			&single.Key_id,
-			&single.Key_type,
+		if err = rows.Scan(
+			&single.UserID,
+			&single.DeviceID,
+			&single.KeyID,
+			&single.KeyType,
 			&single.Key,
-			&single.Key_algorithm,
+			&single.KeyAlgorithm,
 			&single.Signature,
 		); err != nil {
 			return nil, err
 		}
 		holders = append(holders, *single)
 	}
+	err = rowsP.Close()
 	return holders, err
 }

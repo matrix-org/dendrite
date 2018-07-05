@@ -19,26 +19,21 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixR0 = "/_matrix/client/r0"
 const pathPrefixUnstable = "/_matrix/client/unstable"
 
+// Setup works for setting up encryption api server
 func Setup(
 	apiMux *mux.Router,
-	cfg config.Dendrite,
 	encryptionDB *storage.Database,
-	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 ) {
-	//r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 	unstablemux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	unstablemux.Handle("/keys/upload/{deviceID}",
@@ -56,16 +51,14 @@ func Setup(
 	unstablemux.Handle("/keys/query",
 		common.MakeAuthAPI("query keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			//vars := mux.Vars(req)
-			return QueryPKeys(req, encryptionDB, device.UserID, device.ID, deviceDB)
+			return QueryPKeys(req, encryptionDB, device.ID, deviceDB)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstablemux.Handle("/keys/claim",
 		common.MakeAuthAPI("claim keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			//vars := mux.Vars(req)
-			return ClaimOneTimeKeys(req, encryptionDB, device.UserID, device.ID, deviceDB)
+			return ClaimOneTimeKeys(req, encryptionDB)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-
 
 }

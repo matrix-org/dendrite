@@ -14,17 +14,20 @@
 
 package types
 
+// KeyHolder structure
 type KeyHolder struct {
-	User_id,
-	Device_id,
-	Signature, key,
-	Key_algorithm,
-	Key_id,
+	UserID,
+	DeviceID,
+	Signature,
+	KeyAlgorithm,
+	KeyID,
 	Key,
-	Key_type string
+	KeyType string
 }
+
+// AlHolder structure
 type AlHolder struct {
-	User_id,
-	Device_id,
-	Supported_algorithm string
+	UserID,
+	DeviceID,
+	SupportedAlgorithm string
 }

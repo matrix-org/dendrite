@@ -15,10 +15,9 @@
 package encryptoapi
 
 import (
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/encryptoapi/routing"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/encryptoapi/routing"
 	"github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/sirupsen/logrus"
 )
@@ -27,9 +26,10 @@ import (
 // , CMD should involve this invoke into main function
 // , a setup need an assemble of i.e configs as base and
 // accountDB and deviceDB
+
+// SetupEcryptoapi set up to servers
 func SetupEcryptoapi(
 	base *basecomponent.BaseDendrite,
-	accountsDB *accounts.Database,
 	deviceDB *devices.Database,
 ) {
 	encryptionDB, err := storage.NewDatabase(string(base.Cfg.Database.EncryptAPI))
@@ -38,9 +38,7 @@ func SetupEcryptoapi(
 	}
 	routing.Setup(
 		base.APIMux,
-		*base.Cfg,
 		encryptionDB,
-		accountsDB,
 		deviceDB,
 	)
 	routing.InitNotifier(base)

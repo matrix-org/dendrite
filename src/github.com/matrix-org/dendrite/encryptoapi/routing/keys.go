@@ -15,33 +15,43 @@
 package routing
 
 import (
-	"github.com/matrix-org/util"
-	"github.com/matrix-org/dendrite/encryptoapi/storage"
-	"net/http"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/encryptoapi/types"
 	"context"
-	"github.com/pkg/errors"
-	"strings"
-	"fmt"
 	"encoding/json"
-	"time"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"fmt"
 	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/encryptoapi/storage"
+	"github.com/matrix-org/dendrite/encryptoapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/pkg/errors"
+	"net/http"
+	"strings"
+	"time"
 )
 
 const (
-	TYPESUM          = iota
-	TYPECLAIM
-	TYPEVAL
+	// TYPESUM sum type
+	TYPESUM = iota
+	// BODYDEVICEKEY device key body
 	BODYDEVICEKEY
+	// BODYONETIMEKEY one time key
 	BODYONETIMEKEY
+	// ONETIMEKEYSTRING key string
 	ONETIMEKEYSTRING
+	// ONETIMEKEYOBJECT key object
 	ONETIMEKEYOBJECT
 )
 
+// ONETIMEKEYSTR stands for storage string property
+const ONETIMEKEYSTR = "one_time_key"
+
+// DEVICEKEYSTR stands for storage string property
+const DEVICEKEYSTR = "device_key"
+
+// KeyNotifier kafka notifier
 type KeyNotifier struct {
 	base *basecomponent.BaseDendrite
 	ch   sarama.AsyncProducer
@@ -49,32 +59,30 @@ type KeyNotifier struct {
 
 var keyProducer = &KeyNotifier{}
 
-// this function is for user upload his device key, and one-time-key
-// to a limit at 50 set as default
+// UploadPKeys this function is for user upload his device key, and one-time-key to a limit at 50 set as default
 func UploadPKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
 	userID, deviceID string,
 ) util.JSONResponse {
 	var keybody types.UploadEncrypt
-	if reqErr := httputil.UnmarshalJSONRequest(req, &keybody);
-		reqErr != nil {
+	if reqErr := httputil.UnmarshalJSONRequest(req, &keybody); reqErr != nil {
 		return *reqErr
 	}
 	keySpecific := turnSpecific(keybody)
 	// persist keys into encryptionDB
 	err := persistKeys(
-		encryptionDB,
 		req.Context(),
+		encryptionDB,
 		&keySpecific,
 		userID, deviceID)
 	// numMap is algorithm-num map
 	numMap := (QueryOneTimeKeys(
+		req.Context(),
 		TYPESUM,
 		userID,
 		deviceID,
-		encryptionDB,
-		req.Context())).(map[string]int)
+		encryptionDB)).(map[string]int)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadGateway,
@@ -91,19 +99,19 @@ func UploadPKeys(
 	}
 }
 
-// this function is for user query other's device key
+// QueryPKeys this function is for user query other's device key
 func QueryPKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
-	userID, deviceID string,
+	deviceID string,
 	deviceDB *devices.Database,
 ) util.JSONResponse {
+	var err error
 	var queryRq types.QueryRequest
 	queryRp := types.QueryResponse{}
 	queryRp.Failure = make(map[string]interface{})
 	queryRp.DeviceKeys = make(map[string]map[string]types.DeviceKeysQuery)
-	if reqErr := httputil.UnmarshalJSONRequest(req, &queryRq);
-		reqErr != nil {
+	if reqErr := httputil.UnmarshalJSONRequest(req, &queryRq); reqErr != nil {
 		return *reqErr
 	}
 
@@ -129,6 +137,8 @@ func QueryPKeys(
 			queryRp.Failure = make(map[string]interface{})
 			// todo: key in this map is restricted to username at the end, yet a mocked one.
 			queryRp.Failure["@alice:localhost"] = "ran out of offered time"
+		case <-make(chan interface{}):
+			// todo : here goes federation chan , still a mocked one
 		}
 	}
 
@@ -139,50 +149,35 @@ func QueryPKeys(
 		// backward compatible to old interface
 		midArr := []string{}
 		// figure out device list from devices described as device which is actually deviceID
-		for device, _ := range arr.(map[string]interface{}) {
+		for device := range arr.(map[string]interface{}) {
 			midArr = append(midArr, device)
 		}
 		// all device keys
 		dkeys, _ := encryptionDB.QueryInRange(req.Context(), uid, midArr)
 		// build response for them
-		for _, key := range dkeys {
-			// preset for complicated nested map struct
-			if _, ok := deviceKeysQueryMap[key.Device_id]; !ok {
-				// make consistency
-				deviceKeysQueryMap[key.Device_id] = types.DeviceKeysQuery{}
-			}
-			if deviceKeysQueryMap[key.Device_id].Signature == nil {
-				mid := make(map[string]map[string]string)
-				midmap := deviceKeysQueryMap[key.Device_id]
-				midmap.Signature = mid
-				deviceKeysQueryMap[key.Device_id] = midmap
-			}
-			if deviceKeysQueryMap[key.Device_id].Keys == nil {
-				mid := make(map[string]string)
-				midmap := deviceKeysQueryMap[key.Device_id]
-				midmap.Keys = mid
-				deviceKeysQueryMap[key.Device_id] = midmap
-			}
-			if _, ok := deviceKeysQueryMap[key.Device_id].Signature[uid]; !ok {
-				// make consistency
-				deviceKeysQueryMap[key.Device_id].Signature[uid] = make(map[string]string)
-			}
-			// load for accomplishment
-			single := deviceKeysQueryMap[key.Device_id]
 
-			resKey := fmt.Sprintf("@%s:%s", key.Key_algorithm, key.Device_id)
+		for _, key := range dkeys {
+
+			deviceKeysQueryMap = presetDeviceKeysQueryMap(deviceKeysQueryMap, uid, key)
+			// load for accomplishment
+			single := deviceKeysQueryMap[key.DeviceID]
+			resKey := fmt.Sprintf("@%s:%s", key.KeyAlgorithm, key.DeviceID)
 			resBody := key.Key
-			if _, ok := single.Keys[resKey]; !ok {
-			}
 			single.Keys[resKey] = resBody
-			single.DeviceId = key.Device_id
-			single.UserId = key.User_id
-			single.Signature[uid][fmt.Sprintf("@%s:%s", "ed25519", key.Device_id)] = key.Signature
-			single.Algorithm, _ = takeAL(*encryptionDB, req.Context(), key.User_id, key.Device_id)
+			single.DeviceID = key.DeviceID
+			single.UserID = key.UserID
+			single.Signature[uid][fmt.Sprintf("@%s:%s", "ed25519", key.DeviceID)] = key.Signature
+			single.Algorithm, err = takeAL(req.Context(), *encryptionDB, key.UserID, key.DeviceID)
 			localpart, _, _ := gomatrixserverlib.SplitID('@', uid)
 			device, _ := deviceDB.GetDeviceByID(req.Context(), localpart, deviceID)
 			single.Unsigned.Info = device.DisplayName
-			deviceKeysQueryMap[key.Device_id] = single
+			deviceKeysQueryMap[key.DeviceID] = single
+		}
+	}
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: queryRp,
 		}
 	}
 	return util.JSONResponse{
@@ -191,12 +186,10 @@ func QueryPKeys(
 	}
 }
 
-// claim for one time key that may be used in session exchange in olm encryption
+// ClaimOneTimeKeys claim for one time key that may be used in session exchange in olm encryption
 func ClaimOneTimeKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
-	userID, deviceID string,
-	deviceDB *devices.Database,
 ) util.JSONResponse {
 	var claimRq types.ClaimRequest
 	claimRp := types.ClaimResponse{}
@@ -224,6 +217,8 @@ func ClaimOneTimeKeys(
 			claimRp.Failures = make(map[string]interface{})
 			// todo: key in this map is restricted to username at the end, yet a mocked one.
 			claimRp.Failures["@alice:localhost"] = "ran out of offered time"
+		case <-make(chan interface{}):
+			// todo : here goes federation chan , still a mocked one
 		}
 	}
 
@@ -236,21 +231,24 @@ func ClaimOneTimeKeys(
 			} else {
 				alTyp = ONETIMEKEYSTRING
 			}
-			key, err := pickOne(*encryptionDB, req.Context(), uid, deviceID, al)
+			key, err := pickOne(req.Context(), *encryptionDB, uid, deviceID, al)
 			if err != nil {
 				claimRp.Failures[uid] = fmt.Sprintf("%s:%s", "fail to get keys for device ", deviceID)
 			}
 			claimRp.ClaimBody[uid] = make(map[string]map[string]interface{})
-			keymap := claimRp.ClaimBody[uid][deviceID]
-			keymap = make(map[string]interface{})
+			keyPreMap := claimRp.ClaimBody[uid]
+			keymap := keyPreMap[deviceID]
+			if keymap == nil {
+				keymap = make(map[string]interface{})
+			}
 			switch alTyp {
 			case ONETIMEKEYSTRING:
-				keymap[fmt.Sprintf("%s:%s", al, key.Key_id)] = key.Key
+				keymap[fmt.Sprintf("%s:%s", al, key.KeyID)] = key.Key
 			case ONETIMEKEYOBJECT:
 				sig := make(map[string]map[string]string)
 				sig[uid] = make(map[string]string)
 				sig[uid][fmt.Sprintf("%s:%s", "ed25519", deviceID)] = key.Signature
-				keymap[fmt.Sprintf("%s:%s", al, key.Key_id)] = types.KeyObject{Key: key.Key, Signature: sig}
+				keymap[fmt.Sprintf("%s:%s", al, key.KeyID)] = types.KeyObject{Key: key.Key, Signature: sig}
 			}
 			claimRp.ClaimBody[uid][deviceID] = keymap
 		}
@@ -261,19 +259,12 @@ func ClaimOneTimeKeys(
 	}
 }
 
-func LookUpChangedPKeys() util.JSONResponse {
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: struct{}{},
-	}
-}
-
 // todo: check through interface for duplicate and what type of request should it be
 // whether device or one time or both of them
 func checkUpload(req *types.UploadEncryptSpecific, typ int) bool {
 	if typ == BODYDEVICEKEY {
 		devicekey := req.DeviceKeys
-		if devicekey.UserId == "" {
+		if devicekey.UserID == "" {
 			return false
 		}
 	}
@@ -285,12 +276,12 @@ func checkUpload(req *types.UploadEncryptSpecific, typ int) bool {
 	return true
 }
 
-// todo: complete this field through claim type
+// QueryOneTimeKeys todo: complete this field through claim type
 func QueryOneTimeKeys(
+	ctx context.Context,
 	typ int,
 	userID, deviceID string,
 	encryptionDB *storage.Database,
-	ctx context.Context,
 ) interface{} {
 	if typ == TYPESUM {
 		res, _ := encryptionDB.SelectOneTimeKeyCount(ctx, deviceID, userID)
@@ -299,14 +290,14 @@ func QueryOneTimeKeys(
 	return nil
 }
 
+// ClearUnused when web client sign out, a clean should be processed, cause all keys would never been used from then on.
 // todo: complete this function and invoke through sign out extension or some scenarios else those matter
-// when web client sign out, a clean should be processed, cause all keys would never been used from then on.
 func ClearUnused() {}
 
 // persist both device keys and one time keys
 func persistKeys(
-	database *storage.Database,
 	ctx context.Context,
+	database *storage.Database,
 	body *types.UploadEncryptSpecific,
 	userID,
 	deviceID string,
@@ -319,73 +310,28 @@ func persistKeys(
 	if checkUpload(body, BODYDEVICEKEY) {
 		deviceKeys := body.DeviceKeys
 		al := deviceKeys.Algorithm
-		err = persistAl(*database, ctx, userID, deviceID, al)
+		err = persistAl(ctx, *database, userID, deviceID, al)
+		if err != nil {
+			return
+		}
 		if checkUpload(body, BODYONETIMEKEY) {
-			// insert one time keys firstly
-			onetimeKeys := body.OneTimeKey
-			for al_keyID, val := range onetimeKeys.KeyString {
-				al := (strings.Split(al_keyID, ":"))[0]
-				keyID := (strings.Split(al_keyID, ":"))[1]
-				keyInfo := val
-				keyTyp := "one_time_key"
-				sig := ""
-				database.InsertKey(ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
-			}
-			for al_keyID, val := range onetimeKeys.KeyObject {
-				al := (strings.Split(al_keyID, ":"))[0]
-				keyID := (strings.Split(al_keyID, ":"))[1]
-				keyInfo := val.Key
-				keyTyp := "one_time_key"
-				sig := val.Signature[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
-				database.InsertKey(ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
-			}
-			// insert device keys
-			keys := deviceKeys.Keys
-			sigs := deviceKeys.Signature
-			for al_device, key := range keys {
-				al := (strings.Split(al_device, ":"))[0]
-				keyTyp := "device_key"
-				keyInfo := key
-				keyID := ""
-				sig := sigs[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
-				database.InsertKey(
-					ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
+			if err = bothKeyProcess(ctx, body, userID, deviceID, database, deviceKeys); err != nil {
+				return
 			}
 		} else {
-			keys := deviceKeys.Keys
-			sigs := deviceKeys.Signature
-			for al_device, key := range keys {
-				al := (strings.Split(al_device, ":"))[0]
-				keyTyp := "device_key"
-				keyInfo := key
-				keyID := ""
-				sig := sigs[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
-				database.InsertKey(ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
+			if err = dkeyProcess(ctx, userID, deviceID, database, deviceKeys); err != nil {
+				return
 			}
 		}
 		// notifier to sync server
 		upnotify(userID)
 	} else {
 		if checkUpload(body, BODYONETIMEKEY) {
-			onetimeKeys := body.OneTimeKey
-			for al_keyID, val := range onetimeKeys.KeyString {
-				al := (strings.Split(al_keyID, ":"))[0]
-				keyID := (strings.Split(al_keyID, ":"))[1]
-				keyInfo := val
-				keyTyp := "one_time_key"
-				sig := ""
-				database.InsertKey(ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
-			}
-			for al_keyID, val := range onetimeKeys.KeyObject {
-				al := (strings.Split(al_keyID, ":"))[0]
-				keyID := (strings.Split(al_keyID, ":"))[1]
-				keyInfo := val.Key
-				keyTyp := "one_time_key"
-				sig := val.Signature[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
-				database.InsertKey(ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
+			if err = otmKeyProcess(ctx, body, userID, deviceID, database); err != nil {
+				return
 			}
 		} else {
-			return errors.New("Fail to touch keys !")
+			return errors.New("failed to touch keys")
 		}
 	}
 	return err
@@ -407,7 +353,10 @@ func turnSpecific(
 		} else {
 			valueObject := types.KeyObject{}
 			target, _ := json.Marshal(val)
-			json.Unmarshal(target, &valueObject)
+			err := json.Unmarshal(target, &valueObject)
+			if err != nil {
+				continue
+			}
 			spec.OneTimeKey.KeyObject[key] = valueObject
 		}
 	}
@@ -415,8 +364,8 @@ func turnSpecific(
 }
 
 func persistAl(
-	encryptDB storage.Database,
 	ctx context.Context,
+	encryptDB storage.Database,
 	uid, device string,
 	al []string,
 ) (err error) {
@@ -425,8 +374,8 @@ func persistAl(
 }
 
 func takeAL(
-	encryptDB storage.Database,
 	ctx context.Context,
+	encryptDB storage.Database,
 	uid, device string,
 ) (al []string, err error) {
 	al, err = encryptDB.SelectAl(ctx, uid, device)
@@ -434,12 +383,12 @@ func takeAL(
 }
 
 func pickOne(
-	encryptDB storage.Database,
 	ctx context.Context,
+	encryptDB storage.Database,
 	uid, device, al string,
 ) (key types.KeyHolder, err error) {
-key, err = encryptDB.SelectOneTimeKeySingle(ctx, uid, device, al)
-return
+	key, err = encryptDB.SelectOneTimeKeySingle(ctx, uid, device, al)
+	return
 }
 
 func upnotify(userID string) {
@@ -451,8 +400,138 @@ func upnotify(userID string) {
 	keyProducer.ch.Input() <- &m
 }
 
+// InitNotifier initialize kafka notifier
 func InitNotifier(base *basecomponent.BaseDendrite) {
 	keyProducer.base = base
 	pro, _ := sarama.NewAsyncProducer(base.Cfg.Kafka.Addresses, nil)
 	keyProducer.ch = pro
+}
+
+func presetDeviceKeysQueryMap(
+	deviceKeysQueryMap map[string]types.DeviceKeysQuery,
+	uid string,
+	key types.KeyHolder,
+) map[string]types.DeviceKeysQuery {
+	// preset for complicated nested map struct
+	if _, ok := deviceKeysQueryMap[key.DeviceID]; !ok {
+		// make consistency
+		deviceKeysQueryMap[key.DeviceID] = types.DeviceKeysQuery{}
+	}
+	if deviceKeysQueryMap[key.DeviceID].Signature == nil {
+		mid := make(map[string]map[string]string)
+		midmap := deviceKeysQueryMap[key.DeviceID]
+		midmap.Signature = mid
+		deviceKeysQueryMap[key.DeviceID] = midmap
+	}
+	if deviceKeysQueryMap[key.DeviceID].Keys == nil {
+		mid := make(map[string]string)
+		midmap := deviceKeysQueryMap[key.DeviceID]
+		midmap.Keys = mid
+		deviceKeysQueryMap[key.DeviceID] = midmap
+	}
+	if _, ok := deviceKeysQueryMap[key.DeviceID].Signature[uid]; !ok {
+		// make consistency
+		deviceKeysQueryMap[key.DeviceID].Signature[uid] = make(map[string]string)
+	}
+	return deviceKeysQueryMap
+}
+
+func bothKeyProcess(
+	ctx context.Context,
+	body *types.UploadEncryptSpecific,
+	userID, deviceID string,
+	database *storage.Database,
+	deviceKeys types.DeviceKeys,
+) (err error) {
+	// insert one time keys firstly
+	onetimeKeys := body.OneTimeKey
+	for alKeyID, val := range onetimeKeys.KeyString {
+		al := (strings.Split(alKeyID, ":"))[0]
+		keyID := (strings.Split(alKeyID, ":"))[1]
+		keyInfo := val
+		keyStringTyp := ONETIMEKEYSTR
+		sig := ""
+		err = database.InsertKey(ctx, deviceID, userID, keyID, keyStringTyp, keyInfo, al, sig)
+		if err != nil {
+			return
+		}
+	}
+	for alKeyID, val := range onetimeKeys.KeyObject {
+		al := (strings.Split(alKeyID, ":"))[0]
+		keyID := (strings.Split(alKeyID, ":"))[1]
+		keyInfo := val.Key
+		keyObjectTyp := ONETIMEKEYSTR
+		sig := val.Signature[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
+		err = database.InsertKey(ctx, deviceID, userID, keyID, keyObjectTyp, keyInfo, al, sig)
+		if err != nil {
+			return
+		}
+	}
+	// insert device keys
+	keys := deviceKeys.Keys
+	sigs := deviceKeys.Signature
+	for alDevice, key := range keys {
+		al := (strings.Split(alDevice, ":"))[0]
+		keyTyp := DEVICEKEYSTR
+		keyInfo := key
+		keyID := ""
+		sig := sigs[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
+		err = database.InsertKey(
+			ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func dkeyProcess(
+	ctx context.Context,
+	userID, deviceID string,
+	database *storage.Database,
+	deviceKeys types.DeviceKeys,
+) (err error) {
+	keys := deviceKeys.Keys
+	sigs := deviceKeys.Signature
+	for alDevice, key := range keys {
+		al := (strings.Split(alDevice, ":"))[0]
+		keyTyp := DEVICEKEYSTR
+		keyInfo := key
+		keyID := ""
+		sig := sigs[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
+		err = database.InsertKey(ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
+	}
+	return
+}
+
+func otmKeyProcess(
+	ctx context.Context,
+	body *types.UploadEncryptSpecific,
+	userID, deviceID string,
+	database *storage.Database,
+) (err error) {
+	onetimeKeys := body.OneTimeKey
+	for alKeyID, val := range onetimeKeys.KeyString {
+		al := (strings.Split(alKeyID, ":"))[0]
+		keyID := (strings.Split(alKeyID, ":"))[1]
+		keyInfo := val
+		oneTimeKeyStringTyp := ONETIMEKEYSTR
+		sig := ""
+		err = database.InsertKey(ctx, deviceID, userID, keyID, oneTimeKeyStringTyp, keyInfo, al, sig)
+		if err != nil {
+			return
+		}
+	}
+	for alKeyID, val := range onetimeKeys.KeyObject {
+		al := (strings.Split(alKeyID, ":"))[0]
+		keyID := (strings.Split(alKeyID, ":"))[1]
+		keyInfo := val.Key
+		oneTimeKeyObjectTyp := ONETIMEKEYSTR
+		sig := val.Signature[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
+		err = database.InsertKey(ctx, deviceID, userID, keyID, oneTimeKeyObjectTyp, keyInfo, al, sig)
+		if err != nil {
+			return
+		}
+	}
+	return
 }

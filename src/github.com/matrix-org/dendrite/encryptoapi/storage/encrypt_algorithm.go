@@ -15,8 +15,8 @@
 package storage
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/encryptoapi/types"
 )
@@ -59,29 +59,29 @@ func (s *alStatements) prepare(db *sql.DB) (err error) {
 }
 
 // persist algorithms
-func (ks *alStatements) insertAl(
+func (s *alStatements) insertAl(
 	ctx context.Context, txn *sql.Tx,
 	userID, deviceID, algorithms string,
 ) error {
-	stmt := common.TxStmt(txn, ks.insertAlStmt)
+	stmt := common.TxStmt(txn, s.insertAlStmt)
 	_, err := stmt.ExecContext(ctx, deviceID, userID, algorithms)
 	return err
 }
 
 // select algorithms
-func (ks *alStatements) selectAl(
+func (s *alStatements) selectAl(
 	ctx context.Context,
 	txn *sql.Tx,
-	userID, deviceID  string,
+	userID, deviceID string,
 ) (holder types.AlHolder, err error) {
 
-	stmt := common.TxStmt(txn, ks.selectAlStmt)
+	stmt := common.TxStmt(txn, s.selectAlStmt)
 	row := stmt.QueryRowContext(ctx, userID, deviceID)
 	single := types.AlHolder{}
 	err = row.Scan(
-		&single.User_id,
-		&single.Device_id,
-		&single.Supported_algorithm,
+		&single.UserID,
+		&single.DeviceID,
+		&single.SupportedAlgorithm,
 	)
 	return single, err
 }

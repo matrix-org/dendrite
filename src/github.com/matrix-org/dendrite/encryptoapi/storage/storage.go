@@ -15,9 +15,9 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"github.com/matrix-org/dendrite/common"
-	"context"
 	"github.com/matrix-org/dendrite/encryptoapi/types"
 	"strings"
 )
@@ -47,7 +47,7 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 	return &Database{db: db, keyStatements: keyStatement, alStatements: alStatement}, nil
 }
 
-// insert device key
+// InsertKey insert device key
 func (d *Database) InsertKey(
 	ctx context.Context,
 	deviceID, userID, keyID, keyTyp, keyInfo, al, sig string,
@@ -58,7 +58,7 @@ func (d *Database) InsertKey(
 	return
 }
 
-// for key upload response usage a map from key algorithm to sum to counterpart
+// SelectOneTimeKeyCount for key upload response usage a map from key algorithm to sum to counterpart
 func (d *Database) SelectOneTimeKeyCount(
 	ctx context.Context,
 	deviceID, userID string,
@@ -67,11 +67,11 @@ func (d *Database) SelectOneTimeKeyCount(
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		elems, err := d.keyStatements.selectKey(ctx, txn, deviceID, userID)
 		for _, val := range elems {
-			if _, ok := m[val.Key_algorithm]; !ok {
-				m[val.Key_algorithm] = 0
+			if _, ok := m[val.KeyAlgorithm]; !ok {
+				m[val.KeyAlgorithm] = 0
 			}
-			if val.Key_type == "one_time_key" {
-				m[val.Key_algorithm] += 1
+			if val.KeyType == "one_time_key" {
+				m[val.KeyAlgorithm]++
 			}
 		}
 		return err
@@ -79,7 +79,7 @@ func (d *Database) SelectOneTimeKeyCount(
 	return
 }
 
-// query keys in a range of devices
+// QueryInRange query keys in a range of devices
 func (d *Database) QueryInRange(
 	ctx context.Context,
 	userID string,
@@ -89,30 +89,30 @@ func (d *Database) QueryInRange(
 	return
 }
 
-// persist algorithms
+// InsertAl persist algorithms
 func (d *Database) InsertAl(
 	ctx context.Context, uid, device string, al []string,
 ) (err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) (err error) {
-		d.alStatements.insertAl(ctx, txn, uid, device, strings.Join(al, ","))
+		err = d.alStatements.insertAl(ctx, txn, uid, device, strings.Join(al, ","))
 		return
 	})
 	return
 }
 
-// select algorithms
+// SelectAl select algorithms
 func (d *Database) SelectAl(
 	ctx context.Context, uid, device string,
 ) (res []string, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) (err error) {
 		holder, err := d.alStatements.selectAl(ctx, txn, uid, device)
-		res = strings.Split(holder.Supported_algorithm, ",")
+		res = strings.Split(holder.SupportedAlgorithm, ",")
 		return
 	})
 	return
 }
 
-// claim for one time key one for once
+// SelectOneTimeKeySingle claim for one time key one for once
 func (d *Database) SelectOneTimeKeySingle(
 	ctx context.Context,
 	userID, deviceID, algorithm string,

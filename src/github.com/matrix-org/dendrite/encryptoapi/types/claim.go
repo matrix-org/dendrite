@@ -14,41 +14,14 @@
 
 package types
 
-/*
-	{
-	  "timeout": 10000,
-	  "one_time_keys": {
-		"@alice:example.com": {
-		  "JLAFKJWSCS": "curve25519"
-		}
-	  }
-	}
-*/
+// ClaimRequest structure
 type ClaimRequest struct {
 	Timeout     int64                        `json:"timeout"`
 	ClaimDetail map[string]map[string]string `json:"one_time_keys"`
 }
 
-/*
-	{
-	  "failures": {},
-	  "one_time_keys": {
-		"@alice:example.com": {
-		  "JLAFKJWSCS": {
-			"signed_curve25519:AAAAHg": {
-			  "key": "zKbLg+NrIjpnagy+pIY6uPL4ZwEG2v+8F9lmgsnlZzs",
-			  "signatures": {
-				"@alice:example.com": {
-				  "ed25519:JLAFKJWSCS": "FLWxXqGbwrb8SM3Y795eB6OA8bwBcoMZFXBqnTn58AYWZSqiD45tlBVcDa2L7RwdKXebW/VzDlnfVJ+9jok1Bw"
-				}
-			  }
-			}
-		  }
-		}
-	  }
-	}
-*/
+// ClaimResponse structure
 type ClaimResponse struct {
-	Failures map[string]interface{} `json:"failures"`
+	Failures  map[string]interface{}                       `json:"failures"`
 	ClaimBody map[string]map[string]map[string]interface{} `json:"one_time_keys"`
 }

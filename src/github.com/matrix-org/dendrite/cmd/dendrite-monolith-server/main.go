@@ -32,9 +32,9 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
 
+	"github.com/matrix-org/dendrite/encryptoapi"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
-	"github.com/matrix-org/dendrite/encryptoapi"
 )
 
 var (
@@ -57,7 +57,7 @@ func main() {
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
 
-	encryptoapi.SetupEcryptoapi(base, accountDB, deviceDB)
+	encryptoapi.SetupEcryptoapi(base, deviceDB)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
