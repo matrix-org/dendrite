@@ -39,6 +39,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -186,12 +187,12 @@ func validateUsername(username string) *util.JSONResponse {
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID can only contain characters a-z, 0-9, or '_-./'"),
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./'"),
 		}
 	} else if username[0] == '_' { // Regex checks its not a zero length string
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID cannot start with a '_'"),
+			JSON: jsonerror.InvalidUsername("Username cannot start with a '_'"),
 		}
 	}
 	return nil
@@ -207,7 +208,7 @@ func validateApplicationServiceUsername(username string) *util.JSONResponse {
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID can only contain characters a-z, 0-9, or '_-./'"),
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./'"),
 		}
 	}
 	return nil
@@ -296,20 +297,20 @@ func validateRecaptcha(
 	return nil
 }
 
-// UsernameIsWithinApplicationServiceNamespace checks to see if a username falls
-// within any of the namespaces of a given application service. If no
-// application service is given, it will check to see if it matches any
-// application service's namespace.
-func UsernameIsWithinApplicationServiceNamespace(
+// UserIDIsWithinApplicationServiceNamespace checks to see if a given userID
+// falls within any of the namespaces of a given Application Service. If no
+// Application Service is given, it will check to see if it matches any
+// Application Service's namespace.
+func UserIDIsWithinApplicationServiceNamespace(
 	cfg *config.Dendrite,
-	username string,
+	userID string,
 	appservice *config.ApplicationService,
 ) bool {
 	if appservice != nil {
 		// Loop through given application service's namespaces and see if any match
 		for _, namespace := range appservice.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
-			if namespace.RegexpObject.MatchString(username) {
+			if namespace.RegexpObject.MatchString(userID) {
 				return true
 			}
 		}
@@ -320,7 +321,7 @@ func UsernameIsWithinApplicationServiceNamespace(
 	for _, knownAppservice := range cfg.Derived.ApplicationServices {
 		for _, namespace := range knownAppservice.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
-			if namespace.RegexpObject.MatchString(username) {
+			if namespace.RegexpObject.MatchString(userID) {
 				return true
 			}
 		}
@@ -375,8 +376,10 @@ func validateApplicationService(
 		}
 	}
 
+	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+
 	// Ensure the desired username is within at least one of the application service's namespaces.
-	if !UsernameIsWithinApplicationServiceNamespace(cfg, username, matchedApplicationService) {
+	if !UserIDIsWithinApplicationServiceNamespace(cfg, userID, matchedApplicationService) {
 		// If we didn't find any matches, return M_EXCLUSIVE
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -386,7 +389,7 @@ func validateApplicationService(
 	}
 
 	// Check this user does not fit multiple application service namespaces
-	if UsernameMatchesMultipleExclusiveNamespaces(cfg, username) {
+	if UsernameMatchesMultipleExclusiveNamespaces(cfg, userID) {
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
