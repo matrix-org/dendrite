@@ -175,8 +175,8 @@ type recaptchaResponse struct {
 	ErrorCodes  []int     `json:"error-codes"`
 }
 
-// validateUserName returns an error response if the username is invalid
-func validateUserName(username string) *util.JSONResponse {
+// validateUsername returns an error response if the username is invalid
+func validateUsername(username string) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	if len(username) > maxUsernameLength {
 		return &util.JSONResponse{
@@ -191,7 +191,23 @@ func validateUserName(username string) *util.JSONResponse {
 	} else if username[0] == '_' { // Regex checks its not a zero length string
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID can't start with a '_'"),
+			JSON: jsonerror.InvalidUsername("User ID cannot start with a '_'"),
+		}
+	}
+	return nil
+}
+
+// validateApplicationServiceUsername returns an error response if the username is invalid for an application service
+func validateApplicationServiceUsername(username string) *util.JSONResponse {
+	if len(username) > maxUsernameLength {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
+		}
+	} else if !validUsernameRegex.MatchString(username) {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername("User ID can only contain characters a-z, 0-9, or '_-./'"),
 		}
 	}
 	return nil
@@ -378,6 +394,11 @@ func validateApplicationService(
 		}
 	}
 
+	// Check username application service is trying to register is valid
+	if err := validateApplicationServiceUsername(username); err != nil {
+		return "", err
+	}
+
 	// No errors, registration valid
 	return matchedApplicationService.ID, nil
 }
@@ -433,7 +454,7 @@ func Register(
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
 
-	if resErr = validateUserName(r.Username); resErr != nil {
+	if resErr = validateUsername(r.Username); resErr != nil {
 		return *resErr
 	}
 	if resErr = validatePassword(r.Password); resErr != nil {
@@ -512,7 +533,6 @@ func handleRegistrationFlow(
 		// Check application service register user request is valid.
 		// The application service's ID is returned if so.
 		appserviceID, err := validateApplicationService(cfg, req, r.Username)
-
 		if err != nil {
 			return *err
 		}
@@ -630,7 +650,7 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
 
-	if resErr = validateUserName(r.Username); resErr != nil {
+	if resErr = validateUsername(r.Username); resErr != nil {
 		return resErr
 	}
 	if resErr = validatePassword(r.Password); resErr != nil {
@@ -822,7 +842,7 @@ func RegisterAvailable(
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
 
-	if err := validateUserName(username); err != nil {
+	if err := validateUsername(username); err != nil {
 		return *err
 	}
 
