@@ -187,12 +187,12 @@ func validateUsername(username string) *util.JSONResponse {
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID can only contain characters a-z, 0-9, or '_-./'"),
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./'"),
 		}
 	} else if username[0] == '_' { // Regex checks its not a zero length string
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID cannot start with a '_'"),
+			JSON: jsonerror.InvalidUsername("Username cannot start with a '_'"),
 		}
 	}
 	return nil
@@ -208,7 +208,7 @@ func validateApplicationServiceUsername(username string) *util.JSONResponse {
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID can only contain characters a-z, 0-9, or '_-./'"),
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./'"),
 		}
 	}
 	return nil

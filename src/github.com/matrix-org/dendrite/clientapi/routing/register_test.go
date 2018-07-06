@@ -168,7 +168,7 @@ func TestValidationOfApplicationServices(t *testing.T) {
 
 	// Create a fake application service
 	fakeID := "FakeAS"
-	fakeSenderLocalpart := "@_appservice_bot"
+	fakeSenderLocalpart := "_appservice_bot"
 	fakeApplicationService := config.ApplicationService{
 		ID:              fakeID,
 		URL:             "null",
