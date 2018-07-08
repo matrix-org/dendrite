@@ -140,21 +140,21 @@ func Setup(
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI)
+			return DirectoryRoom(req, strings.TrimSpace(vars["roomAlias"]), federation, &cfg, aliasAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return SetLocalAlias(req, device, vars["roomAlias"], &cfg, aliasAPI)
+			return SetLocalAlias(req, device, strings.TrimSpace(vars["roomAlias"]), &cfg, aliasAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/directory/room/{roomAlias}",
 		common.MakeAuthAPI("directory_room", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return RemoveLocalAlias(req, device, vars["roomAlias"], aliasAPI)
+			return RemoveLocalAlias(req, device, strings.TrimSpace(vars["roomAlias"]), aliasAPI)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 
