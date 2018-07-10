@@ -104,6 +104,25 @@ type QueryEventsByIDResponse struct {
 	Events []gomatrixserverlib.Event `json:"events"`
 }
 
+// QueryMembershipForUserRequest is a request to QueryMembership
+type QueryMembershipForUserRequest struct {
+	// ID of the room to fetch membership from
+	RoomID string `json:"room_id"`
+	// ID of the user sending the request
+	Sender string `json:"sender"`
+}
+
+// QueryMembershipForUserResponse is a response to QueryMembership
+type QueryMembershipForUserResponse struct {
+	// The EventID of the latest "m.room.member" event for the sender,
+	// if HasBeenInRoom is true.
+	EventID string `json:"event_id"`
+	// True if the user has been in room before and has either stayed in it or left it.
+	HasBeenInRoom bool `json:"has_been_in_room"`
+	// True if the user is in room.
+	IsInRoom bool `json:"is_in_room"`
+}
+
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
 type QueryMembershipsForRoomRequest struct {
 	// If true, only returns the membership events of "join" membership
@@ -222,6 +241,13 @@ type RoomserverQueryAPI interface {
 		response *QueryEventsByIDResponse,
 	) error
 
+	// Query the membership event for an user for a room.
+	QueryMembershipForUser(
+		ctx context.Context,
+		request *QueryMembershipForUserRequest,
+		response *QueryMembershipForUserResponse,
+	) error
+
 	// Query a list of membership events for a room
 	QueryMembershipsForRoom(
 		ctx context.Context,
@@ -268,6 +294,9 @@ const RoomserverQueryStateAfterEventsPath = "/api/roomserver/queryStateAfterEven
 
 // RoomserverQueryEventsByIDPath is the HTTP path for the QueryEventsByID API.
 const RoomserverQueryEventsByIDPath = "/api/roomserver/queryEventsByID"
+
+// RoomserverQueryMembershipForUserPath is the HTTP path for the QueryMembershipForUser API.
+const RoomserverQueryMembershipForUserPath = "/api/roomserver/queryMembershipForUser"
 
 // RoomserverQueryMembershipsForRoomPath is the HTTP path for the QueryMembershipsForRoom API
 const RoomserverQueryMembershipsForRoomPath = "/api/roomserver/queryMembershipsForRoom"
@@ -334,6 +363,19 @@ func (h *httpRoomserverQueryAPI) QueryEventsByID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
+	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryMembershipForUser implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) QueryMembershipForUser(
+	ctx context.Context,
+	request *QueryMembershipForUserRequest,
+	response *QueryMembershipForUserResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershipForUser")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryMembershipForUserPath
 	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
