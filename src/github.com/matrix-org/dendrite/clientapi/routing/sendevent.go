@@ -76,7 +76,7 @@ func SendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := common.BuildEvent(req.Context(), &builder, cfg, queryAPI, &queryRes)
+	e, err := common.BuildEvent(req, &builder, cfg, queryAPI, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

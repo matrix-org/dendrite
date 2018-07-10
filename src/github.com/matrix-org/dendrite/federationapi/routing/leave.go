@@ -61,7 +61,7 @@ func MakeLeave(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, query, &queryRes)
+	event, err := common.BuildEvent(httpReq, &builder, cfg, query, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

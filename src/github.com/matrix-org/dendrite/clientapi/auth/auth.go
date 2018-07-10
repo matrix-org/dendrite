@@ -68,7 +68,7 @@ func VerifyUserFromRequest(
 	// Try to find local user from device database
 	dev, devErr := verifyAccessToken(req, data.DeviceDB)
 	if devErr == nil {
-		return dev, nil
+		return dev, verifyUserParameters(req)
 	}
 
 	// Try to find the Application Service user
@@ -132,6 +132,18 @@ func VerifyUserFromRequest(
 		Code: http.StatusUnauthorized,
 		JSON: jsonerror.UnknownToken("Unrecognized access token"),
 	}
+}
+
+// verifyUserParameters ensures that a request coming from a regular user is not
+// using any query parameters reserved for an application service
+func verifyUserParameters(req *http.Request) *util.JSONResponse {
+	if req.URL.Query().Get("ts") != "" {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("parameter 'ts' not allowed without valid parameter 'access_token'"),
+		}
+	}
+	return nil
 }
 
 // verifyAccessToken verifies that an access token was supplied in the given HTTP request
