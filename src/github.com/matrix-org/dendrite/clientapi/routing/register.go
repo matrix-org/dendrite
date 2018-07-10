@@ -382,6 +382,23 @@ func validateApplicationService(
 	return matchedApplicationService.ID, nil
 }
 
+// authTypeIsValid check the registration authentication type of the request
+// and returns an error if necessary
+func authTypeIsValid(authType *authtypes.LoginType, req *http.Request) bool {
+	// If no auth type is specified by the client, send back the list of available flows
+	if *authType == "" && req.URL.Query().Get("access_token") != "" {
+		// Assume this is an application service registering a user if an empty login
+		// type was provided alongside an access token
+		*authType = authtypes.LoginTypeApplicationService
+	} else if *authType == "" {
+		// Not an access token, and no login type. Send back the flows
+		return false
+	}
+
+	return true
+
+}
+
 // Register processes a /register request.
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
@@ -421,13 +438,9 @@ func Register(
 		r.Username = strconv.FormatInt(id, 10)
 	}
 
-	// If no auth type is specified by the client, send back the list of available flows
-	if r.Auth.Type == "" && req.URL.Query().Get("access_token") != "" {
-		// Assume this is an application service registering a user if an empty login
-		// type was provided alongside an access token
-		r.Auth.Type = authtypes.LoginTypeApplicationService
-	} else if r.Auth.Type == "" {
-		// Not an access token, and no login type. Send back the flows
+	// Check r.Auth.Type is correct for the client requesting (handles application
+	// services requesting without an auth type)
+	if !authTypeIsValid(&r.Auth.Type, req) {
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: newUserInteractiveResponse(sessionID,
