@@ -201,7 +201,7 @@ func Setup(
 			roomID := vars["roomID"]
 			userID := vars["userID"]
 			return SendLeave(
-				httpReq, request, cfg, producer, keys, roomID, userID,
+				httpReq, request, cfg, producer, query, keys, roomID, userID,
 			)
 		},
 	)).Methods(http.MethodPut)

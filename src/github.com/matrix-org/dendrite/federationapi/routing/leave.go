@@ -14,6 +14,7 @@ package routing
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -96,6 +97,7 @@ func SendLeave(
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
 	producer *producers.RoomserverProducer,
+	query api.RoomserverQueryAPI,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
@@ -148,12 +150,39 @@ func SendLeave(
 		}
 	}
 
+	var userID string
+	if stateKey := event.StateKey(); stateKey != nil {
+		userID = *stateKey
+	} else {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The event JSON should contain the stateKey"),
+		}
+	}
+
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	_, err = producer.SendEvents(httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
+	}
+
+	// Check that the leave has taken effect
+	var response api.QueryMembershipForUserResponse
+	if err = query.QueryMembershipForUser(
+		httpReq.Context(),
+		&api.QueryMembershipForUserRequest{
+			RoomID: event.RoomID(),
+			Sender: userID,
+		},
+		&response,
+	); err != nil {
+		return httputil.LogThenError(httpReq, err)
+	}
+
+	if response.IsInRoom {
+		return httputil.LogThenError(httpReq, fmt.Errorf("user (user ID: %s) is still in room", userID))
 	}
 
 	return util.JSONResponse{
