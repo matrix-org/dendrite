@@ -71,7 +71,7 @@ type ApplicationService struct {
 func (a *ApplicationService) IsInterestedInRoomID(
 	roomID string,
 ) bool {
-	if namespaceSlice, ok := a.NamespaceMap["users"]; ok {
+	if namespaceSlice, ok := a.NamespaceMap["rooms"]; ok {
 		for _, namespace := range namespaceSlice {
 			if namespace.RegexpObject.MatchString(roomID) {
 				return true
