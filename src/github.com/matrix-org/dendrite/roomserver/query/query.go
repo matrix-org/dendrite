@@ -238,7 +238,7 @@ func (r *RoomserverQueryAPI) QueryMembershipForUser(
 		return err
 	}
 
-	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, roomNID, request.Sender)
+	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, roomNID, request.UserID)
 	if err != nil {
 		return err
 	}

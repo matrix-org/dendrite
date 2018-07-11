@@ -108,8 +108,8 @@ type QueryEventsByIDResponse struct {
 type QueryMembershipForUserRequest struct {
 	// ID of the room to fetch membership from
 	RoomID string `json:"room_id"`
-	// ID of the user sending the request
-	Sender string `json:"sender"`
+	// ID of the user for whom membership is requested
+	UserID string `json:"user_id"`
 }
 
 // QueryMembershipForUserResponse is a response to QueryMembership
