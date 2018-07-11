@@ -15,8 +15,10 @@ package routing
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -32,8 +34,12 @@ func GetState(
 	_ time.Time,
 	_ gomatrixserverlib.KeyRing,
 	roomID string,
-	eventID string,
 ) util.JSONResponse {
+	eventID, err := parseEventIDParam(request)
+	if err != nil {
+		return *err
+	}
+
 	state, err := getState(ctx, request, query, roomID, eventID)
 	if err != nil {
 		return *err
@@ -51,8 +57,12 @@ func GetStateIDs(
 	_ time.Time,
 	_ gomatrixserverlib.KeyRing,
 	roomID string,
-	eventID string,
 ) util.JSONResponse {
+	eventID, err := parseEventIDParam(request)
+	if err != nil {
+		return *err
+	}
+
 	state, err := getState(ctx, request, query, roomID, eventID)
 	if err != nil {
 		return *err
@@ -66,6 +76,26 @@ func GetStateIDs(
 		AuthEventIDs:  authEventIDs,
 	},
 	}
+}
+
+func parseEventIDParam(
+	request *gomatrixserverlib.FederationRequest,
+) (eventID string, resErr *util.JSONResponse) {
+	URL, err := url.Parse(request.RequestURI())
+	if err != nil {
+		*resErr = util.ErrorResponse(err)
+		return
+	}
+
+	eventID = URL.Query().Get("event_id")
+	if eventID == "" {
+		resErr = &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("event_id missing"),
+		}
+	}
+
+	return
 }
 
 func getState(
