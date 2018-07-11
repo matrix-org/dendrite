@@ -149,7 +149,8 @@ func SendLeave(
 	}
 
 	// check membership is set to leave
-	if mem, err := event.Membership(); err != nil {
+	mem, err := event.Membership()
+	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	} else if mem != "leave" {
 		return util.JSONResponse{
