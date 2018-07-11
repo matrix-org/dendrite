@@ -148,6 +148,16 @@ func SendLeave(
 		}
 	}
 
+	// check membership is set to leave
+	if mem, err := event.Membership(); err != nil {
+		return httputil.LogThenError(httpReq, err)
+	} else if mem != "leave" {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The membership in the event content must be set to leave"),
+		}
+	}
+
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
