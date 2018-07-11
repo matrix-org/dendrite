@@ -182,6 +182,30 @@ func Setup(
 		},
 	)).Methods(http.MethodPut)
 
+	v1fedmux.Handle("/make_leave/{roomID}/{userID}", common.MakeFedAPI(
+		"federation_make_leave", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			roomID := vars["roomID"]
+			userID := vars["userID"]
+			return MakeLeave(
+				httpReq, request, cfg, query, roomID, userID,
+			)
+		},
+	)).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/send_leave/{roomID}/{userID}", common.MakeFedAPI(
+		"federation_send_leave", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			roomID := vars["roomID"]
+			userID := vars["userID"]
+			return SendLeave(
+				httpReq, request, cfg, producer, keys, roomID, userID,
+			)
+		},
+	)).Methods(http.MethodPut)
+
 	v1fedmux.Handle("/version", common.MakeExternalAPI(
 		"federation_version",
 		func(httpReq *http.Request) util.JSONResponse {
