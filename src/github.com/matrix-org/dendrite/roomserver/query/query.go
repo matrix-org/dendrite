@@ -227,6 +227,37 @@ func (r *RoomserverQueryAPI) loadEvents(
 	return result, nil
 }
 
+// QueryMembershipForUser implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryMembershipForUser(
+	ctx context.Context,
+	request *api.QueryMembershipForUserRequest,
+	response *api.QueryMembershipForUserResponse,
+) error {
+	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+
+	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, roomNID, request.UserID)
+	if err != nil {
+		return err
+	}
+
+	if membershipEventNID == 0 {
+		response.HasBeenInRoom = false
+		return nil
+	}
+
+	response.IsInRoom = stillInRoom
+	eventIDMap, err := r.DB.EventIDs(ctx, []types.EventNID{membershipEventNID})
+	if err != nil {
+		return err
+	}
+
+	response.EventID = eventIDMap[membershipEventNID]
+	return nil
+}
+
 // QueryMembershipsForRoom implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 	ctx context.Context,
@@ -588,6 +619,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryEventsByID(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryMembershipForUserPath,
+		common.MakeInternalAPI("QueryMembershipForUser", func(req *http.Request) util.JSONResponse {
+			var request api.QueryMembershipForUserRequest
+			var response api.QueryMembershipForUserResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryMembershipForUser(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
