@@ -54,6 +54,9 @@ func SetupAppServiceAPIComponent(
 		logrus.WithError(err).Panicf("failed to connect to appservice db")
 	}
 
+	// Wrap application services in a type that relates the application service and
+	// a sync.Cond object that can be used to notify workers when there are new
+	// events to be sent out.
 	workerStates := make([]types.ApplicationServiceWorkerState, len(base.Cfg.Derived.ApplicationServices))
 	for i, appservice := range base.Cfg.Derived.ApplicationServices {
 		m := sync.Mutex{}
