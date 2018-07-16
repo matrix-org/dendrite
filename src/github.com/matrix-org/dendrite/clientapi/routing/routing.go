@@ -388,6 +388,20 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
+	// Third party lookups
+	r0mux.Handle("/thirdparty/protocol/{protocolID}",
+		common.MakeExternalAPI("get_protocols", func(req *http.Request) util.JSONResponse {
+			vars := mux.Vars(req)
+			return GetThirdPartyProtocol(req, asAPI, vars["protocolID"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/thirdparty/protocols",
+		common.MakeExternalAPI("get_protocols", func(req *http.Request) util.JSONResponse {
+			return GetThirdPartyProtocols(req, asAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	// Stub implementations for sytest
 	r0mux.Handle("/events",
 		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {

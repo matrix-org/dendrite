@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
@@ -38,6 +39,45 @@ const userIDExistsPath = "/users/"
 type AppServiceQueryAPI struct {
 	HTTPClient *http.Client
 	Cfg        *config.Dendrite
+	Db         *storage.Database
+}
+
+// GetProtocolDefinition queries the database for the protocol definition of a
+// protocol with given ID
+func (a *AppServiceQueryAPI) GetProtocolDefinition(
+	ctx context.Context,
+	request *api.GetProtocolDefinitionRequest,
+	response *api.GetProtocolDefinitionResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceGetProtocolDefinition")
+	defer span.Finish()
+
+	protocolDefinition, err := a.Db.GetProtocolDefinition(ctx, request.ProtocolID)
+	if err != nil {
+		return err
+	}
+
+	response.ProtocolDefinition = protocolDefinition
+	return nil
+}
+
+// GetAllProtocolDefinitions queries the database for all known protocol
+// definitions and their IDs
+func (a *AppServiceQueryAPI) GetAllProtocolDefinitions(
+	ctx context.Context,
+	request *api.GetAllProtocolDefinitionsRequest,
+	response *api.GetAllProtocolDefinitionsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceGetAllProtocolDefinitions")
+	defer span.Finish()
+
+	protocolDefinitions, err := a.Db.GetAllProtocolDefinitions(ctx)
+	if err != nil {
+		return err
+	}
+
+	response.Protocols = protocolDefinitions
+	return nil
 }
 
 // RoomAliasExists performs a request to '/room/{roomAlias}' on all known
@@ -184,7 +224,7 @@ func makeHTTPClient() *http.Client {
 // handles and muxes incoming api requests the to internal AppServiceQueryAPI.
 func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
-		api.AppServiceRoomAliasExistsPath,
+		api.RoomAliasExistsPath,
 		common.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
 			var request api.RoomAliasExistsRequest
 			var response api.RoomAliasExistsResponse
@@ -206,6 +246,34 @@ func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := a.UserIDExists(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.GetProtocolDefinitionPath,
+		common.MakeInternalAPI("appserviceGetProtocolDefinition", func(req *http.Request) util.JSONResponse {
+			var request api.GetProtocolDefinitionRequest
+			var response api.GetProtocolDefinitionResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := a.GetProtocolDefinition(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.GetAllProtocolDefinitionsPath,
+		common.MakeInternalAPI("appserviceGetAllProtocolDefinitions", func(req *http.Request) util.JSONResponse {
+			var request api.GetAllProtocolDefinitionsRequest
+			var response api.GetAllProtocolDefinitionsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := a.GetAllProtocolDefinitions(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"time"
 
@@ -30,38 +29,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
+const (
 	// Maximum size of events sent in each transaction.
 	transactionBatchSize = 50
 	// Timeout for sending a single transaction to an application service.
 	transactionTimeout = time.Second * 60
 )
 
-// SetupTransactionWorkers spawns a separate goroutine for each application
-// service. Each of these "workers" handle taking all events intended for their
-// app service, batch them up into a single transaction (up to a max transaction
+// TransactionWorker is a goroutine that sends any queued events to the application service
+// it is given. Each worker handles taking all events intended for their app
+// service, batch them up into a single transaction (up to a max transaction
 // size), then send that off to the AS's /transactions/{txnID} endpoint. It also
 // handles exponentially backing off in case the AS isn't currently available.
-func SetupTransactionWorkers(
-	appserviceDB *storage.Database,
-	workerStates []types.ApplicationServiceWorkerState,
-) error {
-	// Create a worker that handles transmitting events to a single homeserver
-	for _, workerState := range workerStates {
-		// Don't create a worker if this AS doesn't want to receive events
-		if workerState.AppService.URL != "" {
-			go worker(appserviceDB, workerState)
-		}
-	}
-	return nil
-}
-
-// worker is a goroutine that sends any queued events to the application service
-// it is given.
-func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
-	log.WithFields(log.Fields{
-		"appservice": ws.AppService.ID,
-	}).Info("starting application service")
+func TransactionWorker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 	ctx := context.Background()
 
 	// Create a HTTP client for sending requests to app services
@@ -100,8 +80,13 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 		// Backoff if the application service does not respond
 		err = send(client, ws.AppService, txnID, transactionJSON)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"appservice":       ws.AppService.ID,
+				"backoff_exponent": ws.Backoff,
+			}).WithError(err).Warnf("unable to send transactions successfully, backing off")
+
 			// Backoff
-			backoff(&ws, err)
+			backoff(&ws.Backoff)
 			continue
 		}
 
@@ -123,26 +108,6 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 			return
 		}
 	}
-}
-
-// backoff pauses the calling goroutine for a 2^some backoff exponent seconds
-func backoff(ws *types.ApplicationServiceWorkerState, err error) {
-	// Calculate how long to backoff for
-	backoffDuration := time.Duration(math.Pow(2, float64(ws.Backoff)))
-	backoffSeconds := time.Second * backoffDuration
-
-	log.WithFields(log.Fields{
-		"appservice": ws.AppService.ID,
-	}).WithError(err).Warnf("unable to send transactions successfully, backing off for %ds",
-		backoffDuration)
-
-	ws.Backoff++
-	if ws.Backoff > 6 {
-		ws.Backoff = 6
-	}
-
-	// Backoff
-	time.Sleep(backoffSeconds)
 }
 
 // createTransaction takes in a slice of AS events, stores them in an AS

@@ -221,6 +221,7 @@ func appendExclusiveNamespaceRegexs(
 func checkErrors(config *Dendrite) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
+	var protocolMap = make(map[string]bool)
 
 	// Compile regexp object for checking groupIDs
 	groupIDRegexp := regexp.MustCompile(`\+.*:.*`)
@@ -238,37 +239,54 @@ func checkErrors(config *Dendrite) (err error) {
 
 		// Check if the url has trailing /'s. If so, remove them
 		appservice.URL = strings.TrimRight(appservice.URL, "/")
-
-		// Check if we've already seen this ID. No two application services
-		// can have the same ID or token.
-		if idMap[appservice.ID] {
-			return configErrors([]string{fmt.Sprintf(
-				"Application service ID %s must be unique", appservice.ID,
-			)})
+		if err = duplicationCheck(appservice, &idMap, &tokenMap, &protocolMap); err != nil {
+			return err
 		}
-		// Check if we've already seen this token
-		if tokenMap[appservice.ASToken] {
-			return configErrors([]string{fmt.Sprintf(
-				"Application service Token %s must be unique", appservice.ASToken,
-			)})
-		}
-
-		// Add the id/token to their respective maps if we haven't already
-		// seen them.
-		idMap[appservice.ID] = true
-		tokenMap[appservice.ASToken] = true
 
 		// TODO: Remove once rate_limited is implemented
 		if appservice.RateLimited {
-			log.Warn("WARNING: Application service option rate_limited is currently unimplemented")
-		}
-		// TODO: Remove once protocols is implemented
-		if len(appservice.Protocols) > 0 {
-			log.Warn("WARNING: Application service option protocols is currently unimplemented")
+			log.Warn("WARNING: Application service option 'rate_limited' is currently unimplemented")
 		}
 	}
 
 	return setupRegexps(config)
+}
+
+// duplicationCheck returns an error if any application service configuration
+// entries that are supposed to be unique appear than once.
+func duplicationCheck(appservice ApplicationService, idMap, tokenMap, protocolMap *map[string]bool) error {
+	// Check if we've already seen this ID. No two application services
+	// can have the same ID or token.
+	if (*idMap)[appservice.ID] {
+		return configErrors([]string{fmt.Sprintf(
+			"Application service ID '%s' must be unique", appservice.ID,
+		)})
+	}
+	// Check if we've already seen this token
+	if (*tokenMap)[appservice.ASToken] {
+		return configErrors([]string{fmt.Sprintf(
+			"Application service token '%s' must be unique", appservice.ASToken,
+		)})
+	}
+
+	// Add the id/token to their respective maps if we haven't already
+	// seen them.
+	(*idMap)[appservice.ID] = true
+	(*tokenMap)[appservice.ASToken] = true
+
+	// Check if any application services are already handling this protocol
+	for _, protocol := range appservice.Protocols {
+		if (*protocolMap)[protocol] {
+			return configErrors([]string{fmt.Sprintf(
+				"Application service protocol '%s' must be unique", protocol,
+			)})
+		}
+
+		// Add the protocol to the map of seen protocols
+		(*protocolMap)[protocol] = true
+	}
+
+	return nil
 }
 
 // validateNamespace returns nil or an error based on whether a given
@@ -290,12 +308,12 @@ func validateNamespace(
 	// Check if GroupID for the users namespace is in the correct format
 	if key == "users" && namespace.GroupID != "" {
 		// TODO: Remove once group_id is implemented
-		log.Warn("WARNING: Application service option group_id is currently unimplemented")
+		log.Warn("WARNING: Application service option 'group_id' is currently unimplemented")
 
 		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 		if !correctFormat {
 			return configErrors([]string{fmt.Sprintf(
-				"Invalid user group_id field for application service %s.",
+				"Invalid user 'group_id' field for application service %s.",
 				appservice.ID,
 			)})
 		}

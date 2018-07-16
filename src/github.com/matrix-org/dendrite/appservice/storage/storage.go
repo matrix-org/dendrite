@@ -20,14 +20,16 @@ import (
 
 	// Import postgres database driver
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // Database stores events intended to be later sent to application services
 type Database struct {
-	events eventsStatements
-	txnID  txnStatements
-	db     *sql.DB
+	events     eventsStatements
+	txnID      txnStatements
+	thirdparty thirdPartyStatements
+	db         *sql.DB
 }
 
 // NewDatabase opens a new database
@@ -45,6 +47,10 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 
 func (d *Database) prepare() error {
 	if err := d.events.prepare(d.db); err != nil {
+		return err
+	}
+
+	if err := d.thirdparty.prepare(d.db); err != nil {
 		return err
 	}
 
@@ -107,4 +113,37 @@ func (d *Database) GetLatestTxnID(
 	ctx context.Context,
 ) (int, error) {
 	return d.txnID.selectTxnID(ctx)
+}
+
+// GetProtocolDefinition retreives a JSON-encoded protocol definition given a
+// protocol ID
+func (d *Database) GetProtocolDefinition(
+	ctx context.Context,
+	protocolID string,
+) (string, error) {
+	return d.thirdparty.selectProtocolDefinition(ctx, protocolID)
+}
+
+// GetAllProtocolDefinitions retrieves a map of all known third party protocols
+func (d *Database) GetAllProtocolDefinitions(
+	ctx context.Context,
+) (types.ThirdPartyProtocols, error) {
+	return d.thirdparty.selectAllProtocolDefinitions(ctx)
+}
+
+// StoreProtocolDefinition stores a protocol and its definition
+func (d *Database) StoreProtocolDefinition(
+	ctx context.Context,
+	protocolID, protocolDefinition string,
+) error {
+	return d.thirdparty.insertProtocolDefinition(ctx, protocolID, protocolDefinition)
+}
+
+// ClearProtocolDefinition clears all protocol definition entries in the
+// database. This is done on each startup to wipe old protocol definitions from
+// previous application services.
+func (d *Database) ClearProtocolDefinitions(
+	ctx context.Context,
+) error {
+	return d.thirdparty.clearProtocolDefinitions(ctx)
 }
