@@ -66,6 +66,54 @@ type ApplicationService struct {
 	Protocols []string `yaml:"protocols"`
 }
 
+// IsInterestedInRoomID returns a bool on whether an application service's
+// namespace includes the given room ID
+func (a *ApplicationService) IsInterestedInRoomID(
+	roomID string,
+) bool {
+	if namespaceSlice, ok := a.NamespaceMap["rooms"]; ok {
+		for _, namespace := range namespaceSlice {
+			if namespace.RegexpObject.MatchString(roomID) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// IsInterestedInUserID returns a bool on whether an application service's
+// namespace includes the given user ID
+func (a *ApplicationService) IsInterestedInUserID(
+	userID string,
+) bool {
+	if namespaceSlice, ok := a.NamespaceMap["users"]; ok {
+		for _, namespace := range namespaceSlice {
+			if namespace.RegexpObject.MatchString(userID) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// IsInterestedInRoomAlias returns a bool on whether an application service's
+// namespace includes the given room alias
+func (a *ApplicationService) IsInterestedInRoomAlias(
+	roomAlias string,
+) bool {
+	if namespaceSlice, ok := a.NamespaceMap["aliases"]; ok {
+		for _, namespace := range namespaceSlice {
+			if namespace.RegexpObject.MatchString(roomAlias) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // loadAppservices iterates through all application service config files
 // and loads their data into the config object for later access.
 func loadAppservices(config *Dendrite) error {
