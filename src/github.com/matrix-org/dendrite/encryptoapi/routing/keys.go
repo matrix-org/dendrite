@@ -161,12 +161,12 @@ func QueryPKeys(
 			deviceKeysQueryMap = presetDeviceKeysQueryMap(deviceKeysQueryMap, uid, key)
 			// load for accomplishment
 			single := deviceKeysQueryMap[key.DeviceID]
-			resKey := fmt.Sprintf("@%s:%s", key.KeyAlgorithm, key.DeviceID)
+			resKey := fmt.Sprintf("%s:%s", key.KeyAlgorithm, key.DeviceID)
 			resBody := key.Key
 			single.Keys[resKey] = resBody
 			single.DeviceID = key.DeviceID
 			single.UserID = key.UserID
-			single.Signature[uid][fmt.Sprintf("@%s:%s", "ed25519", key.DeviceID)] = key.Signature
+			single.Signature[uid][fmt.Sprintf("%s:%s", "ed25519", key.DeviceID)] = key.Signature
 			single.Algorithm, err = takeAL(req.Context(), *encryptionDB, key.UserID, key.DeviceID)
 			localpart, _, _ := gomatrixserverlib.SplitID('@', uid)
 			device, _ := deviceDB.GetDeviceByID(req.Context(), localpart, deviceID)
