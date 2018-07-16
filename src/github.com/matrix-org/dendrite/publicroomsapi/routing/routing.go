@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
@@ -31,14 +32,18 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // Setup configures the given mux with publicroomsapi server listeners
 func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storage.PublicRoomsServerDatabase) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+
+	authData := auth.Data{nil, deviceDB, nil}
+
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return directory.GetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+	// TODO: Add AS support
 	r0mux.Handle("/directory/list/room/{roomID}",
-		common.MakeAuthAPI("directory_list", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("directory_list", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return directory.SetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
