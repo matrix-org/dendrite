@@ -189,9 +189,7 @@ func checkErrors(config *Dendrite) (err error) {
 		}
 
 		// Check if the url has trailing /'s. If so, remove them
-		for strings.HasSuffix(appservice.URL, "/") {
-			appservice.URL = strings.TrimSuffix(appservice.URL, "/")
-		}
+		appservice.URL = strings.TrimRight(appservice.URL, "/")
 
 		// Check if we've already seen this ID. No two application services
 		// can have the same ID or token.
