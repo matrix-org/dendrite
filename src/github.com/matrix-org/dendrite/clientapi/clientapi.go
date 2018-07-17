@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -38,9 +39,11 @@ func SetupClientAPIComponent(
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	inputAPI roomserverAPI.RoomserverInputAPI,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
+	typingInputAPI typingServerAPI.TypingServerInputAPI,
 	transactionsCache *transactions.Cache,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
+	typingProducer := producers.NewTypingServerProducer(typingInputAPI)
 
 	userUpdateProducer := &producers.UserUpdateProducer{
 		Producer: base.KafkaProducer,
@@ -62,6 +65,6 @@ func SetupClientAPIComponent(
 	routing.Setup(
 		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
-		syncProducer, transactionsCache,
+		syncProducer, typingProducer, transactionsCache,
 	)
 }

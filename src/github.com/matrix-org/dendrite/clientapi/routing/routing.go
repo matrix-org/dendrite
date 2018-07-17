@@ -50,6 +50,7 @@ func Setup(
 	keyRing gomatrixserverlib.KeyRing,
 	userUpdateProducer *producers.UserUpdateProducer,
 	syncProducer *producers.SyncAPIProducer,
+	typingProducer *producers.TypingServerProducer,
 	transactionsCache *transactions.Cache,
 ) {
 
@@ -172,6 +173,13 @@ func Setup(
 			return LogoutAll(req, deviceDB, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
+		common.MakeAuthAPI("rooms_typing", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, typingProducer)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
 
 	// Stub endpoints required by Riot
 
@@ -350,13 +358,6 @@ func Setup(
 			return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-
-	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
-		common.MakeExternalAPI("rooms_typing", func(req *http.Request) util.JSONResponse {
-			// TODO: handling typing
-			return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
-		}),
-	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/devices",
 		common.MakeAuthAPI("get_devices", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
