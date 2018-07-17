@@ -23,12 +23,11 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/matrix-org/dendrite/appservice/types"
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	"github.com/matrix-org/gomatrixserverlib"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -75,7 +74,7 @@ type GetProtocolDefinitionRequest struct {
 // GetProtocolDefinitionResponse is a response providing a protocol definition
 // for the given protocol ID
 type GetProtocolDefinitionResponse struct {
-	ProtocolDefinition string `json:"protocol_definition"`
+	ProtocolDefinition gomatrixserverlib.RawJSON `json:"protocol_definition"`
 }
 
 // GetAllProtocolDefinitionsRequest is a request to the appservice component
@@ -87,6 +86,22 @@ type GetAllProtocolDefinitionsRequest struct {
 // party IDs and their definitions
 type GetAllProtocolDefinitionsResponse struct {
 	Protocols types.ThirdPartyProtocols `json:"protocols"`
+}
+
+// ThirdPartyProxyRequest is a request from a client to a third party lookup
+// endpoint on an application service. The job of the homeserver is simply to
+// proxy the request, thus the same request/response format can be use for each
+// third party lookup endpoint.
+type ThirdPartyProxyRequest struct {
+	ProtocolID string                    `json:"protocol_id"`
+	Path       string                    `json:"path"`
+	Content    gomatrixserverlib.RawJSON `json:"content"`
+}
+
+// ThirdPartyProxyResponse is a response from an application service to a client
+// about a third party lookup request.
+type ThirdPartyProxyResponse struct {
+	Content gomatrixserverlib.RawJSON `json:"content"`
 }
 
 // AppServiceQueryAPI is used to query user and room alias data from application
@@ -116,6 +131,11 @@ type AppServiceQueryAPI interface {
 		req *GetAllProtocolDefinitionsRequest,
 		response *GetAllProtocolDefinitionsResponse,
 	) error
+	ThirdPartyProxy(
+		ctx context.Context,
+		req *ThirdPartyProxyRequest,
+		response *ThirdPartyProxyResponse,
+	) error
 }
 
 // RoomAliasExistsPath is the HTTP path for the RoomAliasExists API
@@ -129,6 +149,9 @@ const GetAllProtocolDefinitionsPath = "/api/appservice/GetAllProtocolDefinitions
 
 // AppServiceUserIDExistsPath is the HTTP path for the UserIDExists API
 const AppServiceUserIDExistsPath = "/api/appservice/UserIDExists"
+
+// ThirdPartyProxyPath is the HTTP path for the ThirdPartyProxy API
+const ThirdPartyProxyPath = "/api/appservice/ThirdPartyProxy"
 
 // httpAppServiceQueryAPI contains the URL to an appservice query API and a
 // reference to a httpClient used to reach it
@@ -243,4 +266,17 @@ func RetreiveUserProfile(
 
 	// profile should not be nil at this point
 	return profile, nil
+}
+
+// ThirdPartyProxy implements AppServiceQueryAPI
+func (h *httpAppServiceQueryAPI) ThirdPartyProxy(
+	ctx context.Context,
+	request *ThirdPartyProxyRequest,
+	response *ThirdPartyProxyResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "appserviceThirdPartyProxy")
+	defer span.Finish()
+
+	apiURL := h.appserviceURL + ThirdPartyProxyPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

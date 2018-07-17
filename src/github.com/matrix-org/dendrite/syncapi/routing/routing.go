@@ -27,11 +27,14 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixR0 = "/_matrix/client/r0"
+const (
+	// PathPrefixClientSync is the current Client-Server Sync API version
+	PathPrefixClientSync = "/_matrix/client/r0"
+)
 
 // Setup configures the given mux with sync-server listeners
 func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux := apiMux.PathPrefix(PathPrefixClientSync).Subrouter()
 
 	authData := auth.Data{nil, deviceDB, nil}
 

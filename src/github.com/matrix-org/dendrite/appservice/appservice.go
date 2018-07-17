@@ -133,7 +133,10 @@ func setupWorkers(
 	workerStates []types.ApplicationServiceWorkerState,
 ) {
 	// Clear all old protocol definitions on startup
-	appserviceDB.ClearProtocolDefinitions(context.TODO())
+	err := appserviceDB.ClearProtocolDefinitions(context.TODO())
+	if err != nil {
+		log.WithError(err).Fatalf("unable to clear appservice protocol definitions from db")
+	}
 
 	// Create a worker that handles transmitting events to a single homeserver
 	for _, workerState := range workerStates {

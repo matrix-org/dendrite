@@ -31,7 +31,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const pathPrefixR0 = "/_matrix/media/v1"
+const (
+	// PathPrefixMedia is the current Media API version
+	PathPrefixMedia = "/_matrix/media/v1"
+)
 
 // Setup registers the media API HTTP handlers
 func Setup(
@@ -41,7 +44,7 @@ func Setup(
 	deviceDB *devices.Database,
 	client *gomatrixserverlib.Client,
 ) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux := apiMux.PathPrefix(PathPrefixMedia).Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},

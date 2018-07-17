@@ -158,6 +158,7 @@ func verifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *auth
 		}
 		return
 	}
+	fmt.Println("Got token:", token)
 	device, err = deviceDB.GetDeviceByAccessToken(req.Context(), token)
 	if err != nil {
 		if err == sql.ErrNoRows {

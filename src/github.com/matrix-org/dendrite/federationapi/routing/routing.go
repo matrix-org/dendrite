@@ -30,8 +30,10 @@ import (
 )
 
 const (
-	pathPrefixV2Keys       = "/_matrix/key/v2"
-	pathPrefixV1Federation = "/_matrix/federation/v1"
+	// PathPrefixKeys is the current Key API version
+	PathPrefixKeys = "/_matrix/key/v2"
+	// PathPrefixFederation is the current Federation API version
+	PathPrefixFederation = "/_matrix/federation/v1"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -47,8 +49,8 @@ func Setup(
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 ) {
-	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
-	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
+	v2keysmux := apiMux.PathPrefix(PathPrefixKeys).Subrouter()
+	v1fedmux := apiMux.PathPrefix(PathPrefixFederation).Subrouter()
 
 	localKeys := common.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
 		return LocalKeys(cfg)

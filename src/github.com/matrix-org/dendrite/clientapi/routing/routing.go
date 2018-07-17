@@ -35,9 +35,14 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixV1 = "/_matrix/client/api/v1"
-const pathPrefixR0 = "/_matrix/client/r0"
-const pathPrefixUnstable = "/_matrix/client/unstable"
+const (
+	// PathPrefixClientAPI is the deprecated client server API version
+	PathPrefixClientAPI = "/_matrix/client/api/v1"
+	// PathPrefixClient is the current stable client server API version
+	PathPrefixClient = "/_matrix/client/r0"
+	// PathPrefixClientUnstable is the unstable client server API version
+	PathPrefixClientUnstable = "/_matrix/client/unstable"
+)
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -56,7 +61,6 @@ func Setup(
 	typingProducer *producers.TypingServerProducer,
 	transactionsCache *transactions.Cache,
 ) {
-
 	apiMux.Handle("/_matrix/client/versions",
 		common.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
@@ -73,9 +77,9 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-	v1mux := apiMux.PathPrefix(pathPrefixV1).Subrouter()
-	unstableMux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
+	r0mux := apiMux.PathPrefix(PathPrefixClient).Subrouter()
+	v1mux := apiMux.PathPrefix(PathPrefixClientAPI).Subrouter()
+	unstableMux := apiMux.PathPrefix(PathPrefixClientUnstable).Subrouter()
 
 	authData := auth.Data{accountDB, deviceDB, cfg.Derived.ApplicationServices}
 
@@ -313,16 +317,6 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	unstableMux.Handle("/thirdparty/protocols",
-		common.MakeExternalAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
-			// TODO: Return the third party protcols
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: struct{}{},
-			}
-		}),
-	).Methods(http.MethodGet, http.MethodOptions)
-
 	r0mux.Handle("/rooms/{roomID}/initialSync",
 		common.MakeExternalAPI("rooms_initial_sync", func(req *http.Request) util.JSONResponse {
 			// TODO: Allow people to peek into rooms.
@@ -390,15 +384,41 @@ func Setup(
 
 	// Third party lookups
 	r0mux.Handle("/thirdparty/protocol/{protocolID}",
-		common.MakeExternalAPI("get_protocols", func(req *http.Request) util.JSONResponse {
+		common.MakeAuthAPI("third_party_protocols", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return GetThirdPartyProtocol(req, asAPI, vars["protocolID"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/thirdparty/protocols",
-		common.MakeExternalAPI("get_protocols", func(req *http.Request) util.JSONResponse {
+		common.MakeAuthAPI("third_party_protocol", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return GetThirdPartyProtocols(req, asAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/thirdparty/location/{protocolID}",
+		common.MakeAuthAPI("third_party_protocol", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return ThirdPartyProxy(req, asAPI, vars["protocolID"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/thirdparty/user/{protocolID}",
+		common.MakeAuthAPI("third_party_protocol", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return ThirdPartyProxy(req, asAPI, vars["protocolID"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/thirdparty/location",
+		common.MakeAuthAPI("third_party_protocol", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return ThirdPartyProxy(req, asAPI, "")
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/thirdparty/user",
+		common.MakeAuthAPI("third_party_protocol", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return ThirdPartyProxy(req, asAPI, "")
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

@@ -27,7 +27,12 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixApp = "/_matrix/app/r0"
+const (
+	// PathPrefixApp for current stable application services API version
+	PathPrefixApp = "/_matrix/app/r0"
+	// PathPrefixAppUnstable is the unstable application services API version
+	PathPrefixAppUnstable = "/_matrix/app/unstable"
+)
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -38,7 +43,7 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient, // nolint: unparam
 	transactionsCache *transactions.Cache, // nolint: unparam
 ) {
-	appMux := apiMux.PathPrefix(pathPrefixApp).Subrouter()
+	appMux := apiMux.PathPrefix(PathPrefixApp).Subrouter()
 
 	appMux.Handle("/alias",
 		common.MakeExternalAPI("alias", func(req *http.Request) util.JSONResponse {

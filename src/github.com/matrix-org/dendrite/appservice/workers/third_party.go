@@ -79,7 +79,13 @@ func ThirdPartyWorker(
 		}
 
 		// Cache protocol definition for clients to request later
-		storeProtocolDefinition(ctx, db, appservice, protocolID, protocolDefinition)
+		err = storeProtocolDefinition(ctx, db, protocolID, protocolDefinition)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"appservice": appservice.ID,
+				"definition": protocolDefinition,
+			}).WithError(err).Fatalf("unable to store appservice protocol definition in db")
+		}
 	}
 }
 
@@ -144,7 +150,6 @@ func retreiveProtocolInformation(
 func storeProtocolDefinition(
 	ctx context.Context,
 	db *storage.Database,
-	appservice config.ApplicationService,
 	protocolID, protocolDefinition string,
 ) error {
 	return db.StoreProtocolDefinition(ctx, protocolID, protocolDefinition)

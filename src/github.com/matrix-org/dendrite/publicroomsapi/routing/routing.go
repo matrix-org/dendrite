@@ -27,12 +27,14 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixR0 = "/_matrix/client/r0"
+const (
+	// PathPrefixClientPublicRooms is the current Client-Server Public Rooms API version
+	PathPrefixClientPublicRooms = "/_matrix/client/r0"
+)
 
 // Setup configures the given mux with publicroomsapi server listeners
 func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storage.PublicRoomsServerDatabase) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-
+	r0mux := apiMux.PathPrefix(PathPrefixClientPublicRooms).Subrouter()
 	authData := auth.Data{nil, deviceDB, nil}
 
 	r0mux.Handle("/directory/list/room/{roomID}",

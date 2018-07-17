@@ -231,8 +231,8 @@ func checkErrors(config *Dendrite) (err error) {
 		// Namespace-related checks
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			for _, namespace := range namespaceSlice {
-				if err := validateNamespace(&appservice, key, &namespace, groupIDRegexp); err != nil {
-					return err
+				if err = validateNamespace(&appservice, key, &namespace, groupIDRegexp); err != nil {
+					return
 				}
 			}
 		}
@@ -240,7 +240,7 @@ func checkErrors(config *Dendrite) (err error) {
 		// Check if the url has trailing /'s. If so, remove them
 		appservice.URL = strings.TrimRight(appservice.URL, "/")
 		if err = duplicationCheck(appservice, &idMap, &tokenMap, &protocolMap); err != nil {
-			return err
+			return
 		}
 
 		// TODO: Remove once rate_limited is implemented

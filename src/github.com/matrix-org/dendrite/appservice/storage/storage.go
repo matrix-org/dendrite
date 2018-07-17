@@ -139,7 +139,7 @@ func (d *Database) StoreProtocolDefinition(
 	return d.thirdparty.insertProtocolDefinition(ctx, protocolID, protocolDefinition)
 }
 
-// ClearProtocolDefinition clears all protocol definition entries in the
+// ClearProtocolDefinitions clears all protocol definition entries in the
 // database. This is done on each startup to wipe old protocol definitions from
 // previous application services.
 func (d *Database) ClearProtocolDefinitions(

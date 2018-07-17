@@ -15,11 +15,14 @@
 package routing
 
 import (
-	"encoding/json"
+	"io/ioutil"
 	"net/http"
+	"strings"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	appserviceRouting "github.com/matrix-org/dendrite/appservice/routing"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
 )
 
@@ -37,6 +40,14 @@ func GetThirdPartyProtocol(
 	var queryRes appserviceAPI.GetProtocolDefinitionResponse
 	if err := asAPI.GetProtocolDefinition(req.Context(), &queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(req, err)
+	}
+
+	// Account for unknown protocol/empty definition
+	if len(queryRes.ProtocolDefinition) == 0 {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("unknown protocol"),
+		}
 	}
 
 	return util.JSONResponse{
@@ -60,15 +71,44 @@ func GetThirdPartyProtocols(
 
 	// TODO: Check what we get if no protocols defined by anyone
 
-	// Marshal protocols to JSON
-	protocolJSON, err := json.Marshal(queryRes.Protocols)
+	// Return protocol IDs along with definitions
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: queryRes.Protocols,
+	}
+}
+
+// ThirdPartyProxy proxies a third party lookup request to the handler
+// application service
+func ThirdPartyProxy(
+	req *http.Request,
+	asAPI appserviceAPI.AppServiceQueryAPI,
+	protocolID string,
+) util.JSONResponse {
+	// Read the request body
+	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	// Return protocol IDs along with definitions
+	// Rewrite the path from a client URL to an application service URL
+	requestPath := strings.Replace(req.URL.String(), PathPrefixClient, appserviceRouting.PathPrefixAppUnstable, 1)
+
+	// Proxy the location lookup to the appservices component, which will send it
+	// off to an application service
+	queryReq := appserviceAPI.ThirdPartyProxyRequest{
+		ProtocolID: protocolID,
+		Path:       requestPath,
+		Content:    body,
+	}
+	var queryRes appserviceAPI.ThirdPartyProxyResponse
+	if err := asAPI.ThirdPartyProxy(req.Context(), &queryReq, &queryRes); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	// Return response to the client
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: protocolJSON,
+		JSON: queryRes.Content,
 	}
 }

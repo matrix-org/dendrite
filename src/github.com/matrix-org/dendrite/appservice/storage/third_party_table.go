@@ -26,8 +26,10 @@ import (
 const thirdPartySchema = `
 -- Stores protocol definitions for clients to later request
 CREATE TABLE IF NOT EXISTS appservice_third_party_protocol_def (
-	-- The ID of the procotol
+	-- The ID of the protocol
 	protocol_id TEXT NOT NULL PRIMARY KEY,
+	-- The URL of the application service handling this protocol
+	appservice_url TEXT NOT NULL,
 	-- The JSON-encoded protocol definition
 	protocol_definition TEXT NOT NULL,
 	UNIQUE(protocol_id)
@@ -106,6 +108,7 @@ func (s *thirdPartyStatements) selectAllProtocolDefinitions(
 	ctx context.Context,
 ) (protocols types.ThirdPartyProtocols, err error) {
 	protocolDefinitionRows, err := s.selectAllProtocolDefinitionsStmt.QueryContext(ctx)
+	protocols = make(types.ThirdPartyProtocols)
 	if err != nil && err != sql.ErrNoRows {
 		return
 	}
@@ -116,12 +119,14 @@ func (s *thirdPartyStatements) selectAllProtocolDefinitions(
 		}
 	}()
 
+	// Extract protocol information from each row
 	for protocolDefinitionRows.Next() {
 		var protocolID, protocolDefinition string
 		if err = protocolDefinitionRows.Scan(&protocolID, &protocolDefinition); err != nil {
 			return nil, err
 		}
 
+		// Store each protocol in a map indexed by protocol ID
 		protocols[protocolID] = gomatrixserverlib.RawJSON(protocolDefinition)
 	}
 
@@ -129,7 +134,7 @@ func (s *thirdPartyStatements) selectAllProtocolDefinitions(
 }
 
 // insertProtocolDefinition inserts a protocol ID along with its definition in
-// order for clients to later retreive it from the client-server API.
+// order for clients to later retrieve it from the client-server API.
 func (s *thirdPartyStatements) insertProtocolDefinition(
 	ctx context.Context,
 	protocolID, protocolDefinition string,
