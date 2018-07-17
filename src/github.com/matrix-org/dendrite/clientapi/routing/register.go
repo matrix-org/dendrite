@@ -40,6 +40,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -116,7 +117,10 @@ type registerRequest struct {
 
 	InitialDisplayName *string `json:"initial_device_display_name"`
 
-	// Application services place Type in the root of their registration
+	// Prevent this user from logging in
+	InhibitLogin common.WeakBoolean `json:"inhibit_login"`
+
+	// Application Services place Type in the root of their registration
 	// request, whereas clients place it in the authDict struct.
 	Type authtypes.LoginType `json:"type"`
 }
@@ -163,9 +167,9 @@ func newUserInteractiveResponse(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 type registerResponse struct {
 	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token"`
+	AccessToken string                       `json:"access_token,omitempty"`
 	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id"`
+	DeviceID    string                       `json:"device_id,omitempty"`
 }
 
 // recaptchaResponse represents the HTTP response from a Google Recaptcha server
@@ -569,8 +573,10 @@ func handleRegistrationFlow(
 		// If no error, application service was successfully validated.
 		// Don't need to worry about appending to registration stages as
 		// application service registration is entirely separate.
-		return completeRegistration(req.Context(), accountDB, deviceDB,
-			r.Username, "", appserviceID, r.InitialDisplayName)
+		return completeRegistration(
+			req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
+			r.InhibitLogin, r.InitialDisplayName,
+		)
 
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
@@ -605,8 +611,10 @@ func checkAndCompleteFlow(
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
-		return completeRegistration(req.Context(), accountDB, deviceDB,
-			r.Username, r.Password, "", r.InitialDisplayName)
+		return completeRegistration(
+			req.Context(), accountDB, deviceDB, r.Username, r.Password, "",
+			r.InhibitLogin, r.InitialDisplayName,
+		)
 	}
 
 	// There are still more stages to complete.
@@ -656,10 +664,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -702,6 +710,7 @@ func completeRegistration(
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	username, password, appserviceID string,
+	inhibitLogin common.WeakBoolean,
 	displayName *string,
 ) util.JSONResponse {
 	if username == "" {
@@ -731,6 +740,18 @@ func completeRegistration(
 		}
 	}
 
+	// Check whether inhibit_login option is set. If so, don't create an access
+	// token or a device for this user
+	if inhibitLogin {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: registerResponse{
+				UserID:     userutil.MakeUserID(username, acc.ServerName),
+				HomeServer: acc.ServerName,
+			},
+		}
+	}
+
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
 		return util.JSONResponse{
@@ -739,7 +760,7 @@ func completeRegistration(
 		}
 	}
 
-	// // TODO: Use the device ID in the request.
+	// TODO: Use the device ID in the request.
 	dev, err := deviceDB.CreateDevice(ctx, username, nil, token, displayName)
 	if err != nil {
 		return util.JSONResponse{
