@@ -19,6 +19,7 @@ import (
 	"context"
 	"net/http"
 
+	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	"github.com/matrix-org/gomatrixserverlib"
 	opentracing "github.com/opentracing/opentracing-go"
 )
@@ -134,5 +135,5 @@ func (h *httpRoomserverInputAPI) InputRoomEvents(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverInputRoomEventsPath
-	return postJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

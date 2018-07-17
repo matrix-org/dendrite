@@ -30,8 +30,9 @@ import (
 	"github.com/gorilla/mux"
 	sarama "gopkg.in/Shopify/sarama.v1"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/sirupsen/logrus"
 )
 
@@ -80,12 +81,22 @@ func (b *BaseDendrite) Close() error {
 	return b.tracerCloser.Close()
 }
 
-// CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI to hit
+// CreateHTTPAppServiceAPIs returns the QueryAPI for hitting the appservice
+// component over HTTP.
+func (b *BaseDendrite) CreateHTTPAppServiceAPIs() appserviceAPI.AppServiceQueryAPI {
+	return appserviceAPI.NewAppServiceQueryAPIHTTP(b.Cfg.AppServiceURL(), nil)
+}
+
+// CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI for hitting
 // the roomserver over HTTP.
-func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
-	alias := api.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), nil)
-	input := api.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), nil)
-	query := api.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
+func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
+	roomserverAPI.RoomserverAliasAPI,
+	roomserverAPI.RoomserverInputAPI,
+	roomserverAPI.RoomserverQueryAPI,
+) {
+	alias := roomserverAPI.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), nil)
+	input := roomserverAPI.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), nil)
+	query := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
 	return alias, input, query
 }
 

@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/transactions"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -35,9 +35,9 @@ func SetupClientAPIComponent(
 	accountsDB *accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
-	aliasAPI api.RoomserverAliasAPI,
-	inputAPI api.RoomserverInputAPI,
-	queryAPI api.RoomserverQueryAPI,
+	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	inputAPI roomserverAPI.RoomserverInputAPI,
+	queryAPI roomserverAPI.RoomserverQueryAPI,
 	transactionsCache *transactions.Cache,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
@@ -60,10 +60,8 @@ func SetupClientAPIComponent(
 	}
 
 	routing.Setup(
-		base.APIMux, *base.Cfg, roomserverProducer,
-		queryAPI, aliasAPI, accountsDB, deviceDB,
-		federation, *keyRing,
-		userUpdateProducer, syncProducer,
-		transactionsCache,
+		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI,
+		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
+		syncProducer, transactionsCache,
 	)
 }

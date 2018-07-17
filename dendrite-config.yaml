@@ -113,7 +113,7 @@ listen:
     media_api: "localhost:7774"
     public_rooms_api: "localhost:7775"
     federation_sender: "localhost:7776"
-    appservice: "localhost:7777"
+    appservice_api: "localhost:7777"
 
 # The configuration for tracing the dendrite components.
 tracing:
