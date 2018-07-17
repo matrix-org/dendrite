@@ -40,6 +40,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -117,7 +118,7 @@ type registerRequest struct {
 	InitialDisplayName *string `json:"initial_device_display_name"`
 
 	// Prevent this user from logging in
-	InhibitLogin int `json:"inhibit_login"`
+	InhibitLogin common.WeakBoolean `json:"inhibit_login"`
 
 	// Application Services place Type in the root of their registration
 	// request, whereas clients place it in the authDict struct.
@@ -646,10 +647,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", 0, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", 0, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -692,7 +693,7 @@ func completeRegistration(
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	username, password, appserviceID string,
-	inhibitLogin int,
+	inhibitLogin common.WeakBoolean,
 	displayName *string,
 ) util.JSONResponse {
 	if username == "" {
@@ -724,7 +725,7 @@ func completeRegistration(
 
 	// Check whether inhibit_login option is set. If so, don't create an access
 	// token or a device for this user
-	if inhibitLogin != 0 {
+	if inhibitLogin {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: registerResponse{
