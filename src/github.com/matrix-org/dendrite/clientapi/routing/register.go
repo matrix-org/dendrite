@@ -542,22 +542,12 @@ func handleRegistrationFlow(
 		// Add SharedSecret to the list of completed registration stages
 		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeSharedSecret)
 
-	case "":
-		// not passing a Auth.Type is only allowed for ApplicationServices. So assume that
-		fallthrough
-	case authtypes.LoginTypeApplicationService:
+	case "", authtypes.LoginTypeApplicationService:
+		// not passing a Auth.Type is allowed for ApplicationServices. So assume that as well
 		// Check application service register user request is valid.
 		// The application service's ID is returned if so.
 		appserviceID, err := validateApplicationService(cfg, req, r.Username)
 		if err != nil {
-			if err.Code == http.StatusUnauthorized && r.Auth.Type == "" {
-				// the appservice could not be found and we have no auth type
-				return util.JSONResponse{
-					Code: http.StatusUnauthorized,
-					JSON: newUserInteractiveResponse(sessionID,
-						cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
-				}
-			}
 			return *err
 		}
 
