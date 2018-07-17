@@ -59,6 +59,7 @@ listen:
   federation_api: "localhost:7772"
   sync_api: "localhost:7773"
   media_api: "localhost:7774"
+  typing_server: "localhost:7778"
 logging:
   - type: "file"
     level: "info"
