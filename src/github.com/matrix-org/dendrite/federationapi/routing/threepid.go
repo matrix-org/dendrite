@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -70,7 +69,7 @@ func CreateInvitesFrom3PIDInvites(
 	evs := []gomatrixserverlib.Event{}
 	for _, inv := range body.Invites {
 		event, err := createInviteFrom3PIDInvite(
-			req.Context(), queryAPI, cfg, inv, federation, accountDB,
+			req, queryAPI, cfg, inv, federation, accountDB,
 		)
 		if err != nil {
 			return httputil.LogThenError(req, err)
@@ -135,7 +134,7 @@ func ExchangeThirdPartyInvite(
 	}
 
 	// Auth and build the event from what the remote server sent us
-	event, err := buildMembershipEvent(httpReq.Context(), &builder, queryAPI, cfg)
+	event, err := buildMembershipEvent(httpReq, &builder, queryAPI, cfg)
 	if err == errNotInRoom {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -170,7 +169,7 @@ func ExchangeThirdPartyInvite(
 // Returns an error if there was a problem building the event or fetching the
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
-	ctx context.Context, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
+	req *http.Request, queryAPI api.RoomserverQueryAPI, cfg config.Dendrite,
 	inv invite, federation *gomatrixserverlib.FederationClient,
 	accountDB *accounts.Database,
 ) (*gomatrixserverlib.Event, error) {
@@ -191,7 +190,7 @@ func createInviteFrom3PIDInvite(
 		StateKey: &inv.MXID,
 	}
 
-	profile, err := accountDB.GetProfileByLocalpart(ctx, localpart)
+	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return nil, err
 	}
@@ -209,9 +208,9 @@ func createInviteFrom3PIDInvite(
 		return nil, err
 	}
 
-	event, err := buildMembershipEvent(ctx, builder, queryAPI, cfg)
+	event, err := buildMembershipEvent(req, builder, queryAPI, cfg)
 	if err == errNotInRoom {
-		return nil, sendToRemoteServer(ctx, inv, federation, cfg, *builder)
+		return nil, sendToRemoteServer(req.Context(), inv, federation, cfg, *builder)
 	}
 	if err != nil {
 		return nil, err
@@ -226,7 +225,7 @@ func createInviteFrom3PIDInvite(
 // Returns errNotInRoom if the server is not in the room the invite is for.
 // Returns an error if something failed during the process.
 func buildMembershipEvent(
-	ctx context.Context,
+	req *http.Request,
 	builder *gomatrixserverlib.EventBuilder, queryAPI api.RoomserverQueryAPI,
 	cfg config.Dendrite,
 ) (*gomatrixserverlib.Event, error) {
@@ -241,7 +240,7 @@ func buildMembershipEvent(
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	var queryRes api.QueryLatestEventsAndStateResponse
-	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, &queryRes); err != nil {
+	if err = queryAPI.QueryLatestEventsAndState(req.Context(), &queryReq, &queryRes); err != nil {
 		return nil, err
 	}
 
@@ -274,8 +273,8 @@ func buildMembershipEvent(
 	builder.AuthEvents = refs
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	now := time.Now()
-	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	eventTime := common.ParseTSParam(req)
+	event, err := builder.Build(eventID, eventTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 
 	return &event, err
 }
