@@ -65,14 +65,33 @@ type Data struct {
 func VerifyUserFromRequest(
 	req *http.Request, data Data,
 ) (*authtypes.Device, *util.JSONResponse) {
-	// Try to find local user from device database
-	dev, devErr := verifyAccessToken(req, data.DeviceDB)
-	if devErr == nil {
+	// Check to see if this is an application service user
+	dev, err := verifyApplicationServiceUser(req, data)
+	if err != nil {
+		return nil, err
+	} else if dev != nil {
 		return dev, nil
 	}
 
+	// Try to find local user from device database
+	dev, err = verifyAccessToken(req, data.DeviceDB)
+	if err == nil {
+		return dev, nil
+	}
+
+	return nil, &util.JSONResponse{
+		Code: http.StatusUnauthorized,
+		JSON: jsonerror.UnknownToken("Unrecognized access token"),
+	}
+}
+
+// verifyApplicationServiceUser attempts to retrieve a userID given a request
+// originating from an application service
+func verifyApplicationServiceUser(
+	req *http.Request, data Data,
+) (*authtypes.Device, *util.JSONResponse) {
 	// Try to find the Application Service user
-	token, err := extractAccessToken(req)
+	token, err := extractApplicationServiceAccessToken(req)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -89,6 +108,7 @@ func VerifyUserFromRequest(
 		}
 	}
 
+	userID := req.URL.Query().Get("user_id")
 	if appService != nil {
 		// Create a dummy device for AS user
 		dev := authtypes.Device{
@@ -98,47 +118,47 @@ func VerifyUserFromRequest(
 			AccessToken: token,
 		}
 
-		userID := req.URL.Query().Get("user_id")
-		localpart, err := userutil.ParseUsernameParam(userID, nil)
-		if err != nil {
-			return nil, &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername(err.Error()),
+		// Check for user masquerading
+		if userID != "" {
+			localpart, err := userutil.ParseUsernameParam(userID, nil)
+			if err != nil {
+				return nil, &util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.InvalidUsername(err.Error()),
+				}
 			}
+
+			if localpart != "" { // AS is masquerading as another user
+				// Verify that the user is registered
+				account, err := data.AccountDB.GetAccountByLocalpart(req.Context(), localpart)
+				// Verify that account exists & appServiceID matches
+				if err == nil && account.AppServiceID == appService.ID {
+					// Set the userID of dummy device
+					dev.UserID = userID
+					return &dev, nil
+				}
+
+				return nil, &util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: jsonerror.Forbidden("Application service has not registered this user"),
+				}
+			}
+		} else {
+			// AS is not masquerading as any user, so use AS's sender_localpart
+			dev.UserID = appService.SenderLocalpart
 		}
-
-		if localpart != "" { // AS is masquerading as another user
-			// Verify that the user is registered
-			account, err := data.AccountDB.GetAccountByLocalpart(req.Context(), localpart)
-			// Verify that account exists & appServiceID matches
-			if err == nil && account.AppServiceID == appService.ID {
-				// Set the userID of dummy device
-				dev.UserID = userID
-				return &dev, nil
-			}
-
-			return nil, &util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("Application service has not registered this user"),
-			}
-		}
-
-		// AS is not masquerading as any user, so use AS's sender_localpart
-		dev.UserID = appService.SenderLocalpart
 		return &dev, nil
 	}
 
-	return nil, &util.JSONResponse{
-		Code: http.StatusUnauthorized,
-		JSON: jsonerror.UnknownToken("Unrecognized access token"),
-	}
+	// Application service was not found with this token
+	return nil, nil
 }
 
 // verifyAccessToken verifies that an access token was supplied in the given HTTP request
 // and returns the device it corresponds to. Returns resErr (an error response which can be
 // sent to the client) if the token is invalid or there was a problem querying the database.
 func verifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *authtypes.Device, resErr *util.JSONResponse) {
-	token, err := extractAccessToken(req)
+	token, err := extractUserAccessToken(req)
 	if err != nil {
 		resErr = &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -172,19 +192,25 @@ func GenerateAccessToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// extractAccessToken from a request, or return an error detailing what went wrong. The
-// error message MUST be human-readable and comprehensible to the client.
-func extractAccessToken(req *http.Request) (string, error) {
-	// cf https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/api/auth.py#L631
+// extractApplicationServiceAccessToken retreives an access token from a request
+// originating from an application service
+func extractApplicationServiceAccessToken(req *http.Request) (string, error) {
 	authBearer := req.Header.Get("Authorization")
-	queryToken := req.URL.Query().Get("access_token")
-	if authBearer != "" && queryToken != "" {
+	token := req.URL.Query().Get("access_token")
+	if authBearer != "" && token != "" {
 		return "", fmt.Errorf("mixing Authorization headers and access_token query parameters")
 	}
-
-	if queryToken != "" {
-		return queryToken, nil
+	if token != "" {
+		return token, nil
 	}
+
+	return "", fmt.Errorf("missing access token")
+}
+
+// extractUserAccessToken retreives an access token from a request originating
+// from a non-application service
+func extractUserAccessToken(req *http.Request) (string, error) {
+	authBearer := req.Header.Get("Authorization")
 
 	if authBearer != "" {
 		parts := strings.SplitN(authBearer, " ", 2)
