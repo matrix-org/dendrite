@@ -382,8 +382,8 @@ func validateApplicationService(
 	return matchedApplicationService.ID, nil
 }
 
-// authTypeIsValid check the registration authentication type of the request
-// and returns an error if necessary
+// authTypeIsValid checks the registration authentication type of the request
+// and returns true or false depending on whether the auth type is valid
 func authTypeIsValid(authType *authtypes.LoginType, req *http.Request) bool {
 	// If no auth type is specified by the client, send back the list of available flows
 	if *authType == "" && req.URL.Query().Get("access_token") != "" {
@@ -396,7 +396,6 @@ func authTypeIsValid(authType *authtypes.LoginType, req *http.Request) bool {
 	}
 
 	return true
-
 }
 
 // Register processes a /register request.
