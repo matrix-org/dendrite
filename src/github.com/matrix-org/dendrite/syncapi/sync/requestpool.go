@@ -106,6 +106,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// can respond
 
 		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
+
+		// std extension consideration
+		syncData = storage.StdEXT(syncReq.ctx, rp.db, *syncData, syncReq.device.UserID, syncReq.device.ID, int64(currPos))
+
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}

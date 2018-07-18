@@ -27,10 +27,12 @@ import (
 )
 
 const pathPrefixR0 = "/_matrix/client/r0"
+const pathPrefixUnstable = "/_matrix/client/unstable"
 
 // Setup configures the given mux with sync-server listeners
-func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database) {
+func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database, notifier *sync.Notifier) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	unstablemux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
@@ -50,4 +52,13 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServer
 		vars := mux.Vars(req)
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], vars["stateKey"])
 	})).Methods(http.MethodGet, http.MethodOptions)
+
+	unstablemux.Handle("/sendToDevice/{eventType}/{txnId}",
+		common.MakeAuthAPI("look up changes", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			eventType := vars["eventType"]
+			txnID := vars["txnId"]
+			return SendToDevice(req, device.UserID, syncDB, deviceDB, eventType, txnID, notifier)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
 }

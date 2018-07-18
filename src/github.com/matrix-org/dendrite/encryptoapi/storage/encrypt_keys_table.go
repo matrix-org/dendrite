@@ -167,20 +167,37 @@ func (s *keyStatements) selectInKeys(
 	ctx context.Context,
 	userID string,
 	arr []string,
-) (holders []types.KeyHolder, err error) {
-	rows := sql.Rows{}
-	rowsP := &rows
+) ([]types.KeyHolder, error) {
+	holders := []types.KeyHolder{}
 	stmt := s.selectAllKeyStmt
 	if len(arr) == 0 {
-		rowsP, err = stmt.QueryContext(ctx, userID, "device_key")
-	} else {
-		stmt = s.selectInKeysStmt
-		list := pq.Array(arr)
-		rowsP, err = stmt.QueryContext(ctx, userID, list)
+		// mapping for all device keys
+		rowsP, err := stmt.QueryContext(ctx, userID, "device_key")
+		if err != nil {
+			return nil, err
+		}
+		holders, err = injectKeyHolder(rowsP, holders)
+		if err != nil {
+			return nil, err
+		}
+		err = rowsP.Close()
+		return holders, err
 	}
+	stmt = s.selectInKeysStmt
+	list := pq.Array(arr)
+	rowsP, err := stmt.QueryContext(ctx, userID, list)
 	if err != nil {
 		return nil, err
 	}
+	holders, err = injectKeyHolder(rowsP, holders)
+	if err != nil {
+		return nil, err
+	}
+	err = rowsP.Close()
+	return holders, err
+}
+
+func injectKeyHolder(rows *sql.Rows, keyHolder []types.KeyHolder) (holders []types.KeyHolder, err error) {
 	for rows.Next() {
 		single := &types.KeyHolder{}
 		if err = rows.Scan(
@@ -194,8 +211,8 @@ func (s *keyStatements) selectInKeys(
 		); err != nil {
 			return nil, err
 		}
-		holders = append(holders, *single)
+		keyHolder = append(keyHolder, *single)
 	}
-	err = rowsP.Close()
-	return holders, err
+	holders = keyHolder
+	return
 }

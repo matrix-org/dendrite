@@ -60,7 +60,9 @@ const selectDeviceByIDSQL = "" +
 	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name FROM device_devices WHERE localpart = $1"
+	// todo : display name still has a problem when value is null
+	//"SELECT device_id, display_name FROM device_devices WHERE localpart = $1"
+	"SELECT device_id FROM device_devices WHERE localpart = $1"
 
 const updateDeviceNameSQL = "" +
 	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
@@ -197,6 +199,8 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	for rows.Next() {
 		var dev authtypes.Device
 		err = rows.Scan(&dev.ID)
+		// todo: display name still has a problem when value is null
+		//err = rows.Scan(&dev.ID, &dev.DisplayName)
 		if err != nil {
 			return devices, err
 		}

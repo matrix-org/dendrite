@@ -71,5 +71,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB)
+	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, notifier)
 }

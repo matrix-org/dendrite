@@ -23,8 +23,8 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	// Import the postgres database driver.
-	_ "github.com/lib/pq"
+
+	"encoding/json"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -54,6 +54,7 @@ type SyncServerDatabase struct {
 	events      outputRoomEventsStatements
 	roomstate   currentRoomStateStatements
 	invites     inviteEventsStatements
+	stdMsg      stdEventsStatements
 }
 
 // NewSyncServerDatabase creates a new sync server database
@@ -76,6 +77,9 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 		return nil, err
 	}
 	if err := d.invites.prepare(d.db); err != nil {
+		return nil, err
+	}
+	if err := d.stdMsg.prepare(d.db); err != nil {
 		return nil, err
 	}
 	return &d, nil
@@ -211,6 +215,13 @@ func (d *SyncServerDatabase) syncStreamPositionTx(
 	}
 	if maxInviteID > maxID {
 		maxID = maxInviteID
+	}
+	maxStdID, err := d.stdMsg.selectMaxStdID(ctx, txn)
+	if err != nil {
+		return 0, err
+	}
+	if maxStdID > maxID {
+		maxID = maxStdID
 	}
 	return types.StreamPosition(maxID), nil
 }
@@ -677,4 +688,95 @@ func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) string {
 		return membership
 	}
 	return ""
+}
+
+/*
+send to device messaging implementation
+del / maxID / select in range / insert
+*/
+
+// DelStdMessage delete message for a given maxID, those below would be deleted
+func (d *SyncServerDatabase) DelStdMessage(
+	ctx context.Context, targetUID, targetDevice string, maxID int64,
+) (err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		err := d.stdMsg.deleteStdEvent(ctx, targetUID, targetDevice, maxID)
+		return err
+	})
+	return
+}
+
+// InsertStdMessage insert std message
+func (d *SyncServerDatabase) InsertStdMessage(
+	ctx context.Context, stdEvent types.StdHolder, transactionID, targetUID, targetDevice string,
+) (pos int64, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		curPos, err := d.stdMsg.insertStdEvent(ctx, stdEvent, transactionID, targetUID, targetDevice)
+		pos = curPos
+		return err
+	})
+	return
+}
+
+// SelectMaxStdID select maximum id in std stream
+func (d *SyncServerDatabase) SelectMaxStdID(
+	ctx context.Context,
+) (maxID int64, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		max, err := d.stdMsg.selectMaxStdID(ctx, txn)
+		maxID = max
+		return err
+	})
+	return
+}
+
+// SelectRangedStd select a range of std messages
+func (d *SyncServerDatabase) SelectRangedStd(
+	ctx context.Context,
+	targetUserID, targetDeviceID string,
+	endPos int64,
+) (holder []types.StdHolder, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		list, err := d.stdMsg.selectStdEventsInRange(ctx, txn, targetUserID, targetDeviceID, endPos)
+		holder = list
+		return err
+	})
+	return
+}
+
+// StdEXT : send to device extension process
+func StdEXT(
+	ctx context.Context,
+	syncDB *SyncServerDatabase,
+	respIn types.Response,
+	userID, deviceID string,
+	since int64,
+) (respOut *types.Response) {
+	respOut = &respIn
+	// when extension works at the very beginning
+	err := syncDB.stdMsg.deleteStdEvent(ctx, userID, deviceID, since)
+	if err != nil {
+		return
+	}
+	// when err is nil, these before res should be tagged omitted,
+	// when next /sync is coming , and err is nil , all those omitted.
+	res, err := syncDB.SelectRangedStd(ctx, userID, deviceID, since)
+	if err != nil {
+		return
+	}
+	//toDevice := &types.ToDevice{}
+	mid := []types.StdEvent{}
+	//toDevice.StdEvent = mid
+	for _, val := range res {
+		ev := types.StdEvent{}
+		ev.Sender = val.Sender
+		ev.Type = val.EventTyp
+		err := json.Unmarshal(val.Event, &ev.Content)
+		if err != nil {
+			return
+		}
+		mid = append(mid, ev)
+	}
+	respOut.ToDevice.StdEvent = mid
+	return
 }
