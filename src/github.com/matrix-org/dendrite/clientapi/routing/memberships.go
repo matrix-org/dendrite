@@ -30,6 +30,10 @@ type response struct {
 	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
 }
 
+type joinedResponse struct {
+	JoinedRooms []string `json:"joined_rooms,flow"`
+}
+
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
 	req *http.Request, device *authtypes.Device, roomID string, joinedOnly bool,
@@ -56,5 +60,26 @@ func GetMemberships(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: response{queryRes.JoinEvents},
+	}
+}
+
+// GetJoinedRooms implements GET /joined_rooms
+func GetJoinedRooms(
+	req *http.Request, device *authtypes.Device,
+	_ config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+) util.JSONResponse {
+	queryReq := api.QueryRoomsForUserRequest{
+		UserID: device.UserID,
+		Membership:"join",
+	}
+	var queryRes api.QueryRoomsForUserResponse
+	if err := queryAPI.QueryRoomsForUser(req.Context(), &queryReq, &queryRes); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: joinedResponse{queryRes.RoomIDs},
 	}
 }

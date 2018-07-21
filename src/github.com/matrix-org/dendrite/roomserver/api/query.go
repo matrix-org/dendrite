@@ -138,6 +138,20 @@ type QueryMembershipsForRoomResponse struct {
 	HasBeenInRoom bool `json:"has_been_in_room"`
 }
 
+// QueryRoomsForUserRequest is a request to QueryRoomsForUser
+type QueryRoomsForUserRequest struct {
+	// The ID of the user sending the request
+	UserID string `json:"user_id"`
+	// The membership state to be queried for
+	Membership string `json:"membership"`
+}
+
+// QueryRoomsForUserResponse is a response to QueryRoomsForUser
+type QueryRoomsForUserResponse struct {
+	// The room IDs that match the user ID and membership requested
+	RoomIDs []string `json:"room_ids,flow"`
+}
+
 // QueryInvitesForUserRequest is a request to QueryInvitesForUser
 type QueryInvitesForUserRequest struct {
 	// The room ID to look up invites in.
@@ -251,6 +265,13 @@ type RoomserverQueryAPI interface {
 		response *QueryMembershipsForRoomResponse,
 	) error
 
+	// Query a list of rooms the user has membership in
+	QueryRoomsForUser(
+		ctx context.Context,
+		request *QueryRoomsForUserRequest,
+		response *QueryRoomsForUserResponse,
+	) error
+
 	// Query a list of invite event senders for a user in a room.
 	QueryInvitesForUser(
 		ctx context.Context,
@@ -296,6 +317,9 @@ const RoomserverQueryMembershipForUserPath = "/api/roomserver/queryMembershipFor
 
 // RoomserverQueryMembershipsForRoomPath is the HTTP path for the QueryMembershipsForRoom API
 const RoomserverQueryMembershipsForRoomPath = "/api/roomserver/queryMembershipsForRoom"
+
+// RoomserverQueryRoomsForUserPath is the HTTP path for the QueryRoomsForUser API
+const RoomserverQueryRoomsForUserPath = "/api/roomserver/queryRoomsForUser"
 
 // RoomserverQueryInvitesForUserPath is the HTTP path for the QueryInvitesForUser API
 const RoomserverQueryInvitesForUserPath = "/api/roomserver/queryInvitesForUser"
@@ -385,6 +409,18 @@ func (h *httpRoomserverQueryAPI) QueryMembershipsForRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpRoomserverQueryAPI) QueryRoomsForUser(
+	ctx context.Context,
+	request *QueryRoomsForUserRequest,
+	response *QueryRoomsForUserResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomsForUser")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryRoomsForUserPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

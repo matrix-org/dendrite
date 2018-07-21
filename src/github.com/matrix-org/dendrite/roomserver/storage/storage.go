@@ -412,6 +412,21 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 	return roomNID, err
 }
 
+func (d *Database) GetRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error) {
+	roomIDs := make([]string, 0)
+
+	for _, nid := range roomNIDs {
+		roomID, err := d.statements.selectRoomID(ctx, nil, nid)
+		if err != nil {
+			return nil, err
+		}
+
+		roomIDs = append(roomIDs, roomID)
+	}
+
+	return roomIDs, nil
+}
+
 // LatestEventIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
@@ -429,6 +444,20 @@ func (d *Database) LatestEventIDs(
 		return nil, 0, 0, err
 	}
 	return references, currentStateSnapshotNID, depth, nil
+}
+
+func (d *Database) GetRoomsForUserMembership(
+	ctx context.Context,
+	userNID types.EventStateKeyNID,
+	membership string,
+) (roomNIDs []types.RoomNID, err error) {
+	membershipNID := membershipStateLeaveOrBan
+	if membership == "join" {
+		membershipNID = membershipStateJoin
+	} else if membership == "invite" {
+		membershipNID = membershipStateInvite
+	}
+	return d.statements.selectRoomsForUserMembership(ctx, userNID, membershipNID)
 }
 
 // GetInvitesForUser implements query.RoomserverQueryAPIDatabase

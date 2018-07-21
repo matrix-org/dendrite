@@ -45,6 +45,9 @@ type RoomserverQueryAPIDatabase interface {
 	// Returns 0 if the room doesn't exists.
 	// Returns an error if there was a problem talking to the database.
 	RoomNID(ctx context.Context, roomID string) (types.RoomNID, error)
+	// Look up the room IDs corresponding to the room numeric IDs
+	// Returns an error if there was a problem talking to the database.
+	GetRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error)
 	// Look up event references for the latest events in the room and the current state snapshot.
 	// Returns the latest events, the current state and the maximum depth of the latest events plus 1.
 	// Returns an error if there was a problem talking to the database.
@@ -72,6 +75,11 @@ type RoomserverQueryAPIDatabase interface {
 	GetMembershipEventNIDsForRoom(
 		ctx context.Context, roomNID types.RoomNID, joinOnly bool,
 	) ([]types.EventNID, error)
+	// Lookup the rooms for which a user has a particular membership state.
+	// Returns an error if there was a problem talkign to the database.
+	GetRoomsForUserMembership(
+		ctx context.Context, userNID types.EventStateKeyNID, membership string,
+	) ([]types.RoomNID, error)
 	// Look up the active invites targeting a user in a room and return the
 	// numeric state key IDs for the user IDs who sent them.
 	// Returns an error if there was a problem talking to the database.
@@ -367,6 +375,32 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	return events, nil
 }
 
+// QueryRoomsForUser implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryRoomsForUser(
+	ctx context.Context,
+	request *api.QueryRoomsForUserRequest,
+	response *api.QueryRoomsForUserResponse,
+) error {
+	targetUserNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{request.UserID})
+	if err != nil {
+		return err
+	}
+	targetUserNID := targetUserNIDs[request.UserID]
+
+	roomNIDs, err := r.DB.GetRoomsForUserMembership(ctx, targetUserNID, request.Membership)
+	if err != nil {
+		return err
+	}
+
+	roomIDs, err := r.DB.GetRoomIDs(ctx, roomNIDs)
+	if err != nil {
+		return err
+	}
+
+	response.RoomIDs = roomIDs
+	return nil
+}
+
 // QueryInvitesForUser implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryInvitesForUser(
 	ctx context.Context,
@@ -647,6 +681,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryMembershipsForRoom(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryRoomsForUserPath,
+		common.MakeInternalAPI("queryRoomsForUser", func(req *http.Request) util.JSONResponse {
+			var request api.QueryRoomsForUserRequest
+			var response api.QueryRoomsForUserResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryRoomsForUser(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

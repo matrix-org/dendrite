@@ -344,6 +344,12 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	r0mux.Handle("/joined_rooms",
+		common.MakeAuthAPI("joined_rooms", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return GetJoinedRooms(req, device, cfg, queryAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	r0mux.Handle("/rooms/{roomID}/read_markers",
 		common.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
 			// TODO: return the read_markers.

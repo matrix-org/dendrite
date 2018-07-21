@@ -89,12 +89,17 @@ const updateMembershipSQL = "" +
 	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4, event_nid = $5" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
+const selectRoomsForUserMembershipSQL = "" +
+	"SELECT room_nid FROM roomserver_membership" +
+	" WHERE target_nid = $1 AND membership_nid = $2"
+
 type membershipStatements struct {
 	insertMembershipStmt                       *sql.Stmt
 	selectMembershipForUpdateStmt              *sql.Stmt
 	selectMembershipFromRoomAndTargetStmt      *sql.Stmt
 	selectMembershipsFromRoomAndMembershipStmt *sql.Stmt
 	selectMembershipsFromRoomStmt              *sql.Stmt
+	selectRoomsForUserMembershipStmt           *sql.Stmt
 	updateMembershipStmt                       *sql.Stmt
 }
 
@@ -110,6 +115,7 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectMembershipFromRoomAndTargetStmt, selectMembershipFromRoomAndTargetSQL},
 		{&s.selectMembershipsFromRoomAndMembershipStmt, selectMembershipsFromRoomAndMembershipSQL},
 		{&s.selectMembershipsFromRoomStmt, selectMembershipsFromRoomSQL},
+		{&s.selectRoomsForUserMembershipStmt, selectRoomsForUserMembershipSQL},
 		{&s.updateMembershipStmt, updateMembershipSQL},
 	}.prepare(db)
 }
@@ -176,6 +182,26 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 			return
 		}
 		eventNIDs = append(eventNIDs, eNID)
+	}
+	return
+}
+
+func (s *membershipStatements) selectRoomsForUserMembership(
+	ctx context.Context,
+	targetUserNID types.EventStateKeyNID, membership membershipState,
+) (roomNIDs []types.RoomNID, err error) {
+	stmt := s.selectRoomsForUserMembershipStmt
+	rows, err := stmt.QueryContext(ctx, targetUserNID, membership)
+	if err != nil {
+		return
+	}
+
+	for rows.Next() {
+		var rNID types.RoomNID
+		if err = rows.Scan(&rNID); err != nil {
+			return
+		}
+		roomNIDs = append(roomNIDs, rNID)
 	}
 	return
 }
