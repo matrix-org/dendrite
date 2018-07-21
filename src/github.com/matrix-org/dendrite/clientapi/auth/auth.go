@@ -65,12 +65,6 @@ type Data struct {
 func VerifyUserFromRequest(
 	req *http.Request, data Data,
 ) (*authtypes.Device, *util.JSONResponse) {
-	// Try to find local user from device database
-	dev, devErr := verifyAccessToken(req, data.DeviceDB)
-	if devErr == nil {
-		return dev, verifyUserParameters(req)
-	}
-
 	// Try to find the Application Service user
 	token, err := extractAccessToken(req)
 	if err != nil {
@@ -126,6 +120,12 @@ func VerifyUserFromRequest(
 		// AS is not masquerading as any user, so use AS's sender_localpart
 		dev.UserID = appService.SenderLocalpart
 		return &dev, nil
+	}
+
+	// Try to find local user from device database
+	dev, devErr := verifyAccessToken(req, data.DeviceDB)
+	if devErr == nil {
+		return dev, verifyUserParameters(req)
 	}
 
 	return nil, &util.JSONResponse{
