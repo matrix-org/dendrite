@@ -24,43 +24,29 @@ import (
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
 )
 
+// Tracers is a collection of Jaeger OpenTracing tracers. There is one tracer
+// per Dendrite component, and each is kept track of with a single Tracers
+// object. Upon shutdown, each tracer is closed by calling the Tracers' Close()
+// method.
 type Tracers struct {
 	cfg     *config.Dendrite
 	closers []io.Closer
 }
 
+// NoopTracers is a Tracers object that will never contain any tracers. Disables tracing.
 func NoopTracers() *Tracers {
 	return &Tracers{}
 }
 
+// NewTracers creates a new Tracers object with the given Dendrite config.
 func NewTracers(cfg *config.Dendrite) *Tracers {
 	return &Tracers{
 		cfg: cfg,
 	}
 }
 
-func (t *Tracers) InitGlobalTracer(serviceName string) error {
-	if t.cfg == nil {
-		return nil
-	}
-
-	// Set up GlobalTracer
-	closer, err := t.cfg.Tracing.Jaeger.InitGlobalTracer(
-		serviceName,
-		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
-		jaegerconfig.Metrics(jaegermetrics.NullFactory),
-	)
-
-	if err != nil {
-		return err
-	}
-
-	t.closers = append(t.closers, closer)
-
-	return nil
-}
-
-// SetupTracing configures the opentracing using the supplied configuration.
+// SetupNewTracer creates a new tracer and adds it to those being kept track of
+// on the linked Tracers object.
 func (t *Tracers) SetupNewTracer(serviceName string) opentracing.Tracer {
 	if t.cfg == nil {
 		return opentracing.NoopTracer{}
@@ -81,6 +67,7 @@ func (t *Tracers) SetupNewTracer(serviceName string) opentracing.Tracer {
 	return tracer
 }
 
+// Close will close all Jaeger OpenTracing tracers associated with the Tracers object.
 func (t *Tracers) Close() error {
 	for _, c := range t.closers {
 		c.Close() // nolint: errcheck
@@ -94,10 +81,12 @@ type logrusLogger struct {
 	l *logrus.Logger
 }
 
+// Error prints an error message to the logger
 func (l logrusLogger) Error(msg string) {
 	l.l.Error(msg)
 }
 
+// Infof prints an info message with printf formatting to the logger
 func (l logrusLogger) Infof(msg string, args ...interface{}) {
 	l.l.Infof(msg, args...)
 }

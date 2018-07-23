@@ -711,11 +711,14 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux, tracer opentracin
 	)
 }
 
+// InProcessRoomServerQueryAPI is a RoomserverQueryAPI database linked with a
+// OpenTracing tracer, providing metrics
 type InProcessRoomServerQueryAPI struct {
 	db     RoomserverQueryAPI
 	tracer opentracing.Tracer
 }
 
+// NewInProcessRoomServerQueryAPI creates a new InProcessRoomServerQueryAPI
 func NewInProcessRoomServerQueryAPI(db RoomserverQueryAPI, tracer opentracing.Tracer) InProcessRoomServerQueryAPI {
 	return InProcessRoomServerQueryAPI{
 		db:     db,

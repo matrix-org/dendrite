@@ -31,13 +31,6 @@ func main() {
 
 	federation := base.CreateFederationClient()
 
-	/* TODO delete
-	err = tracers.InitGlobalTracer("Dendrite - Federation Sender")
-	if err != nil {
-		log.WithError(err).Fatalf("Failed to start tracer")
-	}
-	*/
-
 	_, _, query := base.CreateHTTPRoomserverAPIs()
 
 	federationsender.SetupFederationSenderComponent(

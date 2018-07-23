@@ -95,17 +95,14 @@ func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux, tracer opentracin
 	)
 }
 
+// InProcessRoomServerInput is a RoomserverInput database linked with a
+// OpenTracing tracer, providing metrics
 type InProcessRoomServerInput struct {
 	db     RoomserverInputAPI
 	tracer opentracing.Tracer
 }
 
-func NewInProcessRoomServerInput(db RoomserverInputAPI, tracer opentracing.Tracer) *InProcessRoomServerInput {
-	return &InProcessRoomServerInput{
-		db: db, tracer: tracer,
-	}
-}
-
+// InputRoomEvents is a wrapper providing opentracing metrics data around room events
 func (r *InProcessRoomServerInput) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,

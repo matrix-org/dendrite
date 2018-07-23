@@ -18,7 +18,7 @@ type statusCodeResponseWriter struct {
 	statusCode int
 }
 
-func NewStatusCodeResponseWriter(w http.ResponseWriter) *statusCodeResponseWriter {
+func newStatusCodeResponseWriter(w http.ResponseWriter) *statusCodeResponseWriter {
 	return &statusCodeResponseWriter{w, http.StatusOK}
 }
 
@@ -60,7 +60,7 @@ func MakeExternalAPI(tracer opentracing.Tracer, metricsName string, f func(*http
 		ext.HTTPMethod.Set(span, req.Method)
 
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
-		rw := NewStatusCodeResponseWriter(w)
+		rw := newStatusCodeResponseWriter(w)
 
 		h.ServeHTTP(w, req)
 		ext.HTTPStatusCode.Set(span, uint16(rw.statusCode))
@@ -91,7 +91,7 @@ func MakeInternalAPI(tracer opentracing.Tracer, metricsName string, f func(*http
 		ext.HTTPUrl.Set(span, req.URL.String())
 		ext.HTTPMethod.Set(span, req.Method)
 
-		// TODO: Do we need to do the NewStatusCodeResponseWriter stuff?
+		// TODO: Do we need to do the newStatusCodeResponseWriter stuff?
 
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
 		h.ServeHTTP(w, req)
