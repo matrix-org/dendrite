@@ -148,8 +148,8 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/query/user_devices/{userID}", common.MakeFedAPI(
-		"federation_query_user_devices", cfg.Matrix.ServerName, keys,
+	v1fedmux.Handle("/user/devices/{userID}", common.MakeFedAPI(
+		"federation_user_devices", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetUserDevices(
