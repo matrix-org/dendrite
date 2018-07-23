@@ -17,10 +17,10 @@ package roomserver
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/alias"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/input"
 	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -33,8 +33,11 @@ import (
 // APIs directly instead of having to use HTTP.
 func SetupRoomServerComponent(
 	base *basecomponent.BaseDendrite,
+	tracers *common.Tracers,
 ) (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
-	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
+	tracer := tracers.SetupNewTracer("Dendrite - RoomserverAPI")
+
+	roomserverDB, err := storage.Open(tracers, string(base.Cfg.Database.RoomServer))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
@@ -45,11 +48,11 @@ func SetupRoomServerComponent(
 		OutputRoomEventTopic: string(base.Cfg.Kafka.Topics.OutputRoomEvent),
 	}
 
-	inputAPI.SetupHTTP(http.DefaultServeMux)
+	inputAPI.SetupHTTP(http.DefaultServeMux, tracer)
 
 	queryAPI := query.RoomserverQueryAPI{DB: roomserverDB}
 
-	queryAPI.SetupHTTP(http.DefaultServeMux)
+	queryAPI.SetupHTTP(http.DefaultServeMux, tracer)
 
 	aliasAPI := alias.RoomserverAliasAPI{
 		DB:       roomserverDB,
@@ -58,7 +61,7 @@ func SetupRoomServerComponent(
 		QueryAPI: &queryAPI,
 	}
 
-	aliasAPI.SetupHTTP(http.DefaultServeMux)
+	aliasAPI.SetupHTTP(http.DefaultServeMux, tracer)
 
 	return &aliasAPI, &inputAPI, &queryAPI
 }

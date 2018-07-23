@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/util"
+	opentracing "github.com/opentracing/opentracing-go"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -78,9 +79,9 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 }
 
 // SetupHTTP adds the RoomserverInputAPI handlers to the http.ServeMux.
-func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux) {
+func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux, tracer opentracing.Tracer) {
 	servMux.Handle(api.RoomserverInputRoomEventsPath,
-		common.MakeInternalAPI("inputRoomEvents", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "inputRoomEvents", func(req *http.Request) util.JSONResponse {
 			var request api.InputRoomEventsRequest
 			var response api.InputRoomEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -92,4 +93,30 @@ func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+}
+
+type InProcessRoomServerInput struct {
+	db     RoomserverInputAPI
+	tracer opentracing.Tracer
+}
+
+func NewInProcessRoomServerInput(db RoomserverInputAPI, tracer opentracing.Tracer) *InProcessRoomServerInput {
+	return &InProcessRoomServerInput{
+		db: db, tracer: tracer,
+	}
+}
+
+func (r *InProcessRoomServerInput) InputRoomEvents(
+	ctx context.Context,
+	request *api.InputRoomEventsRequest,
+	response *api.InputRoomEventsResponse,
+) error {
+	span := r.tracer.StartSpan(
+		"InputRoomEvents",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()),
+	)
+	defer span.Finish()
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	return r.db.InputRoomEvents(ctx, request, response)
 }

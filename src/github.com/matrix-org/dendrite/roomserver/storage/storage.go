@@ -20,6 +20,7 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -32,10 +33,10 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(dataSourceName string) (*Database, error) {
+func Open(tracers *common.Tracers, dataSourceName string) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if d.db, err = common.OpenPostgresWithTracing(tracers, "roomserver", dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = d.statements.prepare(d.db); err != nil {

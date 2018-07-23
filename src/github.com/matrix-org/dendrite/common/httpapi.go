@@ -15,7 +15,7 @@ import (
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
-	metricsName string, data auth.Data,
+	tracer opentracing.Tracer, metricsName string, data auth.Data,
 	f func(*http.Request, *authtypes.Device) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -26,15 +26,15 @@ func MakeAuthAPI(
 
 		return f(req, device)
 	}
-	return MakeExternalAPI(metricsName, h)
+	return MakeExternalAPI(tracer, metricsName, h)
 }
 
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.
 // This is used for APIs that are called from the internet.
-func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+func MakeExternalAPI(tracer opentracing.Tracer, metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
-		span := opentracing.StartSpan(metricsName)
+		span := tracer.StartSpan(metricsName)
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
 		h.ServeHTTP(w, req)
@@ -47,11 +47,10 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 // This is used for APIs that are internal to dendrite.
 // If we are passed a tracing context in the request headers then we use that
 // as the parent of any tracing spans we create.
-func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+func MakeInternalAPI(tracer opentracing.Tracer, metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		carrier := opentracing.HTTPHeadersCarrier(req.Header)
-		tracer := opentracing.GlobalTracer()
 		clientContext, err := tracer.Extract(opentracing.HTTPHeaders, carrier)
 		var span opentracing.Span
 		if err == nil {
@@ -71,6 +70,7 @@ func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 
 // MakeFedAPI makes an http.Handler that checks matrix federation authentication.
 func MakeFedAPI(
+	tracer opentracing.Tracer,
 	metricsName string,
 	serverName gomatrixserverlib.ServerName,
 	keyRing gomatrixserverlib.KeyRing,
@@ -85,7 +85,7 @@ func MakeFedAPI(
 		}
 		return f(req, fedReq)
 	}
-	return MakeExternalAPI(metricsName, h)
+	return MakeExternalAPI(tracer, metricsName, h)
 }
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
@@ -105,7 +105,7 @@ func WrapHandlerInCORS(h http.Handler) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
 
 		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
-			// Its easiest just to always return a 200 OK for everything. Whether
+			// It's easiest just to always return a 200 OK for everything. Whether
 			// this is technically correct or not is a question, but in the end this
 			// is what a lot of other people do (including synapse) and the clients
 			// are perfectly happy with it.

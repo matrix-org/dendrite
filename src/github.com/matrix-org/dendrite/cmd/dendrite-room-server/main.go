@@ -17,16 +17,21 @@ package main
 import (
 	_ "net/http/pprof"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver"
 )
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "RoomServerAPI")
+
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	base := basecomponent.NewBaseDendrite(cfg, tracers, "RoomServerAPI")
 	defer base.Close() // nolint: errcheck
 
-	roomserver.SetupRoomServerComponent(base)
+	roomserver.SetupRoomServerComponent(base, tracers)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.RoomServer))
 }

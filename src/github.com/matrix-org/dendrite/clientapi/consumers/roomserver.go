@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
@@ -34,6 +35,7 @@ type OutputRoomEventConsumer struct {
 	db                 *accounts.Database
 	query              api.RoomserverQueryAPI
 	serverName         string
+	tracer             opentracing.Tracer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -42,6 +44,7 @@ func NewOutputRoomEventConsumer(
 	kafkaConsumer sarama.Consumer,
 	store *accounts.Database,
 	queryAPI api.RoomserverQueryAPI,
+	tracer opentracing.Tracer,
 ) *OutputRoomEventConsumer {
 
 	consumer := common.ContinualConsumer{
@@ -54,6 +57,7 @@ func NewOutputRoomEventConsumer(
 		db:                 store,
 		query:              queryAPI,
 		serverName:         string(cfg.Matrix.ServerName),
+		tracer:             tracer,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -77,6 +81,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
+	ctx, span := output.StartSpanAndReplaceContext(context.Background(), s.tracer)
+	defer span.Finish()
+
 	if output.Type != api.OutputTypeNewRoomEvent {
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -96,7 +103,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
-	return s.db.UpdateMemberships(context.TODO(), events, output.NewRoomEvent.RemovesStateEventIDs)
+	return s.db.UpdateMemberships(ctx, events, output.NewRoomEvent.RemovesStateEventIDs)
 }
 
 // lookupStateEvents looks up the state events that are added by a new event.

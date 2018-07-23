@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -31,6 +32,7 @@ import (
 // component.
 func SetupClientAPIComponent(
 	base *basecomponent.BaseDendrite,
+	tracers *common.Tracers,
 	deviceDB *devices.Database,
 	accountsDB *accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
@@ -40,6 +42,8 @@ func SetupClientAPIComponent(
 	queryAPI roomserverAPI.RoomserverQueryAPI,
 	transactionsCache *transactions.Cache,
 ) {
+	tracer := tracers.SetupNewTracer("Dendrite - ClientAPI")
+
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 
 	userUpdateProducer := &producers.UserUpdateProducer{
@@ -53,7 +57,7 @@ func SetupClientAPIComponent(
 	}
 
 	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, queryAPI,
+		base.Cfg, base.KafkaConsumer, accountsDB, queryAPI, tracer,
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -62,6 +66,6 @@ func SetupClientAPIComponent(
 	routing.Setup(
 		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
-		syncProducer, transactionsCache,
+		syncProducer, transactionsCache, tracer,
 	)
 }

@@ -15,13 +15,18 @@
 package main
 
 import (
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/syncapi"
 )
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "SyncAPI")
+
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	base := basecomponent.NewBaseDendrite(cfg, tracers, "SyncAPI")
 	defer base.Close() // nolint: errcheck
 
 	deviceDB := base.CreateDeviceDB()
@@ -29,7 +34,7 @@ func main() {
 
 	_, _, query := base.CreateHTTPRoomserverAPIs()
 
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
+	syncapi.SetupSyncAPIComponent(base, tracers, deviceDB, accountDB, query)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.SyncAPI))
 }

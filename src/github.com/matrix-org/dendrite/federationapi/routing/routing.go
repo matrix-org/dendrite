@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 const (
@@ -45,11 +46,12 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
+	tracer opentracing.Tracer,
 ) {
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
 
-	localKeys := common.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
+	localKeys := common.MakeExternalAPI(tracer, "localkeys", func(req *http.Request) util.JSONResponse {
 		return LocalKeys(cfg)
 	})
 
@@ -61,7 +63,7 @@ func Setup(
 	v2keysmux.Handle("/server/", localKeys).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/send/{txnID}/", common.MakeFedAPI(
-		"federation_send", cfg.Matrix.ServerName, keys,
+		tracer, "federation_send", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return Send(
@@ -72,7 +74,7 @@ func Setup(
 	)).Methods(http.MethodPut, http.MethodOptions)
 
 	v1fedmux.Handle("/invite/{roomID}/{eventID}", common.MakeFedAPI(
-		"federation_invite", cfg.Matrix.ServerName, keys,
+		tracer, "federation_invite", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return Invite(
@@ -82,14 +84,15 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
-	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
+	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI(
+		tracer, "3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
 			return CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
 	v1fedmux.Handle("/exchange_third_party_invite/{roomID}", common.MakeFedAPI(
-		"exchange_third_party_invite", cfg.Matrix.ServerName, keys,
+		tracer, "exchange_third_party_invite", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return ExchangeThirdPartyInvite(
@@ -99,7 +102,7 @@ func Setup(
 	)).Methods(http.MethodPut, http.MethodOptions)
 
 	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
-		"federation_get_event", cfg.Matrix.ServerName, keys,
+		tracer, "federation_get_event", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetEvent(
@@ -109,7 +112,7 @@ func Setup(
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/state/{roomID}", common.MakeFedAPI(
-		"federation_get_event_auth", cfg.Matrix.ServerName, keys,
+		tracer, "federation_get_event_auth", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetState(
@@ -120,7 +123,7 @@ func Setup(
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/state_ids/{roomID}", common.MakeFedAPI(
-		"federation_get_event_auth", cfg.Matrix.ServerName, keys,
+		tracer, "federation_get_event_auth", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetStateIDs(
@@ -131,7 +134,7 @@ func Setup(
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/query/directory/", common.MakeFedAPI(
-		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
+		tracer, "federation_query_room_alias", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return RoomAliasToID(
 				httpReq, federation, cfg, aliasAPI,
@@ -140,7 +143,7 @@ func Setup(
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/query/profile", common.MakeFedAPI(
-		"federation_query_profile", cfg.Matrix.ServerName, keys,
+		tracer, "federation_query_profile", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return GetProfile(
 				httpReq, accountDB, cfg,
@@ -149,7 +152,7 @@ func Setup(
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/query/user_devices/{userID}", common.MakeFedAPI(
-		"federation_query_user_devices", cfg.Matrix.ServerName, keys,
+		tracer, "federation_query_user_devices", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetUserDevices(
@@ -159,7 +162,7 @@ func Setup(
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/make_join/{roomID}/{userID}", common.MakeFedAPI(
-		"federation_make_join", cfg.Matrix.ServerName, keys,
+		tracer, "federation_make_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			roomID := vars["roomID"]
@@ -171,7 +174,7 @@ func Setup(
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/send_join/{roomID}/{userID}", common.MakeFedAPI(
-		"federation_send_join", cfg.Matrix.ServerName, keys,
+		tracer, "federation_send_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			roomID := vars["roomID"]
@@ -183,7 +186,7 @@ func Setup(
 	)).Methods(http.MethodPut)
 
 	v1fedmux.Handle("/make_leave/{roomID}/{userID}", common.MakeFedAPI(
-		"federation_make_leave", cfg.Matrix.ServerName, keys,
+		tracer, "federation_make_leave", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			roomID := vars["roomID"]
@@ -195,7 +198,7 @@ func Setup(
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/send_leave/{roomID}/{userID}", common.MakeFedAPI(
-		"federation_send_leave", cfg.Matrix.ServerName, keys,
+		tracer, "federation_send_leave", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			roomID := vars["roomID"]
@@ -207,14 +210,14 @@ func Setup(
 	)).Methods(http.MethodPut)
 
 	v1fedmux.Handle("/version", common.MakeExternalAPI(
-		"federation_version",
+		tracer, "federation_version",
 		func(httpReq *http.Request) util.JSONResponse {
 			return Version()
 		},
 	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("get_missing_events/{roomID}", common.MakeFedAPI(
-		"federation_get_missing_events", cfg.Matrix.ServerName, keys,
+		tracer, "federation_get_missing_events", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetMissingEvents(httpReq, request, query, vars["roomID"])

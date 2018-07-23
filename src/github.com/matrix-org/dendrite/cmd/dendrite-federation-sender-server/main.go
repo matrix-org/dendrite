@@ -15,21 +15,33 @@
 package main
 
 import (
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/federationsender"
 )
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "FederationSender")
+
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	base := basecomponent.NewBaseDendrite(cfg, tracers, "FederationSender")
 	defer base.Close() // nolint: errcheck
 
 	federation := base.CreateFederationClient()
 
+	/* TODO delete
+	err = tracers.InitGlobalTracer("Dendrite - Federation Sender")
+	if err != nil {
+		log.WithError(err).Fatalf("Failed to start tracer")
+	}
+	*/
+
 	_, _, query := base.CreateHTTPRoomserverAPIs()
 
 	federationsender.SetupFederationSenderComponent(
-		base, federation, query,
+		base, tracers, federation, query,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationSender))

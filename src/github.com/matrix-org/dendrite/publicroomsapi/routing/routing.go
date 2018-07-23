@@ -25,31 +25,37 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/directory"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/util"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup configures the given mux with publicroomsapi server listeners
-func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storage.PublicRoomsServerDatabase) {
+func Setup(
+	apiMux *mux.Router,
+	deviceDB *devices.Database,
+	publicRoomsDB *storage.PublicRoomsServerDatabase,
+	tracer opentracing.Tracer,
+) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{nil, deviceDB, nil}
 
 	r0mux.Handle("/directory/list/room/{roomID}",
-		common.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI(tracer, "directory_list", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return directory.GetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 	// TODO: Add AS support
 	r0mux.Handle("/directory/list/room/{roomID}",
-		common.MakeAuthAPI("directory_list", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI(tracer, "directory_list", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			return directory.SetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
-		common.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI(tracer, "public_rooms", func(req *http.Request) util.JSONResponse {
 			return directory.GetPublicRooms(req, publicRoomsDB)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)

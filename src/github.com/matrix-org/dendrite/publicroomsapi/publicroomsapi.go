@@ -16,6 +16,7 @@ package publicroomsapi
 
 import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/publicroomsapi/routing"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
@@ -26,12 +27,15 @@ import (
 // component.
 func SetupPublicRoomsAPIComponent(
 	base *basecomponent.BaseDendrite,
+	tracers *common.Tracers,
 	deviceDB *devices.Database,
 ) {
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(tracers, string(base.Cfg.Database.PublicRoomsAPI))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
-	routing.Setup(base.APIMux, deviceDB, publicRoomsDB)
+	tracer := tracers.SetupNewTracer("Dendrite - PublicRoomsAPI")
+
+	routing.Setup(base.APIMux, deviceDB, publicRoomsDB, tracer)
 }

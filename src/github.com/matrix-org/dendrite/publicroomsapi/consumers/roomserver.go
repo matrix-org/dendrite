@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
@@ -31,6 +32,7 @@ type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *storage.PublicRoomsServerDatabase
 	query              api.RoomserverQueryAPI
+	tracer             opentracing.Tracer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -39,6 +41,7 @@ func NewOutputRoomEventConsumer(
 	kafkaConsumer sarama.Consumer,
 	store *storage.PublicRoomsServerDatabase,
 	queryAPI api.RoomserverQueryAPI,
+	tracer opentracing.Tracer,
 ) *OutputRoomEventConsumer {
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
@@ -49,6 +52,7 @@ func NewOutputRoomEventConsumer(
 		roomServerConsumer: &consumer,
 		db:                 store,
 		query:              queryAPI,
+		tracer:             tracer,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -77,6 +81,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
+	ctx, span := output.StartSpanAndReplaceContext(context.Background(), s.tracer)
+	defer span.Finish()
+
 	ev := output.NewRoomEvent.Event
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
@@ -86,17 +93,17 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 	addQueryReq := api.QueryEventsByIDRequest{EventIDs: output.NewRoomEvent.AddsStateEventIDs}
 	var addQueryRes api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &addQueryReq, &addQueryRes); err != nil {
+	if err := s.query.QueryEventsByID(ctx, &addQueryReq, &addQueryRes); err != nil {
 		log.Warn(err)
 		return err
 	}
 
 	remQueryReq := api.QueryEventsByIDRequest{EventIDs: output.NewRoomEvent.RemovesStateEventIDs}
 	var remQueryRes api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &remQueryReq, &remQueryRes); err != nil {
+	if err := s.query.QueryEventsByID(ctx, &remQueryReq, &remQueryRes); err != nil {
 		log.Warn(err)
 		return err
 	}
 
-	return s.db.UpdateRoomFromEvents(context.TODO(), addQueryRes.Events, remQueryRes.Events)
+	return s.db.UpdateRoomFromEvents(ctx, addQueryRes.Events, remQueryRes.Events)
 }

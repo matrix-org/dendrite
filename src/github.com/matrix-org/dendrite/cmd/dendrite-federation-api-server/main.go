@@ -15,6 +15,7 @@
 package main
 
 import (
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/federationapi"
@@ -22,7 +23,11 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI")
+
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	base := basecomponent.NewBaseDendrite(cfg, tracers, "FederationAPI")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -34,7 +39,7 @@ func main() {
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
 
 	federationapi.SetupFederationAPIComponent(
-		base, accountDB, deviceDB, federation, &keyRing,
+		base, tracers, accountDB, deviceDB, federation, &keyRing,
 		alias, input, query,
 	)
 

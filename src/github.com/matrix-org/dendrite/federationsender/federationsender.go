@@ -15,6 +15,7 @@
 package federationsender
 
 import (
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/queue"
@@ -28,19 +29,22 @@ import (
 // FederationSender component.
 func SetupFederationSenderComponent(
 	base *basecomponent.BaseDendrite,
+	tracers *common.Tracers,
 	federation *gomatrixserverlib.FederationClient,
 	queryAPI api.RoomserverQueryAPI,
 ) {
-	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
+	federationSenderDB, err := storage.NewDatabase(tracers, string(base.Cfg.Database.FederationSender))
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
 	queues := queue.NewOutgoingQueues(base.Cfg.Matrix.ServerName, federation)
 
+	tracer := tracers.SetupNewTracer("Dendrite - FederationSender")
+
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,
-		federationSenderDB, queryAPI,
+		federationSenderDB, queryAPI, tracer,
 	)
 	if err = consumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")

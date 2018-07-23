@@ -16,6 +16,7 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/clientapi"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
@@ -24,7 +25,10 @@ import (
 func main() {
 	cfg := basecomponent.ParseFlags()
 
-	base := basecomponent.NewBaseDendrite(cfg, "ClientAPI")
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	base := basecomponent.NewBaseDendrite(cfg, tracers, "ClientAPI")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -37,7 +41,7 @@ func main() {
 	cache := transactions.New()
 
 	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB, federation, &keyRing,
+		base, tracers, deviceDB, accountDB, federation, &keyRing,
 		alias, input, query, cache,
 	)
 

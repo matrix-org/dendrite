@@ -15,18 +15,23 @@
 package main
 
 import (
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/publicroomsapi"
 )
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "PublicRoomsAPI")
+
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	base := basecomponent.NewBaseDendrite(cfg, tracers, "PublicRoomsAPI")
 	defer base.Close() // nolint: errcheck
 
 	deviceDB := base.CreateDeviceDB()
 
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, tracers, deviceDB)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.PublicRoomsAPI))
 }

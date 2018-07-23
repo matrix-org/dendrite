@@ -35,10 +35,10 @@ type Database struct {
 }
 
 // NewDatabase creates a new device database
-func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(tracers *common.Tracers, dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if db, err = common.OpenPostgresWithTracing(tracers, "devices", dataSourceName); err != nil {
 		return nil, err
 	}
 	d := devicesStatements{}

@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
@@ -38,6 +39,7 @@ type OutputRoomEventConsumer struct {
 	query              api.RoomserverQueryAPI
 	alias              api.RoomserverAliasAPI
 	serverName         string
+	tracer             opentracing.Tracer
 	workerStates       []types.ApplicationServiceWorkerState
 }
 
@@ -51,6 +53,7 @@ func NewOutputRoomEventConsumer(
 	queryAPI api.RoomserverQueryAPI,
 	aliasAPI api.RoomserverAliasAPI,
 	workerStates []types.ApplicationServiceWorkerState,
+	tracer opentracing.Tracer,
 ) *OutputRoomEventConsumer {
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
@@ -64,6 +67,7 @@ func NewOutputRoomEventConsumer(
 		query:              queryAPI,
 		alias:              aliasAPI,
 		serverName:         string(cfg.Matrix.ServerName),
+		tracer:             tracer,
 		workerStates:       workerStates,
 	}
 	consumer.ProcessMessage = s.onMessage

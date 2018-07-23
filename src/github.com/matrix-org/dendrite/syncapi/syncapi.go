@@ -20,10 +20,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/api"
-
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -35,11 +35,14 @@ import (
 // component.
 func SetupSyncAPIComponent(
 	base *basecomponent.BaseDendrite,
+	tracers *common.Tracers,
 	deviceDB *devices.Database,
 	accountsDB *accounts.Database,
 	queryAPI api.RoomserverQueryAPI,
 ) {
-	syncDB, err := storage.NewSyncServerDatabase(string(base.Cfg.Database.SyncAPI))
+	tracer := tracers.SetupNewTracer("Dendrite - RoomserverAPI")
+
+	syncDB, err := storage.NewSyncServerDatabase(tracers, string(base.Cfg.Database.SyncAPI))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
@@ -58,7 +61,7 @@ func SetupSyncAPIComponent(
 	requestPool := sync.NewRequestPool(syncDB, notifier, accountsDB)
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB, queryAPI,
+		base.Cfg, base.KafkaConsumer, notifier, syncDB, queryAPI, tracer,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -71,5 +74,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB)
+	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, tracer)
 }

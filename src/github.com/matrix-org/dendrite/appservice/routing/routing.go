@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 const pathPrefixApp = "/_matrix/app/r0"
@@ -37,11 +38,12 @@ func Setup(
 	accountDB *accounts.Database, // nolint: unparam
 	federation *gomatrixserverlib.FederationClient, // nolint: unparam
 	transactionsCache *transactions.Cache, // nolint: unparam
+	tracer opentracing.Tracer,
 ) {
 	appMux := apiMux.PathPrefix(pathPrefixApp).Subrouter()
 
 	appMux.Handle("/alias",
-		common.MakeExternalAPI("alias", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI(tracer, "alias", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -50,7 +52,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 	appMux.Handle("/user",
-		common.MakeExternalAPI("user", func(req *http.Request) util.JSONResponse {
+		common.MakeExternalAPI(tracer, "user", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement
 			return util.JSONResponse{
 				Code: http.StatusOK,

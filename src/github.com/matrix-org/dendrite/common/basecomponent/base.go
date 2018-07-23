@@ -16,7 +16,6 @@ package basecomponent
 
 import (
 	"database/sql"
-	"io"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common/keydb"
@@ -43,7 +42,7 @@ import (
 // Must be closed when shutting down.
 type BaseDendrite struct {
 	componentName string
-	tracerCloser  io.Closer
+	tracers       *common.Tracers
 
 	// APIMux should be used to register new public matrix api endpoints
 	APIMux        *mux.Router
@@ -55,20 +54,19 @@ type BaseDendrite struct {
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
-func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
+func NewBaseDendrite(
+	cfg *config.Dendrite,
+	tracers *common.Tracers,
+	componentName string,
+) *BaseDendrite {
 	common.SetupStdLogging()
 	common.SetupHookLogging(cfg.Logging, componentName)
-
-	closer, err := cfg.SetupTracing("Dendrite" + componentName)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to start opentracing")
-	}
 
 	kafkaConsumer, kafkaProducer := setupKafka(cfg)
 
 	return &BaseDendrite{
 		componentName: componentName,
-		tracerCloser:  closer,
+		tracers:       tracers,
 		Cfg:           cfg,
 		APIMux:        mux.NewRouter(),
 		KafkaConsumer: kafkaConsumer,
@@ -78,7 +76,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 
 // Close implements io.Closer
 func (b *BaseDendrite) Close() error {
-	return b.tracerCloser.Close()
+	return b.tracers.Close()
 }
 
 // CreateHTTPAppServiceAPIs returns the QueryAPI for hitting the appservice
@@ -103,7 +101,7 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
 func (b *BaseDendrite) CreateDeviceDB() *devices.Database {
-	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.Matrix.ServerName)
+	db, err := devices.NewDatabase(b.tracers, string(b.Cfg.Database.Device), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to devices db")
 	}
@@ -114,7 +112,7 @@ func (b *BaseDendrite) CreateDeviceDB() *devices.Database {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() *accounts.Database {
-	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.Matrix.ServerName)
+	db, err := accounts.NewDatabase(b.tracers, string(b.Cfg.Database.Account), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
@@ -125,7 +123,7 @@ func (b *BaseDendrite) CreateAccountsDB() *accounts.Database {
 // CreateKeyDB creates a new instance of the key database. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateKeyDB() *keydb.Database {
-	db, err := keydb.NewDatabase(string(b.Cfg.Database.ServerKey))
+	db, err := keydb.NewDatabase(b.tracers, string(b.Cfg.Database.ServerKey))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to keys db")
 	}

@@ -16,13 +16,18 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/appservice"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/transactions"
 )
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "AppServiceAPI")
+
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	base := basecomponent.NewBaseDendrite(cfg, tracers, "AppServiceAPI")
 
 	defer base.Close() // nolint: errcheck
 	accountDB := base.CreateAccountsDB()
@@ -32,7 +37,7 @@ func main() {
 	cache := transactions.New()
 
 	appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, alias, query, cache,
+		base, tracers, accountDB, deviceDB, federation, alias, query, cache,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationSender))

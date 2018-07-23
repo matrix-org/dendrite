@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
@@ -40,6 +41,7 @@ func Setup(
 	db *storage.Database,
 	deviceDB *devices.Database,
 	client *gomatrixserverlib.Client,
+	tracer opentracing.Tracer,
 ) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
@@ -48,9 +50,11 @@ func Setup(
 	}
 	authData := auth.Data{nil, deviceDB, nil}
 
+	// TODO: How to use tracing with these endpoints?
+
 	// TODO: Add AS support
 	r0mux.Handle("/upload", common.MakeAuthAPI(
-		"upload", authData,
+		tracer, "upload", authData,
 		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
 			return Upload(req, cfg, db, activeThumbnailGeneration)
 		},
@@ -75,6 +79,8 @@ func makeDownloadAPI(
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) http.HandlerFunc {
+	// TODO: Add opentracing.
+
 	return prometheus.InstrumentHandler(name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		req = util.RequestWithLogging(req)
 

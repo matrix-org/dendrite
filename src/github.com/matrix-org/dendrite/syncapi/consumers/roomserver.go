@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -36,6 +38,7 @@ type OutputRoomEventConsumer struct {
 	db                 *storage.SyncServerDatabase
 	notifier           *sync.Notifier
 	query              api.RoomserverQueryAPI
+	tracer             opentracing.Tracer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -45,6 +48,7 @@ func NewOutputRoomEventConsumer(
 	n *sync.Notifier,
 	store *storage.SyncServerDatabase,
 	queryAPI api.RoomserverQueryAPI,
+	tracer opentracing.Tracer,
 ) *OutputRoomEventConsumer {
 
 	consumer := common.ContinualConsumer{
@@ -57,6 +61,7 @@ func NewOutputRoomEventConsumer(
 		db:                 store,
 		notifier:           n,
 		query:              queryAPI,
+		tracer:             tracer,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -80,13 +85,16 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
+	ctx, span := output.StartSpanAndReplaceContext(context.Background(), s.tracer)
+	defer span.Finish()
+
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
-		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
+		return s.onNewRoomEvent(ctx, *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:
-		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
+		return s.onNewInviteEvent(ctx, *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
-		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
+		return s.onRetireInviteEvent(ctx, *output.RetireInviteEvent)
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",

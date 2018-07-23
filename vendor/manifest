@@ -78,6 +78,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/gchaincl/sqlhooks",
+			"repository": "https://github.com/gchaincl/sqlhooks",
+			"revision": "b4a12bad76664eae8012d196ed901f8fa8f87909",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/golang/protobuf/proto",
 			"repository": "https://github.com/golang/protobuf",
 			"revision": "8ee79997227bf9b34611aee7946ae64735e6fd93",

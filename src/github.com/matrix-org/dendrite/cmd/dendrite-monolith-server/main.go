@@ -18,13 +18,12 @@ import (
 	"flag"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/common/transactions"
-
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/keydb"
+	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/mediaapi"
@@ -45,7 +44,11 @@ var (
 
 func main() {
 	cfg := basecomponent.ParseMonolithFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
+
+	tracers := common.NewTracers(cfg)
+	defer tracers.Close() // nolint: errcheck
+
+	base := basecomponent.NewBaseDendrite(cfg, tracers, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -54,19 +57,19 @@ func main() {
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
-	alias, input, query := roomserver.SetupRoomServerComponent(base)
+	alias, input, query := roomserver.SetupRoomServerComponent(base, tracers)
 
 	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
+		base, tracers, deviceDB, accountDB,
 		federation, &keyRing, alias, input, query,
 		transactions.New(),
 	)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query)
-	federationsender.SetupFederationSenderComponent(base, federation, query)
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
-	appservice.SetupAppServiceAPIComponent(base, accountDB, deviceDB, federation, alias, query, transactions.New())
+	federationapi.SetupFederationAPIComponent(base, tracers, accountDB, deviceDB, federation, &keyRing, alias, input, query)
+	federationsender.SetupFederationSenderComponent(base, tracers, federation, query)
+	mediaapi.SetupMediaAPIComponent(base, tracers, deviceDB)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, tracers, deviceDB)
+	syncapi.SetupSyncAPIComponent(base, tracers, deviceDB, accountDB, query)
+	appservice.SetupAppServiceAPIComponent(base, tracers, accountDB, deviceDB, federation, alias, query, transactions.New())
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 

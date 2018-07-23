@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // RoomserverQueryAPIEventDB has a convenience API to fetch events directly by
@@ -581,10 +582,10 @@ func getAuthChain(
 
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
 // nolint: gocyclo
-func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
+func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux, tracer opentracing.Tracer) {
 	servMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,
-		common.MakeInternalAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
 			var request api.QueryLatestEventsAndStateRequest
 			var response api.QueryLatestEventsAndStateResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -598,7 +599,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryStateAfterEventsPath,
-		common.MakeInternalAPI("queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAfterEventsRequest
 			var response api.QueryStateAfterEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -612,7 +613,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryEventsByIDPath,
-		common.MakeInternalAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "queryEventsByID", func(req *http.Request) util.JSONResponse {
 			var request api.QueryEventsByIDRequest
 			var response api.QueryEventsByIDResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -626,7 +627,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryMembershipForUserPath,
-		common.MakeInternalAPI("QueryMembershipForUser", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "QueryMembershipForUser", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMembershipForUserRequest
 			var response api.QueryMembershipForUserResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -640,7 +641,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryMembershipsForRoomPath,
-		common.MakeInternalAPI("queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMembershipsForRoomRequest
 			var response api.QueryMembershipsForRoomResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -654,7 +655,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryInvitesForUserPath,
-		common.MakeInternalAPI("queryInvitesForUser", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "queryInvitesForUser", func(req *http.Request) util.JSONResponse {
 			var request api.QueryInvitesForUserRequest
 			var response api.QueryInvitesForUserResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -668,7 +669,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryServerAllowedToSeeEventPath,
-		common.MakeInternalAPI("queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
 			var request api.QueryServerAllowedToSeeEventRequest
 			var response api.QueryServerAllowedToSeeEventResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -682,7 +683,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryMissingEventsPath,
-		common.MakeInternalAPI("queryMissingEvents", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "queryMissingEvents", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMissingEventsRequest
 			var response api.QueryMissingEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -696,7 +697,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.RoomserverQueryStateAndAuthChainPath,
-		common.MakeInternalAPI("queryStateAndAuthChain", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI(tracer, "queryStateAndAuthChain", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAndAuthChainRequest
 			var response api.QueryStateAndAuthChainResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -708,4 +709,128 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+}
+
+type InProcessRoomServerQueryAPI struct {
+	db     RoomserverQueryAPI
+	tracer opentracing.Tracer
+}
+
+func NewInProcessRoomServerQueryAPI(db RoomserverQueryAPI, tracer opentracing.Tracer) InProcessRoomServerQueryAPI {
+	return InProcessRoomServerQueryAPI{
+		db:     db,
+		tracer: tracer,
+	}
+}
+
+// QueryLatestEventsAndState implements RoomserverQueryAPI
+func (h *InProcessRoomServerQueryAPI) QueryLatestEventsAndState(
+	ctx context.Context,
+	request *api.QueryLatestEventsAndStateRequest,
+	response *api.QueryLatestEventsAndStateResponse,
+) error {
+	span := h.tracer.StartSpan(
+		"QueryLatestEventsAndState",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()),
+	)
+	defer span.Finish()
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	return h.db.QueryLatestEventsAndState(ctx, request, response)
+}
+
+// QueryStateAfterEvents implements RoomserverQueryAPI
+func (h *InProcessRoomServerQueryAPI) QueryStateAfterEvents(
+	ctx context.Context,
+	request *api.QueryStateAfterEventsRequest,
+	response *api.QueryStateAfterEventsResponse,
+) error {
+	span := h.tracer.StartSpan(
+		"QueryStateAfterEvents",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()),
+	)
+	defer span.Finish()
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	return h.db.QueryStateAfterEvents(ctx, request, response)
+}
+
+// QueryEventsByID implements RoomserverQueryAPI
+func (h *InProcessRoomServerQueryAPI) QueryEventsByID(
+	ctx context.Context,
+	request *api.QueryEventsByIDRequest,
+	response *api.QueryEventsByIDResponse,
+) error {
+	span := h.tracer.StartSpan(
+		"QueryEventsByID",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()),
+	)
+	defer span.Finish()
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	return h.db.QueryEventsByID(ctx, request, response)
+}
+
+// QueryMembershipsForRoom implements RoomserverQueryAPI
+func (h *InProcessRoomServerQueryAPI) QueryMembershipsForRoom(
+	ctx context.Context,
+	request *api.QueryMembershipsForRoomRequest,
+	response *api.QueryMembershipsForRoomResponse,
+) error {
+	span := h.tracer.StartSpan(
+		"QueryMembershipsForRoom",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()),
+	)
+	defer span.Finish()
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	return h.db.QueryMembershipsForRoom(ctx, request, response)
+}
+
+// QueryInvitesForUser implements RoomserverQueryAPI
+func (h *InProcessRoomServerQueryAPI) QueryInvitesForUser(
+	ctx context.Context,
+	request *api.QueryInvitesForUserRequest,
+	response *api.QueryInvitesForUserResponse,
+) error {
+	span := h.tracer.StartSpan(
+		"QueryInvitesForUser",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()),
+	)
+	defer span.Finish()
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	return h.db.QueryInvitesForUser(ctx, request, response)
+}
+
+// QueryServerAllowedToSeeEvent implements RoomserverQueryAPI
+func (h *InProcessRoomServerQueryAPI) QueryServerAllowedToSeeEvent(
+	ctx context.Context,
+	request *api.QueryServerAllowedToSeeEventRequest,
+	response *api.QueryServerAllowedToSeeEventResponse,
+) (err error) {
+	span := h.tracer.StartSpan(
+		"QueryServerAllowedToSeeEvent",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()),
+	)
+	defer span.Finish()
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	return h.db.QueryServerAllowedToSeeEvent(ctx, request, response)
+}
+
+// QueryStateAndAuthChain implements RoomserverQueryAPI
+func (h *InProcessRoomServerQueryAPI) QueryStateAndAuthChain(
+	ctx context.Context,
+	request *api.QueryStateAndAuthChainRequest,
+	response *api.QueryStateAndAuthChainResponse,
+) error {
+	span := h.tracer.StartSpan(
+		"QueryStateAndAuthChain",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()),
+	)
+	defer span.Finish()
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	return h.db.QueryStateAndAuthChain(ctx, request, response)
 }

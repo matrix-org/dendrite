@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice/workers"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/transactions"
@@ -41,6 +42,7 @@ import (
 // component.
 func SetupAppServiceAPIComponent(
 	base *basecomponent.BaseDendrite,
+	tracers *common.Tracers,
 	accountsDB *accounts.Database,
 	deviceDB *devices.Database,
 	federation *gomatrixserverlib.FederationClient,
@@ -48,8 +50,10 @@ func SetupAppServiceAPIComponent(
 	roomserverQueryAPI roomserverAPI.RoomserverQueryAPI,
 	transactionsCache *transactions.Cache,
 ) appserviceAPI.AppServiceQueryAPI {
+	tracer := tracers.SetupNewTracer("Dendrite - Appservice")
+
 	// Create a connection to the appservice postgres DB
-	appserviceDB, err := storage.NewDatabase(string(base.Cfg.Database.AppService))
+	appserviceDB, err := storage.NewDatabase(tracers, string(base.Cfg.Database.AppService))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to appservice db")
 	}
@@ -90,6 +94,7 @@ func SetupAppServiceAPIComponent(
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
 		roomserverQueryAPI, roomserverAliasAPI, workerStates,
+		tracer,
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start app service roomserver consumer")
@@ -103,7 +108,7 @@ func SetupAppServiceAPIComponent(
 	// Set up HTTP Endpoints
 	routing.Setup(
 		base.APIMux, *base.Cfg, roomserverQueryAPI, roomserverAliasAPI,
-		accountsDB, federation, transactionsCache,
+		accountsDB, federation, transactionsCache, tracer,
 	)
 
 	return &appserviceQueryAPI
