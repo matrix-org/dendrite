@@ -13,6 +13,20 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+type statusCodeResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func NewStatusCodeResponseWriter(w http.ResponseWriter) *statusCodeResponseWriter {
+	return &statusCodeResponseWriter{w, http.StatusOK}
+}
+
+func (lrw *statusCodeResponseWriter) WriteHeader(code int) {
+	lrw.statusCode = code
+	lrw.ResponseWriter.WriteHeader(code)
+}
+
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
 	tracer opentracing.Tracer, metricsName string, data auth.Data,
@@ -23,6 +37,11 @@ func MakeAuthAPI(
 		if err != nil {
 			return *err
 		}
+
+		// Add user information to opentracing span
+		span := opentracing.SpanFromContext(req.Context())
+		span.SetTag("matrix.user", device.UserID)
+		span.SetTag("matrix.device", device.ID)
 
 		return f(req, device)
 	}
@@ -36,8 +55,15 @@ func MakeExternalAPI(tracer opentracing.Tracer, metricsName string, f func(*http
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		span := tracer.StartSpan(metricsName)
 		defer span.Finish()
+
+		ext.HTTPUrl.Set(span, req.URL.String())
+		ext.HTTPMethod.Set(span, req.Method)
+
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
+		rw := NewStatusCodeResponseWriter(w)
+
 		h.ServeHTTP(w, req)
+		ext.HTTPStatusCode.Set(span, uint16(rw.statusCode))
 	}
 
 	return http.HandlerFunc(withSpan)
