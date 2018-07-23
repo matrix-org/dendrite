@@ -87,6 +87,12 @@ func MakeInternalAPI(tracer opentracing.Tracer, metricsName string, f func(*http
 			span = tracer.StartSpan(metricsName, ext.RPCServerOption(clientContext))
 		}
 		defer span.Finish()
+
+		ext.HTTPUrl.Set(span, req.URL.String())
+		ext.HTTPMethod.Set(span, req.Method)
+
+		// TODO: Do we need to do the NewStatusCodeResponseWriter stuff?
+
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
 		h.ServeHTTP(w, req)
 	}
