@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	// Import the postgres database driver.
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
