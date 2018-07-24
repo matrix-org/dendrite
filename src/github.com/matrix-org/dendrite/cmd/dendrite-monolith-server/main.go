@@ -46,8 +46,6 @@ func main() {
 	cfg := basecomponent.ParseMonolithFlags()
 
 	tracers := common.NewTracers(cfg)
-	defer tracers.Close() // nolint: errcheck
-
 	base := basecomponent.NewBaseDendrite(cfg, tracers, "Monolith")
 	defer base.Close() // nolint: errcheck
 

@@ -25,11 +25,9 @@ func main() {
 	cfg := basecomponent.ParseFlags()
 
 	tracers := common.NewTracers(cfg)
-	defer tracers.Close() // nolint: errcheck
-
 	base := basecomponent.NewBaseDendrite(cfg, tracers, "AppServiceAPI")
-
 	defer base.Close() // nolint: errcheck
+
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()

@@ -24,8 +24,6 @@ func main() {
 	cfg := basecomponent.ParseFlags()
 
 	tracers := common.NewTracers(cfg)
-	defer tracers.Close() // nolint: errcheck
-
 	base := basecomponent.NewBaseDendrite(cfg, tracers, "FederationSender")
 	defer base.Close() // nolint: errcheck
 
