@@ -103,6 +103,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Listen.RoomServer = assignAddress()
 	cfg.Listen.SyncAPI = assignAddress()
 	cfg.Listen.PublicRoomsAPI = assignAddress()
+	cfg.Listen.TypingServer = assignAddress()
 
 	return &cfg, port, nil
 }

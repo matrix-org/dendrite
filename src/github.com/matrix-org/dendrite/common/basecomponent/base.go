@@ -33,6 +33,7 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/sirupsen/logrus"
 )
 
@@ -98,6 +99,12 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	input := roomserverAPI.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), nil)
 	query := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
 	return alias, input, query
+}
+
+// CreateHTTPTypingServerAPIs returns typingInputAPI for hitting the typing
+// server over HTTP
+func (b *BaseDendrite) CreateHTTPTypingServerAPIs() typingServerAPI.TypingServerInputAPI {
+	return typingServerAPI.NewTypingServerInputAPIHTTP(b.Cfg.TypingServerURL(), nil)
 }
 
 // CreateDeviceDB creates a new instance of the device database. Should only be
