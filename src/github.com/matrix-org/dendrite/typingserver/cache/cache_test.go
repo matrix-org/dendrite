@@ -42,18 +42,18 @@ func TestTypingCache(t *testing.T) {
 
 func testAddTypingUser(t *testing.T, tCache *TypingCache) {
 	timeAfterDefaultInterval := time.Now().Add(defaultInterval)
-	timeAfterTwiceDefaultInterval := time.Now().Add(2 * defaultInterval)
 	tests := []struct {
 		userID string
 		roomID string
 		expire *time.Time
-	}{
+	}{ // Set four users typing state to room1
 		{"user1", "room1", nil},
 		{"user2", "room1", nil},
 		{"user3", "room1", nil},
 		{"user4", "room1", nil},
+		// Override timeout
 		{"user1", "room2", &timeAfterDefaultInterval},
-		{"user1", "room2", &timeAfterTwiceDefaultInterval},
+		{"user1", "room2", nil},
 	}
 
 	for _, tt := range tests {
