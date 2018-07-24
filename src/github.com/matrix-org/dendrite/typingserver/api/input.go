@@ -36,25 +36,25 @@ type InputTypingEvent struct {
 	OriginServerTS gomatrixserverlib.Timestamp `json:"origin_server_ts"`
 }
 
-// InputTypingEventsRequest is a request to TypingServerInputAPI
-type InputTypingEventsRequest struct {
-	InputTypingEvents []InputTypingEvent `json:"input_typing_events"`
+// InputTypingEventRequest is a request to TypingServerInputAPI
+type InputTypingEventRequest struct {
+	InputTypingEvent InputTypingEvent `json:"input_typing_event"`
 }
 
-// InputTypingEventsResponse is a response to InputTypingEvents
-type InputTypingEventsResponse struct{}
+// InputTypingEventResponse is a response to InputTypingEvents
+type InputTypingEventResponse struct{}
 
 // TypingServerInputAPI is used to write events to the typing server.
 type TypingServerInputAPI interface {
-	InputTypingEvents(
+	InputTypingEvent(
 		ctx context.Context,
-		request *InputTypingEventsRequest,
-		response *InputTypingEventsResponse,
+		request *InputTypingEventRequest,
+		response *InputTypingEventResponse,
 	) error
 }
 
-// TypingServerInputTypingEventsPath is the HTTP path for the InputTypingEvents API.
-const TypingServerInputTypingEventsPath = "/api/typingserver/input"
+// TypingServerInputTypingEventPath is the HTTP path for the InputTypingEvent API.
+const TypingServerInputTypingEventPath = "/api/typingserver/input"
 
 // NewTypingServerInputAPIHTTP creates a TypingServerInputAPI implemented by talking to a HTTP POST API.
 func NewTypingServerInputAPIHTTP(typingServerURL string, httpClient *http.Client) TypingServerInputAPI {
@@ -70,14 +70,14 @@ type httpTypingServerInputAPI struct {
 }
 
 // InputRoomEvents implements TypingServerInputAPI
-func (h *httpTypingServerInputAPI) InputTypingEvents(
+func (h *httpTypingServerInputAPI) InputTypingEvent(
 	ctx context.Context,
-	request *InputTypingEventsRequest,
-	response *InputTypingEventsResponse,
+	request *InputTypingEventRequest,
+	response *InputTypingEventResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputTypingEvents")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputTypingEvent")
 	defer span.Finish()
 
-	apiURL := h.typingServerURL + TypingServerInputTypingEventsPath
+	apiURL := h.typingServerURL + TypingServerInputTypingEventPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

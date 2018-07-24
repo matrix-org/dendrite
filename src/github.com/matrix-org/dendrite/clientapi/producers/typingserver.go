@@ -37,18 +37,17 @@ func (p *TypingServerProducer) Send(
 	ctx context.Context, userID, roomID string,
 	typing bool, timeout int64,
 ) error {
-	data := api.InputTypingEvent{
+	requestData := api.InputTypingEvent{
 		UserID:         userID,
 		RoomID:         roomID,
 		Typing:         typing,
 		Timeout:        timeout,
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
-	request := []api.InputTypingEvent{data}
 
-	var response api.InputTypingEventsResponse
-	err := p.InputAPI.InputTypingEvents(
-		ctx, &api.InputTypingEventsRequest{InputTypingEvents: request}, &response,
+	var response api.InputTypingEventResponse
+	err := p.InputAPI.InputTypingEvent(
+		ctx, &api.InputTypingEventRequest{InputTypingEvent: requestData}, &response,
 	)
 
 	return err
