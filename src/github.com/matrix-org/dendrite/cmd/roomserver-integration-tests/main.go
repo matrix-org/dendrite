@@ -388,8 +388,10 @@ func main() {
 			"removes_state_event_ids":null,
 			"last_sent_event_id":"",
 			"send_as_server":"",
-			"transaction_id": null
-		}}`,
+			"transaction_id":null
+		},
+		"opentracing_carrier": {}
+		}`,
 	}
 
 	testRoomserver(input, want, func(q api.RoomserverQueryAPI) {
