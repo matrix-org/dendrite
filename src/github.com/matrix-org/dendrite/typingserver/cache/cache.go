@@ -18,11 +18,11 @@ import (
 )
 
 var (
-	userExists           = struct{}{} // Value denoting user is present in a userSet
+	userExists           = struct{}{} // Value denoting user is present in a userSet.
 	defaultTypingTimeout = 10 * time.Second
 )
 
-// userSet is a map of user IDs
+// userSet is a map of user IDs.
 type userSet map[string]struct{}
 
 // TypingCache maintains a list of users typing in each room.
