@@ -18,8 +18,6 @@ import (
 	"context"
 	"database/sql"
 
-	// Import postgres database driver
-	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
