@@ -17,13 +17,10 @@ import (
 	"time"
 )
 
-var (
-	userExists           = struct{}{} // Value denoting user is present in a userSet.
-	defaultTypingTimeout = 10 * time.Second
-)
+var defaultTypingTimeout = 10 * time.Second
 
-// userSet is a map of user IDs.
-type userSet map[string]struct{}
+// userSet is a map of user IDs to their time of expiry.
+type userSet map[string]time.Time
 
 // TypingCache maintains a list of users typing in each room.
 type TypingCache struct {
@@ -57,33 +54,40 @@ func (t *TypingCache) GetTypingUsers(roomID string) (users []string) {
 func (t *TypingCache) AddTypingUser(userID, roomID string, expire *time.Time) {
 	expireTime := getExpireTime(expire)
 	if until := time.Until(expireTime); until > 0 {
-		t.addUser(userID, roomID)
-		t.removeUserAfterDuration(userID, roomID, until)
+		t.addUser(userID, roomID, expireTime)
+		t.removeUserAfterTime(userID, roomID, expireTime)
 	}
 }
 
-func (t *TypingCache) addUser(userID, roomID string) {
+// addUser with mutex lock.
+func (t *TypingCache) addUser(userID, roomID string, expireTime time.Time) {
 	t.Lock()
+	defer t.Unlock()
+
 	if t.data[roomID] == nil {
 		t.data[roomID] = make(userSet)
 	}
 
-	t.data[roomID][userID] = userExists
-	t.Unlock()
+	t.data[roomID][userID] = expireTime
 }
 
-// Creates a go routine which removes the user after d duration has elapsed.
-func (t *TypingCache) removeUserAfterDuration(userID, roomID string, d time.Duration) {
+// Creates a go routine which removes the user after expireTime has elapsed,
+// only if the expiration is not updated to a later time in cache.
+func (t *TypingCache) removeUserAfterTime(userID, roomID string, expireTime time.Time) {
 	go func() {
-		time.Sleep(d)
-		t.removeUser(userID, roomID)
+		time.Sleep(time.Until(expireTime))
+		t.removeUserIfExpired(userID, roomID)
 	}()
 }
 
-func (t *TypingCache) removeUser(userID, roomID string) {
+// removeUserIfExpired with mutex lock.
+func (t *TypingCache) removeUserIfExpired(userID, roomID string) {
 	t.Lock()
-	delete(t.data[roomID], userID)
-	t.Unlock()
+	defer t.Unlock()
+
+	if time.Until(t.data[roomID][userID]) <= 0 {
+		delete(t.data[roomID], userID)
+	}
 }
 
 func getExpireTime(expire *time.Time) time.Time {

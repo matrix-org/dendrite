@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const defaultInterval = time.Second
+const longInterval = time.Hour
 
 func TestTypingCache(t *testing.T) {
 	tCache := NewTypingCache()
@@ -35,13 +35,13 @@ func TestTypingCache(t *testing.T) {
 		testGetTypingUsers(t, tCache)
 	})
 
-	t.Run("GetTypingUsersAfterTimeout", func(t *testing.T) {
-		testGetTypingUsersAfterTimeout(t, tCache)
+	t.Run("removeUserIfExpired", func(t *testing.T) {
+		testRemoveUserIfExpired(t, tCache)
 	})
 }
 
 func testAddTypingUser(t *testing.T, tCache *TypingCache) {
-	timeAfterDefaultInterval := time.Now().Add(defaultInterval)
+	timeAfterLongInterval := time.Now().Add(longInterval)
 	tests := []struct {
 		userID string
 		roomID string
@@ -51,9 +51,8 @@ func testAddTypingUser(t *testing.T, tCache *TypingCache) {
 		{"user2", "room1", nil},
 		{"user3", "room1", nil},
 		{"user4", "room1", nil},
-		// Override timeout
-		{"user1", "room2", &timeAfterDefaultInterval},
-		{"user1", "room2", nil},
+		// removeUserIfExpired should not remove the user before expiration time.
+		{"user1", "room2", &timeAfterLongInterval},
 	}
 
 	for _, tt := range tests {
@@ -80,16 +79,17 @@ func testGetTypingUsers(t *testing.T, tCache *TypingCache) {
 	}
 }
 
-func testGetTypingUsersAfterTimeout(t *testing.T, tCache *TypingCache) {
-	time.Sleep(defaultInterval)
+func testRemoveUserIfExpired(t *testing.T, tCache *TypingCache) {
 	tests := []struct {
 		roomID    string
+		userID    string
 		wantUsers []string
 	}{
-		{"room2", []string{"user1"}},
+		{"room2", "user1", []string{"user1"}},
 	}
 
 	for _, tt := range tests {
+		tCache.removeUserIfExpired(tt.userID, tt.roomID)
 		if gotUsers := tCache.GetTypingUsers(tt.roomID); !reflect.DeepEqual(gotUsers, tt.wantUsers) {
 			t.Errorf("TypingCache.GetTypingUsers(%s) = %v, want %v", tt.roomID, gotUsers, tt.wantUsers)
 		}
