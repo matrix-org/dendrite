@@ -70,7 +70,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	if strings.ContainsAny(r.RoomAliasName, whitespace+":") {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("room_alias_name cannot contain whitespace"),
+			JSON: jsonerror.BadJSON("room_alias_name cannot contain whitespace or ':'"),
 		}
 	}
 	for _, userID := range r.Invite {
