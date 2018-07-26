@@ -116,7 +116,7 @@ func TestGetAuthChainSingle(t *testing.T) {
 
 	expectedIDs := []string{"a", "b", "c", "d", "e"}
 
-	if !test.StringSliceEqual(expectedIDs, returnedIDs) {
+	if !test.UnsortedStringSliceEqual(expectedIDs, returnedIDs) {
 		t.Fatalf("returnedIDs got '%v', expected '%v'", returnedIDs, expectedIDs)
 	}
 }
@@ -149,7 +149,7 @@ func TestGetAuthChainMultiple(t *testing.T) {
 
 	expectedIDs := []string{"a", "b", "c", "d", "e", "f"}
 
-	if !test.StringSliceEqual(expectedIDs, returnedIDs) {
+	if !test.UnsortedStringSliceEqual(expectedIDs, returnedIDs) {
 		t.Fatalf("returnedIDs got '%v', expected '%v'", returnedIDs, expectedIDs)
 	}
 }

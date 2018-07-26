@@ -14,9 +14,9 @@ package test
 
 import "sort"
 
-// StringSliceEqual returns true if the slices have same length & elements.
+// UnsortedStringSliceEqual returns true if the slices have same length & elements.
 // Does not modify the given slice.
-func StringSliceEqual(first, second []string) bool {
+func UnsortedStringSliceEqual(first, second []string) bool {
 	if len(first) != len(second) {
 		return false
 	}
