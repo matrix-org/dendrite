@@ -15,11 +15,13 @@ package test
 import "sort"
 
 // StringSliceEqual returns true if the slices have same length & elements.
-func StringSliceEqual(a []string, b []string) bool {
-	if len(a) != len(b) {
+// Does not modify the given slice.
+func StringSliceEqual(first, second []string) bool {
+	if len(first) != len(second) {
 		return false
 	}
 
+	a, b := first[:], second[:]
 	sort.Strings(a)
 	sort.Strings(b)
 	for i := range a {
