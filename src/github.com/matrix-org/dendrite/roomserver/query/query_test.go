@@ -19,8 +19,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"sort"
-
+	"github.com/matrix-org/dendrite/common/test"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -90,24 +89,6 @@ func (db *getEventDB) EventsFromIDs(ctx context.Context, eventIDs []string) (res
 	return
 }
 
-// Returns if the slices are equal after sorting them.
-func compareUnsortedStringSlices(a []string, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	sort.Strings(a)
-	sort.Strings(b)
-
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-
-	return true
-}
-
 func TestGetAuthChainSingle(t *testing.T) {
 	db := createEventDB()
 
@@ -135,7 +116,7 @@ func TestGetAuthChainSingle(t *testing.T) {
 
 	expectedIDs := []string{"a", "b", "c", "d", "e"}
 
-	if !compareUnsortedStringSlices(expectedIDs, returnedIDs) {
+	if !test.StringSliceEqual(expectedIDs, returnedIDs) {
 		t.Fatalf("returnedIDs got '%v', expected '%v'", returnedIDs, expectedIDs)
 	}
 }
@@ -168,7 +149,7 @@ func TestGetAuthChainMultiple(t *testing.T) {
 
 	expectedIDs := []string{"a", "b", "c", "d", "e", "f"}
 
-	if !compareUnsortedStringSlices(expectedIDs, returnedIDs) {
+	if !test.StringSliceEqual(expectedIDs, returnedIDs) {
 		t.Fatalf("returnedIDs got '%v', expected '%v'", returnedIDs, expectedIDs)
 	}
 }
