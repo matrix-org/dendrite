@@ -53,7 +53,7 @@ func (t *TypingCache) GetTypingUsers(roomID string) (users []string) {
 // if expire is nil, defaultTypingTimeout is assumed.
 func (t *TypingCache) AddTypingUser(userID, roomID string, expire *time.Time) {
 	expireTime := getExpireTime(expire)
-	if until := time.Until(expireTime); until > 0 {
+	if time.Until(expireTime) > 0 {
 		t.addUser(userID, roomID, expireTime)
 		t.removeUserAfterTime(userID, roomID, expireTime)
 	}
