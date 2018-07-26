@@ -485,6 +485,17 @@ func Register(
 		}
 	}
 
+	// Application services can register users with no auth type, but require
+	// access token. Differentiate from users who are initially hitting register
+	// without an auth type
+	if r.Auth.Type == "" && req.URL.Query().Get("access_token") == "" {
+		return util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: newUserInteractiveResponse(sessionID,
+				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
+		}
+	}
+
 	logger := util.GetLogger(req.Context())
 	logger.WithFields(log.Fields{
 		"username":   r.Username,
