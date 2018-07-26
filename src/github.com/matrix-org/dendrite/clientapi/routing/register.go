@@ -180,6 +180,18 @@ type recaptchaResponse struct {
 	ErrorCodes  []int     `json:"error-codes"`
 }
 
+// validateUsernameAndPassword is a convenience function that returns an error
+// response if either the username or password is invalid
+func validateUsernameAndPassword(username, password string) *util.JSONResponse {
+	if err := validateUsername(username); err != nil {
+		return err
+	}
+	if err := validatePassword(password); err != nil {
+		return err
+	}
+	return nil
+}
+
 // validateUsername returns an error response if the username is invalid
 func validateUsername(username string) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
@@ -467,10 +479,7 @@ func Register(
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
 
-	if resErr = validateUsername(r.Username); resErr != nil {
-		return *resErr
-	}
-	if resErr = validatePassword(r.Password); resErr != nil {
+	if resErr = validateUsernameAndPassword(r.Username, r.Password); resErr != nil {
 		return *resErr
 	}
 
@@ -679,10 +688,7 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
 
-	if resErr = validateUsername(r.Username); resErr != nil {
-		return resErr
-	}
-	if resErr = validatePassword(r.Password); resErr != nil {
+	if resErr = validateUsernameAndPassword(r.Username, r.Password); resErr != nil {
 		return resErr
 	}
 
