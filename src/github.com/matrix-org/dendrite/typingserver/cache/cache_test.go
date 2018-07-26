@@ -13,10 +13,10 @@
 package cache
 
 import (
-	"reflect"
-	"sort"
 	"testing"
 	"time"
+
+	"github.com/matrix-org/dendrite/common/test"
 )
 
 const longInterval = time.Hour
@@ -71,9 +71,7 @@ func testGetTypingUsers(t *testing.T, tCache *TypingCache) {
 
 	for _, tt := range tests {
 		gotUsers := tCache.GetTypingUsers(tt.roomID)
-		sort.Strings(gotUsers)
-		sort.Strings(tt.wantUsers)
-		if !reflect.DeepEqual(gotUsers, tt.wantUsers) {
+		if !test.UnsortedStringSliceEqual(gotUsers, tt.wantUsers) {
 			t.Errorf("TypingCache.GetTypingUsers(%s) = %v, want %v", tt.roomID, gotUsers, tt.wantUsers)
 		}
 	}
@@ -90,7 +88,7 @@ func testRemoveUserIfExpired(t *testing.T, tCache *TypingCache) {
 
 	for _, tt := range tests {
 		tCache.removeUserIfExpired(tt.userID, tt.roomID)
-		if gotUsers := tCache.GetTypingUsers(tt.roomID); !reflect.DeepEqual(gotUsers, tt.wantUsers) {
+		if gotUsers := tCache.GetTypingUsers(tt.roomID); !test.UnsortedStringSliceEqual(gotUsers, tt.wantUsers) {
 			t.Errorf("TypingCache.GetTypingUsers(%s) = %v, want %v", tt.roomID, gotUsers, tt.wantUsers)
 		}
 	}
