@@ -15,7 +15,7 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/util"
 )
 
@@ -24,23 +24,11 @@ type whoamiResponse struct {
 	UserID string `json:"user_id"`
 }
 
-// Whoami implements `/account/whoami` which enables client to query owner of the HTTP request.
+// Whoami implements `/account/whoami` which enables client to query their account user id.
 // https://matrix.org/docs/spec/client_server/r0.3.0.html#get-matrix-client-r0-account-whoami
-func Whoami(req *http.Request, userID string) util.JSONResponse {
-
-	if req.Method == http.MethodGet {
-		util.GetLogger(req.Context()).WithField("user", userID).Info("Processing whoami request")
-
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: whoamiResponse{
-				UserID: userID,
-			},
-		}
-	}
-
+func Whoami(req *http.Request, device *authtypes.Device) util.JSONResponse {
 	return util.JSONResponse{
-		Code: http.StatusMethodNotAllowed,
-		JSON: jsonerror.NotFound("Bad method"),
+		Code: http.StatusOK,
+		JSON: whoamiResponse{UserID: device.UserID},
 	}
 }

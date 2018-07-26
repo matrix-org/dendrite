@@ -181,6 +181,12 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
+	r0mux.Handle("/account/whoami",
+		common.MakeAuthAPI("whoami", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return Whoami(req, device)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
@@ -378,12 +384,6 @@ func Setup(
 			return UpdateDeviceByID(req, deviceDB, device, vars["deviceID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
-
-	r0mux.Handle("/account/whoami",
-		common.MakeAuthAPI("whoami", accountDB, deviceDB, cfg.Derived.ApplicationServices, func(req *http.Request, user string, device *authtypes.Device) util.JSONResponse {
-			return Whoami(req, user)
-		}),
-	).Methods(http.MethodGet, http.MethodOptions)
 
 	// Stub implementations for sytest
 	r0mux.Handle("/events",
