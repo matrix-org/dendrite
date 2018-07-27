@@ -497,8 +497,7 @@ func Register(
 	// Application services can register users with no auth type, but require
 	// access token. Differentiate from users who are initially hitting register
 	// without an auth type
-	if r.Auth.Type == "" && req.URL.Query().Get("access_token") == "" &&
-		req.Header.Get("Authorization") == "" {
+	if initialUserInteractiveRequest(req, r) {
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: newUserInteractiveResponse(sessionID,
@@ -780,6 +779,17 @@ func completeRegistration(
 			DeviceID:    dev.ID,
 		},
 	}
+}
+
+// initialUserInteractiveRequest returns true or false based on whether the
+// request should have User Interactive Authentication Flows returned. This is
+// the case if a user is requesting registration first without specifying a
+// registration type. This method also differentiates between application
+// services and users, as application services can register with no type and an
+// access token, either included as part of the query parameters or an
+// Authorization header
+func initialUserInteractiveRequest(req *http.Request, r registerRequest) bool {
+	return r.Auth.Type == "" && req.URL.Query().Get("access_token") == "" && req.Header.Get("Authorization") == ""
 }
 
 // Used for shared secret registration.
