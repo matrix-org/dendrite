@@ -155,10 +155,10 @@ func (s *keyStatements) selectSingleKey(
 		&holder.KeyAlgorithm,
 		&holder.Signature,
 	); err != nil {
-		deleteStmt := s.deleteSingleKeyStmt
-		_, err = deleteStmt.ExecContext(ctx, userID, deviceID, algorithm, holder.KeyID)
 		return holder, err
 	}
+	deleteStmt := s.deleteSingleKeyStmt
+	_, err = deleteStmt.ExecContext(ctx, userID, deviceID, algorithm, holder.KeyID)
 	return holder, err
 }
 
