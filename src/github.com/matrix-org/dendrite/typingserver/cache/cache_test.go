@@ -13,6 +13,7 @@
 package cache
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -31,6 +32,10 @@ func TestTypingCache(t *testing.T) {
 
 	t.Run("GetTypingUsers", func(t *testing.T) {
 		testGetTypingUsers(t, tCache)
+	})
+
+	t.Run("removeUser", func(t *testing.T) {
+		testRemoveUser(t, tCache)
 	})
 }
 
@@ -69,4 +74,27 @@ func testGetTypingUsers(t *testing.T, tCache *TypingCache) {
 			t.Errorf("TypingCache.GetTypingUsers(%s) = %v, want %v", tt.roomID, gotUsers, tt.wantUsers)
 		}
 	}
+}
+
+func testRemoveUser(t *testing.T, tCache *TypingCache) {
+	tests := []struct {
+		roomID  string
+		userIDs []string
+	}{
+		{"room3", []string{"user1"}},
+		{"room4", []string{"user1", "user2", "user3"}},
+	}
+	for _, tt := range tests {
+		for _, userID := range tt.userIDs {
+			tCache.AddTypingUser(userID, tt.roomID, nil)
+		}
+		i := rand.Intn(len(tt.userIDs))
+		tCache.removeUser(tt.userIDs[i], tt.roomID)
+		expLeftUsers := append(tt.userIDs[:i], tt.userIDs[i+1:]...)
+
+		if leftUsers := tCache.GetTypingUsers(tt.roomID); !test.UnsortedStringSliceEqual(leftUsers, expLeftUsers) {
+			t.Errorf("Response after removal is unexpected %s/%s", leftUsers, expLeftUsers)
+		}
+	}
+
 }

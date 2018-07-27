@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-var defaultTypingTimeout = 10 * time.Second
+const defaultTypingTimeout = 10 * time.Second
 
 // userSet is a map of user IDs to a timer, timer fires at expiry.
 type userSet map[string]*time.Timer
@@ -40,8 +40,8 @@ func (t *TypingCache) GetTypingUsers(roomID string) (users []string) {
 	t.RUnlock()
 	if ok {
 		users = make([]string, 0, len(usersMap))
-		for key := range usersMap {
-			users = append(users, key)
+		for userID := range usersMap {
+			users = append(users, userID)
 		}
 	}
 
