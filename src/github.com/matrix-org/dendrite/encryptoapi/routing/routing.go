@@ -37,13 +37,13 @@ func Setup(
 	unstablemux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	unstablemux.Handle("/keys/upload/{deviceID}",
-		common.MakeAuthAPI("upload keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("upload keys", nil, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return UploadPKeys(req, encryptionDB, device.UserID, device.ID)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstablemux.Handle("/keys/upload",
-		common.MakeAuthAPI("upload keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("upload keys", nil, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return UploadPKeys(req, encryptionDB, device.UserID, device.ID)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
@@ -56,7 +56,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstablemux.Handle("/keys/claim",
-		common.MakeAuthAPI("claim keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("claim keys", nil, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return ClaimOneTimeKeys(req, encryptionDB)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
