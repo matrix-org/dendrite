@@ -21,10 +21,10 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 
+	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/matrix-org/util"
-	"github.com/matrix-org/dendrite/clientapi/auth"
 )
 
 const pathPrefixUnstable = "/_matrix/client/unstable"

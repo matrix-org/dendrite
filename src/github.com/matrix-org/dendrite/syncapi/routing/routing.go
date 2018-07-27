@@ -58,7 +58,7 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServer
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	unstablemux.Handle("/sendToDevice/{eventType}/{txnId}",
-		common.MakeAuthAPI("look up changes", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("look up changes", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
 			eventType := vars["eventType"]
 			txnID := vars["txnId"]
