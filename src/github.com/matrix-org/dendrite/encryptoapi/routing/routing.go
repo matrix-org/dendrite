@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/matrix-org/util"
+	"github.com/matrix-org/dendrite/clientapi/auth"
 )
 
 const pathPrefixUnstable = "/_matrix/client/unstable"
@@ -34,29 +35,30 @@ func Setup(
 	encryptionDB *storage.Database,
 	deviceDB *devices.Database,
 ) {
+	dataDB := auth.DeviceDatabase(deviceDB)
 	unstablemux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	unstablemux.Handle("/keys/upload/{deviceID}",
-		common.MakeAuthAPI("upload keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("upload keys", dataDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return UploadPKeys(req, encryptionDB, device.UserID, device.ID)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstablemux.Handle("/keys/upload",
-		common.MakeAuthAPI("upload keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("upload keys", dataDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return UploadPKeys(req, encryptionDB, device.UserID, device.ID)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstablemux.Handle("/keys/query",
-		common.MakeAuthAPI("query keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("query keys", dataDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			//vars := mux.Vars(req)
 			return QueryPKeys(req, encryptionDB, device.ID, deviceDB)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstablemux.Handle("/keys/claim",
-		common.MakeAuthAPI("claim keys", deviceDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("claim keys", dataDB, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return ClaimOneTimeKeys(req, encryptionDB)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
