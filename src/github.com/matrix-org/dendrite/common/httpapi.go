@@ -13,13 +13,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which checks the access token in the request.
-func MakeAuthAPI(metricsName string, deviceDB auth.DeviceDatabase, f func(*http.Request, *authtypes.Device) util.JSONResponse) http.Handler {
+// MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
+func MakeAuthAPI(
+	metricsName string, data auth.Data,
+	f func(*http.Request, *authtypes.Device) util.JSONResponse,
+) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		device, resErr := auth.VerifyAccessToken(req, deviceDB)
-		if resErr != nil {
-			return *resErr
+		device, err := auth.VerifyUserFromRequest(req, data)
+		if err != nil {
+			return *err
 		}
+
 		return f(req, device)
 	}
 	return MakeExternalAPI(metricsName, h)

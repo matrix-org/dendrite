@@ -22,16 +22,17 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "AppService")
+	base := basecomponent.NewBaseDendrite(cfg, "AppServiceAPI")
 
 	defer base.Close() // nolint: errcheck
 	accountDB := base.CreateAccountsDB()
+	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
 	alias, _, query := base.CreateHTTPRoomserverAPIs()
 	cache := transactions.New()
 
 	appservice.SetupAppServiceAPIComponent(
-		base, accountDB, federation, alias, query, cache,
+		base, accountDB, deviceDB, federation, alias, query, cache,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationSender))

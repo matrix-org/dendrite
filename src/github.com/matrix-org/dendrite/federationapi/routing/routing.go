@@ -103,29 +103,29 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetEvent(
-				httpReq.Context(), request, cfg, query, time.Now(), keys, vars["eventID"],
+				httpReq.Context(), request, query, vars["eventID"],
 			)
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/state/{roomID}/{eventID}", common.MakeFedAPI(
+	v1fedmux.Handle("/state/{roomID}", common.MakeFedAPI(
 		"federation_get_event_auth", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetState(
 				httpReq.Context(), request, cfg, query, time.Now(),
-				keys, vars["roomID"], vars["eventID"],
+				keys, vars["roomID"],
 			)
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/state_ids/{roomID}/{eventID}", common.MakeFedAPI(
+	v1fedmux.Handle("/state_ids/{roomID}", common.MakeFedAPI(
 		"federation_get_event_auth", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetStateIDs(
 				httpReq.Context(), request, cfg, query, time.Now(),
-				keys, vars["roomID"], vars["eventID"],
+				keys, vars["roomID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -148,8 +148,8 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/query/user_devices/{userID}", common.MakeFedAPI(
-		"federation_query_user_devices", cfg.Matrix.ServerName, keys,
+	v1fedmux.Handle("/user/devices/{userID}", common.MakeFedAPI(
+		"federation_user_devices", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetUserDevices(
@@ -165,7 +165,7 @@ func Setup(
 			roomID := vars["roomID"]
 			userID := vars["userID"]
 			return MakeJoin(
-				httpReq.Context(), httpReq, request, cfg, query, roomID, userID,
+				httpReq, request, cfg, query, roomID, userID,
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -178,6 +178,30 @@ func Setup(
 			userID := vars["userID"]
 			return SendJoin(
 				httpReq.Context(), httpReq, request, cfg, query, producer, keys, roomID, userID,
+			)
+		},
+	)).Methods(http.MethodPut)
+
+	v1fedmux.Handle("/make_leave/{roomID}/{userID}", common.MakeFedAPI(
+		"federation_make_leave", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			roomID := vars["roomID"]
+			userID := vars["userID"]
+			return MakeLeave(
+				httpReq, request, cfg, query, roomID, userID,
+			)
+		},
+	)).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/send_leave/{roomID}/{userID}", common.MakeFedAPI(
+		"federation_send_leave", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars := mux.Vars(httpReq)
+			roomID := vars["roomID"]
+			userID := vars["userID"]
+			return SendLeave(
+				httpReq, request, cfg, producer, keys, roomID, userID,
 			)
 		},
 	)).Methods(http.MethodPut)

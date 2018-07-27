@@ -48,8 +48,7 @@ func SendMembership(
 	}
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req.Context(),
-		device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
+		req, device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
 	)
 	if err == threepid.ErrMissingParameter {
 		return util.JSONResponse{
@@ -81,7 +80,7 @@ func SendMembership(
 	}
 
 	event, err := buildMembershipEvent(
-		req.Context(), body, accountDB, device, membership, roomID, cfg, queryAPI,
+		req, body, accountDB, device, membership, roomID, cfg, queryAPI,
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
@@ -110,7 +109,7 @@ func SendMembership(
 }
 
 func buildMembershipEvent(
-	ctx context.Context,
+	req *http.Request,
 	body threepid.MembershipRequest, accountDB *accounts.Database,
 	device *authtypes.Device, membership string, roomID string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
@@ -120,7 +119,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	profile, err := loadProfile(ctx, stateKey, cfg, accountDB)
+	profile, err := loadProfile(req.Context(), stateKey, cfg, accountDB)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +147,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return common.BuildEvent(ctx, &builder, cfg, queryAPI, nil)
+	return common.BuildEvent(req, &builder, cfg, queryAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

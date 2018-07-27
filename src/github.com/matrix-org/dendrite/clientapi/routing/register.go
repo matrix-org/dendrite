@@ -39,6 +39,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -115,6 +117,9 @@ type registerRequest struct {
 
 	InitialDisplayName *string `json:"initial_device_display_name"`
 
+	// Prevent this user from logging in
+	InhibitLogin common.WeakBoolean `json:"inhibit_login"`
+
 	// Application Services place Type in the root of their registration
 	// request, whereas clients place it in the authDict struct.
 	Type authtypes.LoginType `json:"type"`
@@ -162,9 +167,9 @@ func newUserInteractiveResponse(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 type registerResponse struct {
 	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token"`
+	AccessToken string                       `json:"access_token,omitempty"`
 	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id"`
+	DeviceID    string                       `json:"device_id,omitempty"`
 }
 
 // recaptchaResponse represents the HTTP response from a Google Recaptcha server
@@ -175,8 +180,8 @@ type recaptchaResponse struct {
 	ErrorCodes  []int     `json:"error-codes"`
 }
 
-// validateUserName returns an error response if the username is invalid
-func validateUserName(username string) *util.JSONResponse {
+// validateUsername returns an error response if the username is invalid
+func validateUsername(username string) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	if len(username) > maxUsernameLength {
 		return &util.JSONResponse{
@@ -186,12 +191,28 @@ func validateUserName(username string) *util.JSONResponse {
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID can only contain characters a-z, 0-9, or '_-./'"),
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./'"),
 		}
 	} else if username[0] == '_' { // Regex checks its not a zero length string
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("User ID can't start with a '_'"),
+			JSON: jsonerror.InvalidUsername("Username cannot start with a '_'"),
+		}
+	}
+	return nil
+}
+
+// validateApplicationServiceUsername returns an error response if the username is invalid for an application service
+func validateApplicationServiceUsername(username string) *util.JSONResponse {
+	if len(username) > maxUsernameLength {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
+		}
+	} else if !validUsernameRegex.MatchString(username) {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./'"),
 		}
 	}
 	return nil
@@ -280,31 +301,31 @@ func validateRecaptcha(
 	return nil
 }
 
-// UsernameIsWithinApplicationServiceNamespace checks to see if a username falls
-// within any of the namespaces of a given Application Service. If no
+// UserIDIsWithinApplicationServiceNamespace checks to see if a given userID
+// falls within any of the namespaces of a given Application Service. If no
 // Application Service is given, it will check to see if it matches any
 // Application Service's namespace.
-func UsernameIsWithinApplicationServiceNamespace(
+func UserIDIsWithinApplicationServiceNamespace(
 	cfg *config.Dendrite,
-	username string,
+	userID string,
 	appservice *config.ApplicationService,
 ) bool {
 	if appservice != nil {
-		// Loop through given Application Service's namespaces and see if any match
+		// Loop through given application service's namespaces and see if any match
 		for _, namespace := range appservice.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
-			if namespace.RegexpObject.MatchString(username) {
+			if namespace.RegexpObject.MatchString(userID) {
 				return true
 			}
 		}
 		return false
 	}
 
-	// Loop through all known Application Service's namespaces and see if any match
-	for _, knownAppservice := range cfg.Derived.ApplicationServices {
-		for _, namespace := range knownAppservice.NamespaceMap["users"] {
+	// Loop through all known application service's namespaces and see if any match
+	for _, knownAppService := range cfg.Derived.ApplicationServices {
+		for _, namespace := range knownAppService.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
-			if namespace.RegexpObject.MatchString(username) {
+			if namespace.RegexpObject.MatchString(userID) {
 				return true
 			}
 		}
@@ -318,19 +339,28 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 	cfg *config.Dendrite,
 	username string,
 ) bool {
+	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+
 	// Check namespaces and see if more than one match
 	matchCount := 0
 	for _, appservice := range cfg.Derived.ApplicationServices {
-		for _, namespaceSlice := range appservice.NamespaceMap {
-			for _, namespace := range namespaceSlice {
-				// Check if we have a match on this username
-				if namespace.RegexpObject.MatchString(username) {
-					matchCount++
-				}
+		if appservice.IsInterestedInUserID(userID) {
+			if matchCount++; matchCount > 1 {
+				return true
 			}
 		}
 	}
-	return matchCount > 1
+	return false
+}
+
+// UsernameMatchesExclusiveNamespaces will check if a given username matches any
+// application service's exclusive users namespace
+func UsernameMatchesExclusiveNamespaces(
+	cfg *config.Dendrite,
+	username string,
+) bool {
+	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+	return cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(userID)
 }
 
 // validateApplicationService checks if a provided application service token
@@ -344,7 +374,13 @@ func validateApplicationService(
 ) (string, *util.JSONResponse) {
 	// Check if the token if the application service is valid with one we have
 	// registered in the config.
-	accessToken := req.URL.Query().Get("access_token")
+	accessToken, err := auth.ExtractAccessToken(req)
+	if err != nil {
+		return "", &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.MissingToken(err.Error()),
+		}
+	}
 	var matchedApplicationService *config.ApplicationService
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		if appservice.ASToken == accessToken {
@@ -359,8 +395,10 @@ func validateApplicationService(
 		}
 	}
 
+	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+
 	// Ensure the desired username is within at least one of the application service's namespaces.
-	if !UsernameIsWithinApplicationServiceNamespace(cfg, username, matchedApplicationService) {
+	if !UserIDIsWithinApplicationServiceNamespace(cfg, userID, matchedApplicationService) {
 		// If we didn't find any matches, return M_EXCLUSIVE
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -370,12 +408,17 @@ func validateApplicationService(
 	}
 
 	// Check this user does not fit multiple application service namespaces
-	if UsernameMatchesMultipleExclusiveNamespaces(cfg, username) {
+	if UsernameMatchesMultipleExclusiveNamespaces(cfg, userID) {
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
 				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", username)),
 		}
+	}
+
+	// Check username application service is trying to register is valid
+	if err := validateApplicationServiceUsername(username); err != nil {
+		return "", err
 	}
 
 	// No errors, registration valid
@@ -421,19 +464,10 @@ func Register(
 		r.Username = strconv.FormatInt(id, 10)
 	}
 
-	// If no auth type is specified by the client, send back the list of available flows
-	if r.Auth.Type == "" {
-		return util.JSONResponse{
-			Code: http.StatusUnauthorized,
-			JSON: newUserInteractiveResponse(sessionID,
-				cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
-		}
-	}
-
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
 
-	if resErr = validateUserName(r.Username); resErr != nil {
+	if resErr = validateUsername(r.Username); resErr != nil {
 		return *resErr
 	}
 	if resErr = validatePassword(r.Password); resErr != nil {
@@ -442,9 +476,9 @@ func Register(
 
 	// Make sure normal user isn't registering under an exclusive application
 	// service namespace. Skip this check if no app services are registered.
-	if r.Auth.Type != "m.login.application_service" &&
+	if r.Auth.Type != authtypes.LoginTypeApplicationService &&
 		len(cfg.Derived.ApplicationServices) != 0 &&
-		cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(r.Username) {
+		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
@@ -508,11 +542,11 @@ func handleRegistrationFlow(
 		// Add SharedSecret to the list of completed registration stages
 		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeSharedSecret)
 
-	case authtypes.LoginTypeApplicationService:
-		// Check Application Service register user request is valid.
+	case "", authtypes.LoginTypeApplicationService:
+		// not passing a Auth.Type is allowed for ApplicationServices. So assume that as well
+		// Check application service register user request is valid.
 		// The application service's ID is returned if so.
 		appserviceID, err := validateApplicationService(cfg, req, r.Username)
-
 		if err != nil {
 			return *err
 		}
@@ -520,8 +554,10 @@ func handleRegistrationFlow(
 		// If no error, application service was successfully validated.
 		// Don't need to worry about appending to registration stages as
 		// application service registration is entirely separate.
-		return completeRegistration(req.Context(), accountDB, deviceDB,
-			r.Username, "", appserviceID, r.InitialDisplayName)
+		return completeRegistration(
+			req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
+			r.InhibitLogin, r.InitialDisplayName,
+		)
 
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
@@ -556,8 +592,10 @@ func checkAndCompleteFlow(
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
-		return completeRegistration(req.Context(), accountDB, deviceDB,
-			r.Username, r.Password, "", r.InitialDisplayName)
+		return completeRegistration(
+			req.Context(), accountDB, deviceDB, r.Username, r.Password, "",
+			r.InhibitLogin, r.InitialDisplayName,
+		)
 	}
 
 	// There are still more stages to complete.
@@ -607,10 +645,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -630,7 +668,7 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
 
-	if resErr = validateUserName(r.Username); resErr != nil {
+	if resErr = validateUsername(r.Username); resErr != nil {
 		return resErr
 	}
 	if resErr = validatePassword(r.Password); resErr != nil {
@@ -653,6 +691,7 @@ func completeRegistration(
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	username, password, appserviceID string,
+	inhibitLogin common.WeakBoolean,
 	displayName *string,
 ) util.JSONResponse {
 	if username == "" {
@@ -682,6 +721,18 @@ func completeRegistration(
 		}
 	}
 
+	// Check whether inhibit_login option is set. If so, don't create an access
+	// token or a device for this user
+	if inhibitLogin {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: registerResponse{
+				UserID:     userutil.MakeUserID(username, acc.ServerName),
+				HomeServer: acc.ServerName,
+			},
+		}
+	}
+
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
 		return util.JSONResponse{
@@ -690,7 +741,7 @@ func completeRegistration(
 		}
 	}
 
-	// // TODO: Use the device ID in the request.
+	// TODO: Use the device ID in the request.
 	dev, err := deviceDB.CreateDevice(ctx, username, nil, token, displayName)
 	if err != nil {
 		return util.JSONResponse{
@@ -822,7 +873,7 @@ func RegisterAvailable(
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
 
-	if err := validateUserName(username); err != nil {
+	if err := validateUsername(username); err != nil {
 		return *err
 	}
 

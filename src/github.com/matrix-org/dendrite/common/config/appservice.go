@@ -66,9 +66,57 @@ type ApplicationService struct {
 	Protocols []string `yaml:"protocols"`
 }
 
-// loadAppservices iterates through all application service config files
+// IsInterestedInRoomID returns a bool on whether an application service's
+// namespace includes the given room ID
+func (a *ApplicationService) IsInterestedInRoomID(
+	roomID string,
+) bool {
+	if namespaceSlice, ok := a.NamespaceMap["rooms"]; ok {
+		for _, namespace := range namespaceSlice {
+			if namespace.RegexpObject.MatchString(roomID) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// IsInterestedInUserID returns a bool on whether an application service's
+// namespace includes the given user ID
+func (a *ApplicationService) IsInterestedInUserID(
+	userID string,
+) bool {
+	if namespaceSlice, ok := a.NamespaceMap["users"]; ok {
+		for _, namespace := range namespaceSlice {
+			if namespace.RegexpObject.MatchString(userID) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// IsInterestedInRoomAlias returns a bool on whether an application service's
+// namespace includes the given room alias
+func (a *ApplicationService) IsInterestedInRoomAlias(
+	roomAlias string,
+) bool {
+	if namespaceSlice, ok := a.NamespaceMap["aliases"]; ok {
+		for _, namespace := range namespaceSlice {
+			if namespace.RegexpObject.MatchString(roomAlias) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// loadAppServices iterates through all application service config files
 // and loads their data into the config object for later access.
-func loadAppservices(config *Dendrite) error {
+func loadAppServices(config *Dendrite) error {
 	for _, configPath := range config.ApplicationServices.ConfigFiles {
 		// Create a new application service with default options
 		appservice := ApplicationService{
@@ -122,8 +170,6 @@ func setupRegexps(cfg *Dendrite) (err error) {
 			}
 		}
 	}
-
-	fmt.Println(exclusiveUsernameStrings, exclusiveAliasStrings)
 
 	// Join the regexes together into one big regex.
 	// i.e. "app1.*", "app2.*" -> "(app1.*)|(app2.*)"
@@ -190,17 +236,20 @@ func checkErrors(config *Dendrite) (err error) {
 			}
 		}
 
+		// Check if the url has trailing /'s. If so, remove them
+		appservice.URL = strings.TrimRight(appservice.URL, "/")
+
 		// Check if we've already seen this ID. No two application services
 		// can have the same ID or token.
 		if idMap[appservice.ID] {
 			return configErrors([]string{fmt.Sprintf(
-				"Application Service ID %s must be unique", appservice.ID,
+				"Application service ID %s must be unique", appservice.ID,
 			)})
 		}
 		// Check if we've already seen this token
 		if tokenMap[appservice.ASToken] {
 			return configErrors([]string{fmt.Sprintf(
-				"Application Service Token %s must be unique", appservice.ASToken,
+				"Application service Token %s must be unique", appservice.ASToken,
 			)})
 		}
 
@@ -208,18 +257,6 @@ func checkErrors(config *Dendrite) (err error) {
 		// seen them.
 		idMap[appservice.ID] = true
 		tokenMap[appservice.ASToken] = true
-
-		// Check if more than one regex exists per namespace
-		for _, namespace := range appservice.NamespaceMap {
-			if len(namespace) > 1 {
-				// It's quite easy to accidentally make multiple regex objects per
-				// namespace, which often ends up in an application service receiving events
-				// it doesn't want, as an empty regex will match all events.
-				return configErrors([]string{fmt.Sprintf(
-					"Application Service namespace can only contain a single regex tuple. Check your YAML.",
-				)})
-			}
-		}
 
 		// TODO: Remove once rate_limited is implemented
 		if appservice.RateLimited {

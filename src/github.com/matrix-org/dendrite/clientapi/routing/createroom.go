@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 
@@ -88,8 +87,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		}
 	}
 	switch r.Preset {
-	case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat:
-		break
+	case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat, "":
 	default:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -114,7 +112,8 @@ type fledglingEvent struct {
 }
 
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request, device *authtypes.Device,
+func CreateRoom(
+	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
@@ -126,7 +125,8 @@ func CreateRoom(req *http.Request, device *authtypes.Device,
 
 // createRoom implements /createRoom
 // nolint: gocyclo
-func createRoom(req *http.Request, device *authtypes.Device,
+func createRoom(
+	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
@@ -180,6 +180,11 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
 	case presetPublicChat:
 		joinRules = joinRulePublic
+		historyVisibility = historyVisibilityShared
+	default:
+		// Default room rules, r.Preset was previously checked for valid values so
+		// only a request with no preset should end up here.
+		joinRules = joinRuleInvite
 		historyVisibility = historyVisibilityShared
 	}
 
@@ -244,7 +249,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(&builder, &authEvents, cfg)
+		ev, err = buildEvent(req, &builder, &authEvents, cfg)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -303,9 +308,12 @@ func createRoom(req *http.Request, device *authtypes.Device,
 }
 
 // buildEvent fills out auth_events for the builder then builds the event
-func buildEvent(builder *gomatrixserverlib.EventBuilder,
+func buildEvent(
+	req *http.Request,
+	builder *gomatrixserverlib.EventBuilder,
 	provider gomatrixserverlib.AuthEventProvider,
-	cfg config.Dendrite) (*gomatrixserverlib.Event, error) {
+	cfg config.Dendrite,
+) (*gomatrixserverlib.Event, error) {
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -317,8 +325,8 @@ func buildEvent(builder *gomatrixserverlib.EventBuilder,
 	}
 	builder.AuthEvents = refs
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	now := time.Now()
-	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	eventTime := common.ParseTSParam(req)
+	event, err := builder.Build(eventID, eventTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
 	}

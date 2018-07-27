@@ -17,8 +17,9 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
+	"github.com/matrix-org/dendrite/appservice/storage"
+	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -29,29 +30,28 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
-var (
-	appServices []config.ApplicationService
-)
-
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 *accounts.Database
+	asDB               *storage.Database
 	query              api.RoomserverQueryAPI
 	alias              api.RoomserverAliasAPI
 	serverName         string
+	workerStates       []types.ApplicationServiceWorkerState
 }
 
-// NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
+// NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call
+// Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	store *accounts.Database,
+	appserviceDB *storage.Database,
 	queryAPI api.RoomserverQueryAPI,
 	aliasAPI api.RoomserverAliasAPI,
+	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
-	appServices = cfg.Derived.ApplicationServices
-
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
@@ -60,9 +60,11 @@ func NewOutputRoomEventConsumer(
 	s := &OutputRoomEventConsumer{
 		roomServerConsumer: &consumer,
 		db:                 store,
+		asDB:               appserviceDB,
 		query:              queryAPI,
 		alias:              aliasAPI,
 		serverName:         string(cfg.Matrix.ServerName),
+		workerStates:       workerStates,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -74,9 +76,8 @@ func (s *OutputRoomEventConsumer) Start() error {
 	return s.roomServerConsumer.Start()
 }
 
-// onMessage is called when the sync server receives a new event from the room server output log.
-// It is not safe for this function to be called from multiple goroutines, or else the
-// sync stream position may race and be incorrectly calculated.
+// onMessage is called when the appservice component receives a new event from
+// the room server output log.
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
@@ -98,50 +99,37 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),
 		"type":     ev.Type(),
-	}).Info("appservice received event from roomserver")
+	}).Info("appservice received an event from roomserver")
 
-	events, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
+	missingEvents, err := s.lookupMissingStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
 	if err != nil {
 		return err
 	}
+	events := append(missingEvents, ev)
 
-	// Create a context to thread through the whole filtering process
-	ctx := context.TODO()
-
-	if err = s.db.UpdateMemberships(ctx, events, output.NewRoomEvent.RemovesStateEventIDs); err != nil {
-		return err
-	}
-
-	// Check if any events need to passed on to external application services
-	return s.filterRoomserverEvents(ctx, append(events, ev))
+	// Send event to any relevant application services
+	return s.filterRoomserverEvents(context.TODO(), events)
 }
 
-// lookupStateEvents looks up the state events that are added by a new event.
-func (s *OutputRoomEventConsumer) lookupStateEvents(
+// lookupMissingStateEvents looks up the state events that are added by a new event,
+// and returns any not already present.
+func (s *OutputRoomEventConsumer) lookupMissingStateEvents(
 	addsStateEventIDs []string, event gomatrixserverlib.Event,
 ) ([]gomatrixserverlib.Event, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
-		// If the event is a membership update (e.g. for a profile update), it won't
-		// show up in AddsStateEventIDs, so we need to add it manually
-		if event.Type() == "m.room.member" {
-			return []gomatrixserverlib.Event{event}, nil
-		}
-		return nil, nil
+		return []gomatrixserverlib.Event{}, nil
 	}
 
 	// Fast path if the only state event added is the event itself.
 	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.Event{event}, nil
+		return []gomatrixserverlib.Event{}, nil
 	}
 
 	result := []gomatrixserverlib.Event{}
 	missing := []string{}
 	for _, id := range addsStateEventIDs {
-		// Append the current event in the results if its ID is in the events list
-		if id == event.EventID() {
-			result = append(result, event)
-		} else {
+		if id != event.EventID() {
 			// If the event isn't the current one, add it to the list of events
 			// to retrieve from the roomserver
 			missing = append(missing, id)
@@ -165,13 +153,22 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 // each namespace of each registered application service, and if there is a
 // match, adds the event to the queue for events to be sent to a particular
 // application service.
-func (s *OutputRoomEventConsumer) filterRoomserverEvents(ctx context.Context, events []gomatrixserverlib.Event) error {
-	for _, event := range events {
-		for _, appservice := range appServices {
+func (s *OutputRoomEventConsumer) filterRoomserverEvents(
+	ctx context.Context,
+	events []gomatrixserverlib.Event,
+) error {
+	for _, ws := range s.workerStates {
+		for _, event := range events {
 			// Check if this event is interesting to this application service
-			if s.appserviceIsInterestedInEvent(ctx, event, appservice) {
-				// TODO: Queue this event to be sent off to the application service
-				fmt.Println(appservice.ID, "was interested in", event.Sender(), event.Type(), event.RoomID())
+			if s.appserviceIsInterestedInEvent(ctx, event, ws.AppService) {
+				// Queue this event to be sent off to the application service
+				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, &event); err != nil {
+					log.WithError(err).Warn("failed to insert incoming event into appservices database")
+				} else {
+					// Tell our worker to send out new messages by updating remaining message
+					// count and waking them up with a broadcast
+					ws.NotifyNewEvents()
+				}
 			}
 		}
 	}
@@ -188,18 +185,9 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		return false
 	}
 
-	// Check sender of the event
-	for _, userNamespace := range appservice.NamespaceMap["users"] {
-		if userNamespace.RegexpObject.MatchString(event.Sender()) {
-			return true
-		}
-	}
-
-	// Check room id of the event
-	for _, roomNamespace := range appservice.NamespaceMap["rooms"] {
-		if roomNamespace.RegexpObject.MatchString(event.RoomID()) {
-			return true
-		}
+	if appservice.IsInterestedInUserID(event.Sender()) ||
+		appservice.IsInterestedInRoomID(event.RoomID()) {
+		return true
 	}
 
 	// Check all known room aliases of the room the event came from
@@ -207,10 +195,8 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	var queryRes api.GetAliasesForRoomIDResponse
 	if err := s.alias.GetAliasesForRoomID(ctx, &queryReq, &queryRes); err == nil {
 		for _, alias := range queryRes.Aliases {
-			for _, aliasNamespace := range appservice.NamespaceMap["aliases"] {
-				if aliasNamespace.RegexpObject.MatchString(alias) {
-					return true
-				}
+			if appservice.IsInterestedInRoomAlias(alias) {
+				return true
 			}
 		}
 	} else {

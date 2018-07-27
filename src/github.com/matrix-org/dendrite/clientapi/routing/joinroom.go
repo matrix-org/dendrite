@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -27,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -42,8 +41,8 @@ func JoinRoomByIDOrAlias(
 	cfg config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
-	queryAPI api.RoomserverQueryAPI,
-	aliasAPI api.RoomserverAliasAPI,
+	queryAPI roomserverAPI.RoomserverQueryAPI,
+	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	keyRing gomatrixserverlib.KeyRing,
 	accountDB *accounts.Database,
 ) util.JSONResponse {
@@ -87,8 +86,8 @@ type joinRoomReq struct {
 	cfg        config.Dendrite
 	federation *gomatrixserverlib.FederationClient
 	producer   *producers.RoomserverProducer
-	queryAPI   api.RoomserverQueryAPI
-	aliasAPI   api.RoomserverAliasAPI
+	queryAPI   roomserverAPI.RoomserverQueryAPI
+	aliasAPI   roomserverAPI.RoomserverAliasAPI
 	keyRing    gomatrixserverlib.KeyRing
 }
 
@@ -100,10 +99,10 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 	// If the server is not in the room the we will need to look up the
 	// remote server the invite came from in order to request a join event
 	// from that server.
-	queryReq := api.QueryInvitesForUserRequest{
+	queryReq := roomserverAPI.QueryInvitesForUserRequest{
 		RoomID: roomID, TargetUserID: r.userID,
 	}
-	var queryRes api.QueryInvitesForUserResponse
+	var queryRes roomserverAPI.QueryInvitesForUserResponse
 	if err := r.queryAPI.QueryInvitesForUser(r.req.Context(), &queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(r.req, err)
 	}
@@ -145,8 +144,8 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 		}
 	}
 	if domain == r.cfg.Matrix.ServerName {
-		queryReq := api.GetRoomIDForAliasRequest{Alias: roomAlias}
-		var queryRes api.GetRoomIDForAliasResponse
+		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
+		var queryRes roomserverAPI.GetRoomIDForAliasResponse
 		if err = r.aliasAPI.GetRoomIDForAlias(r.req.Context(), &queryReq, &queryRes); err != nil {
 			return httputil.LogThenError(r.req, err)
 		}
@@ -214,8 +213,8 @@ func (r joinRoomReq) joinRoomUsingServers(
 		return httputil.LogThenError(r.req, err)
 	}
 
-	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.queryAPI, &queryRes)
+	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
+	event, err := common.BuildEvent(r.req, &eb, r.cfg, r.queryAPI, &queryRes)
 	if err == nil {
 		if _, err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName, nil); err != nil {
 			return httputil.LogThenError(r.req, err)
@@ -285,10 +284,10 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, err
 	}
 
-	now := time.Now()
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
+	eventTime := common.ParseTSParam(r.req)
 	event, err := respMakeJoin.JoinEvent.Build(
-		eventID, now, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
+		eventID, eventTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
 	)
 	if err != nil {
 		res := httputil.LogThenError(r.req, err)

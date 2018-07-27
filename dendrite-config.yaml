@@ -98,6 +98,7 @@ database:
     room_server: "postgres://dendrite:itsasecret@localhost/dendrite_roomserver?sslmode=disable"
     server_key: "postgres://dendrite:itsasecret@localhost/dendrite_serverkey?sslmode=disable"
     federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
+    appservice: "postgres://dendrite:itsasecret@localhost/dendrite_appservice?sslmode=disable"
     public_rooms_api: "postgres://dendrite:itsasecret@localhost/dendrite_publicroomsapi?sslmode=disable"
     encrypt_api: "postgres://dendrite:itsasecret@localhost/dendrite_encryptapi?sslmode=disable"
     # If using naffka you need to specify a naffka database
@@ -114,7 +115,8 @@ listen:
     media_api: "localhost:7774"
     public_rooms_api: "localhost:7775"
     federation_sender: "localhost:7776"
-    appservice: "localhost:7777"
+    appservice_api: "localhost:7777"
+    typing_server: "localhost:7778"
 
 # The configuration for tracing the dendrite components.
 tracing:

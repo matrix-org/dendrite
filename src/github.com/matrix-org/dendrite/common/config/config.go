@@ -162,6 +162,9 @@ type Dendrite struct {
 		// The FederationSender database stores information used by the FederationSender
 		// It is only accessed by the FederationSender.
 		FederationSender DataSource `yaml:"federation_sender"`
+		// The AppServices database stores information used by the AppService component.
+		// It is only accessed by the AppService component.
+		AppService DataSource `yaml:"appservice"`
 		// The PublicRoomsAPI database stores information used to compute the public
 		// room directory. It is only accessed by the PublicRoomsAPI server.
 		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
@@ -197,10 +200,12 @@ type Dendrite struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
 		FederationAPI    Address `yaml:"federation_api"`
+		AppServiceAPI    Address `yaml:"appservice_api"`
 		SyncAPI          Address `yaml:"sync_api"`
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
+		TypingServer     Address `yaml:"typing_server"`
 	} `yaml:"listen"`
 
 	// The config for tracing the dendrite servers.
@@ -233,15 +238,15 @@ type Dendrite struct {
 			Params map[string]interface{} `json:"params"`
 		}
 
-		// Application Services parsed from their config files
+		// Application services parsed from their config files
 		// The paths of which were given above in the main config file
 		ApplicationServices []ApplicationService
 
-		// Meta-regexes compiled from all exclusive Application Service
+		// Meta-regexes compiled from all exclusive application service
 		// Regexes.
 		//
 		// When a user registers, we check that their username does not match any
-		// exclusive Application Service namespaces
+		// exclusive application service namespaces
 		ExclusiveApplicationServicesUsernameRegexp *regexp.Regexp
 		// When a user creates a room alias, we check that it isn't already
 		// reserved by an application service
@@ -407,7 +412,7 @@ func (config *Dendrite) derive() error {
 	}
 
 	// Load application service configuration files
-	if err := loadAppservices(config); err != nil {
+	if err := loadAppServices(config); err != nil {
 		return err
 	}
 
@@ -544,6 +549,7 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "listen.federation_api", string(config.Listen.FederationAPI))
 	checkNotEmpty(configErrs, "listen.sync_api", string(config.Listen.SyncAPI))
 	checkNotEmpty(configErrs, "listen.room_server", string(config.Listen.RoomServer))
+	checkNotEmpty(configErrs, "listen.typing_server", string(config.Listen.TypingServer))
 }
 
 // checkLogging verifies the parameters logging.* are valid.
@@ -639,6 +645,15 @@ func fingerprintPEM(data []byte) *gomatrixserverlib.TLSFingerprint {
 	}
 }
 
+// AppServiceURL returns a HTTP URL for where the appservice component is listening.
+func (config *Dendrite) AppServiceURL() string {
+	// Hard code the roomserver to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.AppServiceAPI)
+}
+
 // RoomServerURL returns an HTTP URL for where the roomserver is listening.
 func (config *Dendrite) RoomServerURL() string {
 	// Hard code the roomserver to talk HTTP for now.
@@ -646,6 +661,15 @@ func (config *Dendrite) RoomServerURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return "http://" + string(config.Listen.RoomServer)
+}
+
+// TypingServerURL returns an HTTP URL for where the typing server is listening.
+func (config *Dendrite) TypingServerURL() string {
+	// Hard code the typing server to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.TypingServer)
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.

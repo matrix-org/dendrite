@@ -185,6 +185,16 @@ func (d *Database) UpdateMemberships(
 	})
 }
 
+// GetMembershipInRoomByLocalpart returns the membership for an user
+// matching the given localpart if he is a member of the room matching roomID,
+// if not sql.ErrNoRows is returned.
+// If there was an issue during the retrieval, returns the SQL error
+func (d *Database) GetMembershipInRoomByLocalpart(
+	ctx context.Context, localpart, roomID string,
+) (authtypes.Membership, error) {
+	return d.memberships.selectMembershipInRoomByLocalpart(ctx, localpart, roomID)
+}
+
 // GetMembershipsByLocalpart returns an array containing the memberships for all
 // the rooms a user matching a given localpart is a member of
 // If no membership match the given localpart, returns an empty array

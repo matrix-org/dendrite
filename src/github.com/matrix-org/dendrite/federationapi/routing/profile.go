@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -52,7 +53,12 @@ func GetProfile(
 	}
 
 	profile, err := accountDB.GetProfileByLocalpart(httpReq.Context(), localpart)
-	if err != nil {
+	if err == sql.ErrNoRows {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("no profile information for this user or this user does not exist"),
+		}
+	} else if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
 

@@ -72,7 +72,7 @@ Dendrite requires a postgres database engine, version 9.5 or later.
   ```
 * Create databases:
   ```bash
-  for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi naffka; do
+  for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi appservice naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
@@ -252,4 +252,15 @@ you want to support federation.
 
 ```bash
 ./bin/dendrite-federation-sender-server --config dendrite.yaml
+```
+
+### Run an appservice server 
+
+This sends events from the network to [application
+services](https://matrix.org/docs/spec/application_service/unstable.html)
+running locally.  This is only required if you want to support running
+application services on your homeserver.
+
+```bash
+./bin/dendrite-appservice-server --config dendrite.yaml
 ```
