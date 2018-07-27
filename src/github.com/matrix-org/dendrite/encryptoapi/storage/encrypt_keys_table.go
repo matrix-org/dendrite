@@ -59,14 +59,19 @@ const selectAllkeysSQL = `
 SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys 
 WHERE user_id = $1 AND key_type = $2
 `
+const selectCountOneTimeKey = `
+SELECT algorithm, COUNT(algorithm) FROM encrypt_keys WHERE user_id = $1 AND device_id = $2 AND key_type = 'one_time_key'
+GROUP BY algorithm
+`
 
 type keyStatements struct {
-	insertKeyStmt       *sql.Stmt
-	selectKeyStmt       *sql.Stmt
-	selectInKeysStmt    *sql.Stmt
-	selectAllKeyStmt    *sql.Stmt
-	selectSingleKeyStmt *sql.Stmt
-	deleteSingleKeyStmt *sql.Stmt
+	insertKeyStmt             *sql.Stmt
+	selectKeyStmt             *sql.Stmt
+	selectInKeysStmt          *sql.Stmt
+	selectAllKeyStmt          *sql.Stmt
+	selectSingleKeyStmt       *sql.Stmt
+	deleteSingleKeyStmt       *sql.Stmt
+	selectCountOneTimeKeyStmt *sql.Stmt
 }
 
 func (s *keyStatements) prepare(db *sql.DB) (err error) {
@@ -90,6 +95,9 @@ func (s *keyStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectSingleKeyStmt, err = db.Prepare(deleteSinglekeySQL); err != nil {
+		return
+	}
+	if s.selectCountOneTimeKeyStmt, err = db.Prepare(selectCountOneTimeKey); err != nil {
 		return
 	}
 	return
@@ -215,4 +223,29 @@ func injectKeyHolder(rows *sql.Rows, keyHolder []types.KeyHolder) (holders []typ
 	}
 	holders = keyHolder
 	return
+}
+
+// select by user and device
+func (s *keyStatements) selectOneTimeKeyCount(
+	ctx context.Context,
+	userID, deviceID string,
+) (map[string]int, error) {
+	holders := make(map[string]int)
+	rows, err := s.selectCountOneTimeKeyStmt.QueryContext(ctx, userID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var singleKey string
+		var singleVal int
+		if err = rows.Scan(
+			&singleKey,
+			&singleVal,
+		); err != nil {
+			return nil, err
+		}
+		holders[singleKey] = singleVal
+	}
+	err = rows.Close()
+	return holders, err
 }

@@ -31,7 +31,7 @@ import (
 func SetupEcryptoapi(
 	base *basecomponent.BaseDendrite,
 	deviceDB *devices.Database,
-) {
+) *storage.Database {
 	encryptionDB, err := storage.NewDatabase(string(base.Cfg.Database.EncryptAPI))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to encryption db")
@@ -42,4 +42,5 @@ func SetupEcryptoapi(
 		deviceDB,
 	)
 	routing.InitNotifier(base)
+	return encryptionDB
 }

@@ -120,3 +120,12 @@ func (d *Database) SelectOneTimeKeySingle(
 	holder, err = d.keyStatements.selectSingleKey(ctx, userID, deviceID, algorithm)
 	return
 }
+
+// SyncOneTimeCount for sync device_one_time_keys_count extension
+func (d *Database) SyncOneTimeCount(
+	ctx context.Context,
+	userID, deviceID string,
+) (holder map[string]int, err error) {
+	holder, err = d.keyStatements.selectOneTimeKeyCount(ctx, userID, deviceID)
+	return
+}

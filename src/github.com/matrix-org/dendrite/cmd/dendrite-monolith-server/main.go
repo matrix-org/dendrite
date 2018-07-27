@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/typingserver"
 
-	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
@@ -59,7 +58,7 @@ func main() {
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
 	typingInputAPI := typingserver.SetupTypingServerComponent(base)
 
-	encryptoapi.SetupEcryptoapi(base, deviceDB)
+	encryptDB := encryptoapi.SetupEcryptoapi(base, deviceDB)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
@@ -70,8 +69,8 @@ func main() {
 	federationsender.SetupFederationSenderComponent(base, federation, query)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
-	appservice.SetupAppServiceAPIComponent(base, accountDB, deviceDB, federation, alias, query, transactions.New())
+	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, encryptDB)
+	//appservice.SetupAppServiceAPIComponent(base, accountDB, deviceDB, federation, alias, query, transactions.New())
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 

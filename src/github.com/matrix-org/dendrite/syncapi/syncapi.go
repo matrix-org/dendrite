@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	encryptoapi "github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -38,6 +39,7 @@ func SetupSyncAPIComponent(
 	deviceDB *devices.Database,
 	accountsDB *accounts.Database,
 	queryAPI api.RoomserverQueryAPI,
+	encryptDB *encryptoapi.Database,
 ) {
 	syncDB, err := storage.NewSyncServerDatabase(string(base.Cfg.Database.SyncAPI))
 	if err != nil {
@@ -71,5 +73,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, notifier)
+	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, notifier, encryptDB)
 }

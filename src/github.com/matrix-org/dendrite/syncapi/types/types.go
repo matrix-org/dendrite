@@ -50,7 +50,8 @@ type Response struct {
 		Invite map[string]InviteResponse `json:"invite"`
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
-	ToDevice ToDevice `json:"to_device"`
+	ToDevice ToDevice       `json:"to_device"`
+	SignNum  map[string]int `json:"device_one_time_keys_count"`
 }
 
 // StdHolder represents send to device response from db
