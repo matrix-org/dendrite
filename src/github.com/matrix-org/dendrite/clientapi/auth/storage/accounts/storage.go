@@ -143,8 +143,7 @@ func (d *Database) CreateAccount(
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
-// room. It also stores the ID of the membership event and a flag on whether the user
-// is still in the room.
+// room. It also stores the ID of the membership event.
 // If a membership already exists between the user and the room, or of the
 // insert fails, returns the SQL error
 func (d *Database) saveMembership(
@@ -205,11 +204,9 @@ func (d *Database) GetMembershipsByLocalpart(
 	return d.memberships.selectMembershipsByLocalpart(ctx, localpart)
 }
 
-// newMembership will save a new membership in the database, with a flag on whether
-// the user is still in the room. This flag is set to true if the given state
-// event is a "join" membership event and false if the event is a "leave" or "ban"
-// membership. If the event isn't a m.room.member event with one of these three
-// values, does nothing.
+// newMembership will save a new membership in the database.
+// If the event isn't a m.room.member event or there's no state key
+// (which stores the server name and localpart), does nothing.
 // If the event isn't a "join" membership event, does nothing
 // If an error occurred, returns it
 func (d *Database) newMembership(
