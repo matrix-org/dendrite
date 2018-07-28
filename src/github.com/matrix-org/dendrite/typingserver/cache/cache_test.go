@@ -19,8 +19,6 @@ import (
 	"github.com/matrix-org/dendrite/common/test"
 )
 
-const longInterval = time.Hour
-
 func TestTypingCache(t *testing.T) {
 	tCache := NewTypingCache()
 	if tCache == nil {
@@ -34,14 +32,10 @@ func TestTypingCache(t *testing.T) {
 	t.Run("GetTypingUsers", func(t *testing.T) {
 		testGetTypingUsers(t, tCache)
 	})
-
-	t.Run("removeUserIfExpired", func(t *testing.T) {
-		testRemoveUserIfExpired(t, tCache)
-	})
 }
 
 func testAddTypingUser(t *testing.T, tCache *TypingCache) {
-	timeAfterLongInterval := time.Now().Add(longInterval)
+	present := time.Now()
 	tests := []struct {
 		userID string
 		roomID string
@@ -51,8 +45,8 @@ func testAddTypingUser(t *testing.T, tCache *TypingCache) {
 		{"user2", "room1", nil},
 		{"user3", "room1", nil},
 		{"user4", "room1", nil},
-		// removeUserIfExpired should not remove the user before expiration time.
-		{"user1", "room2", &timeAfterLongInterval},
+		//typing state with past expireTime should not take effect or removed.
+		{"user1", "room2", &present},
 	}
 
 	for _, tt := range tests {
@@ -66,29 +60,12 @@ func testGetTypingUsers(t *testing.T, tCache *TypingCache) {
 		wantUsers []string
 	}{
 		{"room1", []string{"user1", "user2", "user3", "user4"}},
-		{"room2", []string{"user1"}},
+		{"room2", []string{}},
 	}
 
 	for _, tt := range tests {
 		gotUsers := tCache.GetTypingUsers(tt.roomID)
 		if !test.UnsortedStringSliceEqual(gotUsers, tt.wantUsers) {
-			t.Errorf("TypingCache.GetTypingUsers(%s) = %v, want %v", tt.roomID, gotUsers, tt.wantUsers)
-		}
-	}
-}
-
-func testRemoveUserIfExpired(t *testing.T, tCache *TypingCache) {
-	tests := []struct {
-		roomID    string
-		userID    string
-		wantUsers []string
-	}{
-		{"room2", "user1", []string{"user1"}},
-	}
-
-	for _, tt := range tests {
-		tCache.removeUserIfExpired(tt.userID, tt.roomID)
-		if gotUsers := tCache.GetTypingUsers(tt.roomID); !test.UnsortedStringSliceEqual(gotUsers, tt.wantUsers) {
 			t.Errorf("TypingCache.GetTypingUsers(%s) = %v, want %v", tt.roomID, gotUsers, tt.wantUsers)
 		}
 	}

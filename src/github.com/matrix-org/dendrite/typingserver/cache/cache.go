@@ -19,8 +19,8 @@ import (
 
 var defaultTypingTimeout = 10 * time.Second
 
-// userSet is a map of user IDs to their time of expiry.
-type userSet map[string]time.Time
+// userSet is a map of user IDs to a timer, timer fires at expiry.
+type userSet map[string]*time.Timer
 
 // TypingCache maintains a list of users typing in each room.
 type TypingCache struct {
@@ -53,14 +53,14 @@ func (t *TypingCache) GetTypingUsers(roomID string) (users []string) {
 // if expire is nil, defaultTypingTimeout is assumed.
 func (t *TypingCache) AddTypingUser(userID, roomID string, expire *time.Time) {
 	expireTime := getExpireTime(expire)
-	if time.Until(expireTime) > 0 {
-		t.addUser(userID, roomID, expireTime)
-		t.removeUserAfterTime(userID, roomID, expireTime)
+	if until := time.Until(expireTime); until > 0 {
+		timer := time.AfterFunc(until, t.timeoutCallback(userID, roomID))
+		t.addUser(userID, roomID, timer)
 	}
 }
 
-// addUser with mutex lock.
-func (t *TypingCache) addUser(userID, roomID string, expireTime time.Time) {
+// addUser with mutex lock & replace the previous timer.
+func (t *TypingCache) addUser(userID, roomID string, expiryTimer *time.Timer) {
 	t.Lock()
 	defer t.Unlock()
 
@@ -68,24 +68,34 @@ func (t *TypingCache) addUser(userID, roomID string, expireTime time.Time) {
 		t.data[roomID] = make(userSet)
 	}
 
-	t.data[roomID][userID] = expireTime
+	// Stop the timer to cancel the call to timeoutCallback
+	if timer, ok := t.data[roomID][userID]; ok {
+		// It may happen that at this stage timer fires but now we have a lock on t.
+		// Hence the execution of timeoutCallback will happen after we unlock.
+		// So we may lose a typing state, though this event is highly unlikely.
+		// This can be mitigated by keeping another time.Time in the map and check against it
+		// before removing. This however is not required in most practical scenario.
+		timer.Stop()
+	}
+
+	t.data[roomID][userID] = expiryTimer
 }
 
-// Creates a go routine which removes the user after expireTime has elapsed,
-// only if the expiration is not updated to a later time in cache.
-func (t *TypingCache) removeUserAfterTime(userID, roomID string, expireTime time.Time) {
-	go func() {
-		time.Sleep(time.Until(expireTime))
-		t.removeUserIfExpired(userID, roomID)
-	}()
+// Returns a function which is called after timeout happens.
+// This removes the user.
+func (t *TypingCache) timeoutCallback(userID, roomID string) func() {
+	return func() {
+		t.removeUser(userID, roomID)
+	}
 }
 
-// removeUserIfExpired with mutex lock.
-func (t *TypingCache) removeUserIfExpired(userID, roomID string) {
+// removeUser with mutex lock & stop the timer.
+func (t *TypingCache) removeUser(userID, roomID string) {
 	t.Lock()
 	defer t.Unlock()
 
-	if time.Until(t.data[roomID][userID]) <= 0 {
+	if timer, ok := t.data[roomID][userID]; ok {
+		timer.Stop()
 		delete(t.data[roomID], userID)
 	}
 }
