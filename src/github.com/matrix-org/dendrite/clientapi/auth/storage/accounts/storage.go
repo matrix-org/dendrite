@@ -143,9 +143,8 @@ func (d *Database) CreateAccount(
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
-// room. It also stores the ID of the membership event and a flag on whether the user
-// is still in the room.
-// If a membership already exists between the user and the room, or of the
+// room. It also stores the ID of the membership event.
+// If a membership already exists between the user and the room, or if the
 // insert fails, returns the SQL error
 func (d *Database) saveMembership(
 	ctx context.Context, txn *sql.Tx, localpart, roomID, eventID string,
@@ -153,8 +152,8 @@ func (d *Database) saveMembership(
 	return d.memberships.insertMembership(ctx, txn, localpart, roomID, eventID)
 }
 
-// removeMembershipsByEventIDs removes the memberships of which the `join` membership
-// event ID is included in a given array of events IDs
+// removeMembershipsByEventIDs removes the memberships corresponding to the
+// `join` membership events IDs in the eventIDs slice.
 // If the removal fails, or if there is no membership to remove, returns an error
 func (d *Database) removeMembershipsByEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
@@ -205,13 +204,9 @@ func (d *Database) GetMembershipsByLocalpart(
 	return d.memberships.selectMembershipsByLocalpart(ctx, localpart)
 }
 
-// newMembership will save a new membership in the database, with a flag on whether
-// the user is still in the room. This flag is set to true if the given state
-// event is a "join" membership event and false if the event is a "leave" or "ban"
-// membership. If the event isn't a m.room.member event with one of these three
-// values, does nothing.
-// If the event isn't a "join" membership event, does nothing
-// If an error occurred, returns it
+// newMembership saves a new membership in the database.
+// If the event isn't a valid m.room.member event with type `join`, does nothing.
+// If an error occurred, returns the SQL error
 func (d *Database) newMembership(
 	ctx context.Context, txn *sql.Tx, ev gomatrixserverlib.Event,
 ) error {
