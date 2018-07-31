@@ -18,20 +18,20 @@ import (
 	"flag"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/common/transactions"
-	"github.com/matrix-org/dendrite/typingserver"
-
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/keydb"
+	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
+	"github.com/matrix-org/dendrite/typingserver"
+	"github.com/matrix-org/dendrite/typingserver/cache"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -56,7 +56,7 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
-	typingInputAPI := typingserver.SetupTypingServerComponent(base)
+	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
