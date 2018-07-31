@@ -13,6 +13,8 @@
 package typingserver
 
 import (
+	"net/http"
+
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/dendrite/typingserver/cache"
@@ -33,5 +35,6 @@ func SetupTypingServerComponent(
 		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),
 	}
 
+	inputAPI.SetupHTTP(http.DefaultServeMux)
 	return inputAPI
 }
