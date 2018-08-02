@@ -109,6 +109,19 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/jaegertracing/jaeger-client-go",
+			"repository": "https://github.com/jaegertracing/jaeger-client-go",
+			"revision": "3ad49a1d839b517923a6fdac36d81cbf7b744f37",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/jaegertracing/jaeger-lib/metrics",
+			"repository": "https://github.com/jaegertracing/jaeger-lib",
+			"revision": "21a3da6d66fe0e278072676fdc84cd4c9ccb9b67",
+			"branch": "master",
+			"path": "/metrics"
+		},
+		{
 			"importpath": "github.com/klauspost/crc32",
 			"repository": "https://github.com/klauspost/crc32",
 			"revision": "cb6bfca970f6908083f26f39a79009d608efd5cd",
@@ -135,7 +148,7 @@
 		{
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
-			"revision": "929828872b51e6733166553d6b1a20155b6ab829",
+			"revision": "677bbe93ffc9ad9ba5de615cd81185d0493f5d25",
 			"branch": "master"
 		},
 		{
@@ -303,19 +316,6 @@
 			"repository": "https://github.com/uber-go/atomic",
 			"revision": "54f72d32435d760d5604f17a82e2435b28dc4ba5",
 			"branch": "master"
-		},
-		{
-			"importpath": "github.com/jaegertracing/jaeger-client-go",
-			"repository": "https://github.com/jaegertracing/jaeger-client-go",
-			"revision": "3ad49a1d839b517923a6fdac36d81cbf7b744f37",
-			"branch": "master"
-		},
-		{
-			"importpath": "github.com/jaegertracing/jaeger-lib/metrics",
-			"repository": "https://github.com/jaegertracing/jaeger-lib",
-			"revision": "21a3da6d66fe0e278072676fdc84cd4c9ccb9b67",
-			"branch": "master",
-			"path": "/metrics"
 		},
 		{
 			"importpath": "github.com/uber/tchannel-go",

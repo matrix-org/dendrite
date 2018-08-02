@@ -13,8 +13,12 @@
 package typingserver
 
 import (
+	"net/http"
+
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/typingserver/api"
+	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/dendrite/typingserver/input"
 )
 
 // SetupTypingServerComponent sets up and registers HTTP handlers for the
@@ -23,7 +27,14 @@ import (
 // APIs directly instead of having to use HTTP.
 func SetupTypingServerComponent(
 	base *basecomponent.BaseDendrite,
+	typingCache *cache.TypingCache,
 ) api.TypingServerInputAPI {
-	// TODO: implement typing server
-	return base.CreateHTTPTypingServerAPIs()
+	inputAPI := &input.TypingServerInputAPI{
+		Cache:                  typingCache,
+		Producer:               base.KafkaProducer,
+		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),
+	}
+
+	inputAPI.SetupHTTP(http.DefaultServeMux)
+	return inputAPI
 }

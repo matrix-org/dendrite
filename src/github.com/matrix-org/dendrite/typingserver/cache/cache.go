@@ -85,12 +85,12 @@ func (t *TypingCache) addUser(userID, roomID string, expiryTimer *time.Timer) {
 // This removes the user.
 func (t *TypingCache) timeoutCallback(userID, roomID string) func() {
 	return func() {
-		t.removeUser(userID, roomID)
+		t.RemoveUser(userID, roomID)
 	}
 }
 
-// removeUser with mutex lock & stop the timer.
-func (t *TypingCache) removeUser(userID, roomID string) {
+// RemoveUser with mutex lock & stop the timer.
+func (t *TypingCache) RemoveUser(userID, roomID string) {
 	t.Lock()
 	defer t.Unlock()
 

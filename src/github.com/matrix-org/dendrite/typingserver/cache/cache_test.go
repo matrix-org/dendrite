@@ -33,7 +33,7 @@ func TestTypingCache(t *testing.T) {
 		testGetTypingUsers(t, tCache)
 	})
 
-	t.Run("removeUser", func(t *testing.T) {
+	t.Run("RemoveUser", func(t *testing.T) {
 		testRemoveUser(t, tCache)
 	})
 }
@@ -90,7 +90,7 @@ func testRemoveUser(t *testing.T, tCache *TypingCache) {
 		}
 
 		length := len(tt.userIDs)
-		tCache.removeUser(tt.userIDs[length-1], tt.roomID)
+		tCache.RemoveUser(tt.userIDs[length-1], tt.roomID)
 		expLeftUsers := tt.userIDs[:length-1]
 		if leftUsers := tCache.GetTypingUsers(tt.roomID); !test.UnsortedStringSliceEqual(leftUsers, expLeftUsers) {
 			t.Errorf("Response after removal is unexpected. Want = %s, got = %s", leftUsers, expLeftUsers)
