@@ -1,10 +1,12 @@
 package routing
 
 import (
+	"encoding/json"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
+	"io/ioutil"
 	"net/http"
-	"strings"
-	"unicode"
 )
 
 // URIToUIDResponse represents response to an AppService URI to User Id
@@ -17,10 +19,7 @@ type URIToUIDResponse struct {
 // enables users to contact App Service users directly by taking an encoded
 // URI and turning it into a Matrix ID on the homeserver.
 // https://matrix.org/docs/spec/application_service/unstable.html#user-ids
-// tel://123.1234 -> @tel_//123.1234:matrix.org
-// mailto:test@matrix.org -> @mailto_test_matrix.org:matrix.org
 func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
-	homeserver := cfg.Matrix.ServerName
 	uri := req.URL.Query().Get("uri")
 	if uri == "" {
 		return util.JSONResponse{
@@ -28,25 +27,31 @@ func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
 			JSON: nil,
 		}
 	}
-	// V1 just replaces the illegal characters (from
-	// https://matrix.org/docs/spec/appendices.html#id12) with _
-	// TODO: Come up with a better way to turn URIs into User IDs
-	w := strings.FieldsFunc(strings.ToLower(uri), func(r rune) bool {
-		if unicode.IsDigit(r) || unicode.IsLetter(r) {
-			return false
+	baseReqURL := "http://" + string(cfg.Matrix.ServerName) + "/_matrix/app/unstable/thirdparty/user/"
+	//appServices := cfg.Derived.ApplicationServices
+	for _, appservice := range cfg.Derived.ApplicationServices {
+		// Check all the fields associated with each application service
+		if appservice.IsInterestedInUserID(uri) {
+			// call the application service
+			reqURL := baseReqURL + appservice.ID + "?access_token=" + appservice.HSToken +
+				"&fields=" + uri
+			resp, err := http.Get(reqURL)
+			// take the first successful match and send that back to the user
+			if err == nil {
+				body, _ := ioutil.ReadAll(resp.Body)
+				respMap := map[string]interface{}{}
+				json.Unmarshal(body, &respMap)
+				if userID, ok := respMap["userid"].(string); ok {
+					return util.JSONResponse{
+						Code: http.StatusOK,
+						JSON: URIToUIDResponse{UserID: userID},
+					}
+				}
+			}
 		}
-		switch r {
-		case '.', '_', '=', '-', '/':
-			return false
-		}
-		return true
-	})
-
-	// compile user ID and return
-	userID := "@" + strings.Join(w, "_") + ":" + homeserver
-
+	}
 	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: URIToUIDResponse{UserID: userID},
+		Code: http.StatusNotFound,
+		JSON: jsonerror.NotFound("URI not supported by app services"),
 	}
 }
