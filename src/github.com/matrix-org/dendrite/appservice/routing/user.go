@@ -16,8 +16,9 @@ type URIToUIDResponse struct {
 // URI and turning it into a Matrix ID on the homeserver.
 // https://matrix.org/docs/spec/application_service/unstable.html#user-ids
 
-func URIToUID(req *http.Request) util.JSONResponse {
+func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
 	// TODO: Implement
+	homeserver := cfg.Matrix.ServerName
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: nil,
