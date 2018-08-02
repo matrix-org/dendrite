@@ -40,7 +40,10 @@ func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
 			if err == nil {
 				body, _ := ioutil.ReadAll(resp.Body)
 				respMap := map[string]interface{}{}
-				json.Unmarshal(body, &respMap)
+				err := json.Unmarshal(body, &respMap)
+				if err != nil {
+					panic(err)
+				}
 				if userID, ok := respMap["userid"].(string); ok {
 					return util.JSONResponse{
 						Code: http.StatusOK,
