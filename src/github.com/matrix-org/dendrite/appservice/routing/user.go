@@ -19,6 +19,13 @@ type URIToUIDResponse struct {
 func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
 	// TODO: Implement
 	homeserver := cfg.Matrix.ServerName
+	uri := req.URL.Query().Get("uri")
+	if uri == "" {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: nil,
+		}
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: nil,
