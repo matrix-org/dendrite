@@ -51,11 +51,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 	appMux.Handle("/user",
 		common.MakeExternalAPI("user", func(req *http.Request) util.JSONResponse {
-			// TODO: Implement
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: nil,
-			}
+			return URIToUID(req)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 }
