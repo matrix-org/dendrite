@@ -14,7 +14,7 @@ type URIToUIDResponse struct {
 }
 
 // URIToUID implements `/_matrix/app/r0/user?uri={url_encoded_uri}`, which
-// enables users to contact appservice users directly by taking an encoded
+// enables users to contact App Service users directly by taking an encoded
 // URI and turning it into a Matrix ID on the homeserver.
 // https://matrix.org/docs/spec/application_service/unstable.html#user-ids
 // tel://123.1234 -> @tel_//123.1234:matrix.org
