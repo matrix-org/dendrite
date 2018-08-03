@@ -165,7 +165,7 @@ func Setup(
 			roomID := vars["roomID"]
 			userID := vars["userID"]
 			return MakeJoin(
-				httpReq, request, cfg, query, roomID, userID,
+				httpReq.Context(), httpReq, request, cfg, query, roomID, userID,
 			)
 		},
 	)).Methods(http.MethodGet)

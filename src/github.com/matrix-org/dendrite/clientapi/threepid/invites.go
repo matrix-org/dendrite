@@ -85,7 +85,7 @@ var (
 // fills the Matrix ID in the request body so a normal invite membership event
 // can be emitted.
 func CheckAndProcessInvite(
-	req *http.Request,
+	ctx context.Context,
 	device *authtypes.Device, body *MembershipRequest, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, db *accounts.Database,
 	producer *producers.RoomserverProducer, membership string, roomID string,
@@ -101,7 +101,7 @@ func CheckAndProcessInvite(
 		return
 	}
 
-	lookupRes, storeInviteRes, err := queryIDServer(req.Context(), db, cfg, device, body, roomID)
+	lookupRes, storeInviteRes, err := queryIDServer(ctx, db, cfg, device, body, roomID)
 	if err != nil {
 		return
 	}
@@ -110,7 +110,7 @@ func CheckAndProcessInvite(
 		// No Matrix ID could be found for this 3PID, meaning that a
 		// "m.room.third_party_invite" have to be emitted from the data in
 		// storeInviteRes.
-		err = emit3PIDInviteEvent(req, body, storeInviteRes, device, roomID, cfg, queryAPI, producer)
+		err = emit3PIDInviteEvent(ctx, body, storeInviteRes, device, roomID, cfg, queryAPI, producer)
 		inviteStoredOnIDServer = err == nil
 
 		return
@@ -325,7 +325,7 @@ func checkIDServerSignatures(
 // emit3PIDInviteEvent builds and sends a "m.room.third_party_invite" event.
 // Returns an error if something failed in the process.
 func emit3PIDInviteEvent(
-	req *http.Request,
+	ctx context.Context,
 	body *MembershipRequest, res *idServerStoreInviteResponse,
 	device *authtypes.Device, roomID string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
@@ -350,11 +350,11 @@ func emit3PIDInviteEvent(
 	}
 
 	var queryRes *api.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(req, builder, cfg, queryAPI, queryRes)
+	event, err := common.BuildEvent(ctx, builder, cfg, queryAPI, queryRes)
 	if err != nil {
 		return err
 	}
 
-	_, err = producer.SendEvents(req.Context(), []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName, nil)
+	_, err = producer.SendEvents(ctx, []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName, nil)
 	return err
 }

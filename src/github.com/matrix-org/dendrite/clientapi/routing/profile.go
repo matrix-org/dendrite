@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 
@@ -150,7 +151,7 @@ func SetAvatarURL(
 		AvatarURL:   r.AvatarURL,
 	}
 
-	events, err := buildMembershipEvents(req, memberships, newProfile, userID, cfg, queryAPI)
+	events, err := buildMembershipEvents(req.Context(), memberships, newProfile, userID, cfg, queryAPI)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -238,7 +239,7 @@ func SetDisplayName(
 		AvatarURL:   oldProfile.AvatarURL,
 	}
 
-	events, err := buildMembershipEvents(req, memberships, newProfile, userID, cfg, queryAPI)
+	events, err := buildMembershipEvents(req.Context(), memberships, newProfile, userID, cfg, queryAPI)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -258,7 +259,7 @@ func SetDisplayName(
 }
 
 func buildMembershipEvents(
-	req *http.Request,
+	ctx context.Context,
 	memberships []authtypes.Membership,
 	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
@@ -284,7 +285,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := common.BuildEvent(req, &builder, *cfg, queryAPI, nil)
+		event, err := common.BuildEvent(ctx, &builder, *cfg, queryAPI, nil)
 		if err != nil {
 			return nil, err
 		}

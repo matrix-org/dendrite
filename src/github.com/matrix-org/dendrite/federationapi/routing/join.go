@@ -31,6 +31,7 @@ import (
 
 // MakeJoin implements the /make_join API
 func MakeJoin(
+	ctx context.Context,
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
@@ -64,7 +65,7 @@ func MakeJoin(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(httpReq, &builder, cfg, query, &queryRes)
+	event, err := common.BuildEvent(ctx, &builder, cfg, query, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
