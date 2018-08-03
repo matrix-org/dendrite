@@ -28,28 +28,32 @@ func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
 		}
 	}
 	baseReqURL := "http://" + string(cfg.Matrix.ServerName) + "/_matrix/app/unstable/thirdparty/user/"
-	//appServices := cfg.Derived.ApplicationServices
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Check all the fields associated with each application service
-		if appservice.IsInterestedInUserID(uri) {
-			// call the application service
-			reqURL := baseReqURL + appservice.ID + "?access_token=" + appservice.HSToken +
-				"&fields=" + uri
-			resp, err := http.Get(reqURL)
-			// take the first successful match and send that back to the user
-			if err == nil {
-				body, _ := ioutil.ReadAll(resp.Body)
-				respMap := map[string]interface{}{}
-				err := json.Unmarshal(body, &respMap)
-				if err != nil {
-					panic(err)
-				}
-				if userID, ok := respMap["userid"].(string); ok {
-					return util.JSONResponse{
-						Code: http.StatusOK,
-						JSON: URIToUIDResponse{UserID: userID},
-					}
-				}
+		if !appservice.IsInterestedInUserID(uri) {
+			continue
+		}
+		// call the application service
+		reqURL := baseReqURL + appservice.ID + "?access_token=" + appservice.HSToken +
+			"&fields=" + uri
+		resp, err := http.Get(reqURL)
+		// take the first successful match and send that back to the user
+		if err != nil {
+			continue
+		}
+		// decode the JSON to get the field we want
+		body, _ := ioutil.ReadAll(resp.Body)
+		respMap := map[string]interface{}{}
+		if err := json.Unmarshal(body, &respMap); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			}
+		}
+		if userID, ok := respMap["userid"].(string); ok {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: URIToUIDResponse{UserID: userID},
 			}
 		}
 	}
