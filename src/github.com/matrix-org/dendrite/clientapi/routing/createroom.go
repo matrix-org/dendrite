@@ -113,7 +113,8 @@ type fledglingEvent struct {
 }
 
 // CreateRoom implements /createRoom
-func CreateRoom(req *http.Request, device *authtypes.Device,
+func CreateRoom(
+	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
@@ -125,7 +126,8 @@ func CreateRoom(req *http.Request, device *authtypes.Device,
 
 // createRoom implements /createRoom
 // nolint: gocyclo
-func createRoom(req *http.Request, device *authtypes.Device,
+func createRoom(
+	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
 ) util.JSONResponse {
@@ -142,8 +144,8 @@ func createRoom(req *http.Request, device *authtypes.Device,
 		return *resErr
 	}
 
+	evTime := httputil.ParseTSParam(req)
 	// TODO: visibility/presets/raw initial state/creation content
-
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!
 
@@ -248,7 +250,7 @@ func createRoom(req *http.Request, device *authtypes.Device,
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(&builder, &authEvents, cfg)
+		ev, err = buildEvent(&builder, &authEvents, cfg, evTime)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -307,10 +309,11 @@ func createRoom(req *http.Request, device *authtypes.Device,
 }
 
 // buildEvent fills out auth_events for the builder then builds the event
-func buildEvent(builder *gomatrixserverlib.EventBuilder,
+func buildEvent(
+	builder *gomatrixserverlib.EventBuilder,
 	provider gomatrixserverlib.AuthEventProvider,
-	cfg config.Dendrite) (*gomatrixserverlib.Event, error) {
-
+	cfg config.Dendrite, evTime time.Time,
+) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
 		return nil, err
@@ -321,8 +324,7 @@ func buildEvent(builder *gomatrixserverlib.EventBuilder,
 	}
 	builder.AuthEvents = refs
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	now := time.Now()
-	event, err := builder.Build(eventID, now, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
 	}

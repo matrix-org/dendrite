@@ -89,6 +89,7 @@ func CheckAndProcessInvite(
 	device *authtypes.Device, body *MembershipRequest, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, db *accounts.Database,
 	producer *producers.RoomserverProducer, membership string, roomID string,
+	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
 	if membership != "invite" || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
 		// If none of the 3PID-specific fields are supplied, it's a standard invite
@@ -110,7 +111,9 @@ func CheckAndProcessInvite(
 		// No Matrix ID could be found for this 3PID, meaning that a
 		// "m.room.third_party_invite" have to be emitted from the data in
 		// storeInviteRes.
-		err = emit3PIDInviteEvent(ctx, body, storeInviteRes, device, roomID, cfg, queryAPI, producer)
+		err = emit3PIDInviteEvent(
+			ctx, body, storeInviteRes, device, roomID, cfg, queryAPI, producer, evTime,
+		)
 		inviteStoredOnIDServer = err == nil
 
 		return
@@ -329,6 +332,7 @@ func emit3PIDInviteEvent(
 	body *MembershipRequest, res *idServerStoreInviteResponse,
 	device *authtypes.Device, roomID string, cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
+	evTime time.Time,
 ) error {
 	builder := &gomatrixserverlib.EventBuilder{
 		Sender:   device.UserID,
@@ -350,7 +354,7 @@ func emit3PIDInviteEvent(
 	}
 
 	var queryRes *api.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(ctx, builder, cfg, queryAPI, queryRes)
+	event, err := common.BuildEvent(ctx, builder, cfg, evTime, queryAPI, queryRes)
 	if err != nil {
 		return err
 	}
