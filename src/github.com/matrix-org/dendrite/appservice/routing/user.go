@@ -27,14 +27,14 @@ func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
 			JSON: nil,
 		}
 	}
-	baseReqURL := "http://" + string(cfg.Matrix.ServerName) + "/_matrix/app/unstable/thirdparty/user/"
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Check all the fields associated with each application service
 		if !appservice.IsInterestedInUserID(uri) {
 			continue
 		}
 		// call the application service
-		reqURL := baseReqURL + appservice.ID + "?access_token=" + appservice.HSToken +
+		reqURL := "http://" + appservice.URL + "/_matrix/app/unstable/thirdparty/user/" +
+			appservice.ID + "?access_token=" + appservice.HSToken +
 			"&fields=" + uri
 		resp, err := http.Get(reqURL)
 		// take the first successful match and send that back to the user
