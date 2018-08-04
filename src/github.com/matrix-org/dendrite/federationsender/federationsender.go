@@ -46,7 +46,9 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start room server consumer")
 	}
 
-	tsConsumer := consumers.NewOutputTypingEventConsumer(cfg, kafkaConsumer, queues, store)
+	tsConsumer := consumers.NewOutputTypingEventConsumer(
+		base.Cfg, base.KafkaConsumer, queues, federationSenderDB,
+	)
 	if err := tsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
