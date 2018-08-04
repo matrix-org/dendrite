@@ -7,6 +7,8 @@ import (
 	"github.com/matrix-org/util"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"sync"
 )
 
 // URIToUIDResponse represents response to an AppService URI to User Id
@@ -14,6 +16,8 @@ import (
 type URIToUIDResponse struct {
 	UserID string `json:"user_id"`
 }
+
+const PathPrefixUnstableThirdPartyUser = "/_matrix/app/unstable/thirdparty/user/"
 
 // URIToUID implements `/_matrix/app/r0/user?uri={url_encoded_uri}`, which
 // enables users to contact App Service users directly by taking an encoded
@@ -27,36 +31,51 @@ func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
 			JSON: nil,
 		}
 	}
+	// contact the app services in parallel, rather than sequentially
+	var wg sync.WaitGroup
+	userIDs := make([]string, 0)
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Check all the fields associated with each application service
 		if !appservice.IsInterestedInUserID(uri) {
 			continue
 		}
-		// call the application service
-		reqURL := "http://" + appservice.URL + "/_matrix/app/unstable/thirdparty/user/" +
-			appservice.ID + "?access_token=" + appservice.HSToken +
-			"&fields=" + uri
-		resp, err := http.Get(reqURL)
-		// take the first successful match and send that back to the user
-		if err != nil {
-			continue
-		}
-		// decode the JSON to get the field we want
-		body, _ := ioutil.ReadAll(resp.Body)
-		respMap := map[string]interface{}{}
-		if err := json.Unmarshal(body, &respMap); err != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		wg.Add(1)
+		// call the applicable application services in parallel
+		go func(as config.ApplicationService, ids *[]string) {
+			defer wg.Done()
+			reqURL, err := url.Parse(as.URL + PathPrefixUnstableThirdPartyUser + as.ID +
+				"?access_token=" + as.HSToken +
+				"&fields=" + uri)
+			if err != nil {
+				return
 			}
-		}
-		if userID, ok := respMap["userid"].(string); ok {
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: URIToUIDResponse{UserID: userID},
+			resp, err := http.Get(reqURL.String())
+			// take the first successful match and send that back to the user
+			if err != nil {
+				return
 			}
+			// decode the JSON to get the field we want
+			body, _ := ioutil.ReadAll(resp.Body)
+			respMap := map[string]interface{}{}
+			if err := json.Unmarshal(body, &respMap); err != nil {
+				return
+			}
+			if userID, ok := respMap["userid"].(string); ok {
+				*ids = append(*ids, userID)
+			}
+		}(appservice, &userIDs)
+
+	}
+
+	wg.Wait()
+
+	if len(userIDs) > 0 {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: URIToUIDResponse{UserID: userIDs[0]},
 		}
 	}
+
 	return util.JSONResponse{
 		Code: http.StatusNotFound,
 		JSON: jsonerror.NotFound("URI not supported by app services"),
