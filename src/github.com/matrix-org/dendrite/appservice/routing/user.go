@@ -17,7 +17,7 @@ type URIToUIDResponse struct {
 	UserID string `json:"user_id"`
 }
 
-const PathPrefixUnstableThirdPartyUser = "/_matrix/app/unstable/thirdparty/user/"
+const pathPrefixUnstableThirdPartyUser = "/_matrix/app/unstable/thirdparty/user/"
 
 // URIToUID implements `/_matrix/app/r0/user?uri={url_encoded_uri}`, which
 // enables users to contact App Service users directly by taking an encoded
@@ -43,7 +43,7 @@ func URIToUID(req *http.Request, cfg config.Dendrite) util.JSONResponse {
 		// call the applicable application services in parallel
 		go func(as config.ApplicationService, ids *[]string) {
 			defer wg.Done()
-			reqURL, err := url.Parse(as.URL + PathPrefixUnstableThirdPartyUser + as.ID +
+			reqURL, err := url.Parse(as.URL + pathPrefixUnstableThirdPartyUser + as.ID +
 				"?access_token=" + as.HSToken +
 				"&fields=" + uri)
 			if err != nil {
