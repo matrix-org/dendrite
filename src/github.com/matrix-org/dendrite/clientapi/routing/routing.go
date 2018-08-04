@@ -181,6 +181,12 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
+	r0mux.Handle("/account/whoami",
+		common.MakeAuthAPI("whoami", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return Whoami(req, device)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
