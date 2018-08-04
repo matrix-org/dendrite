@@ -16,7 +16,6 @@ package routing
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -113,8 +112,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetState(
-				httpReq.Context(), request, cfg, query, time.Now(),
-				keys, vars["roomID"],
+				httpReq.Context(), request, query, vars["roomID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -124,8 +122,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetStateIDs(
-				httpReq.Context(), request, cfg, query, time.Now(),
-				keys, vars["roomID"],
+				httpReq.Context(), request, query, vars["roomID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -177,7 +174,7 @@ func Setup(
 			roomID := vars["roomID"]
 			userID := vars["userID"]
 			return SendJoin(
-				httpReq.Context(), httpReq, request, cfg, query, producer, keys, roomID, userID,
+				httpReq, request, cfg, query, producer, keys, roomID, userID,
 			)
 		},
 	)).Methods(http.MethodPut)
