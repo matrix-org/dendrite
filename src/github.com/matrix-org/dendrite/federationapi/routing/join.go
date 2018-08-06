@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
@@ -95,7 +94,6 @@ func MakeJoin(
 
 // SendJoin implements the /send_join API
 func SendJoin(
-	ctx context.Context,
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg config.Dendrite,
@@ -142,7 +140,7 @@ func SendJoin(
 		Message:    event.Redact().JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
-	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
+	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
@@ -156,7 +154,7 @@ func SendJoin(
 	// Fetch the state and auth chain. We do this before we send the events
 	// on, in case this fails.
 	var stateAndAuthChainRepsonse api.QueryStateAndAuthChainResponse
-	err = query.QueryStateAndAuthChain(ctx, &api.QueryStateAndAuthChainRequest{
+	err = query.QueryStateAndAuthChain(httpReq.Context(), &api.QueryStateAndAuthChainRequest{
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
@@ -168,7 +166,9 @@ func SendJoin(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(ctx, []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
+	_, err = producer.SendEvents(
+		httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil,
+	)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}

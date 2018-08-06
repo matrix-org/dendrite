@@ -16,10 +16,8 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -29,10 +27,7 @@ import (
 func GetState(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	_ config.Dendrite,
 	query api.RoomserverQueryAPI,
-	_ time.Time,
-	_ gomatrixserverlib.KeyRing,
 	roomID string,
 ) util.JSONResponse {
 	eventID, err := parseEventIDParam(request)
@@ -52,10 +47,7 @@ func GetState(
 func GetStateIDs(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	_ config.Dendrite,
 	query api.RoomserverQueryAPI,
-	_ time.Time,
-	_ gomatrixserverlib.KeyRing,
 	roomID string,
 ) util.JSONResponse {
 	eventID, err := parseEventIDParam(request)
