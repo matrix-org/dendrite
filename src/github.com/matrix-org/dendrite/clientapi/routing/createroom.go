@@ -312,7 +312,8 @@ func createRoom(
 func buildEvent(
 	builder *gomatrixserverlib.EventBuilder,
 	provider gomatrixserverlib.AuthEventProvider,
-	cfg config.Dendrite, evTime time.Time,
+	cfg config.Dendrite,
+	evTime time.Time,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
