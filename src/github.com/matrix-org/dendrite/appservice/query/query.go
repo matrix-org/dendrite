@@ -69,7 +69,9 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 			if err != nil {
 				return err
 			}
-			resp, err := a.HTTPClient.Do(req.WithContext(ctx))
+			req := req.WithContent(ctx)
+
+			resp, err := a.HTTPClient.Do(req)
 			if resp != nil {
 				defer func() {
 					err = resp.Body.Close()
