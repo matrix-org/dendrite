@@ -68,12 +68,6 @@ func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
 	// Create a HTTP client for sending requests to app services
 	client := &http.Client{
 		Timeout: transactionTimeout,
-		// TODO: Verify certificates
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, // nolint: gas
-			},
-		},
 	}
 
 	// Initial check for any leftover events to send from last time

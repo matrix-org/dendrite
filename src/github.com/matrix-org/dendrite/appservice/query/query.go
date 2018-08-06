@@ -77,7 +77,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 						log.WithFields(log.Fields{
 							"appservice_id": appservice.ID,
 							"status_code":   resp.StatusCode,
-						}).Error("Unable to close application service response body")
+						}).WithError(err).Error("Unable to close application service response body")
 					}
 				}()
 			}
@@ -107,12 +107,6 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 func makeHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: time.Second * 30,
-		// TODO: Verify certificates
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, // nolint: gas
-			},
-		},
 	}
 }
 
