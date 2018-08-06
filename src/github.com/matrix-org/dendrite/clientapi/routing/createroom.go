@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 
@@ -143,8 +144,8 @@ func createRoom(
 		return *resErr
 	}
 
+	evTime := httputil.ParseTSParam(req)
 	// TODO: visibility/presets/raw initial state/creation content
-
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!
 
@@ -249,7 +250,7 @@ func createRoom(
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(req, &builder, &authEvents, cfg)
+		ev, err = buildEvent(&builder, &authEvents, cfg, evTime)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -309,12 +310,11 @@ func createRoom(
 
 // buildEvent fills out auth_events for the builder then builds the event
 func buildEvent(
-	req *http.Request,
 	builder *gomatrixserverlib.EventBuilder,
 	provider gomatrixserverlib.AuthEventProvider,
 	cfg config.Dendrite,
+	evTime time.Time,
 ) (*gomatrixserverlib.Event, error) {
-
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
 		return nil, err
@@ -325,8 +325,7 @@ func buildEvent(
 	}
 	builder.AuthEvents = refs
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	eventTime := common.ParseTSParam(req)
-	event, err := builder.Build(eventID, eventTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
 	}

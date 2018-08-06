@@ -15,8 +15,10 @@
 package routing
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -150,7 +152,9 @@ func SetAvatarURL(
 		AvatarURL:   r.AvatarURL,
 	}
 
-	events, err := buildMembershipEvents(req, memberships, newProfile, userID, cfg, queryAPI)
+	events, err := buildMembershipEvents(
+		req.Context(), memberships, newProfile, userID, cfg, httputil.ParseTSParam(req), queryAPI,
+	)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -238,7 +242,9 @@ func SetDisplayName(
 		AvatarURL:   oldProfile.AvatarURL,
 	}
 
-	events, err := buildMembershipEvents(req, memberships, newProfile, userID, cfg, queryAPI)
+	events, err := buildMembershipEvents(
+		req.Context(), memberships, newProfile, userID, cfg, httputil.ParseTSParam(req), queryAPI,
+	)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -258,10 +264,10 @@ func SetDisplayName(
 }
 
 func buildMembershipEvents(
-	req *http.Request,
+	ctx context.Context,
 	memberships []authtypes.Membership,
 	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	evTime time.Time, queryAPI api.RoomserverQueryAPI,
 ) ([]gomatrixserverlib.Event, error) {
 	evs := []gomatrixserverlib.Event{}
 
@@ -284,7 +290,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := common.BuildEvent(req, &builder, *cfg, queryAPI, nil)
+		event, err := common.BuildEvent(ctx, &builder, *cfg, evTime, queryAPI, nil)
 		if err != nil {
 			return nil, err
 		}

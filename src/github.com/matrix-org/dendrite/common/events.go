@@ -18,8 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
@@ -40,42 +38,22 @@ var ErrRoomNoExists = errors.New("Room does not exist")
 // the room doesn't exist
 // Returns an error if something else went wrong
 func BuildEvent(
-	req *http.Request,
-	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite,
+	ctx context.Context,
+	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite, evTime time.Time,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
-	err := AddPrevEventsToEvent(req.Context(), builder, queryAPI, queryRes)
+	err := AddPrevEventsToEvent(ctx, builder, queryAPI, queryRes)
 	if err != nil {
 		return nil, err
 	}
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	eventTime := ParseTSParam(req)
-	event, err := builder.Build(eventID, eventTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
 	return &event, nil
-}
-
-// ParseTSParam takes a req from an application service and parses a Time object
-// from the req if it exists in the query parameters. If it doesn't exist, the
-// current time is returned.
-func ParseTSParam(req *http.Request) time.Time {
-	// Use the ts parameter's value for event time if present
-	tsStr := req.URL.Query().Get("ts")
-	if tsStr == "" {
-		return time.Now()
-	}
-
-	// The parameter exists, parse into a Time object
-	ts, err := strconv.ParseInt(tsStr, 10, 64)
-	if err != nil {
-		return time.Unix(ts/1000, 0)
-	}
-
-	return time.Unix(ts/1000, 0)
 }
 
 // AddPrevEventsToEvent fills out the prev_events and auth_events fields in builder

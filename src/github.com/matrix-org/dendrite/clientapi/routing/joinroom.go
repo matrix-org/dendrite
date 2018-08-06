@@ -213,8 +213,9 @@ func (r joinRoomReq) joinRoomUsingServers(
 		return httputil.LogThenError(r.req, err)
 	}
 
+	evTime := httputil.ParseTSParam(r.req)
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(r.req, &eb, r.cfg, r.queryAPI, &queryRes)
+	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, evTime, r.queryAPI, &queryRes)
 	if err == nil {
 		if _, err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName, nil); err != nil {
 			return httputil.LogThenError(r.req, err)
@@ -284,10 +285,10 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, err
 	}
 
+	evTime := httputil.ParseTSParam(r.req)
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
-	eventTime := common.ParseTSParam(r.req)
 	event, err := respMakeJoin.JoinEvent.Build(
-		eventID, eventTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
+		eventID, evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
 	)
 	if err != nil {
 		res := httputil.LogThenError(r.req, err)

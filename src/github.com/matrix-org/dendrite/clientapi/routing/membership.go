@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -47,8 +48,10 @@ func SendMembership(
 		return *reqErr
 	}
 
+	evTime := httputil.ParseTSParam(req)
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req, device, &body, cfg, queryAPI, accountDB, producer, membership, roomID,
+		req.Context(), device, &body, cfg, queryAPI, accountDB, producer,
+		membership, roomID, evTime,
 	)
 	if err == threepid.ErrMissingParameter {
 		return util.JSONResponse{
@@ -80,7 +83,7 @@ func SendMembership(
 	}
 
 	event, err := buildMembershipEvent(
-		req, body, accountDB, device, membership, roomID, cfg, queryAPI,
+		req.Context(), body, accountDB, device, membership, roomID, cfg, evTime, queryAPI,
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
@@ -109,17 +112,17 @@ func SendMembership(
 }
 
 func buildMembershipEvent(
-	req *http.Request,
+	ctx context.Context,
 	body threepid.MembershipRequest, accountDB *accounts.Database,
 	device *authtypes.Device, membership string, roomID string, cfg config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	evTime time.Time, queryAPI api.RoomserverQueryAPI,
 ) (*gomatrixserverlib.Event, error) {
 	stateKey, reason, err := getMembershipStateKey(body, device, membership)
 	if err != nil {
 		return nil, err
 	}
 
-	profile, err := loadProfile(req.Context(), stateKey, cfg, accountDB)
+	profile, err := loadProfile(ctx, stateKey, cfg, accountDB)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +150,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return common.BuildEvent(req, &builder, cfg, queryAPI, nil)
+	return common.BuildEvent(ctx, &builder, cfg, evTime, queryAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

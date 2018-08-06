@@ -63,6 +63,8 @@ func SendEvent(
 		return *resErr
 	}
 
+	evTime := httputil.ParseTSParam(req)
+
 	// create the new event and set all the fields we can
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:   userID,
@@ -76,7 +78,7 @@ func SendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := common.BuildEvent(req, &builder, cfg, queryAPI, &queryRes)
+	e, err := common.BuildEvent(req.Context(), &builder, cfg, evTime, queryAPI, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
