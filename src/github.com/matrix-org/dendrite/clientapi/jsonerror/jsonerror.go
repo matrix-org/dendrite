@@ -28,7 +28,7 @@ type MatrixError struct {
 	Err     string `json:"error"`
 }
 
-func (e *MatrixError) Error() string {
+func (e MatrixError) Error() string {
 	return fmt.Sprintf("%s: %s", e.ErrCode, e.Err)
 }
 
