@@ -50,7 +50,11 @@ func SendMembership(
 		return *reqErr
 	}
 
-	evTime := httputil.ParseTSParam(req)
+	evTime, resErr := httputil.ParseTSParam(req)
+	if resErr != nil {
+		return *resErr
+	}
+
 	inviteStored, err := threepid.CheckAndProcessInvite(
 		req.Context(), device, &body, cfg, queryAPI, accountDB, producer,
 		membership, roomID, evTime,

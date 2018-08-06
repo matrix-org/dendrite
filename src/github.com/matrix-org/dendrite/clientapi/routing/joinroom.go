@@ -207,13 +207,17 @@ func (r joinRoomReq) writeToBuilder(eb *gomatrixserverlib.EventBuilder, roomID s
 func (r joinRoomReq) joinRoomUsingServers(
 	roomID string, servers []gomatrixserverlib.ServerName,
 ) util.JSONResponse {
+	evTime, resErr := httputil.ParseTSParam(r.req)
+	if resErr != nil {
+		return *resErr
+	}
+
 	var eb gomatrixserverlib.EventBuilder
 	err := r.writeToBuilder(&eb, roomID)
 	if err != nil {
 		return httputil.LogThenError(r.req, err)
 	}
 
-	evTime := httputil.ParseTSParam(r.req)
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
 	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, evTime, r.queryAPI, &queryRes)
 	if err == nil {
@@ -272,6 +276,12 @@ func (r joinRoomReq) joinRoomUsingServers(
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
 func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
+	// parse all data (and return an error) before doing some work
+	evTime, resErr := httputil.ParseTSParam(r.req)
+	if resErr != nil {
+		// this looks weird here but does what we want.
+		return resErr, resErr.JSON.(jsonerror.MatrixError)
+	}
 	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
@@ -285,7 +295,6 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, err
 	}
 
-	evTime := httputil.ParseTSParam(r.req)
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
 	event, err := respMakeJoin.JoinEvent.Build(
 		eventID, evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,

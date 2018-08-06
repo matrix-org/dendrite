@@ -63,7 +63,10 @@ func SendEvent(
 		return *resErr
 	}
 
-	evTime := httputil.ParseTSParam(req)
+	evTime, resErr := httputil.ParseTSParam(req)
+	if resErr != nil {
+		return *resErr
+	}
 
 	// create the new event and set all the fields we can
 	builder := gomatrixserverlib.EventBuilder{
