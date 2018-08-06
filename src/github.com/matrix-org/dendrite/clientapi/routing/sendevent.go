@@ -35,6 +35,66 @@ type sendEventResponse struct {
 	EventID string `json:"event_id"`
 }
 
+func generateSendEvent(
+	req *http.Request,
+	device *authtypes.Device,
+	roomID, eventType string, stateKey *string,
+	cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+) (*gomatrixserverlib.Event, *util.JSONResponse) {
+	// parse the incoming http request
+	userID := device.UserID
+	var r map[string]interface{} // must be a JSON object
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return nil, resErr
+	}
+
+	evTime, resErr := httputil.ParseTSParam(req)
+	if resErr != nil {
+		return nil, resErr
+	}
+
+	// create the new event and set all the fields we can
+	builder := gomatrixserverlib.EventBuilder{
+		Sender:   userID,
+		RoomID:   roomID,
+		Type:     eventType,
+		StateKey: stateKey,
+	}
+	err := builder.SetContent(r)
+	if err != nil {
+		resErr := httputil.LogThenError(req, err)
+		return nil, &resErr
+	}
+
+	var queryRes api.QueryLatestEventsAndStateResponse
+	e, err := common.BuildEvent(req.Context(), &builder, cfg, evTime, queryAPI, &queryRes)
+	if err == common.ErrRoomNoExists {
+		return nil, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Room does not exist"),
+		}
+	} else if err != nil {
+		resErr := httputil.LogThenError(req, err)
+		return nil, &resErr
+	}
+
+	// check to see if this user can perform this operation
+	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
+	for i := range queryRes.StateEvents {
+		stateEvents[i] = &queryRes.StateEvents[i]
+	}
+	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+	if err = gomatrixserverlib.Allowed(*e, &provider); err != nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
+		}
+	}
+	return e, nil
+}
+
 // SendEvent implements:
 //   /rooms/{roomID}/send/{eventType}
 //   /rooms/{roomID}/send/{eventType}/{txnID}
@@ -55,53 +115,9 @@ func SendEvent(
 		}
 	}
 
-	// parse the incoming http request
-	userID := device.UserID
-	var r map[string]interface{} // must be a JSON object
-	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, queryAPI)
 	if resErr != nil {
 		return *resErr
-	}
-
-	evTime, resErr := httputil.ParseTSParam(req)
-	if resErr != nil {
-		return *resErr
-	}
-
-	// create the new event and set all the fields we can
-	builder := gomatrixserverlib.EventBuilder{
-		Sender:   userID,
-		RoomID:   roomID,
-		Type:     eventType,
-		StateKey: stateKey,
-	}
-	err := builder.SetContent(r)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := common.BuildEvent(req.Context(), &builder, cfg, evTime, queryAPI, &queryRes)
-	if err == common.ErrRoomNoExists {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Room does not exist"),
-		}
-	} else if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	// check to see if this user can perform this operation
-	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
-	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i]
-	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(*e, &provider); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
-		}
 	}
 
 	var txnAndDeviceID *api.TransactionID

@@ -1,6 +1,6 @@
 {
     "Vendor": true,
-    "Cyclo": 13,
+    "Cyclo": 12,
     "Deadline": "5m",
     "Enable": [
         "vetshadow",
