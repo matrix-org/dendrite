@@ -18,7 +18,6 @@ package query
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -69,7 +68,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 			if err != nil {
 				return err
 			}
-			req := req.WithContent(ctx)
+			req = req.WithContext(ctx)
 
 			resp, err := a.HTTPClient.Do(req)
 			if resp != nil {

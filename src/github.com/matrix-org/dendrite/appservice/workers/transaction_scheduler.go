@@ -17,7 +17,6 @@ package workers
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"math"
