@@ -20,7 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/typingserver/dummy/api"
+	"github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/Shopify/sarama.v1"
@@ -71,7 +71,7 @@ func (t *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		return nil
 	}
 
-	joined, err := t.db.GetJoinedHosts(context.TODO(), ote.Event.RoomID())
+	joined, err := t.db.GetJoinedHosts(context.TODO(), ote.Event.RoomID)
 	if err != nil {
 		return err
 	}
@@ -81,5 +81,17 @@ func (t *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		names[i] = joined[i].ServerName
 	}
 
-	return t.queues.SendEvent(&ote.Event, t.ServerName, names)
+	edu := &gomatrixserverlib.EDU{
+		Type:   ote.Event.Type,
+		Origin: string(t.ServerName),
+	}
+	if edu.Content, err = json.Marshal(map[string]interface{}{
+		"room_id": ote.Event.RoomID,
+		"user_id": ote.Event.UserID,
+		"typing":  ote.Event.Typing,
+	}); err != nil {
+		return err
+	}
+
+	return t.queues.SendEDU(edu, t.ServerName, names)
 }
