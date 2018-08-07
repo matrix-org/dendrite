@@ -35,6 +35,60 @@ type sendEventResponse struct {
 	EventID string `json:"event_id"`
 }
 
+// SendEvent implements:
+//   /rooms/{roomID}/send/{eventType}
+//   /rooms/{roomID}/send/{eventType}/{txnID}
+//   /rooms/{roomID}/state/{eventType}/{stateKey}
+func SendEvent(
+	req *http.Request,
+	device *authtypes.Device,
+	roomID, eventType string, txnID, stateKey *string,
+	cfg config.Dendrite,
+	queryAPI api.RoomserverQueryAPI,
+	producer *producers.RoomserverProducer,
+	txnCache *transactions.Cache,
+) util.JSONResponse {
+	if txnID != nil {
+		// Try to fetch response from transactionsCache
+		if res, ok := txnCache.FetchTransaction(*txnID); ok {
+			return *res
+		}
+	}
+
+	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, queryAPI)
+	if resErr != nil {
+		return *resErr
+	}
+
+	var txnAndDeviceID *api.TransactionID
+	if txnID != nil {
+		txnAndDeviceID = &api.TransactionID{
+			TransactionID: *txnID,
+			DeviceID:      device.ID,
+		}
+	}
+
+	// pass the new event to the roomserver and receive the correct event ID
+	// event ID in case of duplicate transaction is discarded
+	eventID, err := producer.SendEvents(
+		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndDeviceID,
+	)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	res := util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: sendEventResponse{eventID},
+	}
+	// Add response to transactionsCache
+	if txnID != nil {
+		txnCache.AddTransaction(*txnID, &res)
+	}
+
+	return res
+}
+
 func generateSendEvent(
 	req *http.Request,
 	device *authtypes.Device,
@@ -93,58 +147,4 @@ func generateSendEvent(
 		}
 	}
 	return e, nil
-}
-
-// SendEvent implements:
-//   /rooms/{roomID}/send/{eventType}
-//   /rooms/{roomID}/send/{eventType}/{txnID}
-//   /rooms/{roomID}/state/{eventType}/{stateKey}
-func SendEvent(
-	req *http.Request,
-	device *authtypes.Device,
-	roomID, eventType string, txnID, stateKey *string,
-	cfg config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
-	producer *producers.RoomserverProducer,
-	txnCache *transactions.Cache,
-) util.JSONResponse {
-	if txnID != nil {
-		// Try to fetch response from transactionsCache
-		if res, ok := txnCache.FetchTransaction(*txnID); ok {
-			return *res
-		}
-	}
-
-	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, queryAPI)
-	if resErr != nil {
-		return *resErr
-	}
-
-	var txnAndDeviceID *api.TransactionID
-	if txnID != nil {
-		txnAndDeviceID = &api.TransactionID{
-			TransactionID: *txnID,
-			DeviceID:      device.ID,
-		}
-	}
-
-	// pass the new event to the roomserver and receive the correct event ID
-	// event ID in case of duplicate transaction is discarded
-	eventID, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndDeviceID,
-	)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	res := util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: sendEventResponse{eventID},
-	}
-	// Add response to transactionsCache
-	if txnID != nil {
-		txnCache.AddTransaction(*txnID, &res)
-	}
-
-	return res
 }
