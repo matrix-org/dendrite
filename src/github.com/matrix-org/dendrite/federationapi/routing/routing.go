@@ -127,7 +127,7 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/query/directory/", common.MakeFedAPI(
+	v1fedmux.Handle("/query/directory", common.MakeFedAPI(
 		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return RoomAliasToID(
