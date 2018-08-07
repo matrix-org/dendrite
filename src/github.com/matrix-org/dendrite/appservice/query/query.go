@@ -86,17 +86,20 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 				log.WithError(err).Errorf("Issue querying room alias on application service %s", appservice.ID)
 				return err
 			}
-			if resp.StatusCode == http.StatusOK {
-				// StatusOK received from appservice. Room exists
+			switch resp.StatusCode {
+			case http.StatusOK:
+				// OK received from appservice. Room exists
 				response.AliasExists = true
 				return nil
+			case http.StatusNotFound:
+				// Room does not exist
+			default:
+				// Application service reported an error. Warn
+				log.WithFields(log.Fields{
+					"appservice_id": appservice.ID,
+					"status_code":   resp.StatusCode,
+				}).Warn("Application service responded with non-OK status code")
 			}
-
-			// Log non OK
-			log.WithFields(log.Fields{
-				"appservice_id": appservice.ID,
-				"status_code":   resp.StatusCode,
-			}).Warn("Application service responded with non-OK status code")
 		}
 	}
 
