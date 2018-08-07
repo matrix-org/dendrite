@@ -16,16 +16,14 @@ package api
 type OutputTypingEvent struct {
 	// The Event for the typing edu event.
 	Event TypingEvent `json:"event"`
+	// Users typing in the room at the event.
+	TypingUsers []string `json:"typing_users"`
 }
 
 // TypingEvent represents a matrix edu event of type 'm.typing'.
 type TypingEvent struct {
-	Type    string             `json:"type"`
-	RoomID  string             `json:"room_id"`
-	Content TypingEventContent `json:"content"`
-}
-
-// TypingEventContent for TypingEvent
-type TypingEventContent struct {
-	UserIDs []string `json:"user_ids"`
+	Type   string `json:"type"`
+	RoomID string `json:"room_id"`
+	UserID string `json:"user_id"`
+	Typing bool   `json:"typing"`
 }
