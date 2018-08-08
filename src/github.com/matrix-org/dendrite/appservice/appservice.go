@@ -74,15 +74,13 @@ func SetupAppServiceAPIComponent(
 		}
 	}
 
-	// Create a HTTP client that this component will use for all outbound and
-	// inbound requests (inbound only for the internal API)
-	httpClient := &http.Client{
-		Timeout: time.Second * 30,
-	}
-
+	// Create appserivce query API with an HTTP client that will be used for all
+	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := query.AppServiceQueryAPI{
-		HTTPClient: httpClient,
-		Cfg:        base.Cfg,
+		HTTPClient: &http.Client{
+			Timeout: time.Second * 30,
+		},
+		Cfg: base.Cfg,
 	}
 
 	appserviceQueryAPI.SetupHTTP(http.DefaultServeMux)

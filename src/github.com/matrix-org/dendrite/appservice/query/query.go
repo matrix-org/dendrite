@@ -17,10 +17,21 @@
 package query
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
+	"net/url"
+	"time"
 
+	"github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/util"
+	opentracing "github.com/opentracing/opentracing-go"
+	log "github.com/sirupsen/logrus"
 )
+
+const roomAliasExistsPath = "/rooms/"
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
 type AppServiceQueryAPI struct {
@@ -28,7 +39,96 @@ type AppServiceQueryAPI struct {
 	Cfg        *config.Dendrite
 }
 
+// RoomAliasExists performs a request to '/room/{roomAlias}' on all known
+// handling application services until one admits to owning the room
+func (a *AppServiceQueryAPI) RoomAliasExists(
+	ctx context.Context,
+	request *api.RoomAliasExistsRequest,
+	response *api.RoomAliasExistsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceRoomAlias")
+	defer span.Finish()
+
+	// Create an HTTP client if one does not already exist
+	if a.HTTPClient == nil {
+		a.HTTPClient = makeHTTPClient()
+	}
+
+	// Determine which application service should handle this request
+	for _, appservice := range a.Cfg.Derived.ApplicationServices {
+		if appservice.URL != "" && appservice.IsInterestedInRoomAlias(request.Alias) {
+			// The full path to the rooms API, includes hs token
+			URL, err := url.Parse(appservice.URL + roomAliasExistsPath)
+			URL.Path += request.Alias
+			apiURL := URL.String() + "?access_token=" + appservice.HSToken
+
+			// Send a request to each application service. If one responds that it has
+			// created the room, immediately return.
+			req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+			if err != nil {
+				return err
+			}
+			req = req.WithContext(ctx)
+
+			resp, err := a.HTTPClient.Do(req)
+			if resp != nil {
+				defer func() {
+					err = resp.Body.Close()
+					if err != nil {
+						log.WithFields(log.Fields{
+							"appservice_id": appservice.ID,
+							"status_code":   resp.StatusCode,
+						}).WithError(err).Error("Unable to close application service response body")
+					}
+				}()
+			}
+			if err != nil {
+				log.WithError(err).Errorf("Issue querying room alias on application service %s", appservice.ID)
+				return err
+			}
+			switch resp.StatusCode {
+			case http.StatusOK:
+				// OK received from appservice. Room exists
+				response.AliasExists = true
+				return nil
+			case http.StatusNotFound:
+				// Room does not exist
+			default:
+				// Application service reported an error. Warn
+				log.WithFields(log.Fields{
+					"appservice_id": appservice.ID,
+					"status_code":   resp.StatusCode,
+				}).Warn("Application service responded with non-OK status code")
+			}
+		}
+	}
+
+	response.AliasExists = false
+	return nil
+}
+
+// makeHTTPClient creates an HTTP client with certain options that will be used for all query requests to application services
+func makeHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: time.Second * 30,
+	}
+}
+
 // SetupHTTP adds the AppServiceQueryPAI handlers to the http.ServeMux. This
 // handles and muxes incoming api requests the to internal AppServiceQueryAPI.
 func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
+	servMux.Handle(
+		api.AppServiceRoomAliasExistsPath,
+		common.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
+			var request api.RoomAliasExistsRequest
+			var response api.RoomAliasExistsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := a.RoomAliasExists(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

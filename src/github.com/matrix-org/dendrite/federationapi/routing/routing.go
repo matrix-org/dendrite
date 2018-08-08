@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -37,8 +37,8 @@ const (
 func Setup(
 	apiMux *mux.Router,
 	cfg config.Dendrite,
-	query api.RoomserverQueryAPI,
-	aliasAPI api.RoomserverAliasAPI,
+	query roomserverAPI.RoomserverQueryAPI,
+	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
