@@ -109,7 +109,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 }
 
 // UserIDExists performs a request to '/users/{userID}' on all known
-// handling application services until one admits to owning the room
+// handling application services until one admits to owning the user ID
 func (a *AppServiceQueryAPI) UserIDExists(
 	ctx context.Context,
 	request *api.UserIDExistsRequest,
