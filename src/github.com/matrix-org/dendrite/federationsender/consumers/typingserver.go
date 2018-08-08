@@ -83,10 +83,7 @@ func (t *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		names[i] = joined[i].ServerName
 	}
 
-	edu := &gomatrixserverlib.EDU{
-		Type:   ote.Event.Type,
-		Origin: string(t.ServerName),
-	}
+	edu := &gomatrixserverlib.EDU{Type: ote.Event.Type}
 	if edu.Content, err = json.Marshal(map[string]interface{}{
 		"room_id": ote.Event.RoomID,
 		"user_id": ote.Event.UserID,
