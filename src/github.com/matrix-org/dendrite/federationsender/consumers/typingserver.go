@@ -62,7 +62,7 @@ func (t *OutputTypingEventConsumer) Start() error {
 	return t.consumer.Start()
 }
 
-// onMessage is called for OutputTypingEvent recieved from the typing servers.
+// onMessage is called for OutputTypingEvent received from the typing servers.
 // Parses the msg, creates a matrix federation EDU and sends it to joined hosts.
 func (t *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Extract the typing event from msg.
