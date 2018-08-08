@@ -82,7 +82,7 @@ func (oqs *OutgoingQueues) SendEvent(
 
 // SendEDU sends an EDU event to the destinations
 func (oqs *OutgoingQueues) SendEDU(
-	ev *gomatrixserverlib.EDU, origin gomatrixserverlib.ServerName,
+	e *gomatrixserverlib.EDU, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if origin != oqs.origin {
@@ -97,7 +97,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	destinations = filterDestinations(oqs.origin, destinations)
 
 	log.WithFields(log.Fields{
-		"destinations": destinations, "edu_type": ev.Type,
+		"destinations": destinations, "edu_type": e.Type,
 	}).Info("Sending EDU event")
 
 	oqs.queuesMutex.Lock()
@@ -113,7 +113,7 @@ func (oqs *OutgoingQueues) SendEDU(
 			oqs.queues[destination] = oq
 		}
 
-		oq.sendEDU(ev)
+		oq.sendEDU(e)
 	}
 
 	return nil

@@ -13,10 +13,12 @@
 package api
 
 // OutputTypingEvent is an entry in typing server output kafka log.
+// This contains the event with extra fields used to create 'm.typing' event
+// in clientapi & federation.
 type OutputTypingEvent struct {
 	// The Event for the typing edu event.
 	Event TypingEvent `json:"event"`
-	// Users typing in the room at the event.
+	// Users typing in the room when the event was generated.
 	TypingUsers []string `json:"typing_users"`
 }
 

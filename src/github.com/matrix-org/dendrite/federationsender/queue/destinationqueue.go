@@ -58,10 +58,10 @@ func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.Event) {
 // sendEDU adds the EDU event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending event to that destination.
-func (oq *destinationQueue) sendEDU(ev *gomatrixserverlib.EDU) {
+func (oq *destinationQueue) sendEDU(e *gomatrixserverlib.EDU) {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
-	oq.pendingEDUs = append(oq.pendingEDUs, ev)
+	oq.pendingEDUs = append(oq.pendingEDUs, e)
 	if !oq.running {
 		oq.running = true
 		go oq.backgroundSend()
