@@ -125,6 +125,7 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 		t.EDUs = append(t.EDUs, *edu)
 	}
 	oq.pendingEDUs = nil
+	oq.sentCounter += len(t.EDUs)
 
 	return &t
 }
