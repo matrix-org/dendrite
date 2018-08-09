@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -51,6 +52,11 @@ func JoinRoomByIDOrAlias(
 		return *resErr
 	}
 
+	evTime, resErr := httputil.ParseTSParam(req)
+	if resErr != nil {
+		return *resErr
+	}
+
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -65,7 +71,9 @@ func JoinRoomByIDOrAlias(
 	content["displayname"] = profile.DisplayName
 	content["avatar_url"] = profile.AvatarURL
 
-	r := joinRoomReq{req, content, device.UserID, cfg, federation, producer, queryAPI, aliasAPI, keyRing}
+	r := joinRoomReq{
+		req, evTime, content, device.UserID, cfg, federation, producer, queryAPI, aliasAPI, keyRing,
+	}
 
 	if strings.HasPrefix(roomIDOrAlias, "!") {
 		return r.joinRoomByID(roomIDOrAlias)
@@ -81,6 +89,7 @@ func JoinRoomByIDOrAlias(
 
 type joinRoomReq struct {
 	req        *http.Request
+	evTime     time.Time
 	content    map[string]interface{}
 	userID     string
 	cfg        config.Dendrite
@@ -207,11 +216,6 @@ func (r joinRoomReq) writeToBuilder(eb *gomatrixserverlib.EventBuilder, roomID s
 func (r joinRoomReq) joinRoomUsingServers(
 	roomID string, servers []gomatrixserverlib.ServerName,
 ) util.JSONResponse {
-	evTime, resErr := httputil.ParseTSParam(r.req)
-	if resErr != nil {
-		return *resErr
-	}
-
 	var eb gomatrixserverlib.EventBuilder
 	err := r.writeToBuilder(&eb, roomID)
 	if err != nil {
@@ -219,7 +223,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 	}
 
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, evTime, r.queryAPI, &queryRes)
+	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.queryAPI, &queryRes)
 	if err == nil {
 		if _, err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName, nil); err != nil {
 			return httputil.LogThenError(r.req, err)
@@ -276,12 +280,6 @@ func (r joinRoomReq) joinRoomUsingServers(
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
 func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
-	// parse all data (and return an error) before doing some work
-	evTime, resErr := httputil.ParseTSParam(r.req)
-	if resErr != nil {
-		// this looks weird here but does what we want.
-		return resErr, resErr.JSON.(jsonerror.MatrixError)
-	}
 	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
@@ -297,7 +295,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
 	event, err := respMakeJoin.JoinEvent.Build(
-		eventID, evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
+		eventID, r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
 	)
 	if err != nil {
 		res := httputil.LogThenError(r.req, err)
