@@ -47,10 +47,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if origin != oqs.origin {
-		// TODO: Support virtual hosting by allowing us to send events using
-		// different origin server names.
-		// For now assume we are always asked to send as the single server configured
-		// in the dendrite config.
+		// TODO: Support virtual hosting; gh issue #577.
 		return fmt.Errorf(
 			"sendevent: unexpected server to send as: got %q expected %q",
 			origin, oqs.origin,
@@ -76,8 +73,49 @@ func (oqs *OutgoingQueues) SendEvent(
 			}
 			oqs.queues[destination] = oq
 		}
+
 		oq.sendEvent(ev)
 	}
+
+	return nil
+}
+
+// SendEDU sends an EDU event to the destinations
+func (oqs *OutgoingQueues) SendEDU(
+	e *gomatrixserverlib.EDU, origin gomatrixserverlib.ServerName,
+	destinations []gomatrixserverlib.ServerName,
+) error {
+	if origin != oqs.origin {
+		// TODO: Support virtual hosting; gh issue #577.
+		return fmt.Errorf(
+			"sendevent: unexpected server to send as: got %q expected %q",
+			origin, oqs.origin,
+		)
+	}
+
+	// Remove our own server from the list of destinations.
+	destinations = filterDestinations(oqs.origin, destinations)
+
+	log.WithFields(log.Fields{
+		"destinations": destinations, "edu_type": e.Type,
+	}).Info("Sending EDU event")
+
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+	for _, destination := range destinations {
+		oq := oqs.queues[destination]
+		if oq == nil {
+			oq = &destinationQueue{
+				origin:      oqs.origin,
+				destination: destination,
+				client:      oqs.client,
+			}
+			oqs.queues[destination] = oq
+		}
+
+		oq.sendEDU(e)
+	}
+
 	return nil
 }
 

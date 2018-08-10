@@ -33,12 +33,13 @@ type destinationQueue struct {
 	origin      gomatrixserverlib.ServerName
 	destination gomatrixserverlib.ServerName
 	// The running mutex protects running, sentCounter, lastTransactionIDs and
-	// pendingEvents.
+	// pendingEvents, pendingEDUs.
 	runningMutex       sync.Mutex
 	running            bool
 	sentCounter        int
 	lastTransactionIDs []gomatrixserverlib.TransactionID
 	pendingEvents      []*gomatrixserverlib.Event
+	pendingEDUs        []*gomatrixserverlib.EDU
 }
 
 // Send event adds the event to the pending queue for the destination.
@@ -48,6 +49,19 @@ func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.Event) {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
 	oq.pendingEvents = append(oq.pendingEvents, ev)
+	if !oq.running {
+		oq.running = true
+		go oq.backgroundSend()
+	}
+}
+
+// sendEDU adds the EDU event to the pending queue for the destination.
+// If the queue is empty then it starts a background goroutine to
+// start sending event to that destination.
+func (oq *destinationQueue) sendEDU(e *gomatrixserverlib.EDU) {
+	oq.runningMutex.Lock()
+	defer oq.runningMutex.Unlock()
+	oq.pendingEDUs = append(oq.pendingEDUs, e)
 	if !oq.running {
 		oq.running = true
 		go oq.backgroundSend()
@@ -82,10 +96,12 @@ func (oq *destinationQueue) backgroundSend() {
 func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
-	if len(oq.pendingEvents) == 0 {
+
+	if len(oq.pendingEvents) == 0 && len(oq.pendingEDUs) == 0 {
 		oq.running = false
 		return nil
 	}
+
 	var t gomatrixserverlib.Transaction
 	now := gomatrixserverlib.AsTimestamp(time.Now())
 	t.TransactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.sentCounter))
@@ -96,11 +112,20 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	if t.PreviousIDs == nil {
 		t.PreviousIDs = []gomatrixserverlib.TransactionID{}
 	}
+
 	oq.lastTransactionIDs = []gomatrixserverlib.TransactionID{t.TransactionID}
+
 	for _, pdu := range oq.pendingEvents {
 		t.PDUs = append(t.PDUs, *pdu)
 	}
 	oq.pendingEvents = nil
 	oq.sentCounter += len(t.PDUs)
+
+	for _, edu := range oq.pendingEDUs {
+		t.EDUs = append(t.EDUs, *edu)
+	}
+	oq.pendingEDUs = nil
+	oq.sentCounter += len(t.EDUs)
+
 	return &t
 }

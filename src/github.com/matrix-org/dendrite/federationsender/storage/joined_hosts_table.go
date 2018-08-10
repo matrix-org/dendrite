@@ -97,10 +97,22 @@ func (s *joinedHostsStatements) deleteJoinedHosts(
 	return err
 }
 
-func (s *joinedHostsStatements) selectJoinedHosts(
+func (s *joinedHostsStatements) selectJoinedHostsWithTx(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) ([]types.JoinedHost, error) {
 	stmt := common.TxStmt(txn, s.selectJoinedHostsStmt)
+	return joinedHostsFromStmt(ctx, stmt, roomID)
+}
+
+func (s *joinedHostsStatements) selectJoinedHosts(
+	ctx context.Context, roomID string,
+) ([]types.JoinedHost, error) {
+	return joinedHostsFromStmt(ctx, s.selectJoinedHostsStmt, roomID)
+}
+
+func joinedHostsFromStmt(
+	ctx context.Context, stmt *sql.Stmt, roomID string,
+) ([]types.JoinedHost, error) {
 	rows, err := stmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return nil, err
@@ -118,5 +130,6 @@ func (s *joinedHostsStatements) selectJoinedHosts(
 			ServerName:    gomatrixserverlib.ServerName(serverName),
 		})
 	}
+
 	return result, nil
 }

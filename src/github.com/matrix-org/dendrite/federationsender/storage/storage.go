@@ -92,7 +92,7 @@ func (d *Database) UpdateRoom(
 			}
 		}
 
-		joinedHosts, err = d.selectJoinedHosts(ctx, txn, roomID)
+		joinedHosts, err = d.selectJoinedHostsWithTx(ctx, txn, roomID)
 		if err != nil {
 			return err
 		}
@@ -109,4 +109,13 @@ func (d *Database) UpdateRoom(
 		return d.updateRoom(ctx, txn, roomID, newEventID)
 	})
 	return
+}
+
+// GetJoinedHosts returns the currently joined hosts for room,
+// as known to federationserver.
+// Returns an error if something goes wrong.
+func (d *Database) GetJoinedHosts(
+	ctx context.Context, roomID string,
+) ([]types.JoinedHost, error) {
+	return d.selectJoinedHosts(ctx, roomID)
 }

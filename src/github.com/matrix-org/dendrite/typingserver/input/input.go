@@ -53,24 +53,29 @@ func (t *TypingServerInputAPI) InputTypingEvent(
 		t.Cache.RemoveUser(ite.UserID, ite.RoomID)
 	}
 
-	return t.sendUpdateForRoom(ite.RoomID)
+	return t.sendEvent(ite)
 }
 
-func (t *TypingServerInputAPI) sendUpdateForRoom(roomID string) error {
-	userIDs := t.Cache.GetTypingUsers(roomID)
-	event := &api.TypingEvent{
-		Type:    gomatrixserverlib.MTyping,
-		RoomID:  roomID,
-		Content: api.TypingEventContent{UserIDs: userIDs},
+func (t *TypingServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
+	userIDs := t.Cache.GetTypingUsers(ite.RoomID)
+	ev := &api.TypingEvent{
+		Type:   gomatrixserverlib.MTyping,
+		RoomID: ite.RoomID,
+		UserID: ite.UserID,
 	}
-	eventJSON, err := json.Marshal(api.OutputTypingEvent{Event: *event})
+	ote := &api.OutputTypingEvent{
+		Event:       *ev,
+		TypingUsers: userIDs,
+	}
+
+	eventJSON, err := json.Marshal(ote)
 	if err != nil {
 		return err
 	}
 
 	m := &sarama.ProducerMessage{
 		Topic: string(t.OutputTypingEventTopic),
-		Key:   sarama.StringEncoder(roomID),
+		Key:   sarama.StringEncoder(ite.RoomID),
 		Value: sarama.ByteEncoder(eventJSON),
 	}
 
