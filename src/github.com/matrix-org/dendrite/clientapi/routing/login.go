@@ -17,7 +17,10 @@ package routing
 import (
 	"net/http"
 
+	"context"
+	"database/sql"
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -41,6 +44,7 @@ type passwordRequest struct {
 	User               string  `json:"user"`
 	Password           string  `json:"password"`
 	InitialDisplayName *string `json:"initial_device_display_name"`
+	DeviceID           string  `json:"device_id"`
 }
 
 type loginResponse struct {
@@ -105,10 +109,7 @@ func Login(
 			httputil.LogThenError(req, err)
 		}
 
-		// TODO: Use the device ID in the request
-		dev, err := deviceDB.CreateDevice(
-			req.Context(), acc.Localpart, nil, token, r.InitialDisplayName,
-		)
+		dev, err := getDevice(req.Context(), r, deviceDB, acc, localpart, token)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -130,4 +131,22 @@ func Login(
 		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
+}
+
+// check if device exists else create one
+func getDevice(
+	ctx context.Context,
+	r passwordRequest,
+	deviceDB *devices.Database,
+	acc *authtypes.Account,
+	localpart, token string,
+) (dev *authtypes.Device, err error) {
+	dev, err = deviceDB.GetDeviceByID(ctx, localpart, r.DeviceID)
+	if err == sql.ErrNoRows {
+		// device doesn't exist, create one
+		dev, err = deviceDB.CreateDevice(
+			ctx, acc.Localpart, nil, token, r.InitialDisplayName,
+		)
+	}
+	return
 }
