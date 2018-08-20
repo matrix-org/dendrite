@@ -16,10 +16,10 @@ package routing
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"time"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -35,7 +35,7 @@ import (
 
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
-	req *http.Request, accountDB *accounts.Database, userID string,
+	req *http.Request, accountDB *accounts.Database, userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	if req.Method != http.MethodGet {
 		return util.JSONResponse{
@@ -43,10 +43,9 @@ func GetProfile(
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
-
-	profile, err := getProfileByUserID(req, accountDB, userID)
+	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
-		return *err
+		return httputil.LogThenError(req, err)
 	}
 
 	res := common.ProfileResponse{
@@ -59,37 +58,13 @@ func GetProfile(
 	}
 }
 
-// getProfileByUserID returns the profile for userID, otherwise returns an error response
-func getProfileByUserID(
-	req *http.Request, accountDB *accounts.Database, userID string,
-) (*authtypes.Profile, *util.JSONResponse) {
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
-	}
-
-	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
-	if err == sql.ErrNoRows {
-		return nil, &util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("no profile information for this user or this user does not exist"),
-		}
-	} else if err != nil {
-		resErr := httputil.LogThenError(req, err)
-		return nil, &resErr
-	}
-
-	return profile, nil
-}
-
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
-	req *http.Request, accountDB *accounts.Database, userID string,
+	req *http.Request, accountDB *accounts.Database, userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
-	profile, err := getProfileByUserID(req, accountDB, userID)
+	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
-		return *err
+		return httputil.LogThenError(req, err)
 	}
 
 	res := common.AvatarURL{
@@ -175,13 +150,12 @@ func SetAvatarURL(
 
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
-	req *http.Request, accountDB *accounts.Database, userID string,
+	req *http.Request, accountDB *accounts.Database, userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
-	profile, err := getProfileByUserID(req, accountDB, userID)
+	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
-		return *err
+		return httputil.LogThenError(req, err)
 	}
-
 	res := common.DisplayName{
 		DisplayName: profile.DisplayName,
 	}

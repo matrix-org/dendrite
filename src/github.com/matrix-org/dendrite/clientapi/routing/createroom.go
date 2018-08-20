@@ -20,7 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -116,12 +117,13 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
+	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI)
+	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI, asAPI)
 }
 
 // createRoom implements /createRoom
@@ -129,7 +131,8 @@ func CreateRoom(
 func createRoom(
 	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
+	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
@@ -154,12 +157,7 @@ func createRoom(
 		"roomID": roomID,
 	}).Info("Creating new room")
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
+	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -280,13 +278,13 @@ func createRoom(
 	if r.RoomAliasName != "" {
 		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
 
-		aliasReq := api.SetRoomAliasRequest{
+		aliasReq := roomserverAPI.SetRoomAliasRequest{
 			Alias:  roomAlias,
 			RoomID: roomID,
 			UserID: userID,
 		}
 
-		var aliasResp api.SetRoomAliasResponse
+		var aliasResp roomserverAPI.SetRoomAliasResponse
 		err = aliasAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
 		if err != nil {
 			return httputil.LogThenError(req, err)

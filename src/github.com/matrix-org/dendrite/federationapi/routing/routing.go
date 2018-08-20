@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -39,6 +40,7 @@ func Setup(
 	cfg config.Dendrite,
 	query roomserverAPI.RoomserverQueryAPI,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
@@ -83,7 +85,7 @@ func Setup(
 
 	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
-			return CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
+			return CreateInvitesFrom3PIDInvites(req, query, asAPI, cfg, producer, federation, accountDB)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
@@ -140,7 +142,7 @@ func Setup(
 		"federation_query_profile", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return GetProfile(
-				httpReq, accountDB, cfg,
+				httpReq, accountDB, cfg, asAPI,
 			)
 		},
 	)).Methods(http.MethodGet)

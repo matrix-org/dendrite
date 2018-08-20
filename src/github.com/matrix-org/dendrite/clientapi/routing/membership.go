@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"time"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -28,7 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
@@ -41,7 +42,8 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 func SendMembership(
 	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
 	roomID string, membership string, cfg config.Dendrite,
-	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
+	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
 	var body threepid.MembershipRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -83,7 +85,7 @@ func SendMembership(
 	}
 
 	event, err := buildMembershipEvent(
-		req.Context(), body, accountDB, device, membership, roomID, cfg, evTime, queryAPI,
+		req.Context(), body, accountDB, device, membership, roomID, cfg, evTime, queryAPI, asAPI,
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
@@ -114,15 +116,17 @@ func SendMembership(
 func buildMembershipEvent(
 	ctx context.Context,
 	body threepid.MembershipRequest, accountDB *accounts.Database,
-	device *authtypes.Device, membership string, roomID string, cfg config.Dendrite,
-	evTime time.Time, queryAPI api.RoomserverQueryAPI,
+	device *authtypes.Device,
+	membership, roomID string,
+	cfg config.Dendrite, evTime time.Time,
+	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.Event, error) {
 	stateKey, reason, err := getMembershipStateKey(body, device, membership)
 	if err != nil {
 		return nil, err
 	}
 
-	profile, err := loadProfile(ctx, stateKey, cfg, accountDB)
+	profile, err := loadProfile(ctx, stateKey, cfg, accountDB, asAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -158,16 +162,20 @@ func buildMembershipEvent(
 // Returns an error if the retrieval failed or if the first parameter isn't a
 // valid Matrix ID.
 func loadProfile(
-	ctx context.Context, userID string, cfg config.Dendrite, accountDB *accounts.Database,
+	ctx context.Context,
+	userID string,
+	cfg config.Dendrite,
+	accountDB *accounts.Database,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*authtypes.Profile, error) {
-	localpart, serverName, err := gomatrixserverlib.SplitID('@', userID)
+	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return nil, err
 	}
 
 	var profile *authtypes.Profile
 	if serverName == cfg.Matrix.ServerName {
-		profile, err = accountDB.GetProfileByLocalpart(ctx, localpart)
+		profile, err = appserviceAPI.RetreiveUserProfile(ctx, userID, asAPI, accountDB)
 	} else {
 		profile = &authtypes.Profile{}
 	}
