@@ -866,6 +866,7 @@ type availableResponse struct {
 // RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
+	cfg config.Dendrite,
 	accountDB *accounts.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
@@ -875,6 +876,17 @@ func RegisterAvailable(
 
 	if err := validateUsername(username); err != nil {
 		return *err
+	}
+
+	// Check if this username is reserved by an application service
+	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+	for _, appservice := range cfg.Derived.ApplicationServices {
+		if appservice.IsInterestedInUserID(userID) {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.UserInUse("Desired user ID is reserved by an application service."),
+			}
+		}
 	}
 
 	availability, availabilityErr := accountDB.CheckAccountAvailability(req.Context(), username)
@@ -887,7 +899,7 @@ func RegisterAvailable(
 	if !availability {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("A different user ID has already been registered for this session"),
+			JSON: jsonerror.UserInUse("Desired User ID is already taken."),
 		}
 	}
 

@@ -139,7 +139,7 @@ func Setup(
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/register/available", common.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
-		return RegisterAvailable(req, accountDB)
+		return RegisterAvailable(req, cfg, accountDB)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/directory/room/{roomAlias}",
