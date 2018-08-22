@@ -17,15 +17,12 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/util"
 )
 
 // ParseTSParam takes a req (typically from an application service) and parses a Time object
 // from the req if it exists in the query parameters. If it doesn't exist, the
 // current time is returned.
-func ParseTSParam(req *http.Request) (time.Time, *util.JSONResponse) {
+func ParseTSParam(req *http.Request) (time.Time, error) {
 	// Use the ts parameter's value for event time if present
 	tsStr := req.URL.Query().Get("ts")
 	if tsStr == "" {
@@ -35,12 +32,7 @@ func ParseTSParam(req *http.Request) (time.Time, *util.JSONResponse) {
 	// The parameter exists, parse into a Time object
 	ts, err := strconv.ParseInt(tsStr, 10, 64)
 	if err != nil {
-		return time.Time{}, &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(
-				fmt.Sprintf("Param 'ts' is no valid int (%s)", err.Error()),
-			),
-		}
+		return time.Time{}, fmt.Errorf("Param 'ts' is no valid int (%s)", err.Error())
 	}
 
 	return time.Unix(ts/1000, 0), nil

@@ -104,9 +104,12 @@ func generateSendEvent(
 		return nil, resErr
 	}
 
-	evTime, resErr := httputil.ParseTSParam(req)
-	if resErr != nil {
-		return nil, resErr
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
 	}
 
 	// create the new event and set all the fields we can
@@ -116,7 +119,7 @@ func generateSendEvent(
 		Type:     eventType,
 		StateKey: stateKey,
 	}
-	err := builder.SetContent(r)
+	err = builder.SetContent(r)
 	if err != nil {
 		resErr := httputil.LogThenError(req, err)
 		return nil, &resErr

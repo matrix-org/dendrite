@@ -50,9 +50,12 @@ func SendMembership(
 		return *reqErr
 	}
 
-	evTime, resErr := httputil.ParseTSParam(req)
-	if resErr != nil {
-		return *resErr
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
 	}
 
 	inviteStored, err := threepid.CheckAndProcessInvite(

@@ -107,9 +107,12 @@ func SetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
-	evTime, resErr := httputil.ParseTSParam(req)
-	if resErr != nil {
-		return *resErr
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
 	}
 
 	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
@@ -201,9 +204,12 @@ func SetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
-	evTime, resErr := httputil.ParseTSParam(req)
-	if resErr != nil {
-		return *resErr
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
 	}
 
 	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
