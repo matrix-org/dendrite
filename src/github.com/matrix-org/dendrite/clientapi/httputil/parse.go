@@ -13,6 +13,7 @@
 package httputil
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -21,18 +22,18 @@ import (
 // ParseTSParam takes a req (typically from an application service) and parses a Time object
 // from the req if it exists in the query parameters. If it doesn't exist, the
 // current time is returned.
-func ParseTSParam(req *http.Request) time.Time {
+func ParseTSParam(req *http.Request) (time.Time, error) {
 	// Use the ts parameter's value for event time if present
 	tsStr := req.URL.Query().Get("ts")
 	if tsStr == "" {
-		return time.Now()
+		return time.Now(), nil
 	}
 
 	// The parameter exists, parse into a Time object
 	ts, err := strconv.ParseInt(tsStr, 10, 64)
 	if err != nil {
-		return time.Unix(ts/1000, 0)
+		return time.Time{}, fmt.Errorf("Param 'ts' is no valid int (%s)", err.Error())
 	}
 
-	return time.Unix(ts/1000, 0)
+	return time.Unix(ts/1000, 0), nil
 }

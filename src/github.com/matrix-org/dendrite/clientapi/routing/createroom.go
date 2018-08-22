@@ -147,7 +147,13 @@ func createRoom(
 		return *resErr
 	}
 
-	evTime := httputil.ParseTSParam(req)
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
+	}
 	// TODO: visibility/presets/raw initial state/creation content
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!

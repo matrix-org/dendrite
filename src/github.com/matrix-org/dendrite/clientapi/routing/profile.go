@@ -107,6 +107,14 @@ func SetAvatarURL(
 		return httputil.LogThenError(req, err)
 	}
 
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
+	}
+
 	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -128,7 +136,7 @@ func SetAvatarURL(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), memberships, newProfile, userID, cfg, httputil.ParseTSParam(req), queryAPI,
+		req.Context(), memberships, newProfile, userID, cfg, evTime, queryAPI,
 	)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -196,6 +204,14 @@ func SetDisplayName(
 		return httputil.LogThenError(req, err)
 	}
 
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
+	}
+
 	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -217,7 +233,7 @@ func SetDisplayName(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), memberships, newProfile, userID, cfg, httputil.ParseTSParam(req), queryAPI,
+		req.Context(), memberships, newProfile, userID, cfg, evTime, queryAPI,
 	)
 	if err != nil {
 		return httputil.LogThenError(req, err)
