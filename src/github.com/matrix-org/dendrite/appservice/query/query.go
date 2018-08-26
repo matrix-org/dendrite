@@ -90,8 +90,8 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 					err = resp.Body.Close()
 					if err != nil {
 						log.WithFields(log.Fields{
-							"appservice":  appservice.ID,
-							"status_code": resp.StatusCode,
+							"appservice_id": appservice.ID,
+							"status_code":   resp.StatusCode,
 						}).WithError(err).Error("Unable to close application service response body")
 					}
 				}()
@@ -110,8 +110,8 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 			default:
 				// Application service reported an error. Warn
 				log.WithFields(log.Fields{
-					"appservice":  appservice.ID,
-					"status_code": resp.StatusCode,
+					"appservice_id": appservice.ID,
+					"status_code":   resp.StatusCode,
 				}).Warn("Application service responded with non-OK status code")
 			}
 		}
@@ -159,7 +159,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			}
 			if err != nil {
 				log.WithFields(log.Fields{
-					"appservice": appservice.ID,
+					"appservice_id": appservice.ID,
 				}).WithError(err).Error("issue querying user ID on application service")
 				return err
 			}
@@ -172,8 +172,8 @@ func (a *AppServiceQueryAPI) UserIDExists(
 
 			// Log if return code is not OK
 			log.WithFields(log.Fields{
-				"appservice":  appservice.ID,
-				"status_code": resp.StatusCode,
+				"appservice_id": appservice.ID,
+				"status_code":   resp.StatusCode,
 			}).Warn("application service responded with non-OK status code")
 		}
 	}
@@ -305,7 +305,7 @@ func contactApplicationService(
 	req, err := http.NewRequest(http.MethodGet, requestURL, bytes.NewReader(request.Content))
 	if err != nil {
 		log.WithFields(log.Fields{
-			"appservice": as.ID,
+			"appservice_id": as.ID,
 		}).WithError(err).Error("problem building proxy request to application service")
 		return
 	}
@@ -318,15 +318,15 @@ func contactApplicationService(
 	}
 	if err != nil {
 		log.WithFields(log.Fields{
-			"appservice": as.ID,
+			"appservice_id": as.ID,
 		}).WithError(err).Warn("unable to proxy request to application service")
 		return
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		log.WithFields(log.Fields{
-			"appservice":  as.ID,
-			"status_code": resp.StatusCode,
+			"appservice_id": as.ID,
+			"status_code":   resp.StatusCode,
 		}).Warn("non-OK response from application server while proxying request")
 		return
 	}
@@ -336,7 +336,7 @@ func contactApplicationService(
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"appservice": as.ID,
+			"appservice_id": as.ID,
 		}).WithError(err).Warn("unable to read response from application server while proxying request")
 		return
 	}
@@ -346,7 +346,7 @@ func contactApplicationService(
 	err = json.Unmarshal(body, &querySlice)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"appservice": as.ID,
+			"appservice_id": as.ID,
 		}).WithError(err).Warn("unable to unmarshal response from application server while proxying request")
 		return
 	}

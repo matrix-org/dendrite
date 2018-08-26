@@ -68,7 +68,7 @@ func SetupAppServiceAPIComponent(
 		// Create bot account for this AS if it doesn't already exist
 		if err = generateAppServiceAccount(accountsDB, deviceDB, appservice); err != nil {
 			log.WithFields(log.Fields{
-				"appservice": appservice.ID,
+				"appservice_id": appservice.ID,
 			}).WithError(err).Panicf("failed to generate bot account for appservice")
 		}
 	}
@@ -141,7 +141,7 @@ func setupWorkers(
 	// Create a worker that handles transmitting events to a single homeserver
 	for _, workerState := range workerStates {
 		log.WithFields(log.Fields{
-			"appservice": workerState.AppService.ID,
+			"appservice_id": workerState.AppService.ID,
 		}).Info("starting application service")
 
 		// Don't create a worker if this AS doesn't want to receive events

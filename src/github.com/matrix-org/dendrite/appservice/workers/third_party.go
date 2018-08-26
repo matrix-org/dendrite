@@ -66,7 +66,7 @@ func ThirdPartyWorker(
 		)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"appservice":       appservice.ID,
+				"appservice_id":    appservice.ID,
 				"backoff_exponent": backoffCount,
 			}).WithError(err).Warn("error contacting appservice thirdparty endpoints")
 
@@ -82,8 +82,8 @@ func ThirdPartyWorker(
 		err = storeProtocolDefinition(ctx, db, protocolID, protocolDefinition)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"appservice": appservice.ID,
-				"definition": protocolDefinition,
+				"appservice_id": appservice.ID,
+				"definition":    protocolDefinition,
 			}).WithError(err).Fatalf("unable to store appservice protocol definition in db")
 		}
 	}

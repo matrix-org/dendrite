@@ -53,7 +53,7 @@ func TransactionWorker(db *storage.Database, ws types.ApplicationServiceWorkerSt
 	eventCount, err := db.CountEventsWithAppServiceID(ctx, ws.AppService.ID)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"appservice": ws.AppService.ID,
+			"appservice_id": ws.AppService.ID,
 		}).WithError(err).Fatal("appservice worker unable to read queued events from DB")
 		return
 	}
@@ -70,7 +70,7 @@ func TransactionWorker(db *storage.Database, ws types.ApplicationServiceWorkerSt
 		transactionJSON, txnID, maxEventID, eventsRemaining, err := createTransaction(ctx, db, ws.AppService.ID)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"appservice": ws.AppService.ID,
+				"appservice_id": ws.AppService.ID,
 			}).WithError(err).Fatal("appservice worker unable to create transaction")
 
 			return
@@ -81,7 +81,7 @@ func TransactionWorker(db *storage.Database, ws types.ApplicationServiceWorkerSt
 		err = send(client, ws.AppService, txnID, transactionJSON)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"appservice":       ws.AppService.ID,
+				"appservice_id":    ws.AppService.ID,
 				"backoff_exponent": ws.Backoff,
 			}).WithError(err).Warnf("unable to send transactions successfully, backing off")
 
@@ -103,7 +103,7 @@ func TransactionWorker(db *storage.Database, ws types.ApplicationServiceWorkerSt
 		err = db.RemoveEventsBeforeAndIncludingID(ctx, ws.AppService.ID, maxEventID)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"appservice": ws.AppService.ID,
+				"appservice_id": ws.AppService.ID,
 			}).WithError(err).Fatal("unable to remove appservice events from the database")
 			return
 		}
@@ -126,7 +126,7 @@ func createTransaction(
 	txnID, maxID, events, eventsRemaining, err := db.GetEventsWithAppServiceID(ctx, appserviceID, transactionBatchSize)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"appservice": appserviceID,
+			"appservice_id": appserviceID,
 		}).WithError(err).Fatalf("appservice worker unable to read queued events from DB")
 
 		return
@@ -177,7 +177,7 @@ func send(
 		err := resp.Body.Close()
 		if err != nil {
 			log.WithFields(log.Fields{
-				"appservice": appservice.ID,
+				"appservice_id": appservice.ID,
 			}).WithError(err).Error("unable to close response body from application service")
 		}
 	}()

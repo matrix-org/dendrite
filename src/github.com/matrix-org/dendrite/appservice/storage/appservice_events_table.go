@@ -119,7 +119,7 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 		err = eventRows.Close()
 		if err != nil {
 			log.WithFields(log.Fields{
-				"appservice": applicationServiceID,
+				"appservice_id": applicationServiceID,
 			}).WithError(err).Fatalf("appservice unable to select new events to send")
 		}
 	}()
