@@ -359,7 +359,7 @@ func makeHTTPClient() *http.Client {
 	}
 }
 
-// SetupHTTP adds the AppServiceQueryPAI handlers to the http.ServeMux. This
+// SetupHTTP adds the AppServiceQueryAPI handlers to the http.ServeMux. This
 // handles and muxes incoming api requests the to internal AppServiceQueryAPI.
 func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
