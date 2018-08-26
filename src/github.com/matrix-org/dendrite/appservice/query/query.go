@@ -86,15 +86,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 			req = req.WithContext(ctx)
 			resp, err := a.HTTPClient.Do(req)
 			if resp != nil {
-				defer func() {
-					err = resp.Body.Close()
-					if err != nil {
-						log.WithFields(log.Fields{
-							"appservice_id": appservice.ID,
-							"status_code":   resp.StatusCode,
-						}).WithError(err).Error("Unable to close application service response body")
-					}
-				}()
+				defer resp.Body.Close() // nolint: errcheck
 			}
 			if err != nil {
 				log.WithError(err).Errorf("Issue querying room alias on application service %s", appservice.ID)
@@ -141,6 +133,10 @@ func (a *AppServiceQueryAPI) UserIDExists(
 		if appservice.URL != "" && appservice.IsInterestedInUserID(request.UserID) {
 			// The full path to the rooms API, includes hs token
 			URL, err := url.Parse(appservice.URL + userIDExistsPath)
+			if err != nil {
+				return err
+			}
+
 			URL.Path += request.UserID
 			apiURL := URL.String() + "?access_token=" + appservice.HSToken
 
