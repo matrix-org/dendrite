@@ -311,7 +311,7 @@ func sendToRemoteServer(
 		if err == nil {
 			return
 		}
-		logrus.WithError(err).Warn("failed to send 3PID invite via %s", server)
+		logrus.WithError(err).Warnf("failed to send 3PID invite via %s", server)
 	}
 
 	return errors.New("failed to send 3PID invite via any server")
