@@ -134,6 +134,8 @@ type Dendrite struct {
 			OutputRoomEvent Topic `yaml:"output_room_event"`
 			// Topic for sending account data from client API to sync API
 			OutputClientData Topic `yaml:"output_client_data"`
+			// Topic for typingserver/api.OutputTypingEvent events.
+			OutputTypingEvent Topic `yaml:"output_typing_event"`
 			// Topic for user updates (profile, presence)
 			UserUpdates Topic `yaml:"user_updates"`
 		}
@@ -203,6 +205,7 @@ type Dendrite struct {
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
+		TypingServer     Address `yaml:"typing_server"`
 	} `yaml:"listen"`
 
 	// The config for tracing the dendrite servers.
@@ -526,6 +529,7 @@ func (config *Dendrite) checkKafka(configErrs *configErrors, monolithic bool) {
 	}
 	checkNotEmpty(configErrs, "kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
 	checkNotEmpty(configErrs, "kafka.topics.output_client_data", string(config.Kafka.Topics.OutputClientData))
+	checkNotEmpty(configErrs, "kafka.topics.output_typing_event", string(config.Kafka.Topics.OutputTypingEvent))
 	checkNotEmpty(configErrs, "kafka.topics.user_updates", string(config.Kafka.Topics.UserUpdates))
 }
 
@@ -546,6 +550,7 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "listen.federation_api", string(config.Listen.FederationAPI))
 	checkNotEmpty(configErrs, "listen.sync_api", string(config.Listen.SyncAPI))
 	checkNotEmpty(configErrs, "listen.room_server", string(config.Listen.RoomServer))
+	checkNotEmpty(configErrs, "listen.typing_server", string(config.Listen.TypingServer))
 }
 
 // checkLogging verifies the parameters logging.* are valid.
@@ -657,6 +662,15 @@ func (config *Dendrite) RoomServerURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return "http://" + string(config.Listen.RoomServer)
+}
+
+// TypingServerURL returns an HTTP URL for where the typing server is listening.
+func (config *Dendrite) TypingServerURL() string {
+	// Hard code the typing server to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.TypingServer)
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.

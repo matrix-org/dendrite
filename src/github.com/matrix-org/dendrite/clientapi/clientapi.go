@@ -15,6 +15,7 @@
 package clientapi
 
 import (
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/consumers"
@@ -23,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -38,9 +40,12 @@ func SetupClientAPIComponent(
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	inputAPI roomserverAPI.RoomserverInputAPI,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
+	typingInputAPI typingServerAPI.TypingServerInputAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
+	typingProducer := producers.NewTypingServerProducer(typingInputAPI)
 
 	userUpdateProducer := &producers.UserUpdateProducer{
 		Producer: base.KafkaProducer,
@@ -60,8 +65,8 @@ func SetupClientAPIComponent(
 	}
 
 	routing.Setup(
-		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI,
+		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
-		syncProducer, transactionsCache,
+		syncProducer, typingProducer, transactionsCache,
 	)
 }

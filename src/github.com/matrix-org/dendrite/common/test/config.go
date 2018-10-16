@@ -83,6 +83,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	// Make this configurable somehow?
 	cfg.Kafka.Topics.OutputRoomEvent = "test.room.output"
 	cfg.Kafka.Topics.OutputClientData = "test.clientapi.output"
+	cfg.Kafka.Topics.OutputTypingEvent = "test.typing.output"
 	cfg.Kafka.Topics.UserUpdates = "test.user.output"
 
 	// TODO: Use different databases for the different schemas.
@@ -103,6 +104,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Listen.RoomServer = assignAddress()
 	cfg.Listen.SyncAPI = assignAddress()
 	cfg.Listen.PublicRoomsAPI = assignAddress()
+	cfg.Listen.TypingServer = assignAddress()
 
 	return &cfg, port, nil
 }

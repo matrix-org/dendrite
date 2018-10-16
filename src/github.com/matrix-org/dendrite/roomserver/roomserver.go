@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 
+	asQuery "github.com/matrix-org/dendrite/appservice/query"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/alias"
 	"github.com/matrix-org/dendrite/roomserver/input"
@@ -51,11 +52,14 @@ func SetupRoomServerComponent(
 
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 
+	asAPI := asQuery.AppServiceQueryAPI{Cfg: base.Cfg}
+
 	aliasAPI := alias.RoomserverAliasAPI{
-		DB:       roomserverDB,
-		Cfg:      base.Cfg,
-		InputAPI: &inputAPI,
-		QueryAPI: &queryAPI,
+		DB:            roomserverDB,
+		Cfg:           base.Cfg,
+		InputAPI:      &inputAPI,
+		QueryAPI:      &queryAPI,
+		AppserviceAPI: &asAPI,
 	}
 
 	aliasAPI.SetupHTTP(http.DefaultServeMux)

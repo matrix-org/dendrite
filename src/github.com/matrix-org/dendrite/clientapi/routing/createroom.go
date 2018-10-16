@@ -18,8 +18,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -70,7 +72,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	if strings.ContainsAny(r.RoomAliasName, whitespace+":") {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("room_alias_name cannot contain whitespace"),
+			JSON: jsonerror.BadJSON("room_alias_name cannot contain whitespace or ':'"),
 		}
 	}
 	for _, userID := range r.Invite {
@@ -115,12 +117,13 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
+	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI)
+	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI, asAPI)
 }
 
 // createRoom implements /createRoom
@@ -128,7 +131,8 @@ func CreateRoom(
 func createRoom(
 	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI api.RoomserverAliasAPI,
+	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
@@ -143,8 +147,14 @@ func createRoom(
 		return *resErr
 	}
 
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
+	}
 	// TODO: visibility/presets/raw initial state/creation content
-
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!
 
@@ -153,12 +163,7 @@ func createRoom(
 		"roomID": roomID,
 	}).Info("Creating new room")
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
+	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -249,7 +254,7 @@ func createRoom(
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(req, &builder, &authEvents, cfg)
+		ev, err = buildEvent(&builder, &authEvents, cfg, evTime)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -279,13 +284,13 @@ func createRoom(
 	if r.RoomAliasName != "" {
 		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
 
-		aliasReq := api.SetRoomAliasRequest{
+		aliasReq := roomserverAPI.SetRoomAliasRequest{
 			Alias:  roomAlias,
 			RoomID: roomID,
 			UserID: userID,
 		}
 
-		var aliasResp api.SetRoomAliasResponse
+		var aliasResp roomserverAPI.SetRoomAliasResponse
 		err = aliasAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
 		if err != nil {
 			return httputil.LogThenError(req, err)
@@ -309,12 +314,11 @@ func createRoom(
 
 // buildEvent fills out auth_events for the builder then builds the event
 func buildEvent(
-	req *http.Request,
 	builder *gomatrixserverlib.EventBuilder,
 	provider gomatrixserverlib.AuthEventProvider,
 	cfg config.Dendrite,
+	evTime time.Time,
 ) (*gomatrixserverlib.Event, error) {
-
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
 		return nil, err
@@ -325,8 +329,7 @@ func buildEvent(
 	}
 	builder.AuthEvents = refs
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	eventTime := common.ParseTSParam(req)
-	event, err := builder.Build(eventID, eventTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
 	}

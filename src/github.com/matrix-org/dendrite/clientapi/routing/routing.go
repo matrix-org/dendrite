@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -29,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/transactions"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -42,14 +43,17 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 // to clients which need to make outbound HTTP requests.
 func Setup(
 	apiMux *mux.Router, cfg config.Dendrite,
-	producer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
-	aliasAPI api.RoomserverAliasAPI,
+	producer *producers.RoomserverProducer,
+	queryAPI roomserverAPI.RoomserverQueryAPI,
+	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.KeyRing,
 	userUpdateProducer *producers.UserUpdateProducer,
 	syncProducer *producers.SyncAPIProducer,
+	typingProducer *producers.TypingServerProducer,
 	transactionsCache *transactions.Cache,
 ) {
 
@@ -77,7 +81,7 @@ func Setup(
 
 	r0mux.Handle("/createRoom",
 		common.MakeAuthAPI("createRoom", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return CreateRoom(req, device, cfg, producer, accountDB, aliasAPI)
+			return CreateRoom(req, device, cfg, producer, accountDB, aliasAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/join/{roomIDOrAlias}",
@@ -91,7 +95,7 @@ func Setup(
 	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
 		common.MakeAuthAPI("membership", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, producer)
+			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, asAPI, producer)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
@@ -137,11 +141,11 @@ func Setup(
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/register/available", common.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
-		return RegisterAvailable(req, accountDB)
+		return RegisterAvailable(req, cfg, accountDB)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/directory/room/{roomAlias}",
-		common.MakeAuthAPI("directory_room", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeExternalAPI("directory_room", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
 			return DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI)
 		}),
@@ -172,6 +176,19 @@ func Setup(
 			return LogoutAll(req, deviceDB, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
+		common.MakeAuthAPI("rooms_typing", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, typingProducer)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
+
+	r0mux.Handle("/account/whoami",
+		common.MakeAuthAPI("whoami", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return Whoami(req, device)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	// Stub endpoints required by Riot
 
@@ -219,14 +236,14 @@ func Setup(
 	r0mux.Handle("/profile/{userID}",
 		common.MakeExternalAPI("profile", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return GetProfile(req, accountDB, vars["userID"])
+			return GetProfile(req, accountDB, vars["userID"], asAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		common.MakeExternalAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return GetAvatarURL(req, accountDB, vars["userID"])
+			return GetAvatarURL(req, accountDB, vars["userID"], asAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -242,7 +259,7 @@ func Setup(
 	r0mux.Handle("/profile/{userID}/displayname",
 		common.MakeExternalAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return GetDisplayName(req, accountDB, vars["userID"])
+			return GetDisplayName(req, accountDB, vars["userID"], asAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -356,13 +373,6 @@ func Setup(
 			return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-
-	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
-		common.MakeExternalAPI("rooms_typing", func(req *http.Request) util.JSONResponse {
-			// TODO: handling typing
-			return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
-		}),
-	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/devices",
 		common.MakeAuthAPI("get_devices", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {

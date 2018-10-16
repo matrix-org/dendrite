@@ -16,15 +16,15 @@ package routing
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gorilla/mux"
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -38,8 +38,9 @@ const (
 func Setup(
 	apiMux *mux.Router,
 	cfg config.Dendrite,
-	query api.RoomserverQueryAPI,
-	aliasAPI api.RoomserverAliasAPI,
+	query roomserverAPI.RoomserverQueryAPI,
+	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
@@ -84,7 +85,7 @@ func Setup(
 
 	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
-			return CreateInvitesFrom3PIDInvites(req, query, cfg, producer, federation, accountDB)
+			return CreateInvitesFrom3PIDInvites(req, query, asAPI, cfg, producer, federation, accountDB)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
@@ -113,8 +114,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetState(
-				httpReq.Context(), request, cfg, query, time.Now(),
-				keys, vars["roomID"],
+				httpReq.Context(), request, query, vars["roomID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -124,13 +124,12 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetStateIDs(
-				httpReq.Context(), request, cfg, query, time.Now(),
-				keys, vars["roomID"],
+				httpReq.Context(), request, query, vars["roomID"],
 			)
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/query/directory/", common.MakeFedAPI(
+	v1fedmux.Handle("/query/directory", common.MakeFedAPI(
 		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return RoomAliasToID(
@@ -143,13 +142,13 @@ func Setup(
 		"federation_query_profile", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return GetProfile(
-				httpReq, accountDB, cfg,
+				httpReq, accountDB, cfg, asAPI,
 			)
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/query/user_devices/{userID}", common.MakeFedAPI(
-		"federation_query_user_devices", cfg.Matrix.ServerName, keys,
+	v1fedmux.Handle("/user/devices/{userID}", common.MakeFedAPI(
+		"federation_user_devices", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetUserDevices(
@@ -177,7 +176,7 @@ func Setup(
 			roomID := vars["roomID"]
 			userID := vars["userID"]
 			return SendJoin(
-				httpReq.Context(), httpReq, request, cfg, query, producer, keys, roomID, userID,
+				httpReq, request, cfg, query, producer, keys, roomID, userID,
 			)
 		},
 	)).Methods(http.MethodPut)

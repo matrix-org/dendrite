@@ -72,7 +72,7 @@ func VerifyUserFromRequest(
 	}
 
 	// Try to find the Application Service user
-	token, err := extractAccessToken(req)
+	token, err := ExtractAccessToken(req)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -150,7 +150,7 @@ func verifyUserParameters(req *http.Request) *util.JSONResponse {
 // and returns the device it corresponds to. Returns resErr (an error response which can be
 // sent to the client) if the token is invalid or there was a problem querying the database.
 func verifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *authtypes.Device, resErr *util.JSONResponse) {
-	token, err := extractAccessToken(req)
+	token, err := ExtractAccessToken(req)
 	if err != nil {
 		resErr = &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -184,9 +184,9 @@ func GenerateAccessToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// extractAccessToken from a request, or return an error detailing what went wrong. The
+// ExtractAccessToken from a request, or return an error detailing what went wrong. The
 // error message MUST be human-readable and comprehensible to the client.
-func extractAccessToken(req *http.Request) (string, error) {
+func ExtractAccessToken(req *http.Request) (string, error) {
 	// cf https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/api/auth.py#L631
 	authBearer := req.Header.Get("Authorization")
 	queryToken := req.URL.Query().Get("access_token")

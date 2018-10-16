@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -51,6 +52,14 @@ func JoinRoomByIDOrAlias(
 		return *resErr
 	}
 
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
+	}
+
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -65,7 +74,9 @@ func JoinRoomByIDOrAlias(
 	content["displayname"] = profile.DisplayName
 	content["avatar_url"] = profile.AvatarURL
 
-	r := joinRoomReq{req, content, device.UserID, cfg, federation, producer, queryAPI, aliasAPI, keyRing}
+	r := joinRoomReq{
+		req, evTime, content, device.UserID, cfg, federation, producer, queryAPI, aliasAPI, keyRing,
+	}
 
 	if strings.HasPrefix(roomIDOrAlias, "!") {
 		return r.joinRoomByID(roomIDOrAlias)
@@ -81,6 +92,7 @@ func JoinRoomByIDOrAlias(
 
 type joinRoomReq struct {
 	req        *http.Request
+	evTime     time.Time
 	content    map[string]interface{}
 	userID     string
 	cfg        config.Dendrite
@@ -214,7 +226,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 	}
 
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(r.req, &eb, r.cfg, r.queryAPI, &queryRes)
+	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.queryAPI, &queryRes)
 	if err == nil {
 		if _, err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName, nil); err != nil {
 			return httputil.LogThenError(r.req, err)
@@ -285,9 +297,8 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	}
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
-	eventTime := common.ParseTSParam(r.req)
 	event, err := respMakeJoin.JoinEvent.Build(
-		eventID, eventTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
+		eventID, r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
 	)
 	if err != nil {
 		res := httputil.LogThenError(r.req, err)

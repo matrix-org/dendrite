@@ -47,6 +47,8 @@ const (
 	MRoomHistoryVisibility = "m.room.history_visibility"
 	// MRoomRedaction https://matrix.org/docs/spec/client_server/r0.2.0.html#id21
 	MRoomRedaction = "m.room.redaction"
+	// MTyping https://matrix.org/docs/spec/client_server/r0.3.0.html#m-typing
+	MTyping = "m.typing"
 )
 
 // StateNeeded lists the event types and state_keys needed to authenticate an event.

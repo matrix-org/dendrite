@@ -48,13 +48,17 @@ const insertMembershipSQL = `
 const selectMembershipsByLocalpartSQL = "" +
 	"SELECT room_id, event_id FROM account_memberships WHERE localpart = $1"
 
+const selectMembershipInRoomByLocalpartSQL = "" +
+	"SELECT event_id FROM account_memberships WHERE localpart = $1 AND room_id = $2"
+
 const deleteMembershipsByEventIDsSQL = "" +
 	"DELETE FROM account_memberships WHERE event_id = ANY($1)"
 
 type membershipStatements struct {
-	deleteMembershipsByEventIDsStmt  *sql.Stmt
-	insertMembershipStmt             *sql.Stmt
-	selectMembershipsByLocalpartStmt *sql.Stmt
+	deleteMembershipsByEventIDsStmt       *sql.Stmt
+	insertMembershipStmt                  *sql.Stmt
+	selectMembershipInRoomByLocalpartStmt *sql.Stmt
+	selectMembershipsByLocalpartStmt      *sql.Stmt
 }
 
 func (s *membershipStatements) prepare(db *sql.DB) (err error) {
@@ -66,6 +70,9 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.insertMembershipStmt, err = db.Prepare(insertMembershipSQL); err != nil {
+		return
+	}
+	if s.selectMembershipInRoomByLocalpartStmt, err = db.Prepare(selectMembershipInRoomByLocalpartSQL); err != nil {
 		return
 	}
 	if s.selectMembershipsByLocalpartStmt, err = db.Prepare(selectMembershipsByLocalpartSQL); err != nil {
@@ -88,6 +95,16 @@ func (s *membershipStatements) deleteMembershipsByEventIDs(
 	stmt := txn.Stmt(s.deleteMembershipsByEventIDsStmt)
 	_, err = stmt.ExecContext(ctx, pq.StringArray(eventIDs))
 	return
+}
+
+func (s *membershipStatements) selectMembershipInRoomByLocalpart(
+	ctx context.Context, localpart, roomID string,
+) (authtypes.Membership, error) {
+	membership := authtypes.Membership{Localpart: localpart, RoomID: roomID}
+	stmt := s.selectMembershipInRoomByLocalpartStmt
+	err := stmt.QueryRowContext(ctx, localpart, roomID).Scan(&membership.EventID)
+
+	return membership, err
 }
 
 func (s *membershipStatements) selectMembershipsByLocalpart(
