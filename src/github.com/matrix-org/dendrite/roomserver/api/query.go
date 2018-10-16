@@ -412,6 +412,7 @@ func (h *httpRoomserverQueryAPI) QueryMembershipsForRoom(
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
+// QueryRoomsForUser implements RoomserverQueryAPI
 func (h *httpRoomserverQueryAPI) QueryRoomsForUser(
 	ctx context.Context,
 	request *QueryRoomsForUserRequest,

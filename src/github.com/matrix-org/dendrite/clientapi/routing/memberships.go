@@ -31,7 +31,7 @@ type response struct {
 }
 
 type joinedResponse struct {
-	JoinedRooms []string `json:"joined_rooms,flow"`
+	JoinedRooms []string `json:"joined_rooms"`
 }
 
 // GetMemberships implements GET /rooms/{roomId}/members

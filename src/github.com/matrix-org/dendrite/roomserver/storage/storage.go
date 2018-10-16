@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"github.com/pkg/errors"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -412,6 +413,7 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 	return roomNID, err
 }
 
+// GetRoomIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) GetRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error) {
 	roomIDs := make([]string, 0)
 
@@ -446,16 +448,21 @@ func (d *Database) LatestEventIDs(
 	return references, currentStateSnapshotNID, depth, nil
 }
 
+// GetRoomsForUserMembership implements query.RoomserverQueryAPIDatabase
 func (d *Database) GetRoomsForUserMembership(
 	ctx context.Context,
 	userNID types.EventStateKeyNID,
 	membership string,
 ) (roomNIDs []types.RoomNID, err error) {
-	membershipNID := membershipStateLeaveOrBan
+	var membershipNID membershipState
 	if membership == "join" {
 		membershipNID = membershipStateJoin
 	} else if membership == "invite" {
 		membershipNID = membershipStateInvite
+	} else if membership == "ban" || membership == "leave" {
+		membershipNID = membershipStateLeaveOrBan
+	} else {
+		return nil, errors.New("invalid membership")
 	}
 	return d.statements.selectRoomsForUserMembership(ctx, userNID, membershipNID)
 }

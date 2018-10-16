@@ -76,7 +76,7 @@ type RoomserverQueryAPIDatabase interface {
 		ctx context.Context, roomNID types.RoomNID, joinOnly bool,
 	) ([]types.EventNID, error)
 	// Lookup the rooms for which a user has a particular membership state.
-	// Returns an error if there was a problem talkign to the database.
+	// Returns an error if there was a problem talking to the database.
 	GetRoomsForUserMembership(
 		ctx context.Context, userNID types.EventStateKeyNID, membership string,
 	) ([]types.RoomNID, error)
