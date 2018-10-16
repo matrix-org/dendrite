@@ -70,8 +70,8 @@ func GetJoinedRooms(
 	queryAPI api.RoomserverQueryAPI,
 ) util.JSONResponse {
 	queryReq := api.QueryRoomsForUserRequest{
-		UserID: device.UserID,
-		Membership:"join",
+		UserID:     device.UserID,
+		Membership: "join",
 	}
 	var queryRes api.QueryRoomsForUserResponse
 	if err := queryAPI.QueryRoomsForUser(req.Context(), &queryReq, &queryRes); err != nil {

@@ -66,7 +66,7 @@ const updateLatestEventNIDsSQL = "" +
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
-	selectRoomIDStmt                  *sql.Stmt
+	selectRoomIDStmt                   *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
