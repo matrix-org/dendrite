@@ -369,7 +369,6 @@ func UsernameMatchesExclusiveNamespaces(
 // two requirements are met, no error will be returned.
 func validateApplicationService(
 	cfg *config.Dendrite,
-	req *http.Request,
 	username string,
 	accessToken string,
 ) (string, *util.JSONResponse) {
@@ -558,7 +557,7 @@ func handleRegistrationFlow(
 			// Check application service register user request is valid.
 			// The application service's ID is returned if so.
 			appserviceID, err := validateApplicationService(
-				cfg, req, r.Username, accessToken,
+				cfg, r.Username, accessToken,
 			)
 			if err != nil {
 				return *err

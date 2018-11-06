@@ -15,8 +15,6 @@
 package routing
 
 import (
-	"net/http"
-	"net/url"
 	"regexp"
 	"testing"
 
@@ -186,47 +184,26 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	fakeConfig.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
 
 	// Access token is correct, user_id omitted so we are acting as SenderLocalpart
-	URL, _ := url.Parse("http://localhost/register?access_token=1234")
-	fakeHTTPRequest := http.Request{
-		Method: "POST",
-		URL:    URL,
-	}
-	asID, resp := validateApplicationService(&fakeConfig, &fakeHTTPRequest, fakeSenderLocalpart)
+	asID, resp := validateApplicationService(&fakeConfig, fakeSenderLocalpart, "1234")
 	if resp != nil || asID != fakeID {
 		t.Errorf("appservice should have validated and returned correct ID: %s", resp.JSON)
 	}
 
 	// Access token is incorrect, user_id omitted so we are acting as SenderLocalpart
-	URL, _ = url.Parse("http://localhost/register?access_token=xxxx")
-	fakeHTTPRequest = http.Request{
-		Method: "POST",
-		URL:    URL,
-	}
-	asID, resp = validateApplicationService(&fakeConfig, &fakeHTTPRequest, fakeSenderLocalpart)
+	asID, resp = validateApplicationService(&fakeConfig, fakeSenderLocalpart, "xxxx")
 	if resp == nil || asID == fakeID {
 		t.Errorf("access_token should have been marked as invalid")
 	}
 
 	// Access token is correct, acting as valid user_id
-	URL, _ = url.Parse("http://localhost/register?access_token=1234&user_id=@_appservice_bob:localhost")
-	fakeHTTPRequest = http.Request{
-		Method: "POST",
-		URL:    URL,
-	}
-	asID, resp = validateApplicationService(&fakeConfig, &fakeHTTPRequest, "_appservice_bob")
+	asID, resp = validateApplicationService(&fakeConfig, "_appservice_bob", "1234")
 	if resp != nil || asID != fakeID {
 		t.Errorf("access_token and user_id should've been valid: %s", resp.JSON)
 	}
 
 	// Access token is correct, acting as invalid user_id
-	URL, _ = url.Parse("http://localhost/register?access_token=1234&user_id=@_something_else:localhost")
-	fakeHTTPRequest = http.Request{
-		Method: "POST",
-		URL:    URL,
-	}
-	asID, resp = validateApplicationService(&fakeConfig, &fakeHTTPRequest, "_something_else")
+	asID, resp = validateApplicationService(&fakeConfig, "_something_else", "1234")
 	if resp == nil || asID == fakeID {
-		t.Errorf("user_id should not have been valid: %s",
-			fakeHTTPRequest.URL.Query().Get("user_id"))
+		t.Errorf("user_id should not have been valid: @_something_else:localhost")
 	}
 }
