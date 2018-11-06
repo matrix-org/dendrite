@@ -490,6 +490,7 @@ func Register(
 
 // handleRegistrationFlow will direct and complete registration flow stages
 // that the client has requested.
+// nolint: gocyclo
 func handleRegistrationFlow(
 	req *http.Request,
 	r registerRequest,
@@ -551,7 +552,11 @@ func handleRegistrationFlow(
 		}
 
 	case authtypes.LoginTypeApplicationService:
+		// Extract the access token from the request.
 		accessToken, err := auth.ExtractAccessToken(req)
+		// Let the AS registration handler handle the process from here. We
+		// don't need a condition on that call since the registration is clearly
+		// stated as being AS-related.
 		return handleApplicationServiceRegistration(
 			accessToken, err, req, r, cfg, accountDB, deviceDB,
 		)
@@ -575,6 +580,14 @@ func handleRegistrationFlow(
 		req, r, sessionID, cfg, accountDB, deviceDB)
 }
 
+// handleApplicationServiceRegistration handles the registration of an
+// application service's user by validating the AS from its access token and
+// registering the user. Its two first parameters must be the two return values
+// of the auth.ExtractAccessToken function.
+// Returns an error if the access token couldn't be extracted from the request
+// at an earlier step of the registration workflow, or if the provided access
+// token doesn't belong to a valid AS, or if there was an issue completing the
+// registration process.
 func handleApplicationServiceRegistration(
 	accessToken string,
 	tokenErr error,
@@ -584,8 +597,8 @@ func handleApplicationServiceRegistration(
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 ) util.JSONResponse {
-	// If the auth type explicitly relates to Application Services but
-	// there's no access token provided, return an error.
+	// Check if we previously had issues extracting the access token from the
+	// request.
 	if tokenErr != nil {
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
