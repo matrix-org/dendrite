@@ -487,6 +487,80 @@ BFSLoop:
 	return err
 }
 
+// QueryPreviousEvents implements api.RoomServerQueryAPI
+func (r *RoomserverQueryAPI) QueryPreviousEvents(
+	ctx context.Context,
+	request *api.QueryPreviousEventsRequest,
+	response *api.QueryPreviousEventsResponse,
+) error {
+	var allowed bool
+	var events []types.Event
+	var err error
+	var front []string
+
+	// The limit defines the maximum number of events to retrieve, so it also
+	// defines the highest number of elements in the slice and the map below.
+	resultNIDs := make([]types.EventNID, 0, request.Limit)
+	visited := make(map[string]bool, request.Limit)
+
+	// The provided event IDs have already been seen by the request's emitter,
+	// and will be retrieved anyway, so there's no need to care about them if
+	// they appear in our exploration of the event tree.
+	for _, id := range request.EarliestEventsIDs {
+		visited[id] = true
+	}
+
+	front = request.EarliestEventsIDs
+
+	// Loop through the event IDs to retrieve the related events and go through
+	// the whole tree (up to the provided limit) using the events' "prev_event"
+	// key.
+BFSLoop:
+	for len(front) > 0 {
+		var next []string
+		// Retrieve the events to process from the database.
+		events, err = r.DB.EventsFromIDs(ctx, front)
+		if err != nil {
+			return err
+		}
+
+		for _, ev := range events {
+			// Break out of the loop if the provided limit is reached.
+			if len(resultNIDs) == request.Limit {
+				break BFSLoop
+			}
+			// Update the list of events to retrieve.
+			resultNIDs = append(resultNIDs, ev.EventNID)
+			// Loop through the event's parents.
+			for _, pre := range ev.PrevEventIDs() {
+				// Only add an event to the list of next events to process if it
+				// hasn't been seen before.
+				if !visited[pre] {
+					visited[pre] = true
+					allowed, err = r.checkServerAllowedToSeeEvent(
+						ctx, pre, request.ServerName,
+					)
+					if err != nil {
+						return err
+					}
+
+					// If the event hasn't been seen before and the HS
+					// requesting to retrieve it is allowed to do so, add it to
+					// the list of events to retrieve.
+					if allowed {
+						next = append(next, pre)
+					}
+				}
+			}
+		}
+		front = next
+	}
+
+	// Retrieve events from the list that was filled previously.
+	response.Events, err = r.loadEvents(ctx, resultNIDs)
+	return err
+}
+
 // QueryStateAndAuthChain implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	ctx context.Context,
@@ -703,6 +777,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryStateAndAuthChain(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryPreviousEventsPath,
+		common.MakeInternalAPI("queryPreviousEvents", func(req *http.Request) util.JSONResponse {
+			var request api.QueryPreviousEventsRequest
+			var response api.QueryPreviousEventsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryPreviousEvents(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
