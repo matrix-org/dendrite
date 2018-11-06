@@ -369,18 +369,11 @@ func UsernameMatchesExclusiveNamespaces(
 // two requirements are met, no error will be returned.
 func validateApplicationService(
 	cfg *config.Dendrite,
-	req *http.Request,
 	username string,
+	accessToken string,
 ) (string, *util.JSONResponse) {
 	// Check if the token if the application service is valid with one we have
 	// registered in the config.
-	accessToken, err := auth.ExtractAccessToken(req)
-	if err != nil {
-		return "", &util.JSONResponse{
-			Code: http.StatusUnauthorized,
-			JSON: jsonerror.MissingToken(err.Error()),
-		}
-	}
 	var matchedApplicationService *config.ApplicationService
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		if appservice.ASToken == accessToken {
@@ -497,6 +490,7 @@ func Register(
 
 // handleRegistrationFlow will direct and complete registration flow stages
 // that the client has requested.
+// nolint: gocyclo
 func handleRegistrationFlow(
 	req *http.Request,
 	r registerRequest,
@@ -542,21 +536,29 @@ func handleRegistrationFlow(
 		// Add SharedSecret to the list of completed registration stages
 		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeSharedSecret)
 
-	case "", authtypes.LoginTypeApplicationService:
-		// not passing a Auth.Type is allowed for ApplicationServices. So assume that as well
-		// Check application service register user request is valid.
-		// The application service's ID is returned if so.
-		appserviceID, err := validateApplicationService(cfg, req, r.Username)
-		if err != nil {
-			return *err
+	case "":
+		// Extract the access token from the request, if there's one to extract
+		// (which we can know by checking whether the error is nil or not).
+		accessToken, err := auth.ExtractAccessToken(req)
+
+		// A missing auth type can mean either the registration is performed by
+		// an AS or the request is made as the first step of a registration
+		// using the User-Interactive Authentication API. This can be determined
+		// by whether the request contains an access token.
+		if err == nil {
+			return handleApplicationServiceRegistration(
+				accessToken, err, req, r, cfg, accountDB, deviceDB,
+			)
 		}
 
-		// If no error, application service was successfully validated.
-		// Don't need to worry about appending to registration stages as
-		// application service registration is entirely separate.
-		return completeRegistration(
-			req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
-			r.InhibitLogin, r.InitialDisplayName,
+	case authtypes.LoginTypeApplicationService:
+		// Extract the access token from the request.
+		accessToken, err := auth.ExtractAccessToken(req)
+		// Let the AS registration handler handle the process from here. We
+		// don't need a condition on that call since the registration is clearly
+		// stated as being AS-related.
+		return handleApplicationServiceRegistration(
+			accessToken, err, req, r, cfg, accountDB, deviceDB,
 		)
 
 	case authtypes.LoginTypeDummy:
@@ -576,6 +578,50 @@ func handleRegistrationFlow(
 	// will be returned if a flow has not been successfully completed yet
 	return checkAndCompleteFlow(sessions.GetCompletedStages(sessionID),
 		req, r, sessionID, cfg, accountDB, deviceDB)
+}
+
+// handleApplicationServiceRegistration handles the registration of an
+// application service's user by validating the AS from its access token and
+// registering the user. Its two first parameters must be the two return values
+// of the auth.ExtractAccessToken function.
+// Returns an error if the access token couldn't be extracted from the request
+// at an earlier step of the registration workflow, or if the provided access
+// token doesn't belong to a valid AS, or if there was an issue completing the
+// registration process.
+func handleApplicationServiceRegistration(
+	accessToken string,
+	tokenErr error,
+	req *http.Request,
+	r registerRequest,
+	cfg *config.Dendrite,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+) util.JSONResponse {
+	// Check if we previously had issues extracting the access token from the
+	// request.
+	if tokenErr != nil {
+		return util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.MissingToken(tokenErr.Error()),
+		}
+	}
+
+	// Check application service register user request is valid.
+	// The application service's ID is returned if so.
+	appserviceID, err := validateApplicationService(
+		cfg, r.Username, accessToken,
+	)
+	if err != nil {
+		return *err
+	}
+
+	// If no error, application service was successfully validated.
+	// Don't need to worry about appending to registration stages as
+	// application service registration is entirely separate.
+	return completeRegistration(
+		req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
+		r.InhibitLogin, r.InitialDisplayName,
+	)
 }
 
 // checkAndCompleteFlow checks if a given registration flow is completed given
