@@ -437,7 +437,6 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	request *api.QueryMissingEventsRequest,
 	response *api.QueryMissingEventsResponse,
 ) error {
-	resultNIDs := make([]types.EventNID, 0, request.Limit)
 	var front []string
 	visited := make(map[string]bool, request.Limit) // request.Limit acts as a hint to size.
 	for _, id := range request.EarliestEvents {
@@ -450,39 +449,11 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 		}
 	}
 
-BFSLoop:
-	for len(front) > 0 {
-		var next []string
-		events, err := r.DB.EventsFromIDs(ctx, front)
-		if err != nil {
-			return err
-		}
-
-		for _, ev := range events {
-			if len(resultNIDs) > request.Limit {
-				break BFSLoop
-			}
-			resultNIDs = append(resultNIDs, ev.EventNID)
-			for _, pre := range ev.PrevEventIDs() {
-				if !visited[pre] {
-					visited[pre] = true
-					allowed, err := r.checkServerAllowedToSeeEvent(
-						ctx, ev.EventID(), request.ServerName,
-					)
-					if err != nil {
-						return err
-					}
-
-					if allowed {
-						next = append(next, pre)
-					}
-				}
-			}
-		}
-		front = next
+	resultNIDs, err := r.scanEventTree(ctx, front, visited, request.Limit, request.ServerName)
+	if err != nil {
+		return err
 	}
 
-	var err error
 	response.Events, err = r.loadEvents(ctx, resultNIDs)
 	return err
 }
@@ -493,14 +464,11 @@ func (r *RoomserverQueryAPI) QueryPreviousEvents(
 	request *api.QueryPreviousEventsRequest,
 	response *api.QueryPreviousEventsResponse,
 ) error {
-	var allowed bool
-	var events []types.Event
 	var err error
 	var front []string
 
 	// The limit defines the maximum number of events to retrieve, so it also
-	// defines the highest number of elements in the slice and the map below.
-	resultNIDs := make([]types.EventNID, 0, request.Limit)
+	// defines the highest number of elements in the map below.
 	visited := make(map[string]bool, request.Limit)
 
 	// The provided event IDs have already been seen by the request's emitter,
@@ -512,6 +480,26 @@ func (r *RoomserverQueryAPI) QueryPreviousEvents(
 
 	front = request.EarliestEventsIDs
 
+	// Scan the event tree for events to send back.
+	resultNIDs, err := r.scanEventTree(ctx, front, visited, request.Limit, request.ServerName)
+	if err != nil {
+		return err
+	}
+
+	// Retrieve events from the list that was filled previously.
+	response.Events, err = r.loadEvents(ctx, resultNIDs)
+	return err
+}
+
+func (r *RoomserverQueryAPI) scanEventTree(
+	ctx context.Context, front []string, visited map[string]bool, limit int,
+	serverName gomatrixserverlib.ServerName,
+) (resultNIDs []types.EventNID, err error) {
+	var allowed bool
+	var events []types.Event
+
+	resultNIDs = make([]types.EventNID, 0, limit)
+
 	// Loop through the event IDs to retrieve the related events and go through
 	// the whole tree (up to the provided limit) using the events' "prev_event"
 	// key.
@@ -521,12 +509,12 @@ BFSLoop:
 		// Retrieve the events to process from the database.
 		events, err = r.DB.EventsFromIDs(ctx, front)
 		if err != nil {
-			return err
+			return
 		}
 
 		for _, ev := range events {
 			// Break out of the loop if the provided limit is reached.
-			if len(resultNIDs) == request.Limit {
+			if len(resultNIDs) == limit {
 				break BFSLoop
 			}
 			// Update the list of events to retrieve.
@@ -537,11 +525,9 @@ BFSLoop:
 				// hasn't been seen before.
 				if !visited[pre] {
 					visited[pre] = true
-					allowed, err = r.checkServerAllowedToSeeEvent(
-						ctx, pre, request.ServerName,
-					)
+					allowed, err = r.checkServerAllowedToSeeEvent(ctx, pre, serverName)
 					if err != nil {
-						return err
+						return
 					}
 
 					// If the event hasn't been seen before and the HS
@@ -556,9 +542,7 @@ BFSLoop:
 		front = next
 	}
 
-	// Retrieve events from the list that was filled previously.
-	response.Events, err = r.loadEvents(ctx, resultNIDs)
-	return err
+	return
 }
 
 // QueryStateAndAuthChain implements api.RoomserverQueryAPI
