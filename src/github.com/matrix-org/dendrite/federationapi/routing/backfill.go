@@ -31,7 +31,7 @@ func Backfill(
 	query api.RoomserverQueryAPI,
 	roomID string,
 ) util.JSONResponse {
-	var res api.QueryPreviousEventsResponse
+	var res api.QueryBackfillResponse
 	var eIDs []string
 	var limit string
 	var exists bool
@@ -62,7 +62,7 @@ func Backfill(
 	}
 
 	// Populate the request.
-	req := api.QueryPreviousEventsRequest{
+	req := api.QueryBackfillRequest{
 		EarliestEventsIDs: eIDs,
 		ServerName:        request.Origin(),
 	}
@@ -71,7 +71,7 @@ func Backfill(
 	}
 
 	// Query the roomserver.
-	if err = query.QueryPreviousEvents(httpReq.Context(), &req, &res); err != nil {
+	if err = query.QueryBackfill(httpReq.Context(), &req, &res); err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
 

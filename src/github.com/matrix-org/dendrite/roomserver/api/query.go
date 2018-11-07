@@ -214,8 +214,8 @@ type QueryStateAndAuthChainResponse struct {
 	AuthChainEvents []gomatrixserverlib.Event `json:"auth_chain_events"`
 }
 
-// QueryPreviousEventsRequest is a request to QueryPreviousEvents.
-type QueryPreviousEventsRequest struct {
+// QueryBackfillRequest is a request to QueryBackfill.
+type QueryBackfillRequest struct {
 	// Events to start paginating from.
 	EarliestEventsIDs []string `json:"earliest_event_ids"`
 	// The maximum number of events to retrieve.
@@ -224,8 +224,8 @@ type QueryPreviousEventsRequest struct {
 	ServerName gomatrixserverlib.ServerName `json:"server_name"`
 }
 
-// QueryPreviousEventsResponse is a response to QueryPreviousEvents.
-type QueryPreviousEventsResponse struct {
+// QueryBackfillResponse is a response to QueryBackfill.
+type QueryBackfillResponse struct {
 	// Missing events, arbritrary order.
 	Events []gomatrixserverlib.Event `json:"events"`
 }
@@ -298,10 +298,10 @@ type RoomserverQueryAPI interface {
 	) error
 
 	// Query a given amount (or less) of events prior to a given set of events.
-	QueryPreviousEvents(
+	QueryBackfill(
 		ctx context.Context,
-		request *QueryPreviousEventsRequest,
-		response *QueryPreviousEventsResponse,
+		request *QueryBackfillRequest,
+		response *QueryBackfillResponse,
 	) error
 }
 
@@ -332,8 +332,8 @@ const RoomserverQueryMissingEventsPath = "/api/roomserver/queryMissingEvents"
 // RoomserverQueryStateAndAuthChainPath is the HTTP path for the QueryStateAndAuthChain API
 const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthChain"
 
-// RoomserverQueryPreviousEventsPath is the HTTP path for the QueryMissingEvents API
-const RoomserverQueryPreviousEventsPath = "/api/roomserver/queryPreviousEvents"
+// RoomserverQueryBackfillPath is the HTTP path for the QueryMissingEvents API
+const RoomserverQueryBackfillPath = "/api/roomserver/QueryBackfill"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -466,13 +466,13 @@ func (h *httpRoomserverQueryAPI) QueryStateAndAuthChain(
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// QueryPreviousEvents implements RoomServerQueryAPI
-func (h *httpRoomserverQueryAPI) QueryPreviousEvents(
+// QueryBackfill implements RoomServerQueryAPI
+func (h *httpRoomserverQueryAPI) QueryBackfill(
 	ctx context.Context,
-	request *QueryPreviousEventsRequest,
-	response *QueryPreviousEventsResponse,
+	request *QueryBackfillRequest,
+	response *QueryBackfillResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPreviousEvents")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBackfill")
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMissingEventsPath

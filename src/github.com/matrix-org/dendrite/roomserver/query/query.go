@@ -458,11 +458,11 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	return err
 }
 
-// QueryPreviousEvents implements api.RoomServerQueryAPI
-func (r *RoomserverQueryAPI) QueryPreviousEvents(
+// QueryBackfill implements api.RoomServerQueryAPI
+func (r *RoomserverQueryAPI) QueryBackfill(
 	ctx context.Context,
-	request *api.QueryPreviousEventsRequest,
-	response *api.QueryPreviousEventsResponse,
+	request *api.QueryBackfillRequest,
+	response *api.QueryBackfillResponse,
 ) error {
 	var err error
 	var front []string
@@ -773,14 +773,14 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(
-		api.RoomserverQueryPreviousEventsPath,
-		common.MakeInternalAPI("queryPreviousEvents", func(req *http.Request) util.JSONResponse {
-			var request api.QueryPreviousEventsRequest
-			var response api.QueryPreviousEventsResponse
+		api.RoomserverQueryBackfillPath,
+		common.MakeInternalAPI("QueryBackfill", func(req *http.Request) util.JSONResponse {
+			var request api.QueryBackfillRequest
+			var response api.QueryBackfillResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.QueryPreviousEvents(req.Context(), &request, &response); err != nil {
+			if err := r.QueryBackfill(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
