@@ -497,6 +497,8 @@ func (r *RoomserverQueryAPI) scanEventTree(
 ) (resultNIDs []types.EventNID, err error) {
 	var allowed bool
 	var events []types.Event
+	var next []string
+	var pre string
 
 	resultNIDs = make([]types.EventNID, 0, limit)
 
@@ -505,7 +507,10 @@ func (r *RoomserverQueryAPI) scanEventTree(
 	// "prev_event" key.
 BFSLoop:
 	for len(front) > 0 {
-		var next []string
+		// Prevent unnecessary allocations: reset the slice only when not empty.
+		if len(next) > 0 {
+			next = make([]string, 0)
+		}
 		// Retrieve the events to process from the database.
 		events, err = r.DB.EventsFromIDs(ctx, front)
 		if err != nil {
@@ -520,7 +525,7 @@ BFSLoop:
 			// Update the list of events to retrieve.
 			resultNIDs = append(resultNIDs, ev.EventNID)
 			// Loop through the event's parents.
-			for _, pre := range ev.PrevEventIDs() {
+			for _, pre = range ev.PrevEventIDs() {
 				// Only add an event to the list of next events to process if it
 				// hasn't been seen before.
 				if !visited[pre] {
