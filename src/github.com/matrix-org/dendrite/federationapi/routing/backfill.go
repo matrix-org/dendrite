@@ -1,3 +1,5 @@
+// Copyright 2018 New Vector Ltd
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -18,6 +20,8 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -30,6 +34,7 @@ func Backfill(
 	request *gomatrixserverlib.FederationRequest,
 	query api.RoomserverQueryAPI,
 	roomID string,
+	cfg config.Dendrite,
 ) util.JSONResponse {
 	var res api.QueryBackfillResponse
 	var eIDs []string
@@ -84,11 +89,14 @@ func Backfill(
 			evs = append(evs, ev)
 		}
 	}
-	res.Events = evs
+
+	txn := types.NewTransaction()
+	txn.Origin = cfg.Matrix.ServerName
+	txn.PDUs = evs
 
 	// Send the events to the client.
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: res,
+		JSON: txn,
 	}
 }

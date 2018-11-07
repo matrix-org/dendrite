@@ -224,7 +224,7 @@ func Setup(
 		"federation_backfill", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
-			return Backfill(httpReq, request, query, vars["roomID"])
+			return Backfill(httpReq, request, query, vars["roomID"], cfg)
 		},
 	)).Methods(http.MethodGet)
 }
