@@ -500,9 +500,9 @@ func (r *RoomserverQueryAPI) scanEventTree(
 
 	resultNIDs = make([]types.EventNID, 0, limit)
 
-	// Loop through the event IDs to retrieve the related events and go through
-	// the whole tree (up to the provided limit) using the events' "prev_event"
-	// key.
+	// Loop through the event IDs to retrieve the requested events and go
+	// through the whole tree (up to the provided limit) using the events'
+	// "prev_event" key.
 BFSLoop:
 	for len(front) > 0 {
 		var next []string
@@ -539,6 +539,7 @@ BFSLoop:
 				}
 			}
 		}
+		// Repeat the same process with the parent events we just processed.
 		front = next
 	}
 
