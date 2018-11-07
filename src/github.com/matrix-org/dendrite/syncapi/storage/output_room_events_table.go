@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"sort"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 
@@ -65,7 +66,7 @@ const selectEventsSQL = "" +
 const selectRecentEventsSQL = "" +
 	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC LIMIT $4"
+	" ORDER BY id DESC LIMIT $4"
 
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
@@ -234,6 +235,12 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	if err != nil {
 		return nil, err
 	}
+	// The events need to be returned from oldest to latest, which isn't
+	// necessary the way the SQL query returns them, so a sort is necessary to
+	// ensure the events are in the right order in the slice.
+	sort.SliceStable(events, func(i int, j int) bool {
+		return events[i].streamPosition < events[j].streamPosition
+	})
 	return events, nil
 }
 
