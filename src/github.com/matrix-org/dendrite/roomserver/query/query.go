@@ -437,7 +437,6 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	request *api.QueryMissingEventsRequest,
 	response *api.QueryMissingEventsResponse,
 ) error {
-	resultNIDs := make([]types.EventNID, 0, request.Limit)
 	var front []string
 	visited := make(map[string]bool, request.Limit) // request.Limit acts as a hint to size.
 	for _, id := range request.EarliestEvents {
@@ -450,41 +449,106 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 		}
 	}
 
+	resultNIDs, err := r.scanEventTree(ctx, front, visited, request.Limit, request.ServerName)
+	if err != nil {
+		return err
+	}
+
+	response.Events, err = r.loadEvents(ctx, resultNIDs)
+	return err
+}
+
+// QueryBackfill implements api.RoomServerQueryAPI
+func (r *RoomserverQueryAPI) QueryBackfill(
+	ctx context.Context,
+	request *api.QueryBackfillRequest,
+	response *api.QueryBackfillResponse,
+) error {
+	var err error
+	var front []string
+
+	// The limit defines the maximum number of events to retrieve, so it also
+	// defines the highest number of elements in the map below.
+	visited := make(map[string]bool, request.Limit)
+
+	// The provided event IDs have already been seen by the request's emitter,
+	// and will be retrieved anyway, so there's no need to care about them if
+	// they appear in our exploration of the event tree.
+	for _, id := range request.EarliestEventsIDs {
+		visited[id] = true
+	}
+
+	front = request.EarliestEventsIDs
+
+	// Scan the event tree for events to send back.
+	resultNIDs, err := r.scanEventTree(ctx, front, visited, request.Limit, request.ServerName)
+	if err != nil {
+		return err
+	}
+
+	// Retrieve events from the list that was filled previously.
+	response.Events, err = r.loadEvents(ctx, resultNIDs)
+	return err
+}
+
+func (r *RoomserverQueryAPI) scanEventTree(
+	ctx context.Context, front []string, visited map[string]bool, limit int,
+	serverName gomatrixserverlib.ServerName,
+) (resultNIDs []types.EventNID, err error) {
+	var allowed bool
+	var events []types.Event
+	var next []string
+	var pre string
+
+	resultNIDs = make([]types.EventNID, 0, limit)
+
+	// Loop through the event IDs to retrieve the requested events and go
+	// through the whole tree (up to the provided limit) using the events'
+	// "prev_event" key.
 BFSLoop:
 	for len(front) > 0 {
-		var next []string
-		events, err := r.DB.EventsFromIDs(ctx, front)
+		// Prevent unnecessary allocations: reset the slice only when not empty.
+		if len(next) > 0 {
+			next = make([]string, 0)
+		}
+		// Retrieve the events to process from the database.
+		events, err = r.DB.EventsFromIDs(ctx, front)
 		if err != nil {
-			return err
+			return
 		}
 
 		for _, ev := range events {
-			if len(resultNIDs) > request.Limit {
+			// Break out of the loop if the provided limit is reached.
+			if len(resultNIDs) == limit {
 				break BFSLoop
 			}
+			// Update the list of events to retrieve.
 			resultNIDs = append(resultNIDs, ev.EventNID)
-			for _, pre := range ev.PrevEventIDs() {
+			// Loop through the event's parents.
+			for _, pre = range ev.PrevEventIDs() {
+				// Only add an event to the list of next events to process if it
+				// hasn't been seen before.
 				if !visited[pre] {
 					visited[pre] = true
-					allowed, err := r.checkServerAllowedToSeeEvent(
-						ctx, ev.EventID(), request.ServerName,
-					)
+					allowed, err = r.checkServerAllowedToSeeEvent(ctx, pre, serverName)
 					if err != nil {
-						return err
+						return
 					}
 
+					// If the event hasn't been seen before and the HS
+					// requesting to retrieve it is allowed to do so, add it to
+					// the list of events to retrieve.
 					if allowed {
 						next = append(next, pre)
 					}
 				}
 			}
 		}
+		// Repeat the same process with the parent events we just processed.
 		front = next
 	}
 
-	var err error
-	response.Events, err = r.loadEvents(ctx, resultNIDs)
-	return err
+	return
 }
 
 // QueryStateAndAuthChain implements api.RoomserverQueryAPI
@@ -703,6 +767,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryStateAndAuthChain(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryBackfillPath,
+		common.MakeInternalAPI("QueryBackfill", func(req *http.Request) util.JSONResponse {
+			var request api.QueryBackfillRequest
+			var response api.QueryBackfillResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryBackfill(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

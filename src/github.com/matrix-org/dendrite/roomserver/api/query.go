@@ -214,6 +214,22 @@ type QueryStateAndAuthChainResponse struct {
 	AuthChainEvents []gomatrixserverlib.Event `json:"auth_chain_events"`
 }
 
+// QueryBackfillRequest is a request to QueryBackfill.
+type QueryBackfillRequest struct {
+	// Events to start paginating from.
+	EarliestEventsIDs []string `json:"earliest_event_ids"`
+	// The maximum number of events to retrieve.
+	Limit int `json:"limit"`
+	// The server interested in the events.
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+}
+
+// QueryBackfillResponse is a response to QueryBackfill.
+type QueryBackfillResponse struct {
+	// Missing events, arbritrary order.
+	Events []gomatrixserverlib.Event `json:"events"`
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -280,6 +296,13 @@ type RoomserverQueryAPI interface {
 		request *QueryStateAndAuthChainRequest,
 		response *QueryStateAndAuthChainResponse,
 	) error
+
+	// Query a given amount (or less) of events prior to a given set of events.
+	QueryBackfill(
+		ctx context.Context,
+		request *QueryBackfillRequest,
+		response *QueryBackfillResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -308,6 +331,9 @@ const RoomserverQueryMissingEventsPath = "/api/roomserver/queryMissingEvents"
 
 // RoomserverQueryStateAndAuthChainPath is the HTTP path for the QueryStateAndAuthChain API
 const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthChain"
+
+// RoomserverQueryBackfillPath is the HTTP path for the QueryMissingEvents API
+const RoomserverQueryBackfillPath = "/api/roomserver/QueryBackfill"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -437,5 +463,18 @@ func (h *httpRoomserverQueryAPI) QueryStateAndAuthChain(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryStateAndAuthChainPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryBackfill implements RoomServerQueryAPI
+func (h *httpRoomserverQueryAPI) QueryBackfill(
+	ctx context.Context,
+	request *QueryBackfillRequest,
+	response *QueryBackfillResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBackfill")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryMissingEventsPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
