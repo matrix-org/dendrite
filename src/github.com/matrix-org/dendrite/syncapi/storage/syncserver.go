@@ -310,6 +310,11 @@ func (d *SyncServerDatabase) CompleteSync(
 
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
+		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
+			jr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
+		} else {
+			jr.Timeline.PrevBatch = recentStreamEvents[0].streamPosition.String()
+		}
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
 		jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
@@ -439,6 +444,11 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 	switch delta.membership {
 	case "join":
 		jr := types.NewJoinResponse()
+		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
+			jr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
+		} else {
+			jr.Timeline.PrevBatch = recentStreamEvents[0].streamPosition.String()
+		}
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -449,6 +459,11 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		// TODO: recentEvents may contain events that this user is not allowed to see because they are
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
+		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
+			lr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
+		} else {
+			lr.Timeline.PrevBatch = recentStreamEvents[0].streamPosition.String()
+		}
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
