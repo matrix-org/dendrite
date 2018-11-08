@@ -68,6 +68,11 @@ const selectRecentEventsSQL = "" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
+const selectEarlyEventsSQL = "" +
+	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
+	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
+	" ORDER BY id ASC LIMIT $4"
+
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
 
@@ -83,6 +88,7 @@ type outputRoomEventsStatements struct {
 	selectEventsStmt       *sql.Stmt
 	selectMaxEventIDStmt   *sql.Stmt
 	selectRecentEventsStmt *sql.Stmt
+	selectEarlyEventsStmt  *sql.Stmt
 	selectStateInRangeStmt *sql.Stmt
 }
 
@@ -101,6 +107,9 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
+		return
+	}
+	if s.selectEarlyEventsStmt, err = db.Prepare(selectEarlyEventsSQL); err != nil {
 		return
 	}
 	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
@@ -171,7 +180,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 
 		eventIDToEvent[ev.EventID()] = StreamEvent{
 			Event:          ev,
-			streamPosition: types.StreamPosition(streamPos),
+			StreamPosition: types.StreamPosition(streamPos),
 		}
 	}
 
@@ -224,6 +233,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 func (s *outputRoomEventsStatements) selectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	chronologicalOrder bool,
 ) ([]StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectRecentEventsStmt)
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
@@ -235,12 +245,33 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	if err != nil {
 		return nil, err
 	}
-	// The events need to be returned from oldest to latest, which isn't
-	// necessary the way the SQL query returns them, so a sort is necessary to
-	// ensure the events are in the right order in the slice.
-	sort.SliceStable(events, func(i int, j int) bool {
-		return events[i].streamPosition < events[j].streamPosition
-	})
+	if chronologicalOrder {
+		// The events need to be returned from oldest to latest, which isn't
+		// necessary the way the SQL query returns them, so a sort is necessary to
+		// ensure the events are in the right order in the slice.
+		sort.SliceStable(events, func(i int, j int) bool {
+			return events[i].StreamPosition < events[j].StreamPosition
+		})
+	}
+	return events, nil
+}
+
+// selectEarlyEvents returns the earliest events in the given room, starting
+// from a given position, up to a maximum of 'limit'.
+func (s *outputRoomEventsStatements) selectEarlyEvents(
+	ctx context.Context, txn *sql.Tx,
+	roomID string, fromPos, toPos types.StreamPosition, limit int,
+) ([]StreamEvent, error) {
+	stmt := common.TxStmt(txn, s.selectEarlyEventsStmt)
+	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() // nolint: errcheck
+	events, err := rowsToStreamEvents(rows)
+	if err != nil {
+		return nil, err
+	}
 	return events, nil
 }
 
@@ -286,8 +317,8 @@ func rowsToStreamEvents(rows *sql.Rows) ([]StreamEvent, error) {
 
 		result = append(result, StreamEvent{
 			Event:          ev,
-			streamPosition: types.StreamPosition(streamPos),
-			transactionID:  transactionID,
+			StreamPosition: types.StreamPosition(streamPos),
+			TransactionID:  transactionID,
 		})
 	}
 	return result, nil

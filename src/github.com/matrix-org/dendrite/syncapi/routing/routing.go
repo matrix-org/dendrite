@@ -54,4 +54,9 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServer
 		vars := mux.Vars(req)
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], vars["stateKey"])
 	})).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/rooms/{roomID}/messages", common.MakeAuthAPI("room_messages", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		vars := mux.Vars(req)
+		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"])
+	})).Methods(http.MethodGet, http.MethodOptions)
 }

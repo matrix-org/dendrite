@@ -43,8 +43,8 @@ type stateDelta struct {
 // position for this event.
 type StreamEvent struct {
 	gomatrixserverlib.Event
-	streamPosition types.StreamPosition
-	transactionID  *api.TransactionID
+	StreamPosition types.StreamPosition
+	TransactionID  *api.TransactionID
 }
 
 // SyncServerDatabase represents a sync server database
@@ -100,7 +100,7 @@ func (d *SyncServerDatabase) Events(ctx context.Context, eventIDs []string) ([]g
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return streamEventsToEvents(nil, streamEvents), nil
+	return StreamEventsToEvents(nil, streamEvents), nil
 }
 
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
@@ -185,6 +185,24 @@ func (d *SyncServerDatabase) GetStateEventsForRoom(
 		return err
 	})
 	return
+}
+
+// GetEventsInRange retrieves all of the events on a given ordering using the
+// given extremities and limit.
+func (d *SyncServerDatabase) GetEventsInRange(
+	ctx context.Context,
+	from, to types.StreamPosition,
+	roomID string, limit int,
+	backwardOrdering bool,
+) (events []StreamEvent, err error) {
+
+	if backwardOrdering {
+		// We need all events matching to < streamPos < from
+		return d.events.selectRecentEvents(ctx, nil, roomID, to, from, limit, false)
+	}
+
+	// We need all events from < streamPos < to
+	return d.events.selectEarlyEvents(ctx, nil, roomID, from, to, limit)
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
@@ -299,7 +317,8 @@ func (d *SyncServerDatabase) CompleteSync(
 		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 		var recentStreamEvents []StreamEvent
 		recentStreamEvents, err = d.events.selectRecentEvents(
-			ctx, txn, roomID, types.StreamPosition(0), pos, numRecentEventsPerRoom,
+			ctx, txn, roomID, types.StreamPosition(0), pos,
+			numRecentEventsPerRoom, true,
 		)
 		if err != nil {
 			return nil, err
@@ -307,8 +326,7 @@ func (d *SyncServerDatabase) CompleteSync(
 
 		// We don't include a device here as we don't need to send down
 		// transaction IDs for complete syncs
-		recentEvents := streamEventsToEvents(nil, recentStreamEvents)
-
+		recentEvents := StreamEventsToEvents(nil, recentStreamEvents)
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
@@ -424,12 +442,12 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		endPos = delta.membershipPos
 	}
 	recentStreamEvents, err := d.events.selectRecentEvents(
-		ctx, txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom,
+		ctx, txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom, true,
 	)
 	if err != nil {
 		return err
 	}
-	recentEvents := streamEventsToEvents(device, recentStreamEvents)
+	recentEvents := StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 
 	// Don't bother appending empty room entries
@@ -586,7 +604,7 @@ func (d *SyncServerDatabase) getStateDeltas(
 					}
 					s := make([]StreamEvent, len(allState))
 					for i := 0; i < len(s); i++ {
-						s[i] = StreamEvent{Event: allState[i], streamPosition: types.StreamPosition(0)}
+						s[i] = StreamEvent{Event: allState[i], StreamPosition: types.StreamPosition(0)}
 					}
 					state[roomID] = s
 					continue // we'll add this room in when we do joined rooms
@@ -594,8 +612,8 @@ func (d *SyncServerDatabase) getStateDeltas(
 
 				deltas = append(deltas, stateDelta{
 					membership:    membership,
-					membershipPos: ev.streamPosition,
-					stateEvents:   streamEventsToEvents(device, stateStreamEvents),
+					membershipPos: ev.StreamPosition,
+					stateEvents:   StreamEventsToEvents(device, stateStreamEvents),
 					roomID:        roomID,
 				})
 				break
@@ -611,7 +629,7 @@ func (d *SyncServerDatabase) getStateDeltas(
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, stateDelta{
 			membership:  "join",
-			stateEvents: streamEventsToEvents(device, state[joinedRoomID]),
+			stateEvents: StreamEventsToEvents(device, state[joinedRoomID]),
 			roomID:      joinedRoomID,
 		})
 	}
@@ -619,17 +637,17 @@ func (d *SyncServerDatabase) getStateDeltas(
 	return deltas, nil
 }
 
-// streamEventsToEvents converts StreamEvent to Event. If device is non-nil and
+// StreamEventsToEvents converts StreamEvent to Event. If device is non-nil and
 // matches the streamevent.transactionID device then the transaction ID gets
 // added to the unsigned section of the output event.
-func streamEventsToEvents(device *authtypes.Device, in []StreamEvent) []gomatrixserverlib.Event {
+func StreamEventsToEvents(device *authtypes.Device, in []StreamEvent) []gomatrixserverlib.Event {
 	out := make([]gomatrixserverlib.Event, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].Event
-		if device != nil && in[i].transactionID != nil {
-			if device.UserID == in[i].Sender() && device.ID == in[i].transactionID.DeviceID {
+		if device != nil && in[i].TransactionID != nil {
+			if device.UserID == in[i].Sender() && device.ID == in[i].TransactionID.DeviceID {
 				err := out[i].SetUnsignedField(
-					"transaction_id", in[i].transactionID.TransactionID,
+					"transaction_id", in[i].TransactionID.TransactionID,
 				)
 				if err != nil {
 					logrus.WithFields(logrus.Fields{
