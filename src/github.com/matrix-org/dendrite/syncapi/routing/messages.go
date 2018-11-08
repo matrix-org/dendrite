@@ -15,12 +15,14 @@
 package routing
 
 import (
-	// "encoding/json"
+	"context"
 	"net/http"
 	"strconv"
 
-	// "github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -36,9 +38,18 @@ type messageResp struct {
 
 const defaultMessagesLimit = 10
 
-func OnIncomingMessagesRequest(req *http.Request, db *storage.SyncServerDatabase, roomID string) util.JSONResponse {
+// OnIncomingMessagesRequest implements the /messages endpoint from the
+// client-server API.
+// See: https://matrix.org/docs/spec/client_server/r0.4.0.html#get-matrix-client-r0-rooms-roomid-messages
+func OnIncomingMessagesRequest(
+	req *http.Request, db *storage.SyncServerDatabase, roomID string,
+	federation *gomatrixserverlib.FederationClient,
+	queryAPI api.RoomserverQueryAPI,
+	cfg *config.Dendrite,
+) util.JSONResponse {
 	var from, to int
 	var err error
+
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
 	from, err = strconv.Atoi(req.URL.Query().Get("from"))
@@ -58,8 +69,12 @@ func OnIncomingMessagesRequest(req *http.Request, db *storage.SyncServerDatabase
 			JSON: jsonerror.MissingArgument("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
 	}
+	// A boolean is easier to handle in this case, especially since dir is sure
+	// to have one of the two accepted values (so dir == "f" <=> !backwardOrdering).
 	backwardOrdering := (dir == "b")
 
+	// Pagination tokens. To is optional, and its default value depends on the
+	// direction ("b" or "f").
 	toStr := req.URL.Query().Get("to")
 	var toPos types.StreamPosition
 	if len(toStr) > 0 {
@@ -72,13 +87,12 @@ func OnIncomingMessagesRequest(req *http.Request, db *storage.SyncServerDatabase
 		}
 		toPos = types.StreamPosition(to)
 	} else {
-		if backwardOrdering {
-			toPos = types.StreamPosition(0)
-		} else {
-			toPos, err = db.SyncStreamPosition(req.Context())
-			if err != nil {
-				return jsonerror.InternalServerError()
-			}
+		// If "to" isn't provided, it defaults to either the earliest stream
+		// position (if we're going backward) or to the latest one (if we're
+		// going forward).
+		toPos, err = setToDefault(req.Context(), backwardOrdering, db)
+		if err != nil {
+			return httputil.LogThenError(req, err)
 		}
 	}
 
@@ -104,14 +118,68 @@ func OnIncomingMessagesRequest(req *http.Request, db *storage.SyncServerDatabase
 		}
 	}
 
-	streamEvents, err := db.GetEventsInRange(
-		req.Context(), fromPos, toPos, roomID, limit, backwardOrdering,
+	clientEvents, start, end, err := retrieveEvents(
+		req.Context(), db, roomID, fromPos, toPos, toStr, limit, backwardOrdering,
+		federation, queryAPI, cfg,
 	)
 	if err != nil {
-		return jsonerror.InternalServerError()
+		return httputil.LogThenError(req, err)
 	}
 
-	// Check if we don't have enough events, i.e. len(sev) < limit and the events
+	// Respond with the events.
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: messageResp{
+			Chunk: clientEvents,
+			Start: start,
+			End:   end,
+		},
+	}
+}
+
+// setToDefault returns the default value for the "to" query parameter of a
+// request to /messages if not provided. It defaults to either the earliest
+// stream position (if we're going backward) or to the latest one (if we're
+// going forward).
+// Returns an error if there was an issue with retrieving the latest position
+// from the database
+func setToDefault(
+	ctx context.Context, backwardOrdering bool, db *storage.SyncServerDatabase,
+) (toPos types.StreamPosition, err error) {
+	if backwardOrdering {
+		toPos = types.StreamPosition(1)
+	} else {
+		toPos, err = db.SyncStreamPosition(ctx)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+// retrieveEvents retrieve events from the local database for a request on
+// /messages. If there's not enough events to retrieve, it asks another
+// homeserver in the room for older events.
+// Returns an error if there was an issue talking to the database or with the
+// remote homeserver.
+func retrieveEvents(
+	ctx context.Context, db *storage.SyncServerDatabase, roomID string,
+	fromPos, toPos types.StreamPosition, toStr string, limit int,
+	backwardOrdering bool,
+	federation *gomatrixserverlib.FederationClient,
+	queryAPI api.RoomserverQueryAPI,
+	cfg *config.Dendrite,
+) (clientEvents []gomatrixserverlib.ClientEvent, start string, end string, err error) {
+	// Retrieve the events from the local database.
+	streamEvents, err := db.GetEventsInRange(
+		ctx, fromPos, toPos, roomID, limit, backwardOrdering,
+	)
+	if err != nil {
+		return
+	}
+
+	// Check if we have enough events.
 	isSetLargeEnough := true
 	if len(streamEvents) < limit {
 		if backwardOrdering {
@@ -121,50 +189,121 @@ func OnIncomingMessagesRequest(req *http.Request, db *storage.SyncServerDatabase
 				isSetLargeEnough = (toPos-1 == streamEvents[0].StreamPosition)
 			}
 		} else {
-			// We need all events from < streamPos < to
 			isSetLargeEnough = (fromPos-1 == streamEvents[0].StreamPosition)
 		}
 	}
+
 	// Check if earliest event is a backward extremity, i.e. if one of its
-	// previous events is missing from the db.
+	// previous events is missing from the database.
+	// Get the earliest retrieved event's parents.
 	prevIDs := streamEvents[0].PrevEventIDs()
-	prevs, err := db.Events(req.Context(), prevIDs)
+	prevs, err := db.Events(ctx, prevIDs)
+	if err != nil {
+		return
+	}
+	// Check if we have all of the events we requested. If not, it means we've
+	// reached a backard extremity.
 	var eventInDB, isBackwardExtremity bool
 	var id string
+	// Iterate over the IDs we used in the request.
 	for _, id = range prevIDs {
 		eventInDB = false
+		// Iterate over the events we got in response.
 		for _, ev := range prevs {
 			if ev.EventID() == id {
 				eventInDB = true
 			}
 		}
+		// One occurrence of one the event's parents not being present in the
+		// database is enough to say that the event is a backward extremity.
 		if !eventInDB {
 			isBackwardExtremity = true
 			break
 		}
 	}
 
-	if isBackwardExtremity && !isSetLargeEnough {
-		log.WithFields(log.Fields{
-			"limit":               limit,
-			"nb_events":           len(streamEvents),
-			"from":                fromPos.String(),
-			"to":                  toPos.String(),
-			"isBackwardExtremity": isBackwardExtremity,
-			"isSetLargeEnough":    isSetLargeEnough,
-		}).Info("Backfilling!")
-		println("Backfilling!")
+	var events []gomatrixserverlib.Event
+
+	// Backfill is needed if we've reached a backward extremity and need more
+	// events. It's only needed if the direction is backard.
+	if isBackwardExtremity && !isSetLargeEnough && backwardOrdering {
+		var pdus []gomatrixserverlib.Event
+		// Only ask the remote server for enough events to reach the limit.
+		pdus, err = backfill(
+			ctx, roomID, streamEvents[0].EventID(), limit-len(streamEvents),
+			queryAPI, cfg, federation,
+		)
+		if err != nil {
+			return
+		}
+
+		events = append(events, pdus...)
 	}
 
-	events := storage.StreamEventsToEvents(nil, streamEvents)
-	clientEvents := gomatrixserverlib.ToClientEvents(events, gomatrixserverlib.FormatAll)
+	// Append the events we retrieved locally, then convert them into client
+	// events.
+	events = append(events, storage.StreamEventsToEvents(nil, streamEvents)...)
+	clientEvents = gomatrixserverlib.ToClientEvents(events, gomatrixserverlib.FormatAll)
+	start = streamEvents[0].StreamPosition.String()
+	end = streamEvents[len(streamEvents)-1].StreamPosition.String()
 
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: messageResp{
-			Chunk: clientEvents,
-			Start: streamEvents[0].StreamPosition.String(),
-			End:   streamEvents[len(streamEvents)-1].StreamPosition.String(),
-		},
+	return
+}
+
+// backfill performs a backfill request over the federation on another
+// homeserver in the room.
+// See: https://matrix.org/docs/spec/server_server/unstable.html#get-matrix-federation-v1-backfill-roomid
+// Returns with an empty string if the remote homeserver didn't return with any
+// event, or if there is no remote homeserver to contact.
+// Returns an error if there was an issue with retrieving the list of servers in
+// the room or sending the request.
+func backfill(
+	ctx context.Context, roomID, fromEventID string, limit int,
+	queryAPI api.RoomserverQueryAPI, cfg *config.Dendrite,
+	federation *gomatrixserverlib.FederationClient,
+) ([]gomatrixserverlib.Event, error) {
+	// Query the list of servers in the room when the earlier event we know
+	// of was sent.
+	var serversResponse api.QueryServersInRoomAtEventResponse
+	serversRequest := api.QueryServersInRoomAtEventRequest{
+		RoomID:  roomID,
+		EventID: fromEventID,
 	}
+	if err := queryAPI.QueryServersInRoomAtEvent(ctx, &serversRequest, &serversResponse); err != nil {
+		return nil, err
+	}
+
+	// Use the first server from the response, except if that server is us.
+	// In that case, use the second one if the roomserver responded with
+	// enough servers. If not, use an empty string to prevent the backfill
+	// from happening as there's no server to direct the request towards.
+	// TODO: Be smarter at selecting the server to direct the request
+	// towards.
+	srvToBackfillFrom := serversResponse.Servers[0]
+	if srvToBackfillFrom == cfg.Matrix.ServerName {
+		if len(serversResponse.Servers) > 1 {
+			srvToBackfillFrom = serversResponse.Servers[1]
+		} else {
+			srvToBackfillFrom = gomatrixserverlib.ServerName("")
+			log.Warn("Not enough servers to backfill from")
+		}
+	}
+
+	pdus := make([]gomatrixserverlib.Event, 0)
+
+	// If the roomserver responded with at least one server that isn't us,
+	// send it a request for backfill.
+	if len(srvToBackfillFrom) > 0 {
+		txn, err := federation.Backfill(
+			ctx, srvToBackfillFrom, roomID, limit, []string{fromEventID},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO: Store the events in the database.
+		pdus = txn.PDUs
+	}
+
+	return pdus, nil
 }

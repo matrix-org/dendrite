@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
@@ -29,6 +30,8 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
+
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // SetupSyncAPIComponent sets up and registers HTTP handlers for the SyncAPI
@@ -38,6 +41,8 @@ func SetupSyncAPIComponent(
 	deviceDB *devices.Database,
 	accountsDB *accounts.Database,
 	queryAPI api.RoomserverQueryAPI,
+	federation *gomatrixserverlib.FederationClient,
+	cfg *config.Dendrite,
 ) {
 	syncDB, err := storage.NewSyncServerDatabase(string(base.Cfg.Database.SyncAPI))
 	if err != nil {
@@ -71,5 +76,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB)
+	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, federation, queryAPI, cfg)
 }
