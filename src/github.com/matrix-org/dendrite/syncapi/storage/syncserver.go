@@ -313,7 +313,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
 			jr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
 		} else {
-			jr.Timeline.PrevBatch = recentStreamEvents[0].streamPosition.String()
+			jr.Timeline.PrevBatch = types.StreamPosition(1).String()
 		}
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
@@ -447,7 +447,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
 			jr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
 		} else {
-			jr.Timeline.PrevBatch = recentStreamEvents[0].streamPosition.String()
+			jr.Timeline.PrevBatch = types.StreamPosition(1).String()
 		}
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
@@ -462,7 +462,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
 			lr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
 		} else {
-			lr.Timeline.PrevBatch = recentStreamEvents[0].streamPosition.String()
+			lr.Timeline.PrevBatch = types.StreamPosition(1).String()
 		}
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
