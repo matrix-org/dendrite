@@ -114,7 +114,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
 	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
-) (map[string]map[string]bool, map[string]streamEvent, error) {
+) (map[string]map[string]bool, map[string]StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(ctx, oldPos, newPos)
@@ -126,7 +126,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
 	// For each room, map cumulative event IDs to events and return. This may need to a batch SELECT based on event ID
 	// if they aren't in the event ID cache. We don't handle state deletion yet.
-	eventIDToEvent := make(map[string]streamEvent)
+	eventIDToEvent := make(map[string]StreamEvent)
 
 	// RoomID => A set (map[string]bool) of state event IDs which are between the two positions
 	stateNeeded := make(map[string]map[string]bool)
@@ -169,7 +169,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 		}
 		stateNeeded[ev.RoomID()] = needSet
 
-		eventIDToEvent[ev.EventID()] = streamEvent{
+		eventIDToEvent[ev.EventID()] = StreamEvent{
 			Event:          ev,
 			streamPosition: types.StreamPosition(streamPos),
 		}
@@ -224,7 +224,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 func (s *outputRoomEventsStatements) selectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, fromPos, toPos types.StreamPosition, limit int,
-) ([]streamEvent, error) {
+) ([]StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectRecentEventsStmt)
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
 	if err != nil {
@@ -248,7 +248,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 // from the database.
 func (s *outputRoomEventsStatements) selectEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
-) ([]streamEvent, error) {
+) ([]StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectEventsStmt)
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
@@ -258,8 +258,8 @@ func (s *outputRoomEventsStatements) selectEvents(
 	return rowsToStreamEvents(rows)
 }
 
-func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
-	var result []streamEvent
+func rowsToStreamEvents(rows *sql.Rows) ([]StreamEvent, error) {
+	var result []StreamEvent
 	for rows.Next() {
 		var (
 			streamPos     int64
@@ -284,7 +284,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 			}
 		}
 
-		result = append(result, streamEvent{
+		result = append(result, StreamEvent{
 			Event:          ev,
 			streamPosition: types.StreamPosition(streamPos),
 			transactionID:  transactionID,

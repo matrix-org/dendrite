@@ -205,7 +205,7 @@ func (s *currentRoomStateStatements) upsertRoomState(
 
 func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
-) ([]streamEvent, error) {
+) ([]StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectEventsWithEventIDsStmt)
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
