@@ -196,37 +196,17 @@ func retrieveEvents(
 	// Check if earliest event is a backward extremity, i.e. if one of its
 	// previous events is missing from the database.
 	// Get the earliest retrieved event's parents.
-	prevIDs := streamEvents[0].PrevEventIDs()
-	prevs, err := db.Events(ctx, prevIDs)
+
+	backwardExtremity, err := isBackwardExtremity(ctx, &(streamEvents[0]), db)
 	if err != nil {
 		return
-	}
-	// Check if we have all of the events we requested. If not, it means we've
-	// reached a backard extremity.
-	var eventInDB, isBackwardExtremity bool
-	var id string
-	// Iterate over the IDs we used in the request.
-	for _, id = range prevIDs {
-		eventInDB = false
-		// Iterate over the events we got in response.
-		for _, ev := range prevs {
-			if ev.EventID() == id {
-				eventInDB = true
-			}
-		}
-		// One occurrence of one the event's parents not being present in the
-		// database is enough to say that the event is a backward extremity.
-		if !eventInDB {
-			isBackwardExtremity = true
-			break
-		}
 	}
 
 	var events []gomatrixserverlib.Event
 
 	// Backfill is needed if we've reached a backward extremity and need more
 	// events. It's only needed if the direction is backard.
-	if isBackwardExtremity && !isSetLargeEnough && backwardOrdering {
+	if backwardExtremity && !isSetLargeEnough && backwardOrdering {
 		var pdus []gomatrixserverlib.Event
 		// Only ask the remote server for enough events to reach the limit.
 		pdus, err = backfill(
@@ -248,6 +228,42 @@ func retrieveEvents(
 	end = streamEvents[len(streamEvents)-1].StreamPosition.String()
 
 	return
+}
+
+// isBackwardExtremity checks if a given event is a backward extremity. It does
+// so by checking the presence in the database of all of its parent events, and
+// consider the event itself a backward extremity if at least one of the parent
+// events doesn't exist in the database.
+// Returns an error if there was an issue with talking to the database.
+func isBackwardExtremity(
+	ctx context.Context, ev *storage.StreamEvent, db *storage.SyncServerDatabase,
+) (bool, error) {
+	prevIDs := ev.PrevEventIDs()
+	prevs, err := db.Events(ctx, prevIDs)
+	if err != nil {
+		return false, nil
+	}
+	// Check if we have all of the events we requested. If not, it means we've
+	// reached a backard extremity.
+	var eventInDB bool
+	var id string
+	// Iterate over the IDs we used in the request.
+	for _, id = range prevIDs {
+		eventInDB = false
+		// Iterate over the events we got in response.
+		for _, ev := range prevs {
+			if ev.EventID() == id {
+				eventInDB = true
+			}
+		}
+		// One occurrence of one the event's parents not being present in the
+		// database is enough to say that the event is a backward extremity.
+		if !eventInDB {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // backfill performs a backfill request over the federation on another
