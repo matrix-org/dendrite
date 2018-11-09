@@ -317,7 +317,10 @@ func backfill(
 			return nil, err
 		}
 
-		// TODO: Store the events in the database.
+		// TODO: Store the events in the database. The remaining question to
+		// make this possible is what to assign to the new events' stream
+		// position (negative integers? change the stream position format into a
+		// timestamp-based one?...)
 		pdus = txn.PDUs
 	}
 
