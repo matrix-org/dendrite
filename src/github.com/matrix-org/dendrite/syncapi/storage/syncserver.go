@@ -43,8 +43,9 @@ type stateDelta struct {
 // position for this event.
 type StreamEvent struct {
 	gomatrixserverlib.Event
-	StreamPosition types.StreamPosition
-	TransactionID  *api.TransactionID
+	StreamPosition  types.StreamPosition
+	TransactionID   *api.TransactionID
+	ExcludeFromSync bool
 }
 
 // SyncServerDatabase represents a sync server database
@@ -111,11 +112,13 @@ func (d *SyncServerDatabase) WriteEvent(
 	ev *gomatrixserverlib.Event,
 	addStateEvents []gomatrixserverlib.Event,
 	addStateEventIDs, removeStateEventIDs []string,
-	transactionID *api.TransactionID,
+	transactionID *api.TransactionID, excludeFromSync bool,
 ) (streamPos types.StreamPosition, returnErr error) {
 	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
-		pos, err := d.events.insertEvent(ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID)
+		pos, err := d.events.insertEvent(
+			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
+		)
 		if err != nil {
 			return err
 		}
@@ -198,7 +201,7 @@ func (d *SyncServerDatabase) GetEventsInRange(
 
 	if backwardOrdering {
 		// We need all events matching to < streamPos < from
-		return d.events.selectRecentEvents(ctx, nil, roomID, to, from, limit, false)
+		return d.events.selectRecentEvents(ctx, nil, roomID, to, from, limit, false, false)
 	}
 
 	// We need all events from < streamPos < to
@@ -318,7 +321,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		var recentStreamEvents []StreamEvent
 		recentStreamEvents, err = d.events.selectRecentEvents(
 			ctx, txn, roomID, types.StreamPosition(0), pos,
-			numRecentEventsPerRoom, true,
+			numRecentEventsPerRoom, true, true,
 		)
 		if err != nil {
 			return nil, err
@@ -447,7 +450,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		endPos = delta.membershipPos
 	}
 	recentStreamEvents, err := d.events.selectRecentEvents(
-		ctx, txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom, true,
+		ctx, txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom, true, true,
 	)
 	if err != nil {
 		return err
