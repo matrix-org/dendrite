@@ -46,6 +46,8 @@ require (
 	github.com/tidwall/match v0.0.0-20171002075945-1731857f09b1
 	github.com/tidwall/sjson v1.0.0
 	github.com/uber-go/atomic v1.3.0
+	github.com/uber/jaeger-client-go v2.15.0+incompatible
+	github.com/uber/jaeger-lib v1.5.0
 	github.com/uber/tchannel-go v0.0.0-20170927010734-b3e26487e291
 	go.uber.org/atomic v1.3.0
 	go.uber.org/multierr v0.0.0-20170829224307-fb7d312c2c04
