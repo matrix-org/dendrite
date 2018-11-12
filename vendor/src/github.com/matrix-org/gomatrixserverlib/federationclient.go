@@ -3,6 +3,7 @@ package gomatrixserverlib
 import (
 	"context"
 	"net/url"
+	"strconv"
 
 	"golang.org/x/crypto/ed25519"
 )
@@ -166,6 +167,36 @@ func (ac *FederationClient) LookupRoomAlias(
 ) (res RespDirectory, err error) {
 	path := federationPathPrefix + "/query/directory?room_alias=" +
 		url.QueryEscape(roomAlias)
+	req := NewFederationRequest("GET", s, path)
+	err = ac.doRequest(ctx, req, &res)
+	return
+}
+
+// Backfill asks a homeserver for events early enough for them to not be in the
+// local database.
+// See https://matrix.org/docs/spec/server_server/unstable.html#get-matrix-federation-v1-backfill-roomid
+func (ac *FederationClient) Backfill(
+	ctx context.Context, s ServerName, roomID string, limit int, eventIDs []string,
+) (res Transaction, err error) {
+	// Encode the room ID so it won't interfer with the path.
+	roomID = url.PathEscape(roomID)
+
+	// Parse the limit into a string so that we can include it in the URL's query.
+	limitStr := strconv.Itoa(limit)
+
+	// Define the URL's query.
+	query := url.Values{}
+	query["v"] = eventIDs
+	query.Set("limit", limitStr)
+
+	// Use the url.URL structure to easily generate the request's URI (path?query).
+	u := url.URL{
+		Path:     "/_matrix/federation/v1/backfill/" + roomID + "/",
+		RawQuery: query.Encode(),
+	}
+	path := u.RequestURI()
+
+	// Send the request.
 	req := NewFederationRequest("GET", s, path)
 	err = ac.doRequest(ctx, req, &res)
 	return
