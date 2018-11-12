@@ -149,7 +149,7 @@
 			"importpath": "github.com/matrix-org/gomatrixserverlib",
 			"repository": "https://github.com/matrix-org/gomatrixserverlib",
 			"revision": "1c2cbc0872f0b2f19929dd70d22f77486078641e",
-			"branch": "master"
+			"branch": "HEAD"
 		},
 		{
 			"importpath": "github.com/matrix-org/naffka",
@@ -370,6 +370,34 @@
 			"path": "/ed25519"
 		},
 		{
+			"importpath": "golang.org/x/crypto/internal/subtle",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "e4dc69e5b2fd71dcaf8bd5d054eb936deb78d1fa",
+			"branch": "master",
+			"path": "/internal/subtle"
+		},
+		{
+			"importpath": "golang.org/x/crypto/nacl/secretbox",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "e4dc69e5b2fd71dcaf8bd5d054eb936deb78d1fa",
+			"branch": "master",
+			"path": "/nacl/secretbox"
+		},
+		{
+			"importpath": "golang.org/x/crypto/poly1305",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "e4dc69e5b2fd71dcaf8bd5d054eb936deb78d1fa",
+			"branch": "master",
+			"path": "/poly1305"
+		},
+		{
+			"importpath": "golang.org/x/crypto/salsa20/salsa",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "e4dc69e5b2fd71dcaf8bd5d054eb936deb78d1fa",
+			"branch": "master",
+			"path": "/salsa20/salsa"
+		},
+		{
 			"importpath": "golang.org/x/crypto/ssh",
 			"repository": "https://go.googlesource.com/crypto",
 			"revision": "9419663f5a44be8b34ca85f08abc5fe1be11f8a3",
@@ -453,6 +481,12 @@
 			"importpath": "gopkg.in/h2non/bimg.v1",
 			"repository": "https://gopkg.in/h2non/bimg.v1",
 			"revision": "02e621739c77c791d8c153f240b7a1f75b07816f",
+			"branch": "master"
+		},
+		{
+			"importpath": "gopkg.in/macaroon.v2",
+			"repository": "https://gopkg.in/macaroon.v2",
+			"revision": "bed2a428da6e56d950bed5b41fcbae3141e5b0d0",
 			"branch": "master"
 		},
 		{
