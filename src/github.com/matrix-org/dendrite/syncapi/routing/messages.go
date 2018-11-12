@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -47,19 +48,17 @@ func OnIncomingMessagesRequest(
 	queryAPI api.RoomserverQueryAPI,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-	var from, to int
 	var err error
 
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
-	from, err = strconv.Atoi(req.URL.Query().Get("from"))
+	from, err := types.NewPaginationTokenFromString(req.URL.Query().Get("from"))
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("from could not be parsed into an integer: " + err.Error()),
+			JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
 		}
 	}
-	fromPos := types.StreamPosition(from)
 
 	// Direction to return events from.
 	dir := req.URL.Query().Get("dir")
@@ -75,25 +74,25 @@ func OnIncomingMessagesRequest(
 
 	// Pagination tokens. To is optional, and its default value depends on the
 	// direction ("b" or "f").
-	toStr := req.URL.Query().Get("to")
-	var toPos types.StreamPosition
-	if len(toStr) > 0 {
-		to, err = strconv.Atoi(toStr)
+	var to *types.PaginationToken
+	var toDefault bool
+	if s := req.URL.Query().Get("to"); len(s) > 0 {
+		to, err = types.NewPaginationTokenFromString(s)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("to could not be parsed into an integer: " + err.Error()),
+				JSON: jsonerror.InvalidArgumentValue("Invalid to parameter: " + err.Error()),
 			}
 		}
-		toPos = types.StreamPosition(to)
 	} else {
 		// If "to" isn't provided, it defaults to either the earliest stream
 		// position (if we're going backward) or to the latest one (if we're
 		// going forward).
-		toPos, err = setToDefault(req.Context(), backwardOrdering, db)
+		to, err = setToDefault(req.Context(), db, backwardOrdering, roomID)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
+		toDefault = true
 	}
 
 	// Maximum number of events to return; defaults to 10.
@@ -119,7 +118,7 @@ func OnIncomingMessagesRequest(
 	}
 
 	clientEvents, start, end, err := retrieveEvents(
-		req.Context(), db, roomID, fromPos, toPos, toStr, limit, backwardOrdering,
+		req.Context(), db, roomID, from, to, toDefault, limit, backwardOrdering,
 		federation, queryAPI, cfg,
 	)
 	if err != nil {
@@ -131,28 +130,32 @@ func OnIncomingMessagesRequest(
 		Code: http.StatusOK,
 		JSON: messageResp{
 			Chunk: clientEvents,
-			Start: start,
-			End:   end,
+			Start: start.String(),
+			End:   end.String(),
 		},
 	}
 }
 
 // setToDefault returns the default value for the "to" query parameter of a
 // request to /messages if not provided. It defaults to either the earliest
-// stream position (if we're going backward) or to the latest one (if we're
+// topological position (if we're going backward) or to the latest one (if we're
 // going forward).
 // Returns an error if there was an issue with retrieving the latest position
 // from the database
 func setToDefault(
-	ctx context.Context, backwardOrdering bool, db *storage.SyncServerDatabase,
-) (toPos types.StreamPosition, err error) {
+	ctx context.Context, db *storage.SyncServerDatabase, backwardOrdering bool,
+	roomID string,
+) (to *types.PaginationToken, err error) {
 	if backwardOrdering {
-		toPos = types.StreamPosition(1)
+		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 1)
 	} else {
-		toPos, err = db.SyncStreamPosition(ctx)
+		var pos types.StreamPosition
+		pos, err = db.MaxTopologicalPosition(ctx, roomID)
 		if err != nil {
 			return
 		}
+
+		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, pos)
 	}
 
 	return
@@ -165,15 +168,15 @@ func setToDefault(
 // remote homeserver.
 func retrieveEvents(
 	ctx context.Context, db *storage.SyncServerDatabase, roomID string,
-	fromPos, toPos types.StreamPosition, toStr string, limit int,
+	from, to *types.PaginationToken, toDefault bool, limit int,
 	backwardOrdering bool,
 	federation *gomatrixserverlib.FederationClient,
 	queryAPI api.RoomserverQueryAPI,
 	cfg *config.Dendrite,
-) (clientEvents []gomatrixserverlib.ClientEvent, start string, end string, err error) {
+) (clientEvents []gomatrixserverlib.ClientEvent, start, end *types.PaginationToken, err error) {
 	// Retrieve the events from the local database.
 	streamEvents, err := db.GetEventsInRange(
-		ctx, fromPos, toPos, roomID, limit, backwardOrdering,
+		ctx, from, to, roomID, limit, backwardOrdering,
 	)
 	if err != nil {
 		return
@@ -183,21 +186,20 @@ func retrieveEvents(
 	isSetLargeEnough := true
 	if len(streamEvents) < limit {
 		if backwardOrdering {
-			if len(toStr) > 0 {
+			if !toDefault {
 				// The condition in the SQL query is a strict "greater than" so
 				// we need to check against to-1.
-				isSetLargeEnough = (toPos-1 == streamEvents[0].StreamPosition)
+				isSetLargeEnough = (to.Position-1 == streamEvents[len(streamEvents)-1].StreamPosition)
 			}
 		} else {
-			isSetLargeEnough = (fromPos-1 == streamEvents[0].StreamPosition)
+			isSetLargeEnough = (from.Position-1 == streamEvents[0].StreamPosition)
 		}
 	}
 
-	// Check if earliest event is a backward extremity, i.e. if one of its
-	// previous events is missing from the database.
-	// Get the earliest retrieved event's parents.
-
-	backwardExtremity, err := isBackwardExtremity(ctx, &(streamEvents[0]), db)
+	// Check if the slice contains a backward extremity.
+	backwardExtremity, err := containsBackwardExtremity(
+		ctx, db, streamEvents, backwardOrdering,
+	)
 	if err != nil {
 		return
 	}
@@ -205,39 +207,79 @@ func retrieveEvents(
 	var events []gomatrixserverlib.Event
 
 	// Backfill is needed if we've reached a backward extremity and need more
-	// events. It's only needed if the direction is backard.
+	// events. It's only needed if the direction is backward.
 	if backwardExtremity && !isSetLargeEnough && backwardOrdering {
 		var pdus []gomatrixserverlib.Event
 		// Only ask the remote server for enough events to reach the limit.
 		pdus, err = backfill(
-			ctx, roomID, streamEvents[0].EventID(), limit-len(streamEvents),
+			ctx, db, roomID, streamEvents[0].EventID(), limit-len(streamEvents),
 			queryAPI, cfg, federation,
 		)
 		if err != nil {
 			return
 		}
 
+		// Append the PDUs to the list to send back to the client.
 		events = append(events, pdus...)
 	}
 
-	// Append the events we retrieved locally, then convert them into client
-	// events.
+	// Append the events ve previously retrieved locally.
 	events = append(events, storage.StreamEventsToEvents(nil, streamEvents)...)
+	// Sort the events to ensure we send them in the right order. We currently
+	// do that based on the event's timestamp.
+	if backwardOrdering {
+		sort.SliceStable(events, func(i int, j int) bool {
+			// Backward ordering is antichronological (latest event to oldest
+			// one).
+			return sortEvents(&(events[j]), &(events[i]))
+		})
+	} else {
+		sort.SliceStable(events, func(i int, j int) bool {
+			// Forward ordering is chronological (oldest event to latest one).
+			return sortEvents(&(events[i]), &(events[j]))
+		})
+	}
+
+	// Convert all of the events into client events.
 	clientEvents = gomatrixserverlib.ToClientEvents(events, gomatrixserverlib.FormatAll)
-	start = streamEvents[0].StreamPosition.String()
-	end = streamEvents[len(streamEvents)-1].StreamPosition.String()
+	// Generate pagination tokens to send to the client.
+	start = types.NewPaginationTokenFromTypeAndPosition(
+		types.PaginationTokenTypeTopology, streamEvents[0].StreamPosition,
+	)
+	end = types.NewPaginationTokenFromTypeAndPosition(
+		types.PaginationTokenTypeTopology, streamEvents[len(streamEvents)-1].StreamPosition,
+	)
 
 	return
 }
 
-// isBackwardExtremity checks if a given event is a backward extremity. It does
-// so by checking the presence in the database of all of its parent events, and
-// consider the event itself a backward extremity if at least one of the parent
+// sortEvents is a function to give to sort.SliceStable, and compares the
+// timestamp of two Matrix events.
+// Returns true if the first event happened before the second one, false
+// otherwise.
+func sortEvents(e1 *gomatrixserverlib.Event, e2 *gomatrixserverlib.Event) bool {
+	t := e1.OriginServerTS().Time()
+	return e2.OriginServerTS().Time().After(t)
+}
+
+// containsBackwardExtremity checks if a slice of StreamEvent contains a
+// backward extremity. It does so by selecting the earliest event in the slice
+// and by checking the presence in the database of all of its parent events, and
+// considers the event itself a backward extremity if at least one of the parent
 // events doesn't exist in the database.
 // Returns an error if there was an issue with talking to the database.
-func isBackwardExtremity(
-	ctx context.Context, ev *storage.StreamEvent, db *storage.SyncServerDatabase,
+func containsBackwardExtremity(
+	ctx context.Context, db *storage.SyncServerDatabase,
+	events []storage.StreamEvent, backwardOrdering bool,
 ) (bool, error) {
+	// Select the earliest retrieved event.
+	var ev *storage.StreamEvent
+	if backwardOrdering {
+		ev = &(events[len(events)-1])
+	} else {
+		ev = &(events[0])
+	}
+	// Get the earliest retrieved event's parents.
 	prevIDs := ev.PrevEventIDs()
 	prevs, err := db.Events(ctx, prevIDs)
 	if err != nil {
@@ -269,14 +311,16 @@ func isBackwardExtremity(
 // backfill performs a backfill request over the federation on another
 // homeserver in the room.
 // See: https://matrix.org/docs/spec/server_server/unstable.html#get-matrix-federation-v1-backfill-roomid
+// It also stores the PDUs retrieved from the remote homeserver's response to
+// the database.
 // Returns with an empty string if the remote homeserver didn't return with any
 // event, or if there is no remote homeserver to contact.
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
 func backfill(
-	ctx context.Context, roomID, fromEventID string, limit int,
-	queryAPI api.RoomserverQueryAPI, cfg *config.Dendrite,
-	federation *gomatrixserverlib.FederationClient,
+	ctx context.Context, db *storage.SyncServerDatabase, roomID,
+	fromEventID string, limit int, queryAPI api.RoomserverQueryAPI,
+	cfg *config.Dendrite, federation *gomatrixserverlib.FederationClient,
 ) ([]gomatrixserverlib.Event, error) {
 	// Query the list of servers in the room when the earlier event we know
 	// of was sent.
@@ -317,11 +361,18 @@ func backfill(
 			return nil, err
 		}
 
-		// TODO: Store the events in the database. The remaining question to
-		// make this possible is what to assign to the new events' stream
-		// position (negative integers? change the stream position format into a
-		// timestamp-based one?...)
 		pdus = txn.PDUs
+
+		// Store the events in the database, while marking them as unfit to show
+		// up in responses to sync requests.
+		for _, pdu := range pdus {
+			if _, err = db.WriteEvent(
+				ctx, &pdu, []gomatrixserverlib.Event{}, []string{}, []string{},
+				nil, true,
+			); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return pdus, nil

@@ -55,11 +55,16 @@ const selectPositionInTopologySQL = "" +
 	"SELECT topological_position FROM syncapi_output_room_events_topology" +
 	" WHERE event_id = $1"
 
+const selectMaxPositionInTopologySQL = "" +
+	"SELECT MAX(topological_position) FROM syncapi_output_room_events_topology" +
+	" WHERE room_id = $1"
+
 type outputRoomEventsTopologyStatements struct {
-	insertEventInTopologyStmt     *sql.Stmt
-	selectEventIDsInRangeASCStmt  *sql.Stmt
-	selectEventIDsInRangeDESCStmt *sql.Stmt
-	selectPositionInTopologyStmt  *sql.Stmt
+	insertEventInTopologyStmt       *sql.Stmt
+	selectEventIDsInRangeASCStmt    *sql.Stmt
+	selectEventIDsInRangeDESCStmt   *sql.Stmt
+	selectPositionInTopologyStmt    *sql.Stmt
+	selectMaxPositionInTopologyStmt *sql.Stmt
 }
 
 func (s *outputRoomEventsTopologyStatements) prepare(db *sql.DB) (err error) {
@@ -77,6 +82,9 @@ func (s *outputRoomEventsTopologyStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectPositionInTopologyStmt, err = db.Prepare(selectPositionInTopologySQL); err != nil {
+		return
+	}
+	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
 		return
 	}
 	return
@@ -133,8 +141,15 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 // selectPositionInTopology returns the position of a given event in the
 // topology of the room it belongs to.
 func (s *outputRoomEventsTopologyStatements) selectPositionInTopology(
-	eventID string,
+	ctx context.Context, eventID string,
 ) (pos types.StreamPosition, err error) {
-	err = s.selectPositionInTopologyStmt.QueryRow(eventID).Scan(&pos)
+	err = s.selectPositionInTopologyStmt.QueryRowContext(ctx, eventID).Scan(&pos)
+	return
+}
+
+func (s *outputRoomEventsTopologyStatements) selectMaxPositionInTopology(
+	ctx context.Context, roomID string,
+) (pos types.StreamPosition, err error) {
+	err = s.selectMaxPositionInTopologyStmt.QueryRowContext(ctx, roomID).Scan(&pos)
 	return
 }

@@ -202,18 +202,71 @@ func (d *SyncServerDatabase) GetStateEventsForRoom(
 // given extremities and limit.
 func (d *SyncServerDatabase) GetEventsInRange(
 	ctx context.Context,
-	from, to types.StreamPosition,
+	from, to *types.PaginationToken,
 	roomID string, limit int,
 	backwardOrdering bool,
 ) (events []StreamEvent, err error) {
+	// If the pagination token's type is types.PaginationTokenTypeTopology, the
+	// events must be retrieved from the rooms' topology table rather than the
+	// table contaning the syncapi server's whole stream of events.
+	if from.Type == types.PaginationTokenTypeTopology {
+		// Determine the backward and forward limit, i.e. the upper and lower
+		// limits to the selection in the room's topology, from the direction.
+		var backwardLimit, forwardLimit types.StreamPosition
+		if backwardOrdering {
+			// Backward ordering is antichronological (latest event to oldest
+			// one).
+			backwardLimit = to.Position
+			forwardLimit = from.Position
+		} else {
+			// Forward ordering is chronological (oldest event to latest one).
+			backwardLimit = from.Position
+			forwardLimit = to.Position
+		}
 
-	if backwardOrdering {
-		// We need all events matching to < streamPos < from
-		return d.events.selectRecentEvents(ctx, nil, roomID, to, from, limit, false, false)
+		// Select the event IDs from the defined range.
+		var eIDs []string
+		eIDs, err = d.topology.selectEventIDsInRange(
+			ctx, roomID, backwardLimit, forwardLimit, !backwardOrdering,
+		)
+		if err != nil {
+			return
+		}
+
+		// Retrieve the events' contents using their IDs.
+		events, err = d.events.selectEvents(ctx, nil, eIDs)
+		return
 	}
 
-	// We need all events from < streamPos < to
-	return d.events.selectEarlyEvents(ctx, nil, roomID, from, to, limit)
+	// If the pagination token's type is types.PaginationTokenTypeStream, the
+	// events must be retrieved from the table contaning the syncapi server's
+	// whole stream of events.
+
+	if backwardOrdering {
+		// When using backward ordering, we want the most recent events first.
+		if events, err = d.events.selectRecentEvents(
+			ctx, nil, roomID, to.Position, from.Position, limit, false, false,
+		); err != nil {
+			return
+		}
+	} else {
+		// When using forward ordering, we want the least recent events first.
+		if events, err = d.events.selectEarlyEvents(
+			ctx, nil, roomID, from.Position, to.Position, limit,
+		); err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+// MaxTopologicalPosition returns the highest topological position for a given
+// room.
+func (d *SyncServerDatabase) MaxTopologicalPosition(
+	ctx context.Context, roomID string,
+) (types.StreamPosition, error) {
+	return d.topology.selectMaxPositionInTopology(ctx, roomID)
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
@@ -338,7 +391,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		// Retrieve the backward topology position, i.e. the position of the
 		// oldest event in the room's topology.
 		var backwardTopologyPos types.StreamPosition
-		backwardTopologyPos, err = d.topology.selectPositionInTopology(recentStreamEvents[0].EventID())
+		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
 		if err != nil {
 			return nil, err
 		}
@@ -483,7 +536,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
 	var backwardTopologyPos types.StreamPosition
-	backwardTopologyPos, err = d.topology.selectPositionInTopology(recentStreamEvents[0].EventID())
+	backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
 	if err != nil {
 		return err
 	}
