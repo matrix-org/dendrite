@@ -45,7 +45,7 @@ type messagesReq struct {
 	backwardOrdering bool
 }
 
-type messageResp struct {
+type messagesResp struct {
 	Start string                          `json:"start"`
 	End   string                          `json:"end"`
 	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
@@ -153,7 +153,7 @@ func OnIncomingMessagesRequest(
 	// Respond with the events.
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: messageResp{
+		JSON: messagesResp{
 			Chunk: clientEvents,
 			Start: start.String(),
 			End:   end.String(),
