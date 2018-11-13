@@ -182,49 +182,83 @@ func retrieveEvents(
 		return
 	}
 
-	// Check if we have enough events.
-	isSetLargeEnough := true
-	if len(streamEvents) < limit {
-		if backwardOrdering {
-			if !toDefault {
-				// The condition in the SQL query is a strict "greater than" so
-				// we need to check against to-1.
-				isSetLargeEnough = (to.Position-1 == streamEvents[len(streamEvents)-1].StreamPosition)
-			}
-		} else {
-			isSetLargeEnough = (from.Position-1 == streamEvents[0].StreamPosition)
-		}
-	}
-
-	// Check if the slice contains a backward extremity.
-	backwardExtremity, err := containsBackwardExtremity(
-		ctx, db, streamEvents, backwardOrdering,
-	)
-	if err != nil {
-		return
-	}
-
+	var backwardExtremity bool
 	var events []gomatrixserverlib.Event
 
-	// Backfill is needed if we've reached a backward extremity and need more
-	// events. It's only needed if the direction is backward.
-	if backwardExtremity && !isSetLargeEnough && backwardOrdering {
-		var pdus []gomatrixserverlib.Event
-		// Only ask the remote server for enough events to reach the limit.
-		pdus, err = backfill(
-			ctx, db, roomID, streamEvents[0].EventID(), limit-len(streamEvents),
-			queryAPI, cfg, federation,
+	// There can be two reasons for streamEvents to be empty: either we've
+	// reached the oldest event in the room (or the most recent one, depending
+	// on the ordering), or we've reached a backward extremity.
+	if len(streamEvents) == 0 {
+		var evs []storage.StreamEvent
+		var laterPosition types.StreamPosition
+		if backwardOrdering {
+			laterPosition = from.Position + 1
+		} else {
+			laterPosition = to.Position + 1
+		}
+
+		evs, err = db.EventsAtTopologicalPosition(ctx, roomID, laterPosition)
+		if err != nil {
+			return
+		}
+
+		backwardExtremity, err = containsBackwardExtremity(ctx, db, evs, backwardOrdering)
+		if err != nil {
+			return
+		}
+
+		if backwardExtremity {
+			events, err = backfill(ctx, db, roomID, evs[0].EventID(), limit, queryAPI, cfg, federation)
+			if err != nil {
+				return
+			}
+		} else {
+			return []gomatrixserverlib.ClientEvent{}, from, to, nil
+		}
+	} else {
+		// Check if we have enough events.
+		isSetLargeEnough := true
+		if len(streamEvents) < limit {
+			if backwardOrdering {
+				if !toDefault {
+					// The condition in the SQL query is a strict "greater than" so
+					// we need to check against to-1.
+					isSetLargeEnough = (to.Position-1 == streamEvents[len(streamEvents)-1].StreamPosition)
+				}
+			} else {
+				isSetLargeEnough = (from.Position-1 == streamEvents[0].StreamPosition)
+			}
+		}
+
+		// Check if the slice contains a backward extremity.
+		backwardExtremity, err = containsBackwardExtremity(
+			ctx, db, streamEvents, backwardOrdering,
 		)
 		if err != nil {
 			return
 		}
 
-		// Append the PDUs to the list to send back to the client.
-		events = append(events, pdus...)
+		// Backfill is needed if we've reached a backward extremity and need more
+		// events. It's only needed if the direction is backward.
+		if backwardExtremity && !isSetLargeEnough && backwardOrdering {
+			var pdus []gomatrixserverlib.Event
+			// Only ask the remote server for enough events to reach the limit.
+			pdus, err = backfill(
+				ctx, db, roomID, streamEvents[0].EventID(), limit-len(streamEvents),
+				queryAPI, cfg, federation,
+			)
+			if err != nil {
+				return
+			}
+
+			// Append the PDUs to the list to send back to the client.
+			events = append(events, pdus...)
+		}
+
+		// Append the events ve previously retrieved locally.
+		events = append(events, storage.StreamEventsToEvents(nil, streamEvents)...)
 	}
 
-	// Append the events ve previously retrieved locally.
-	events = append(events, storage.StreamEventsToEvents(nil, streamEvents)...)
 	// Sort the events to ensure we send them in the right order. We currently
 	// do that based on the event's timestamp.
 	if backwardOrdering {
@@ -249,6 +283,10 @@ func retrieveEvents(
 	end = types.NewPaginationTokenFromTypeAndPosition(
 		types.PaginationTokenTypeTopology, streamEvents[len(streamEvents)-1].StreamPosition,
 	)
+
+	if end.Position == types.StreamPosition(0) {
+		end.Position = types.StreamPosition(1)
+	}
 
 	return
 }
@@ -286,7 +324,7 @@ func containsBackwardExtremity(
 		return false, nil
 	}
 	// Check if we have all of the events we requested. If not, it means we've
-	// reached a backard extremity.
+	// reached a backward extremity.
 	var eventInDB bool
 	var id string
 	// Iterate over the IDs we used in the request.

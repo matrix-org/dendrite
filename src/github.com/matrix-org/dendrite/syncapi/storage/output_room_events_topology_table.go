@@ -59,12 +59,17 @@ const selectMaxPositionInTopologySQL = "" +
 	"SELECT MAX(topological_position) FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1"
 
+const selectEventIDsFromPositionSQL = "" +
+	"SELECT event_id FROM syncapi_output_room_events_topology" +
+	" WHERE room_id = $1 AND topological_position = $2"
+
 type outputRoomEventsTopologyStatements struct {
 	insertEventInTopologyStmt       *sql.Stmt
 	selectEventIDsInRangeASCStmt    *sql.Stmt
 	selectEventIDsInRangeDESCStmt   *sql.Stmt
 	selectPositionInTopologyStmt    *sql.Stmt
 	selectMaxPositionInTopologyStmt *sql.Stmt
+	selectEventIDsFromPositionStmt  *sql.Stmt
 }
 
 func (s *outputRoomEventsTopologyStatements) prepare(db *sql.DB) (err error) {
@@ -85,6 +90,9 @@ func (s *outputRoomEventsTopologyStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
+		return
+	}
+	if s.selectEventIDsFromPositionStmt, err = db.Prepare(selectEventIDsFromPositionSQL); err != nil {
 		return
 	}
 	return
@@ -151,5 +159,29 @@ func (s *outputRoomEventsTopologyStatements) selectMaxPositionInTopology(
 	ctx context.Context, roomID string,
 ) (pos types.StreamPosition, err error) {
 	err = s.selectMaxPositionInTopologyStmt.QueryRowContext(ctx, roomID).Scan(&pos)
+	return
+}
+
+// selectEventIDsFromPosition returns the IDs of all events that have a given
+// position in the topology of a given room.
+func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
+	ctx context.Context, roomID string, pos types.StreamPosition,
+) (eventIDs []string, err error) {
+	// Query the event IDs.
+	rows, err := s.selectEventIDsFromPositionStmt.QueryContext(ctx, roomID, pos)
+	if err == sql.ErrNoRows {
+		// If no event matched the request, return an empty slice.
+		return []string{}, nil
+	} else if err != nil {
+		return
+	}
+	// Return the IDs.
+	var eventID string
+	for rows.Next() {
+		if err = rows.Scan(&eventID); err != nil {
+			return
+		}
+		eventIDs = append(eventIDs, eventID)
+	}
 	return
 }

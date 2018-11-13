@@ -269,6 +269,19 @@ func (d *SyncServerDatabase) MaxTopologicalPosition(
 	return d.topology.selectMaxPositionInTopology(ctx, roomID)
 }
 
+// EventsAtTopologicalPosition returns all of the events matching a given
+// position in the topology of a given room.
+func (d *SyncServerDatabase) EventsAtTopologicalPosition(
+	ctx context.Context, roomID string, pos types.StreamPosition,
+) ([]StreamEvent, error) {
+	eIDs, err := d.topology.selectEventIDsFromPosition(ctx, roomID, pos)
+	if err != nil {
+		return nil, err
+	}
+
+	return d.events.selectEvents(ctx, nil, eIDs)
+}
+
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 func (d *SyncServerDatabase) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
 	return d.syncStreamPositionTx(ctx, nil)
@@ -397,6 +410,8 @@ func (d *SyncServerDatabase) CompleteSync(
 		}
 		if backwardTopologyPos-1 <= 0 {
 			backwardTopologyPos = types.StreamPosition(1)
+		} else {
+			backwardTopologyPos = backwardTopologyPos - 1
 		}
 
 		// We don't include a device here as we don't need to send down
@@ -405,7 +420,7 @@ func (d *SyncServerDatabase) CompleteSync(
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos-1,
+			types.PaginationTokenTypeTopology, backwardTopologyPos,
 		).String()
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
@@ -542,6 +557,8 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 	}
 	if backwardTopologyPos-1 <= 0 {
 		backwardTopologyPos = types.StreamPosition(1)
+	} else {
+		backwardTopologyPos = backwardTopologyPos - 1
 	}
 
 	switch delta.membership {
@@ -549,7 +566,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		jr := types.NewJoinResponse()
 
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos-1,
+			types.PaginationTokenTypeTopology, backwardTopologyPos,
 		).String()
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
@@ -562,7 +579,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
 		lr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeStream, backwardTopologyPos-1,
+			types.PaginationTokenTypeStream, backwardTopologyPos,
 		).String()
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
