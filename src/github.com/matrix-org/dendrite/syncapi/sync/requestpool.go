@@ -84,38 +84,33 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	userStreamListener := rp.notifier.GetListener(*syncReq)
 	defer userStreamListener.Close()
 
-	for {
-		select {
-		// Wait for notifier to wake us up
-		case <-userStreamListener.GetNotifyChannel(currPos):
-			currPos = userStreamListener.GetStreamPosition()
-		// Or for timeout to expire
-		case <-timer.C:
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: types.NewResponse(currPos),
-			}
-		// Or for the request to be cancelled
-		case <-req.Context().Done():
-			return httputil.LogThenError(req, req.Context().Err())
-		}
+	select {
+	// Wait for notifier to wake us up
+	case <-userStreamListener.GetNotifyChannel(currPos):
+		currPos = userStreamListener.GetStreamPosition()
+	// Or for timeout to expire
+	case <-timer.C:
+		// We just need to ensure we get out of the select after reaching the
+		// timeout, but there's nothing specific we want to do in this case
+		// apart from that, so we do nothing.
+	// Or for the request to be cancelled
+	case <-req.Context().Done():
+		return httputil.LogThenError(req, req.Context().Err())
+	}
 
-		// Note that we don't time out during calculation of sync
-		// response. This ensures that we don't waste the hard work
-		// of calculating the sync only to get timed out before we
-		// can respond
+	// Note that we don't time out during calculation of sync
+	// response. This ensures that we don't waste the hard work
+	// of calculating the sync only to get timed out before we
+	// can respond
 
-		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
-		if err != nil {
-			return httputil.LogThenError(req, err)
-		}
-		if !syncData.IsEmpty() {
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: syncData,
-			}
-		}
+	syncData, err := rp.currentSyncForUser(*syncReq, currPos)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: syncData,
 	}
 }
 
