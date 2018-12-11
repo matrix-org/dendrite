@@ -220,7 +220,18 @@ func (r *messagesReq) retrieveEvents() (
 		types.PaginationTokenTypeTopology, streamEvents[len(streamEvents)-1].StreamPosition,
 	)
 
-	if end.Position == types.StreamPosition(0) {
+	if r.backwardOrdering {
+		// A stream/topological position is a cursor located between two events.
+		// While they are identified in the code by the event on their right (if
+		// we consider a left to right chronological order), tokens need to refer
+		// to them by the event on their left, therefore we need to decrement the
+		// end position we send in the response if we're going backward.
+		end.Position--
+	}
+
+	// The lowest token value is 1, therefore we need to manually set it to that
+	// value if we're below it.
+	if end.Position < types.StreamPosition(1) {
 		end.Position = types.StreamPosition(1)
 	}
 
