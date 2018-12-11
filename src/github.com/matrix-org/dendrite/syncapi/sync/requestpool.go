@@ -86,6 +86,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	userStreamListener := rp.notifier.GetListener(*syncReq)
 	defer userStreamListener.Close()
 
+	// We need the loop in case userStreamListener wakes up even if there isn't
+	// anything to send down. In this case, we'll jump out of the select but
+	// don't want to send anything back until we get some actual content to
+	// respond with, so we skip the return an go back to waiting for content to
+	// be sent down or the request timing out.
+	var hasTimedOut bool
 	for {
 		select {
 		// Wait for notifier to wake us up
@@ -95,7 +101,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		case <-timer.C:
 			// We just need to ensure we get out of the select after reaching the
 			// timeout, but there's nothing specific we want to do in this case
-			// apart from that, so we do nothing.
+			// apart from that, so we do nothing except stating we're timing out
+			// and need to respond.
+			hasTimedOut = true
 		// Or for the request to be cancelled
 		case <-req.Context().Done():
 			return httputil.LogThenError(req, req.Context().Err())
@@ -111,7 +119,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			return httputil.LogThenError(req, err)
 		}
 
-		if !syncData.IsEmpty() {
+		if !syncData.IsEmpty() || hasTimedOut {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: syncData,
