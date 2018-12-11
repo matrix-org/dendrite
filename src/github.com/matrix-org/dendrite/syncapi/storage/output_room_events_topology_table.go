@@ -44,12 +44,12 @@ const insertEventInTopologySQL = "" +
 const selectEventIDsInRangeASCSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND topological_position > $2 AND topological_position <= $3" +
-	" ORDER BY topological_position ASC"
+	" ORDER BY topological_position ASC LIMIT $4"
 
 const selectEventIDsInRangeDESCSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND topological_position > $2 AND topological_position <= $3" +
-	" ORDER BY topological_position DESC"
+	" ORDER BY topological_position DESC LIMIT $4"
 
 const selectPositionInTopologySQL = "" +
 	"SELECT topological_position FROM syncapi_output_room_events_topology" +
@@ -114,7 +114,7 @@ func (s *outputRoomEventsTopologyStatements) insertEventInTopology(
 // Returns an empty slice if no events match the given range.
 func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 	ctx context.Context, roomID string, fromPos, toPos types.StreamPosition,
-	chronologicalOrder bool,
+	limit int, chronologicalOrder bool,
 ) (eventIDs []string, err error) {
 	// Decide on the selection's order according to whether chronological order
 	// is requested or not.
@@ -126,7 +126,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 	}
 
 	// Query the event IDs.
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos)
+	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
 	if err == sql.ErrNoRows {
 		// If no event matched the request, return an empty slice.
 		return []string{}, nil

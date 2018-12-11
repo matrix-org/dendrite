@@ -227,7 +227,7 @@ func (d *SyncServerDatabase) GetEventsInRange(
 		// Select the event IDs from the defined range.
 		var eIDs []string
 		eIDs, err = d.topology.selectEventIDsInRange(
-			ctx, roomID, backwardLimit, forwardLimit, !backwardOrdering,
+			ctx, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
 		)
 		if err != nil {
 			return
