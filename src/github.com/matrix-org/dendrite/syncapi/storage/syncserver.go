@@ -282,6 +282,12 @@ func (d *SyncServerDatabase) EventsAtTopologicalPosition(
 	return d.events.selectEvents(ctx, nil, eIDs)
 }
 
+func (d *SyncServerDatabase) EventPositionInTopology(
+	ctx context.Context, eventID string,
+) (types.StreamPosition, error) {
+	return d.topology.selectPositionInTopology(ctx, eventID)
+}
+
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 func (d *SyncServerDatabase) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
 	return d.syncStreamPositionTx(ctx, nil)

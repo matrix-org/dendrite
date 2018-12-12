@@ -212,12 +212,31 @@ func (r *messagesReq) retrieveEvents() (
 
 	// Convert all of the events into client events.
 	clientEvents = gomatrixserverlib.ToClientEvents(events, gomatrixserverlib.FormatAll)
-	// Generate pagination tokens to send to the client.
+	// Get the position of the first and the last event in the room's topology.
+	// This position is currently determined by the event's depth, so we could
+	// also use it instead of retrieving from the database. However, if we ever
+	// change the way topological positions are defined (as depth isn't the most
+	// reliable way to define it), it would be easier and less troublesome to
+	// only have to change it in one place, i.e. the database.
+	startPos, err := r.db.EventPositionInTopology(
+		r.ctx, streamEvents[0].EventID(),
+	)
+	if err != nil {
+		return
+	}
+	endPos, err := r.db.EventPositionInTopology(
+		r.ctx, streamEvents[len(streamEvents)-1].EventID(),
+	)
+	if err != nil {
+		return
+	}
+	// Generate pagination tokens to send to the client using the positions
+	// retrieved previously.
 	start = types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeTopology, streamEvents[0].StreamPosition,
+		types.PaginationTokenTypeTopology, startPos,
 	)
 	end = types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeTopology, streamEvents[len(streamEvents)-1].StreamPosition,
+		types.PaginationTokenTypeTopology, endPos,
 	)
 
 	if r.backwardOrdering {
