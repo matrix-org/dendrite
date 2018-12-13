@@ -301,8 +301,8 @@ func (s *outputRoomEventsStatements) selectEarlyEvents(
 	return events, nil
 }
 
-// Events returns the events for the given event IDs. Returns an error if any one of the event IDs given are missing
-// from the database.
+// selectEvents returns the events for the given event IDs. If an event is
+// missing from the database, it will be omitted.
 func (s *outputRoomEventsStatements) selectEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]StreamEvent, error) {
