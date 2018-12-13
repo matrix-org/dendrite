@@ -186,13 +186,16 @@ func (r *messagesReq) retrieveEvents() (
 	if len(streamEvents) == 0 {
 		if events, err = r.handleEmptyEventsSlice(); err != nil {
 			return
-		} else if len(events) == 0 {
-			return []gomatrixserverlib.ClientEvent{}, r.from, r.to, nil
 		}
 	} else {
 		if events, err = r.handleNonEmptyEventsSlice(streamEvents); err != nil {
 			return
 		}
+	}
+
+	// If we didn't get any event, we don't need to proceed any further.
+	if len(events) == 0 {
+		return []gomatrixserverlib.ClientEvent{}, r.from, r.to, nil
 	}
 
 	// Sort the events to ensure we send them in the right order. We currently
@@ -267,37 +270,18 @@ func (r *messagesReq) retrieveEvents() (
 func (r *messagesReq) handleEmptyEventsSlice() (
 	events []gomatrixserverlib.Event, err error,
 ) {
-	var evs []storage.StreamEvent
-	// Determine what could be the oldest position of interest in the room's
-	// topology for this.
-	var laterPosition types.StreamPosition
-	if r.backwardOrdering {
-		laterPosition = r.from.Position + 1
-	} else {
-		laterPosition = r.to.Position + 1
-	}
+	backwardExtremities, err := r.db.BackwardExtremitiesForRoom(r.ctx, r.roomID)
 
-	// Retrieve events at that position.
-	evs, err = r.db.EventsAtTopologicalPosition(r.ctx, r.roomID, laterPosition)
-	if err != nil {
-		return
-	}
-
-	// Check if one of these events is a backward extremity.
-	backwardExtremity, err := r.containsBackwardExtremity(evs)
-	if err != nil {
-		return
-	}
-
-	// If so, retrieve as much events as requested through backfilling.
-	if backwardExtremity {
-		events, err = r.backfill(evs[0].EventID(), r.limit)
+	// Check if we have backward extremities for this room.
+	if len(backwardExtremities) > 0 {
+		// If so, retrieve as much events as needed through backfilling.
+		events, err = r.backfill(backwardExtremities, r.limit)
 		if err != nil {
 			return
 		}
 	} else {
-		// If not, it means the slice was empty because we reached the limit of
-		// the room's topology, so return an empty slice.
+		// If not, it means the slice was empty because we reached the room's
+		// creation, so return an empty slice.
 		events = []gomatrixserverlib.Event{}
 	}
 
@@ -327,17 +311,17 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []storage.StreamEve
 	}
 
 	// Check if the slice contains a backward extremity.
-	backwardExtremity, err := r.containsBackwardExtremity(streamEvents)
+	backwardExtremities, err := r.db.BackwardExtremitiesForRoom(r.ctx, r.roomID)
 	if err != nil {
 		return
 	}
 
 	// Backfill is needed if we've reached a backward extremity and need more
 	// events. It's only needed if the direction is backward.
-	if backwardExtremity && !isSetLargeEnough && r.backwardOrdering {
+	if len(backwardExtremities) > 0 && !isSetLargeEnough && r.backwardOrdering {
 		var pdus []gomatrixserverlib.Event
 		// Only ask the remote server for enough events to reach the limit.
-		pdus, err = r.backfill(streamEvents[0].EventID(), r.limit-len(streamEvents))
+		pdus, err = r.backfill(backwardExtremities, r.limit-len(streamEvents))
 		if err != nil {
 			return
 		}
@@ -404,13 +388,13 @@ func (r *messagesReq) containsBackwardExtremity(events []storage.StreamEvent) (b
 // event, or if there is no remote homeserver to contact.
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
-func (r *messagesReq) backfill(fromEventID string, limit int) ([]gomatrixserverlib.Event, error) {
-	// Query the list of servers in the room when the earlier event we know
-	// of was sent.
+func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserverlib.Event, error) {
+	// Query the list of servers in the room when one of the backward extremities
+	// was sent.
 	var serversResponse api.QueryServersInRoomAtEventResponse
 	serversRequest := api.QueryServersInRoomAtEventRequest{
 		RoomID:  r.roomID,
-		EventID: fromEventID,
+		EventID: fromEventIDs[0],
 	}
 	if err := r.queryAPI.QueryServersInRoomAtEvent(r.ctx, &serversRequest, &serversResponse); err != nil {
 		return nil, err
@@ -438,7 +422,7 @@ func (r *messagesReq) backfill(fromEventID string, limit int) ([]gomatrixserverl
 	// send it a request for backfill.
 	if len(srvToBackfillFrom) > 0 {
 		txn, err := r.federation.Backfill(
-			r.ctx, srvToBackfillFrom, r.roomID, limit, []string{fromEventID},
+			r.ctx, srvToBackfillFrom, r.roomID, limit, fromEventIDs,
 		)
 		if err != nil {
 			return nil, err

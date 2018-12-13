@@ -52,11 +52,12 @@ type StreamEvent struct {
 type SyncServerDatabase struct {
 	db *sql.DB
 	common.PartitionOffsetStatements
-	accountData accountDataStatements
-	events      outputRoomEventsStatements
-	roomstate   currentRoomStateStatements
-	invites     inviteEventsStatements
-	topology    outputRoomEventsTopologyStatements
+	accountData         accountDataStatements
+	events              outputRoomEventsStatements
+	roomstate           currentRoomStateStatements
+	invites             inviteEventsStatements
+	topology            outputRoomEventsTopologyStatements
+	backwardExtremities backwardExtremitiesStatements
 }
 
 // NewSyncServerDatabase creates a new sync server database
@@ -82,6 +83,9 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 		return nil, err
 	}
 	if err := d.topology.prepare(d.db); err != nil {
+		return nil, err
+	}
+	if err := d.backwardExtremities.prepare(d.db); err != nil {
 		return nil, err
 	}
 	return &d, nil
@@ -130,6 +134,41 @@ func (d *SyncServerDatabase) WriteEvent(
 
 		if err = d.topology.insertEventInTopology(ctx, ev); err != nil {
 			return err
+		}
+
+		// If the event is already known as a backward extremity, don't consider
+		// it as such anymore now that we have it.
+		isBackwardExtremity, err := d.backwardExtremities.isBackwardExtremity(ctx, ev.RoomID(), ev.EventID())
+		if err != nil {
+			return err
+		}
+		if isBackwardExtremity {
+			if err = d.backwardExtremities.deleteBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+				return err
+			}
+		}
+
+		// Check if we have all of the event's previous events. If an event is
+		// missing, add it to the room's backward extremities.
+		prevEvents, err := d.events.selectEvents(ctx, nil, ev.PrevEventIDs())
+		if err != nil {
+			return err
+		}
+		var found bool
+		for _, eID := range ev.PrevEventIDs() {
+			found = false
+			for _, prevEv := range prevEvents {
+				if eID == prevEv.EventID() {
+					found = true
+				}
+			}
+
+			// If the event is missing, consider it a backward extremity.
+			if !found {
+				if err = d.backwardExtremities.insertsBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+					return err
+				}
+			}
 		}
 
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
@@ -259,6 +298,14 @@ func (d *SyncServerDatabase) GetEventsInRange(
 	}
 
 	return
+}
+
+// BackwardExtremitiesForRoom returns the event IDs of all of the backward
+// extremities we know of for a given room.
+func (d *SyncServerDatabase) BackwardExtremitiesForRoom(
+	ctx context.Context, roomID string,
+) (backwardExtremities []string, err error) {
+	return d.backwardExtremities.selectBackwardExtremitiesForRoom(ctx, roomID)
 }
 
 // MaxTopologicalPosition returns the highest topological position for a given
