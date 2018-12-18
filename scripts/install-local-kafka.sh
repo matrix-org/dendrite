@@ -9,9 +9,9 @@ cd `dirname $0`/..
 mkdir -p .downloads
 
 # The mirror to download kafka from is picked from the list of mirrors at
-# https://www.apache.org/dyn/closer.cgi?path=/kafka/0.10.2.0/kafka_2.11-0.11.0.2.tgz
+# https://www.apache.org/dyn/closer.cgi?path=/kafka/2.1.0/kafka_2.11-2.1.0.tgz
 # TODO: Check the signature since we are downloading over HTTP.
-MIRROR=http://apache.mirror.anlx.net/kafka/0.11.0.2/kafka_2.11-0.11.0.2.tgz
+MIRROR=http://apache.mirror.anlx.net/kafka/2.1.0/kafka_2.11-2.1.0.tgz
 
 # Only download the kafka if it isn't already downloaded.
 test -f .downloads/kafka.tgz || wget $MIRROR -O .downloads/kafka.tgz
