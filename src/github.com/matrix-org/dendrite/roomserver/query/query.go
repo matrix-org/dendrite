@@ -438,7 +438,7 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	response *api.QueryMissingEventsResponse,
 ) error {
 	var front []string
-	eventsToFilter := make(map[string]bool)
+	eventsToFilter := make(map[string]bool, len(request.LatestEvents))
 	visited := make(map[string]bool, request.Limit) // request.Limit acts as a hint to size.
 	for _, id := range request.EarliestEvents {
 		visited[id] = true
