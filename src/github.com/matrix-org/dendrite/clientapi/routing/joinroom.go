@@ -119,16 +119,14 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 		return httputil.LogThenError(r.req, err)
 	}
 	if len(queryRes.InviteSenderUserIDs) == 0 {
-		// TODO: We might need to support clients which erroneously try to join
-		// the room by ID even when they are not invited.
-		// This can be done by removing this check and falling through to
-		// joinRoomUsingServers passing an empty list since joinRoomUserServers
-		// will check if we are already in the room first.
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You are not invited to the room"),
+		// Support clients erroneously trying to join without an invite
+		_, domain, err := gomatrixserverlib.SplitID('!', roomID)
+		if err != nil {
+			return httputil.LogThenError(r.req, err)
 		}
+		return r.joinRoomUsingServers(roomID, []gomatrixserverlib.ServerName{domain})
 	}
+
 	servers := []gomatrixserverlib.ServerName{}
 	seenBefore := map[gomatrixserverlib.ServerName]bool{}
 	for _, userID := range queryRes.InviteSenderUserIDs {
