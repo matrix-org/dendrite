@@ -438,6 +438,7 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	response *api.QueryMissingEventsResponse,
 ) error {
 	var front []string
+	eventsToFilter := make(map[string]bool, len(request.LatestEvents))
 	visited := make(map[string]bool, request.Limit) // request.Limit acts as a hint to size.
 	for _, id := range request.EarliestEvents {
 		visited[id] = true
@@ -446,6 +447,7 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	for _, id := range request.LatestEvents {
 		if !visited[id] {
 			front = append(front, id)
+			eventsToFilter[id] = true
 		}
 	}
 
@@ -454,7 +456,18 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 		return err
 	}
 
-	response.Events, err = r.loadEvents(ctx, resultNIDs)
+	loadedEvents, err := r.loadEvents(ctx, resultNIDs)
+	if err != nil {
+		return err
+	}
+
+	response.Events = make([]gomatrixserverlib.Event, 0, len(loadedEvents)-len(eventsToFilter))
+	for _, event := range loadedEvents {
+		if !eventsToFilter[event.EventID()] {
+			response.Events = append(response.Events, event)
+		}
+	}
+
 	return err
 }
 
