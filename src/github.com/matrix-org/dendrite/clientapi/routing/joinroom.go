@@ -118,28 +118,30 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 	if err := r.queryAPI.QueryInvitesForUser(r.req.Context(), &queryReq, &queryRes); err != nil {
 		return httputil.LogThenError(r.req, err)
 	}
-	if len(queryRes.InviteSenderUserIDs) == 0 {
-		// TODO: We might need to support clients which erroneously try to join
-		// the room by ID even when they are not invited.
-		// This can be done by removing this check and falling through to
-		// joinRoomUsingServers passing an empty list since joinRoomUserServers
-		// will check if we are already in the room first.
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You are not invited to the room"),
-		}
-	}
+
 	servers := []gomatrixserverlib.ServerName{}
-	seenBefore := map[gomatrixserverlib.ServerName]bool{}
+	seenInInviterIDs := map[gomatrixserverlib.ServerName]bool{}
 	for _, userID := range queryRes.InviteSenderUserIDs {
 		_, domain, err := gomatrixserverlib.SplitID('@', userID)
 		if err != nil {
 			return httputil.LogThenError(r.req, err)
 		}
-		if !seenBefore[domain] {
+		if !seenInInviterIDs[domain] {
 			servers = append(servers, domain)
-			seenBefore[domain] = true
+			seenInInviterIDs[domain] = true
 		}
+	}
+
+	// Also add the domain extracted from the roomID as a last resort to join
+	// in case the client is erroneously trying to join by ID without an invite
+	// or all previous attempts at domains extracted from the inviter IDs fail
+	// Note: It's no guarantee we'll succeed because a room isn't bound to the domain in its ID
+	_, domain, err := gomatrixserverlib.SplitID('!', roomID)
+	if err != nil {
+		return httputil.LogThenError(r.req, err)
+	}
+	if domain != r.cfg.Matrix.ServerName && !seenInInviterIDs[domain] {
+		servers = append(servers, domain)
 	}
 
 	return r.joinRoomUsingServers(roomID, servers)
