@@ -1,0 +1,4 @@
+args:
+  database: dendrite
+  host: /var/run/postgresql
+type: pg

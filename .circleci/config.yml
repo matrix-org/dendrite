@@ -1,0 +1,36 @@
+version: 2
+jobs:
+  dendrite:
+    docker:
+      # TODO: Change to a pre-made image with sytest installed
+      - image: matrixdotorg/sytest-synapse
+    working_directory: /
+    steps:
+      - checkout
+
+      # Set up dendrite
+      - run: 
+          name: Build Dendrite
+          command: go get github.com/constabulary/gb/... && gb build
+      - run: 
+          name: Copy custom dendrite config
+          command: cp .circleci/dendrite-config.yaml dendrite.yaml
+      - run: 
+          name: Generating self-signed server keys
+          command: |
+            test -f server.key || openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 3650 -nodes -subj /CN=localhost
+            test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
+
+      - store_artifacts:
+          path: /logs
+          destination: logs
+      - store_test_results:
+          path: /logs
+workflows:
+  version: 2
+  build:
+    jobs:
+      - dendrite:
+          filters:
+            branches:
+              only: master
