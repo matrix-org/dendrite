@@ -31,7 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const pathPrefixR0 = "/_matrix/media/v1"
+const pathPrefixR0 = "/_matrix/media/r0"
 
 // Setup registers the media API HTTP handlers
 func Setup(
