@@ -122,6 +122,7 @@ func SendMembership(
 			}{roomID},
 		}
 	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
