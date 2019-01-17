@@ -108,7 +108,7 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 	// A client should only join a room by room ID when it has an invite
 	// to the room. If the server is already in the room then we can
 	// lookup the invite and process the request as a normal state event.
-	// If the server is not in the room the we will need to look up the
+	// If the server is not in the room then we will need to look up the
 	// remote server the invite came from in order to request a join event
 	// from that server.
 	queryReq := roomserverAPI.QueryInvitesForUserRequest{

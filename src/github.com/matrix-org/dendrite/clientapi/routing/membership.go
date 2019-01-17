@@ -114,6 +114,14 @@ func SendMembership(
 		return httputil.LogThenError(req, err)
 	}
 
+	if membership == "join" {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct {
+				RoomID string `json:"room_id"`
+			}{roomID},
+		}
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
