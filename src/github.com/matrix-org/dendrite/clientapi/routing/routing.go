@@ -95,7 +95,14 @@ func Setup(
 	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
 		common.MakeAuthAPI("membership", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
-			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, asAPI, producer)
+			r := SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, asAPI, producer)
+			if r.Code == http.StatusOK && vars["membership"] == "join" {
+				r.JSON = struct {
+					RoomID string `json:"room_id"`
+				}{vars["roomID"]}
+				return r
+			}
+			return r
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
