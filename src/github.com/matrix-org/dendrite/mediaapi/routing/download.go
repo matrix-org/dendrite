@@ -316,6 +316,10 @@ func (r *downloadRequest) respondFromLocalFile(
 		" object-src 'self';"
 	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
+	if len(responseMetadata.UploadName) > 0 && !r.IsThumbnailRequest {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename*=utf-8"%s"`, responseMetadata.UploadName))
+	}
+
 	if _, err := io.Copy(w, responseFile); err != nil {
 		return nil, errors.Wrap(err, "failed to copy from cache")
 	}
