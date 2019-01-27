@@ -17,7 +17,7 @@ We aim to try and make it as easy as possible to jump in.
 # Discussion
 
 For questions about Dendrite we have a dedicated room on Matrix
-[#dendrite:matrix.org](https://riot.im/develop/#/room/#dendrite:matrix.org).
+[#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org).
 
 # Progress
 
