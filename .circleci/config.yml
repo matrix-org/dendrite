@@ -3,7 +3,7 @@ jobs:
   dendrite:
     docker:
       - image: anoa/sytest-dendrite
-    working_directory: /
+    working_directory: /src
     steps:
       - checkout
 
