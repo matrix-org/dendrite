@@ -2,13 +2,8 @@ version: 2
 jobs:
   dendrite:
     docker:
-      # TODO: Change to a pre-made image with sytest installed
-      - image: circleci/golang:1.11.4-stretch
-      - image: circleci/postgres:9.6-alpine
-        environment:
-          POSTGRES_USER: dendrite
-          POSTGRES_PASSWORD: ""
-    working_directory: /go/src/github.com/matrix-org/dendrite
+      - image: anoa/sytest-dendrite
+    working_directory: /
     steps:
       - checkout
 
@@ -25,45 +20,11 @@ jobs:
             test -f server.key || openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 3650 -nodes -subj /CN=localhost
             test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
 
-      # Set up postgres
-      - run:
-          name: Install postgres client
-          command: sudo apt-get install postgresql-client libdbd-pg-perl libpq-dev
-      - run:
-          name: Wait for postgres to start up
-          command: dockerize -wait tcp://localhost:5432 -timeout 1m
-      - run: 
-          name: Create postgres databases
-          command: for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi appservice naffka; do createdb -U dendrite -h localhost -p 5432 -O dendrite dendrite_$i; done
-
-      # Set up sytest
-      - run: 
-          name: Clone sytest
-          command: |
-            cd .. 
-            git clone -b anoa/homeserver_specific_tests https://github.com/matrix-org/sytest
-      - run:
-          name: Set up sytest deps
-          command: |
-            cd ../sytest
-            export SHELL=bash
-            echo | cpan
-            sudo ./install-deps.pl
-            ./run-tests.pl -I Dendrite::Monolith
-      - run:
-          name: Copy dendrite sytest config
-          command: cp .circleci/sytest-database.yaml server-0/database.yaml
-      - run:
-          name: Run sytest
-          command: |
-            cd ../sytest
-            ./run-tests.pl -I Dendrite::Monolith
-
       - store_artifacts:
           path: /logs
           destination: logs
-      #- store_test_results:
-      #    path: /logs
+      - store_test_results:
+          path: /logs
 workflows:
   version: 2
   build:
