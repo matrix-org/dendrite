@@ -19,6 +19,9 @@ jobs:
           command: |
             test -f server.key || openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 3650 -nodes -subj /CN=localhost
             test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
+      - run:
+          name: Run sytest with whitelisted tests
+          command: /synapse_sytest.sh
 
       - store_artifacts:
           path: /logs
