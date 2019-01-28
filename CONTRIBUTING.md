@@ -48,10 +48,10 @@ with the `vendor/manifest` file), name it with the command you just ran (ie
 ## Getting Help
 
 For questions related to developing on Dendrite we have a dedicated room on
-Matrix [#dendrite-dev:matrix.org](https://riot.im/develop/#/room/#dendrite-dev:matrix.org)
+Matrix [#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)
 where we're happy to help.
 
-For more general questions please use [#dendrite:matrix.org](https://riot.im/develop/#/room/#dendrite:matrix.org).
+For more general questions please use [#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org).
 
 ## Sign off
 
