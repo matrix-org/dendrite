@@ -1,4 +1,4 @@
-# Dendrite [![Build Status](https://travis-ci.org/matrix-org/dendrite.svg?branch=master)](https://travis-ci.org/matrix-org/dendrite)
+# Dendrite [![Build Status](https://travis-ci.org/matrix-org/dendrite.svg?branch=master)](https://travis-ci.org/matrix-org/dendrite) [![Matrix Chat](	https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
 Dendrite will be a matrix homeserver written in go.
 
