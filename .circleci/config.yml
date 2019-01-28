@@ -21,7 +21,7 @@ jobs:
             test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
       - run:
           name: Run sytest with whitelisted tests
-          command: /synapse_sytest.sh
+          command: /dendrite_sytest.sh
 
       - store_artifacts:
           path: /logs
