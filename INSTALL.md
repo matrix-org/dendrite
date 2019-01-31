@@ -12,7 +12,7 @@ Dendrite can be run in one of two configurations:
 
 ## Requirements
 
- - Go 1.8+
+ - Go 1.10+
  - Postgres 9.5+
  - For Kafka (optional if using the monolith server):
    - Unix-based system (https://kafka.apache.org/documentation/#os)
@@ -22,7 +22,7 @@ Dendrite can be run in one of two configurations:
 
 ## Setting up a development environment
 
-Assumes Go 1.8 and JDK 1.8 are already installed and are on PATH.
+Assumes Go 1.10+ and JDK 1.8+ are already installed and are on PATH.
 
 ```bash
 # Get the code
