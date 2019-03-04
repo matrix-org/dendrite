@@ -95,7 +95,7 @@ test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
 
 Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Things that will need editing include *at least*:
 * `server_name`
-* `database/*` ( All lines in the database section must have the username and password of the user created with the `createuser` command above. eg:`dendrite:password@localhost` )
+* `database/*` (All lines in the database section must have the username and password of the user created with the `createuser` command above. eg:`dendrite:password@localhost` )
 
 
 ## Starting a monolith server
