@@ -95,7 +95,7 @@ test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
 
 Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Things that will need editing include *at least*:
 * `server_name`
-* `database/*`
+* `database/*` (All lines in the database section must have the password of the postgres db running in your system. eg:```dendrite:password@localhost``` )
 
 
 ## Starting a monolith server
@@ -107,8 +107,6 @@ The monolith server can be started as shown below. By default it listens for
 HTTP connections on port 8008, so point your client at
 `http://localhost:8008`. If you set `--tls-cert` and `--tls-key` as shown
 below, it will also listen for HTTPS connections on port 8448.
-
-Before running below command, ensure that all uncommented lines in the `database` section have the password of your postgres db (dendrite:password@localhost)
 
 ```bash
 ./bin/dendrite-monolith-server --tls-cert=server.crt --tls-key=server.key
