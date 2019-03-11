@@ -14,31 +14,19 @@
 
 package routing
 
-const pathPrefixR0 = "/_matrix/client/r0"
+import "net/http"
 
-func TagRoom(
-	req *http.Request
-) util.JSONResponse {
+// GetTag implements GET /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags
+func GetTag(req *http.Request, userId string, roomId string) {
 
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+}
 
+// PutTag implements GET /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}
+func PutTag(req *http.Request, userId string, roomId string, tag string) {
 
-	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return GetTag()
-		}),
-	).Methods(http.MethodGet, http.MethodOptions)
+}
 
-	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return PutTag()
-		}),
-	).Methods(http.MethodPut, http.MethodOptions)
+// DeleteTag implements DELETE /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}
+func DeleteTag(req *http.Request, userId string, roomId string, tag string) {
 
-	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return DeleteTag()
-		}),
-	).Methods(http.MethodDelete, http.MethodOptions)
-	
 }
