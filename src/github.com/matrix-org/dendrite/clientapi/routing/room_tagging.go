@@ -41,9 +41,13 @@ func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
 		}
 	}
 
+	mtag := NewMTag()
+
 	data, err := accountDB.GetAccountDataByType(
 		req.Context(), localpart, "ROOM_ID", "m.tag",
 	)
+
+	json.Unmarshal([]byte(data), &mtag)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -51,7 +55,7 @@ func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: tags,
+		JSON: mtag,
 	}
 }
 
