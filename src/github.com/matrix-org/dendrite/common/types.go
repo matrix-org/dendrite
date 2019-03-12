@@ -46,6 +46,12 @@ type DisplayName struct {
 // recognized by strconv.ParseBool
 type WeakBoolean bool
 
+// RoomTags contain the data of the Tags per User for each Room
+type Tag struct {
+	Name  string
+	Order string
+}
+
 // UnmarshalJSON is overridden here to allow strings vaguely representing a true
 // or false boolean to be set as their closest counterpart
 func (b *WeakBoolean) UnmarshalJSON(data []byte) error {
