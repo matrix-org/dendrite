@@ -81,13 +81,8 @@ func PutTag(req *http.Request, userId string, roomId string, tag string) util.JS
 
 	mtag := NewMTag()
 
-	// outInterface := map[string]interface{}{}
-
 	if len(data) > 0 {
 		json.Unmarshal([]byte(data), &mtag)
-		if outInterface[tag] != nil {
-			// Error saying this Tag already exists
-		}
 	}
 
 	mtag.Tags[tag] = TagProperties{
@@ -121,6 +116,31 @@ func DeleteTag(req *http.Request, userId string, roomId string, tag string) util
 	localpart, _, err := gomatrixserverlib.SplitID('@', "USER_ID")
 	if err != nil {
 		return httputil.LogThenError(req, err)
+	}
+
+	data, err := accountDB.GetAccountDataByType(
+		req.Context(), localpart, "ROOM_ID", "m.tag",
+	)
+
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	mtag := NewMTag()
+
+	if len(data) > 0 {
+		json.Unmarshal([]byte(data), &mtag)
+	} else {
+		//Error indicating there is no Tag data
+		return util.JSONResponse{}
+	}
+
+	//Check whether the Tag to be deleted exists
+	if _, ok := mtag.Tags[tag]; ok {
+		delete(mtag.Tags, tag) //Deletion completed
+	} else {
+		//Error indicating that there is no Tag to delete
+		return util.JSONResponse{}
 	}
 
 	return util.JSONResponse{
