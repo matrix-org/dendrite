@@ -20,10 +20,16 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
+
+// Creates and returns a new MTag type variable
+func NewMTag() MTag {
+	return MTag{
+		Tags: make(map[string]TagProperties),
+	}
+}
 
 // GetTag implements GET /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags
 func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
@@ -50,7 +56,7 @@ func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
 }
 
 // PutTag implements PUT /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}
-func PutTag(req *http.Request, userId string, roomId string, tag common.Tag) util.JSONResponse {
+func PutTag(req *http.Request, userId string, roomId string, tag string) util.JSONResponse {
 
 	if req.Method != http.MethodPut {
 		return util.JSONResponse{
@@ -73,18 +79,22 @@ func PutTag(req *http.Request, userId string, roomId string, tag common.Tag) uti
 		return httputil.LogThenError(req, err)
 	}
 
-	outInterface := map[string]interface{}{}
-	json.Unmarshal([]byte(data), &outInterface)
+	mtag := NewMTag()
+
+	// outInterface := map[string]interface{}{}
 
 	if len(data) > 0 {
-		if outInterface[tag.Name] != nil {
+		json.Unmarshal([]byte(data), &mtag)
+		if outInterface[tag] != nil {
 			// Error saying this Tag already exists
 		}
 	}
 
-	outInterface[tag.Name] = tag.Order
+	mtag.Tags[tag] = TagProperties{
+		Order: 0.5, // Change value based on need
+	}
 
-	newTagData, _ := json.Marshal(outInterface)
+	newTagData, _ := json.Marshal(mtag)
 
 	if err := accountDB.SaveAccountData(
 		req.Context(), localpart, "ROOM_ID", "m.tag", newTagData,

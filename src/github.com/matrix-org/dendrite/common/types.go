@@ -46,10 +46,14 @@ type DisplayName struct {
 // recognized by strconv.ParseBool
 type WeakBoolean bool
 
-// RoomTags contain the data of the Tags per User for each Room
-type Tag struct {
-	Name  string
-	Order string
+// MTag contains the data for a Tag which can be referenced by the Tag name
+type MTag struct {
+	Tags map[string]TagProperties `json:"tags"`
+}
+
+// TagProperties contains the properties of an MTag datatype
+type TagProperties struct {
+	Order float32 `json:"order,omitempty"` // Empty values must be neglected
 }
 
 // UnmarshalJSON is overridden here to allow strings vaguely representing a true
