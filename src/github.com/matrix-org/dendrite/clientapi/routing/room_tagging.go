@@ -18,23 +18,25 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 // Creates and returns a new MTag type variable
-func NewMTag() MTag {
-	return MTag{
-		Tags: make(map[string]TagProperties),
+func NewMTag() common.MTag {
+	return common.MTag{
+		Tags: make(map[string]common.TagProperties),
 	}
 }
 
 // GetTag implements GET /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags
-func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
+func GetTag(req *http.Request, accountDB *accounts.Database, userId string, roomId string) util.JSONResponse {
 
-	if req.Method != http.MethodPGet {
+	if req.Method != http.MethodGet {
 		return util.JSONResponse{
 			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.NotFound("Bad method"),
@@ -42,6 +44,11 @@ func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
 	}
 
 	mtag := NewMTag()
+
+	localpart, _, err := gomatrixserverlib.SplitID('@', "USER_ID")
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	data, err := accountDB.GetAccountDataByType(
 		req.Context(), localpart, "ROOM_ID", "m.tag",
@@ -51,7 +58,8 @@ func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
 		return httputil.LogThenError(req, err)
 	}
 
-	err = json.Unmarshal([]byte(data), &mtag)
+	dataByte, _ := json.Marshal(data)
+	err = json.Unmarshal(dataByte, &mtag)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -64,7 +72,7 @@ func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
 }
 
 // PutTag implements PUT /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}
-func PutTag(req *http.Request, userId string, roomId string, tag string) util.JSONResponse {
+func PutTag(req *http.Request, accountDB *accounts.Database, userId string, roomId string, tag string) util.JSONResponse {
 
 	if req.Method != http.MethodPut {
 		return util.JSONResponse{
@@ -89,14 +97,15 @@ func PutTag(req *http.Request, userId string, roomId string, tag string) util.JS
 
 	mtag := NewMTag()
 
-	var properties TagProperties
+	var properties common.TagProperties
 
 	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
 		return *reqErr
 	}
 
 	if len(data) > 0 {
-		json.Unmarshal([]byte(data), &mtag)
+		dataByte, _ := json.Marshal(data)
+		err = json.Unmarshal(dataByte, &mtag)
 	}
 
 	mtag.Tags[tag] = properties
@@ -104,19 +113,19 @@ func PutTag(req *http.Request, userId string, roomId string, tag string) util.JS
 	newTagData, _ := json.Marshal(mtag)
 
 	if err := accountDB.SaveAccountData(
-		req.Context(), localpart, "ROOM_ID", "m.tag", newTagData,
+		req.Context(), localpart, "ROOM_ID", "m.tag", string(newTagData),
 	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: {},
+		JSON: struct{}{},
 	}
 }
 
 // DeleteTag implements DELETE /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}
-func DeleteTag(req *http.Request, userId string, roomId string, tag string) util.JSONResponse {
+func DeleteTag(req *http.Request, accountDB *accounts.Database, userId string, roomId string, tag string) util.JSONResponse {
 
 	if req.Method != http.MethodDelete {
 		return util.JSONResponse{
@@ -141,7 +150,8 @@ func DeleteTag(req *http.Request, userId string, roomId string, tag string) util
 	mtag := NewMTag()
 
 	if len(data) > 0 {
-		json.Unmarshal([]byte(data), &mtag)
+		dataByte, _ := json.Marshal(data)
+		err = json.Unmarshal(dataByte, &mtag)
 	} else {
 		//Error indicating there is no Tag data
 		return util.JSONResponse{}
@@ -155,8 +165,16 @@ func DeleteTag(req *http.Request, userId string, roomId string, tag string) util
 		return util.JSONResponse{}
 	}
 
+	newTagData, _ := json.Marshal(mtag)
+
+	if err := accountDB.SaveAccountData(
+		req.Context(), localpart, "ROOM_ID", "m.tag", string(newTagData),
+	); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: {},
+		JSON: struct{}{},
 	}
 }
