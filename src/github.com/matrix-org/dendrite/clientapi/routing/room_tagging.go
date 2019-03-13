@@ -26,15 +26,15 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// Creates and returns a new MTag type variable
+// MewMTag creates and returns a new MTag type variable
 func NewMTag() common.MTag {
 	return common.MTag{
 		Tags: make(map[string]common.TagProperties),
 	}
 }
 
-// GetTag implements GET /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags
-func GetTag(req *http.Request, accountDB *accounts.Database, userId string, roomId string) util.JSONResponse {
+// GetTag implements GET /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags
+func GetTag(req *http.Request, accountDB *accounts.Database, userID string, roomID string) util.JSONResponse {
 
 	if req.Method != http.MethodGet {
 		return util.JSONResponse{
@@ -45,13 +45,13 @@ func GetTag(req *http.Request, accountDB *accounts.Database, userId string, room
 
 	mtag := NewMTag()
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', "USER_ID")
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
 	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, "ROOM_ID", "m.tag",
+		req.Context(), localpart, roomID, "m.tag",
 	)
 
 	if err != nil {
@@ -71,8 +71,8 @@ func GetTag(req *http.Request, accountDB *accounts.Database, userId string, room
 	}
 }
 
-// PutTag implements PUT /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}
-func PutTag(req *http.Request, accountDB *accounts.Database, userId string, roomId string, tag string) util.JSONResponse {
+// PutTag implements PUT /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
+func PutTag(req *http.Request, accountDB *accounts.Database, userID string, roomID string, tag string) util.JSONResponse {
 
 	if req.Method != http.MethodPut {
 		return util.JSONResponse{
@@ -81,14 +81,14 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userId string, room
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', "USER_ID")
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
 	//Check for existing entries of tags for this ROOM ID and localpart
 	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, "ROOM_ID", "m.tag",
+		req.Context(), localpart, roomID, "m.tag",
 	)
 
 	if err != nil {
@@ -106,6 +106,9 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userId string, room
 	if len(data) > 0 {
 		dataByte, _ := json.Marshal(data)
 		err = json.Unmarshal(dataByte, &mtag)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
 	}
 
 	mtag.Tags[tag] = properties
@@ -113,7 +116,7 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userId string, room
 	newTagData, _ := json.Marshal(mtag)
 
 	if err := accountDB.SaveAccountData(
-		req.Context(), localpart, "ROOM_ID", "m.tag", string(newTagData),
+		req.Context(), localpart, roomID, "m.tag", string(newTagData),
 	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -124,8 +127,8 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userId string, room
 	}
 }
 
-// DeleteTag implements DELETE /_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}
-func DeleteTag(req *http.Request, accountDB *accounts.Database, userId string, roomId string, tag string) util.JSONResponse {
+// DeleteTag implements DELETE /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
+func DeleteTag(req *http.Request, accountDB *accounts.Database, userID string, roomID string, tag string) util.JSONResponse {
 
 	if req.Method != http.MethodDelete {
 		return util.JSONResponse{
@@ -134,13 +137,13 @@ func DeleteTag(req *http.Request, accountDB *accounts.Database, userId string, r
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', "USER_ID")
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
 	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, "ROOM_ID", "m.tag",
+		req.Context(), localpart, roomID, "m.tag",
 	)
 
 	if err != nil {
@@ -152,6 +155,9 @@ func DeleteTag(req *http.Request, accountDB *accounts.Database, userId string, r
 	if len(data) > 0 {
 		dataByte, _ := json.Marshal(data)
 		err = json.Unmarshal(dataByte, &mtag)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
 	} else {
 		//Error indicating there is no Tag data
 		return util.JSONResponse{}
@@ -168,7 +174,7 @@ func DeleteTag(req *http.Request, accountDB *accounts.Database, userId string, r
 	newTagData, _ := json.Marshal(mtag)
 
 	if err := accountDB.SaveAccountData(
-		req.Context(), localpart, "ROOM_ID", "m.tag", string(newTagData),
+		req.Context(), localpart, roomID, "m.tag", string(newTagData),
 	); err != nil {
 		return httputil.LogThenError(req, err)
 	}
