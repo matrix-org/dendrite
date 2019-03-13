@@ -26,7 +26,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// MewMTag creates and returns a new MTag type variable
+// NewMTag creates and returns a new MTag type variable
 func NewMTag() common.MTag {
 	return common.MTag{
 		Tags: make(map[string]common.TagProperties),
