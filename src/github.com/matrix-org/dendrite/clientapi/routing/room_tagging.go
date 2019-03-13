@@ -47,7 +47,11 @@ func GetTag(req *http.Request, userId string, roomId string) util.JSONResponse {
 		req.Context(), localpart, "ROOM_ID", "m.tag",
 	)
 
-	json.Unmarshal([]byte(data), &mtag)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	err = json.Unmarshal([]byte(data), &mtag)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -85,13 +89,17 @@ func PutTag(req *http.Request, userId string, roomId string, tag string) util.JS
 
 	mtag := NewMTag()
 
+	var properties TagProperties
+
+	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
+		return *reqErr
+	}
+
 	if len(data) > 0 {
 		json.Unmarshal([]byte(data), &mtag)
 	}
 
-	mtag.Tags[tag] = TagProperties{
-		Order: 0.5, // Change value based on need
-	}
+	mtag.Tags[tag] = properties
 
 	newTagData, _ := json.Marshal(mtag)
 
