@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2019 Sumukha PK
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// NewMTag creates and returns a new MTag type variable
-func NewMTag() common.MTag {
+// newMTag creates and returns a new MTag type variable
+func newMTag() common.MTag {
 	return common.MTag{
 		Tags: make(map[string]common.TagProperties),
 	}
@@ -35,14 +35,12 @@ func NewMTag() common.MTag {
 
 // GetTag implements GET /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags
 func GetTag(req *http.Request, accountDB *accounts.Database, userID string, roomID string) util.JSONResponse {
-
 	if req.Method != http.MethodGet {
 		return util.JSONResponse{
 			Code: http.StatusMethodNotAllowed,
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
-
 	mtag := NewMTag()
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
@@ -73,7 +71,6 @@ func GetTag(req *http.Request, accountDB *accounts.Database, userID string, room
 
 // PutTag implements PUT /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
 func PutTag(req *http.Request, accountDB *accounts.Database, userID string, roomID string, tag string) util.JSONResponse {
-
 	if req.Method != http.MethodPut {
 		return util.JSONResponse{
 			Code: http.StatusMethodNotAllowed,
@@ -94,9 +91,7 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userID string, room
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-
 	mtag := NewMTag()
-
 	var properties common.TagProperties
 
 	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
@@ -112,7 +107,6 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userID string, room
 	}
 
 	mtag.Tags[tag] = properties
-
 	newTagData, _ := json.Marshal(mtag)
 
 	if err := accountDB.SaveAccountData(
@@ -149,7 +143,6 @@ func DeleteTag(req *http.Request, accountDB *accounts.Database, userID string, r
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-
 	mtag := NewMTag()
 
 	if len(data) > 0 {
@@ -160,7 +153,10 @@ func DeleteTag(req *http.Request, accountDB *accounts.Database, userID string, r
 		}
 	} else {
 		//Error indicating there is no Tag data
-		return util.JSONResponse{}
+		return util.JSONResponse{
+			Code: http.StatusMethodNotAllowed,
+			JSON: jsonerror.NoTagExists("No Tag Exists"),
+		}
 	}
 
 	//Check whether the Tag to be deleted exists
@@ -168,9 +164,11 @@ func DeleteTag(req *http.Request, accountDB *accounts.Database, userID string, r
 		delete(mtag.Tags, tag) //Deletion completed
 	} else {
 		//Error indicating that there is no Tag to delete
-		return util.JSONResponse{}
+		return util.JSONResponse{
+			Code: http.StatusMethodNotAllowed,
+			JSON: jsonerror.NoTagExists("No Tag Exists"),
+		}
 	}
-
 	newTagData, _ := json.Marshal(mtag)
 
 	if err := accountDB.SaveAccountData(
