@@ -408,7 +408,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("get_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			// When a GET tag request is done, obtain all data of user from here and provide a JSON response.
 			// MakeAuthAPI will convert it to a HTTP response and reflect it on the browser.
 			vars := mux.Vars(req)
@@ -417,7 +417,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("put_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			// When a PUT tag request is done, obtain all data of user from here and provide a JSON response.
 			// MakeAuthAPI will convert it to a HTTP response and reflect it on the browser.
 			vars := mux.Vars(req)
@@ -426,7 +426,7 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("delete_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			// When a DELETE tag request is done, obtain all data of user from here and provide a JSON response.
 			// MakeAuthAPI will convert it to a HTTP response and reflect it on the browser.
 			vars := mux.Vars(req)
