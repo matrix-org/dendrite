@@ -41,7 +41,7 @@ func GetTag(req *http.Request, accountDB *accounts.Database, userID string, room
 			JSON: jsonerror.NotFound("Bad method"),
 		}
 	}
-	mtag := NewMTag()
+	mtag := newMTag()
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -91,7 +91,7 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userID string, room
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	mtag := NewMTag()
+	mtag := newMTag()
 	var properties common.TagProperties
 
 	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
@@ -143,7 +143,7 @@ func DeleteTag(req *http.Request, accountDB *accounts.Database, userID string, r
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	mtag := NewMTag()
+	mtag := newMTag()
 
 	if len(data) > 0 {
 		dataByte, _ := json.Marshal(data)
