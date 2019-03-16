@@ -25,13 +25,6 @@ import (
 	"net/http"
 )
 
-var (
-	unknownEventResponse = util.JSONResponse{
-		Code: http.StatusNotFound,
-		JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
-	}
-)
-
 type getEventRequest struct {
 	req            *http.Request
 	device         *authtypes.Device
@@ -66,7 +59,10 @@ func GetEvent(
 
 	if len(eventsResp.Events) == 0 {
 		// TODO: Event not found locally. May need a federation query here.
-		return unknownEventResponse
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+		}
 	}
 
 	r := getEventRequest{
@@ -92,7 +88,10 @@ func GetEvent(
 	}
 
 	if !stateResp.RoomExists {
-		return unknownEventResponse
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+		}
 	}
 
 	if !stateResp.PrevEventsExist {
@@ -104,8 +103,10 @@ func GetEvent(
 	return r.proceedWithStateEvents(stateResp.StateEvents)
 }
 
+// proceedWithMissingState tries to proceed by fetching the missing states with
+// federation.
+// Note: It's not guaranteed that the server(s) we query have the state events.
 func (r *getEventRequest) proceedWithMissingState() util.JSONResponse {
-	// It's not guaranteed that the server we query has these events.
 	_, domain, err := gomatrixserverlib.SplitID('$', r.eventID)
 	if err != nil {
 		return httputil.LogThenError(r.req, err)
@@ -113,7 +114,10 @@ func (r *getEventRequest) proceedWithMissingState() util.JSONResponse {
 
 	if domain == r.cfg.Matrix.ServerName {
 		// Don't send a federation query to self
-		return unknownEventResponse
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+		}
 	}
 
 	state, err := r.federation.LookupState(r.req.Context(), domain, r.roomID, r.eventID)
@@ -147,5 +151,8 @@ func (r *getEventRequest) proceedWithStateEvents(stateEvents []gomatrixserverlib
 		}
 	}
 
-	return unknownEventResponse
+	return util.JSONResponse{
+		Code: http.StatusNotFound,
+		JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+	}
 }
