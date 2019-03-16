@@ -85,8 +85,8 @@ func PutTag(
 	}
 
 	if len(data) > 0 {
-		dataByte, err := json.Marshal(data)
-		if err = json.Unmarshal(dataByte, &mtag); err != nil {
+		dataByte, _ := json.Marshal(data)
+		if err := json.Unmarshal(dataByte, &mtag); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	}
@@ -111,8 +111,8 @@ func DeleteTag(
 	mtag := newMTag()
 
 	if len(data) > 0 {
-		dataByte, err := json.Marshal(data)
-		if err = json.Unmarshal(dataByte, &mtag); err != nil {
+		dataByte, _ := json.Marshal(data)
+		if err := json.Unmarshal(dataByte, &mtag); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	} else {
@@ -164,7 +164,7 @@ func addDataToDB(req *http.Request, localpart string, roomID string, accountDB *
 	if err := accountDB.SaveAccountData(
 		req.Context(), localpart, roomID, "m.tag", string(newTagData),
 	); err != nil {
-		raiseError(req, err)
+		httputil.LogThenError(req, err)
 	}
 }
 
