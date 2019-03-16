@@ -146,8 +146,3 @@ func NotTrusted(serverName string) *MatrixError {
 		Err:     fmt.Sprintf("Untrusted server '%s'", serverName),
 	}
 }
-
-// NoTagExists is an error that indicates the Tag to be deleted doesnt exist.
-func NoTagExists(msg string) *MatrixError {
-	return &MatrixError{"M_NOT_FOUND", msg}
-}

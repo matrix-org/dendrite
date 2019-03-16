@@ -34,18 +34,17 @@ func newMTag() common.MTag {
 }
 
 // GetTag implements GET /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags
-func GetTag(req *http.Request, accountDB *accounts.Database, userID string, roomID string) util.JSONResponse {
-	if req.Method != http.MethodGet {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
+func GetTag(
+	req *http.Request,
+	accountDB *accounts.Database,
+	userID string,
+	roomID string,
+) util.JSONResponse {
 	mtag := newMTag()
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		httputil.LogThenError(req, err)
 	}
 
 	data, err := accountDB.GetAccountDataByType(
@@ -53,14 +52,14 @@ func GetTag(req *http.Request, accountDB *accounts.Database, userID string, room
 	)
 
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		httputil.LogThenError(req, err)
 	}
 
 	dataByte, _ := json.Marshal(data)
 	err = json.Unmarshal(dataByte, &mtag)
 
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
@@ -70,27 +69,14 @@ func GetTag(req *http.Request, accountDB *accounts.Database, userID string, room
 }
 
 // PutTag implements PUT /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
-func PutTag(req *http.Request, accountDB *accounts.Database, userID string, roomID string, tag string) util.JSONResponse {
-	if req.Method != http.MethodPut {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
-
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	//Check for existing entries of tags for this ROOM ID and localpart
-	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, "m.tag",
-	)
-
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
+func PutTag(
+	req *http.Request,
+	accountDB *accounts.Database,
+	userID string,
+	roomID string,
+	tag string,
+) util.JSONResponse {
+	localpart, data := obtainSavedTags(req, userID, roomID, accountDB)
 	mtag := newMTag()
 	var properties common.TagProperties
 
@@ -99,21 +85,13 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userID string, room
 	}
 
 	if len(data) > 0 {
-		dataByte, _ := json.Marshal(data)
-		err = json.Unmarshal(dataByte, &mtag)
-		if err != nil {
+		dataByte, err := json.Marshal(data)
+		if err = json.Unmarshal(dataByte, &mtag); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	}
-
 	mtag.Tags[tag] = properties
-	newTagData, _ := json.Marshal(mtag)
-
-	if err := accountDB.SaveAccountData(
-		req.Context(), localpart, roomID, "m.tag", string(newTagData),
-	); err != nil {
-		return httputil.LogThenError(req, err)
-	}
+	addDataToDB(req, localpart, roomID, accountDB, mtag)
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -122,18 +100,51 @@ func PutTag(req *http.Request, accountDB *accounts.Database, userID string, room
 }
 
 // DeleteTag implements DELETE /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
-func DeleteTag(req *http.Request, accountDB *accounts.Database, userID string, roomID string, tag string) util.JSONResponse {
+func DeleteTag(
+	req *http.Request,
+	accountDB *accounts.Database,
+	userID string,
+	roomID string,
+	tag string,
+) util.JSONResponse {
+	localpart, data := obtainSavedTags(req, userID, roomID, accountDB)
+	mtag := newMTag()
 
-	if req.Method != http.MethodDelete {
+	if len(data) > 0 {
+		dataByte, err := json.Marshal(data)
+		if err = json.Unmarshal(dataByte, &mtag); err != nil {
+			return httputil.LogThenError(req, err)
+		}
+	} else {
+		//Error indicating there is no Tag data
 		return util.JSONResponse{
 			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
+			JSON: jsonerror.NotFound("No Tag Exists"),
 		}
 	}
 
+	// Check whether the Tag to be deleted exists
+	if _, ok := mtag.Tags[tag]; ok {
+		delete(mtag.Tags, tag)
+	} else {
+		return util.JSONResponse{
+			Code: http.StatusMethodNotAllowed,
+			JSON: struct{}{},
+		}
+	}
+	addDataToDB(req, localpart, roomID, accountDB, mtag)
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+// obtainSavedTags is a utility function to get all the tags saved in the DB
+func obtainSavedTags(req *http.Request, userID string, roomID string, accountDB *accounts.Database) (string, []gomatrixserverlib.ClientEvent) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		raiseError(req, err)
 	}
 
 	data, err := accountDB.GetAccountDataByType(
@@ -141,44 +152,23 @@ func DeleteTag(req *http.Request, accountDB *accounts.Database, userID string, r
 	)
 
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		raiseError(req, err)
 	}
-	mtag := newMTag()
+	return localpart, data
+}
 
-	if len(data) > 0 {
-		dataByte, _ := json.Marshal(data)
-		err = json.Unmarshal(dataByte, &mtag)
-		if err != nil {
-			return httputil.LogThenError(req, err)
-		}
-	} else {
-		//Error indicating there is no Tag data
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NoTagExists("No Tag Exists"),
-		}
-	}
-
-	//Check whether the Tag to be deleted exists
-	if _, ok := mtag.Tags[tag]; ok {
-		delete(mtag.Tags, tag) //Deletion completed
-	} else {
-		//Error indicating that there is no Tag to delete
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NoTagExists("No Tag Exists"),
-		}
-	}
+// addDataToDB is a utility function to save the tag data into the DB
+func addDataToDB(req *http.Request, localpart string, roomID string, accountDB *accounts.Database, mtag common.MTag) {
 	newTagData, _ := json.Marshal(mtag)
 
 	if err := accountDB.SaveAccountData(
 		req.Context(), localpart, roomID, "m.tag", string(newTagData),
 	); err != nil {
-		return httputil.LogThenError(req, err)
+		raiseError(req, err)
 	}
+}
 
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: struct{}{},
-	}
+// raiseError helps in returning a error via a JSONResponse
+func raiseError(req *http.Request, err error) util.JSONResponse {
+	return httputil.LogThenError(req, err)
 }
