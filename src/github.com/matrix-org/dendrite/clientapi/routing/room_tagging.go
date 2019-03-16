@@ -76,7 +76,11 @@ func PutTag(
 	roomID string,
 	tag string,
 ) util.JSONResponse {
-	localpart, data := obtainSavedTags(req, userID, roomID, accountDB)
+	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
+
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 	mtag := newMTag()
 	var properties common.TagProperties
 
@@ -107,7 +111,11 @@ func DeleteTag(
 	roomID string,
 	tag string,
 ) util.JSONResponse {
-	localpart, data := obtainSavedTags(req, userID, roomID, accountDB)
+	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
+
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 	mtag := newMTag()
 
 	if len(data) > 0 {
@@ -141,20 +149,20 @@ func DeleteTag(
 }
 
 // obtainSavedTags is a utility function to get all the tags saved in the DB
-func obtainSavedTags(req *http.Request, userID string, roomID string, accountDB *accounts.Database) (string, []gomatrixserverlib.ClientEvent) {
+func obtainSavedTags(req *http.Request, userID string, roomID string, accountDB *accounts.Database) (string, []gomatrixserverlib.ClientEvent, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		raiseError(req, err)
+		return "", []gomatrixserverlib.ClientEvent{}, err
 	}
 
 	data, err := accountDB.GetAccountDataByType(
 		req.Context(), localpart, roomID, "m.tag",
 	)
-
 	if err != nil {
-		raiseError(req, err)
+		return "", []gomatrixserverlib.ClientEvent{}, err
 	}
-	return localpart, data
+
+	return localpart, data, nil
 }
 
 // addDataToDB is a utility function to save the tag data into the DB
@@ -168,7 +176,7 @@ func addDataToDB(req *http.Request, localpart string, roomID string, accountDB *
 	}
 }
 
-// raiseError helps in returning a error via a JSONResponse
-func raiseError(req *http.Request, err error) util.JSONResponse {
-	return httputil.LogThenError(req, err)
-}
+// // raiseError helps in returning a error via a JSONResponse
+// func raiseError(req *http.Request, err error) util.JSONResponse {
+// 	return httputil.LogThenError(req, err)
+// }
