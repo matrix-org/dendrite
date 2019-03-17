@@ -175,8 +175,3 @@ func addDataToDB(req *http.Request, localpart string, roomID string, accountDB *
 		httputil.LogThenError(req, err)
 	}
 }
-
-// // raiseError helps in returning a error via a JSONResponse
-// func raiseError(req *http.Request, err error) util.JSONResponse {
-// 	return httputil.LogThenError(req, err)
-// }
