@@ -26,7 +26,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// newMTag creates and returns a new MTag type variable
+// newMTag creates and returns a new MTag type
 func newMTag() common.MTag {
 	return common.MTag{
 		Tags: make(map[string]common.TagProperties),
@@ -55,7 +55,10 @@ func GetTag(
 		httputil.LogThenError(req, err)
 	}
 
-	dataByte, _ := json.Marshal(data)
+	dataByte, err := json.Marshal(data)
+	if err != nil {
+		httputil.LogThenError(req, err)
+	}
 	err = json.Unmarshal(dataByte, &mtag)
 
 	if err != nil {
@@ -89,8 +92,11 @@ func PutTag(
 	}
 
 	if len(data) > 0 {
-		dataByte, _ := json.Marshal(data)
-		if err := json.Unmarshal(dataByte, &mtag); err != nil {
+		dataByte, err := json.Marshal(data)
+		if err != nil {
+			httputil.LogThenError(req, err)
+		}
+		if err = json.Unmarshal(dataByte, &mtag); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	}
@@ -119,7 +125,10 @@ func DeleteTag(
 	mtag := newMTag()
 
 	if len(data) > 0 {
-		dataByte, _ := json.Marshal(data)
+		dataByte, err := json.Marshal(data)
+		if err != nil {
+			httputil.LogThenError(req, err)
+		}
 		if err := json.Unmarshal(dataByte, &mtag); err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -149,7 +158,12 @@ func DeleteTag(
 }
 
 // obtainSavedTags is a utility function to get all the tags saved in the DB
-func obtainSavedTags(req *http.Request, userID string, roomID string, accountDB *accounts.Database) (string, []gomatrixserverlib.ClientEvent, error) {
+func obtainSavedTags(
+	req *http.Request,
+	userID string,
+	roomID string,
+	accountDB *accounts.Database,
+) (string, []gomatrixserverlib.ClientEvent, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return "", []gomatrixserverlib.ClientEvent{}, err
@@ -166,10 +180,18 @@ func obtainSavedTags(req *http.Request, userID string, roomID string, accountDB 
 }
 
 // addDataToDB is a utility function to save the tag data into the DB
-func addDataToDB(req *http.Request, localpart string, roomID string, accountDB *accounts.Database, mtag common.MTag) {
-	newTagData, _ := json.Marshal(mtag)
-
-	if err := accountDB.SaveAccountData(
+func addDataToDB(
+	req *http.Request,
+	localpart string,
+	roomID string,
+	accountDB *accounts.Database,
+	mtag common.MTag,
+) {
+	newTagData, err := json.Marshal(mtag)
+	if err != nil {
+		httputil.LogThenError(req, err)
+	}
+	if err = accountDB.SaveAccountData(
 		req.Context(), localpart, roomID, "m.tag", string(newTagData),
 	); err != nil {
 		httputil.LogThenError(req, err)
