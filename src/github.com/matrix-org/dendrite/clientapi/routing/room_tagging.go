@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -133,10 +132,9 @@ func DeleteTag(
 			return httputil.LogThenError(req, err)
 		}
 	} else {
-		//Error indicating there is no Tag data
 		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("No Tag Exists"),
+			Code: http.StatusOK,
+			JSON: struct{}{},
 		}
 	}
 
@@ -145,7 +143,7 @@ func DeleteTag(
 		delete(mtag.Tags, tag)
 	} else {
 		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
+			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
