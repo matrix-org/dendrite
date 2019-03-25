@@ -21,5 +21,6 @@ type Device struct {
 	// The access_token granted to this device.
 	// This uniquely identifies the device from all other devices and clients.
 	AccessToken string
-	// TODO: display name, last used timestamp, keys, etc
+	DisplayName string
+	// TODO: last used timestamp, keys, etc
 }
