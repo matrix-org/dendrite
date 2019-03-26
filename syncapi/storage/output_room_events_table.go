@@ -67,10 +67,12 @@ const insertEventSQL = "" +
 	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id"
 
 const selectEventsSQL = "" +
-	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
+	"SELECT id, event_json, device_id, transaction_id" +
+	" FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectRecentEventsSQL = "" +
-	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
+	"SELECT id, event_json, device_id, transaction_id" +
+	" FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
