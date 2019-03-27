@@ -38,7 +38,7 @@ func init() {
 
 type deviceSpec struct {
 	localPart   string
-	devId       string
+	devID       string
 	accessToken string
 	displayName string
 }
@@ -49,7 +49,7 @@ func TestDatabase_GetDevicesByLocalpart(t *testing.T) {
 
 	devSpec := deviceSpec{
 		localPart:   "get-device-test-local-part",
-		devId:       "get-device-test-device-id",
+		devID:       "get-device-test-device-id",
 		accessToken: "get-device-test-access-token",
 		displayName: "get-device-test-display-name",
 	}
@@ -69,7 +69,7 @@ func TestDatabase_GetDevicesByLocalpart(t *testing.T) {
 func TestDatabase_CreateDevice(t *testing.T) {
 	devSpec := deviceSpec{
 		localPart:   "create-test-local-part",
-		devId:       "create-test-device-id",
+		devID:       "create-test-device-id",
 		accessToken: "create-test-access-token",
 		displayName: "create-test-display-name",
 	}
@@ -89,16 +89,15 @@ func createTestDevice(devSpecScheme *deviceSpec, count int) (devices []*authtype
 	}
 
 	for i := 0; i < count; i++ {
-		devId := fmt.Sprintf("%s%d", devSpecScheme.devId, i)
+		devID := fmt.Sprintf("%s%d", devSpecScheme.devID, i)
 		displayName := fmt.Sprintf("%s%d", devSpecScheme.displayName, i)
 		if device, err := db.CreateDevice(
 			context.Background(),
 			fmt.Sprintf("%s%d", devSpecScheme.localPart, i),
-			&devId,
+			&devID,
 			fmt.Sprintf("%s%d", devSpecScheme.accessToken, i),
 			&displayName); err != nil {
 			fmt.Println(err)
-			return nil, err
 		} else {
 			devices = append(devices, device)
 		}
