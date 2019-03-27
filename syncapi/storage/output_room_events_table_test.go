@@ -16,6 +16,7 @@ import (
 var dataSource string
 var insideCi = false
 var insideDocker = false
+
 const dbName = "dendrite_syncapi"
 
 func init() {
@@ -34,7 +35,7 @@ func init() {
 	if insideCi {
 		dataSource = fmt.Sprintf("postgres://postgres@localhost/%s?sslmode=disable", dbName)
 	} else if insideDocker {
-		dataSource = fmt.Sprintf("postgres://dendrite:itsasecret@localhost/%s?sslmode=disable", dbName)
+		dataSource = fmt.Sprintf("postgres://dendrite:itsasecret@postgres/%s?sslmode=disable", dbName)
 	} else {
 		dataSource = fmt.Sprintf("postgres://dendrite:itsasecret@localhost:15432/%s?sslmode=disable", dbName)
 	}
