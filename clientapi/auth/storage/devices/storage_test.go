@@ -6,6 +6,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/stretchr/testify/assert"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -13,6 +14,7 @@ import (
 var dataSource string
 var insideCi = false
 var insideDocker = false
+const dbName = "dendrite_device"
 
 func init() {
 	for _, val := range os.Environ() {
@@ -28,13 +30,29 @@ func init() {
 	}
 
 	if insideCi {
-		dataSource = "postgres://postgres@localhost/dendrite_device?sslmode=disable"
+		dataSource = fmt.Sprintf("postgres://postgres@localhost/%s?sslmode=disable", dbName)
 	} else if insideDocker {
-		dataSource = "postgres://dendrite:itsasecret@postgres/dendrite_device?sslmode=disable"
+		dataSource = fmt.Sprintf("postgres://dendrite:itsasecret@localhost/%s?sslmode=disable", dbName)
 	} else {
-		dataSource = "postgres://dendrite:itsasecret@localhost:15432/dendrite_device?sslmode=disable"
+		dataSource = fmt.Sprintf("postgres://dendrite:itsasecret@localhost:15432/%s?sslmode=disable", dbName)
+	}
+
+
+	if insideCi {
+		database := "dendrite_device"
+		cmd := exec.Command("psql", database)
+		cmd.Stdin = strings.NewReader(
+			fmt.Sprintf("DROP DATABASE IF EXISTS %s; CREATE DATABASE %s;", database, database),
+		)
+		// Send stdout and stderr to our stderr so that we see error messages from
+		// the psql process
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
+		_ = cmd.Run()
 	}
 }
+
+
 
 type deviceSpec struct {
 	localPart   string
