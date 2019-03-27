@@ -37,7 +37,7 @@ func init() {
 	}
 }
 
-const testEventID = "test-event-id"
+const testEventID = "$test-event-id:test-domain.example.com"
 
 func Test_sanityCheckOutputRoomEvents(t *testing.T) {
 	db, err := NewSyncServerDatabase(dataSource)
@@ -67,7 +67,6 @@ func TestSyncServerDatabase_selectEventsWithEventIDs(t *testing.T) {
 	assert.Condition(t, func() bool {
 		return len(events) > 0
 	})
-
 }
 
 func insertTestEvent(t *testing.T, db *SyncServerDatabase) {
@@ -76,13 +75,14 @@ func insertTestEvent(t *testing.T, db *SyncServerDatabase) {
 
 	keyBytes := []byte("1122334455667788112233445566778811223344556677881122334455667788")
 	eventBuilder := gomatrixserverlib.EventBuilder{
-		RoomID:  "test-room-id",
+		RoomID:  "!test_room_id:test-domain.example.com",
 		Content: []byte(`{"RawContent": "test-raw-content"}`),
+		Sender:  "@test-user:test-domain.example.com",
 	}
 	event, err := eventBuilder.Build(
 		testEventID,
 		time.Now(),
-		"test-server-name",
+		"test-domain.example.com",
 		"test-key-id",
 		keyBytes)
 
