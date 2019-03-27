@@ -20,15 +20,15 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-// newMTag creates and returns a new MTag type
-func newMTag() common.MTag {
-	return common.MTag{
-		Tags: make(map[string]common.TagProperties),
+// newTag creates and returns a new Tag type
+func newTag() gomatrix.TagContent {
+	return gomatrix.TagContent{
+		Tags: make(map[string]gomatrix.TagProperties),
 	}
 }
 
@@ -39,7 +39,7 @@ func GetTag(
 	userID string,
 	roomID string,
 ) util.JSONResponse {
-	mtag := newMTag()
+	Tag := newTag()
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -47,7 +47,7 @@ func GetTag(
 	}
 
 	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, "m.tag",
+		req.Context(), localpart, roomID, "tag",
 	)
 
 	if err != nil {
@@ -58,7 +58,7 @@ func GetTag(
 	if err != nil {
 		httputil.LogThenError(req, err)
 	}
-	err = json.Unmarshal(dataByte, &mtag)
+	err = json.Unmarshal(dataByte, &Tag)
 
 	if err != nil {
 		httputil.LogThenError(req, err)
@@ -66,7 +66,7 @@ func GetTag(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: mtag,
+		JSON: Tag,
 	}
 }
 
@@ -83,8 +83,8 @@ func PutTag(
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	mtag := newMTag()
-	var properties common.TagProperties
+	Tag := newTag()
+	var properties gomatrix.TagProperties
 
 	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
 		return *reqErr
@@ -95,12 +95,12 @@ func PutTag(
 		if err != nil {
 			httputil.LogThenError(req, err)
 		}
-		if err = json.Unmarshal(dataByte, &mtag); err != nil {
+		if err = json.Unmarshal(dataByte, &Tag); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	}
-	mtag.Tags[tag] = properties
-	addDataToDB(req, localpart, roomID, accountDB, mtag)
+	Tag.Tags[tag] = properties
+	addDataToDB(req, localpart, roomID, accountDB, Tag)
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -121,17 +121,18 @@ func DeleteTag(
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	mtag := newMTag()
+	Tag := newTag()
 
 	if len(data) > 0 {
 		dataByte, err := json.Marshal(data)
 		if err != nil {
 			httputil.LogThenError(req, err)
 		}
-		if err := json.Unmarshal(dataByte, &mtag); err != nil {
+		if err := json.Unmarshal(dataByte, &Tag); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	} else {
+		//Synapse returns a 200 OK response on finding no Tags, same policy is followed here.
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
@@ -139,15 +140,16 @@ func DeleteTag(
 	}
 
 	// Check whether the Tag to be deleted exists
-	if _, ok := mtag.Tags[tag]; ok {
-		delete(mtag.Tags, tag)
+	if _, ok := Tag.Tags[tag]; ok {
+		delete(Tag.Tags, tag)
 	} else {
+		//Synapse returns a 200 OK response on finding no Tags, same policy is followed here.
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
-	addDataToDB(req, localpart, roomID, accountDB, mtag)
+	addDataToDB(req, localpart, roomID, accountDB, Tag)
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -168,7 +170,7 @@ func obtainSavedTags(
 	}
 
 	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, "m.tag",
+		req.Context(), localpart, roomID, "tag",
 	)
 	if err != nil {
 		return "", []gomatrixserverlib.ClientEvent{}, err
@@ -183,14 +185,14 @@ func addDataToDB(
 	localpart string,
 	roomID string,
 	accountDB *accounts.Database,
-	mtag common.MTag,
+	Tag gomatrix.TagContent,
 ) {
-	newTagData, err := json.Marshal(mtag)
+	newTagData, err := json.Marshal(Tag)
 	if err != nil {
 		httputil.LogThenError(req, err)
 	}
 	if err = accountDB.SaveAccountData(
-		req.Context(), localpart, roomID, "m.tag", string(newTagData),
+		req.Context(), localpart, roomID, "tag", string(newTagData),
 	); err != nil {
 		httputil.LogThenError(req, err)
 	}

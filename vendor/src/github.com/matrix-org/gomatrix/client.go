@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -68,6 +69,10 @@ func (cli *Client) BuildBaseURL(urlPath ...string) string {
 	parts := []string{hsURL.Path}
 	parts = append(parts, urlPath...)
 	hsURL.Path = path.Join(parts...)
+	// Manually add the trailing slash back to the end of the path if it's explicitly needed
+	if strings.HasSuffix(urlPath[len(urlPath)-1], "/") {
+		hsURL.Path = hsURL.Path + "/"
+	}
 	query := hsURL.Query()
 	if cli.AccessToken != "" {
 		query.Set("access_token", cli.AccessToken)
@@ -529,7 +534,7 @@ func (cli *Client) ForgetRoom(roomID string) (resp *RespForgetRoom, err error) {
 // InviteUser invites a user to a room. See http://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-rooms-roomid-invite
 func (cli *Client) InviteUser(roomID string, req *ReqInviteUser) (resp *RespInviteUser, err error) {
 	u := cli.BuildURL("rooms", roomID, "invite")
-	_, err = cli.MakeRequest("POST", u, struct{}{}, &resp)
+	_, err = cli.MakeRequest("POST", u, req, &resp)
 	return
 }
 

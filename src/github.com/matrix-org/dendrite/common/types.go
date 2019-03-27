@@ -46,16 +46,6 @@ type DisplayName struct {
 // recognized by strconv.ParseBool
 type WeakBoolean bool
 
-// MTag contains the data for a Tag which can be referenced by the Tag name
-type MTag struct {
-	Tags map[string]TagProperties `json:"tags"`
-}
-
-// TagProperties contains the properties of an MTag
-type TagProperties struct {
-	Order float32 `json:"order,omitempty"` // Empty values must be neglected
-}
-
 // UnmarshalJSON is overridden here to allow strings vaguely representing a true
 // or false boolean to be set as their closest counterpart
 func (b *WeakBoolean) UnmarshalJSON(data []byte) error {

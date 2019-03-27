@@ -14,6 +14,8 @@ type Event struct {
 	ID        string                 `json:"event_id"`            // The unique ID of this event
 	RoomID    string                 `json:"room_id"`             // The room the event was sent to. May be nil (e.g. for presence)
 	Content   map[string]interface{} `json:"content"`             // The JSON content of the event.
+	Redacts   string                 `json:"redacts,omitempty"`   // The event ID that was redacted if a m.room.redaction event
+	Unsigned  map[string]interface{} `json:"unsigned"`            // The unsigned portions of the event, such as age and prev_content
 }
 
 // Body returns the value of the "body" key in the event content if it is
