@@ -5,12 +5,36 @@ import (
 	"fmt"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"strings"
 	"testing"
 )
 
-const dataSourceName = "postgres://dendrite:itsasecret@postgres/dendrite_device?sslmode=disable"
+var dataSource string
+var insideCi = false
+var insideDocker = false
 
-//const dataSourceLocal = "postgres://dendrite:itsasecret@localhost:15432/dendrite_device?sslmode=disable"
+func init() {
+	for _, val := range os.Environ() {
+		tokens := strings.Split(val, "=")
+		if tokens[0] == "CI" && tokens[1] == "true" {
+			insideCi = true
+		}
+	}
+	if !insideCi {
+		if _, err := os.Open("/.dockerenv"); err == nil {
+			insideDocker = true
+		}
+	}
+
+	if insideCi {
+		dataSource = "postgres://postgres@postgres/dendrite_device?sslmode=disable"
+	} else if insideDocker {
+		dataSource = "postgres://dendrite:itsasecret@postgres/dendrite_device?sslmode=disable"
+	} else {
+		dataSource = "postgres://dendrite:itsasecret@localhost:15432/dendrite_device?sslmode=disable"
+	}
+}
 
 type deviceSpec struct {
 	localPart   string
@@ -20,7 +44,7 @@ type deviceSpec struct {
 }
 
 func TestDatabase_GetDevicesByLocalpart(t *testing.T) {
-	db, err := NewDatabase(dataSourceName, "localhost")
+	db, err := NewDatabase(dataSource, "localhost")
 	assert.Nil(t, err)
 
 	devSpec := deviceSpec{
@@ -59,7 +83,7 @@ func TestDatabase_CreateDevice(t *testing.T) {
 
 // create a number of device entries in the database, using ``devSpecScheme`` as the creation pattern.
 func createTestDevice(devSpecScheme *deviceSpec, count int) (devices []*authtypes.Device, err error) {
-	db, err := NewDatabase(dataSourceName, "localhost")
+	db, err := NewDatabase(dataSource, "localhost")
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -5,18 +5,42 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"strings"
 	"testing"
 	"time"
 )
 
-const dataSourceName = "postgres://dendrite:itsasecret@postgres/dendrite_syncapi?sslmode=disable"
+var dataSource string
+var insideCi = false
+var insideDocker = false
 
-//const dataSourceName = "postgres://dendrite:itsasecret@localhost:15432/dendrite_syncapi?sslmode=disable"
+func init() {
+	for _, val := range os.Environ() {
+		tokens := strings.Split(val, "=")
+		if tokens[0] == "CI" && tokens[1] == "true" {
+			insideCi = true
+		}
+	}
+	if !insideCi {
+		if _, err := os.Open("/.dockerenv"); err == nil {
+			insideDocker = true
+		}
+	}
+
+	if insideCi {
+		dataSource = "postgres://postgres@postgres/dendrite_syncapi?sslmode=disable"
+	} else if insideDocker {
+		dataSource = "postgres://dendrite:itsasecret@postgres/dendrite_syncapi?sslmode=disable"
+	} else {
+		dataSource = "postgres://dendrite:itsasecret@localhost:15432/dendrite_syncapi?sslmode=disable"
+	}
+}
 
 const testEventId = "test-event-id"
 
 func Test_sanityCheckOutputRoomEvents(t *testing.T) {
-	db, err := NewSyncServerDatabase(dataSourceName)
+	db, err := NewSyncServerDatabase(dataSource)
 	assert.Nil(t, err)
 
 	err = db.events.prepare(db.db)
@@ -29,7 +53,7 @@ func Test_sanityCheckOutputRoomEvents(t *testing.T) {
 }
 
 func TestSyncServerDatabase_selectEventsWithEventIDs(t *testing.T) {
-	db, err := NewSyncServerDatabase(dataSourceName)
+	db, err := NewSyncServerDatabase(dataSource)
 	assert.Nil(t, err)
 	insertTestEvent(t, db)
 	ctx := context.Background()
