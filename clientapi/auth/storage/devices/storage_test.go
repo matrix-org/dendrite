@@ -28,7 +28,7 @@ func init() {
 	}
 
 	if insideCi {
-		dataSource = "postgres://postgres@postgres/dendrite_device?sslmode=disable"
+		dataSource = "postgres://postgres@localhost/dendrite_device?sslmode=disable"
 	} else if insideDocker {
 		dataSource = "postgres://dendrite:itsasecret@postgres/dendrite_device?sslmode=disable"
 	} else {
