@@ -37,7 +37,7 @@ func init() {
 	}
 }
 
-const testEventId = "test-event-id"
+const testEventID = "test-event-id"
 
 func Test_sanityCheckOutputRoomEvents(t *testing.T) {
 	db, err := NewSyncServerDatabase(dataSource)
@@ -58,8 +58,9 @@ func TestSyncServerDatabase_selectEventsWithEventIDs(t *testing.T) {
 	insertTestEvent(t, db)
 	ctx := context.Background()
 	txn, err := db.db.Begin()
+	assert.Nil(t, err)
 
-	var eventIDs = []string{testEventId}
+	var eventIDs = []string{testEventID}
 	events, err := db.fetchMissingStateEvents(ctx, txn, eventIDs)
 	assert.Nil(t, err)
 	assert.NotNil(t, events)
@@ -79,17 +80,18 @@ func insertTestEvent(t *testing.T, db *SyncServerDatabase) {
 		Content: []byte(`{"RawContent": "test-raw-content"}`),
 	}
 	event, err := eventBuilder.Build(
-		testEventId,
+		testEventID,
 		time.Now(),
 		"test-server-name",
 		"test-key-id",
 		keyBytes)
 
+	assert.Nil(t, err)
 
 	var addState, removeState []string
 	transactionID := api.TransactionID{
-		DeviceID: "test-device-id",
-		TransactionID:"test-transaction-id",
+		DeviceID:      "test-device-id",
+		TransactionID: "test-transaction-id",
 	}
 
 	newEventID, err := db.events.insertEvent(
@@ -112,7 +114,7 @@ func insertTestEvent(t *testing.T, db *SyncServerDatabase) {
 func selectTestEvent(t *testing.T, db *SyncServerDatabase) {
 	ctx := context.Background()
 
-	var eventIDs = []string{testEventId}
+	var eventIDs = []string{testEventID}
 	res, err := db.Events(ctx, eventIDs)
 	assert.Nil(t, err)
 	assert.NotNil(t, res)
