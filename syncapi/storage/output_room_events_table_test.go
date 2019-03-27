@@ -29,7 +29,7 @@ func init() {
 	}
 
 	if insideCi {
-		dataSource = "postgres://postgres@postgres/dendrite_syncapi?sslmode=disable"
+		dataSource = "postgres://postgres@localhost/dendrite_syncapi?sslmode=disable"
 	} else if insideDocker {
 		dataSource = "postgres://dendrite:itsasecret@postgres/dendrite_syncapi?sslmode=disable"
 	} else {
