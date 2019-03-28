@@ -42,7 +42,7 @@ func init() {
 
 	if insideCi {
 		database := "dendrite_syncapi"
-		cmd := exec.Command("psql", database)
+		cmd := exec.Command("psql", "postgres")
 		cmd.Stdin = strings.NewReader(
 			fmt.Sprintf("DROP DATABASE IF EXISTS %s; CREATE DATABASE %s;", database, database),
 		)
