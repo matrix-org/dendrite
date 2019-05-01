@@ -163,20 +163,20 @@ func obtainSavedTags(
 	userID string,
 	roomID string,
 	accountDB *accounts.Database,
-) (string, []gomatrixserverlib.ClientEvent, error) {
+) (string, gomatrixserverlib.RawJSON, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return "", []gomatrixserverlib.ClientEvent{}, err
+		return "",gomatrixserverlib.RawJSON{}, err
 	}
 
 	data, err := accountDB.GetAccountDataByType(
 		req.Context(), localpart, roomID, "tag",
 	)
 	if err != nil {
-		return "", []gomatrixserverlib.ClientEvent{}, err
+		return "", gomatrixserverlib.RawJSON{}, err
 	}
 
-	return localpart, data, nil
+	return localpart, data.Content, nil
 }
 
 // addDataToDB is a utility function to save the tag data into the DB
