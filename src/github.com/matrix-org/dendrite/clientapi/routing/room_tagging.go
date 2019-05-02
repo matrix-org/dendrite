@@ -198,11 +198,11 @@ func addDataToDB(
 	}
 }
 
-// getContentFromData is an utility function to obtain "content" from the ClientEvent 
+// getContentFromData is an utility function to obtain "content" from the ClientEvent
 func getContentFromData(data []gomatrixserverlib.ClientEvent) []gomatrixserverlib.RawJSON {
 	var contentData []gomatrixserverlib.RawJSON
-	for i:=0 ; i< len(data); i++ {
-		contentData = append(contentData,data[i].Content)
+	for i := 0; i < len(data); i++ {
+		contentData = append(contentData, data[i].Content)
 	}
 	return contentData
 }
