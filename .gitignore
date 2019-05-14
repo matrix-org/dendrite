@@ -40,3 +40,10 @@ _testmain.go
 *.pem
 *.key
 *.crt
+
+# Individual dendrite.yaml
+dendrite.yaml
+
+# Logs and media
+/log
+/media
