@@ -12,7 +12,6 @@ set -eu
 export GOGC=400
 export DENDRITE_LINT_DISABLE_GC=1
 
-export GOPATH="$(pwd):$(pwd)/vendor"
 export PATH="$PATH:$(pwd)/bin"
 
 # starts a travis fold section. The first argument is the name of the fold
@@ -51,29 +50,29 @@ if [ "${TEST_SUITE:-lint}" == "lint" ]; then
 fi
 
 if [ "${TEST_SUITE:-unit-test}" == "unit-test" ]; then
-    gb test
+    go test ./...
 fi
 
 if [ "${TEST_SUITE:-integ-test}" == "integ-test" ]; then
-    travis_start gb-build "Building dendrite and integ tests"
-    gb build
+    travis_start go-build "Building dendrite and integ tests"
+    go build
     travis_end
-    
+
     # Check that all the packages can build.
     # When `go build` is given multiple packages it won't output anything, and just
     # checks that everything builds. This seems to do a better job of handling
-    # missing imports than `gb build` does.
+    # missing imports than `go build` does.
     go build github.com/matrix-org/dendrite/cmd/...
 
-    # Check that the servers build (this is done explicitly because `gb build` can silently fail (exit 0) and then we'd test a stale binary)
-    gb build github.com/matrix-org/dendrite/cmd/dendrite-room-server
-    gb build github.com/matrix-org/dendrite/cmd/roomserver-integration-tests
-    gb build github.com/matrix-org/dendrite/cmd/dendrite-sync-api-server
-    gb build github.com/matrix-org/dendrite/cmd/syncserver-integration-tests
-    gb build github.com/matrix-org/dendrite/cmd/create-account
-    gb build github.com/matrix-org/dendrite/cmd/dendrite-media-api-server
-    gb build github.com/matrix-org/dendrite/cmd/mediaapi-integration-tests
-    gb build github.com/matrix-org/dendrite/cmd/client-api-proxy
+    # Check that the servers build (this is done explicitly because `go build` can silently fail (exit 0) and then we'd test a stale binary)
+    go build github.com/matrix-org/dendrite/cmd/dendrite-room-server
+    go build github.com/matrix-org/dendrite/cmd/roomserver-integration-tests
+    go build github.com/matrix-org/dendrite/cmd/dendrite-sync-api-server
+    go build github.com/matrix-org/dendrite/cmd/syncserver-integration-tests
+    go build github.com/matrix-org/dendrite/cmd/create-account
+    go build github.com/matrix-org/dendrite/cmd/dendrite-media-api-server
+    go build github.com/matrix-org/dendrite/cmd/mediaapi-integration-tests
+    go build github.com/matrix-org/dendrite/cmd/client-api-proxy
 
     # Create necessary certificates and keys to run dendrite
     travis_start certs "Building SSL certs"

@@ -15,8 +15,6 @@ set -eux
 
 cd `dirname $0`/..
 
-export GOPATH="$(pwd):$(pwd)/vendor"
-
 # prefer the versions of gometalinter and the linters that we install
 # to anythign that ends up on the PATH.
 export PATH="$(pwd)/bin:$PATH"
@@ -36,7 +34,7 @@ then args="$args --enable-gc"
 fi
 
 echo "Installing lint search engine..."
-gb build github.com/alecthomas/gometalinter/
+go build github.com/alecthomas/gometalinter/
 gometalinter --config=linter.json ./... --install
 
 echo "Looking for lint..."

@@ -24,7 +24,7 @@ cache:
     - .downloads
 
 install:
- - go get github.com/constabulary/gb/...
+ - go get -u -v github.com/alecthomas/gometalinter/
 
 script:
  - ./scripts/travis-test.sh

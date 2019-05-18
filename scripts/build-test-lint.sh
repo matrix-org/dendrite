@@ -8,7 +8,7 @@ export GOPATH="$(pwd):$(pwd)/vendor"
 export PATH="$PATH:$(pwd)/bin"
 
 echo "Checking that it builds"
-gb build
+go build ./...
 
 # Check that all the packages can build.
 # When `go build` is given multiple packages it won't output anything, and just
@@ -20,4 +20,4 @@ go build github.com/matrix-org/dendrite/cmd/...
 ./scripts/find-lint.sh
 
 echo "Testing..."
-gb test
+go test ./...
