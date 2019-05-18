@@ -12,9 +12,9 @@ See [INSTALL.md](INSTALL.md) for instructions on setting up a running dev
 instance of dendrite, and [CODE_STYLE.md](CODE_STYLE.md) for the code style
 guide.
 
-We use `gb` for managing our dependencies, so `gb build` and `gb test` is how
+We use `go mod` for managing our dependencies, so `go build` and `go test` is how
 to build dendrite and run the unit tests respectively. Be aware that a list of
-all dendrite packages is the expected output for all tests succeeding with `gb
+all dendrite packages is the expected output for all tests succeeding with `go
 test`. There are also [scripts](scripts) for [linting](scripts/find-lint.sh)
 and doing a [build/test/lint run](scripts/build-test-lint.sh).
 
@@ -35,15 +35,15 @@ issues so that there is always a way for new people to come and get involved.
 
 ## Contributing to dependencies
 
-Dependencies are located in `vendor/src` and are managed by `gb`. If you need
+Dependencies are located in `vendor` and are managed by `go mod`. If you need
 to make some changes in those directories, you first need to open a PR in the
-dependency repository. Once your PR is merged, you need to run `gb vendor
-update $repo_url` (example: `gb vendor update github.com/matrix-org/gomatrix`)
+dependency repository. Once your PR is merged, you need to run `go get -u -v
+$repo_url` (example: `go get -u -v github.com/matrix-org/gomatrix`)
 in the dendrite repository to update the dependency.
 
 You can then create a commit containing only the modified vendor files (along
-with the `vendor/manifest` file), name it with the command you just ran (ie
-`gb vendor update github.com/matrix-org/gomatrix`), and open a PR on Dendrite.
+with the `go.mod` and `go.sum` file), name it with the command you just ran
+(ie `go get -u -v`), and open a PR on Dendrite.
 
 ## Getting Help
 
@@ -57,4 +57,3 @@ For more general questions please use [#dendrite:matrix.org](https://matrix.to/#
 
 We ask that everyone who contributes to the project signs off their
 contributions, in accordance with the [DCO](https://github.com/matrix-org/matrix-doc/blob/master/CONTRIBUTING.rst#sign-off).
-

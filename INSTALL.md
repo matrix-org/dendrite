@@ -12,7 +12,7 @@ Dendrite can be run in one of two configurations:
 
 ## Requirements
 
- - Go 1.10+
+ - Go 1.11+
  - Postgres 9.5+
  - For Kafka (optional if using the monolith server):
    - Unix-based system (https://kafka.apache.org/documentation/#os)
@@ -28,10 +28,6 @@ Assumes Go 1.10+ and JDK 1.8+ are already installed and are on PATH.
 # Get the code
 git clone https://github.com/matrix-org/dendrite
 cd dendrite
-
-# Build it
-go get github.com/constabulary/gb/...
-gb build
 ```
 
 If using Kafka, install and start it (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
@@ -102,7 +98,7 @@ Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Th
 
 It is possible to use 'naffka' as an in-process replacement to Kafka when using
 the monolith server. To do this, set `use_naffka: true` in `dendrite.yaml` and uncomment
-the necessary line related to naffka in the `database` section. Be sure to update the 
+the necessary line related to naffka in the `database` section. Be sure to update the
 database username and password if needed.
 
 The monolith server can be started as shown below. By default it listens for
@@ -256,7 +252,7 @@ you want to support federation.
 ./bin/dendrite-federation-sender-server --config dendrite.yaml
 ```
 
-### Run an appservice server 
+### Run an appservice server
 
 This sends events from the network to [application
 services](https://matrix.org/docs/spec/application_service/unstable.html)
