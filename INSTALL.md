@@ -22,7 +22,7 @@ Dendrite can be run in one of two configurations:
 
 ## Setting up a development environment
 
-Assumes Go 1.10+ and JDK 1.8+ are already installed and are on PATH.
+Assumes Go 1.11+ and JDK 1.8+ are already installed and are on PATH.
 
 ```bash
 # Get the code
