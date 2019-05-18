@@ -1,9 +1,0 @@
-#! /bin/bash
-
-set -eu
-
-golint
-go fmt
-go tool vet --all --shadow .
-gocyclo -over 12 .
-go test -timeout 5s -test.v
