@@ -55,7 +55,7 @@ fi
 
 if [ "${TEST_SUITE:-integ-test}" == "integ-test" ]; then
     travis_start go-build "Building dendrite and integ tests"
-    go build
+    go build ./...
     travis_end
 
     # Check that all the packages can build.

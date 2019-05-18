@@ -6,7 +6,6 @@
         "vetshadow",
         "deadcode",
         "gocyclo",
-        "golint",
         "varcheck",
         "structcheck",
         "ineffassign",
