@@ -1,4 +1,4 @@
-# /bin/bash
+#! /bin/bash
 
 # Downloads, installs and runs a kafka instance
 

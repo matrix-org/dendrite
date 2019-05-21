@@ -36,7 +36,7 @@ then args="$args --enable-gc"
 fi
 
 echo "Installing lint search engine..."
-gb build github.com/alecthomas/gometalinter/
+go get github.com/alecthomas/gometalinter/
 gometalinter --config=linter.json ./... --install
 
 echo "Looking for lint..."
