@@ -33,7 +33,11 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storage.PublicRoomsServerDatabase) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
-	authData := auth.Data{nil, deviceDB, nil}
+	authData := auth.Data{
+		AccountDB: nil,
+		DeviceDB: deviceDB,
+		AppServices: nil,
+	}
 
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {

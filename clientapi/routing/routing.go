@@ -77,7 +77,11 @@ func Setup(
 	v1mux := apiMux.PathPrefix(pathPrefixV1).Subrouter()
 	unstableMux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
-	authData := auth.Data{accountDB, deviceDB, cfg.Derived.ApplicationServices}
+	authData := auth.Data{
+		AccountDB: accountDB,
+		DeviceDB: deviceDB,
+		AppServices: cfg.Derived.ApplicationServices,
+	}
 
 	r0mux.Handle("/createRoom",
 		common.MakeAuthAPI("createRoom", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {

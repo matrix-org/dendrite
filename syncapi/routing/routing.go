@@ -33,7 +33,11 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
-	authData := auth.Data{nil, deviceDB, nil}
+	authData := auth.Data{
+		AccountDB: nil,
+		DeviceDB: deviceDB,
+		AppServices: nil,
+	}
 
 	// TODO: Add AS support for all handlers below.
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
