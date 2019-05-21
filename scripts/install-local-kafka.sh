@@ -2,7 +2,7 @@
 
 # Downloads, installs and runs a kafka instance
 
-set -eu
+set -eux
 
 cd `dirname $0`/..
 

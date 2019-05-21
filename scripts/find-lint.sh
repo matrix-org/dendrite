@@ -17,7 +17,7 @@ cd `dirname $0`/..
 
 # gometalinter doesn't seem to work without this.
 # We should move from gometalinter asap as per https://github.com/matrix-org/dendrite/issues/697 so this is a temporary
-# measure. It is not, however, in the scope of this PR.
+# fix.
 export GO111MODULE=off
 export GOPATH="$(pwd)/vendor:$GOPATH"
 # prefer the versions of gometalinter and the linters that we install
