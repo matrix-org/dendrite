@@ -40,3 +40,6 @@ _testmain.go
 *.pem
 *.key
 *.crt
+
+# Default configuration file
+dendrite.yaml
