@@ -15,12 +15,6 @@ set -eux
 
 cd `dirname $0`/..
 
-export GOPATH="$(pwd):$(pwd)/vendor"
-
-# prefer the versions of gometalinter and the linters that we install
-# to anythign that ends up on the PATH.
-export PATH="$(pwd)/bin:$PATH"
-
 args=""
 if [ ${1:-""} = "fast" ]
 then args="--config=linter-fast.json"
