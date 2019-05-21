@@ -24,4 +24,4 @@ Development discussion should happen in
 # Progress
 
 There's plenty still to do to make Dendrite usable! We're tracking progress in
-a [spreadsheet](https://docs.google.com/spreadsheets/d/1tkMNpIpPjvuDJWjPFbw_xzNzOHBA-Hp50Rkpcr43xTw).
+a [project board](https://github.com/matrix-org/dendrite/projects/2).
