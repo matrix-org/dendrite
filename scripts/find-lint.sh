@@ -15,6 +15,15 @@ set -eux
 
 cd `dirname $0`/..
 
+# gometalinter doesn't seem to work without this.
+# We should move from gometalinter asap as per https://github.com/matrix-org/dendrite/issues/697 so this is a temporary
+# measure. It is not, however, in the scope of this PR.
+export GO111MODULE=off
+export GOPATH="$(pwd):$(pwd)/vendor"
+# prefer the versions of gometalinter and the linters that we install
+# to anythign that ends up on the PATH.
+export PATH="$(pwd)/bin:$PATH"
+
 args=""
 if [ ${1:-""} = "fast" ]
 then args="--config=linter-fast.json"
@@ -31,6 +40,7 @@ fi
 
 echo "Installing lint search engine..."
 go get github.com/alecthomas/gometalinter/
+
 gometalinter --config=linter.json ./... --install
 
 echo "Looking for lint..."
