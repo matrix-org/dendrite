@@ -78,8 +78,8 @@ func Setup(
 	unstableMux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	authData := auth.Data{
-		AccountDB: accountDB,
-		DeviceDB: deviceDB,
+		AccountDB:   accountDB,
+		DeviceDB:    deviceDB,
 		AppServices: cfg.Derived.ApplicationServices,
 	}
 

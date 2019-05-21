@@ -34,8 +34,8 @@ func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storag
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
-		AccountDB: nil,
-		DeviceDB: deviceDB,
+		AccountDB:   nil,
+		DeviceDB:    deviceDB,
 		AppServices: nil,
 	}
 

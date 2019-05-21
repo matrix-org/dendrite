@@ -47,8 +47,8 @@ func Setup(
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
 	}
 	authData := auth.Data{
-		AccountDB: nil,
-		DeviceDB: deviceDB,
+		AccountDB:   nil,
+		DeviceDB:    deviceDB,
 		AppServices: nil,
 	}
 
