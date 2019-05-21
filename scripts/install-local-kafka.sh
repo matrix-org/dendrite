@@ -2,7 +2,7 @@
 
 # Downloads, installs and runs a kafka instance
 
-set -eux
+set -eu
 
 cd `dirname $0`/..
 
@@ -11,7 +11,7 @@ mkdir -p .downloads
 KAFKA_URL=http://archive.apache.org/dist/kafka/2.1.0/kafka_2.11-2.1.0.tgz
 
 # Only download the kafka if it isn't already downloaded.
-wget KAFKA_URL -O .downloads/kafka.tgz
+test -f .downloads/kafka.tgz || wget $KAFKA_URL -O .downloads/kafka.tgz
 # Unpack the kafka over the top of any existing installation
 mkdir -p kafka && tar xzf .downloads/kafka.tgz -C kafka --strip-components 1
 # Start the zookeeper running in the background.
