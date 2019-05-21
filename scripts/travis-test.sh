@@ -50,7 +50,7 @@ if [ "${TEST_SUITE:-lint}" == "lint" ]; then
 fi
 
 if [ "${TEST_SUITE:-unit-test}" == "unit-test" ]; then
-    gb test
+    go test ./...
 fi
 
 if [ "${TEST_SUITE:-integ-test}" == "integ-test" ]; then
