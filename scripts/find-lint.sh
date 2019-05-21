@@ -19,10 +19,6 @@ cd `dirname $0`/..
 # We should move from gometalinter asap as per https://github.com/matrix-org/dendrite/issues/697 so this is a temporary
 # fix.
 export GO111MODULE=off
-export GOPATH="$(pwd)/vendor:$GOPATH"
-# prefer the versions of gometalinter and the linters that we install
-# to anythign that ends up on the PATH.
-export PATH="$(pwd)/vendor/bin:$PATH"
 
 args=""
 if [ ${1:-""} = "fast" ]
