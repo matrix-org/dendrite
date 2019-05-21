@@ -41,7 +41,7 @@ var (
 	// Postgres docker container name (for running psql). If not set, psql must be in PATH.
 	postgresContainerName = os.Getenv("POSTGRES_CONTAINER")
 	// Test image to be uploaded/downloaded
-	testJPEG = test.Defaulting(os.Getenv("TEST_JPEG_PATH"), "src/github.com/matrix-org/dendrite/cmd/mediaapi-integration-tests/totem.jpg")
+	testJPEG = test.Defaulting(os.Getenv("TEST_JPEG_PATH"), "cmd/mediaapi-integration-tests/totem.jpg")
 	kafkaURI = test.Defaulting(os.Getenv("KAFKA_URIS"), "localhost:9092")
 )
 
