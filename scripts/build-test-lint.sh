@@ -7,7 +7,7 @@ set -eu
 # Check that all the packages can build.
 # When `go build` is given multiple packages it won't output anything, and just
 # checks that everything builds.
-echo "Double checking it builds..."
+echo "Checking that it builds..."
 go build ./cmd/...
 
 ./scripts/find-lint.sh
