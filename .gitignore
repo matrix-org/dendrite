@@ -41,9 +41,5 @@ _testmain.go
 *.key
 *.crt
 
-# Individual dendrite.yaml
+# Default configuration file
 dendrite.yaml
-
-# Logs and media
-/log
-/media

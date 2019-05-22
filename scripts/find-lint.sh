@@ -15,11 +15,10 @@ set -eux
 
 cd `dirname $0`/..
 
-export GOPATH="$(pwd):$(pwd)/vendor"
-
-# prefer the versions of gometalinter and the linters that we install
-# to anythign that ends up on the PATH.
-export PATH="$(pwd)/bin:$PATH"
+# gometalinter doesn't seem to work without this.
+# We should move from gometalinter asap as per https://github.com/matrix-org/dendrite/issues/697 so this is a temporary
+# fix.
+export GO111MODULE=off
 
 args=""
 if [ ${1:-""} = "fast" ]
@@ -36,7 +35,8 @@ then args="$args --enable-gc"
 fi
 
 echo "Installing lint search engine..."
-gb build github.com/alecthomas/gometalinter/
+go get github.com/alecthomas/gometalinter/
+
 gometalinter --config=linter.json ./... --install
 
 echo "Looking for lint..."
