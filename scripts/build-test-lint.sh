@@ -5,7 +5,7 @@
 set -eu
 
 echo "Checking that it builds"
-gb build
+go build
 
 # Check that all the packages can build.
 # When `go build` is given multiple packages it won't output anything, and just
