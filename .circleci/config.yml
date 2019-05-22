@@ -2,7 +2,7 @@ version: 2
 jobs:
   dendrite:
     docker:
-      - image: matrixdotorg/sytest-dendrite
+      - image: anoa/sytest-dendrite
     working_directory: /src
     steps:
       - checkout
