@@ -13,11 +13,12 @@ instance of dendrite, and [CODE_STYLE.md](CODE_STYLE.md) for the code style
 guide.
 
 As of May 2019, we're not using `gb` anymore, which is the tool we had been
-using for managing our dependencies, and switched to Go modules. To build
-Dendrite, run the `build.sh` script at the root of this repository, and to run
-unit tests, run `go test ./...` (which should pick up any unit test and run
-them). There are also [scripts](scripts) for [linting](scripts/find-lint.sh)
-and doing a [build/test/lint run](scripts/build-test-lint.sh).
+using for managing our dependencies. We're now using Go modules. To build
+Dendrite, run the `build.sh` script at the root of this repository (which runs
+`go install` under the hood), and to run unit tests, run `go test ./...` (which
+should pick up any unit test and run it). There are also [scripts](scripts) for
+[linting](scripts/find-lint.sh) and doing a [build/test/lint
+run](scripts/build-test-lint.sh).
 
 
 ## Picking Things To Do
