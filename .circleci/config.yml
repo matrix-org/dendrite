@@ -10,7 +10,7 @@ jobs:
       # Set up dendrite
       - run: 
           name: Build Dendrite
-          command: ./build.sh
+          command: echo $PATH && ./build.sh
       - run: 
           name: Copy custom dendrite config
           command: cp .circleci/dendrite-config.yaml dendrite.yaml
