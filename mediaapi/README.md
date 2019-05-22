@@ -18,7 +18,7 @@ See the sample below for image quality with nfnt/resize:
 
 ### bimg (uses libvips C library)
 
-Alternatively one can use `gb build -tags bimg` to use bimg from https://github.com/h2non/bimg (MIT-licensed) which uses libvips from https://github.com/jcupitt/libvips (LGPL v2.1+ -licensed). libvips is a C library and must be installed/built separately. See the github page for details. Also note that libvips in turn has dependencies with a selection of FOSS licenses.
+Alternatively one can use `go build -tags bimg` to use bimg from https://github.com/h2non/bimg (MIT-licensed) which uses libvips from https://github.com/jcupitt/libvips (LGPL v2.1+ -licensed). libvips is a C library and must be installed/built separately. See the github page for details. Also note that libvips in turn has dependencies with a selection of FOSS licenses.
 
 bimg and libvips have significantly better performance than nfnt/resize but produce slightly less-sharp images. bimg uses a box filter for downscaling to within about 200% of the target scale and then uses Lanczos3 for the last bit. This is a much faster approach but comes at the expense of sharpness. (~295ms in total for pre-generating 32x32-crop, 96x96-crop, 320x240-scale, 640x480-scale and 800x600-scale from a given JPEG image on a given machine.)
 
