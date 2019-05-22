@@ -17,7 +17,6 @@ matrix:
     trusted_third_party_id_servers:
       - vector.im
       - matrix.org
-      - riot.im
 
 # The media repository config
 media:

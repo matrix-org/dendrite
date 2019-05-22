@@ -1,10 +1,9 @@
-FROM golang:alpine3.6
+FROM docker.io/golang:1.12.5-alpine3.9
 
 RUN mkdir /build
 
 WORKDIR /build
 
-RUN apk --update --no-cache add openssl bash git && \
-    go get github.com/constabulary/gb/...
+RUN apk --update --no-cache add openssl bash git
 
 CMD ["bash", "docker/build.sh"]
