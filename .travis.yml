@@ -1,7 +1,7 @@
 language: go
 go:
- - 1.10.x
  - 1.11.x
+ - 1.12.x
 
 env:
 - TEST_SUITE="lint"
@@ -22,9 +22,6 @@ services:
 cache:
   directories:
     - .downloads
-
-install:
- - go get github.com/constabulary/gb/...
 
 script:
  - ./scripts/travis-test.sh

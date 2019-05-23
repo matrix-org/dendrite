@@ -18,8 +18,10 @@ We aim to try and make it as easy as possible to jump in.
 
 For questions about Dendrite we have a dedicated room on Matrix
 [#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org).
+Development discussion should happen in
+[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org).
 
 # Progress
 
 There's plenty still to do to make Dendrite usable! We're tracking progress in
-a [spreadsheet](https://docs.google.com/spreadsheets/d/1tkMNpIpPjvuDJWjPFbw_xzNzOHBA-Hp50Rkpcr43xTw).
+a [project board](https://github.com/matrix-org/dendrite/projects/2).
