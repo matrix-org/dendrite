@@ -2,7 +2,7 @@ version: 2
 jobs:
   dendrite:
     docker:
-      - image: matrixdotorg/sytest-dendrite
+      - image: anoa/sytest-dendrite
     working_directory: /src
     steps:
       - checkout
@@ -15,10 +15,10 @@ jobs:
           name: Copy custom dendrite config
           command: cp .circleci/dendrite-config.yaml dendrite.yaml
       - run: 
-          name: Generating self-signed server keys
+          name: Copy dummy keys to root
           command: |
-            test -f server.key || openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 3650 -nodes -subj /CN=localhost
-            test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
+            mv .circleci/matrix_key.pem .
+            mv .circleci/server.key .
       - run:
           name: Run sytest with whitelisted tests
           command: /dendrite_sytest.sh
