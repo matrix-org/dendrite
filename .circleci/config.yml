@@ -12,9 +12,6 @@ jobs:
           name: Build Dendrite
           command: ./build.sh
       - run: 
-          name: Copy custom dendrite config
-          command: cp .circleci/dendrite-config.yaml dendrite.yaml
-      - run: 
           name: Copy dummy keys to root
           command: |
             mv .circleci/matrix_key.pem .
