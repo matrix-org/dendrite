@@ -1,3 +1,4 @@
 GET /register yields a set of flows
 POST /register can create a user
 POST /register downcases capitals in usernames
+
