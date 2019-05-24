@@ -1,0 +1,35 @@
+version: 2
+jobs:
+  dendrite:
+    docker:
+      - image: matrixdotorg/sytest-dendrite
+    working_directory: /src
+    steps:
+      - checkout
+
+      # Set up dendrite
+      - run: 
+          name: Build Dendrite
+          command: ./build.sh
+      - run: 
+          name: Copy dummy keys to root
+          command: |
+            mv .circleci/matrix_key.pem .
+            mv .circleci/server.key .
+      - run:
+          name: Run sytest with whitelisted tests
+          command: /dendrite_sytest.sh
+
+      - store_artifacts:
+          path: /logs
+          destination: logs
+      - store_test_results:
+          path: /logs
+workflows:
+  version: 2
+  build:
+    jobs:
+      - dendrite:
+          filters:
+            branches:
+              only: master
