@@ -22,7 +22,7 @@ require (
 	github.com/klauspost/crc32 v0.0.0-20161016154125-cb6bfca970f6
 	github.com/lib/pq v0.0.0-20170918175043-23da1db4f16d
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
-	github.com/matrix-org/gomatrix v0.0.0-20171003113848-a7fc80c8060c
+	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20181109104322-1c2cbc0872f0
 	github.com/matrix-org/naffka v0.0.0-20171115094957-662bfd0841d0
 	github.com/matrix-org/util v0.0.0-20171013132526-8b1c8ab81986
