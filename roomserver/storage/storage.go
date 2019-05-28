@@ -441,8 +441,8 @@ func (d *Database) GetInvitesForUser(
 }
 
 // SetRoomAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string) error {
-	return d.statements.insertRoomAlias(ctx, alias, roomID)
+func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
+	return d.statements.insertRoomAlias(ctx, alias, roomID, creatorUserID)
 }
 
 // GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
@@ -453,6 +453,13 @@ func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string,
 // GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
 func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
 	return d.statements.selectAliasesFromRoomID(ctx, roomID)
+}
+
+// GetCreatorIDForAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) GetCreatorIDForAlias(
+	ctx context.Context, alias string,
+) (string, error) {
+	return d.statements.selectCreatorIDFromAlias(ctx, alias)
 }
 
 // RemoveRoomAlias implements alias.RoomserverAliasAPIDB
