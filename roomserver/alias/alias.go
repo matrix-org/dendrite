@@ -269,6 +269,20 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(
+		roomserverAPI.RoomserverGetAliasesForRoomIDPath,
+		common.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.GetAliasesForRoomIDRequest
+			var response roomserverAPI.GetAliasesForRoomIDResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.GetAliasesForRoomID(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
 		roomserverAPI.RoomserverRemoveRoomAliasPath,
 		common.MakeInternalAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
 			var request roomserverAPI.RemoveRoomAliasRequest
