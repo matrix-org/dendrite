@@ -25,7 +25,6 @@ type statementList []struct {
 }
 
 // prepare the SQL for each statement in the list and assign the result to the prepared statement.
-// nolint: safesql
 func (s statementList) prepare(db *sql.DB) (err error) {
 	for _, statement := range s {
 		if *statement.statement, err = db.Prepare(statement.sql); err != nil {
