@@ -7,7 +7,7 @@ steps:
       DENDRITE_LINT_DISABLE_GC: "1"
     plugins:
       - docker#v3.0.1:
-          image: "golang:1.11-alpine"
+          image: "golang:1.11-stretch"
 
   - command:
     - "go test ./..."
@@ -17,7 +17,7 @@ steps:
       DENDRITE_LINT_DISABLE_GC: "1"
     plugins:
       - docker#v3.0.1:
-          image: "golang:1.11-alpine"
+          image: "golang:1.11-stretch"
 
   - command:
     - "go build ./cmd/..."
@@ -27,7 +27,7 @@ steps:
       DENDRITE_LINT_DISABLE_GC: "1"
     plugins:
       - docker#v3.0.1:
-          image: "golang:1.12-alpine"
+          image: "golang:1.12-stretch"
 
   - command:
     - "go test ./..."
@@ -37,7 +37,7 @@ steps:
       DENDRITE_LINT_DISABLE_GC: "1"
     plugins:
       - docker#v3.0.1:
-          image: "golang:1.12-alpine"
+          image: "golang:1.12-stretch"
 
   - command:
     - "./scripts/find-lint.sh"
@@ -47,4 +47,4 @@ steps:
       DENDRITE_LINT_DISABLE_GC: "1"
     plugins:
       - docker#v3.0.1:
-          image: "golang:1.12-alpine"
+          image: "golang:1.12-stretch"
