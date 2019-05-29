@@ -1,6 +1,6 @@
 steps:
   - command:
-    - "./build.sh"
+    - "go build ./cmd/..."
     label: ":hammer-and-wrench: Build / :go: 1.11"
     env:
       GOGC: "400"
@@ -11,7 +11,7 @@ steps:
 
   - command:
     - "go test ./..."
-    label: ":female-scientist: Unit tests / :go: 1.11"
+    label: ":scientist: Unit tests / :go: 1.11"
     env:
       GOGC: "400"
       DENDRITE_LINT_DISABLE_GC: "1"
@@ -20,7 +20,7 @@ steps:
         image: "golang:1.11-alpine"
 
   - command:
-    - "./build.sh"
+    - "go build ./cmd/..."
     label: ":hammer-and-wrench: Build / :go: 1.12"
     env:
       GOGC: "400"
