@@ -29,7 +29,4 @@ workflows:
   version: 2
   build:
     jobs:
-      - dendrite:
-          filters:
-            branches:
-              only: master
+      - dendrite
