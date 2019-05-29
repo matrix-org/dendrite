@@ -5,6 +5,10 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "golang:1.11"
+    retry:
+      automatic:
+        - exit_status: 128
+          limit: 3
 
   - command:
     - "go build ./cmd/..."
@@ -12,6 +16,10 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "golang:1.12"
+    retry:
+      automatic:
+        - exit_status: 128
+          limit: 3
 
   - command:
     - "go test ./..."
