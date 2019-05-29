@@ -76,7 +76,7 @@ linters-settings:
 
     # path to a file containing a list of functions to exclude from checking
     # see https://github.com/kisielk/errcheck#excluding-functions for details
-    exclude: /path/to/file.txt
+    #exclude: /path/to/file.txt
   govet:
     # report about shadowed variables
     check-shadowing: true
@@ -163,28 +163,28 @@ linters-settings:
     #enabled-checks:
 
     # Which checks should be disabled; can't be combined with 'enabled-checks'; default is empty
-    disabled-checks:
-      - regexpMust
+    #disabled-checks:
 
     # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint` run to see all tags and checks.
     # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
-    enabled-tags:
-      - performance
+    #enabled-tags:
+    #  - performance
 
     settings: # settings passed to gocritic
       captLocal: # must be valid enabled check name
         paramsOnly: true
-      rangeValCopy:
-        sizeThreshold: 32
+      #rangeValCopy:
+      #  sizeThreshold: 32
 
 linters:
   enable:
     - megacheck
-    - govet
   enable-all: false
   disable:
     - maligned
     - prealloc
+    - gosec
+    - scopelint
   disable-all: false
   presets:
     - bugs
@@ -248,7 +248,7 @@ issues:
   new: false
 
   # Show only new issues created after git revision `REV`
-  new-from-rev: REV
+  #new-from-rev: REV
 
   # Show only new issues created in git patch with set file path.
-  new-from-patch: path/to/patch/file
+  #new-from-patch: path/to/patch/file

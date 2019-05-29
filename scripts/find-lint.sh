@@ -29,4 +29,4 @@ echo "Looking for lint..."
 golangci-lint run $args
 
 echo "Checking spelling..."
-golangci-lint -E "misspell" ./*.md
+misspell -error src *.md
