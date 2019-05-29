@@ -31,7 +31,8 @@ steps:
     - "./scripts/find-lint.sh"
     label: ":lower_left_crayon: Lint / :go: 1.12"
     env:
-      GOGC: 5 # https://github.com/golangci/golangci-lint#memory-usage-of-golangci-lint
+      # https://github.com/golangci/golangci-lint#memory-usage-of-golangci-lint
+      GOGC: 5
     plugins:
       - docker#v3.0.1:
           image: "golang:1.12"
