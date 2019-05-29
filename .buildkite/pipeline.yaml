@@ -11,7 +11,7 @@ steps:
 
   - command:
     - "go test ./..."
-    label: ":scientist: Unit tests / :go: 1.11"
+    label: ":female-scientist: Unit tests / :go: 1.11"
     env:
       GOGC: "400"
       DENDRITE_LINT_DISABLE_GC: "1"
