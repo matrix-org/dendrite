@@ -45,7 +45,7 @@ steps:
     env:
       GOGC: "400"
       DENDRITE_LINT_DISABLE_GC: "1"
-      GO111MODULE: off
+      GO111MODULE: "off"
     plugins:
       - docker#v3.0.1:
           image: "golang:1.12"
