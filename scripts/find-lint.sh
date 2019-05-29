@@ -22,6 +22,8 @@ if [ -n "${DENDRITE_LINT_CONCURRENCY:-}" ]
 then args="$args --concurrency=$DENDRITE_LINT_CONCURRENCY"
 fi
 
+echo "GOGC: $GOGC"
+
 echo "Installing golangci-lint..."
 go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
