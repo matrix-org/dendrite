@@ -1,0 +1,30 @@
+steps:
+  - command:
+    - "./build.sh"
+    label: "\U0001F528 Build - Go 1.12"
+    env:
+      GOGC: "400"
+      DENDRITE_LINT_DISABLE_GC: "1"
+    plugins:
+      - docker#v3.0.1:
+        image: "1.12-alpine:latest"
+
+  - command:
+    - "./scripts/find-lint.sh"
+    label: "\U0001F9F9 Lint - Go 1.12"
+    env:
+      GOGC: "400"
+      DENDRITE_LINT_DISABLE_GC: "1"
+    plugins:
+      - docker#v3.0.1:
+        image: "1.12-alpine:latest"
+
+  - command:
+    - "go test ./..."
+    label: "\U0001F9EA Unit tests - Go 1.12"
+    env:
+      GOGC: "400"
+      DENDRITE_LINT_DISABLE_GC: "1"
+    plugins:
+      - docker#v3.0.1:
+        image: "1.12-alpine:latest"
