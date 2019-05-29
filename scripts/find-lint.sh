@@ -23,7 +23,7 @@ then args="$args --concurrency=$DENDRITE_LINT_CONCURRENCY"
 fi
 
 echo "Installing golangci-lint..."
-go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
 echo "Looking for lint..."
 golangci-lint run $args

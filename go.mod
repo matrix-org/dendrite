@@ -8,12 +8,13 @@ require (
 	github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
 	github.com/crossdock/crossdock-go v0.0.0-20160816171116-049aabb0122b
-	github.com/davecgh/go-spew v1.1.0
+	github.com/davecgh/go-spew v1.1.1
 	github.com/eapache/go-resiliency v0.0.0-20160104191539-b86b1ec0dd42
 	github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934
 	github.com/eapache/queue v1.1.0
-	github.com/golang/protobuf v0.0.0-20161117033126-8ee79997227b
+	github.com/golang/protobuf v1.2.0
 	github.com/golang/snappy v0.0.0-20170119014723-7db9049039a0
+	github.com/golangci/golangci-lint v1.16.0 // indirect
 	github.com/google/shlex v0.0.0-20150127133951-6f45313302b9
 	github.com/gorilla/context v1.1.1
 	github.com/gorilla/mux v1.3.0
@@ -30,18 +31,18 @@ require (
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
 	github.com/nicksnyder/go-i18n v1.8.1
 	github.com/opentracing/opentracing-go v0.0.0-20170806192116-8ebe5d4e236e
-	github.com/pelletier/go-toml v0.0.0-20170904195809-1d6b12b7cb29
+	github.com/pelletier/go-toml v1.1.0
 	github.com/pierrec/lz4 v0.0.0-20161206202305-5c9560bfa9ac
 	github.com/pierrec/xxHash v0.0.0-20160112165351-5a004441f897
-	github.com/pkg/errors v0.0.0-20170505043639-c605e284fe17
+	github.com/pkg/errors v0.8.0
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v0.0.0-20180519192340-c51dc758d4bb
 	github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335
 	github.com/prometheus/common v0.0.0-20170108231212-dd2f054febf4
 	github.com/prometheus/procfs v0.0.0-20170128160123-1878d9fbb537
 	github.com/rcrowley/go-metrics v0.0.0-20161128210544-1f30fe9094a5
-	github.com/sirupsen/logrus v0.0.0-20170822132746-89742aefa4b2
-	github.com/stretchr/testify v0.0.0-20170809224252-890a5c3458b4
+	github.com/sirupsen/logrus v1.0.5
+	github.com/stretchr/testify v1.2.2
 	github.com/tidwall/gjson v1.0.2
 	github.com/tidwall/match v0.0.0-20171002075945-1731857f09b1
 	github.com/tidwall/sjson v1.0.0
@@ -52,14 +53,14 @@ require (
 	go.uber.org/atomic v1.3.0
 	go.uber.org/multierr v0.0.0-20170829224307-fb7d312c2c04
 	go.uber.org/zap v1.7.1
-	golang.org/x/crypto v0.0.0-20181106171534-e4dc69e5b2fd
-	golang.org/x/net v0.0.0-20170927055102-0a9397675ba3
-	golang.org/x/sys v0.0.0-20171012164349-43eea11bc926
+	golang.org/x/crypto v0.0.0-20190313024323-a1f597ede03a
+	golang.org/x/net v0.0.0-20190313220215-9f648a60d977
+	golang.org/x/sys v0.0.0-20190312061237-fead79001313
 	gopkg.in/Shopify/sarama.v1 v1.11.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20170727041045-23bcc3c4eae3
 	gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2
 	gopkg.in/h2non/bimg.v1 v1.0.18
 	gopkg.in/macaroon.v2 v2.0.0
-	gopkg.in/yaml.v2 v2.0.0-20171116090243-287cf08546ab
+	gopkg.in/yaml.v2 v2.2.1
 )
