@@ -29,7 +29,7 @@ echo "Installing golangci-lint..."
 go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
 echo "Looking for lint..."
-golangci-lint run $args
+golangci-lint run $args --deadline 30m
 
 echo "Checking spelling..."
 misspell -error src *.md
