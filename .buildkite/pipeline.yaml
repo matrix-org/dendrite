@@ -2,19 +2,6 @@ steps:
   - command:
     - "go build ./cmd/..."
     label: ":hammer_and_wrench: Build / :go: 1.11"
-    env:
-      GOGC: "400"
-      DENDRITE_LINT_DISABLE_GC: "1"
-    plugins:
-      - docker#v3.0.1:
-          image: "golang:1.11"
-
-  - command:
-    - "go test ./..."
-    label: ":female-scientist: Unit tests / :go: 1.11"
-    env:
-      GOGC: "400"
-      DENDRITE_LINT_DISABLE_GC: "1"
     plugins:
       - docker#v3.0.1:
           image: "golang:1.11"
@@ -22,19 +9,20 @@ steps:
   - command:
     - "go build ./cmd/..."
     label: ":hammer_and_wrench: Build / :go: 1.12"
-    env:
-      GOGC: "400"
-      DENDRITE_LINT_DISABLE_GC: "1"
     plugins:
       - docker#v3.0.1:
           image: "golang:1.12"
 
   - command:
     - "go test ./..."
+    label: ":female-scientist: Unit tests / :go: 1.11"
+    plugins:
+      - docker#v3.0.1:
+          image: "golang:1.11"
+
+  - command:
+    - "go test ./..."
     label: ":female-scientist: Unit tests / :go: 1.12"
-    env:
-      GOGC: "400"
-      DENDRITE_LINT_DISABLE_GC: "1"
     plugins:
       - docker#v3.0.1:
           image: "golang:1.12"
@@ -43,9 +31,7 @@ steps:
     - "./scripts/find-lint.sh"
     label: ":lower_left_crayon: Lint / :go: 1.12"
     env:
-      GOGC: "400"
-      DENDRITE_LINT_DISABLE_GC: "1"
-      GO111MODULE: "off"
+      GOGC: "100" # https://github.com/golangci/golangci-lint#memory-usage-of-golangci-lint
     plugins:
       - docker#v3.0.1:
           image: "golang:1.12"
