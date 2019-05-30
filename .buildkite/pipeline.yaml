@@ -1,0 +1,50 @@
+steps:
+  - command:
+    - "go build ./cmd/..."
+    label: ":hammer-and-wrench: Build / :go: 1.11"
+    env:
+      GOGC: "400"
+      DENDRITE_LINT_DISABLE_GC: "1"
+    plugins:
+      - docker#v3.0.1:
+        image: "golang:1.11-alpine"
+
+  - command:
+    - "go test ./..."
+    label: ":female-scientist: Unit tests / :go: 1.11"
+    env:
+      GOGC: "400"
+      DENDRITE_LINT_DISABLE_GC: "1"
+    plugins:
+      - docker#v3.0.1:
+        image: "golang:1.11-alpine"
+
+  - command:
+    - "go build ./cmd/..."
+    label: ":hammer-and-wrench: Build / :go: 1.12"
+    env:
+      GOGC: "400"
+      DENDRITE_LINT_DISABLE_GC: "1"
+    plugins:
+      - docker#v3.0.1:
+        image: "golang:1.12-alpine"
+
+  - command:
+    - "go test ./..."
+    label: ":female-scientist: Unit tests / :go: 1.12"
+    env:
+      GOGC: "400"
+      DENDRITE_LINT_DISABLE_GC: "1"
+    plugins:
+      - docker#v3.0.1:
+        image: "golang:1.12-alpine"
+
+  - command:
+    - "./scripts/find-lint.sh"
+    label: ":lower_left_crayon: Lint / :go: 1.12"
+    env:
+      GOGC: "400"
+      DENDRITE_LINT_DISABLE_GC: "1"
+    plugins:
+      - docker#v3.0.1:
+        image: "golang:1.12-alpine"
