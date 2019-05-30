@@ -103,6 +103,10 @@ func getState(
 		return nil, resErr
 	}
 
+	if event.RoomID() != roomID {
+		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
+	}
+
 	prevEventIDs := getIDsFromEventRef(event.PrevEvents())
 	authEventIDs := getIDsFromEventRef(event.AuthEvents())
 
