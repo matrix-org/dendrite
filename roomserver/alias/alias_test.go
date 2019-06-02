@@ -44,7 +44,10 @@ func (db MockRoomserverAliasAPIDatabase) RemoveRoomAlias(ctx context.Context, al
 }
 
 // This method needs to change depending on test case
-func (db MockRoomserverAliasAPIDatabase) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
+func (db *MockRoomserverAliasAPIDatabase) GetRoomIDForAlias(
+	ctx context.Context,
+	alias string,
+) (string, error) {
 	switch db.methodModes["GetRoomIDForAlias"] {
 	case "empty":
 		return "", nil
@@ -64,7 +67,7 @@ func (db MockRoomserverAliasAPIDatabase) GetRoomIDForAlias(ctx context.Context, 
 			return "", nil
 		}
 	default:
-		return "", fmt.Errorf("Unknown option used")
+		return "", fmt.Errorf("unknown option used")
 	}
 }
 
@@ -114,7 +117,7 @@ func TestGetRoomIDForAlias(t *testing.T) {
 	}
 
 	setup := func(modes map[string]string) *RoomserverAliasAPI {
-		mockAliasAPIDB := MockRoomserverAliasAPIDatabase{modes, 0}
+		mockAliasAPIDB := &MockRoomserverAliasAPIDatabase{modes, 0}
 		mockAppServiceQueryAPI := MockAppServiceQueryAPI{modes}
 
 		return &RoomserverAliasAPI{
