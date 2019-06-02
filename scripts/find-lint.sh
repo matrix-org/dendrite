@@ -21,12 +21,8 @@ if [ ${1:-""} = "fast" ]
 then args="--fast"
 fi
 
-if [ -n "${DENDRITE_LINT_CONCURRENCY:-}" ]
-then args="$args --concurrency=$DENDRITE_LINT_CONCURRENCY"
-fi
-
 echo "Installing golangci-lint..."
 go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
 echo "Looking for lint..."
-golangci-lint run $args --deadline 30m
+golangci-lint run $args
