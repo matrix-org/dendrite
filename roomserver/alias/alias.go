@@ -84,6 +84,19 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID)
 }
 
+func getRoomIDFromDB(
+	ctx context.Context,
+	db RoomserverAliasAPIDatabase,
+	request *roomserverAPI.GetRoomIDForAliasRequest,
+) (string, error) {
+	roomID, err := db.GetRoomIDForAlias(ctx, request.Alias)
+	if err != nil {
+		return "", err
+	}
+
+	return roomID, nil
+}
+
 // GetRoomIDForAlias implements alias.RoomserverAliasAPI
 func (r *RoomserverAliasAPI) GetRoomIDForAlias(
 	ctx context.Context,
@@ -91,18 +104,25 @@ func (r *RoomserverAliasAPI) GetRoomIDForAlias(
 	response *roomserverAPI.GetRoomIDForAliasResponse,
 ) error {
 	// Look up the room ID in the database
-	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
+	roomID, err := getRoomIDFromDB(ctx, r.DB, request)
 	if err != nil {
 		return err
 	}
 
-	if len(roomID) == 0 {
+	if roomID == "" {
 		// No rooms found locally, try our application services by making a call to
 		// the appservice component
 		aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
 		var aliasResp appserviceAPI.RoomAliasExistsResponse
 		if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
 			return err
+		}
+
+		if aliasResp.AliasExists {
+			roomID, err = getRoomIDFromDB(ctx, r.DB, request)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
