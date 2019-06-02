@@ -25,7 +25,7 @@ import (
 )
 
 type MockRoomserverAliasAPIDatabase struct {
-	methodModes map[string]string
+	mode string
 	attempts    int
 }
 
@@ -48,7 +48,7 @@ func (db *MockRoomserverAliasAPIDatabase) GetRoomIDForAlias(
 	ctx context.Context,
 	alias string,
 ) (string, error) {
-	switch db.methodModes["GetRoomIDForAlias"] {
+	switch db.mode {
 	case "empty":
 		return "", nil
 	case "error":
@@ -72,7 +72,7 @@ func (db *MockRoomserverAliasAPIDatabase) GetRoomIDForAlias(
 }
 
 type MockAppServiceQueryAPI struct {
-	methodModes map[string]string
+	mode string
 }
 
 // This method can be noop
@@ -89,7 +89,7 @@ func (q MockAppServiceQueryAPI) RoomAliasExists(
 	req *appserviceAPI.RoomAliasExistsRequest,
 	resp *appserviceAPI.RoomAliasExistsResponse,
 ) error {
-	switch q.methodModes["RoomAliasExists"] {
+	switch q.mode {
 	case "error":
 		return fmt.Errorf("found an error from RoomAliasExists")
 	case "found":
@@ -116,9 +116,9 @@ func TestGetRoomIDForAlias(t *testing.T) {
 		&roomserverAPI.GetRoomIDForAliasResponse{},
 	}
 
-	setup := func(modes map[string]string) *RoomserverAliasAPI {
-		mockAliasAPIDB := &MockRoomserverAliasAPIDatabase{modes, 0}
-		mockAppServiceQueryAPI := MockAppServiceQueryAPI{modes}
+	setup := func(dbMode, queryMode string) *RoomserverAliasAPI {
+		mockAliasAPIDB := &MockRoomserverAliasAPIDatabase{dbMode, 0}
+		mockAppServiceQueryAPI := MockAppServiceQueryAPI{queryMode}
 
 		return &RoomserverAliasAPI{
 			DB:            mockAliasAPIDB,
@@ -127,10 +127,7 @@ func TestGetRoomIDForAlias(t *testing.T) {
 	}
 
 	t.Run("Found local alias", func(t *testing.T) {
-		methodModes := make(map[string]string)
-		methodModes["GetRoomIDForAlias"] = "found"
-		methodModes["RoomAliasExists"] = "error"
-		aliasAPI := setup(methodModes)
+		aliasAPI := setup("found", "error")
 
 		err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response)
 		if err != nil {
@@ -143,10 +140,7 @@ func TestGetRoomIDForAlias(t *testing.T) {
 	})
 
 	t.Run("found appservice alias", func(t *testing.T) {
-		methodModes := make(map[string]string)
-		methodModes["GetRoomIDForAlias"] = "emptyFound"
-		methodModes["RoomAliasExists"] = "found"
-		aliasAPI := setup(methodModes)
+		aliasAPI := setup("emptyFound", "found")
 
 		if err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response); err != nil {
 			t.Fatalf("Got %s; wanted no error", err)
@@ -158,9 +152,7 @@ func TestGetRoomIDForAlias(t *testing.T) {
 	})
 
 	t.Run("error returned from DB", func(t *testing.T) {
-		methodModes := make(map[string]string)
-		methodModes["GetRoomIDForAlias"] = "error"
-		aliasAPI := setup(methodModes)
+		aliasAPI := setup("error", "")
 
 		err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response)
 		if err == nil {
@@ -171,10 +163,7 @@ func TestGetRoomIDForAlias(t *testing.T) {
 	})
 
 	t.Run("error returned from appserviceAPI", func(t *testing.T) {
-		methodModes := make(map[string]string)
-		methodModes["GetRoomIDForAlias"] = "empty"
-		methodModes["RoomAliasExists"] = "error"
-		aliasAPI := setup(methodModes)
+		aliasAPI := setup("empty", "error")
 
 		err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response)
 		if err == nil {
@@ -185,10 +174,7 @@ func TestGetRoomIDForAlias(t *testing.T) {
 	})
 
 	t.Run("no errors but no alias", func(t *testing.T) {
-		methodModes := make(map[string]string)
-		methodModes["GetRoomIDForAlias"] = "empty"
-		methodModes["RoomAliasExists"] = "empty"
-		aliasAPI := setup(methodModes)
+		aliasAPI := setup("empty",  "empty")
 		args.response.RoomID = "Should be empty"
 
 		if err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response); err != nil {
