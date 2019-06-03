@@ -25,11 +25,11 @@ import (
 )
 
 type MockRoomserverAliasAPIDatabase struct {
-	mode string
-	attempts    int
+	mode     string
+	attempts int
 }
 
-// Those methods can be essentially noop
+// These methods can be essentially noop
 func (db MockRoomserverAliasAPIDatabase) SetRoomAlias(ctx context.Context, alias string, roomID string) error {
 	return nil
 }
@@ -109,11 +109,60 @@ func TestGetRoomIDForAlias(t *testing.T) {
 		request  *roomserverAPI.GetRoomIDForAliasRequest
 		response *roomserverAPI.GetRoomIDForAliasResponse
 	}
-
 	args := arguments{
 		context.Background(),
 		&roomserverAPI.GetRoomIDForAliasRequest{},
 		&roomserverAPI.GetRoomIDForAliasResponse{},
+	}
+	type testCase struct {
+		name      string
+		dbMode    string
+		queryMode string
+		wantError bool
+		errorMsg  string
+		want      string
+	}
+	tt := []testCase{
+		{
+			"found local alias",
+			"found",
+			"error",
+			false,
+			"",
+			"123",
+		},
+		{
+			"found appservice alias",
+			"emptyFound",
+			"found",
+			false,
+			"",
+			"123",
+		},
+		{
+			"error returned from DB",
+			"error",
+			"",
+			true,
+			"GetRoomIDForAlias",
+			"",
+		},
+		{
+			"error returned from appserviceAPI",
+			"empty",
+			"error",
+			true,
+			"RoomAliasExists",
+			"",
+		},
+		{
+			"no errors but no alias",
+			"empty",
+			"empty",
+			false,
+			"",
+			"",
+		},
 	}
 
 	setup := func(dbMode, queryMode string) *RoomserverAliasAPI {
@@ -126,62 +175,22 @@ func TestGetRoomIDForAlias(t *testing.T) {
 		}
 	}
 
-	t.Run("Found local alias", func(t *testing.T) {
-		aliasAPI := setup("found", "error")
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			aliasAPI := setup(tc.dbMode, tc.queryMode)
 
-		err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response)
-		if err != nil {
-			t.Errorf("Got %s; wanted no error", err)
-		}
-
-		if args.response.RoomID != "123" {
-			t.Errorf("Got %s; wanted 123", args.response.RoomID)
-		}
-	})
-
-	t.Run("found appservice alias", func(t *testing.T) {
-		aliasAPI := setup("emptyFound", "found")
-
-		if err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response); err != nil {
-			t.Fatalf("Got %s; wanted no error", err)
-		}
-
-		if args.response.RoomID != "123" {
-			t.Errorf("Got %s; wanted 123", args.response.RoomID)
-		}
-	})
-
-	t.Run("error returned from DB", func(t *testing.T) {
-		aliasAPI := setup("error", "")
-
-		err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response)
-		if err == nil {
-			t.Fatalf("Got no error; wanted error from DB")
-		} else if !strings.Contains(err.Error(), "GetRoomIDForAlias") {
-			t.Errorf("Got %s; wanted error from GetRoomIDForAlias", err)
-		}
-	})
-
-	t.Run("error returned from appserviceAPI", func(t *testing.T) {
-		aliasAPI := setup("empty", "error")
-
-		err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response)
-		if err == nil {
-			t.Fatalf("Got no error; wanted error from appserviceAPI")
-		} else if !strings.Contains(err.Error(), "RoomAliasExists") {
-			t.Errorf("Got %s; wanted error from RoomAliasExists", err)
-		}
-	})
-
-	t.Run("no errors but no alias", func(t *testing.T) {
-		aliasAPI := setup("empty",  "empty")
-		args.response.RoomID = "Should be empty"
-
-		if err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response); err != nil {
-			t.Fatalf("Got %s; wanted no error", err)
-		}
-		if args.response.RoomID != "" {
-			t.Errorf("response.RoomID should have been empty")
-		}
-	})
+			err := aliasAPI.GetRoomIDForAlias(args.ctx, args.request, args.response)
+			if tc.wantError {
+				if err == nil {
+					t.Fatalf("Got no error; wanted error from %s", tc.errorMsg)
+				} else if !strings.Contains(err.Error(), tc.errorMsg) {
+					t.Fatalf("Got %s; wanted error from %s", err, tc.errorMsg)
+				}
+			} else if err != nil {
+				t.Fatalf("Got %s; wanted no error", err)
+			} else if args.response.RoomID != tc.want {
+				t.Errorf("Got '%s'; wanted '%s'", args.response.RoomID, tc.want)
+			}
+		})
+	}
 }
