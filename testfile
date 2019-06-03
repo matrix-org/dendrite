@@ -122,7 +122,6 @@ Can add account data to room
 Latest account data appears in v2 /sync
 New account data appears in incremental v2 /sync
 Checking local federation server
-Federation key API allows unsigned requests for keys
 Inbound federation can query profile data
 Outbound federation can send room-join requests
 Outbound federation can send events
