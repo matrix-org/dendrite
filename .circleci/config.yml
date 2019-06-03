@@ -8,10 +8,10 @@ jobs:
       - checkout
 
       # Set up dendrite
-      - run: 
+      - run:
           name: Build Dendrite
           command: ./build.sh
-      - run: 
+      - run:
           name: Copy dummy keys to root
           command: |
             mv .circleci/matrix_key.pem .
@@ -19,6 +19,9 @@ jobs:
       - run:
           name: Run sytest with whitelisted tests
           command: /dendrite_sytest.sh
+      - run:
+          name: Check for new tests to be added to testfile
+          command: /show-expected-fail-tests.sh /logs/results.tap
 
       - store_artifacts:
           path: /logs
