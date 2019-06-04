@@ -21,7 +21,7 @@ jobs:
           command: /dendrite_sytest.sh
       - run:
           name: Check for new tests to be added to testfile
-          command: /show-expected-fail-tests.sh /logs/results.tap
+          command: ./show-expected-fail-tests.sh /logs/results.tap
 
       - store_artifacts:
           path: /logs
