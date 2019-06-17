@@ -52,9 +52,9 @@ require (
 	go.uber.org/atomic v1.3.0
 	go.uber.org/multierr v0.0.0-20170829224307-fb7d312c2c04
 	go.uber.org/zap v1.7.1
-	golang.org/x/crypto v0.0.0-20181106171534-e4dc69e5b2fd
-	golang.org/x/net v0.0.0-20170927055102-0a9397675ba3
-	golang.org/x/sys v0.0.0-20171012164349-43eea11bc926
+	golang.org/x/crypto v0.0.0-20190617133340-57b3e21c3d56
+	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
+	golang.org/x/sys v0.0.0-20190412213103-97732733099d
 	gopkg.in/Shopify/sarama.v1 v1.11.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20170727041045-23bcc3c4eae3
