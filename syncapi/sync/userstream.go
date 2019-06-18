@@ -34,8 +34,8 @@ type UserStream struct {
 	lock sync.Mutex
 	// Closed when there is an update.
 	signalChannel chan struct{}
-	// The last stream position that there may have been an update for the suser
-	pos types.StreamPosition
+	// The last sync position that there may have been an update for the user
+	pos types.SyncPosition
 	// The last time when we had some listeners waiting
 	timeOfLastChannel time.Time
 	// The number of listeners waiting
@@ -51,7 +51,7 @@ type UserStreamListener struct {
 }
 
 // NewUserStream creates a new user stream
-func NewUserStream(userID string, currPos types.StreamPosition) *UserStream {
+func NewUserStream(userID string, currPos types.SyncPosition) *UserStream {
 	return &UserStream{
 		UserID:            userID,
 		timeOfLastChannel: time.Now(),
@@ -85,7 +85,7 @@ func (s *UserStream) GetListener(ctx context.Context) UserStreamListener {
 }
 
 // Broadcast a new stream position for this user.
-func (s *UserStream) Broadcast(pos types.StreamPosition) {
+func (s *UserStream) Broadcast(pos types.SyncPosition) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -120,7 +120,7 @@ func (s *UserStream) TimeOfLastNonEmpty() time.Time {
 
 // GetStreamPosition returns last stream position which the UserStream was
 // notified about
-func (s *UserStreamListener) GetStreamPosition() types.StreamPosition {
+func (s *UserStreamListener) GetStreamPosition() types.SyncPosition {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
 
@@ -132,11 +132,11 @@ func (s *UserStreamListener) GetStreamPosition() types.StreamPosition {
 // sincePos specifies from which point we want to be notified about. If there
 // has already been an update after sincePos we'll return a closed channel
 // immediately.
-func (s *UserStreamListener) GetNotifyChannel(sincePos types.StreamPosition) <-chan struct{} {
+func (s *UserStreamListener) GetNotifyChannel(sincePos types.SyncPosition) <-chan struct{} {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
 
-	if sincePos < s.userStream.pos {
+	if s.userStream.pos.IsAfter(sincePos) {
 		// If the listener is behind, i.e. missed a potential update, then we
 		// want them to wake up immediately. We do this by returning a new
 		// closed stream, which returns immediately when selected.

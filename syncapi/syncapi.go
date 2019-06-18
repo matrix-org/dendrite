@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
-	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 // SetupSyncAPIComponent sets up and registers HTTP handlers for the SyncAPI
@@ -39,17 +38,17 @@ func SetupSyncAPIComponent(
 	accountsDB *accounts.Database,
 	queryAPI api.RoomserverQueryAPI,
 ) {
-	syncDB, err := storage.NewSyncServerDatabase(string(base.Cfg.Database.SyncAPI))
+	syncDB, err := storage.NewSyncServerDatasource(string(base.Cfg.Database.SyncAPI))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
-	pos, err := syncDB.SyncStreamPosition(context.Background())
+	pos, err := syncDB.SyncPosition(context.Background())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to get stream position")
 	}
 
-	notifier := sync.NewNotifier(types.StreamPosition(pos))
+	notifier := sync.NewNotifier(pos)
 	err = notifier.Load(context.Background(), syncDB)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start notifier")
@@ -69,6 +68,13 @@ func SetupSyncAPIComponent(
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
+	}
+
+	typingConsumer := consumers.NewOutputTypingEventConsumer(
+		base.Cfg, base.KafkaConsumer, notifier, syncDB,
+	)
+	if err = typingConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start typing server consumer")
 	}
 
 	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB)

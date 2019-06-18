@@ -23,7 +23,6 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -113,7 +112,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
-	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, oldPos, newPos int64,
 ) (map[string]map[string]bool, map[string]streamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 
@@ -171,7 +170,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 
 		eventIDToEvent[ev.EventID()] = streamEvent{
 			Event:          ev,
-			streamPosition: types.StreamPosition(streamPos),
+			streamPosition: streamPos,
 		}
 	}
 
@@ -223,7 +222,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 // RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
 func (s *outputRoomEventsStatements) selectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	roomID string, fromPos, toPos int64, limit int,
 ) ([]streamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectRecentEventsStmt)
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
@@ -286,7 +285,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 
 		result = append(result, streamEvent{
 			Event:          ev,
-			streamPosition: types.StreamPosition(streamPos),
+			streamPosition: streamPos,
 			transactionID:  transactionID,
 		})
 	}

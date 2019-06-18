@@ -68,6 +68,13 @@ func (t *TypingServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
 		TypingUsers: userIDs,
 	}
 
+	if ev.Typing {
+		expireTime := ite.OriginServerTS.Time().Add(
+			time.Duration(ite.Timeout) * time.Millisecond,
+		)
+		ote.ExpireTime = &expireTime
+	}
+
 	eventJSON, err := json.Marshal(ote)
 	if err != nil {
 		return err

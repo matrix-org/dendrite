@@ -21,12 +21,24 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// StreamPosition represents the offset in the sync stream a client is at.
-type StreamPosition int64
+// SyncPosition contains the PDU and EDU stream sync positions for a client.
+type SyncPosition struct {
+	// PDUPosition is the stream position for PDUs the client is at.
+	PDUPosition int64
+	// TypingPosition is the position for typing notifications the client is at.
+	TypingPosition int64
+}
 
 // String implements the Stringer interface.
-func (sp StreamPosition) String() string {
-	return strconv.FormatInt(int64(sp), 10)
+func (sp SyncPosition) String() string {
+	return strconv.FormatInt(sp.PDUPosition, 10) + "_" +
+		strconv.FormatInt(sp.TypingPosition, 10)
+}
+
+// IsAfter returns whether sp refers to states newer than other
+func (sp SyncPosition) IsAfter(other SyncPosition) bool {
+	return sp.PDUPosition > other.PDUPosition ||
+		sp.TypingPosition > other.TypingPosition
 }
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
@@ -53,11 +65,10 @@ type Response struct {
 }
 
 // NewResponse creates an empty response with initialised maps.
-func NewResponse(pos StreamPosition) *Response {
-	res := Response{}
-	// Make sure we send the next_batch as a string. We don't want to confuse clients by sending this
-	// as an integer even though (at the moment) it is.
-	res.NextBatch = pos.String()
+func NewResponse(pos SyncPosition) *Response {
+	res := Response{
+		NextBatch: pos.String(),
+	}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
 	res.Rooms.Join = make(map[string]JoinResponse)

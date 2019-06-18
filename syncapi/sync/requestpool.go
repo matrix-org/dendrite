@@ -31,13 +31,13 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db        *storage.SyncServerDatabase
+	db        *storage.SyncServerDatasource
 	accountDB *accounts.Database
 	notifier  *Notifier
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db *storage.SyncServerDatabase, n *Notifier, adb *accounts.Database) *RequestPool {
+func NewRequestPool(db *storage.SyncServerDatasource, n *Notifier, adb *accounts.Database) *RequestPool {
 	return &RequestPool{db, adb, n}
 }
 
@@ -128,7 +128,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	}
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.StreamPosition) (res *types.Response, err error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.SyncPosition) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
@@ -140,12 +140,12 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.Stre
 		return
 	}
 
-	res, err = rp.appendAccountData(res, req.device.UserID, req, currentPos)
+	res, err = rp.appendAccountData(res, req.device.UserID, req, currentPos.PDUPosition)
 	return
 }
 
 func (rp *RequestPool) appendAccountData(
-	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
+	data *types.Response, userID string, req syncRequest, currentPos int64,
 ) (*types.Response, error) {
 	// TODO: Account data doesn't have a sync position of its own, meaning that
 	// account data might be sent multiple time to the client if multiple account
@@ -179,7 +179,7 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, *req.since, currentPos)
+	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, req.since.PDUPosition, currentPos)
 	if err != nil {
 		return nil, err
 	}
