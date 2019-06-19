@@ -29,8 +29,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const pathPrefixR0 = "/_matrix/media/r0"
@@ -81,34 +79,26 @@ func makeDownloadAPI(
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) http.HandlerFunc {
-	return promhttp.InstrumentHandlerCounter(
-		promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: name,
-				Help: "Total number of media_api requests for either thumbnails or full downloads",
-			},
-			[]string{"code"},
-		), http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			req = util.RequestWithLogging(req)
+	return prometheus.InstrumentHandler(name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		req = util.RequestWithLogging(req)
 
-			// Set common headers returned regardless of the outcome of the request
-			util.SetCORSHeaders(w)
-			// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
-			w.Header().Set("Content-Type", "application/json")
+		// Set common headers returned regardless of the outcome of the request
+		util.SetCORSHeaders(w)
+		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
+		w.Header().Set("Content-Type", "application/json")
 
-			vars := mux.Vars(req)
-			Download(
-				w,
-				req,
-				gomatrixserverlib.ServerName(vars["serverName"]),
-				types.MediaID(vars["mediaId"]),
-				cfg,
-				db,
-				client,
-				activeRemoteRequests,
-				activeThumbnailGeneration,
-				name == "thumbnail",
-			)
-		},
-		))
+		vars := mux.Vars(req)
+		Download(
+			w,
+			req,
+			gomatrixserverlib.ServerName(vars["serverName"]),
+			types.MediaID(vars["mediaId"]),
+			cfg,
+			db,
+			client,
+			activeRemoteRequests,
+			activeThumbnailGeneration,
+			name == "thumbnail",
+		)
+	}))
 }
