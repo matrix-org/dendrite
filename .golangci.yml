@@ -194,6 +194,7 @@ linters:
     - unparam
     - unused
     - varcheck
+    - maligned
   enable-all: false
   disable:
     - bodyclose
@@ -207,7 +208,6 @@ linters:
     - gosec
     - interfacer
     - lll
-    - maligned
     - prealloc # Should turn back on soon
     - scopelint
     - stylecheck
