@@ -204,7 +204,7 @@ linters:
     - gocritic
     - gofmt
     - golint
-    - gosec
+    - gosec # Should turn back on soon
     - interfacer
     - lll
     - maligned
