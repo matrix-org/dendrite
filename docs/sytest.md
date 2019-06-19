@@ -9,33 +9,68 @@ tracked through the amount of SyTest tests it passes.
 
 ## Finding out which tests to add
 
-An easy way to do this will be let CircleCI run sytest, and then search for the
-tests that should be added in the test results file.
+We recommend you run the tests locally by manually setting up sytest or using a
+sytest docker image. After running the tests, a script will print the tests you
+need to add to `testfile` for you.
 
-You may enable [CircleCI](https://circleci.com/) for your own fork, or simply
-refer to the CircleCI build for your PR. Once the build is complete, you can
-find the test results in `Container N/logs/results.tap` under the **Artifacts**
-tab on the CircleCI build page. To get the tests that should be added, search
-for the string:
+You should proceed after you see no build problems for dendrite by running:
 
-```
-# TODO passed but expected fail
+```sh
+./build.sh
 ```
 
-Generally, tests with this label should be the tests that your PR is allowing to
-pass.
+### Manually Setting up sytest
 
-To add a test into `testfile`, extract its test ID and append it to `testfile`.
-For example, to add this test:
+Get a copy of sytest on the `develop` branch next to your dendrite
+directory, and run the setup script:
 
-```
-ok 4 (expected fail) POST /register rejects registration of usernames with '!' # TODO passed but expected fail
-```
-
-Append:
-
-```
-POST /register rejects registration of usernames with '!'
+```sh
+git clone -b develop https://github.com/matrix-org/sytest
+cd sytest
+./install-deps.pl
 ```
 
-to `testfile`.
+Set up the database:
+
+```sh
+sudo -u postgres psql -c "CREATE USER dendrite PASSWORD 'itsasecret'"
+sudo -u postgres psql -c "CREATE DATABASE sytest_template OWNER dendrite"
+mkdir -p "server-0"
+cat > "server-0/database.yaml" << EOF
+args:
+    user: $PGUSER
+    database: $PGUSER
+    host: $PGHOST
+type: pg
+EOF
+```
+
+Run the tests:
+
+```sh
+./run-tests.pl -I Dendrite::Monolith -d ../dendrite/bin -W ../dendrite/testfile -O tap --all | tee results.tap
+```
+
+where `tee` lets you see the results while they're being piped to the file.
+
+Once the tests are complete, run the helper script to see if you need to add
+anything, and add them as needed:
+
+```sh
+../dendrite/show-expected-fail-tests.sh results.tap
+```
+
+If the script prints nothing/exits with 0, then you're good to go.
+
+### Using a sytest Docker Image
+
+Ensure you have the latest image for sytest, then run the tests:
+
+```sh
+docker pull matrixdotorg/sytest-dendrite
+docker run --rm -v /path/to/dendrite/:/src/ matrixdotorg/sytest-dendrite
+```
+
+where `/path/to/dendrite/` should be replaced with the actual path to your
+dendrite source code. The output should tell you if you need to add any tests to
+`testfile`.
