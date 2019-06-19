@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
+
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 )

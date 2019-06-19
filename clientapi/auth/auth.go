@@ -130,7 +130,7 @@ func VerifyUserFromRequest(
 
 	return nil, &util.JSONResponse{
 		Code: http.StatusUnauthorized,
-		JSON: jsonerror.UnknownToken("Unrecognized access token"),
+		JSON: jsonerror.UnknownToken("Unrecognized access token"), // nolint: misspell
 	}
 }
 

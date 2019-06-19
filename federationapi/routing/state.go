@@ -75,7 +75,8 @@ func parseEventIDParam(
 ) (eventID string, resErr *util.JSONResponse) {
 	URL, err := url.Parse(request.RequestURI())
 	if err != nil {
-		*resErr = util.ErrorResponse(err)
+		response := util.ErrorResponse(err)
+		resErr = &response
 		return
 	}
 

@@ -43,7 +43,7 @@ type DisplayName struct {
 
 // WeakBoolean is a type that will Unmarshal to true or false even if the encoded
 // representation is "true"/1 or "false"/0, as well as whatever other forms are
-// recognized by strconv.ParseBool
+// recognised by strconv.ParseBool
 type WeakBoolean bool
 
 // UnmarshalJSON is overridden here to allow strings vaguely representing a true

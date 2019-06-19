@@ -135,10 +135,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.TransactionID,
 	)
 	if err != nil {
-		return err
-	}
-
-	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event":      string(ev.JSON()),
