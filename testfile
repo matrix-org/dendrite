@@ -140,3 +140,5 @@ Changing the actions of an unknown rule fails with 404
 Enabling an unknown default rule fails with 404
 Trying to get push rules with unknown rule_id fails with 404
 Events come down the correct room
+local user can join room with version 5
+User can invite local user to room with version 5
