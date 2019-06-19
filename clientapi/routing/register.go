@@ -108,24 +108,21 @@ var (
 // remembered. If ANY parameters are supplied, the server should REPLACE all knowledge of
 // previous parameters with the ones supplied. This mean you cannot "build up" request params.
 type registerRequest struct {
-	// user-interactive auth params
-	Auth authDict `json:"auth"`
-
 	// registration parameters
 	Password string `json:"password"`
 	Username string `json:"username"`
+	Admin    bool   `json:"admin"`
+	// user-interactive auth params
+	Auth authDict `json:"auth"`
+
+	InitialDisplayName *string `json:"initial_device_display_name"`
+
+	// Prevent this user from logging in
+	InhibitLogin common.WeakBoolean `json:"inhibit_login"`
 
 	// Application Services place Type in the root of their registration
 	// request, whereas clients place it in the authDict struct.
 	Type authtypes.LoginType `json:"type"`
-
-	InitialDisplayName *string `json:"initial_device_display_name"`
-
-	// more reg params
-	Admin    bool   `json:"admin"`
-
-	// Prevent this user from logging in
-	InhibitLogin common.WeakBoolean `json:"inhibit_login"`
 }
 
 type authDict struct {
