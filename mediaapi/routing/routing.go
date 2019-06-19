@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const pathPrefixR0 = "/_matrix/media/r0"
@@ -79,7 +80,13 @@ func makeDownloadAPI(
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) http.HandlerFunc {
-	return prometheus.InstrumentHandler(name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	handlerInfo := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: name,
+		},
+		[]string{name},
+	)
+	return promhttp.InstrumentHandlerCounter(handlerInfo, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		req = util.RequestWithLogging(req)
 
 		// Set common headers returned regardless of the outcome of the request

@@ -108,7 +108,7 @@ require (
 	golang.org/x/mobile v0.0.0-20190607214518-6fa95d984e88 // indirect
 	golang.org/x/mod v0.1.0 // indirect
 	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980
-	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
+	golang.org/x/sys v0.0.0-20190618155005-516e3c20635f
 	golang.org/x/tools v0.0.0-20190614205625-5aca471b1d59 // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/genproto v0.0.0-20190611190212-a7e196e89fd3 // indirect
