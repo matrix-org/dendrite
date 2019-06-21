@@ -9,8 +9,8 @@ tracked through the amount of SyTest tests it passes.
 
 ## Finding out which tests to add
 
-We recommend you run the tests locally by manually setting up sytest or using a
-sytest docker image. After running the tests, a script will print the tests you
+We recommend you run the tests locally by manually setting up SyTest or using a
+SyTest docker image. After running the tests, a script will print the tests you
 need to add to `testfile` for you.
 
 You should proceed after you see no build problems for dendrite after running:
@@ -19,11 +19,11 @@ You should proceed after you see no build problems for dendrite after running:
 ./build.sh
 ```
 
-### Manually Setting up sytest
+### Manually Setting up SyTest
 
-Make sure you have Perl v5+ installed, and get sytest with:
+Make sure you have Perl v5+ installed, and get SyTest with:
 
-(Note that this guide assumes your `sytest` checkout is next to your
+(Note that this guide assumes your SyTest checkout is next to your
 `dendrite` checkout.)
 
 ```sh
@@ -64,9 +64,9 @@ any newly passing test names to `testfile` in the project's root directory:
 
 If the script prints nothing/exits with 0, then you're good to go.
 
-### Using a sytest Docker image
+### Using a SyTest Docker image
 
-Ensure you have the latest image for sytest, then run the tests:
+Ensure you have the latest image for SyTest, then run the tests:
 
 ```sh
 docker pull matrixdotorg/sytest-dendrite
