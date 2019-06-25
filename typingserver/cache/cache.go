@@ -62,11 +62,12 @@ func (t *TypingCache) GetTypingUsersIfUpdatedAfter(
 	roomID string, position int64,
 ) (users []string, updated bool) {
 	t.RLock()
+	defer t.RUnlock()
+
 	roomData, ok := t.data[roomID]
-	userSet := roomData.userSet
-	t.RUnlock()
 	if ok && roomData.syncPosition > position {
 		updated = true
+		userSet := roomData.userSet
 		users = make([]string, 0, len(userSet))
 		for userID := range userSet {
 			users = append(users, userID)
