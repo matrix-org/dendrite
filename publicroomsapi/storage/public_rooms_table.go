@@ -134,7 +134,6 @@ type publicRoomsStatements struct {
 	updateRoomAttributeStmts                map[string]*sql.Stmt
 }
 
-// nolint: safesql
 func (s *publicRoomsStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(publicRoomsSchema)
 	if err != nil {

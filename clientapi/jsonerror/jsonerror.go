@@ -87,7 +87,7 @@ func MissingToken(msg string) *MatrixError {
 }
 
 // UnknownToken is an error when the client tries to access a resource which
-// requires authentication and supplies an unrecognized token
+// requires authentication and supplies an unrecognised token
 func UnknownToken(msg string) *MatrixError {
 	return &MatrixError{"M_UNKNOWN_TOKEN", msg}
 }

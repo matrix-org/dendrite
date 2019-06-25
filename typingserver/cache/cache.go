@@ -28,7 +28,7 @@ type TypingCache struct {
 	data map[string]userSet
 }
 
-// NewTypingCache returns a new TypingCache initialized for use.
+// NewTypingCache returns a new TypingCache initialised for use.
 func NewTypingCache() *TypingCache {
 	return &TypingCache{data: make(map[string]userSet)}
 }

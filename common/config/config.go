@@ -585,7 +585,7 @@ func (config *Dendrite) check(monolithic bool) error {
 	}
 
 	// Due to how Golang manages its interface types, this condition is not redundant.
-	// In order to get the proper behavior, it is necessary to return an explicit nil
+	// In order to get the proper behaviour, it is necessary to return an explicit nil
 	// and not a nil configErrors.
 	// This is because the following equalities hold:
 	// error(nil) == nil
