@@ -272,7 +272,6 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 }
 
 func (d *SyncServerDatasource) addTypingDeltaToResponse(
-	ctx context.Context,
 	since int64,
 	joinedRoomIDs []string,
 	res *types.Response,
@@ -308,7 +307,6 @@ func (d *SyncServerDatasource) addTypingDeltaToResponse(
 // addEDUDeltaToResponse adds updates for each type of EDUs since fromPos if
 // the position for that type of EDU in toPos is not 0.
 func (d *SyncServerDatasource) addEDUDeltaToResponse(
-	ctx context.Context,
 	fromPos, toPos types.SyncPosition,
 	joinedRoomIDs []string,
 	res *types.Response,
@@ -316,7 +314,7 @@ func (d *SyncServerDatasource) addEDUDeltaToResponse(
 
 	if toPos.TypingPosition != 0 {
 		err = d.addTypingDeltaToResponse(
-			ctx, fromPos.TypingPosition, joinedRoomIDs, res,
+			fromPos.TypingPosition, joinedRoomIDs, res,
 		)
 	}
 
@@ -352,7 +350,7 @@ func (d *SyncServerDatasource) IncrementalSync(
 	}
 
 	err = d.addEDUDeltaToResponse(
-		ctx, fromPos, toPos, joinedRoomIDs, res,
+		fromPos, toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
 		return nil, err
@@ -455,7 +453,7 @@ func (d *SyncServerDatasource) CompleteSync(
 
 	// Use a zero value SyncPosition for fromPos so all EDU states are added.
 	err = d.addEDUDeltaToResponse(
-		ctx, types.SyncPosition{}, toPos, joinedRoomIDs, res,
+		types.SyncPosition{}, toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
 		return nil, err

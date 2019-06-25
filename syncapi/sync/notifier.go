@@ -99,17 +99,11 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userID
 			}
 		}
 
-		for _, toNotifyUserID := range userIDs {
-			n.wakeupUser(toNotifyUserID, pos)
-		}
+		n.wakeupUsers(userIDs, pos)
 	} else if roomID != "" {
-		for _, userID := range n.joinedUsers(roomID) {
-			n.wakeupUser(userID, pos)
-		}
+		n.wakeupUsers(n.joinedUsers(roomID), pos)
 	} else if len(userIDs) > 0 {
-		for _, userID := range userIDs {
-			n.wakeupUser(userID, pos)
-		}
+		n.wakeupUsers(userIDs, pos)
 	}
 }
 
@@ -160,6 +154,12 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 		for _, userID := range userIDs {
 			n.roomIDToJoinedUsers[roomID].add(userID)
 		}
+	}
+}
+
+func (n *Notifier) wakeupUsers(userIDs []string, newPos types.SyncPosition) {
+	for _, userID := range userIDs {
+		n.wakeupUser(userID, newPos)
 	}
 }
 
