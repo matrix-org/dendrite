@@ -104,6 +104,8 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userID
 		n.wakeupUsers(n.joinedUsers(roomID), pos)
 	} else if len(userIDs) > 0 {
 		n.wakeupUsers(userIDs, pos)
+	} else {
+		log.Warn("WARNING: Notifier.OnNewEvent called but caller supplied no user to wake up")
 	}
 }
 
