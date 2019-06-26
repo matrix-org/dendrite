@@ -41,8 +41,8 @@ func (sp SyncPosition) IsAfter(other SyncPosition) bool {
 		sp.TypingPosition > other.TypingPosition
 }
 
-// WithUpdates returns a copy of sp with updates represented by other applied.
-// If a fieldn is not 0 in other, it is considered an update.
+// WithUpdates returns a copy of `sp` with updates represented by `other` applied.
+// If a field is not 0 in `other`, it is considered an update.
 func (sp SyncPosition) WithUpdates(other SyncPosition) SyncPosition {
 	ret := sp
 	if other.PDUPosition != 0 {
