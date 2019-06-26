@@ -141,6 +141,9 @@ func (n *Notifier) Load(ctx context.Context, db *storage.SyncServerDatasource) e
 
 // CurrentPosition returns the current stream position
 func (n *Notifier) CurrentPosition() types.SyncPosition {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
 	return n.currPos
 }
 
