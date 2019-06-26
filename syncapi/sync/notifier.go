@@ -72,7 +72,7 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userID
 
 	if ev != nil {
 		// Map this event's room_id to a list of joined users, and wake them up.
-		userIDs := n.joinedUsers(ev.RoomID())
+		usersToNotify := n.joinedUsers(ev.RoomID())
 		// If this is an invite, also add in the invitee to this list.
 		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 			targetUserID := *ev.StateKey()
@@ -85,11 +85,11 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userID
 				// Keep the joined user map up-to-date
 				switch membership {
 				case "invite":
-					userIDs = append(userIDs, targetUserID)
+					usersToNotify = append(usersToNotify, targetUserID)
 				case "join":
 					// Manually append the new user's ID so they get notified
 					// along all members in the room
-					userIDs = append(userIDs, targetUserID)
+					usersToNotify = append(usersToNotify, targetUserID)
 					n.addJoinedUser(ev.RoomID(), targetUserID)
 				case "leave":
 					fallthrough
@@ -99,7 +99,7 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userID
 			}
 		}
 
-		n.wakeupUsers(userIDs, pos)
+		n.wakeupUsers(usersToNotify, pos)
 	} else if roomID != "" {
 		n.wakeupUsers(n.joinedUsers(roomID), pos)
 	} else if len(userIDs) > 0 {
