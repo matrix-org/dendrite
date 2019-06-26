@@ -80,16 +80,23 @@ func (t *TypingCache) GetTypingUsersIfUpdatedAfter(
 // AddTypingUser sets an user as typing in a room.
 // expire is the time when the user typing should time out.
 // if expire is nil, defaultTypingTimeout is assumed.
-func (t *TypingCache) AddTypingUser(userID, roomID string, expire *time.Time) {
+// Returns the latest sync position for typing after update.
+func (t *TypingCache) AddTypingUser(
+	userID, roomID string, expire *time.Time,
+) int64 {
 	expireTime := getExpireTime(expire)
 	if until := time.Until(expireTime); until > 0 {
 		timer := time.AfterFunc(until, t.timeoutCallback(userID, roomID))
-		t.addUser(userID, roomID, timer)
+		return t.addUser(userID, roomID, timer)
 	}
+	return t.GetLatestSyncPosition()
 }
 
 // addUser with mutex lock & replace the previous timer.
-func (t *TypingCache) addUser(userID, roomID string, expiryTimer *time.Timer) {
+// Returns the latest typing sync position after update.
+func (t *TypingCache) addUser(
+	userID, roomID string, expiryTimer *time.Timer,
+) int64 {
 	t.Lock()
 	defer t.Unlock()
 
@@ -112,29 +119,33 @@ func (t *TypingCache) addUser(userID, roomID string, expiryTimer *time.Timer) {
 	}
 
 	t.data[roomID].userSet[userID] = expiryTimer
+
+	return t.latestSyncPosition
 }
 
 // Returns a function which is called after timeout happens.
 // This removes the user.
 func (t *TypingCache) timeoutCallback(userID, roomID string) func() {
 	return func() {
+		// TODO: Notify syncing users about removal
 		t.RemoveUser(userID, roomID)
 	}
 }
 
 // RemoveUser with mutex lock & stop the timer.
-func (t *TypingCache) RemoveUser(userID, roomID string) {
+// Returns the latest sync position for typing after update.
+func (t *TypingCache) RemoveUser(userID, roomID string) int64 {
 	t.Lock()
 	defer t.Unlock()
 
 	roomData, ok := t.data[roomID]
 	if !ok {
-		return
+		return t.latestSyncPosition
 	}
 
 	timer, ok := roomData.userSet[userID]
 	if !ok {
-		return
+		return t.latestSyncPosition
 	}
 
 	timer.Stop()
@@ -142,6 +153,8 @@ func (t *TypingCache) RemoveUser(userID, roomID string) {
 
 	t.latestSyncPosition++
 	t.data[roomID].syncPosition = t.latestSyncPosition
+
+	return t.latestSyncPosition
 }
 
 func (t *TypingCache) GetLatestSyncPosition() int64 {

@@ -72,13 +72,14 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		"room_id": output.Event.RoomID,
 	}).Info("received data from typing server")
 
+	var typingPos int64
 	typingEvent := output.Event
 	if typingEvent.Typing {
-		s.db.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime)
+		typingPos = s.db.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime)
 	} else {
-		s.db.RemoveTypingUser(typingEvent.UserID, typingEvent.RoomID)
+		typingPos = s.db.RemoveTypingUser(typingEvent.UserID, typingEvent.RoomID)
 	}
 
-	s.notifier.OnNewEvent(nil, output.Event.RoomID, nil, types.SyncPosition{TypingPosition: 1})
+	s.notifier.OnNewEvent(nil, output.Event.RoomID, nil, types.SyncPosition{TypingPosition: typingPos})
 	return nil
 }

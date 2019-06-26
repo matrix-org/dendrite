@@ -514,16 +514,20 @@ func (d *SyncServerDatasource) RetireInviteEvent(
 	return err
 }
 
+// AddTypingUser adds a typing user to the typing cache.
+// Returns the latest sync position for typing notifications after update.
 func (d *SyncServerDatasource) AddTypingUser(
 	userID, roomID string, expireTime *time.Time,
-) {
-	d.typingCache.AddTypingUser(userID, roomID, expireTime)
+) int64 {
+	return d.typingCache.AddTypingUser(userID, roomID, expireTime)
 }
 
+// RemoveTypingUser removes a typing user from the typing cache.
+// Returns the latest sync position for typing notifications after update.
 func (d *SyncServerDatasource) RemoveTypingUser(
 	userID, roomID string,
-) {
-	d.typingCache.RemoveUser(userID, roomID)
+) int64 {
+	return d.typingCache.RemoveUser(userID, roomID)
 }
 
 func (d *SyncServerDatasource) addInvitesToResponse(
