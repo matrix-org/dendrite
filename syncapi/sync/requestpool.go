@@ -63,9 +63,11 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		"timeout": syncReq.timeout,
 	}).Info("Incoming /sync request")
 
+	currPos := rp.notifier.CurrentPosition()
+
 	// If this is an initial sync or timeout=0 we return immediately
 	if syncReq.since == nil || syncReq.timeout == 0 {
-		syncData, err = rp.currentSyncForUser(*syncReq, rp.notifier.CurrentPosition())
+		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -90,7 +92,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	// respond with, so we skip the return an go back to waiting for content to
 	// be sent down or the request timing out.
 	var hasTimedOut bool
-	var currPos types.SyncPosition
 	sincePos := *syncReq.since
 	for {
 		select {
