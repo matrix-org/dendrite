@@ -331,7 +331,8 @@ func (d *SyncServerDatasource) IncrementalSync(
 	fromPos, toPos types.SyncPosition,
 	numRecentEventsPerRoom int,
 ) (*types.Response, error) {
-	res := types.NewResponse(toPos)
+	nextBatchPos := fromPos.WithUpdates(toPos)
+	res := types.NewResponse(nextBatchPos)
 
 	var joinedRoomIDs []string
 	var err error

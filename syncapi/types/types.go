@@ -41,6 +41,19 @@ func (sp SyncPosition) IsAfter(other SyncPosition) bool {
 		sp.TypingPosition > other.TypingPosition
 }
 
+// WithUpdates returns a copy of sp with updates represented by other applied.
+// If a fieldn is not 0 in other, it is considered an update.
+func (sp SyncPosition) WithUpdates(other SyncPosition) SyncPosition {
+	ret := sp
+	if other.PDUPosition != 0 {
+		ret.PDUPosition = other.PDUPosition
+	}
+	if other.TypingPosition != 0 {
+		ret.TypingPosition = other.TypingPosition
+	}
+	return ret
+}
+
 // PrevEventRef represents a reference to a previous event in a state event upgrade
 type PrevEventRef struct {
 	PrevContent   json.RawMessage `json:"prev_content"`

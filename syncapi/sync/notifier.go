@@ -66,7 +66,7 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userID
 	// This needs to be done PRIOR to waking up users as they will read this value.
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
-	n.currPos = pos
+	n.currPos = n.currPos.WithUpdates(pos)
 
 	n.removeEmptyUserStreams()
 
