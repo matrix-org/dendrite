@@ -284,8 +284,7 @@ func (d *SyncServerDatasource) addTypingDeltaToResponse(
 			roomID, since,
 		); updated {
 			ev := gomatrixserverlib.ClientEvent{
-				Type:   gomatrixserverlib.MTyping,
-				RoomID: roomID,
+				Type: gomatrixserverlib.MTyping,
 			}
 			ev.Content, err = json.Marshal(map[string]interface{}{
 				"user_ids": typingUsers,
