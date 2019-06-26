@@ -57,15 +57,14 @@ func (t *TypingServerInputAPI) InputTypingEvent(
 }
 
 func (t *TypingServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
-	userIDs := t.Cache.GetTypingUsers(ite.RoomID)
 	ev := &api.TypingEvent{
 		Type:   gomatrixserverlib.MTyping,
 		RoomID: ite.RoomID,
 		UserID: ite.UserID,
+		Typing: ite.Typing,
 	}
 	ote := &api.OutputTypingEvent{
-		Event:       *ev,
-		TypingUsers: userIDs,
+		Event: *ev,
 	}
 
 	if ev.Typing {

@@ -23,8 +23,6 @@ type OutputTypingEvent struct {
 	// ExpireTime is the interval after which the user should no longer be
 	// considered typing. Only available if Event.Typing is true.
 	ExpireTime *time.Time
-	// Users typing in the room when the event was generated.
-	TypingUsers []string `json:"typing_users"`
 }
 
 // TypingEvent represents a matrix edu event of type 'm.typing'.
