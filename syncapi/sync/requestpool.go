@@ -130,19 +130,19 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	}
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest, currentPos types.SyncPosition) (res *types.Response, err error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.SyncPosition) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, currentPos, req.limit)
+		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit)
 	}
 
 	if err != nil {
 		return
 	}
 
-	res, err = rp.appendAccountData(res, req.device.UserID, req, currentPos.PDUPosition)
+	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition)
 	return
 }
 

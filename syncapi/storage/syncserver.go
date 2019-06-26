@@ -303,15 +303,15 @@ func (d *SyncServerDatasource) addTypingDeltaToResponse(
 	return nil
 }
 
-// addEDUDeltaToResponse adds updates for each type of EDUs since fromPos if
-// the position for that type of EDU in toPos is not 0.
+// addEDUDeltaToResponse adds updates for EDUs of each type since fromPos if
+// the positions of that type are not equal in fromPos and toPos.
 func (d *SyncServerDatasource) addEDUDeltaToResponse(
 	fromPos, toPos types.SyncPosition,
 	joinedRoomIDs []string,
 	res *types.Response,
 ) (err error) {
 
-	if toPos.TypingPosition != 0 {
+	if fromPos.TypingPosition != toPos.TypingPosition {
 		err = d.addTypingDeltaToResponse(
 			fromPos.TypingPosition, joinedRoomIDs, res,
 		)
@@ -336,7 +336,7 @@ func (d *SyncServerDatasource) IncrementalSync(
 
 	var joinedRoomIDs []string
 	var err error
-	if toPos.PDUPosition != 0 {
+	if fromPos.PDUPosition != toPos.PDUPosition {
 		joinedRoomIDs, err = d.addPDUDeltaToResponse(
 			ctx, device, fromPos.PDUPosition, toPos.PDUPosition, numRecentEventsPerRoom, res,
 		)
