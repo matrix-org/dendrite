@@ -70,6 +70,8 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 
 	log.WithFields(log.Fields{
 		"room_id": output.Event.RoomID,
+		"user_id": output.Event.UserID,
+		"typing":  output.Event.Typing,
 	}).Info("received data from typing server")
 
 	var typingPos int64
