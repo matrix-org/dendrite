@@ -35,6 +35,7 @@ var (
 	syncPositionVeryOld types.SyncPosition
 	syncPositionBefore  types.SyncPosition
 	syncPositionAfter   types.SyncPosition
+	syncPositionNewEDU  types.SyncPosition
 	syncPositionAfter2  types.SyncPosition
 )
 
@@ -58,6 +59,9 @@ func init() {
 
 	syncPositionAfter = baseSyncPos
 	syncPositionAfter.PDUPosition = 12
+
+	syncPositionNewEDU = syncPositionAfter
+	syncPositionNewEDU.TypingPosition = 1
 
 	syncPositionAfter2 = baseSyncPos
 	syncPositionAfter2.PDUPosition = 13
@@ -171,6 +175,34 @@ func TestNewInviteEventForUser(t *testing.T) {
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionAfter)
+
+	wg.Wait()
+}
+
+// Test an EDU-only update wakes up the request.
+func TestEDUWakeup(t *testing.T) {
+	n := NewNotifier(syncPositionAfter)
+	n.setUsersJoinedToRooms(map[string][]string{
+		roomID: {alice, bob},
+	})
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionAfter))
+		if err != nil {
+			t.Errorf("TestNewInviteEventForUser error: %s", err)
+		}
+		if pos != syncPositionNewEDU {
+			t.Errorf("TestNewInviteEventForUser want %d, got %d", syncPositionNewEDU, pos)
+		}
+		wg.Done()
+	}()
+
+	stream := n.fetchUserStream(bob, true)
+	waitForBlocking(stream, 1)
+
+	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionNewEDU)
 
 	wg.Wait()
 }
