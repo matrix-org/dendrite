@@ -99,6 +99,14 @@ func Setup(
 	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
 		common.MakeAuthAPI("membership", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars := mux.Vars(req)
+
+			// If this is a join, reuse the JoinRoomByIDOrAlias method
+			if vars["membership"] == "join" {
+				return JoinRoomByIDOrAlias(
+					req, device, vars["roomID"], cfg, federation, producer, queryAPI, aliasAPI, keyRing, accountDB,
+				)
+			}
+
 			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, asAPI, producer)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
