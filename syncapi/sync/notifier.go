@@ -62,8 +62,8 @@ func NewNotifier(pos types.SyncPosition) *Notifier {
 // Can be called with one among: a *gomatrixserverlib.Event, a room ID, or a list of user IDs.
 // posUpdate contains the latest position(s) for one or more types of events.
 // If a position in posUpdate is 0, it means no updates available of that type.
-// Typically a consumer supplies a posUpdate with and only with the sync position
-// for the type of event it handles to the latest.
+// Typically a consumer supplies a posUpdate with the sync position for the
+// event type it handles set to the latest, leaving other fields as 0.
 func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userIDs []string, posUpdate types.SyncPosition) {
 	// update the current position then notify relevant /sync streams.
 	// This needs to be done PRIOR to waking up users as they will read this value.

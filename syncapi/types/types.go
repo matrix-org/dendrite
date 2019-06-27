@@ -42,7 +42,8 @@ func (sp SyncPosition) IsAfter(other SyncPosition) bool {
 }
 
 // WithUpdates returns a copy of `sp` with updates represented by `other` applied.
-// If a field is not 0 in `other`, it is considered an update.
+// If a field is not 0 in `other`, it is considered an update and its value
+// will replace the corresponding value in sp.
 func (sp SyncPosition) WithUpdates(other SyncPosition) SyncPosition {
 	ret := sp
 	if other.PDUPosition != 0 {
