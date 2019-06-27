@@ -45,11 +45,13 @@ func NewOutputTypingEventConsumer(
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
+
 	s := &OutputTypingEventConsumer{
 		typingConsumer: &consumer,
 		db:             store,
 		notifier:       n,
 	}
+
 	consumer.ProcessMessage = s.onMessage
 
 	return s
@@ -57,6 +59,10 @@ func NewOutputTypingEventConsumer(
 
 // Start consuming from typing api
 func (s *OutputTypingEventConsumer) Start() error {
+	s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
+		s.notifier.OnNewEvent(nil, roomID, nil, types.SyncPosition{TypingPosition: latestSyncPosition})
+	})
+
 	return s.typingConsumer.Start()
 }
 

@@ -515,6 +515,10 @@ func (d *SyncServerDatasource) RetireInviteEvent(
 	return err
 }
 
+func (d *SyncServerDatasource) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
+	d.typingCache.SetTimeoutCallback(fn)
+}
+
 // AddTypingUser adds a typing user to the typing cache.
 // Returns the latest sync position for typing notifications after update.
 func (d *SyncServerDatasource) AddTypingUser(

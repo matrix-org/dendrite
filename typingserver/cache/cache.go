@@ -22,6 +22,11 @@ const defaultTypingTimeout = 10 * time.Second
 // userSet is a map of user IDs to a timer, timer fires at expiry.
 type userSet map[string]*time.Timer
 
+// TimeoutCallbackFn is a function called right after removal of a user
+// from the typing user list due to timeout.
+// latestSyncPosition is the typing sync position after the removal.
+type TimeoutCallbackFn func(userID, roomID string, latestSyncPosition int64)
+
 type roomData struct {
 	syncPosition int64
 	userSet      userSet
@@ -32,6 +37,7 @@ type TypingCache struct {
 	sync.RWMutex
 	latestSyncPosition int64
 	data               map[string]*roomData
+	timeoutCallback    TimeoutCallbackFn
 }
 
 // Create a roomData with its sync position set to the latest sync position.
@@ -46,6 +52,12 @@ func (t *TypingCache) newRoomData() *roomData {
 // NewTypingCache returns a new TypingCache initialised for use.
 func NewTypingCache() *TypingCache {
 	return &TypingCache{data: make(map[string]*roomData)}
+}
+
+// SetTimeoutCallback sets a callback function that is called right after
+// a user is removed from the typing user list due to timeout.
+func (t *TypingCache) SetTimeoutCallback(fn TimeoutCallbackFn) {
+	t.timeoutCallback = fn
 }
 
 // GetTypingUsers returns the list of users typing in a room.
@@ -86,7 +98,12 @@ func (t *TypingCache) AddTypingUser(
 ) int64 {
 	expireTime := getExpireTime(expire)
 	if until := time.Until(expireTime); until > 0 {
-		timer := time.AfterFunc(until, t.timeoutCallback(userID, roomID))
+		timer := time.AfterFunc(until, func() {
+			latestSyncPosition := t.RemoveUser(userID, roomID)
+			if t.timeoutCallback != nil {
+				t.timeoutCallback(userID, roomID, latestSyncPosition)
+			}
+		})
 		return t.addUser(userID, roomID, timer)
 	}
 	return t.GetLatestSyncPosition()
@@ -121,15 +138,6 @@ func (t *TypingCache) addUser(
 	t.data[roomID].userSet[userID] = expiryTimer
 
 	return t.latestSyncPosition
-}
-
-// Returns a function which is called after timeout happens.
-// This removes the user.
-func (t *TypingCache) timeoutCallback(userID, roomID string) func() {
-	return func() {
-		// TODO: Notify syncing users about removal
-		t.RemoveUser(userID, roomID)
-	}
 }
 
 // RemoveUser with mutex lock & stop the timer.
