@@ -15,6 +15,8 @@
 package routing
 
 import (
+	"net/http"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -22,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"net/http"
 )
 
 type getEventRequest struct {
@@ -57,12 +58,31 @@ func GetEvent(
 		return httputil.LogThenError(req, err)
 	}
 
+	var requestedEvent gomatrixserverlib.Event
 	if len(eventsResp.Events) == 0 {
-		// TODO: Event not found locally. May need a federation query here.
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+		// Event not found locally. Do a federation query in hope of getting
+		// the event from another server.
+		// TODO: May need a better way to determine which server to query
+		_, domain, err := gomatrixserverlib.SplitID('$', eventID)
+		if err != nil {
+			return httputil.LogThenError(req, err)
 		}
+
+		txnResp, err := federation.GetEvent(req.Context(), domain, eventID)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+
+		if len(txnResp.PDUs) == 0 {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+			}
+		}
+
+		requestedEvent = txnResp.PDUs[0]
+	} else {
+		requestedEvent = eventsResp.Events[0]
 	}
 
 	r := getEventRequest{
@@ -73,7 +93,7 @@ func GetEvent(
 		cfg:            cfg,
 		federation:     federation,
 		keyRing:        keyRing,
-		requestedEvent: eventsResp.Events[0],
+		requestedEvent: requestedEvent,
 	}
 
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{r.requestedEvent})
