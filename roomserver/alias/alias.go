@@ -96,12 +96,21 @@ func (r *RoomserverAliasAPI) GetRoomIDForAlias(
 		return err
 	}
 
-	// No rooms found locally, try our application services by making a call to
-	// the appservice component
-	aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
-	var aliasResp appserviceAPI.RoomAliasExistsResponse
-	if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
-		return err
+	if roomID == "" {
+		// No room found locally, try our application services by making a call to
+		// the appservice component
+		aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
+		var aliasResp appserviceAPI.RoomAliasExistsResponse
+		if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
+			return err
+		}
+
+		if aliasResp.AliasExists {
+			roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	response.RoomID = roomID
