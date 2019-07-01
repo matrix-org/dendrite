@@ -20,13 +20,13 @@ package api
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/matrix-org/dendrite/common"
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	opentracing "github.com/opentracing/opentracing-go"
 )
@@ -164,7 +164,7 @@ func RetreiveUserProfile(
 
 	// If no user exists, return
 	if !userResp.UserIDExists {
-		return nil, errors.New("no known profile for given user ID")
+		return nil, common.ErrProfileNoExists
 	}
 
 	// Try to query the user from the local database again

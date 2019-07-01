@@ -240,14 +240,14 @@ func Setup(
 	r0mux.Handle("/profile/{userID}",
 		common.MakeExternalAPI("profile", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return GetProfile(req, accountDB, vars["userID"], asAPI)
+			return GetProfile(req, accountDB, &cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		common.MakeExternalAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return GetAvatarURL(req, accountDB, vars["userID"], asAPI)
+			return GetAvatarURL(req, accountDB, &cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -263,7 +263,7 @@ func Setup(
 	r0mux.Handle("/profile/{userID}/displayname",
 		common.MakeExternalAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
 			vars := mux.Vars(req)
-			return GetDisplayName(req, accountDB, vars["userID"], asAPI)
+			return GetDisplayName(req, accountDB, &cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
