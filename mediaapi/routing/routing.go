@@ -34,6 +34,10 @@ import (
 const pathPrefixR0 = "/_matrix/media/r0"
 
 // Setup registers the media API HTTP handlers
+//
+// Due to Setup being used to call many other functions, a gocyclo nolint is
+// applied:
+// nolint: gocyclo
 func Setup(
 	apiMux *mux.Router,
 	cfg *config.Dendrite,
