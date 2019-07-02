@@ -21,12 +21,12 @@ import (
 // URLDecodeVarMap is a function that iterates through each of the items in a
 // map, URL decodes the values, and returns a new map with the decoded values
 // under the same key names
-func URLDecodeVarMap(vars map[string]string) (decodedVars map[string]string, err error) {
-	decodedVars = make(map[string]string, len(vars))
+func URLDecodeVarMap(vars map[string]string) (map[string]string, error) {
+	decodedVars := make(map[string]string, len(vars))
 	for key, value := range vars {
 		decoded, err := url.QueryUnescape(value)
 		if err != nil {
-			return make(map[string]string, 0), err
+			return make(map[string]string), err
 		}
 		decodedVars[key] = decoded
 	}

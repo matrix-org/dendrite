@@ -35,6 +35,10 @@ const (
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
+//
+// Due to Setup being used to call many other functions, a gocyclo nolint is
+// applied:
+// nolint: gocyclo
 func Setup(
 	apiMux *mux.Router,
 	cfg config.Dendrite,

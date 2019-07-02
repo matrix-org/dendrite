@@ -88,7 +88,7 @@ func JoinRoomByIDOrAlias(
 		Code: http.StatusBadRequest,
 		JSON: jsonerror.BadJSON(
 			fmt.Sprintf("Invalid first character '%s' for room ID or alias",
-			[]rune(roomIDOrAlias)[0]), // Wrapping with []rune makes this call UTF-8 safe
+				string([]rune(roomIDOrAlias)[0])), // Wrapping with []rune makes this call UTF-8 safe
 		),
 	}
 }
