@@ -31,5 +31,5 @@ func URLDecodeVarMap(vars map[string]string) (map[string]string, error) {
 		decodedVars[key] = decoded
 	}
 
-	return decodedVars, err
+	return decodedVars, nil
 }
