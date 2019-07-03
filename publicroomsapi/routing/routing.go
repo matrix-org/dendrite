@@ -45,7 +45,7 @@ func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storag
 
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
-			vars, err := common.URLDecodeVarMap(mux.Vars(req))
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -55,7 +55,7 @@ func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storag
 	// TODO: Add AS support
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeAuthAPI("directory_list", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeVarMap(mux.Vars(req))
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
