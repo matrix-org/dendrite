@@ -16,7 +16,7 @@ require (
 	github.com/golang/snappy v0.0.0-20170119014723-7db9049039a0
 	github.com/google/shlex v0.0.0-20150127133951-6f45313302b9
 	github.com/gorilla/context v1.1.1
-	github.com/gorilla/mux v1.3.0
+	github.com/gorilla/mux v1.7.3
 	github.com/jaegertracing/jaeger-client-go v0.0.0-20170921145708-3ad49a1d839b
 	github.com/jaegertracing/jaeger-lib v0.0.0-20170920222118-21a3da6d66fe
 	github.com/klauspost/crc32 v0.0.0-20161016154125-cb6bfca970f6

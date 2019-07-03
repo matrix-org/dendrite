@@ -30,6 +30,10 @@ import (
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup configures the given mux with sync-server listeners
+//
+// Due to Setup being used to call many other functions, a gocyclo nolint is
+// applied:
+// nolint: gocyclo
 func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
@@ -45,17 +49,26 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServer
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars := mux.Vars(req)
+		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
 		return OnIncomingStateRequest(req, syncDB, vars["roomID"])
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars := mux.Vars(req)
+		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], "")
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars := mux.Vars(req)
+		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], vars["stateKey"])
 	})).Methods(http.MethodGet, http.MethodOptions)
 }
