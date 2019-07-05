@@ -12,7 +12,7 @@ Dendrite can be run in one of two configurations:
 
 ## Requirements
 
- - Go 1.8+
+ - Go 1.11+
  - Postgres 9.5+
  - For Kafka (optional if using the monolith server):
    - Unix-based system (https://kafka.apache.org/documentation/#os)
@@ -22,7 +22,7 @@ Dendrite can be run in one of two configurations:
 
 ## Setting up a development environment
 
-Assumes Go 1.8 and JDK 1.8 are already installed and are on PATH.
+Assumes Go 1.10+ and JDK 1.8+ are already installed and are on PATH.
 
 ```bash
 # Get the code
@@ -30,8 +30,7 @@ git clone https://github.com/matrix-org/dendrite
 cd dendrite
 
 # Build it
-go get github.com/constabulary/gb/...
-gb build
+./build.sh
 ```
 
 If using Kafka, install and start it (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
@@ -95,13 +94,15 @@ test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
 
 Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Things that will need editing include *at least*:
 * `server_name`
-* `database/*`
+* `database/*` (All lines in the database section must have the username and password of the user created with the `createuser` command above. eg:`dendrite:password@localhost`)
 
 
 ## Starting a monolith server
 
 It is possible to use 'naffka' as an in-process replacement to Kafka when using
-the monolith server. To do this, set `use_naffka: true` in `dendrite.yaml`.
+the monolith server. To do this, set `use_naffka: true` in `dendrite.yaml` and uncomment
+the necessary line related to naffka in the `database` section. Be sure to update the 
+database username and password if needed.
 
 The monolith server can be started as shown below. By default it listens for
 HTTP connections on port 8008, so point your client at
