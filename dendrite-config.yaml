@@ -17,7 +17,6 @@ matrix:
     trusted_third_party_id_servers:
       - vector.im
       - matrix.org
-      - riot.im
 
 # The media repository config
 media:
@@ -86,6 +85,7 @@ kafka:
     topics:
         output_room_event: roomserverOutput
         output_client_data: clientapiOutput
+        output_typing_event: typingServerOutput
         user_updates: userUpdates
 
 # The postgres connection configs for connecting to the databases e.g a postgres:// URI
@@ -97,6 +97,7 @@ database:
     room_server: "postgres://dendrite:itsasecret@localhost/dendrite_roomserver?sslmode=disable"
     server_key: "postgres://dendrite:itsasecret@localhost/dendrite_serverkey?sslmode=disable"
     federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
+    appservice: "postgres://dendrite:itsasecret@localhost/dendrite_appservice?sslmode=disable"
     public_rooms_api: "postgres://dendrite:itsasecret@localhost/dendrite_publicroomsapi?sslmode=disable"
     # If using naffka you need to specify a naffka database
     # naffka: "postgres://dendrite:itsasecret@localhost/dendrite_naffka?sslmode=disable"
@@ -112,15 +113,34 @@ listen:
     media_api: "localhost:7774"
     public_rooms_api: "localhost:7775"
     federation_sender: "localhost:7776"
+    appservice_api: "localhost:7777"
+    typing_server: "localhost:7778"
 
 # The configuration for tracing the dendrite components.
 tracing:
     # Config for the jaeger opentracing reporter.
     # See https://godoc.org/github.com/uber/jaeger-client-go/config#Configuration
-    # for documtation.
+    # for documentation.
     jaeger:
         disabled: true
 
 # A list of application service config files to use
 application_services:
     config_files: []
+
+# The configuration for dendrite logs
+logging:
+    # The logging type, only "file" is supported at the moment
+    - type: "file"
+      # The logging level, must be one of debug, info, warn, error, fatal, panic.
+      level: "info"
+      # Parameters for this type of log
+      params:
+        # File logging must be given a path to a directory. Each component will write to a different file. Logs are rotated each day and gzipped
+        path: "/var/log/dendrite"
+    # It is possible to have multiple logging hooks at the same time.
+    # To save only errors in a different directory, uncomment the following.
+    # - type: "file"
+    #   level: "error"
+    #   params:
+    #     path: "/var/log/dendrite/errors"

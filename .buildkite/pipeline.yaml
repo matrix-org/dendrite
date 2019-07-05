@@ -1,0 +1,49 @@
+steps:
+  - command:
+    # https://github.com/golangci/golangci-lint#memory-usage-of-golangci-lint
+    - "GOGC=20 ./scripts/find-lint.sh"
+    label: "\U0001F9F9 Lint / :go: 1.12"
+    agents:
+      # Use a larger instance as linting takes a looot of memory
+      queue: "medium"
+    plugins:
+      - docker#v3.0.1:
+          image: "golang:1.12"
+
+  - wait
+
+  - command:
+    - "go build ./cmd/..."
+    label: "\U0001F528 Build / :go: 1.11"
+    plugins:
+      - docker#v3.0.1:
+          image: "golang:1.11"
+    retry:
+      automatic:
+        - exit_status: 128
+          limit: 3
+
+  - command:
+    - "go build ./cmd/..."
+    label: "\U0001F528 Build / :go: 1.12"
+    plugins:
+      - docker#v3.0.1:
+          image: "golang:1.12"
+    retry:
+      automatic:
+        - exit_status: 128
+          limit: 3
+
+  - command:
+    - "go test ./..."
+    label: "\U0001F9EA Unit tests / :go: 1.11"
+    plugins:
+      - docker#v3.0.1:
+          image: "golang:1.11"
+
+  - command:
+    - "go test ./..."
+    label: "\U0001F9EA Unit tests / :go: 1.12"
+    plugins:
+      - docker#v3.0.1:
+          image: "golang:1.12"

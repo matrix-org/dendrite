@@ -1,9 +1,0 @@
-package: github.com/crossdock/crossdock-go
-import:
-- package: golang.org/x/net
-  subpackages:
-  - context
-  - context/ctxhttp
-- package: github.com/davecgh/go-spew
-  subpackages:
-  - spew

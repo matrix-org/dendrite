@@ -1,0 +1,3 @@
+#!/bin/sh
+
+GOBIN=$PWD/`dirname $0`/bin go install -v ./cmd/...

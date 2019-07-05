@@ -18,6 +18,7 @@
 /_obj
 /_test
 /vendor/bin
+/docker/build
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -39,3 +40,6 @@ _testmain.go
 *.pem
 *.key
 *.crt
+
+# Default configuration file
+dendrite.yaml
