@@ -117,12 +117,14 @@ func SetLocalAlias(
 	// 1. The new method for checking for things matching an AS's namespace
 	// 2. Using an overall Regex object for all AS's just like we did for usernames
 	for _, appservice := range cfg.Derived.ApplicationServices {
-		if aliasNamespaces, ok := appservice.NamespaceMap["aliases"]; ok {
-			for _, namespace := range aliasNamespaces {
-				if namespace.Exclusive && namespace.RegexpObject.MatchString(alias) {
-					return util.JSONResponse{
-						Code: http.StatusBadRequest,
-						JSON: jsonerror.ASExclusive("Alias is reserved by an application service"),
+		if device.UserID != appservice.SenderLocalpart {
+			if aliasNamespaces, ok := appservice.NamespaceMap["aliases"]; ok {
+				for _, namespace := range aliasNamespaces {
+					if namespace.Exclusive && namespace.RegexpObject.MatchString(alias) {
+						return util.JSONResponse{
+							Code: http.StatusBadRequest,
+							JSON: jsonerror.ASExclusive("Alias is reserved by an application service"),
+						}
 					}
 				}
 			}
