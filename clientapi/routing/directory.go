@@ -28,6 +28,11 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type roomDirectoryResponse struct {
+	RoomID  string   `json:"room_id"`
+	Servers []string `json:"servers"`
+}
+
 // DirectoryRoom looks up a room alias
 func DirectoryRoom(
 	req *http.Request,
@@ -56,7 +61,10 @@ func DirectoryRoom(
 		if len(queryRes.RoomID) > 0 {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: queryRes,
+				JSON: roomDirectoryResponse{
+					RoomID: queryRes.RoomID,
+					Servers: []string{}, // TODO-aliases
+				},
 			}
 		}
 	} else {
@@ -74,7 +82,10 @@ func DirectoryRoom(
 		if len(resp.RoomID) > 0 {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: resp,
+				JSON: roomDirectoryResponse{
+					RoomID: resp.RoomID,
+					Servers: []string{}, // TODO-aliases
+				},
 			}
 		}
 	}

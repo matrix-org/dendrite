@@ -143,3 +143,10 @@ Events come down the correct room
 local user can join room with version 5
 User can invite local user to room with version 5
 Inbound federation can receive room-join requests
+GET /directory/room/:room_alias yields room ID
+PUT /directory/room/:room_alias creates alias
+Room aliases can contain Unicode
+Creators can delete alias
+Alias creators can delete alias with no ops
+Alias creators can delete canonical alias with no ops
+Regular users cannot create room aliases within the AS namespace
