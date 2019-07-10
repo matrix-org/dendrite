@@ -71,7 +71,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		componentName: componentName,
 		tracerCloser:  closer,
 		Cfg:           cfg,
-		APIMux:        mux.NewRouter(),
+		APIMux:        mux.NewRouter().UseEncodedPath(),
 		KafkaConsumer: kafkaConsumer,
 		KafkaProducer: kafkaProducer,
 	}

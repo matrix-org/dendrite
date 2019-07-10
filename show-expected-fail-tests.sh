@@ -22,6 +22,7 @@ tests_to_add=""
 already_in_testfile=""
 
 while read -r test_id; do
+	[ "${test_id}" = "" ] && continue
 	grep "${test_id}" "${testfile}" > /dev/null 2>&1
 	if [ "$?" != "0" ]; then
 		tests_to_add="${tests_to_add}${test_id}\n"

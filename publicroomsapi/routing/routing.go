@@ -30,6 +30,10 @@ import (
 const pathPrefixR0 = "/_matrix/client/r0"
 
 // Setup configures the given mux with publicroomsapi server listeners
+//
+// Due to Setup being used to call many other functions, a gocyclo nolint is
+// applied:
+// nolint: gocyclo
 func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storage.PublicRoomsServerDatabase) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
@@ -41,14 +45,20 @@ func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storag
 
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
-			vars := mux.Vars(req)
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
 			return directory.GetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 	// TODO: Add AS support
 	r0mux.Handle("/directory/list/room/{roomID}",
 		common.MakeAuthAPI("directory_list", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars := mux.Vars(req)
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
 			return directory.SetVisibility(req, publicRoomsDB, vars["roomID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
