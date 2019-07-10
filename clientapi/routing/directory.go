@@ -117,6 +117,8 @@ func SetLocalAlias(
 	// 1. The new method for checking for things matching an AS's namespace
 	// 2. Using an overall Regex object for all AS's just like we did for usernames
 	for _, appservice := range cfg.Derived.ApplicationServices {
+		// Don't prevent AS from creating aliases in its own namespace
+		// Note that Dendrite uses SenderLocalpart as UserID for AS users
 		if device.UserID != appservice.SenderLocalpart {
 			if aliasNamespaces, ok := appservice.NamespaceMap["aliases"]; ok {
 				for _, namespace := range aliasNamespaces {
