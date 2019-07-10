@@ -123,7 +123,7 @@ func GetEvent(
 	return r.proceedWithStateEvents(stateResp.StateEvents)
 }
 
-// proceedWithMissingState tries to proceed by fetching the missing states with
+// proceedWithMissingState tries to proceed by fetching the missing state over
 // federation.
 // Note: It's not guaranteed that the server(s) we query have the state events.
 func (r *getEventRequest) proceedWithMissingState() util.JSONResponse {
