@@ -58,12 +58,12 @@ func SendMembership(
 		}
 	}
 
-	inviteStored, errRes := checkAndProcessThreepid(
+	inviteStored, jsonErrResp := checkAndProcessThreepid(
 		req, device, &body, cfg, queryAPI, accountDB, producer,
 		membership, roomID, evTime,
 	)
-	if errRes != nil {
-		return *errRes
+	if jsonErrResp != nil {
+		return *jsonErrResp
 	}
 
 	// If an invite has been stored on an identity server, it means that a
@@ -211,9 +211,15 @@ func getMembershipStateKey(
 }
 
 func checkAndProcessThreepid(
-	req *http.Request, device *authtypes.Device, body *threepid.MembershipRequest,
-	cfg config.Dendrite, queryAPI roomserverAPI.RoomserverQueryAPI, accountDB *accounts.Database,
-	producer *producers.RoomserverProducer, membership string, roomID string, evTime time.Time,
+	req *http.Request,
+	device *authtypes.Device,
+	body *threepid.MembershipRequest,
+	cfg config.Dendrite,
+	queryAPI roomserverAPI.RoomserverQueryAPI,
+	accountDB *accounts.Database,
+	producer *producers.RoomserverProducer,
+	membership, roomID string,
+	evTime time.Time,
 ) (inviteStored bool, errRes *util.JSONResponse) {
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
