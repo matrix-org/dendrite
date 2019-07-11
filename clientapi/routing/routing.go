@@ -134,7 +134,10 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/event/{eventID}",
 		common.MakeAuthAPI("rooms_get_event", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars := mux.Vars(req)
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
 			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, queryAPI, federation, keyRing)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
