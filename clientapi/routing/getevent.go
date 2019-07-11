@@ -63,7 +63,7 @@ func GetEvent(
 		// Event not found locally. Do a federation query in hope of getting
 		// the event from another server.
 		// TODO: May need a better way to determine which server to query
-		_, domain, err := gomatrixserverlib.SplitID('$', eventID)
+		_, domain, err := gomatrixserverlib.SplitID('!', roomID)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
@@ -127,7 +127,7 @@ func GetEvent(
 // federation.
 // Note: It's not guaranteed that the server(s) we query have the state events.
 func (r *getEventRequest) proceedWithMissingState() util.JSONResponse {
-	_, domain, err := gomatrixserverlib.SplitID('$', r.eventID)
+	_, domain, err := gomatrixserverlib.SplitID('!', r.roomID)
 	if err != nil {
 		return httputil.LogThenError(r.req, err)
 	}
