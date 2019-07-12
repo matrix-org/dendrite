@@ -58,27 +58,12 @@ func SendMembership(
 		}
 	}
 
-	inviteStored, err := threepid.CheckAndProcessInvite(
-		req.Context(), device, &body, cfg, queryAPI, accountDB, producer,
+	inviteStored, jsonErrResp := checkAndProcessThreepid(
+		req, device, &body, cfg, queryAPI, accountDB, producer,
 		membership, roomID, evTime,
 	)
-	if err == threepid.ErrMissingParameter {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
-		}
-	} else if err == threepid.ErrNotTrusted {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotTrusted(body.IDServer),
-		}
-	} else if err == common.ErrRoomNoExists {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(err.Error()),
-		}
-	} else if err != nil {
-		return httputil.LogThenError(req, err)
+	if jsonErrResp != nil {
+		return *jsonErrResp
 	}
 
 	// If an invite has been stored on an identity server, it means that a
@@ -114,9 +99,18 @@ func SendMembership(
 		return httputil.LogThenError(req, err)
 	}
 
+	var returnData interface{} = struct{}{}
+
+	// The join membership requires the room id to be sent in the response
+	if membership == "join" {
+		returnData = struct {
+			RoomID string `json:"room_id"`
+		}{roomID}
+	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: returnData,
 	}
 }
 
@@ -213,5 +207,43 @@ func getMembershipStateKey(
 		stateKey = device.UserID
 	}
 
+	return
+}
+
+func checkAndProcessThreepid(
+	req *http.Request,
+	device *authtypes.Device,
+	body *threepid.MembershipRequest,
+	cfg config.Dendrite,
+	queryAPI roomserverAPI.RoomserverQueryAPI,
+	accountDB *accounts.Database,
+	producer *producers.RoomserverProducer,
+	membership, roomID string,
+	evTime time.Time,
+) (inviteStored bool, errRes *util.JSONResponse) {
+
+	inviteStored, err := threepid.CheckAndProcessInvite(
+		req.Context(), device, body, cfg, queryAPI, accountDB, producer,
+		membership, roomID, evTime,
+	)
+	if err == threepid.ErrMissingParameter {
+		return inviteStored, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	} else if err == threepid.ErrNotTrusted {
+		return inviteStored, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotTrusted(body.IDServer),
+		}
+	} else if err == common.ErrRoomNoExists {
+		return inviteStored, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(err.Error()),
+		}
+	} else if err != nil {
+		er := httputil.LogThenError(req, err)
+		return inviteStored, &er
+	}
 	return
 }

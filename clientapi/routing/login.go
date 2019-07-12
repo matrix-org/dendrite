@@ -107,7 +107,7 @@ func Login(
 
 		token, err := auth.GenerateAccessToken()
 		if err != nil {
-			httputil.LogThenError(req, err)
+			return httputil.LogThenError(req, err)
 		}
 
 		dev, err := getDevice(req.Context(), r, deviceDB, acc, localpart, token)

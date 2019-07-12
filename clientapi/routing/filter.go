@@ -62,7 +62,7 @@ func GetFilter(
 	filter := gomatrix.Filter{}
 	err = json.Unmarshal(res, &filter)
 	if err != nil {
-		httputil.LogThenError(req, err)
+		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
