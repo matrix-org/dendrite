@@ -75,7 +75,7 @@ func getTimeout(timeoutMS string) time.Duration {
 }
 
 // getSyncStreamPosition tries to parse a 'since' token taken from the API to a
-// stream position. If the string is empty then (nil, nil) is returned.
+// types.SyncPosition. If the string is empty then (nil, nil) is returned.
 // There are two forms of tokens: The full length form containing all PDU and EDU
 // positions separated by "_", and the short form containing only the PDU
 // position. Short form can be used for, e.g., `prev_batch` tokens.
@@ -86,7 +86,7 @@ func getSyncStreamPosition(since string) (*types.SyncPosition, error) {
 
 	posStrings := strings.Split(since, "_")
 	if len(posStrings) != 2 && len(posStrings) != 1 {
-		// A token can either be a full length one or a short (PDU-only) one
+		// A token can either be full length or short (PDU-only).
 		return nil, errors.New("malformed batch token")
 	}
 

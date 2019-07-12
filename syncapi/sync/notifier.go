@@ -26,7 +26,7 @@ import (
 )
 
 // Notifier will wake up sleeping requests when there is some new data.
-// It does not tell requests what that data is, only the stream position which
+// It does not tell requests what that data is, only the sync position which
 // they can use to get at it. This is done to prevent races whereby we tell the caller
 // the event, but the token has already advanced by the time they fetch it, resulting
 // in missed events.
@@ -43,7 +43,7 @@ type Notifier struct {
 	lastCleanUpTime time.Time
 }
 
-// NewNotifier creates a new notifier set to the given stream position.
+// NewNotifier creates a new notifier set to the given sync position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
 // the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
 func NewNotifier(pos types.SyncPosition) *Notifier {
@@ -58,13 +58,18 @@ func NewNotifier(pos types.SyncPosition) *Notifier {
 
 // OnNewEvent is called when a new event is received from the room server. Must only be
 // called from a single goroutine, to avoid races between updates which could set the
-// current position in the stream incorrectly.
-// Can be called with one among: a *gomatrixserverlib.Event, a room ID, or a list of user IDs.
+// current sync position incorrectly.
+// Chooses which user sync streams to update by a provided *gomatrixserverlib.Event
+// (based on the users in the event's room),
+// a roomID directly, or a list of user IDs, whichever specified first in the parameters.
 // posUpdate contains the latest position(s) for one or more types of events.
 // If a position in posUpdate is 0, it means no updates available of that type.
 // Typically a consumer supplies a posUpdate with the sync position for the
 // event type it handles set to the latest, leaving other fields as 0.
-func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userIDs []string, posUpdate types.SyncPosition) {
+func (n *Notifier) OnNewEvent(
+	ev *gomatrixserverlib.Event, roomID string, userIDs []string,
+	posUpdate types.SyncPosition,
+) {
 	// update the current position then notify relevant /sync streams.
 	// This needs to be done PRIOR to waking up users as they will read this value.
 	n.streamLock.Lock()
@@ -109,7 +114,9 @@ func (n *Notifier) OnNewEvent(ev *gomatrixserverlib.Event, roomID string, userID
 	} else if len(userIDs) > 0 {
 		n.wakeupUsers(userIDs, latestPos)
 	} else {
-		log.Warn("WARNING: Notifier.OnNewEvent called but caller supplied no user to wake up")
+		log.WithFields(log.Fields{
+			"posUpdate": posUpdate.String,
+		}).Warn("Notifier.OnNewEvent called but caller supplied no user to wake up")
 	}
 }
 
@@ -143,7 +150,7 @@ func (n *Notifier) Load(ctx context.Context, db *storage.SyncServerDatasource) e
 	return nil
 }
 
-// CurrentPosition returns the current stream position
+// CurrentPosition returns the current sync position
 func (n *Notifier) CurrentPosition() types.SyncPosition {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
@@ -168,16 +175,11 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 
 func (n *Notifier) wakeupUsers(userIDs []string, newPos types.SyncPosition) {
 	for _, userID := range userIDs {
-		n.wakeupUser(userID, newPos)
+		stream := n.fetchUserStream(userID, false)
+		if stream != nil {
+			stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
+		}
 	}
-}
-
-func (n *Notifier) wakeupUser(userID string, newPos types.SyncPosition) {
-	stream := n.fetchUserStream(userID, false)
-	if stream == nil {
-		return
-	}
-	stream.Broadcast(newPos) // wakeup all goroutines Wait()ing on this stream
 }
 
 // fetchUserStream retrieves a stream unique to the given user. If makeIfNotExists is true,

@@ -27,12 +27,15 @@ import (
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
+// OutputTypingEventConsumer consumes events that originated in the typing server.
 type OutputTypingEventConsumer struct {
 	typingConsumer *common.ContinualConsumer
 	db             *storage.SyncServerDatasource
 	notifier       *sync.Notifier
 }
 
+// NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
+// Call Start() to begin consuming from the typing server.
 func NewOutputTypingEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
@@ -78,7 +81,7 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		"room_id": output.Event.RoomID,
 		"user_id": output.Event.UserID,
 		"typing":  output.Event.Typing,
-	}).Info("received data from typing server")
+	}).Debug("received data from typing server")
 
 	var typingPos int64
 	typingEvent := output.Event

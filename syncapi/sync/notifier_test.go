@@ -315,7 +315,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.SyncPosition, error) {
 			"waitForEvents timed out waiting for %s (pos=%d)", req.device.UserID, req.since,
 		)
 	case <-listener.GetNotifyChannel(*req.since):
-		p := listener.GetStreamPosition()
+		p := listener.GetSyncPosition()
 		return p, nil
 	}
 }

@@ -39,12 +39,12 @@ type stateDelta struct {
 	roomID      string
 	stateEvents []gomatrixserverlib.Event
 	membership  string
-	// The stream position of the latest membership event for this user, if applicable.
+	// The PDU stream position of the latest membership event for this user, if applicable.
 	// Can be 0 if there is no membership event in this delta.
 	membershipPos int64
 }
 
-// Same as gomatrixserverlib.Event but also has the stream position for this event.
+// Same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type streamEvent struct {
 	gomatrixserverlib.Event
 	streamPosition int64
@@ -111,7 +111,7 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 }
 
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
-// when generating the stream position for this event. Returns the sync stream position for the inserted event.
+// when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 // Returns an error if there was a problem inserting this event.
 func (d *SyncServerDatasource) WriteEvent(
 	ctx context.Context,
@@ -228,8 +228,8 @@ func (d *SyncServerDatasource) syncPositionTx(
 	return
 }
 
-// addPDUDeltaToResponse adds all PDU delta to a sync response.
-// IDs of all rooms the user joined are returned so EDU delta can be added for them.
+// addPDUDeltaToResponse adds all PDU deltas to a sync response.
+// IDs of all rooms the user joined are returned so EDU deltas can be added for them.
 func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	ctx context.Context,
 	device authtypes.Device,
@@ -245,7 +245,7 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	defer common.EndTransaction(txn, &succeeded)
 
 	// Work out which rooms to return in the response. This is done by getting not only the currently
-	// joined rooms, but also which rooms have membership transitions for this user between the 2 stream positions.
+	// joined rooms, but also which rooms have membership transitions for this user between the 2 PDU stream positions.
 	// This works out what the 'state' key should be for each room as well as which membership block
 	// to put the room into.
 	deltas, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
@@ -271,6 +271,8 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	return joinedRoomIDs, nil
 }
 
+// addTypingDeltaToResponse adds all typing notifications to a sync response
+// since the specified position.
 func (d *SyncServerDatasource) addTypingDeltaToResponse(
 	since int64,
 	joinedRoomIDs []string,
@@ -372,7 +374,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	err error,
 ) {
 	// This needs to be all done in a transaction as we need to do multiple SELECTs, and we need to have
-	// a consistent view of the database throughout. This includes extracting the sync stream position.
+	// a consistent view of the database throughout. This includes extracting the sync position.
 	// This does have the unfortunate side-effect that all the matrixy logic resides in this function,
 	// but it's better to not hide the fact that this is being done in a transaction.
 	txn, err := d.db.BeginTx(ctx, &txReadOnlySnapshot)
@@ -440,7 +442,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	return res, toPos, joinedRoomIDs, err
 }
 
-// CompleteSync a complete /sync API response for the given user.
+// CompleteSync returns a complete /sync API response for the given user.
 func (d *SyncServerDatasource) CompleteSync(
 	ctx context.Context, userID string, numRecentEventsPerRoom int,
 ) (*types.Response, error) {

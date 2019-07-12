@@ -108,7 +108,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-// selectStateInRange returns the state events between the two given stream positions, exclusive of oldPos, inclusive of newPos.
+// selectStateInRange returns the state events between the two given PDU stream positions, exclusive of oldPos, inclusive of newPos.
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(

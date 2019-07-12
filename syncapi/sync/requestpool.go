@@ -97,7 +97,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		select {
 		// Wait for notifier to wake us up
 		case <-userStreamListener.GetNotifyChannel(sincePos):
-			currPos = userStreamListener.GetStreamPosition()
+			currPos = userStreamListener.GetSyncPosition()
 			sincePos = currPos
 		// Or for timeout to expire
 		case <-timer.C:

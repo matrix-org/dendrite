@@ -84,7 +84,7 @@ func (s *UserStream) GetListener(ctx context.Context) UserStreamListener {
 	return listener
 }
 
-// Broadcast a new stream position for this user.
+// Broadcast a new sync position for this user.
 func (s *UserStream) Broadcast(pos types.SyncPosition) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -118,9 +118,9 @@ func (s *UserStream) TimeOfLastNonEmpty() time.Time {
 	return s.timeOfLastChannel
 }
 
-// GetStreamPosition returns last stream position which the UserStream was
+// GetStreamPosition returns last sync position which the UserStream was
 // notified about
-func (s *UserStreamListener) GetStreamPosition() types.SyncPosition {
+func (s *UserStreamListener) GetSyncPosition() types.SyncPosition {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
 

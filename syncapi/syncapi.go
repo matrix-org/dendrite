@@ -45,7 +45,7 @@ func SetupSyncAPIComponent(
 
 	pos, err := syncDB.SyncPosition(context.Background())
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to get stream position")
+		logrus.WithError(err).Panicf("failed to get sync position")
 	}
 
 	notifier := sync.NewNotifier(pos)

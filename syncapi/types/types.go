@@ -25,7 +25,7 @@ import (
 type SyncPosition struct {
 	// PDUPosition is the stream position for PDUs the client is at.
 	PDUPosition int64
-	// TypingPosition is the position for typing notifications the client is at.
+	// TypingPosition is the client's position for typing notifications.
 	TypingPosition int64
 }
 
@@ -35,15 +35,15 @@ func (sp SyncPosition) String() string {
 		strconv.FormatInt(sp.TypingPosition, 10)
 }
 
-// IsAfter returns whether sp refers to states newer than other
+// IsAfter returns whether one SyncPosition refers to states newer than another SyncPosition.
 func (sp SyncPosition) IsAfter(other SyncPosition) bool {
 	return sp.PDUPosition > other.PDUPosition ||
 		sp.TypingPosition > other.TypingPosition
 }
 
-// WithUpdates returns a copy of `sp` with updates represented by `other` applied.
-// If a field is not 0 in `other`, it is considered an update and its value
-// will replace the corresponding value in sp.
+// WithUpdates returns a copy of the SyncPosition with updates applied from another SyncPosition.
+// If the latter SyncPosition contains a field that is not 0, it is considered an update,
+// and its value will replace the corresponding value in the SyncPosition on which WithUpdates is called.
 func (sp SyncPosition) WithUpdates(other SyncPosition) SyncPosition {
 	ret := sp
 	if other.PDUPosition != 0 {
