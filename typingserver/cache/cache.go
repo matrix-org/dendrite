@@ -22,7 +22,7 @@ const defaultTypingTimeout = 10 * time.Second
 // userSet is a map of user IDs to a timer, timer fires at expiry.
 type userSet map[string]*time.Timer
 
-// TimeoutCallbackFn is a function called right after removal of a user
+// TimeoutCallbackFn is a function called right after the removal of a user
 // from the typing user list due to timeout.
 // latestSyncPosition is the typing sync position after the removal.
 type TimeoutCallbackFn func(userID, roomID string, latestSyncPosition int64)

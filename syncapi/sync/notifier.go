@@ -61,11 +61,11 @@ func NewNotifier(pos types.SyncPosition) *Notifier {
 // current sync position incorrectly.
 // Chooses which user sync streams to update by a provided *gomatrixserverlib.Event
 // (based on the users in the event's room),
-// a roomID directly, or a list of user IDs, whichever specified first in the parameters.
+// a roomID directly, or a list of user IDs, prioritised by parameter ordering.
 // posUpdate contains the latest position(s) for one or more types of events.
-// If a position in posUpdate is 0, it means no updates available of that type.
-// Typically a consumer supplies a posUpdate with the sync position for the
-// event type it handles set to the latest, leaving other fields as 0.
+// If a position in posUpdate is 0, it means no updates are available of that type.
+// Typically a consumer supplies a posUpdate with the latest sync position for the
+// event type it handles, leaving other fields as 0.
 func (n *Notifier) OnNewEvent(
 	ev *gomatrixserverlib.Event, roomID string, userIDs []string,
 	posUpdate types.SyncPosition,
