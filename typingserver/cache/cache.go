@@ -22,25 +22,66 @@ const defaultTypingTimeout = 10 * time.Second
 // userSet is a map of user IDs to a timer, timer fires at expiry.
 type userSet map[string]*time.Timer
 
+// TimeoutCallbackFn is a function called right after the removal of a user
+// from the typing user list due to timeout.
+// latestSyncPosition is the typing sync position after the removal.
+type TimeoutCallbackFn func(userID, roomID string, latestSyncPosition int64)
+
+type roomData struct {
+	syncPosition int64
+	userSet      userSet
+}
+
 // TypingCache maintains a list of users typing in each room.
 type TypingCache struct {
 	sync.RWMutex
-	data map[string]userSet
+	latestSyncPosition int64
+	data               map[string]*roomData
+	timeoutCallback    TimeoutCallbackFn
+}
+
+// Create a roomData with its sync position set to the latest sync position.
+// Must only be called after locking the cache.
+func (t *TypingCache) newRoomData() *roomData {
+	return &roomData{
+		syncPosition: t.latestSyncPosition,
+		userSet:      make(userSet),
+	}
 }
 
 // NewTypingCache returns a new TypingCache initialised for use.
 func NewTypingCache() *TypingCache {
-	return &TypingCache{data: make(map[string]userSet)}
+	return &TypingCache{data: make(map[string]*roomData)}
+}
+
+// SetTimeoutCallback sets a callback function that is called right after
+// a user is removed from the typing user list due to timeout.
+func (t *TypingCache) SetTimeoutCallback(fn TimeoutCallbackFn) {
+	t.timeoutCallback = fn
 }
 
 // GetTypingUsers returns the list of users typing in a room.
-func (t *TypingCache) GetTypingUsers(roomID string) (users []string) {
+func (t *TypingCache) GetTypingUsers(roomID string) []string {
+	users, _ := t.GetTypingUsersIfUpdatedAfter(roomID, 0)
+	// 0 should work above because the first position used will be 1.
+	return users
+}
+
+// GetTypingUsersIfUpdatedAfter returns all users typing in this room with
+// updated == true if the typing sync position of the room is after the given
+// position. Otherwise, returns an empty slice with updated == false.
+func (t *TypingCache) GetTypingUsersIfUpdatedAfter(
+	roomID string, position int64,
+) (users []string, updated bool) {
 	t.RLock()
-	usersMap, ok := t.data[roomID]
-	t.RUnlock()
-	if ok {
-		users = make([]string, 0, len(usersMap))
-		for userID := range usersMap {
+	defer t.RUnlock()
+
+	roomData, ok := t.data[roomID]
+	if ok && roomData.syncPosition > position {
+		updated = true
+		userSet := roomData.userSet
+		users = make([]string, 0, len(userSet))
+		for userID := range userSet {
 			users = append(users, userID)
 		}
 	}
@@ -51,53 +92,84 @@ func (t *TypingCache) GetTypingUsers(roomID string) (users []string) {
 // AddTypingUser sets an user as typing in a room.
 // expire is the time when the user typing should time out.
 // if expire is nil, defaultTypingTimeout is assumed.
-func (t *TypingCache) AddTypingUser(userID, roomID string, expire *time.Time) {
+// Returns the latest sync position for typing after update.
+func (t *TypingCache) AddTypingUser(
+	userID, roomID string, expire *time.Time,
+) int64 {
 	expireTime := getExpireTime(expire)
 	if until := time.Until(expireTime); until > 0 {
-		timer := time.AfterFunc(until, t.timeoutCallback(userID, roomID))
-		t.addUser(userID, roomID, timer)
+		timer := time.AfterFunc(until, func() {
+			latestSyncPosition := t.RemoveUser(userID, roomID)
+			if t.timeoutCallback != nil {
+				t.timeoutCallback(userID, roomID, latestSyncPosition)
+			}
+		})
+		return t.addUser(userID, roomID, timer)
 	}
+	return t.GetLatestSyncPosition()
 }
 
 // addUser with mutex lock & replace the previous timer.
-func (t *TypingCache) addUser(userID, roomID string, expiryTimer *time.Timer) {
+// Returns the latest typing sync position after update.
+func (t *TypingCache) addUser(
+	userID, roomID string, expiryTimer *time.Timer,
+) int64 {
 	t.Lock()
 	defer t.Unlock()
 
+	t.latestSyncPosition++
+
 	if t.data[roomID] == nil {
-		t.data[roomID] = make(userSet)
+		t.data[roomID] = t.newRoomData()
+	} else {
+		t.data[roomID].syncPosition = t.latestSyncPosition
 	}
 
 	// Stop the timer to cancel the call to timeoutCallback
-	if timer, ok := t.data[roomID][userID]; ok {
-		// It may happen that at this stage timer fires but now we have a lock on t.
-		// Hence the execution of timeoutCallback will happen after we unlock.
-		// So we may lose a typing state, though this event is highly unlikely.
-		// This can be mitigated by keeping another time.Time in the map and check against it
-		// before removing. This however is not required in most practical scenario.
+	if timer, ok := t.data[roomID].userSet[userID]; ok {
+		// It may happen that at this stage the timer fires, but we now have a lock on
+		// it. Hence the execution of timeoutCallback will happen after we unlock. So
+		// we may lose a typing state, though this is highly unlikely. This can be
+		// mitigated by keeping another time.Time in the map and checking against it
+		// before removing, but its occurrence is so infrequent it does not seem
+		// worthwhile.
 		timer.Stop()
 	}
 
-	t.data[roomID][userID] = expiryTimer
-}
+	t.data[roomID].userSet[userID] = expiryTimer
 
-// Returns a function which is called after timeout happens.
-// This removes the user.
-func (t *TypingCache) timeoutCallback(userID, roomID string) func() {
-	return func() {
-		t.RemoveUser(userID, roomID)
-	}
+	return t.latestSyncPosition
 }
 
 // RemoveUser with mutex lock & stop the timer.
-func (t *TypingCache) RemoveUser(userID, roomID string) {
+// Returns the latest sync position for typing after update.
+func (t *TypingCache) RemoveUser(userID, roomID string) int64 {
 	t.Lock()
 	defer t.Unlock()
 
-	if timer, ok := t.data[roomID][userID]; ok {
-		timer.Stop()
-		delete(t.data[roomID], userID)
+	roomData, ok := t.data[roomID]
+	if !ok {
+		return t.latestSyncPosition
 	}
+
+	timer, ok := roomData.userSet[userID]
+	if !ok {
+		return t.latestSyncPosition
+	}
+
+	timer.Stop()
+	delete(roomData.userSet, userID)
+
+	t.latestSyncPosition++
+	t.data[roomID].syncPosition = t.latestSyncPosition
+
+	return t.latestSyncPosition
+}
+
+func (t *TypingCache) GetLatestSyncPosition() int64 {
+	t.Lock()
+	defer t.Unlock()
+	return t.latestSyncPosition
 }
 
 func getExpireTime(expire *time.Time) time.Time {

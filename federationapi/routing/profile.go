@@ -53,7 +53,7 @@ func GetProfile(
 		return httputil.LogThenError(httpReq, err)
 	}
 
-	profile, err := appserviceAPI.RetreiveUserProfile(httpReq.Context(), userID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(httpReq.Context(), userID, asAPI, accountDB)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}

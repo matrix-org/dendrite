@@ -31,6 +31,10 @@ const pathPrefixApp = "/_matrix/app/r0"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
+//
+// Due to Setup being used to call many other functions, a gocyclo nolint is
+// applied:
+// nolint: gocyclo
 func Setup(
 	apiMux *mux.Router, cfg config.Dendrite, // nolint: unparam
 	queryAPI api.RoomserverQueryAPI, aliasAPI api.RoomserverAliasAPI, // nolint: unparam

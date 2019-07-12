@@ -96,9 +96,11 @@ func (oqs *OutgoingQueues) SendEDU(
 	// Remove our own server from the list of destinations.
 	destinations = filterDestinations(oqs.origin, destinations)
 
-	log.WithFields(log.Fields{
-		"destinations": destinations, "edu_type": e.Type,
-	}).Info("Sending EDU event")
+	if len(destinations) > 0 {
+		log.WithFields(log.Fields{
+			"destinations": destinations, "edu_type": e.Type,
+		}).Info("Sending EDU event")
+	}
 
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()

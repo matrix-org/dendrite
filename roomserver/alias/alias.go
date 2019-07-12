@@ -99,12 +99,21 @@ func (r *RoomserverAliasAPI) GetRoomIDForAlias(
 		return err
 	}
 
-	// No rooms found locally, try our application services by making a call to
-	// the appservice component
-	aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
-	var aliasResp appserviceAPI.RoomAliasExistsResponse
-	if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
-		return err
+	if roomID == "" {
+		// No room found locally, try our application services by making a call to
+		// the appservice component
+		aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
+		var aliasResp appserviceAPI.RoomAliasExistsResponse
+		if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
+			return err
+		}
+
+		if aliasResp.AliasExists {
+			roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	response.RoomID = roomID
@@ -296,6 +305,20 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.GetCreatorIDForAlias(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		roomserverAPI.RoomserverGetAliasesForRoomIDPath,
+		common.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.GetAliasesForRoomIDRequest
+			var response roomserverAPI.GetAliasesForRoomIDResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.GetAliasesForRoomID(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
