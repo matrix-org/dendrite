@@ -361,7 +361,7 @@ func (d *SyncServerDatasource) IncrementalSync(
 	return res, nil
 }
 
-// getResponseWithPDUsForCompleteSync creates a response and add all PDUs needed
+// getResponseWithPDUsForCompleteSync creates a response and adds all PDUs needed
 // to it. It returns toPos and joinedRoomIDs for use of adding EDUs.
 func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	ctx context.Context,
@@ -522,7 +522,7 @@ func (d *SyncServerDatasource) SetTypingTimeoutCallback(fn cache.TimeoutCallback
 }
 
 // AddTypingUser adds a typing user to the typing cache.
-// Returns the latest sync position for typing notifications after update.
+// Returns the newly calculated sync position for typing notifications.
 func (d *SyncServerDatasource) AddTypingUser(
 	userID, roomID string, expireTime *time.Time,
 ) int64 {
@@ -530,7 +530,7 @@ func (d *SyncServerDatasource) AddTypingUser(
 }
 
 // RemoveTypingUser removes a typing user from the typing cache.
-// Returns the latest sync position for typing notifications after update.
+// Returns the newly calculated sync position for typing notifications.
 func (d *SyncServerDatasource) RemoveTypingUser(
 	userID, roomID string,
 ) int64 {
