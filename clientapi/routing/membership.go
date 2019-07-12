@@ -99,18 +99,18 @@ func SendMembership(
 		return httputil.LogThenError(req, err)
 	}
 
+	var returnData interface{} = struct{}{}
+
+	// The join membership requires the room id to be sent in the response
 	if membership == "join" {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: struct {
-				RoomID string `json:"room_id"`
-			}{roomID},
-		}
+		returnData = struct {
+			RoomID string `json:"room_id"`
+		}{roomID}
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: returnData,
 	}
 }
 
