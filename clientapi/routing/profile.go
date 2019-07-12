@@ -48,13 +48,6 @@ func GetProfile(
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
 			}
-		} else if x, ok := err.(gomatrix.HTTPError); ok {
-			if x.Code == http.StatusNotFound {
-				return util.JSONResponse{
-					Code: http.StatusNotFound,
-					JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
-				}
-			}
 		}
 
 		return httputil.LogThenError(req, err)
@@ -81,13 +74,6 @@ func GetAvatarURL(
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
-			}
-		} else if x, ok := err.(gomatrix.HTTPError); ok {
-			if x.Code == http.StatusNotFound {
-				return util.JSONResponse{
-					Code: http.StatusNotFound,
-					JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
-				}
 			}
 		}
 
@@ -195,13 +181,6 @@ func GetDisplayName(
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
 			}
-		} else if x, ok := err.(gomatrix.HTTPError); ok {
-			if x.Code == http.StatusNotFound {
-				return util.JSONResponse{
-					Code: http.StatusNotFound,
-					JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
-				}
-			}
 		}
 
 		return httputil.LogThenError(req, err)
@@ -295,6 +274,10 @@ func SetDisplayName(
 	}
 }
 
+// getProfile gets the full profile of a user by querying the database or a
+// remote homeserver.
+// Returns an error when something goes wrong or specifically
+// common.ErrProfileNoExists when the profile doesn't exist.
 func getProfile(
 	ctx context.Context, accountDB *accounts.Database, cfg *config.Dendrite,
 	userID string,
@@ -309,6 +292,12 @@ func getProfile(
 	if domain != cfg.Matrix.ServerName {
 		profile, fedErr := federation.LookupProfile(ctx, domain, userID, "")
 		if fedErr != nil {
+			if x, ok := err.(gomatrix.HTTPError); ok {
+				if x.Code == http.StatusNotFound {
+					return nil, common.ErrProfileNoExists
+				}
+			}
+
 			return nil, fedErr
 		}
 
