@@ -142,6 +142,7 @@ Trying to get push rules with unknown rule_id fails with 404
 Events come down the correct room
 local user can join room with version 5
 User can invite local user to room with version 5
+Inbound federation can receive room-join requests
 Typing events appear in initial sync
 Typing events appear in incremental sync
 Typing events appear in gapped sync
