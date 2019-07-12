@@ -70,11 +70,12 @@ func (t *TypingCache) addUser(userID, roomID string, expiryTimer *time.Timer) {
 
 	// Stop the timer to cancel the call to timeoutCallback
 	if timer, ok := t.data[roomID][userID]; ok {
-		// It may happen that at this stage timer fires but now we have a lock on t.
-		// Hence the execution of timeoutCallback will happen after we unlock.
-		// So we may lose a typing state, though this event is highly unlikely.
-		// This can be mitigated by keeping another time.Time in the map and check against it
-		// before removing. This however is not required in most practical scenario.
+		// It may happen that at this stage the timer fires, but we now have a lock on
+		// it. Hence the execution of timeoutCallback will happen after we unlock. So
+		// we may lose a typing state, though this is highly unlikely. This can be
+		// mitigated by keeping another time.Time in the map and checking against it
+		// before removing, but its occurrence is so infrequent it does not seem
+		// worthwhile.
 		timer.Stop()
 	}
 

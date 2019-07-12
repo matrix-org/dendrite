@@ -236,7 +236,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 		return nil, err
 	}
 	// The events need to be returned from oldest to latest, which isn't
-	// necessary the way the SQL query returns them, so a sort is necessary to
+	// necessarily the way the SQL query returns them, so a sort is necessary to
 	// ensure the events are in the right order in the slice.
 	sort.SliceStable(events, func(i int, j int) bool {
 		return events[i].streamPosition < events[j].streamPosition

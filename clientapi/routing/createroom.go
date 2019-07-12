@@ -163,7 +163,7 @@ func createRoom(
 		"roomID": roomID,
 	}).Info("Creating new room")
 
-	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
