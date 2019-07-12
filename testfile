@@ -42,6 +42,7 @@ POST /join/:room_alias can join a room
 POST /join/:room_id can join a room
 POST /join/:room_id can join a room with custom content
 POST /join/:room_alias can join a room with custom content
+POST /rooms/:room_id/join can join a room
 POST /rooms/:room_id/leave can leave a room
 POST /rooms/:room_id/invite can send an invite
 POST /rooms/:room_id/ban can ban a user
