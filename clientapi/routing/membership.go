@@ -176,7 +176,7 @@ func loadProfile(
 
 	var profile *authtypes.Profile
 	if serverName == cfg.Matrix.ServerName {
-		profile, err = appserviceAPI.RetreiveUserProfile(ctx, userID, asAPI, accountDB)
+		profile, err = appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, accountDB)
 	} else {
 		profile = &authtypes.Profile{}
 	}
