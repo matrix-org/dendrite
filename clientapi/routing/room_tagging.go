@@ -18,13 +18,13 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 // newTag creates and returns a new Tag type
@@ -46,7 +46,7 @@ func GetTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot set another user's typing state"),
+			JSON: jsonerror.Forbidden("Cannot retrieve another user's typing state"),
 		}
 	}
 
@@ -68,8 +68,8 @@ func GetTag(
 		return httputil.LogThenError(req, err)
 	}
 
-	Tag := newTag()
-	err = json.Unmarshal(dataByte, &Tag)
+	tagContent := newTag()
+	err = json.Unmarshal(dataByte, &tagContent)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -77,7 +77,7 @@ func GetTag(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: Tag,
+		JSON: tagContent,
 	}
 }
 
@@ -94,7 +94,7 @@ func PutTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot set another user's typing state"),
+			JSON: jsonerror.Forbidden("Cannot modify another user's typing state"),
 		}
 	}
 
@@ -103,24 +103,26 @@ func PutTag(
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	Tag := newTag()
+
 	var properties gomatrix.TagProperties
 
 	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
 		return *reqErr
 	}
 
+	tagContent := newTag()
+	var dataByte []byte
 	if len(data) > 0 {
-		dataByte, err := json.Marshal(data)
+		dataByte, err = json.Marshal(data)
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
-		if err = json.Unmarshal(dataByte, &Tag); err != nil {
+		if err = json.Unmarshal(dataByte, &tagContent); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	}
-	Tag.Tags[tag] = properties
-	err = saveTagData(req, localpart, roomID, accountDB, Tag)
+	tagContent.Tags[tag] = properties
+	err = saveTagData(req, localpart, roomID, accountDB, tagContent)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -144,7 +146,7 @@ func DeleteTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot set another user's typing state"),
+			JSON: jsonerror.Forbidden("Cannot delete another user's typing state"),
 		}
 	}
 
@@ -153,7 +155,7 @@ func DeleteTag(
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	Tag := newTag()
+	tagContent := newTag()
 
 	// If there are no tags in the database, exit.
 	if len(data) == 0 {
@@ -164,17 +166,17 @@ func DeleteTag(
 		}
 	}
 
-	dataByte, err := json.Marshal(data)
+	byteData, err := json.Marshal(data)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	if err := json.Unmarshal(dataByte, &Tag); err != nil {
+	if err = json.Unmarshal(byteData, &tagContent); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
 	// Check whether the Tag to be deleted exists
-	if _, ok := Tag.Tags[tag]; ok {
-		delete(Tag.Tags, tag)
+	if _, ok := tagContent.Tags[tag]; ok {
+		delete(tagContent.Tags, tag)
 	} else {
 		//Synapse returns a 200 OK response on finding no Tags, same policy is followed here.
 		return util.JSONResponse{
@@ -203,14 +205,14 @@ func obtainSavedTags(
 ) (string, []gomatrixserverlib.RawJSON, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return "", []gomatrixserverlib.RawJSON{}, err
+		return "", nil, err
 	}
 
 	data, err := accountDB.GetAccountDataByType(
 		req.Context(), localpart, roomID, "tag",
 	)
 	if err != nil {
-		return "", []gomatrixserverlib.RawJSON{}, err
+		return "", nil, err
 	}
 
 	return localpart, extractEventContents(data), nil
@@ -228,12 +230,8 @@ func saveTagData(
 	if err != nil {
 		return err
 	}
-	if err = accountDB.SaveAccountData(
-		req.Context(), localpart, roomID, "tag", string(newTagData),
-	); err != nil {
-		return err
-	}
-	return nil
+
+	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "tag", string(newTagData))
 }
 
 // extractEventContents is an utility function to obtain "content" from the ClientEvent

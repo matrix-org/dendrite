@@ -485,7 +485,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags",
-		common.MakeAuthAPI("get_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		common.MakeAuthAPI("get_tags", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
