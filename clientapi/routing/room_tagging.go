@@ -23,6 +23,8 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 // newTag creates and returns a new Tag type
@@ -36,14 +38,21 @@ func newTag() gomatrix.TagContent {
 func GetTag(
 	req *http.Request,
 	accountDB *accounts.Database,
+	device *authtypes.Device,
 	userID string,
 	roomID string,
 ) util.JSONResponse {
-	Tag := newTag()
+
+	if device.UserID != userID {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Cannot set another user's typing state"),
+		}
+	}
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		httputil.LogThenError(req, err)
+		return httputil.LogThenError(req, err)
 	}
 
 	data, err := accountDB.GetAccountDataByType(
@@ -51,17 +60,19 @@ func GetTag(
 	)
 
 	if err != nil {
-		httputil.LogThenError(req, err)
+		return httputil.LogThenError(req, err)
 	}
 
 	dataByte, err := json.Marshal(data)
 	if err != nil {
-		httputil.LogThenError(req, err)
+		return httputil.LogThenError(req, err)
 	}
+
+	Tag := newTag()
 	err = json.Unmarshal(dataByte, &Tag)
 
 	if err != nil {
-		httputil.LogThenError(req, err)
+		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
@@ -74,10 +85,19 @@ func GetTag(
 func PutTag(
 	req *http.Request,
 	accountDB *accounts.Database,
+	device *authtypes.Device,
 	userID string,
 	roomID string,
 	tag string,
 ) util.JSONResponse {
+
+	if device.UserID != userID {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Cannot set another user's typing state"),
+		}
+	}
+
 	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
 
 	if err != nil {
@@ -93,14 +113,17 @@ func PutTag(
 	if len(data) > 0 {
 		dataByte, err := json.Marshal(data)
 		if err != nil {
-			httputil.LogThenError(req, err)
+			return httputil.LogThenError(req, err)
 		}
 		if err = json.Unmarshal(dataByte, &Tag); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	}
 	Tag.Tags[tag] = properties
-	addDataToDB(req, localpart, roomID, accountDB, Tag)
+	err = saveTagData(req, localpart, roomID, accountDB, Tag)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -112,10 +135,19 @@ func PutTag(
 func DeleteTag(
 	req *http.Request,
 	accountDB *accounts.Database,
+	device *authtypes.Device,
 	userID string,
 	roomID string,
 	tag string,
 ) util.JSONResponse {
+
+	if device.UserID != userID {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Cannot set another user's typing state"),
+		}
+	}
+
 	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
 
 	if err != nil {
@@ -123,20 +155,21 @@ func DeleteTag(
 	}
 	Tag := newTag()
 
-	if len(data) > 0 {
-		dataByte, err := json.Marshal(data)
-		if err != nil {
-			httputil.LogThenError(req, err)
-		}
-		if err := json.Unmarshal(dataByte, &Tag); err != nil {
-			return httputil.LogThenError(req, err)
-		}
-	} else {
+	// If there are no tags in the database, exit.
+	if len(data) == 0 {
 		//Synapse returns a 200 OK response on finding no Tags, same policy is followed here.
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
+	}
+
+	dataByte, err := json.Marshal(data)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+	if err := json.Unmarshal(dataByte, &Tag); err != nil {
+		return httputil.LogThenError(req, err)
 	}
 
 	// Check whether the Tag to be deleted exists
@@ -149,7 +182,11 @@ func DeleteTag(
 			JSON: struct{}{},
 		}
 	}
-	addDataToDB(req, localpart, roomID, accountDB, Tag)
+	err = saveTagData(req, localpart, roomID, accountDB, Tag)
+
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -176,31 +213,32 @@ func obtainSavedTags(
 		return "", []gomatrixserverlib.RawJSON{}, err
 	}
 
-	return localpart, getContentFromData(data), nil
+	return localpart, extractEventContents(data), nil
 }
 
-// addDataToDB is a utility function to save the tag data into the DB
-func addDataToDB(
+// saveTagData is a utility function to save the tag data into the DB
+func saveTagData(
 	req *http.Request,
 	localpart string,
 	roomID string,
 	accountDB *accounts.Database,
 	Tag gomatrix.TagContent,
-) {
+) error {
 	newTagData, err := json.Marshal(Tag)
 	if err != nil {
-		httputil.LogThenError(req, err)
+		return err
 	}
 	if err = accountDB.SaveAccountData(
 		req.Context(), localpart, roomID, "tag", string(newTagData),
 	); err != nil {
-		httputil.LogThenError(req, err)
+		return err
 	}
+	return nil
 }
 
-// getContentFromData is an utility function to obtain "content" from the ClientEvent
-func getContentFromData(data []gomatrixserverlib.ClientEvent) []gomatrixserverlib.RawJSON {
-	var contentData []gomatrixserverlib.RawJSON
+// extractEventContents is an utility function to obtain "content" from the ClientEvent
+func extractEventContents(data []gomatrixserverlib.ClientEvent) []gomatrixserverlib.RawJSON {
+	contentData := make([]gomatrixserverlib.RawJSON, 0, len(data))
 	for i := 0; i < len(data); i++ {
 		contentData = append(contentData, data[i].Content)
 	}

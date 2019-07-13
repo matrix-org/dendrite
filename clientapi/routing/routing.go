@@ -486,22 +486,31 @@ func Setup(
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags",
 		common.MakeAuthAPI("get_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars := mux.Vars(req)
-			return GetTag(req, accountDB, vars["userId"], vars["roomId"])
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetTag(req, accountDB, device, vars["userId"], vars["roomId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
 		common.MakeAuthAPI("put_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars := mux.Vars(req)
-			return PutTag(req, accountDB, vars["userId"], vars["roomId"], vars["tag"])
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return PutTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
 		common.MakeAuthAPI("delete_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars := mux.Vars(req)
-			return DeleteTag(req, accountDB, vars["userId"], vars["roomId"], vars["tag"])
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return DeleteTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"])
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 }

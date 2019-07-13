@@ -22,13 +22,8 @@ require (
 	github.com/klauspost/crc32 v0.0.0-20161016154125-cb6bfca970f6
 	github.com/lib/pq v0.0.0-20170918175043-23da1db4f16d
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
-<<<<<<< HEAD
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20181109104322-1c2cbc0872f0
-=======
-	github.com/matrix-org/gomatrix v0.0.0-20190130130140-385f072fe9af
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20190619132215-178ed5e3b8e2
->>>>>>> e2251199a49ab0bb846c02ba37e1cd437a7f725b
 	github.com/matrix-org/naffka v0.0.0-20171115094957-662bfd0841d0
 	github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5
 	github.com/matttproud/golang_protobuf_extensions v1.0.1
