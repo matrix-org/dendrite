@@ -305,6 +305,10 @@ func (r *downloadRequest) respondFromLocalFile(
 		}).Info("Responding with file")
 		responseFile = file
 		responseMetadata = r.MediaMetadata
+
+		if len(responseMetadata.UploadName) > 0 {
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename*=utf-8"%s"`, responseMetadata.UploadName))
+		}
 	}
 
 	w.Header().Set("Content-Type", string(responseMetadata.ContentType))

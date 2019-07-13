@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2019 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package common
 
 import (
-	"database/sql"
+	"net/url"
 )
 
-// a statementList is a list of SQL statements to prepare and a pointer to where to store the resulting prepared statement.
-type statementList []struct {
-	statement **sql.Stmt
-	sql       string
-}
-
-// prepare the SQL for each statement in the list and assign the result to the prepared statement.
-func (s statementList) prepare(db *sql.DB) (err error) {
-	for _, statement := range s {
-		if *statement.statement, err = db.Prepare(statement.sql); err != nil {
-			return
+// URLDecodeMapValues is a function that iterates through each of the items in a
+// map, URL decodes the value, and returns a new map with the decoded values
+// under the same key names
+func URLDecodeMapValues(vmap map[string]string) (map[string]string, error) {
+	decoded := make(map[string]string, len(vmap))
+	for key, value := range vmap {
+		decodedVal, err := url.QueryUnescape(value)
+		if err != nil {
+			return make(map[string]string), err
 		}
+		decoded[key] = decodedVal
 	}
-	return
+
+	return decoded, nil
 }

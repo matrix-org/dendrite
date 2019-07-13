@@ -20,9 +20,11 @@ import (
 	"context"
 	"image"
 	"image/draw"
+
 	// Imported for gif codec
 	_ "image/gif"
 	"image/jpeg"
+
 	// Imported for png codec
 	_ "image/png"
 	"os"
@@ -258,9 +260,6 @@ func adjustSize(dst types.Path, img image.Image, w, h int, crop bool, logger *lo
 		out = target
 	} else {
 		out = resize.Thumbnail(uint(w), uint(h), img, resize.Lanczos3)
-		if err != nil {
-			return -1, -1, err
-		}
 	}
 
 	if err = writeFile(out, string(dst)); err != nil {

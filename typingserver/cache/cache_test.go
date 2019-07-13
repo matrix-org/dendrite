@@ -38,7 +38,7 @@ func TestTypingCache(t *testing.T) {
 	})
 }
 
-func testAddTypingUser(t *testing.T, tCache *TypingCache) {
+func testAddTypingUser(t *testing.T, tCache *TypingCache) { // nolint: unparam
 	present := time.Now()
 	tests := []struct {
 		userID string

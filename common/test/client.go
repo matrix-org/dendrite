@@ -34,7 +34,7 @@ type Request struct {
 	LastErr          *LastRequestErr
 }
 
-// LastRequestErr is a synchronized error wrapper
+// LastRequestErr is a synchronised error wrapper
 // Useful for obtaining the last error from a set of requests
 type LastRequestErr struct {
 	sync.Mutex

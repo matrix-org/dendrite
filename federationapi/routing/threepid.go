@@ -194,7 +194,7 @@ func createInviteFrom3PIDInvite(
 		StateKey: &inv.MXID,
 	}
 
-	profile, err := appserviceAPI.RetreiveUserProfile(ctx, inv.MXID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, inv.MXID, asAPI, accountDB)
 	if err != nil {
 		return nil, err
 	}

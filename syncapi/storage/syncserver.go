@@ -17,16 +17,21 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
+
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/dendrite/typingserver/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -34,33 +39,35 @@ type stateDelta struct {
 	roomID      string
 	stateEvents []gomatrixserverlib.Event
 	membership  string
-	// The stream position of the latest membership event for this user, if applicable.
+	// The PDU stream position of the latest membership event for this user, if applicable.
 	// Can be 0 if there is no membership event in this delta.
-	membershipPos types.StreamPosition
+	membershipPos int64
 }
 
-// Same as gomatrixserverlib.Event but also has the stream position for this event.
+// Same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type streamEvent struct {
 	gomatrixserverlib.Event
-	streamPosition types.StreamPosition
+	streamPosition int64
 	transactionID  *api.TransactionID
 }
 
-// SyncServerDatabase represents a sync server database
-type SyncServerDatabase struct {
+// SyncServerDatabase represents a sync server datasource which manages
+// both the database for PDUs and caches for EDUs.
+type SyncServerDatasource struct {
 	db *sql.DB
 	common.PartitionOffsetStatements
 	accountData accountDataStatements
 	events      outputRoomEventsStatements
 	roomstate   currentRoomStateStatements
 	invites     inviteEventsStatements
+	typingCache *cache.TypingCache
 }
 
 // NewSyncServerDatabase creates a new sync server database
-func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
-	var d SyncServerDatabase
+func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, error) {
+	var d SyncServerDatasource
 	var err error
-	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if d.db, err = sql.Open("postgres", dbDataSourceName); err != nil {
 		return nil, err
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
@@ -78,11 +85,12 @@ func NewSyncServerDatabase(dataSourceName string) (*SyncServerDatabase, error) {
 	if err := d.invites.prepare(d.db); err != nil {
 		return nil, err
 	}
+	d.typingCache = cache.NewTypingCache()
 	return &d, nil
 }
 
 // AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
-func (d *SyncServerDatabase) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
+func (d *SyncServerDatasource) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.roomstate.selectJoinedUsers(ctx)
 }
 
@@ -91,7 +99,7 @@ func (d *SyncServerDatabase) AllJoinedUsersInRooms(ctx context.Context) (map[str
 // If an event is not found in the database then it will be omitted from the list.
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
-func (d *SyncServerDatabase) Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
 	streamEvents, err := d.events.selectEvents(ctx, nil, eventIDs)
 	if err != nil {
 		return nil, err
@@ -103,38 +111,38 @@ func (d *SyncServerDatabase) Events(ctx context.Context, eventIDs []string) ([]g
 }
 
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
-// when generating the stream position for this event. Returns the sync stream position for the inserted event.
+// when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 // Returns an error if there was a problem inserting this event.
-func (d *SyncServerDatabase) WriteEvent(
+func (d *SyncServerDatasource) WriteEvent(
 	ctx context.Context,
 	ev *gomatrixserverlib.Event,
 	addStateEvents []gomatrixserverlib.Event,
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID,
-) (streamPos types.StreamPosition, returnErr error) {
+) (pduPosition int64, returnErr error) {
 	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.events.insertEvent(ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID)
 		if err != nil {
 			return err
 		}
-		streamPos = types.StreamPosition(pos)
+		pduPosition = pos
 
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
 			// Nothing to do, the event may have just been a message event.
 			return nil
 		}
 
-		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, streamPos)
+		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition)
 	})
 	return
 }
 
-func (d *SyncServerDatabase) updateRoomState(
+func (d *SyncServerDatasource) updateRoomState(
 	ctx context.Context, txn *sql.Tx,
 	removedEventIDs []string,
 	addedEvents []gomatrixserverlib.Event,
-	streamPos types.StreamPosition,
+	pduPosition int64,
 ) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 	for _, eventID := range removedEventIDs {
@@ -156,7 +164,7 @@ func (d *SyncServerDatabase) updateRoomState(
 			}
 			membership = &value
 		}
-		if err := d.roomstate.upsertRoomState(ctx, txn, event, membership, int64(streamPos)); err != nil {
+		if err := d.roomstate.upsertRoomState(ctx, txn, event, membership, pduPosition); err != nil {
 			return err
 		}
 	}
@@ -167,7 +175,7 @@ func (d *SyncServerDatabase) updateRoomState(
 // GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
-func (d *SyncServerDatabase) GetStateEvent(
+func (d *SyncServerDatasource) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.Event, error) {
 	return d.roomstate.selectStateEvent(ctx, roomID, evType, stateKey)
@@ -176,7 +184,7 @@ func (d *SyncServerDatabase) GetStateEvent(
 // GetStateEventsForRoom fetches the state events for a given room.
 // Returns an empty slice if no state events could be found for this room.
 // Returns an error if there was an issue with the retrieval.
-func (d *SyncServerDatabase) GetStateEventsForRoom(
+func (d *SyncServerDatasource) GetStateEventsForRoom(
 	ctx context.Context, roomID string,
 ) (stateEvents []gomatrixserverlib.Event, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
@@ -186,46 +194,49 @@ func (d *SyncServerDatabase) GetStateEventsForRoom(
 	return
 }
 
-// SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
-func (d *SyncServerDatabase) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
-	return d.syncStreamPositionTx(ctx, nil)
+// SyncPosition returns the latest positions for syncing.
+func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (types.SyncPosition, error) {
+	return d.syncPositionTx(ctx, nil)
 }
 
-func (d *SyncServerDatabase) syncStreamPositionTx(
+func (d *SyncServerDatasource) syncPositionTx(
 	ctx context.Context, txn *sql.Tx,
-) (types.StreamPosition, error) {
-	maxID, err := d.events.selectMaxEventID(ctx, txn)
+) (sp types.SyncPosition, err error) {
+
+	maxEventID, err := d.events.selectMaxEventID(ctx, txn)
 	if err != nil {
-		return 0, err
+		return sp, err
 	}
 	maxAccountDataID, err := d.accountData.selectMaxAccountDataID(ctx, txn)
 	if err != nil {
-		return 0, err
+		return sp, err
 	}
-	if maxAccountDataID > maxID {
-		maxID = maxAccountDataID
+	if maxAccountDataID > maxEventID {
+		maxEventID = maxAccountDataID
 	}
 	maxInviteID, err := d.invites.selectMaxInviteID(ctx, txn)
 	if err != nil {
-		return 0, err
+		return sp, err
 	}
-	if maxInviteID > maxID {
-		maxID = maxInviteID
+	if maxInviteID > maxEventID {
+		maxEventID = maxInviteID
 	}
-	return types.StreamPosition(maxID), nil
+	sp.PDUPosition = maxEventID
+
+	sp.TypingPosition = d.typingCache.GetLatestSyncPosition()
+
+	return
 }
 
-// IncrementalSync returns all the data needed in order to create an incremental
-// sync response for the given user. Events returned will include any client
-// transaction IDs associated with the given device. These transaction IDs come
-// from when the device sent the event via an API that included a transaction
-// ID.
-func (d *SyncServerDatabase) IncrementalSync(
+// addPDUDeltaToResponse adds all PDU deltas to a sync response.
+// IDs of all rooms the user joined are returned so EDU deltas can be added for them.
+func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	ctx context.Context,
 	device authtypes.Device,
-	fromPos, toPos types.StreamPosition,
+	fromPos, toPos int64,
 	numRecentEventsPerRoom int,
-) (*types.Response, error) {
+	res *types.Response,
+) ([]string, error) {
 	txn, err := d.db.BeginTx(ctx, &txReadOnlySnapshot)
 	if err != nil {
 		return nil, err
@@ -234,7 +245,7 @@ func (d *SyncServerDatabase) IncrementalSync(
 	defer common.EndTransaction(txn, &succeeded)
 
 	// Work out which rooms to return in the response. This is done by getting not only the currently
-	// joined rooms, but also which rooms have membership transitions for this user between the 2 stream positions.
+	// joined rooms, but also which rooms have membership transitions for this user between the 2 PDU stream positions.
 	// This works out what the 'state' key should be for each room as well as which membership block
 	// to put the room into.
 	deltas, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
@@ -242,8 +253,9 @@ func (d *SyncServerDatabase) IncrementalSync(
 		return nil, err
 	}
 
-	res := types.NewResponse(toPos)
+	joinedRoomIDs := make([]string, 0, len(deltas))
 	for _, delta := range deltas {
+		joinedRoomIDs = append(joinedRoomIDs, delta.roomID)
 		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
 		if err != nil {
 			return nil, err
@@ -256,52 +268,151 @@ func (d *SyncServerDatabase) IncrementalSync(
 	}
 
 	succeeded = true
+	return joinedRoomIDs, nil
+}
+
+// addTypingDeltaToResponse adds all typing notifications to a sync response
+// since the specified position.
+func (d *SyncServerDatasource) addTypingDeltaToResponse(
+	since int64,
+	joinedRoomIDs []string,
+	res *types.Response,
+) error {
+	var jr types.JoinResponse
+	var ok bool
+	var err error
+	for _, roomID := range joinedRoomIDs {
+		if typingUsers, updated := d.typingCache.GetTypingUsersIfUpdatedAfter(
+			roomID, since,
+		); updated {
+			ev := gomatrixserverlib.ClientEvent{
+				Type: gomatrixserverlib.MTyping,
+			}
+			ev.Content, err = json.Marshal(map[string]interface{}{
+				"user_ids": typingUsers,
+			})
+			if err != nil {
+				return err
+			}
+
+			if jr, ok = res.Rooms.Join[roomID]; !ok {
+				jr = *types.NewJoinResponse()
+			}
+			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
+			res.Rooms.Join[roomID] = jr
+		}
+	}
+	return nil
+}
+
+// addEDUDeltaToResponse adds updates for EDUs of each type since fromPos if
+// the positions of that type are not equal in fromPos and toPos.
+func (d *SyncServerDatasource) addEDUDeltaToResponse(
+	fromPos, toPos types.SyncPosition,
+	joinedRoomIDs []string,
+	res *types.Response,
+) (err error) {
+
+	if fromPos.TypingPosition != toPos.TypingPosition {
+		err = d.addTypingDeltaToResponse(
+			fromPos.TypingPosition, joinedRoomIDs, res,
+		)
+	}
+
+	return
+}
+
+// IncrementalSync returns all the data needed in order to create an incremental
+// sync response for the given user. Events returned will include any client
+// transaction IDs associated with the given device. These transaction IDs come
+// from when the device sent the event via an API that included a transaction
+// ID.
+func (d *SyncServerDatasource) IncrementalSync(
+	ctx context.Context,
+	device authtypes.Device,
+	fromPos, toPos types.SyncPosition,
+	numRecentEventsPerRoom int,
+) (*types.Response, error) {
+	nextBatchPos := fromPos.WithUpdates(toPos)
+	res := types.NewResponse(nextBatchPos)
+
+	var joinedRoomIDs []string
+	var err error
+	if fromPos.PDUPosition != toPos.PDUPosition {
+		joinedRoomIDs, err = d.addPDUDeltaToResponse(
+			ctx, device, fromPos.PDUPosition, toPos.PDUPosition, numRecentEventsPerRoom, res,
+		)
+	} else {
+		joinedRoomIDs, err = d.roomstate.selectRoomIDsWithMembership(
+			ctx, nil, device.UserID, "join",
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	err = d.addEDUDeltaToResponse(
+		fromPos, toPos, joinedRoomIDs, res,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	return res, nil
 }
 
-// CompleteSync a complete /sync API response for the given user.
-func (d *SyncServerDatabase) CompleteSync(
-	ctx context.Context, userID string, numRecentEventsPerRoom int,
-) (*types.Response, error) {
+// getResponseWithPDUsForCompleteSync creates a response and adds all PDUs needed
+// to it. It returns toPos and joinedRoomIDs for use of adding EDUs.
+func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
+	ctx context.Context,
+	userID string,
+	numRecentEventsPerRoom int,
+) (
+	res *types.Response,
+	toPos types.SyncPosition,
+	joinedRoomIDs []string,
+	err error,
+) {
 	// This needs to be all done in a transaction as we need to do multiple SELECTs, and we need to have
-	// a consistent view of the database throughout. This includes extracting the sync stream position.
+	// a consistent view of the database throughout. This includes extracting the sync position.
 	// This does have the unfortunate side-effect that all the matrixy logic resides in this function,
 	// but it's better to not hide the fact that this is being done in a transaction.
 	txn, err := d.db.BeginTx(ctx, &txReadOnlySnapshot)
 	if err != nil {
-		return nil, err
+		return
 	}
 	var succeeded bool
 	defer common.EndTransaction(txn, &succeeded)
 
-	// Get the current stream position which we will base the sync response on.
-	pos, err := d.syncStreamPositionTx(ctx, txn)
+	// Get the current sync position which we will base the sync response on.
+	toPos, err = d.syncPositionTx(ctx, txn)
 	if err != nil {
-		return nil, err
+		return
 	}
 
+	res = types.NewResponse(toPos)
+
 	// Extract room state and recent events for all rooms the user is joined to.
-	roomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "join")
+	joinedRoomIDs, err = d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "join")
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// Build up a /sync response. Add joined rooms.
-	res := types.NewResponse(pos)
-	for _, roomID := range roomIDs {
+	for _, roomID := range joinedRoomIDs {
 		var stateEvents []gomatrixserverlib.Event
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
 		if err != nil {
-			return nil, err
+			return
 		}
 		// TODO: When filters are added, we may need to call this multiple times to get enough events.
 		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 		var recentStreamEvents []streamEvent
 		recentStreamEvents, err = d.events.selectRecentEvents(
-			ctx, txn, roomID, types.StreamPosition(0), pos, numRecentEventsPerRoom,
+			ctx, txn, roomID, 0, toPos.PDUPosition, numRecentEventsPerRoom,
 		)
 		if err != nil {
-			return nil, err
+			return
 		}
 
 		// We don't include a device here as we don't need to send down
@@ -310,10 +421,12 @@ func (d *SyncServerDatabase) CompleteSync(
 
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
-		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
-			jr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
+		if prevPDUPos := recentStreamEvents[0].streamPosition - 1; prevPDUPos > 0 {
+			// Use the short form of batch token for prev_batch
+			jr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
 		} else {
-			jr.Timeline.PrevBatch = types.StreamPosition(1).String()
+			// Use the short form of batch token for prev_batch
+			jr.Timeline.PrevBatch = "1"
 		}
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
@@ -321,12 +434,34 @@ func (d *SyncServerDatabase) CompleteSync(
 		res.Rooms.Join[roomID] = *jr
 	}
 
-	if err = d.addInvitesToResponse(ctx, txn, userID, 0, pos, res); err != nil {
-		return nil, err
+	if err = d.addInvitesToResponse(ctx, txn, userID, 0, toPos.PDUPosition, res); err != nil {
+		return
 	}
 
 	succeeded = true
-	return res, err
+	return res, toPos, joinedRoomIDs, err
+}
+
+// CompleteSync returns a complete /sync API response for the given user.
+func (d *SyncServerDatasource) CompleteSync(
+	ctx context.Context, userID string, numRecentEventsPerRoom int,
+) (*types.Response, error) {
+	res, toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
+		ctx, userID, numRecentEventsPerRoom,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use a zero value SyncPosition for fromPos so all EDU states are added.
+	err = d.addEDUDeltaToResponse(
+		types.SyncPosition{}, toPos, joinedRoomIDs, res,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 var txReadOnlySnapshot = sql.TxOptions{
@@ -344,8 +479,8 @@ var txReadOnlySnapshot = sql.TxOptions{
 // Returns a map following the format data[roomID] = []dataTypes
 // If no data is retrieved, returns an empty map
 // If there was an issue with the retrieval, returns an error
-func (d *SyncServerDatabase) GetAccountDataInRange(
-	ctx context.Context, userID string, oldPos, newPos types.StreamPosition,
+func (d *SyncServerDatasource) GetAccountDataInRange(
+	ctx context.Context, userID string, oldPos, newPos int64,
 ) (map[string][]string, error) {
 	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos)
 }
@@ -356,26 +491,24 @@ func (d *SyncServerDatabase) GetAccountDataInRange(
 // If no data with the given type, user ID and room ID exists in the database,
 // creates a new row, else update the existing one
 // Returns an error if there was an issue with the upsert
-func (d *SyncServerDatabase) UpsertAccountData(
+func (d *SyncServerDatasource) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
-) (types.StreamPosition, error) {
-	pos, err := d.accountData.insertAccountData(ctx, userID, roomID, dataType)
-	return types.StreamPosition(pos), err
+) (int64, error) {
+	return d.accountData.insertAccountData(ctx, userID, roomID, dataType)
 }
 
 // AddInviteEvent stores a new invite event for a user.
 // If the invite was successfully stored this returns the stream ID it was stored at.
 // Returns an error if there was a problem communicating with the database.
-func (d *SyncServerDatabase) AddInviteEvent(
+func (d *SyncServerDatasource) AddInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.Event,
-) (types.StreamPosition, error) {
-	pos, err := d.invites.insertInviteEvent(ctx, inviteEvent)
-	return types.StreamPosition(pos), err
+) (int64, error) {
+	return d.invites.insertInviteEvent(ctx, inviteEvent)
 }
 
 // RetireInviteEvent removes an old invite event from the database.
 // Returns an error if there was a problem communicating with the database.
-func (d *SyncServerDatabase) RetireInviteEvent(
+func (d *SyncServerDatasource) RetireInviteEvent(
 	ctx context.Context, inviteEventID string,
 ) error {
 	// TODO: Record that invite has been retired in a stream so that we can
@@ -384,10 +517,30 @@ func (d *SyncServerDatabase) RetireInviteEvent(
 	return err
 }
 
-func (d *SyncServerDatabase) addInvitesToResponse(
+func (d *SyncServerDatasource) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
+	d.typingCache.SetTimeoutCallback(fn)
+}
+
+// AddTypingUser adds a typing user to the typing cache.
+// Returns the newly calculated sync position for typing notifications.
+func (d *SyncServerDatasource) AddTypingUser(
+	userID, roomID string, expireTime *time.Time,
+) int64 {
+	return d.typingCache.AddTypingUser(userID, roomID, expireTime)
+}
+
+// RemoveTypingUser removes a typing user from the typing cache.
+// Returns the newly calculated sync position for typing notifications.
+func (d *SyncServerDatasource) RemoveTypingUser(
+	userID, roomID string,
+) int64 {
+	return d.typingCache.RemoveUser(userID, roomID)
+}
+
+func (d *SyncServerDatasource) addInvitesToResponse(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
-	fromPos, toPos types.StreamPosition,
+	fromPos, toPos int64,
 	res *types.Response,
 ) error {
 	invites, err := d.invites.selectInviteEventsInRange(
@@ -408,11 +561,11 @@ func (d *SyncServerDatabase) addInvitesToResponse(
 }
 
 // addRoomDeltaToResponse adds a room state delta to a sync response
-func (d *SyncServerDatabase) addRoomDeltaToResponse(
+func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	ctx context.Context,
 	device *authtypes.Device,
 	txn *sql.Tx,
-	fromPos, toPos types.StreamPosition,
+	fromPos, toPos int64,
 	delta stateDelta,
 	numRecentEventsPerRoom int,
 	res *types.Response,
@@ -444,10 +597,12 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 	switch delta.membership {
 	case "join":
 		jr := types.NewJoinResponse()
-		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
-			jr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
+		if prevPDUPos := recentStreamEvents[0].streamPosition - 1; prevPDUPos > 0 {
+			// Use the short form of batch token for prev_batch
+			jr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
 		} else {
-			jr.Timeline.PrevBatch = types.StreamPosition(1).String()
+			// Use the short form of batch token for prev_batch
+			jr.Timeline.PrevBatch = "1"
 		}
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
@@ -459,10 +614,12 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 		// TODO: recentEvents may contain events that this user is not allowed to see because they are
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
-		if prevBatch := recentStreamEvents[0].streamPosition - 1; prevBatch > 0 {
-			lr.Timeline.PrevBatch = types.StreamPosition(prevBatch).String()
+		if prevPDUPos := recentStreamEvents[0].streamPosition - 1; prevPDUPos > 0 {
+			// Use the short form of batch token for prev_batch
+			lr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
 		} else {
-			lr.Timeline.PrevBatch = types.StreamPosition(1).String()
+			// Use the short form of batch token for prev_batch
+			lr.Timeline.PrevBatch = "1"
 		}
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
@@ -475,7 +632,7 @@ func (d *SyncServerDatabase) addRoomDeltaToResponse(
 
 // fetchStateEvents converts the set of event IDs into a set of events. It will fetch any which are missing from the database.
 // Returns a map of room ID to list of events.
-func (d *SyncServerDatabase) fetchStateEvents(
+func (d *SyncServerDatasource) fetchStateEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomIDToEventIDSet map[string]map[string]bool,
 	eventIDToEvent map[string]streamEvent,
@@ -520,7 +677,7 @@ func (d *SyncServerDatabase) fetchStateEvents(
 	return stateBetween, nil
 }
 
-func (d *SyncServerDatabase) fetchMissingStateEvents(
+func (d *SyncServerDatasource) fetchMissingStateEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]streamEvent, error) {
 	// Fetch from the events table first so we pick up the stream ID for the
@@ -559,9 +716,9 @@ func (d *SyncServerDatabase) fetchMissingStateEvents(
 	return events, nil
 }
 
-func (d *SyncServerDatabase) getStateDeltas(
+func (d *SyncServerDatasource) getStateDeltas(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
-	fromPos, toPos types.StreamPosition, userID string,
+	fromPos, toPos int64, userID string,
 ) ([]stateDelta, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
@@ -600,7 +757,7 @@ func (d *SyncServerDatabase) getStateDeltas(
 					}
 					s := make([]streamEvent, len(allState))
 					for i := 0; i < len(s); i++ {
-						s[i] = streamEvent{Event: allState[i], streamPosition: types.StreamPosition(0)}
+						s[i] = streamEvent{Event: allState[i], streamPosition: 0}
 					}
 					state[roomID] = s
 					continue // we'll add this room in when we do joined rooms

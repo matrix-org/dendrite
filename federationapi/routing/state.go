@@ -75,7 +75,8 @@ func parseEventIDParam(
 ) (eventID string, resErr *util.JSONResponse) {
 	URL, err := url.Parse(request.RequestURI())
 	if err != nil {
-		*resErr = util.ErrorResponse(err)
+		response := util.ErrorResponse(err)
+		resErr = &response
 		return
 	}
 
@@ -100,6 +101,10 @@ func getState(
 	event, resErr := getEvent(ctx, request, query, eventID)
 	if resErr != nil {
 		return nil, resErr
+	}
+
+	if event.RoomID() != roomID {
+		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
 	prevEventIDs := getIDsFromEventRef(event.PrevEvents())

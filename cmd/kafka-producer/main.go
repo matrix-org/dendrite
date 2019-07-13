@@ -18,9 +18,10 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/Shopify/sarama"
 	"os"
 	"strings"
+
+	"github.com/Shopify/sarama"
 )
 
 const usage = `Usage: %s
