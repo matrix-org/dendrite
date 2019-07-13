@@ -147,3 +147,5 @@ Inbound federation can receive room-join requests
 Typing events appear in initial sync
 Typing events appear in incremental sync
 Typing events appear in gapped sync
+Can add tag
+Can remove tag
