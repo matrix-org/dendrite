@@ -184,7 +184,7 @@ func DeleteTag(
 			JSON: struct{}{},
 		}
 	}
-	err = saveTagData(req, localpart, roomID, accountDB, Tag)
+	err = saveTagData(req, localpart, roomID, accountDB, tagContent)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
