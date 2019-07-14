@@ -34,8 +34,8 @@ func newTag() gomatrix.TagContent {
 	}
 }
 
-// GetTag implements GET /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags
-func GetTag(
+// GetTags implements GET /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags
+func GetTags(
 	req *http.Request,
 	accountDB *accounts.Database,
 	device *authtypes.Device,
@@ -46,7 +46,7 @@ func GetTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot retrieve another user's typing state"),
+			JSON: jsonerror.Forbidden("Cannot retrieve another user's tags"),
 		}
 	}
 
@@ -94,7 +94,7 @@ func PutTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot modify another user's typing state"),
+			JSON: jsonerror.Forbidden("Cannot modify another user's tags"),
 		}
 	}
 
@@ -146,7 +146,7 @@ func DeleteTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot delete another user's typing state"),
+			JSON: jsonerror.Forbidden("Cannot delete another user's tags"),
 		}
 	}
 

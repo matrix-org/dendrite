@@ -490,7 +490,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetTag(req, accountDB, device, vars["userId"], vars["roomId"])
+			return GetTags(req, accountDB, device, vars["userId"], vars["roomId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
