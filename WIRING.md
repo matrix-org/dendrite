@@ -2,12 +2,12 @@
 
 The diagram is incomplete. The following things aren't shown on the diagram:
 
- - [ ] Device Messages
- - [ ] User Profiles
- - [ ] Notification Counts
- - [ ] Sending federation.
- - [ ] Querying federation.
- - [ ] Other things that aren't shown on the diagram.
+* Device Messages
+* User Profiles
+* Notification Counts
+* Sending federation.
+* Querying federation.
+* Other things that aren't shown on the diagram.
 
 Diagram:
 
@@ -36,7 +36,11 @@ Diagram:
     |            |                          |        |                            |          |    |          |
     |            |                          |        |>==========================>|          |    |          |
     |            |                          |        |                            +----------+    |          |
-    |            |                          |        |                                            |          |
+    |            |                          |        |                     +---+                  |          |
+    |            |                          |        |       +-------------| R |                  |          |
+    |            |                          |        |>=====>| Application +---+                  |          |
+    |            |                          |        |       | Services     |                     |          |
+    |            |                          |        |       +--------------+                     |          |
     |            |                          |        |                                     +---+  |          |
     |            |                          |        |                            +--------| R |  |          |
     |            |                          |        |                            | Client +---+  |          |
@@ -111,18 +115,18 @@ choke-point to implement ratelimiting and backoff correctly.
 
 ## Client Presence Setter
 
- * Handles puts to whatever the client API path for presence is?
+ * Handles puts to the [client API presence paths](https://matrix.org/docs/spec/client_server/unstable.html#id41).
  * Writes presence updates to logs.
 
 ## Client Typing Setter
 
- * Handles puts to whatever the client API path for typing is?
+ * Handles puts to the [client API typing paths](https://matrix.org/docs/spec/client_server/unstable.html#id32).
  * Writes typing updates to logs.
 
 ## Client Receipt Updater
 
- * Handles puts to whatever the client API path for receipts is?
- * Writes typing updates to logs.
+ * Handles puts to the [client API receipt paths](https://matrix.org/docs/spec/client_server/unstable.html#id36).
+ * Writes receipt updates to logs.
 
 ## Federation Backfill
 
@@ -138,7 +142,7 @@ choke-point to implement ratelimiting and backoff correctly.
  * Tracks the current state of the room and the state at each event.
  * Probably does auth checks on the incoming events.
  * Handles state resolution as part of working out the current state and the
- * state at each event.
+   state at each event.
  * Writes updates to the current state and new events to logs.
  * Shards by room ID.
 
@@ -190,3 +194,36 @@ choke-point to implement ratelimiting and backoff correctly.
  * Reads new events and the current state of the rooms from logs writeen by the Room Server.
  * Reads the position of the read marker from the Receipts Server.
  * Makes outbound HTTP hits to the push server for the client device.
+
+## Application Service
+
+ * Receives events from the Room Server.
+ * Filters events and sends them to each registered application service.
+ * Runs a separate goroutine for each application service.
+
+# Internal Component API
+
+Some dendrite components use internal APIs to communicate information back
+and forth between each other. There are two implementations of each API, one
+that uses HTTP requests and one that does not. The HTTP implementation is
+used in multi-process mode, so processes on separate computers may still
+communicate, whereas in single-process or Monolith mode, the direct
+implementation is used. HTTP is preferred here to kafka streams as it allows
+for request responses.
+
+Running `dendrite-monolith-server` will set up direct connections between
+components, whereas running each individual component (which are only run in
+multi-process mode) will set up HTTP-based connections.
+
+The functions that make HTTP requests to internal APIs of a component are
+located in `/<component name>/api/<name>.go`, named according to what
+functionality they cover. Each of these requests are handled in `/<component
+name>/<name>/<name>.go`.
+
+As an example, the `appservices` component allows other Dendrite components
+to query external application services via its internal API. A component
+would call the desired function in `/appservices/api/query.go`. In
+multi-process mode, this would send an internal HTTP request, which would
+be handled by a function in `/appservices/query/query.go`. In single-process
+mode, no internal HTTP request occurs, instead functions are simply called
+directly, thus requiring no changes on the calling component's end.

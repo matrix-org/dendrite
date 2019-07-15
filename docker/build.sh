@@ -1,6 +1,6 @@
 #!/bin/bash
 
-gb build
+./build.sh
 
 # Generate the keys if they don't already exist.
 if [ ! -f server.key ] || [ ! -f server.crt ] || [ ! -f matrix_key.pem ]; then
@@ -12,7 +12,7 @@ if [ ! -f server.key ] || [ ! -f server.crt ] || [ ! -f matrix_key.pem ]; then
                         -keyout server.key \
                         -out server.crt \
                         -days 3650 -nodes \
-                        -subj /CN=localhost 
+                        -subj /CN=localhost
 
     test -f matrix_key.pem || /build/bin/generate-keys -private-key matrix_key.pem
 fi

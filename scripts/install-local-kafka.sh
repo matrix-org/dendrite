@@ -1,4 +1,4 @@
-# /bin/bash
+#! /bin/bash
 
 # Downloads, installs and runs a kafka instance
 
@@ -8,13 +8,10 @@ cd `dirname $0`/..
 
 mkdir -p .downloads
 
-# The mirror to download kafka from is picked from the list of mirrors at
-# https://www.apache.org/dyn/closer.cgi?path=/kafka/0.10.2.0/kafka_2.11-0.11.0.2.tgz
-# TODO: Check the signature since we are downloading over HTTP.
-MIRROR=http://apache.mirror.anlx.net/kafka/0.11.0.2/kafka_2.11-0.11.0.2.tgz
+KAFKA_URL=http://archive.apache.org/dist/kafka/2.1.0/kafka_2.11-2.1.0.tgz
 
 # Only download the kafka if it isn't already downloaded.
-test -f .downloads/kafka.tgz || wget $MIRROR -O .downloads/kafka.tgz
+test -f .downloads/kafka.tgz || wget $KAFKA_URL -O .downloads/kafka.tgz
 # Unpack the kafka over the top of any existing installation
 mkdir -p kafka && tar xzf .downloads/kafka.tgz -C kafka --strip-components 1
 # Start the zookeeper running in the background.
