@@ -134,9 +134,9 @@ func (h *httpAppServiceQueryAPI) UserIDExists(
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// RetreiveUserProfile is a wrapper that queries both the local database and
+// RetrieveUserProfile is a wrapper that queries both the local database and
 // application services for a given user's profile
-func RetreiveUserProfile(
+func RetrieveUserProfile(
 	ctx context.Context,
 	userID string,
 	asAPI AppServiceQueryAPI,

@@ -308,7 +308,7 @@ func getProfile(
 		}, nil
 	}
 
-	profile, err := appserviceAPI.RetreiveUserProfile(ctx, userID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, accountDB)
 	if err != nil {
 		return nil, err
 	}
