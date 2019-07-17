@@ -35,15 +35,17 @@ steps:
           limit: 3
 
   - command:
-    - "go test ./..."
+    - "go test -race ./..."
     label: "\U0001F9EA Unit tests / :go: 1.11"
     plugins:
       - docker#v3.0.1:
           image: "golang:1.11"
+    soft_fail: true
 
   - command:
-    - "go test ./..."
+    - "go test -race ./..."
     label: "\U0001F9EA Unit tests / :go: 1.12"
     plugins:
       - docker#v3.0.1:
           image: "golang:1.12"
+    soft_fail: true
