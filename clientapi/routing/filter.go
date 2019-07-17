@@ -32,12 +32,6 @@ import (
 func GetFilter(
 	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string, filterID string,
 ) util.JSONResponse {
-	if req.Method != http.MethodGet {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -79,12 +73,6 @@ type filterResponse struct {
 func PutFilter(
 	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method != http.MethodPost {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
