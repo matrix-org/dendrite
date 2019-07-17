@@ -260,7 +260,7 @@ func Setup(
 		},
 	)).Methods(http.MethodPost)
 
-	v1fedmux.Handle("/backfill/{roomID}/", common.MakeFedAPI(
+	v1fedmux.Handle("/backfill/{roomID}", common.MakeFedAPI(
 		"federation_backfill", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
