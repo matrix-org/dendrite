@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -56,7 +57,7 @@ func GetTags(
 	}
 
 	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, "tag",
+		req.Context(), localpart, roomID, "m.tag",
 	)
 
 	if err != nil {
@@ -75,6 +76,11 @@ func GetTags(
 		return httputil.LogThenError(req, err)
 	}
 
+	// // send data to syncapi
+	// if err := syncProducer.SendData(userID, roomID, tag); err != nil {
+	// 	return httputil.LogThenError(req, err)
+	// }
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: tagContent,
@@ -89,6 +95,7 @@ func PutTag(
 	userID string,
 	roomID string,
 	tag string,
+	syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 
 	if device.UserID != userID {
@@ -127,6 +134,11 @@ func PutTag(
 		return httputil.LogThenError(req, err)
 	}
 
+	// send data to syncapi
+	if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
@@ -141,6 +153,7 @@ func DeleteTag(
 	userID string,
 	roomID string,
 	tag string,
+	syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 
 	if device.UserID != userID {
@@ -190,6 +203,11 @@ func DeleteTag(
 		return httputil.LogThenError(req, err)
 	}
 
+	// send data to syncapi
+	if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
@@ -209,7 +227,7 @@ func obtainSavedTags(
 	}
 
 	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, "tag",
+		req.Context(), localpart, roomID, "m.tag",
 	)
 	if err != nil {
 		return "", nil, err
@@ -231,7 +249,7 @@ func saveTagData(
 		return err
 	}
 
-	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "tag", string(newTagData))
+	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "m.tag", string(newTagData))
 }
 
 // extractEventContents is an utility function to obtain "content" from the ClientEvent

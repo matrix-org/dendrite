@@ -500,7 +500,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return PutTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"])
+			return PutTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -510,7 +510,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DeleteTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"])
+			return DeleteTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 }
