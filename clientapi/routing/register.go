@@ -85,6 +85,12 @@ func (d sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType
 
 // AddCompletedStage records that a session has completed an auth stage.
 func (d *sessionsDict) AddCompletedStage(sessionID string, stage authtypes.LoginType) {
+	// Return if the stage is already present
+	for _, completedStage := range d.GetCompletedStages(sessionID) {
+		if completedStage == stage {
+			return
+		}
+	}
 	d.sessions[sessionID] = append(d.GetCompletedStages(sessionID), stage)
 }
 
@@ -243,8 +249,8 @@ func validateRecaptcha(
 ) *util.JSONResponse {
 	if !cfg.Matrix.RecaptchaEnabled {
 		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Captcha registration is disabled"),
+			Code: http.StatusConflict,
+			JSON: jsonerror.Unknown("Captcha registration is disabled"),
 		}
 	}
 
@@ -279,8 +285,8 @@ func validateRecaptcha(
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Error in contacting captcha server" + err.Error()),
+			Code: http.StatusGatewayTimeout,
+			JSON: jsonerror.Unknown("Error in contacting captcha server" + err.Error()),
 		}
 	}
 	err = json.Unmarshal(body, &r)

@@ -106,13 +106,6 @@ func UpdateDeviceByID(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 	deviceID string,
 ) util.JSONResponse {
-	if req.Method != http.MethodPut {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad Method"),
-		}
-	}
-
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return httputil.LogThenError(req, err)

@@ -19,8 +19,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
-
-	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 const accountDataSchema = `
@@ -94,7 +92,7 @@ func (s *accountDataStatements) insertAccountData(
 func (s *accountDataStatements) selectAccountDataInRange(
 	ctx context.Context,
 	userID string,
-	oldPos, newPos types.StreamPosition,
+	oldPos, newPos int64,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 

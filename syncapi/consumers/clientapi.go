@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
@@ -29,7 +30,7 @@ import (
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
 	clientAPIConsumer *common.ContinualConsumer
-	db                *storage.SyncServerDatabase
+	db                *storage.SyncServerDatasource
 	notifier          *sync.Notifier
 }
 
@@ -38,7 +39,7 @@ func NewOutputClientDataConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
-	store *storage.SyncServerDatabase,
+	store *storage.SyncServerDatasource,
 ) *OutputClientDataConsumer {
 
 	consumer := common.ContinualConsumer{
@@ -78,7 +79,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		"room_id": output.RoomID,
 	}).Info("received data from client API server")
 
-	syncStreamPos, err := s.db.UpsertAccountData(
+	pduPos, err := s.db.UpsertAccountData(
 		context.TODO(), string(msg.Key), output.RoomID, output.Type,
 	)
 	if err != nil {
@@ -89,7 +90,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		}).Panicf("could not save account data")
 	}
 
-	s.notifier.OnNewEvent(nil, string(msg.Key), syncStreamPos)
+	s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.SyncPosition{PDUPosition: pduPos})
 
 	return nil
 }
