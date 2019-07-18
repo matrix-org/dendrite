@@ -58,32 +58,15 @@ func GetEvent(
 		return httputil.LogThenError(req, err)
 	}
 
-	var requestedEvent gomatrixserverlib.Event
 	if len(eventsResp.Events) == 0 {
-		// Event not found locally. Do a federation query in hope of getting
-		// the event from another server.
-		// TODO: May need a better way to determine which server to query
-		_, domain, err := gomatrixserverlib.SplitID('!', roomID)
-		if err != nil {
-			return httputil.LogThenError(req, err)
+		// Event not found locally
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
 		}
-
-		txnResp, err := federation.GetEvent(req.Context(), domain, eventID)
-		if err != nil {
-			return httputil.LogThenError(req, err)
-		}
-
-		if len(txnResp.PDUs) == 0 {
-			return util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
-			}
-		}
-
-		requestedEvent = txnResp.PDUs[0]
-	} else {
-		requestedEvent = eventsResp.Events[0]
 	}
+
+	requestedEvent := eventsResp.Events[0]
 
 	r := getEventRequest{
 		req:            req,
@@ -108,51 +91,20 @@ func GetEvent(
 	}
 
 	if !stateResp.RoomExists {
-		util.GetLogger(req.Context()).Errorf("Room not found for event %s", r.requestedEvent.EventID())
+		util.GetLogger(req.Context()).Errorf("Expected to find room for event %s but failed", r.requestedEvent.EventID())
 		return jsonerror.InternalServerError()
 	}
 
 	if !stateResp.PrevEventsExist {
-		// Missing some events locally so stateResp.StateEvents will be unavailable.
-		// Do a federation query in hope of getting the state events needed.
-		return r.proceedWithMissingState()
-	}
-
-	return r.proceedWithStateEvents(stateResp.StateEvents)
-}
-
-// proceedWithMissingState tries to proceed by fetching the missing state over
-// federation.
-// Note: It's not guaranteed that the server(s) we query have the state events.
-func (r *getEventRequest) proceedWithMissingState() util.JSONResponse {
-	_, domain, err := gomatrixserverlib.SplitID('!', r.roomID)
-	if err != nil {
-		return httputil.LogThenError(r.req, err)
-	}
-
-	if domain == r.cfg.Matrix.ServerName {
-		// Don't send a federation query to self
+		// Missing some events locally; stateResp.StateEvents unavailable.
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
 		}
 	}
 
-	state, err := r.federation.LookupState(r.req.Context(), domain, r.roomID, r.eventID)
-	if err != nil {
-		return httputil.LogThenError(r.req, err)
-	}
-
-	if err := state.Check(r.req.Context(), r.keyRing); err != nil {
-		return httputil.LogThenError(r.req, err)
-	}
-
-	return r.proceedWithStateEvents(state.StateEvents)
-}
-
-func (r *getEventRequest) proceedWithStateEvents(stateEvents []gomatrixserverlib.Event) util.JSONResponse {
 	allowed := false
-	for _, stateEvent := range stateEvents {
+	for _, stateEvent := range stateResp.StateEvents {
 		if stateEvent.StateKeyEquals(r.device.UserID) {
 			membership, err := stateEvent.Membership()
 			if err == nil && membership == "join" {
