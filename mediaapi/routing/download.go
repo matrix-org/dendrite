@@ -55,7 +55,7 @@ type downloadRequest struct {
 	Logger             *log.Entry
 }
 
-// Download implements /download amd /thumbnail
+// Download implements GET /download and GET /thumbnail
 // Files from this server (i.e. origin == cfg.ServerName) are served directly
 // Files from remote servers (i.e. origin != cfg.ServerName) are cached locally.
 // If they are present in the cache, they are served directly.
@@ -107,14 +107,6 @@ func Download(
 	}
 
 	// request validation
-	if req.Method != http.MethodGet {
-		dReq.jsonErrorResponse(w, util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.Unknown("request method must be GET"),
-		})
-		return
-	}
-
 	if resErr := dReq.Validate(); resErr != nil {
 		dReq.jsonErrorResponse(w, *resErr)
 		return
