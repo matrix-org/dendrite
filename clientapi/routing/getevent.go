@@ -108,10 +108,8 @@ func GetEvent(
 	}
 
 	if !stateResp.RoomExists {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
-		}
+		util.GetLogger(req.Context()).Errorf("Room not found for event %s", r.requestedEvent.EventID())
+		return jsonerror.InternalServerError()
 	}
 
 	if !stateResp.PrevEventsExist {
