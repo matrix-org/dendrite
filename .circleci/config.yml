@@ -10,7 +10,7 @@ jobs:
       # Set up dendrite
       - run: 
           name: Build Dendrite
-          command: ./build.sh
+          command: ./build.sh -r
       - run: 
           name: Copy dummy keys to root
           command: |
