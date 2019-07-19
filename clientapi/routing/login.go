@@ -111,7 +111,7 @@ func Login(
 			return httputil.LogThenError(req, err)
 		}
 
-		dev, err := getDevice(req.Context(), r, deviceDB, acc, localpart, token)
+		dev, err := getDevice(req.Context(), r, deviceDB, acc, token)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -141,7 +141,7 @@ func getDevice(
 	r passwordRequest,
 	deviceDB *devices.Database,
 	acc *authtypes.Account,
-	localpart, token string,
+	token string,
 ) (dev *authtypes.Device, err error) {
 	dev, err = deviceDB.CreateDevice(
 		ctx, acc.Localpart, r.DeviceID, token, r.InitialDisplayName,
