@@ -26,12 +26,13 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // newTag creates and returns a new Tag type
 func newTag() gomatrix.TagContent {
 	return gomatrix.TagContent{
-		Tags: make(map[string]gomatrix.TagProperties),
+		Map: make(map[string]gomatrix.TagProperties),
 	}
 }
 
@@ -69,8 +70,13 @@ func GetTags(
 		return httputil.LogThenError(req, err)
 	}
 
+	logrus.Info("MYDUMBDATA")
+	var tagData []gomatrix.TagData
 	tagContent := newTag()
-	err = json.Unmarshal(dataByte, &tagContent)
+	err = json.Unmarshal(dataByte, &tagData)
+	tagData[0].Content.Map["something"] = gomatrix.TagProperties{0}
+	logrus.Info(tagData[0].Content.Map)
+	tagContent = tagData[0].Content
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -83,7 +89,7 @@ func GetTags(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: tagContent,
+		JSON: tagContent.Map,
 	}
 }
 
@@ -128,7 +134,7 @@ func PutTag(
 			return httputil.LogThenError(req, err)
 		}
 	}
-	tagContent.Tags[tag] = properties
+	tagContent.Map[tag] = properties
 	err = saveTagData(req, localpart, roomID, accountDB, tagContent)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -188,8 +194,8 @@ func DeleteTag(
 	}
 
 	// Check whether the Tag to be deleted exists
-	if _, ok := tagContent.Tags[tag]; ok {
-		delete(tagContent.Tags, tag)
+	if _, ok := tagContent.Map[tag]; ok {
+		delete(tagContent.Map, tag)
 	} else {
 		//Synapse returns a 200 OK response on finding no Tags, same policy is followed here.
 		return util.JSONResponse{

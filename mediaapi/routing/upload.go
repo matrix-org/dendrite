@@ -48,7 +48,7 @@ type uploadResponse struct {
 	ContentURI string `json:"content_uri"`
 }
 
-// Upload implements /upload
+// Upload implements POST /upload
 // This endpoint involves uploading potentially significant amounts of data to the homeserver.
 // This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
 // Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
@@ -75,13 +75,6 @@ func Upload(req *http.Request, cfg *config.Dendrite, db *storage.Database, activ
 // all the metadata about the media being uploaded.
 // Returns either an uploadRequest or an error formatted as a util.JSONResponse
 func parseAndValidateRequest(req *http.Request, cfg *config.Dendrite) (*uploadRequest, *util.JSONResponse) {
-	if req.Method != http.MethodPost {
-		return nil, &util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.Unknown("HTTP request method must be POST."),
-		}
-	}
-
 	r := &uploadRequest{
 		MediaMetadata: &types.MediaMetadata{
 			Origin:        cfg.Matrix.ServerName,

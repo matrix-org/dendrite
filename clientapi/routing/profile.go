@@ -37,12 +37,6 @@ import (
 func GetProfile(
 	req *http.Request, accountDB *accounts.Database, userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
-	if req.Method != http.MethodGet {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
 		return httputil.LogThenError(req, err)

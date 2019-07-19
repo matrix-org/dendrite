@@ -149,3 +149,5 @@ Typing events appear in incremental sync
 Typing events appear in gapped sync
 Can add tag
 Can remove tag
+Inbound federation of state requires event_id as a mandatory paramater
+Inbound federation of state_ids requires event_id as a mandatory paramater

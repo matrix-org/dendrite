@@ -42,8 +42,8 @@ type publicRoomRes struct {
 	Estimate  int64              `json:"total_room_count_estimate,omitempty"`
 }
 
-// GetPublicRooms implements GET /publicRooms
-func GetPublicRooms(
+// GetPostPublicRooms implements GET and POST /publicRooms
+func GetPostPublicRooms(
 	req *http.Request, publicRoomDatabase *storage.PublicRoomsServerDatabase,
 ) util.JSONResponse {
 	var limit int16
@@ -89,6 +89,7 @@ func GetPublicRooms(
 
 // fillPublicRoomsReq fills the Limit, Since and Filter attributes of a GET or POST request
 // on /publicRooms by parsing the incoming HTTP request
+// Filter is only filled for POST requests
 func fillPublicRoomsReq(httpReq *http.Request, request *publicRoomReq) *util.JSONResponse {
 	if httpReq.Method == http.MethodGet {
 		limit, err := strconv.Atoi(httpReq.FormValue("limit"))
