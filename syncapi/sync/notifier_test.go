@@ -143,7 +143,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, bob, true)
+	stream := lockedFetchUserStream(n, bob)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter)
@@ -171,7 +171,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, bob, true)
+	stream := lockedFetchUserStream(n, bob)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionAfter)
@@ -199,7 +199,7 @@ func TestEDUWakeup(t *testing.T) {
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, bob, true)
+	stream := lockedFetchUserStream(n, bob)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionNewEDU)
@@ -230,7 +230,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	go poll()
 	go poll()
 
-	stream := lockedFetchUserStream(n, bob, true)
+	stream := lockedFetchUserStream(n, bob)
 	waitForBlocking(stream, 3)
 
 	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter)
@@ -266,14 +266,14 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 		}
 		leaveWG.Done()
 	}()
-	bobStream := lockedFetchUserStream(n, bob, true)
+	bobStream := lockedFetchUserStream(n, bob)
 	waitForBlocking(bobStream, 1)
 	n.OnNewEvent(&bobLeaveEvent, "", nil, syncPositionAfter)
 	leaveWG.Wait()
 
 	// send an event into the room. Make sure alice gets it. Bob should not.
 	var aliceWG sync.WaitGroup
-	aliceStream := lockedFetchUserStream(n, alice, true)
+	aliceStream := lockedFetchUserStream(n, alice)
 	aliceWG.Add(1)
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(alice, syncPositionAfter))
@@ -329,11 +329,12 @@ func waitForBlocking(s *UserStream, numBlocking uint) {
 }
 
 // lockedFetchUserStream invokes Notifier.fetchUserStream, respecting Notifier.streamLock.
-func lockedFetchUserStream(n *Notifier, userID string, makeIfNotExists bool) *UserStream {
+// A new stream is made if it doesn't exist already.
+func lockedFetchUserStream(n *Notifier, userID string) *UserStream {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
-	return n.fetchUserStream(userID, makeIfNotExists)
+	return n.fetchUserStream(userID, true)
 }
 
 func newTestSyncRequest(userID string, since types.SyncPosition) syncRequest {
