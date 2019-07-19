@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
@@ -107,7 +108,11 @@ func AuthFallback(
 	sessionID := req.URL.Query().Get("session")
 
 	if sessionID == "" {
-		w.Write([]byte("Session ID not provided"))
+		_, err := w.Write([]byte("Session ID not provided"))
+		if err != nil {
+			res := httputil.LogThenError(req, err)
+			return &res
+		}
 		return nil
 	}
 
@@ -129,7 +134,11 @@ func AuthFallback(
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
 			if cfg.Matrix.RecaptchaPublicKey == "" {
-				w.Write([]byte("This Homeserver doesn't have a recaptcha public key"))
+				_, err := w.Write([]byte("This Homeserver doesn't have a recaptcha public key"))
+				if err != nil {
+					res := httputil.LogThenError(req, err)
+					return &res
+				}
 				return nil
 			}
 
@@ -142,7 +151,12 @@ func AuthFallback(
 		}
 	} else if req.Method == "POST" {
 		clientIP := req.RemoteAddr
-		req.ParseForm()
+		err := req.ParseForm()
+		if err != nil {
+			res := httputil.LogThenError(req, err)
+			return &res
+		}
+
 		response := req.Form.Get("g-recaptcha-response")
 		if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
 			ServeRecaptcha()
