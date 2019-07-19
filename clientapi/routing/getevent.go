@@ -117,7 +117,7 @@ func GetEvent(
 	if allowed {
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: r.requestedEvent,
+			JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
 		}
 	}
 
