@@ -44,7 +44,7 @@ type passwordRequest struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
-	// Thus a pointer is needed to differentiate between them two
+	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
 	DeviceID           *string `json:"device_id"`
 }
