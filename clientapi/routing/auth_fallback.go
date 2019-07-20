@@ -25,8 +25,8 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// RecaptchaTemplate is template for recaptcha auth
-const RecaptchaTemplate = `
+// recaptchaTemplate is an HTML webpage template for recaptcha auth
+const recaptchaTemplate = `
 <html>
 <head>
 <title>Authentication</title>
@@ -67,8 +67,9 @@ function captchaDone() {
 </html>
 `
 
-// SuccessTemplate is template for success page after auth flow ends
-const SuccessTemplate = `
+// successTemplate is an HTML template presented to the user after successful
+// recaptcha completion
+const successTemplate = `
 <html>
 <head>
 <title>Success!</title>
@@ -79,7 +80,7 @@ const SuccessTemplate = `
 if (window.onAuthDone) {
     window.onAuthDone();
 } else if (window.opener && window.opener.postMessage) {
-     window.opener.postMessage("authDone", "*");
+    window.opener.postMessage("authDone", "*");
 }
 </script>
 </head>
@@ -92,8 +93,8 @@ if (window.onAuthDone) {
 </html>
 `
 
-// ServeTemplate fills data in template and serves it in http.ResponseWriter
-func ServeTemplate(w http.ResponseWriter, templateHTML string, data map[string]string) {
+// serveTemplate fills template data and serves it using http.ResponseWriter
+func serveTemplate(w http.ResponseWriter, templateHTML string, data map[string]string) {
 	t := template.Must(template.New("response").Parse(templateHTML))
 	if err := t.Execute(w, data); err != nil {
 		panic(err)
@@ -116,21 +117,21 @@ func AuthFallback(
 		return nil
 	}
 
-	ServeRecaptcha := func() {
+	serveRecaptcha := func() {
 		data := map[string]string{
 			"MyUrl":   req.URL.String(),
 			"Session": sessionID,
 			"SiteKey": cfg.Matrix.RecaptchaPublicKey,
 		}
-		ServeTemplate(w, RecaptchaTemplate, data)
+		serveTemplate(w, recaptchaTemplate, data)
 	}
 
-	ServeSuccess := func() {
+	serveSuccess := func() {
 		data := map[string]string{}
-		ServeTemplate(w, SuccessTemplate, data)
+		serveTemplate(w, successTemplate, data)
 	}
 
-	if req.Method == "GET" {
+	if req.Method == http.MethodGET {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
 			if cfg.Matrix.RecaptchaPublicKey == "" {
@@ -142,14 +143,14 @@ func AuthFallback(
 				return nil
 			}
 
-			ServeRecaptcha()
+			serveRecaptcha()
 			return nil
 		}
 		return &util.JSONResponse{
 			Code: 404,
 			JSON: jsonerror.NotFound("Unknown auth stage type"),
 		}
-	} else if req.Method == "POST" {
+	} else if req.Method == http.MethodPost {
 		clientIP := req.RemoteAddr
 		err := req.ParseForm()
 		if err != nil {
@@ -159,14 +160,14 @@ func AuthFallback(
 
 		response := req.Form.Get("g-recaptcha-response")
 		if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
-			ServeRecaptcha()
+			serveRecaptcha()
 			return nil
 		}
 
 		// Success. Add recaptcha as a completed login flow
 		AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
 
-		ServeSuccess()
+		serveSuccess()
 		return nil
 	}
 	return &util.JSONResponse{

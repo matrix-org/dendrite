@@ -237,7 +237,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/auth/{authType}/fallback/web",
-		common.MakeHTMLAPI("authfallback", func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
+		common.MakeHTMLAPI("auth_fallback", func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
 			vars := mux.Vars(req)
 			return AuthFallback(w, req, vars["authType"], cfg)
 		}),
