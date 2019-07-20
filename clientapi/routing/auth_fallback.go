@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2019 Parminder Singh <parmsingh129@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ function captchaDone() {
 </script>
 </head>
 <body>
-<form id="registrationForm" method="post" action="{{.MyUrl}}">
+<form id="registrationForm" method="post" action="{{.myUrl}}">
     <div>
         <p>
         Hello! We need to prevent computer programs and other automated
@@ -52,9 +52,9 @@ function captchaDone() {
         <p>
         Please verify that you're not a robot.
         </p>
-		<input type="hidden" name="session" value="{{.Session}}" />
+		<input type="hidden" name="session" value="{{.session}}" />
         <div class="g-recaptcha"
-            data-sitekey="{{.SiteKey}}"
+            data-sitekey="{{.siteKey}}"
             data-callback="captchaDone">
         </div>
         <noscript>
@@ -119,9 +119,9 @@ func AuthFallback(
 
 	serveRecaptcha := func() {
 		data := map[string]string{
-			"MyUrl":   req.URL.String(),
-			"Session": sessionID,
-			"SiteKey": cfg.Matrix.RecaptchaPublicKey,
+			"myUrl":   req.URL.String(),
+			"session": sessionID,
+			"siteKey": cfg.Matrix.RecaptchaPublicKey,
 		}
 		serveTemplate(w, recaptchaTemplate, data)
 	}
@@ -131,7 +131,7 @@ func AuthFallback(
 		serveTemplate(w, successTemplate, data)
 	}
 
-	if req.Method == http.MethodGET {
+	if req.Method == http.MethodGet {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
 			if cfg.Matrix.RecaptchaPublicKey == "" {
