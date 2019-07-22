@@ -19,7 +19,7 @@ type CreateContent struct {
 	Creator     string       `json:"creator"`
 	Federate    *bool        `json:"m.federate,omitempty"`
 	RoomVersion string       `json:"room_version,omitempty"`
-	Predecessor PreviousRoom `json:"predecessor"`
+	Predecessor PreviousRoom `json:"predecessor,omitempty"`
 }
 
 // PreviousRoom is the "Previous Room" structure defined at https://matrix.org/docs/spec/client_server/r0.5.0#m-room-create
