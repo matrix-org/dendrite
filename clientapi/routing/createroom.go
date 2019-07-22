@@ -178,11 +178,11 @@ func createRoom(
 	}
 
 	// Clobber keys: creator, room_version
+
 	if r.CreationContent == nil {
 		r.CreationContent = make(map[string]interface{}, 2)
 	}
 
-	// Clobber keys: creator, room_version
 	r.CreationContent["creator"] = userID
 	r.CreationContent["room_version"] = "1" // TODO: We set this to 1 before we support Room versioning
 
