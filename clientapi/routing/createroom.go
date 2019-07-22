@@ -98,6 +98,10 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		}
 	}
 
+	// Validate creation_content fields defined in the spec by marshalling the
+	// creation_content map into bytes and then unmarshalling the bytes into
+	// common.CreateContent.
+
 	creationContentBytes, err := json.Marshal(r.CreationContent)
 	if err != nil {
 		return &util.JSONResponse{
