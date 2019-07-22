@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -97,6 +98,23 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		}
 	}
 
+	creationContentBytes, err := json.Marshal(r.CreationContent)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("malformed creation_content"),
+		}
+	}
+
+	var CreationContent common.CreateContent
+	err = json.Unmarshal(creationContentBytes, &CreationContent)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("malformed creation_content"),
+		}
+	}
+
 	return nil
 }
 
@@ -154,7 +172,17 @@ func createRoom(
 			JSON: jsonerror.InvalidArgumentValue(err.Error()),
 		}
 	}
-	// TODO: visibility/presets/raw initial state/creation content
+
+	// Clobber keys: creator, room_version
+	if r.CreationContent == nil {
+		r.CreationContent = make(map[string]interface{}, 2)
+	}
+
+	// Clobber keys: creator, room_version
+	r.CreationContent["creator"] = userID
+	r.CreationContent["room_version"] = "1" // TODO: We set this to 1 before we support Room versioning
+
+	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!
 
@@ -214,7 +242,7 @@ func createRoom(
 	// harder to reason about, hence sticking to a strict static ordering.
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
 	eventsToMake := []fledglingEvent{
-		{"m.room.create", "", common.CreateContent{Creator: userID}},
+		{"m.room.create", "", r.CreationContent},
 		{"m.room.member", userID, membershipContent},
 		{"m.room.power_levels", "", common.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
