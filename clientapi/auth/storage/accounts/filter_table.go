@@ -93,7 +93,7 @@ func (s *filterStatements) insertFilter(
 ) (filterID string, err error) {
 	var existingFilterID string
 
-	// Serialize json
+	// Serialise json
 	filterJSON, err := json.Marshal(filter)
 	if err != nil {
 		return "", err

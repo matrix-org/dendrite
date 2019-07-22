@@ -151,3 +151,5 @@ Inbound federation of state requires event_id as a mandatory paramater
 Inbound federation of state_ids requires event_id as a mandatory paramater
 POST /register returns the same device_id as that in the request
 POST /login returns the same device_id as that in the request
+Lazy loading parameters in the filter are strictly boolean
+Check creating invalid filters returns 4xx
