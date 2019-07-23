@@ -44,7 +44,6 @@ func SetupClientAPIComponent(
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 ) {
-
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 	typingProducer := producers.NewTypingServerProducer(typingInputAPI)
 
