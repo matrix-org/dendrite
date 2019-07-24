@@ -23,7 +23,7 @@ require (
 	github.com/lib/pq v0.0.0-20170918175043-23da1db4f16d
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20190619132215-178ed5e3b8e2
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20190724145009-a6df10ef35d6
 	github.com/matrix-org/naffka v0.0.0-20171115094957-662bfd0841d0
 	github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5
 	github.com/matttproud/golang_protobuf_extensions v1.0.1
