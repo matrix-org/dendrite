@@ -84,7 +84,7 @@ func (d *Database) CreateDevice(
 	if deviceID != nil {
 		returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 			var err error
-			// Revoke existing token for this device
+			// Revoke existing tokens for this device
 			if err = d.devices.deleteDevice(ctx, txn, *deviceID, localpart); err != nil {
 				return err
 			}

@@ -344,11 +344,11 @@ func (d *Database) GetThreePIDsForLocalpart(
 }
 
 // GetFilter looks up the filter associated with a given local user and filter ID.
-// Returns a filter represented as a byte slice. Otherwise returns an error if
-// no such filter exists or if there was an error talking to the database.
+// Returns a filter structure. Otherwise returns an error if no such filter exists
+// or if there was an error talking to the database.
 func (d *Database) GetFilter(
 	ctx context.Context, localpart string, filterID string,
-) ([]byte, error) {
+) (*gomatrixserverlib.Filter, error) {
 	return d.filter.selectFilter(ctx, localpart, filterID)
 }
 
@@ -356,7 +356,7 @@ func (d *Database) GetFilter(
 // Returns the filterID as a string. Otherwise returns an error if something
 // goes wrong.
 func (d *Database) PutFilter(
-	ctx context.Context, localpart string, filter []byte,
+	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
 ) (string, error) {
 	return d.filter.insertFilter(ctx, filter, localpart)
 }
