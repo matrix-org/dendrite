@@ -254,19 +254,12 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 PDU stream positions.
 	// This works out what the 'state' key should be for each room as well as which membership block
 	// to put the room into.
-	deltas, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
+	deltas, joinedRoomIDs, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	// len(deltas) should be a good enough initial capacity
-	joinedRoomIDs := make([]string, 0, len(deltas))
-
 	for _, delta := range deltas {
-		if delta.membership == membershipJoin {
-			joinedRoomIDs = append(joinedRoomIDs, delta.roomID)
-		}
-
 		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
 		if err != nil {
 			return nil, err
@@ -727,10 +720,13 @@ func (d *SyncServerDatasource) fetchMissingStateEvents(
 	return events, nil
 }
 
+// getStateDeltas returns the state deltas between fromPos and toPos for the
+// rooms in which the user has new membership events.
+// A list of joined room IDs is also returned in case the caller needs it.
 func (d *SyncServerDatasource) getStateDeltas(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
 	fromPos, toPos int64, userID string,
-) ([]stateDelta, error) {
+) ([]stateDelta, []string, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
 	// - For each room which has membership list changes:
@@ -744,11 +740,11 @@ func (d *SyncServerDatasource) getStateDeltas(
 	// get all the state events ever between these two positions
 	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for roomID, stateStreamEvents := range state {
@@ -764,7 +760,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 					var allState []gomatrixserverlib.Event
 					allState, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
 					if err != nil {
-						return nil, err
+						return nil, nil, err
 					}
 					s := make([]streamEvent, len(allState))
 					for i := 0; i < len(s); i++ {
@@ -788,7 +784,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 	// Add in currently joined rooms
 	joinedRoomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, membershipJoin)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, stateDelta{
@@ -798,7 +794,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 		})
 	}
 
-	return deltas, nil
+	return deltas, joinedRoomIDs, nil
 }
 
 // streamEventsToEvents converts streamEvent to Event. If device is non-nil and
