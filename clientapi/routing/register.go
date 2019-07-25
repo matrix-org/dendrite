@@ -85,6 +85,12 @@ func (d sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType
 
 // AddCompletedStage records that a session has completed an auth stage.
 func (d *sessionsDict) AddCompletedStage(sessionID string, stage authtypes.LoginType) {
+	// Return if the stage is already present
+	for _, completedStage := range d.GetCompletedStages(sessionID) {
+		if completedStage == stage {
+			return
+		}
+	}
 	d.sessions[sessionID] = append(d.GetCompletedStages(sessionID), stage)
 }
 
@@ -115,7 +121,10 @@ type registerRequest struct {
 	// user-interactive auth params
 	Auth authDict `json:"auth"`
 
+	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
+	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
+	DeviceID           *string `json:"device_id"`
 
 	// Prevent this user from logging in
 	InhibitLogin common.WeakBoolean `json:"inhibit_login"`
@@ -243,8 +252,8 @@ func validateRecaptcha(
 ) *util.JSONResponse {
 	if !cfg.Matrix.RecaptchaEnabled {
 		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Captcha registration is disabled"),
+			Code: http.StatusConflict,
+			JSON: jsonerror.Unknown("Captcha registration is disabled"),
 		}
 	}
 
@@ -279,8 +288,8 @@ func validateRecaptcha(
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Error in contacting captcha server" + err.Error()),
+			Code: http.StatusGatewayTimeout,
+			JSON: jsonerror.Unknown("Error in contacting captcha server" + err.Error()),
 		}
 	}
 	err = json.Unmarshal(body, &r)
@@ -620,7 +629,7 @@ func handleApplicationServiceRegistration(
 	// application service registration is entirely separate.
 	return completeRegistration(
 		req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
-		r.InhibitLogin, r.InitialDisplayName,
+		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 	)
 }
 
@@ -640,7 +649,7 @@ func checkAndCompleteFlow(
 		// This flow was completed, registration can continue
 		return completeRegistration(
 			req.Context(), accountDB, deviceDB, r.Username, r.Password, "",
-			r.InhibitLogin, r.InitialDisplayName,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 		)
 	}
 
@@ -691,10 +700,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -732,13 +741,19 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 	return nil
 }
 
+// completeRegistration runs some rudimentary checks against the submitted
+// input, then if successful creates an account and a newly associated device
+// We pass in each individual part of the request here instead of just passing a
+// registerRequest, as this function serves requests encoded as both
+// registerRequests and legacyRegisterRequests, which share some attributes but
+// not all
 func completeRegistration(
 	ctx context.Context,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	username, password, appserviceID string,
 	inhibitLogin common.WeakBoolean,
-	displayName *string,
+	displayName, deviceID *string,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
@@ -767,6 +782,9 @@ func completeRegistration(
 		}
 	}
 
+	// Increment prometheus counter for created users
+	amtRegUsers.Inc()
+
 	// Check whether inhibit_login option is set. If so, don't create an access
 	// token or a device for this user
 	if inhibitLogin {
@@ -787,17 +805,13 @@ func completeRegistration(
 		}
 	}
 
-	// TODO: Use the device ID in the request.
-	dev, err := deviceDB.CreateDevice(ctx, username, nil, token, displayName)
+	dev, err := deviceDB.CreateDevice(ctx, username, deviceID, token, displayName)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
 		}
 	}
-
-	// Increment prometheus counter for created users
-	amtRegUsers.Inc()
 
 	return util.JSONResponse{
 		Code: http.StatusOK,

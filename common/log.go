@@ -15,9 +15,12 @@
 package common
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dugong"
@@ -54,15 +57,35 @@ func (h *logLevelHook) Levels() []logrus.Level {
 	return levels
 }
 
+// callerPrettyfier is a function that given a runtime.Frame object, will
+// extract the calling function's name and file, and return them in a nicely
+// formatted way
+func callerPrettyfier(f *runtime.Frame) (string, string) {
+	// Retrieve just the function name
+	s := strings.Split(f.Function, ".")
+	funcname := s[len(s)-1]
+
+	// Append a newline + tab to it to move the actual log content to its own line
+	funcname += "\n\t"
+
+	// Surround the filepath in brackets and append line number so IDEs can quickly
+	// navigate
+	filename := fmt.Sprintf(" [%s:%d]", f.File, f.Line)
+
+	return funcname, filename
+}
+
 // SetupStdLogging configures the logging format to standard output. Typically, it is called when the config is not yet loaded.
 func SetupStdLogging() {
+	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&utcFormatter{
 		&logrus.TextFormatter{
 			TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
 			FullTimestamp:    true,
 			DisableColors:    false,
 			DisableTimestamp: false,
-			DisableSorting:   false,
+			QuoteEmptyFields: true,
+			CallerPrettyfier: callerPrettyfier,
 		},
 	})
 }
@@ -71,8 +94,8 @@ func SetupStdLogging() {
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
 func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
+	logrus.SetReportCaller(true)
 	for _, hook := range hooks {
-
 		// Check we received a proper logging level
 		level, err := logrus.ParseLevel(hook.Level)
 		if err != nil {
@@ -126,6 +149,7 @@ func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName str
 					DisableColors:    true,
 					DisableTimestamp: false,
 					DisableSorting:   false,
+					QuoteEmptyFields: true,
 				},
 			},
 			&dugong.DailyRotationSchedule{GZip: true},

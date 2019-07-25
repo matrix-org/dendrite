@@ -33,7 +33,7 @@ import (
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
-	db                 *storage.SyncServerDatabase
+	db                 *storage.SyncServerDatasource
 	notifier           *sync.Notifier
 	query              api.RoomserverQueryAPI
 }
@@ -43,7 +43,7 @@ func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
-	store *storage.SyncServerDatabase,
+	store *storage.SyncServerDatasource,
 	queryAPI api.RoomserverQueryAPI,
 ) *OutputRoomEventConsumer {
 
@@ -126,7 +126,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
-	syncStreamPos, err := s.db.WriteEvent(
+	pduPos, err := s.db.WriteEvent(
 		ctx,
 		&ev,
 		addsStateEvents,
@@ -144,7 +144,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&ev, "", types.StreamPosition(syncStreamPos))
+	s.notifier.OnNewEvent(&ev, "", nil, types.SyncPosition{PDUPosition: pduPos})
 
 	return nil
 }
@@ -152,7 +152,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) error {
-	syncStreamPos, err := s.db.AddInviteEvent(ctx, msg.Event)
+	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -161,7 +161,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&msg.Event, "", syncStreamPos)
+	s.notifier.OnNewEvent(&msg.Event, "", nil, types.SyncPosition{PDUPosition: pduPos})
 	return nil
 }
 

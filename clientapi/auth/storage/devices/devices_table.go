@@ -169,6 +169,8 @@ func (s *devicesStatements) selectDeviceByToken(
 	return &dev, err
 }
 
+// selectDeviceByID retrieves a device from the database with the given user
+// localpart and deviceID
 func (s *devicesStatements) selectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
 ) (*authtypes.Device, error) {

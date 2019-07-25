@@ -34,6 +34,10 @@ import (
 const pathPrefixR0 = "/_matrix/media/r0"
 
 // Setup registers the media API HTTP handlers
+//
+// Due to Setup being used to call many other functions, a gocyclo nolint is
+// applied:
+// nolint: gocyclo
 func Setup(
 	apiMux *mux.Router,
 	cfg *config.Dendrite,
@@ -87,7 +91,7 @@ func makeDownloadAPI(
 		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 		w.Header().Set("Content-Type", "application/json")
 
-		vars := mux.Vars(req)
+		vars, _ := common.URLDecodeMapValues(mux.Vars(req))
 		Download(
 			w,
 			req,
