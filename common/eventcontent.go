@@ -16,8 +16,16 @@ package common
 
 // CreateContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-create
 type CreateContent struct {
-	Creator  string `json:"creator"`
-	Federate *bool  `json:"m.federate,omitempty"`
+	Creator     string       `json:"creator"`
+	Federate    *bool        `json:"m.federate,omitempty"`
+	RoomVersion string       `json:"room_version,omitempty"`
+	Predecessor PreviousRoom `json:"predecessor,omitempty"`
+}
+
+// PreviousRoom is the "Previous Room" structure defined at https://matrix.org/docs/spec/client_server/r0.5.0#m-room-create
+type PreviousRoom struct {
+	RoomID  string `json:"room_id"`
+	EventID string `json:"event_id"`
 }
 
 // MemberContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-member
