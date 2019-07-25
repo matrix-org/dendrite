@@ -182,7 +182,7 @@ func RemoveLocalAlias(
 	if creatorQueryRes.UserID == "" {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("alias does not exist"),
+			JSON: jsonerror.NotFound("Alias does not exist"),
 		}
 	}
 
@@ -190,7 +190,7 @@ func RemoveLocalAlias(
 		// TODO: Still allow deletion if user is admin
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("you do not have permission to delete this alias"),
+			JSON: jsonerror.Forbidden("You do not have permission to delete this alias"),
 		}
 	}
 
