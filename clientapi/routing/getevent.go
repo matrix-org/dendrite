@@ -106,7 +106,10 @@ func GetEvent(
 	for _, stateEvent := range stateResp.StateEvents {
 		if stateEvent.StateKeyEquals(r.device.UserID) {
 			membership, err := stateEvent.Membership()
-			if err == nil && membership == "join" {
+			if err != nil {
+				return httputil.LogThenError(req, err)
+			}
+			if membership == "join" {
 				return util.JSONResponse{
 					Code: http.StatusOK,
 					JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
