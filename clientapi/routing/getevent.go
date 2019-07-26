@@ -103,21 +103,15 @@ func GetEvent(
 		}
 	}
 
-	allowed := false
 	for _, stateEvent := range stateResp.StateEvents {
 		if stateEvent.StateKeyEquals(r.device.UserID) {
 			membership, err := stateEvent.Membership()
 			if err == nil && membership == "join" {
-				allowed = true
-				break
+				return util.JSONResponse{
+					Code: http.StatusOK,
+					JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
+				}
 			}
-		}
-	}
-
-	if allowed {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
 		}
 	}
 
