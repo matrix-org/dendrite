@@ -79,11 +79,13 @@ func GetEvent(
 		requestedEvent: requestedEvent,
 	}
 
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{r.requestedEvent})
 	stateReq := api.QueryStateAfterEventsRequest{
 		RoomID:       r.requestedEvent.RoomID(),
 		PrevEventIDs: r.requestedEvent.PrevEventIDs(),
-		StateToFetch: stateNeeded.Tuples(),
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
+			EventType: gomatrixserverlib.MRoomMember,
+			StateKey:  device.UserID,
+		}},
 	}
 	var stateResp api.QueryStateAfterEventsResponse
 	if err := queryAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
