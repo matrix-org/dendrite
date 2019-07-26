@@ -62,7 +62,7 @@ func GetEvent(
 		// Event not found locally
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
 		}
 	}
 
@@ -99,7 +99,7 @@ func GetEvent(
 		// Missing some events locally; stateResp.StateEvents unavailable.
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
 		}
 	}
 
