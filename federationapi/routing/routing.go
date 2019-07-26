@@ -64,6 +64,7 @@ func Setup(
 	// {keyID} argument and always return a response containing all of the keys.
 	v2keysmux.Handle("/server/{keyID}", localKeys).Methods(http.MethodGet)
 	v2keysmux.Handle("/server/", localKeys).Methods(http.MethodGet)
+	v2keysmux.Handle("/server", localKeys).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/send/{txnID}", common.MakeFedAPI(
 		"federation_send", cfg.Matrix.ServerName, keys,
