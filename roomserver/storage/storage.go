@@ -20,6 +20,7 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -84,26 +85,35 @@ func (d *Database) StoreEvent(
 		}
 	}
 
-	if eventNID, stateNID, err = d.statements.insertEvent(
-		ctx,
-		roomNID,
-		eventTypeNID,
-		eventStateKeyNID,
-		event.EventID(),
-		event.EventReference().EventSHA256,
-		authEventNIDs,
-		event.Depth(),
-	); err != nil {
-		if err == sql.ErrNoRows {
-			// We've already inserted the event so select the numeric event ID
-			eventNID, stateNID, err = d.statements.selectEvent(ctx, event.EventID())
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if eventNID, stateNID, err = d.statements.insertEvent(
+			ctx, txn,
+			roomNID,
+			eventTypeNID,
+			eventStateKeyNID,
+			event.EventID(),
+			event.EventReference().EventSHA256,
+			authEventNIDs,
+			event.Depth(),
+		); err != nil {
+			if err == sql.ErrNoRows {
+				// We've already inserted the event so select the numeric event ID
+				eventNID, stateNID, err = d.statements.selectEvent(ctx, txn, event.EventID())
+			}
+			if err != nil {
+				return err
+			}
 		}
-		if err != nil {
-			return 0, types.StateAtEvent{}, err
-		}
-	}
 
-	if err = d.statements.insertEventJSON(ctx, eventNID, event.JSON()); err != nil {
+		if err = d.updateSpecialTablesForEvent(
+			ctx, txn, &event, eventNID,
+		); err != nil {
+			return err
+		}
+
+		return d.statements.insertEventJSON(ctx, txn, eventNID, event.JSON())
+	})
+	if err != nil {
 		return 0, types.StateAtEvent{}, err
 	}
 
@@ -167,6 +177,24 @@ func (d *Database) assignStateKeyNID(
 	return eventStateKeyNID, err
 }
 
+func (d *Database) updateSpecialTablesForEvent(
+	ctx context.Context,
+	txn *sql.Tx,
+	event *gomatrixserverlib.Event,
+	eventNID types.EventNID,
+) (err error) {
+	switch event.Type() {
+	case gomatrixserverlib.MRoomRedaction:
+		// TODO: After we support room versioning, set validated = false only for rooms >= v3.
+		if err = d.statements.insertRedaction(
+			ctx, txn, eventNID, event.Redacts(), false,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // StateEntriesForEventIDs implements input.EventDatabase
 func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
@@ -210,7 +238,9 @@ func (d *Database) Events(
 	if err != nil {
 		return nil, err
 	}
+
 	results := make([]types.Event, len(eventJSONs))
+	eventPointers := make([]*gomatrixserverlib.Event, len(eventJSONs))
 	for i, eventJSON := range eventJSONs {
 		result := &results[i]
 		result.EventNID = eventJSON.EventNID
@@ -219,8 +249,151 @@ func (d *Database) Events(
 		if err != nil {
 			return nil, err
 		}
+		eventPointers[i] = &result.Event
 	}
+
+	if err = d.applyRedactions(ctx, eventPointers); err != nil {
+		return nil, err
+	}
+
 	return results, nil
+}
+
+// applyRedactions applies necessary redactions to the given events.
+// It will replace events referenced by the pointers with their redacted versions.
+// It will update the validation status in the redactions table if there are
+// redaction events newly validated.
+func (d *Database) applyRedactions(
+	ctx context.Context,
+	eventPointers []*gomatrixserverlib.Event,
+) error {
+	eventIDs := make([]string, len(eventPointers))
+	for i, e := range eventPointers {
+		eventIDs[i] = e.EventID()
+	}
+
+	validatedRedactions, unvalidatedRedactions, err := d.statements.bulkSelectRedaction(ctx, nil, eventIDs)
+	if err != nil {
+		return err
+	}
+
+	totalPossibleRedactions := len(validatedRedactions) + len(unvalidatedRedactions)
+
+	// Fast path if nothing to redact
+	if totalPossibleRedactions == 0 {
+		return nil
+	}
+
+	redactionNIDToEvent, err := d.fetchRedactionEvents(ctx, validatedRedactions, unvalidatedRedactions)
+	if err != nil {
+		return err
+	}
+
+	eventIDToEventPointer := make(map[string]*gomatrixserverlib.Event, len(eventPointers))
+	for _, p := range eventPointers {
+		eventIDToEventPointer[p.EventID()] = p
+	}
+
+	if len(unvalidatedRedactions) != 0 {
+		var newlyValidated map[string]types.EventNID
+		if newlyValidated, err = d.validateRedactions(
+			ctx, unvalidatedRedactions, redactionNIDToEvent, eventIDToEventPointer,
+		); err != nil {
+			return err
+		}
+		for redactedEventID, redactedByNID := range newlyValidated {
+			validatedRedactions[redactedEventID] = redactedByNID
+		}
+	}
+
+	for redactedEventID, redactedByNID := range validatedRedactions {
+		redactedEvent := eventIDToEventPointer[redactedEventID]
+		*redactedEvent = redactedEvent.Redact()
+		if err = redactedEvent.SetUnsignedField(
+			"redacted_because",
+			gomatrixserverlib.ToClientEvent(
+				*redactionNIDToEvent[redactedByNID],
+				gomatrixserverlib.FormatAll,
+			),
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *Database) fetchRedactionEvents(
+	ctx context.Context,
+	validatedRedactions, unvalidatedRedactions map[string]types.EventNID,
+) (redactionNIDToEvent map[types.EventNID]*gomatrixserverlib.Event, err error) {
+	redactionEventsToFetch := make([]types.EventNID, 0, len(validatedRedactions)+len(unvalidatedRedactions))
+	for _, nid := range validatedRedactions {
+		redactionEventsToFetch = append(redactionEventsToFetch, nid)
+	}
+	for _, nid := range unvalidatedRedactions {
+		redactionEventsToFetch = append(redactionEventsToFetch, nid)
+	}
+
+	redactionJSONs, err := d.statements.bulkSelectEventJSON(ctx, redactionEventsToFetch)
+	if err != nil {
+		return nil, err
+	}
+
+	redactionNIDToEvent = make(map[types.EventNID]*gomatrixserverlib.Event, len(redactionJSONs))
+	for _, redactionJSON := range redactionJSONs {
+		e, err := gomatrixserverlib.NewEventFromTrustedJSON(redactionJSON.EventJSON, false)
+		if err != nil {
+			return nil, err
+		}
+		redactionNIDToEvent[redactionJSON.EventNID] = &e
+	}
+
+	return
+}
+
+func (d *Database) validateRedactions(
+	ctx context.Context,
+	unvalidatedRedactions map[string]types.EventNID,
+	redactionNIDToEvent map[types.EventNID]*gomatrixserverlib.Event,
+	eventIDToEvent map[string]*gomatrixserverlib.Event,
+) (validatedRedactions map[string]types.EventNID, err error) {
+	validatedRedactions = make(map[string]types.EventNID, len(unvalidatedRedactions))
+
+	var expectedDomain, redactorDomain gomatrixserverlib.ServerName
+	for redactedEventID, redactedByNID := range unvalidatedRedactions {
+		if _, expectedDomain, err = gomatrixserverlib.SplitID(
+			'@', eventIDToEvent[redactedEventID].Sender(),
+		); err != nil {
+			return nil, err
+		}
+		if _, redactorDomain, err = gomatrixserverlib.SplitID(
+			'@', redactionNIDToEvent[redactedByNID].Sender(),
+		); err != nil {
+			return nil, err
+		}
+
+		if redactorDomain != expectedDomain {
+			// TODO: Still allow power users to redact
+			continue
+		}
+
+		validatedRedactions[redactedEventID] = redactedByNID
+	}
+
+	eventNIDs := make([]types.EventNID, 0, len(validatedRedactions))
+	for _, nid := range validatedRedactions {
+		eventNIDs = append(eventNIDs, nid)
+	}
+	if err = d.statements.bulkUpdateValidationStatus(
+		ctx, nil, eventNIDs, true,
+	); err != nil {
+		return nil, err
+	}
+
+	// TODO: We might want to clear the unvalidated redactions
+
+	return validatedRedactions, nil
 }
 
 // AddState implements input.EventDatabase
@@ -276,7 +449,7 @@ func (d *Database) StateEntries(
 func (d *Database) SnapshotNIDFromEventID(
 	ctx context.Context, eventID string,
 ) (types.StateSnapshotNID, error) {
-	_, stateNID, err := d.statements.selectEvent(ctx, eventID)
+	_, stateNID, err := d.statements.selectEvent(ctx, nil, eventID)
 	return stateNID, err
 }
 

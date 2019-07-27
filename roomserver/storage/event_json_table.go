@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -67,9 +68,10 @@ func (s *eventJSONStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *eventJSONStatements) insertEventJSON(
-	ctx context.Context, eventNID types.EventNID, eventJSON []byte,
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, eventJSON []byte,
 ) error {
-	_, err := s.insertEventJSONStmt.ExecContext(ctx, int64(eventNID), eventJSON)
+	stmt := common.TxStmt(txn, s.insertEventJSONStmt)
+	_, err := stmt.ExecContext(ctx, int64(eventNID), eventJSON)
 	return err
 }
 

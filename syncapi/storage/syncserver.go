@@ -60,6 +60,7 @@ type SyncServerDatasource struct {
 	events      outputRoomEventsStatements
 	roomstate   currentRoomStateStatements
 	invites     inviteEventsStatements
+	redactions  redactionStatements
 	typingCache *cache.TypingCache
 }
 
@@ -83,6 +84,9 @@ func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, er
 		return nil, err
 	}
 	if err := d.invites.prepare(d.db); err != nil {
+		return nil, err
+	}
+	if err := d.redactions.prepare(d.db); err != nil {
 		return nil, err
 	}
 	d.typingCache = cache.NewTypingCache()
@@ -128,6 +132,10 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
+		if err = d.updateSpecialTablesForEvent(ctx, txn, ev); err != nil {
+			return err
+		}
+
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
 			// Nothing to do, the event may have just been a message event.
 			return nil
@@ -136,6 +144,23 @@ func (d *SyncServerDatasource) WriteEvent(
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition)
 	})
 	return
+}
+
+func (d *SyncServerDatasource) updateSpecialTablesForEvent(
+	ctx context.Context,
+	txn *sql.Tx,
+	event *gomatrixserverlib.Event,
+) (err error) {
+	switch event.Type() {
+	case gomatrixserverlib.MRoomRedaction:
+		// TODO: After we support room versioning, set validated = false only for rooms >= v3.
+		if err = d.redactions.insertRedaction(
+			ctx, txn, event.EventID(), event.Redacts(), false,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *SyncServerDatasource) updateRoomState(
@@ -178,7 +203,18 @@ func (d *SyncServerDatasource) updateRoomState(
 func (d *SyncServerDatasource) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.Event, error) {
-	return d.roomstate.selectStateEvent(ctx, roomID, evType, stateKey)
+	e, err := d.roomstate.selectStateEvent(ctx, roomID, evType, stateKey)
+	if e == nil || err != nil {
+		return e, err
+	}
+
+	if err = d.applyRedactionsForEventPointers(
+		ctx, nil, []*gomatrixserverlib.Event{e},
+	); err != nil {
+		return nil, err
+	}
+
+	return e, nil
 }
 
 // GetStateEventsForRoom fetches the state events for a given room.
@@ -189,7 +225,10 @@ func (d *SyncServerDatasource) GetStateEventsForRoom(
 ) (stateEvents []gomatrixserverlib.Event, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
-		return err
+		if err != nil {
+			return err
+		}
+		return d.applyRedactionsForEventLists(ctx, txn, stateEvents)
 	})
 	return
 }
@@ -418,8 +457,17 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		// We don't include a device here as we don't need to send down
 		// transaction IDs for complete syncs
 		recentEvents := streamEventsToEvents(nil, recentStreamEvents)
-
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
+
+		// Note that we're not passing txn into applyRedactions because txn is
+		// readonly but we may need to write during validation of redactions.
+		// This may be optimised in the future.
+		if err = d.applyRedactionsForEventLists(
+			ctx, nil, recentEvents, stateEvents,
+		); err != nil {
+			return
+		}
+
 		jr := types.NewJoinResponse()
 		if prevPDUPos := recentStreamEvents[0].streamPosition - 1; prevPDUPos > 0 {
 			// Use the short form of batch token for prev_batch
@@ -549,10 +597,26 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 	if err != nil {
 		return err
 	}
+
+	// Unzip the map into two lists so we can applyRedactions()
+	roomIDs := make([]string, 0, len(invites))
+	inviteEvents := make([]gomatrixserverlib.Event, 0, len(invites))
 	for roomID, inviteEvent := range invites {
+		roomIDs = append(roomIDs, roomID)
+		inviteEvents = append(inviteEvents, inviteEvent)
+	}
+
+	// Note that we're not passing txn into applyRedactions because txn may be
+	// readonly but we may need to write during validation of redactions.
+	// This may be optimised in the future.
+	if err = d.applyRedactionsForEventLists(ctx, nil, inviteEvents); err != nil {
+		return err
+	}
+
+	for i, roomID := range roomIDs {
 		ir := types.NewInviteResponse()
 		ir.InviteState.Events = gomatrixserverlib.ToClientEvents(
-			[]gomatrixserverlib.Event{inviteEvent}, gomatrixserverlib.FormatSync,
+			[]gomatrixserverlib.Event{inviteEvents[i]}, gomatrixserverlib.FormatSync,
 		)
 		// TODO: add the invite state from the invite event.
 		res.Rooms.Invite[roomID] = *ir
@@ -592,6 +656,15 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	// Don't bother appending empty room entries
 	if len(recentEvents) == 0 && len(delta.stateEvents) == 0 {
 		return nil
+	}
+
+	// Note that we're not passing txn into applyRedactions because txn is
+	// readonly but we may need to write during validation of redactions.
+	// This may be optimised in the future.
+	if err = d.applyRedactionsForEventLists(
+		ctx, nil, recentEvents, delta.stateEvents,
+	); err != nil {
+		return err
 	}
 
 	switch delta.membership {
@@ -788,6 +861,165 @@ func (d *SyncServerDatasource) getStateDeltas(
 	}
 
 	return deltas, nil
+}
+
+// applyRedactionsForEventLists applies necessary redactions to the events in the lists in-place.
+// It will replace the events with their redacted versions.
+// It will update the validation status in the redactions table if there are
+// redaction events newly validated.
+func (d *SyncServerDatasource) applyRedactionsForEventLists(
+	ctx context.Context,
+	txn *sql.Tx,
+	eventLists ...[]gomatrixserverlib.Event,
+) error {
+	totalLen := 0
+	for _, eventList := range eventLists {
+		totalLen += len(eventList)
+	}
+
+	eventPointers := make([]*gomatrixserverlib.Event, 0, totalLen)
+	for _, eventList := range eventLists {
+		for i := range eventList {
+			eventPointers = append(eventPointers, &eventList[i])
+		}
+	}
+
+	return d.applyRedactionsForEventPointers(ctx, txn, eventPointers)
+}
+
+// applyRedactionsForEventPointers applies necessary redactions to the events
+// referenced by the given pointers. The events will be replaced with their
+// redacted copies.
+// There cannot be nil pointers in eventPointers.
+func (d *SyncServerDatasource) applyRedactionsForEventPointers(
+	ctx context.Context,
+	txn *sql.Tx,
+	eventPointers []*gomatrixserverlib.Event,
+) error {
+	eventIDs := make([]string, len(eventPointers))
+	for i, e := range eventPointers {
+		eventIDs[i] = e.EventID()
+	}
+
+	validatedRedactions, unvalidatedRedactions, err := d.redactions.bulkSelectRedaction(ctx, txn, eventIDs)
+	if err != nil {
+		return err
+	}
+
+	totalPossibleRedactions := len(validatedRedactions) + len(unvalidatedRedactions)
+
+	// Fast path if nothing to redact
+	if totalPossibleRedactions == 0 {
+		return nil
+	}
+
+	redactionIDToEvent, err := d.fetchRedactionEvents(ctx, txn, validatedRedactions, unvalidatedRedactions)
+	if err != nil {
+		return err
+	}
+
+	eventIDToEventPointer := make(map[string]*gomatrixserverlib.Event, len(eventPointers))
+	for _, p := range eventPointers {
+		eventIDToEventPointer[p.EventID()] = p
+	}
+
+	if len(unvalidatedRedactions) != 0 {
+		var newlyValidated redactedToRedactionMap
+		if newlyValidated, err = d.validateRedactions(
+			ctx, txn, unvalidatedRedactions, redactionIDToEvent, eventIDToEventPointer,
+		); err != nil {
+			return err
+		}
+		for redactedEventID, redactedByID := range newlyValidated {
+			validatedRedactions[redactedEventID] = redactedByID
+		}
+	}
+
+	for redactedEventID, redactedByID := range validatedRedactions {
+		redactedEvent := eventIDToEventPointer[redactedEventID]
+		*redactedEvent = redactedEvent.Redact()
+		if err = redactedEvent.SetUnsignedField(
+			"redacted_because",
+			gomatrixserverlib.ToClientEvent(
+				*redactionIDToEvent[redactedByID], gomatrixserverlib.FormatAll,
+			),
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *SyncServerDatasource) fetchRedactionEvents(
+	ctx context.Context,
+	txn *sql.Tx,
+	validatedRedactions, unvalidatedRedactions redactedToRedactionMap,
+) (redactionIDToEvent map[string]*gomatrixserverlib.Event, err error) {
+	redactionEventsToFetch := make([]string, 0, len(validatedRedactions)+len(unvalidatedRedactions))
+	for _, id := range validatedRedactions {
+		redactionEventsToFetch = append(redactionEventsToFetch, id)
+	}
+	for _, id := range unvalidatedRedactions {
+		redactionEventsToFetch = append(redactionEventsToFetch, id)
+	}
+
+	redactionEvents, err := d.events.selectEvents(ctx, txn, redactionEventsToFetch)
+	if err != nil {
+		return nil, err
+	}
+
+	redactionIDToEvent = make(map[string]*gomatrixserverlib.Event, len(redactionEvents))
+	for _, redactionEvent := range redactionEvents {
+		redactionIDToEvent[redactionEvent.EventID()] = &redactionEvent.Event
+	}
+
+	return
+}
+
+func (d *SyncServerDatasource) validateRedactions(
+	ctx context.Context,
+	txn *sql.Tx,
+	unvalidatedRedactions redactedToRedactionMap,
+	redactionIDToEvent map[string]*gomatrixserverlib.Event,
+	eventIDToEvent map[string]*gomatrixserverlib.Event,
+) (validatedRedactions redactedToRedactionMap, err error) {
+	validatedRedactions = make(redactedToRedactionMap, len(unvalidatedRedactions))
+
+	var expectedDomain, redactorDomain gomatrixserverlib.ServerName
+	for redactedEventID, redactedByID := range unvalidatedRedactions {
+		if _, expectedDomain, err = gomatrixserverlib.SplitID(
+			'@', eventIDToEvent[redactedEventID].Sender(),
+		); err != nil {
+			return nil, err
+		}
+		if _, redactorDomain, err = gomatrixserverlib.SplitID(
+			'@', redactionIDToEvent[redactedByID].Sender(),
+		); err != nil {
+			return nil, err
+		}
+
+		if redactorDomain != expectedDomain {
+			// TODO: Still allow power users to redact
+			continue
+		}
+
+		validatedRedactions[redactedEventID] = redactedByID
+	}
+
+	eventIDs := make([]string, 0, len(validatedRedactions))
+	for _, id := range validatedRedactions {
+		eventIDs = append(eventIDs, id)
+	}
+	if err = d.redactions.bulkUpdateValidationStatus(
+		ctx, txn, eventIDs, true,
+	); err != nil {
+		return nil, err
+	}
+
+	// TODO: We might want to clear the unvalidated redactions
+
+	return validatedRedactions, nil
 }
 
 // streamEventsToEvents converts streamEvent to Event. If device is non-nil and

@@ -155,7 +155,7 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *eventStatements) insertEvent(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID,
 	eventTypeNID types.EventTypeNID,
 	eventStateKeyNID types.EventStateKeyNID,
@@ -166,7 +166,8 @@ func (s *eventStatements) insertEvent(
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
-	err := s.insertEventStmt.QueryRowContext(
+	stmt := common.TxStmt(txn, s.insertEventStmt)
+	err := stmt.QueryRowContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
 		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
 	).Scan(&eventNID, &stateNID)
@@ -174,11 +175,12 @@ func (s *eventStatements) insertEvent(
 }
 
 func (s *eventStatements) selectEvent(
-	ctx context.Context, eventID string,
+	ctx context.Context, txn *sql.Tx, eventID string,
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
-	err := s.selectEventStmt.QueryRowContext(ctx, eventID).Scan(&eventNID, &stateNID)
+	stmt := common.TxStmt(txn, s.selectEventStmt)
+	err := stmt.QueryRowContext(ctx, eventID).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
