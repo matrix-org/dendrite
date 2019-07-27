@@ -109,6 +109,7 @@ func AuthFallback(
 	sessionID := req.URL.Query().Get("session")
 
 	if sessionID == "" {
+		w.WriteHeader(http.StatusBadRequest)
 		_, err := w.Write([]byte("Session ID not provided"))
 		if err != nil {
 			res := httputil.LogThenError(req, err)
@@ -135,6 +136,7 @@ func AuthFallback(
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
 			if cfg.Matrix.RecaptchaPublicKey == "" {
+				w.WriteHeader(http.StatusInternalServerError)
 				_, err := w.Write([]byte("This Homeserver doesn't have a recaptcha public key"))
 				if err != nil {
 					res := httputil.LogThenError(req, err)

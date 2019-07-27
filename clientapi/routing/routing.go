@@ -241,7 +241,7 @@ func Setup(
 			vars := mux.Vars(req)
 			return AuthFallback(w, req, vars["authType"], cfg)
 		}),
-	).Methods("GET", "POST", "OPTIONS")
+	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/pushrules/",
 		common.MakeExternalAPI("push_rules", func(req *http.Request) util.JSONResponse {
