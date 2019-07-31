@@ -17,6 +17,7 @@ package accounts
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -71,25 +72,44 @@ func (s *filterStatements) prepare(db *sql.DB) (err error) {
 
 func (s *filterStatements) selectFilter(
 	ctx context.Context, localpart string, filterID string,
-) (filter []byte, err error) {
-	err = s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filter)
-	return
+) (*gomatrixserverlib.Filter, error) {
+	// Retrieve filter from database (stored as canonical JSON)
+	var filterData []byte
+	err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal JSON into Filter struct
+	var filter gomatrixserverlib.Filter
+	if err = json.Unmarshal(filterData, &filter); err != nil {
+		return nil, err
+	}
+	return &filter, nil
 }
 
 func (s *filterStatements) insertFilter(
-	ctx context.Context, filter []byte, localpart string,
+	ctx context.Context, filter *gomatrixserverlib.Filter, localpart string,
 ) (filterID string, err error) {
 	var existingFilterID string
 
-	// This can result in a race condition when two clients try to insert the
-	// same filter and localpart at the same time, however this is not a
-	// problem as both calls will result in the same filterID
-	filterJSON, err := gomatrixserverlib.CanonicalJSON(filter)
+	// Serialise json
+	filterJSON, err := json.Marshal(filter)
+	if err != nil {
+		return "", err
+	}
+	// Remove whitespaces and sort JSON data
+	// needed to prevent from inserting the same filter multiple times
+	filterJSON, err = gomatrixserverlib.CanonicalJSON(filterJSON)
 	if err != nil {
 		return "", err
 	}
 
-	// Check if filter already exists in the database
+	// Check if filter already exists in the database using its localpart and content
+	//
+	// This can result in a race condition when two clients try to insert the
+	// same filter and localpart at the same time, however this is not a
+	// problem as both calls will result in the same filterID
 	err = s.selectFilterIDByContentStmt.QueryRowContext(ctx,
 		localpart, filterJSON).Scan(&existingFilterID)
 	if err != nil && err != sql.ErrNoRows {
