@@ -164,10 +164,21 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return Redact(req, device, vars["roomID"], vars["eventID"], vars["txnID"],
+			txnID := vars["txnID"]
+			return Redact(req, device, vars["roomID"], vars["eventID"], &txnID,
 				cfg, queryAPI, producer, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/redact/{eventID}",
+		common.MakeAuthAPI("redact", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return Redact(req, device, vars["roomID"], vars["eventID"], nil,
+				cfg, queryAPI, producer, transactionsCache)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/register", common.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
 		return Register(req, accountDB, deviceDB, &cfg)

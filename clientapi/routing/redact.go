@@ -41,10 +41,11 @@ type redactResponse struct {
 }
 
 // Redact implements PUT /_matrix/client/r0/rooms/{roomId}/redact/{eventId}/{txnId}
+// and POST /_matrix/client/r0/rooms/{roomId}/redact/{eventId} (mainly for SyTest)
 func Redact(
 	req *http.Request,
 	device *authtypes.Device,
-	roomID, redactedEventID, txnID string,
+	roomID, redactedEventID string, txnID *string,
 	cfg config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
@@ -127,15 +128,18 @@ func Redact(
 
 	// Send the redaction event
 
-	txnAndDeviceID := api.TransactionID{
-		TransactionID: txnID,
-		DeviceID:      device.ID,
+	var txnAndDeviceID *api.TransactionID
+	if txnID != nil {
+		txnAndDeviceID = &api.TransactionID{
+			TransactionID: *txnID,
+			DeviceID:      device.ID,
+		}
 	}
 
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	eventID, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, &txnAndDeviceID,
+		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndDeviceID,
 	)
 	if err != nil {
 		return httputil.LogThenError(req, err)
