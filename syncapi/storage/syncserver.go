@@ -604,7 +604,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 			return nil
 		}
 
-		// If full_state=true and since= is already up to date, then we'll have
+		// If full_state=true and since is already up to date, then we'll have
 		// state events but no recent events.
 		prevPDUPos = toPos - 1
 	} else {
@@ -826,7 +826,7 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 		})
 	}
 
-	// get all the state events ever between these two positions
+	// Get all the state events ever between these two positions
 	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos)
 	if err != nil {
 		return nil, err
