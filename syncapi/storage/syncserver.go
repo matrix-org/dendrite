@@ -720,8 +720,9 @@ func (d *SyncServerDatasource) fetchMissingStateEvents(
 	return events, nil
 }
 
-// getStateDeltas returns the state deltas between fromPos and toPos for the
-// rooms in which the user has new membership events.
+// getStateDeltas returns the state deltas between fromPos and toPos,
+// exclusive of oldPos, inclusive of newPos, for the rooms in which
+// the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
 func (d *SyncServerDatasource) getStateDeltas(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
