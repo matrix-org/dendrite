@@ -32,7 +32,7 @@ import (
 // newTag creates and returns a new Tag type
 func newTag() gomatrix.TagContent {
 	return gomatrix.TagContent{
-		Map: make(map[string]gomatrix.TagProperties),
+		Tags: make(map[string]gomatrix.TagProperties),
 	}
 }
 
@@ -74,14 +74,23 @@ func GetTags(
 	var tagData []gomatrix.TagData
 	tagContent := newTag()
 	err = json.Unmarshal(dataByte, &tagData)
-	tagData[0].Content.Map["something"] = gomatrix.TagProperties{0}
-	logrus.Info(tagData[0].Content.Map)
+	// tagData[0].Content.Tags["something"] = gomatrix.TagProperties{0}
+	logrus.Info(tagData[0].Content.Tags)
+	logrus.Info(tagData[0].Content)
 	tagContent = tagData[0].Content
+	logrus.Info(tagContent)
+	logrus.Info(tagContent.Tags)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
+	// outJSON, err := json.Marshal(tagContent)
+	// if err != nil {
+	// 	return httputil.LogThenError(req, err)
+	// }
+
+	// logrus.Info(string(outJSON))
 	// // send data to syncapi
 	// if err := syncProducer.SendData(userID, roomID, tag); err != nil {
 	// 	return httputil.LogThenError(req, err)
@@ -89,7 +98,7 @@ func GetTags(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: tagContent.Map,
+		JSON: tagContent,
 	}
 }
 
@@ -134,7 +143,7 @@ func PutTag(
 			return httputil.LogThenError(req, err)
 		}
 	}
-	tagContent.Map[tag] = properties
+	tagContent.Tags[tag] = properties
 	err = saveTagData(req, localpart, roomID, accountDB, tagContent)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -194,8 +203,8 @@ func DeleteTag(
 	}
 
 	// Check whether the Tag to be deleted exists
-	if _, ok := tagContent.Map[tag]; ok {
-		delete(tagContent.Map, tag)
+	if _, ok := tagContent.Tags[tag]; ok {
+		delete(tagContent.Tags, tag)
 	} else {
 		//Synapse returns a 200 OK response on finding no Tags, same policy is followed here.
 		return util.JSONResponse{
