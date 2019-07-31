@@ -986,20 +986,18 @@ func (d *SyncServerDatasource) validateRedactions(
 ) (validatedRedactions redactedToRedactionMap, err error) {
 	validatedRedactions = make(redactedToRedactionMap, len(unvalidatedRedactions))
 
-	var expectedDomain, redactorDomain gomatrixserverlib.ServerName
 	for redactedEventID, redactedByID := range unvalidatedRedactions {
-		if _, expectedDomain, err = gomatrixserverlib.SplitID(
-			'@', eventIDToEvent[redactedEventID].Sender(),
-		); err != nil {
-			return nil, err
+		badEvents, needPowerLevelCheck, validationErr := common.ValidateRedaction(
+			eventIDToEvent[redactedEventID], redactionIDToEvent[redactedByID],
+		)
+		if validationErr != nil {
+			return nil, validationErr
 		}
-		if _, redactorDomain, err = gomatrixserverlib.SplitID(
-			'@', redactionIDToEvent[redactedByID].Sender(),
-		); err != nil {
-			return nil, err
+		if badEvents {
+			continue
 		}
 
-		if redactorDomain != expectedDomain {
+		if needPowerLevelCheck {
 			// TODO: Still allow power users to redact
 			continue
 		}

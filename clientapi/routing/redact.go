@@ -81,49 +81,10 @@ func Redact(
 		return httputil.LogThenError(req, err)
 	}
 
-	// Do some basic checks e.g. ensuring the user is in the room and can send m.room.redaction events
-	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
-	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i]
-	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(*e, &provider); err != nil {
-		// TODO: Is the error returned with suitable HTTP status code?
-		if _, ok := err.(*gomatrixserverlib.NotAllowed); ok {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(err.Error()),
-			}
-		}
-
-		return httputil.LogThenError(req, err)
-	}
-
-	// Ensure the user can redact the specific event
-
-	eventReq := api.QueryEventsByIDRequest{
-		EventIDs: []string{redactedEventID},
-	}
-	var eventResp api.QueryEventsByIDResponse
-	if err = queryAPI.QueryEventsByID(req.Context(), &eventReq, &eventResp); err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	if len(eventResp.Events) == 0 {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Event to redact not found"),
-		}
-	}
-
-	redactedEvent := eventResp.Events[0]
-
-	if redactedEvent.Sender() != device.UserID {
-		// TODO: Allow power users to redact others' events
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You are not allowed to redact this event"),
-		}
+	if resErr := checkRedactionAllowed(
+		req, queryAPI, e, queryRes.StateEvents,
+	); resErr != nil {
+		return *resErr
 	}
 
 	// Send the redaction event
@@ -149,4 +110,71 @@ func Redact(
 		Code: http.StatusOK,
 		JSON: redactResponse{eventID},
 	}
+}
+
+func checkRedactionAllowed(
+	req *http.Request, queryAPI api.RoomserverQueryAPI,
+	redactionEvent *gomatrixserverlib.Event,
+	stateEvents []gomatrixserverlib.Event,
+) *util.JSONResponse {
+	// Do some basic checks e.g. ensuring the user is in the room and can send m.room.redaction events
+	statEventPointers := make([]*gomatrixserverlib.Event, len(stateEvents))
+	for i := range stateEvents {
+		statEventPointers[i] = &stateEvents[i]
+	}
+	provider := gomatrixserverlib.NewAuthEvents(statEventPointers)
+	if err := gomatrixserverlib.Allowed(*redactionEvent, &provider); err != nil {
+		// TODO: Is the error returned with suitable HTTP status code?
+		if _, ok := err.(*gomatrixserverlib.NotAllowed); ok {
+			return &util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden(err.Error()),
+			}
+		}
+
+		res := httputil.LogThenError(req, err)
+		return &res
+	}
+
+	// Ensure the user can redact the specific event
+
+	eventReq := api.QueryEventsByIDRequest{
+		EventIDs: []string{redactionEvent.Redacts()},
+	}
+	var eventResp api.QueryEventsByIDResponse
+	if err := queryAPI.QueryEventsByID(req.Context(), &eventReq, &eventResp); err != nil {
+		res := httputil.LogThenError(req, err)
+		return &res
+	}
+
+	if len(eventResp.Events) == 0 {
+		return &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Event to redact not found"),
+		}
+	}
+
+	redactedEvent := eventResp.Events[0]
+
+	badEvents, _, err := common.ValidateRedaction(&redactedEvent, redactionEvent)
+	if err != nil {
+		res := httputil.LogThenError(req, err)
+		return &res
+	}
+	if badEvents {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("invalid redaction attempt"),
+		}
+	}
+
+	if redactedEvent.Sender() != redactionEvent.Sender() {
+		// TODO: Allow power users to redact others' events
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("You are not allowed to redact this event"),
+		}
+	}
+
+	return nil
 }

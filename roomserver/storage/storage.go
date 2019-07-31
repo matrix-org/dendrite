@@ -360,20 +360,18 @@ func (d *Database) validateRedactions(
 ) (validatedRedactions map[string]types.EventNID, err error) {
 	validatedRedactions = make(map[string]types.EventNID, len(unvalidatedRedactions))
 
-	var expectedDomain, redactorDomain gomatrixserverlib.ServerName
 	for redactedEventID, redactedByNID := range unvalidatedRedactions {
-		if _, expectedDomain, err = gomatrixserverlib.SplitID(
-			'@', eventIDToEvent[redactedEventID].Sender(),
-		); err != nil {
-			return nil, err
+		badEvents, needPowerLevelCheck, validationErr := common.ValidateRedaction(
+			eventIDToEvent[redactedEventID], redactionNIDToEvent[redactedByNID],
+		)
+		if validationErr != nil {
+			return nil, validationErr
 		}
-		if _, redactorDomain, err = gomatrixserverlib.SplitID(
-			'@', redactionNIDToEvent[redactedByNID].Sender(),
-		); err != nil {
-			return nil, err
+		if badEvents {
+			continue
 		}
 
-		if redactorDomain != expectedDomain {
+		if needPowerLevelCheck {
 			// TODO: Still allow power users to redact
 			continue
 		}
