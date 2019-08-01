@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // newTag creates and returns a new Tag type
@@ -52,14 +51,7 @@ func GetTags(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, "m.tag",
-	)
+	_, data, err := obtainSavedTags(req, userID, roomID, accountDB)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -70,31 +62,14 @@ func GetTags(
 		return httputil.LogThenError(req, err)
 	}
 
-	logrus.Info("MYDUMBDATA")
 	var tagData []gomatrix.TagData
 	tagContent := newTag()
 	err = json.Unmarshal(dataByte, &tagData)
-	// tagData[0].Content.Tags["something"] = gomatrix.TagProperties{0}
-	logrus.Info(tagData[0].Content.Tags)
-	logrus.Info(tagData[0].Content)
 	tagContent = tagData[0].Content
-	logrus.Info(tagContent)
-	logrus.Info(tagContent.Tags)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-
-	// outJSON, err := json.Marshal(tagContent)
-	// if err != nil {
-	// 	return httputil.LogThenError(req, err)
-	// }
-
-	// logrus.Info(string(outJSON))
-	// // send data to syncapi
-	// if err := syncProducer.SendData(userID, roomID, tag); err != nil {
-	// 	return httputil.LogThenError(req, err)
-	// }
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -128,9 +103,9 @@ func PutTag(
 
 	var properties gomatrix.TagProperties
 
-	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
-		return *reqErr
-	}
+	// if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
+	// 	return *reqErr
+	// }
 
 	tagContent := newTag()
 	var dataByte []byte
@@ -201,6 +176,7 @@ func DeleteTag(
 	var tagData []gomatrix.TagData
 	tagContent := newTag()
 	err = json.Unmarshal(dataByte, &tagData)
+	tagContent = tagData[0].Content
 
 	// Check whether the Tag to be deleted exists
 	if _, ok := tagContent.Tags[tag]; ok {
@@ -235,7 +211,7 @@ func obtainSavedTags(
 	userID string,
 	roomID string,
 	accountDB *accounts.Database,
-) (string, []gomatrixserverlib.RawJSON, error) {
+) (string, []gomatrixserverlib.ClientEvent, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return "", nil, err
@@ -248,7 +224,7 @@ func obtainSavedTags(
 		return "", nil, err
 	}
 
-	return localpart, extractEventContents(data), nil
+	return localpart, data, nil
 }
 
 // saveTagData is a utility function to save the tag data into the DB
@@ -274,18 +250,4 @@ func extractEventContents(data []gomatrixserverlib.ClientEvent) []gomatrixserver
 		contentData = append(contentData, data[i].Content)
 	}
 	return contentData
-}
-
-func deleteTagData(req *http.Request,
-	localpart string,
-	roomID string,
-	accountDB *accounts.Database,
-	Tag gomatrix.TagContent,
-) error {
-	newTagData, err := json.Marshal(Tag)
-	if err != nil {
-		return err
-	}
-
-	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "m.tag", string(newTagData))
 }
