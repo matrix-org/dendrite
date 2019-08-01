@@ -42,6 +42,7 @@ func GetTags(
 	device *authtypes.Device,
 	userID string,
 	roomID string,
+	syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 
 	if device.UserID != userID {
@@ -68,6 +69,11 @@ func GetTags(
 	tagContent = tagData[0].Content
 
 	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	// send data to syncapi
+	if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
@@ -103,9 +109,9 @@ func PutTag(
 
 	var properties gomatrix.TagProperties
 
-	// if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
-	// 	return *reqErr
-	// }
+	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
+		return *reqErr
+	}
 
 	tagContent := newTag()
 	var dataByte []byte
@@ -241,13 +247,4 @@ func saveTagData(
 	}
 
 	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "m.tag", string(newTagData))
-}
-
-// extractEventContents is an utility function to obtain "content" from the ClientEvent
-func extractEventContents(data []gomatrixserverlib.ClientEvent) []gomatrixserverlib.RawJSON {
-	contentData := make([]gomatrixserverlib.RawJSON, 0, len(data))
-	for i := 0; i < len(data); i++ {
-		contentData = append(contentData, data[i].Content)
-	}
-	return contentData
 }
