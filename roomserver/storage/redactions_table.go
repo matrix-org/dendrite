@@ -99,7 +99,7 @@ func (s *redactionStatements) bulkSelectRedaction(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer func() { err = rows.Close() }()
+	defer rows.Close() // nolint: errcheck
 
 	validated = make(map[string]types.EventNID)
 	unvalidated = make(map[string]types.EventNID)
