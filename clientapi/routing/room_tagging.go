@@ -63,10 +63,14 @@ func GetTags(
 		return httputil.LogThenError(req, err)
 	}
 
-	var tagData []gomatrix.TagData
+	var tagData []gomatrixserverlib.ClientEvent
 	tagContent := newTag()
 	err = json.Unmarshal(dataByte, &tagData)
-	tagContent = tagData[0].Content
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	err = json.Unmarshal(tagData[0].Content, &tagContent)
 
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -84,6 +88,8 @@ func GetTags(
 }
 
 // PutTag implements PUT /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
+// Put functionality works by getting existing data from the DB (if any), adding
+// the tag onto the "map" and saving the new "map" onto the DB
 func PutTag(
 	req *http.Request,
 	accountDB *accounts.Database,
@@ -142,6 +148,8 @@ func PutTag(
 }
 
 // DeleteTag implements DELETE /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
+// Delete functionality works by obtaining the saved Tags, removing the intended tag from
+// the "map" and then saving the new "map" in the DB
 func DeleteTag(
 	req *http.Request,
 	accountDB *accounts.Database,
@@ -179,10 +187,17 @@ func DeleteTag(
 		return httputil.LogThenError(req, err)
 	}
 
-	var tagData []gomatrix.TagData
+	var tagData []gomatrixserverlib.ClientEvent
 	tagContent := newTag()
 	err = json.Unmarshal(dataByte, &tagData)
-	tagContent = tagData[0].Content
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	err = json.Unmarshal(tagData[0].Content, &tagContent)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
 
 	// Check whether the Tag to be deleted exists
 	if _, ok := tagContent.Tags[tag]; ok {
@@ -211,7 +226,7 @@ func DeleteTag(
 	}
 }
 
-// obtainSavedTags is a utility function to get all the tags saved in the DB
+// obtainSavedTags gets all the tags saved in the DB
 func obtainSavedTags(
 	req *http.Request,
 	userID string,
@@ -233,7 +248,7 @@ func obtainSavedTags(
 	return localpart, data, nil
 }
 
-// saveTagData is a utility function to save the tag data into the DB
+// saveTagData saves the tag data into the DB
 func saveTagData(
 	req *http.Request,
 	localpart string,
