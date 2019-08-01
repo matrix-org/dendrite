@@ -56,6 +56,9 @@ type redactionStatements struct {
 	bulkUpdateValidationStatusStmt *sql.Stmt
 }
 
+// redactedToRedactionMap is a map in the form map[redactedEventID]redactionEventNID.
+type redactedToRedactionMap map[string]types.EventNID
+
 func (s *redactionStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(redactionsSchema)
 	if err != nil {
@@ -81,13 +84,14 @@ func (s *redactionStatements) insertRedaction(
 	return err
 }
 
+// bulkSelectRedaction returns the redactions for the given event IDs.
+// Return values validated and unvalidated are both map[redactedEventID]redactedByNID.
 func (s *redactionStatements) bulkSelectRedaction(
 	ctx context.Context,
 	txn *sql.Tx,
 	eventIDs []string,
 ) (
-	validated map[string]types.EventNID,
-	unvalidated map[string]types.EventNID,
+	validated, unvalidated redactedToRedactionMap,
 	err error,
 ) {
 	stmt := common.TxStmt(txn, s.bulkSelectRedactionStmt)

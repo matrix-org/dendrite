@@ -982,13 +982,13 @@ func (d *SyncServerDatasource) validateRedactions(
 	txn *sql.Tx,
 	unvalidatedRedactions redactedToRedactionMap,
 	redactionIDToEvent map[string]*gomatrixserverlib.Event,
-	eventIDToEvent map[string]*gomatrixserverlib.Event,
+	redactedIDToEvent map[string]*gomatrixserverlib.Event,
 ) (validatedRedactions redactedToRedactionMap, err error) {
 	validatedRedactions = make(redactedToRedactionMap, len(unvalidatedRedactions))
 
 	for redactedEventID, redactedByID := range unvalidatedRedactions {
 		badEvents, needPowerLevelCheck, validationErr := common.ValidateRedaction(
-			eventIDToEvent[redactedEventID], redactionIDToEvent[redactedByID],
+			redactedIDToEvent[redactedEventID], redactionIDToEvent[redactedByID],
 		)
 		if validationErr != nil {
 			return nil, validationErr

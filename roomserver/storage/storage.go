@@ -295,7 +295,7 @@ func (d *Database) applyRedactions(
 	}
 
 	if len(unvalidatedRedactions) != 0 {
-		var newlyValidated map[string]types.EventNID
+		var newlyValidated redactedToRedactionMap
 		if newlyValidated, err = d.validateRedactions(
 			ctx, unvalidatedRedactions, redactionNIDToEvent, eventIDToEventPointer,
 		); err != nil {
@@ -325,7 +325,7 @@ func (d *Database) applyRedactions(
 
 func (d *Database) fetchRedactionEvents(
 	ctx context.Context,
-	validatedRedactions, unvalidatedRedactions map[string]types.EventNID,
+	validatedRedactions, unvalidatedRedactions redactedToRedactionMap,
 ) (redactionNIDToEvent map[types.EventNID]*gomatrixserverlib.Event, err error) {
 	redactionEventsToFetch := make([]types.EventNID, 0, len(validatedRedactions)+len(unvalidatedRedactions))
 	for _, nid := range validatedRedactions {
@@ -354,15 +354,15 @@ func (d *Database) fetchRedactionEvents(
 
 func (d *Database) validateRedactions(
 	ctx context.Context,
-	unvalidatedRedactions map[string]types.EventNID,
+	unvalidatedRedactions redactedToRedactionMap,
 	redactionNIDToEvent map[types.EventNID]*gomatrixserverlib.Event,
-	eventIDToEvent map[string]*gomatrixserverlib.Event,
-) (validatedRedactions map[string]types.EventNID, err error) {
-	validatedRedactions = make(map[string]types.EventNID, len(unvalidatedRedactions))
+	redactedIDToEvent map[string]*gomatrixserverlib.Event,
+) (validatedRedactions redactedToRedactionMap, err error) {
+	validatedRedactions = make(redactedToRedactionMap, len(unvalidatedRedactions))
 
 	for redactedEventID, redactedByNID := range unvalidatedRedactions {
 		badEvents, needPowerLevelCheck, validationErr := common.ValidateRedaction(
-			eventIDToEvent[redactedEventID], redactionNIDToEvent[redactedByNID],
+			redactedIDToEvent[redactedEventID], redactionNIDToEvent[redactedByNID],
 		)
 		if validationErr != nil {
 			return nil, validationErr
