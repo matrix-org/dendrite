@@ -185,6 +185,7 @@ func (n *Notifier) wakeupUsers(userIDs []string, newPos types.SyncPosition) {
 // fetchUserStream retrieves a stream unique to the given user. If makeIfNotExists is true,
 // a stream will be made for this user if one doesn't exist and it will be returned. This
 // function does not wait for data to be available on the stream.
+// NB: Callers should have locked the mutex before calling this function.
 func (n *Notifier) fetchUserStream(userID string, makeIfNotExists bool) *UserStream {
 	stream, ok := n.userStreams[userID]
 	if !ok && makeIfNotExists {

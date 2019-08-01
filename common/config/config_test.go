@@ -54,12 +54,14 @@ database:
   server_key: "postgresql:///server_keys"
   sync_api: "postgresql:///syn_api"
   room_server: "postgresql:///room_server"
+  appservice: "postgresql:///appservice"
 listen:
   room_server: "localhost:7770"
   client_api: "localhost:7771"
   federation_api: "localhost:7772"
   sync_api: "localhost:7773"
   media_api: "localhost:7774"
+  appservice_api: "localhost:7777"
   typing_server: "localhost:7778"
 logging:
   - type: "file"
