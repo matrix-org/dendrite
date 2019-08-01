@@ -977,6 +977,9 @@ func (d *SyncServerDatasource) fetchRedactionEvents(
 	return
 }
 
+// validateRedactions attempts to validate the given redactions.
+// Returns redactions that are successfully validated.
+// It will update the validation status in the database for the validated redactions.
 func (d *SyncServerDatasource) validateRedactions(
 	ctx context.Context,
 	txn *sql.Tx,
