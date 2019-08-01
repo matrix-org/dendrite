@@ -65,8 +65,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 	currPos := rp.notifier.CurrentPosition()
 
-	// If this is an initial sync or timeout=0 we return immediately
-	if syncReq.since == nil || syncReq.timeout == 0 {
+	if shouldReturnImmediately(syncReq) {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			return httputil.LogThenError(req, err)
@@ -135,7 +134,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.SyncP
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit)
+		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit, req.wantFullState)
 	}
 
 	if err != nil {
@@ -215,4 +214,11 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	return data, nil
+}
+
+// shouldReturnImmediately returns whether the /sync request is an initial sync,
+// or timeout=0, or full_state=true, in any of the cases the request should
+// return immediately.
+func shouldReturnImmediately(syncReq *syncRequest) bool {
+	return syncReq.since == nil || syncReq.timeout == 0 || syncReq.wantFullState
 }

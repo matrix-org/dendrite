@@ -158,5 +158,6 @@ Inbound federation rejects remote attempts to join local users to rooms
 Inbound federation rejects remote attempts to kick local users to rooms
 An event which redacts itself should be ignored
 A pair of events which redact each other should be ignored
+Full state sync includes joined rooms
 POST /rooms/:room_id/redact/:event_id as original message sender redacts message
 POST /rooms/:room_id/redact/:event_id as random user does not redact message

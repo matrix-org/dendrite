@@ -35,6 +35,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+const (
+	membershipJoin  = "join"
+	membershipLeave = "leave"
+	membershipBan   = "ban"
+)
+
 type stateDelta struct {
 	roomID      string
 	stateEvents []gomatrixserverlib.Event
@@ -274,6 +280,7 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	device authtypes.Device,
 	fromPos, toPos int64,
 	numRecentEventsPerRoom int,
+	wantFullState bool,
 	res *types.Response,
 ) ([]string, error) {
 	txn, err := d.db.BeginTx(ctx, &txReadOnlySnapshot)
@@ -287,14 +294,18 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 PDU stream positions.
 	// This works out what the 'state' key should be for each room as well as which membership block
 	// to put the room into.
-	deltas, err := d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
+	var deltas []stateDelta
+	var joinedRoomIDs []string
+	if !wantFullState {
+		deltas, joinedRoomIDs, err = d.getStateDeltas(ctx, &device, txn, fromPos, toPos, device.UserID)
+	} else {
+		deltas, joinedRoomIDs, err = d.getStateDeltasForFullStateSync(ctx, &device, txn, fromPos, toPos, device.UserID)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	joinedRoomIDs := make([]string, 0, len(deltas))
 	for _, delta := range deltas {
-		joinedRoomIDs = append(joinedRoomIDs, delta.roomID)
 		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
 		if err != nil {
 			return nil, err
@@ -371,19 +382,20 @@ func (d *SyncServerDatasource) IncrementalSync(
 	device authtypes.Device,
 	fromPos, toPos types.SyncPosition,
 	numRecentEventsPerRoom int,
+	wantFullState bool,
 ) (*types.Response, error) {
 	nextBatchPos := fromPos.WithUpdates(toPos)
 	res := types.NewResponse(nextBatchPos)
 
 	var joinedRoomIDs []string
 	var err error
-	if fromPos.PDUPosition != toPos.PDUPosition {
+	if fromPos.PDUPosition != toPos.PDUPosition || wantFullState {
 		joinedRoomIDs, err = d.addPDUDeltaToResponse(
-			ctx, device, fromPos.PDUPosition, toPos.PDUPosition, numRecentEventsPerRoom, res,
+			ctx, device, fromPos.PDUPosition, toPos.PDUPosition, numRecentEventsPerRoom, wantFullState, res,
 		)
 	} else {
 		joinedRoomIDs, err = d.roomstate.selectRoomIDsWithMembership(
-			ctx, nil, device.UserID, "join",
+			ctx, nil, device.UserID, membershipJoin,
 		)
 	}
 	if err != nil {
@@ -432,7 +444,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	res = types.NewResponse(toPos)
 
 	// Extract room state and recent events for all rooms the user is joined to.
-	joinedRoomIDs, err = d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "join")
+	joinedRoomIDs, err = d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, membershipJoin)
 	if err != nil {
 		return
 	}
@@ -635,7 +647,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	res *types.Response,
 ) error {
 	endPos := toPos
-	if delta.membershipPos > 0 && delta.membership == "leave" {
+	if delta.membershipPos > 0 && delta.membership == membershipLeave {
 		// make sure we don't leak recent events after the leave event.
 		// TODO: History visibility makes this somewhat complex to handle correctly. For example:
 		// TODO: This doesn't work for join -> leave in a single /sync request (see events prior to join).
@@ -653,9 +665,23 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	recentEvents := streamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 
-	// Don't bother appending empty room entries
-	if len(recentEvents) == 0 && len(delta.stateEvents) == 0 {
-		return nil
+	var prevPDUPos int64
+
+	if len(recentEvents) == 0 {
+		if len(delta.stateEvents) == 0 {
+			// Don't bother appending empty room entries
+			return nil
+		}
+
+		// If full_state=true and since is already up to date, then we'll have
+		// state events but no recent events.
+		prevPDUPos = toPos - 1
+	} else {
+		prevPDUPos = recentStreamEvents[0].streamPosition - 1
+	}
+
+	if prevPDUPos <= 0 {
+		prevPDUPos = 1
 	}
 
 	// Note that we're not passing txn into applyRedactions because txn is
@@ -668,32 +694,22 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	}
 
 	switch delta.membership {
-	case "join":
+	case membershipJoin:
 		jr := types.NewJoinResponse()
-		if prevPDUPos := recentStreamEvents[0].streamPosition - 1; prevPDUPos > 0 {
-			// Use the short form of batch token for prev_batch
-			jr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
-		} else {
-			// Use the short form of batch token for prev_batch
-			jr.Timeline.PrevBatch = "1"
-		}
+		// Use the short form of batch token for prev_batch
+		jr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.roomID] = *jr
-	case "leave":
+	case membershipLeave:
 		fallthrough // transitions to leave are the same as ban
-	case "ban":
+	case membershipBan:
 		// TODO: recentEvents may contain events that this user is not allowed to see because they are
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
-		if prevPDUPos := recentStreamEvents[0].streamPosition - 1; prevPDUPos > 0 {
-			// Use the short form of batch token for prev_batch
-			lr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
-		} else {
-			// Use the short form of batch token for prev_batch
-			lr.Timeline.PrevBatch = "1"
-		}
+		// Use the short form of batch token for prev_batch
+		lr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -789,10 +805,14 @@ func (d *SyncServerDatasource) fetchMissingStateEvents(
 	return events, nil
 }
 
+// getStateDeltas returns the state deltas between fromPos and toPos,
+// exclusive of oldPos, inclusive of newPos, for the rooms in which
+// the user has new membership events.
+// A list of joined room IDs is also returned in case the caller needs it.
 func (d *SyncServerDatasource) getStateDeltas(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
 	fromPos, toPos int64, userID string,
-) ([]stateDelta, error) {
+) ([]stateDelta, []string, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
 	// - For each room which has membership list changes:
@@ -806,11 +826,11 @@ func (d *SyncServerDatasource) getStateDeltas(
 	// get all the state events ever between these two positions
 	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for roomID, stateStreamEvents := range state {
@@ -821,16 +841,12 @@ func (d *SyncServerDatasource) getStateDeltas(
 			//       the 'state' part of the response though, so is transparent modulo bandwidth concerns as it is not added to
 			//       the timeline.
 			if membership := getMembershipFromEvent(&ev.Event, userID); membership != "" {
-				if membership == "join" {
+				if membership == membershipJoin {
 					// send full room state down instead of a delta
-					var allState []gomatrixserverlib.Event
-					allState, err = d.roomstate.selectCurrentState(ctx, txn, roomID)
+					var s []streamEvent
+					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID)
 					if err != nil {
-						return nil, err
-					}
-					s := make([]streamEvent, len(allState))
-					for i := 0; i < len(s); i++ {
-						s[i] = streamEvent{Event: allState[i], streamPosition: 0}
+						return nil, nil, err
 					}
 					state[roomID] = s
 					continue // we'll add this room in when we do joined rooms
@@ -848,19 +864,92 @@ func (d *SyncServerDatasource) getStateDeltas(
 	}
 
 	// Add in currently joined rooms
-	joinedRoomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "join")
+	joinedRoomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, membershipJoin)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, stateDelta{
-			membership:  "join",
+			membership:  membershipJoin,
 			stateEvents: streamEventsToEvents(device, state[joinedRoomID]),
 			roomID:      joinedRoomID,
 		})
 	}
 
-	return deltas, nil
+	return deltas, joinedRoomIDs, nil
+}
+
+// getStateDeltasForFullStateSync is a variant of getStateDeltas used for /sync
+// requests with full_state=true.
+// Fetches full state for all joined rooms and uses selectStateInRange to get
+// updates for other rooms.
+func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
+	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
+	fromPos, toPos int64, userID string,
+) ([]stateDelta, []string, error) {
+	joinedRoomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, "join")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Use a reasonable initial capacity
+	deltas := make([]stateDelta, 0, len(joinedRoomIDs))
+
+	// Add full states for all joined rooms
+	for _, joinedRoomID := range joinedRoomIDs {
+		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID)
+		if stateErr != nil {
+			return nil, nil, stateErr
+		}
+		deltas = append(deltas, stateDelta{
+			membership:  "join",
+			stateEvents: streamEventsToEvents(device, s),
+			roomID:      joinedRoomID,
+		})
+	}
+
+	// Get all the state events ever between these two positions
+	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos)
+	if err != nil {
+		return nil, nil, err
+	}
+	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for roomID, stateStreamEvents := range state {
+		for _, ev := range stateStreamEvents {
+			if membership := getMembershipFromEvent(&ev.Event, userID); membership != "" {
+				if membership != "join" { // We've already added full state for all joined rooms above.
+					deltas = append(deltas, stateDelta{
+						membership:    membership,
+						membershipPos: ev.streamPosition,
+						stateEvents:   streamEventsToEvents(device, stateStreamEvents),
+						roomID:        roomID,
+					})
+				}
+
+				break
+			}
+		}
+	}
+
+	return deltas, joinedRoomIDs, nil
+}
+
+func (d *SyncServerDatasource) currentStateStreamEventsForRoom(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) ([]streamEvent, error) {
+	allState, err := d.roomstate.selectCurrentState(ctx, txn, roomID)
+	if err != nil {
+		return nil, err
+	}
+	s := make([]streamEvent, len(allState))
+	for i := 0; i < len(s); i++ {
+		s[i] = streamEvent{Event: allState[i], streamPosition: 0}
+	}
+	return s, nil
 }
 
 // applyRedactionsForEventLists applies necessary redactions to the events in the lists in-place.
