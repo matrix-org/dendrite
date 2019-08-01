@@ -183,7 +183,6 @@ func DeleteTag(
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	tagContent := newTag()
 
 	// If there are no tags in the database, exit.
 	if len(data) == 0 {
@@ -194,13 +193,14 @@ func DeleteTag(
 		}
 	}
 
-	byteData, err := json.Marshal(data)
+	dataByte, err := json.Marshal(data)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
-	if err = json.Unmarshal(byteData, &tagContent); err != nil {
-		return httputil.LogThenError(req, err)
-	}
+
+	var tagData []gomatrix.TagData
+	tagContent := newTag()
+	err = json.Unmarshal(dataByte, &tagData)
 
 	// Check whether the Tag to be deleted exists
 	if _, ok := tagContent.Tags[tag]; ok {
@@ -274,4 +274,18 @@ func extractEventContents(data []gomatrixserverlib.ClientEvent) []gomatrixserver
 		contentData = append(contentData, data[i].Content)
 	}
 	return contentData
+}
+
+func deleteTagData(req *http.Request,
+	localpart string,
+	roomID string,
+	accountDB *accounts.Database,
+	Tag gomatrix.TagContent,
+) error {
+	newTagData, err := json.Marshal(Tag)
+	if err != nil {
+		return err
+	}
+
+	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "m.tag", string(newTagData))
 }
