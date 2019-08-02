@@ -107,7 +107,7 @@ func PutTag(
 		if err = json.Unmarshal(data[0].Content, &tagContent); err != nil {
 			return httputil.LogThenError(req, err)
 		}
-	}else{
+	} else {
 		tagContent = newTag()
 	}
 	tagContent.Tags[tag] = properties
