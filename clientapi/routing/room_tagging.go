@@ -163,7 +163,7 @@ func DeleteTag(
 		}
 	}
 
-	tagContent := newTag()
+	var tagContent gomatrix.TagContent
 	err = json.Unmarshal(data[0].Content, &tagContent)
 	if err != nil {
 		return httputil.LogThenError(req, err)
