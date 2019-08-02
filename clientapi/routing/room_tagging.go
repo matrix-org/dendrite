@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -28,7 +30,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// newTag creates and returns a new Tag type
+// newTag creates and returns a new gomatrix.TagContent
 func newTag() gomatrix.TagContent {
 	return gomatrix.TagContent{
 		Tags: make(map[string]gomatrix.TagProperties),
@@ -53,43 +55,32 @@ func GetTags(
 	}
 
 	_, data, err := obtainSavedTags(req, userID, roomID, accountDB)
-
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	dataByte, err := json.Marshal(data)
-	if err != nil {
-		return httputil.LogThenError(req, err)
+	if len(data) == 0 {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
+		}
 	}
 
-	var tagData []gomatrixserverlib.ClientEvent
-	tagContent := newTag()
-	err = json.Unmarshal(dataByte, &tagData)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	err = json.Unmarshal(tagData[0].Content, &tagContent)
-
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	// send data to syncapi
-	if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
-		return httputil.LogThenError(req, err)
-	}
+	go func() {
+		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+			logrus.WithError(err).Error("Incremental sync operation failed")
+		}
+	}()
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: tagContent,
+		JSON: struct{}{},
 	}
 }
 
 // PutTag implements PUT /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
 // Put functionality works by getting existing data from the DB (if any), adding
-// the tag onto the "map" and saving the new "map" onto the DB
+// the tag on to the "map" and saving the new "map" onto the DB
 func PutTag(
 	req *http.Request,
 	accountDB *accounts.Database,
@@ -107,39 +98,32 @@ func PutTag(
 		}
 	}
 
-	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
-
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
 	var properties gomatrix.TagProperties
-
 	if reqErr := httputil.UnmarshalJSONRequest(req, &properties); reqErr != nil {
 		return *reqErr
 	}
 
-	tagContent := newTag()
-	var dataByte []byte
-	if len(data) > 0 {
-		dataByte, err = json.Marshal(data)
-		if err != nil {
-			return httputil.LogThenError(req, err)
-		}
-		if err = json.Unmarshal(dataByte, &tagContent); err != nil {
-			return httputil.LogThenError(req, err)
-		}
-	}
-	tagContent.Tags[tag] = properties
-	err = saveTagData(req, localpart, roomID, accountDB, tagContent)
+	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	// send data to syncapi
-	if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+	tagContent := newTag()
+	if len(data) > 0 {
+		if err = json.Unmarshal(data[0].Content, &tagContent); err != nil {
+			return httputil.LogThenError(req, err)
+		}
+	}
+	tagContent.Tags[tag] = properties
+	if err = saveTagData(req, localpart, roomID, accountDB, tagContent); err != nil {
 		return httputil.LogThenError(req, err)
 	}
+
+	go func() {
+		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+			logrus.WithError(err).Error("Incremental sync operation failed")
+		}
+	}()
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -163,38 +147,26 @@ func DeleteTag(
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Cannot delete another user's tags"),
+			JSON: jsonerror.Forbidden("Cannot modify another user's tags"),
 		}
 	}
 
 	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
-
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	// If there are no tags in the database, exit.
+	// If there are no tags in the database, exit
 	if len(data) == 0 {
-		//Synapse returns a 200 OK response on finding no Tags, same policy is followed here.
+		//Specifications mentions a 200 OK response is returned on finding no Tags, same policy is followed here.
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
 
-	dataByte, err := json.Marshal(data)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	var tagData []gomatrixserverlib.ClientEvent
 	tagContent := newTag()
-	err = json.Unmarshal(dataByte, &tagData)
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	err = json.Unmarshal(tagData[0].Content, &tagContent)
+	err = json.Unmarshal(data[0].Content, &tagContent)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -203,22 +175,21 @@ func DeleteTag(
 	if _, ok := tagContent.Tags[tag]; ok {
 		delete(tagContent.Tags, tag)
 	} else {
-		//Synapse returns a 200 OK response on finding no Tags, same policy is followed here.
+		//Specifications mentions a 200 OK response is returned on finding no Tags, same policy is followed here.
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
-	err = saveTagData(req, localpart, roomID, accountDB, tagContent)
-
-	if err != nil {
+	if err = saveTagData(req, localpart, roomID, accountDB, tagContent); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	// send data to syncapi
-	if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
-		return httputil.LogThenError(req, err)
-	}
+	go func() {
+		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+			logrus.WithError(err).Error("Incremental sync operation failed")
+		}
+	}()
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
