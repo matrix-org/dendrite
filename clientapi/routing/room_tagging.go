@@ -115,6 +115,8 @@ func PutTag(
 		return httputil.LogThenError(req, err)
 	}
 
+	// Send data to syncProducer in order to inform clients of changes
+	// Run in a goroutine in order to prevent blocking the tag request response
 	go func() {
 		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
 			logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
@@ -181,6 +183,8 @@ func DeleteTag(
 		return httputil.LogThenError(req, err)
 	}
 
+	// Send data to syncProducer in order to inform clients of changes
+	// Run in a goroutine in order to prevent blocking the tag request response
 	go func() {
 		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
 			logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
@@ -193,7 +197,8 @@ func DeleteTag(
 	}
 }
 
-// obtainSavedTags gets all the tags saved in the DB
+// obtainSavedTags gets all tags scoped to a userID and roomID
+// from the database
 func obtainSavedTags(
 	req *http.Request,
 	userID string,
@@ -208,14 +213,11 @@ func obtainSavedTags(
 	data, err := accountDB.GetAccountDataByType(
 		req.Context(), localpart, roomID, "m.tag",
 	)
-	if err != nil {
-		return "", nil, err
-	}
 
-	return localpart, data, nil
+	return localpart, data, err
 }
 
-// saveTagData saves the tag data into the DB
+// saveTagData saves the provided tag data into the database
 func saveTagData(
 	req *http.Request,
 	localpart string,
