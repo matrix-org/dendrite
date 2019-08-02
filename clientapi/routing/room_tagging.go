@@ -74,7 +74,7 @@ func GetTags(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: data[0].Content,
 	}
 }
 
