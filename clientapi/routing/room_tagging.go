@@ -66,12 +66,6 @@ func GetTags(
 		}
 	}
 
-	go func() {
-		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
-			logrus.WithError(err).Error("Incremental sync operation failed")
-		}
-	}()
-
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: data[0].Content,
@@ -80,7 +74,7 @@ func GetTags(
 
 // PutTag implements PUT /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
 // Put functionality works by getting existing data from the DB (if any), adding
-// the tag on to the "map" and saving the new "map" onto the DB
+// the tag to the "map" and saving the new "map" to the DB
 func PutTag(
 	req *http.Request,
 	accountDB *accounts.Database,
@@ -108,11 +102,13 @@ func PutTag(
 		return httputil.LogThenError(req, err)
 	}
 
-	tagContent := newTag()
+	var tagContent gomatrix.TagContent
 	if len(data) > 0 {
 		if err = json.Unmarshal(data[0].Content, &tagContent); err != nil {
 			return httputil.LogThenError(req, err)
 		}
+	}else{
+		tagContent = newTag()
 	}
 	tagContent.Tags[tag] = properties
 	if err = saveTagData(req, localpart, roomID, accountDB, tagContent); err != nil {
@@ -121,7 +117,7 @@ func PutTag(
 
 	go func() {
 		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
-			logrus.WithError(err).Error("Incremental sync operation failed")
+			logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
 		}
 	}()
 
@@ -132,7 +128,7 @@ func PutTag(
 }
 
 // DeleteTag implements DELETE /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
-// Delete functionality works by obtaining the saved Tags, removing the intended tag from
+// Delete functionality works by obtaining the saved tags, removing the intended tag from
 // the "map" and then saving the new "map" in the DB
 func DeleteTag(
 	req *http.Request,
@@ -158,7 +154,7 @@ func DeleteTag(
 
 	// If there are no tags in the database, exit
 	if len(data) == 0 {
-		//Specifications mentions a 200 OK response is returned on finding no Tags, same policy is followed here.
+		// Spec only defines 200 responses for this endpoint so we don't return anything else.
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
@@ -171,11 +167,11 @@ func DeleteTag(
 		return httputil.LogThenError(req, err)
 	}
 
-	// Check whether the Tag to be deleted exists
+	// Check whether the tag to be deleted exists
 	if _, ok := tagContent.Tags[tag]; ok {
 		delete(tagContent.Tags, tag)
 	} else {
-		//Specifications mentions a 200 OK response is returned on finding no Tags, same policy is followed here.
+		// Spec only defines 200 responses for this endpoint so we don't return anything else.
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
@@ -187,7 +183,7 @@ func DeleteTag(
 
 	go func() {
 		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
-			logrus.WithError(err).Error("Incremental sync operation failed")
+			logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
 		}
 	}()
 
