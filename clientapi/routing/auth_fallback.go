@@ -35,7 +35,6 @@ const recaptchaTemplate = `
 <script src="https://www.google.com/recaptcha/api.js"
     async defer></script>
 <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
 <script>
 function captchaDone() {
     $('#registrationForm').submit();
@@ -109,13 +108,10 @@ func AuthFallback(
 	sessionID := req.URL.Query().Get("session")
 
 	if sessionID == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		_, err := w.Write([]byte("Session ID not provided"))
-		if err != nil {
-			res := httputil.LogThenError(req, err)
-			return &res
-		}
-		return nil
+		return writeErrorMessage(w, req,
+			"Session ID not provided",
+			http.StatusBadRequest,
+		)
 	}
 
 	serveRecaptcha := func() {
@@ -135,21 +131,25 @@ func AuthFallback(
 	if req.Method == http.MethodGet {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			if cfg.Matrix.RecaptchaPublicKey == "" {
-				w.WriteHeader(http.StatusInternalServerError)
-				_, err := w.Write([]byte("This Homeserver doesn't have a recaptcha public key"))
-				if err != nil {
-					res := httputil.LogThenError(req, err)
-					return &res
+			if cfg.Matrix.RecaptchaEnabled {
+				if cfg.Matrix.RecaptchaPublicKey == "" {
+					return writeErrorMessage(w, req,
+						"This Homeserver doesn't have a recaptcha public key",
+						http.StatusInternalServerError,
+					)
 				}
-				return nil
+			} else {
+				return writeErrorMessage(w, req,
+					"Recaptcha login is disabled on this Homeserver",
+					http.StatusBadRequest,
+				)
 			}
 
 			serveRecaptcha()
 			return nil
 		}
 		return &util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Unknown auth stage type"),
 		}
 	} else if req.Method == http.MethodPost {
@@ -173,7 +173,21 @@ func AuthFallback(
 		return nil
 	}
 	return &util.JSONResponse{
-		Code: 405,
+		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
+}
+
+// WriteErrorMessage writes an error response with the given header and message
+func writeErrorMessage(
+	w http.ResponseWriter, req *http.Request,
+	message string, header int,
+) *util.JSONResponse {
+	w.WriteHeader(header)
+	_, err := w.Write([]byte(message))
+	if err != nil {
+		res := httputil.LogThenError(req, err)
+		return &res
+	}
+	return nil
 }
