@@ -167,3 +167,4 @@ Newly updated tags appear in an incremental v2 /sync
 Deleted tags appear in an incremental v2 /sync
 POST /rooms/:room_id/redact/:event_id as original message sender redacts message
 POST /rooms/:room_id/redact/:event_id as random user does not redact message
+POST /redact disallows redaction of event in different room
