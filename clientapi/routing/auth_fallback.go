@@ -162,8 +162,8 @@ func AuthFallback(
 
 		response := req.Form.Get("g-recaptcha-response")
 		if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
-			serveRecaptcha()
-			return nil
+			util.GetLogger(req.Context()).Error(err)
+			return err
 		}
 
 		// Success. Add recaptcha as a completed login flow
