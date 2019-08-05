@@ -1,0 +1,167 @@
+GET /register yields a set of flows
+POST /register can create a user
+POST /register downcases capitals in usernames
+POST /register rejects registration of usernames with '!'
+POST /register rejects registration of usernames with '"'
+POST /register rejects registration of usernames with ':'
+POST /register rejects registration of usernames with '?'
+POST /register rejects registration of usernames with '\'
+POST /register rejects registration of usernames with '@'
+POST /register rejects registration of usernames with '['
+POST /register rejects registration of usernames with ']'
+POST /register rejects registration of usernames with '{'
+POST /register rejects registration of usernames with '|'
+POST /register rejects registration of usernames with '}'
+POST /register rejects registration of usernames with '£'
+POST /register rejects registration of usernames with 'é'
+POST /register rejects registration of usernames with '\n'
+POST /register rejects registration of usernames with '''
+GET /login yields a set of flows
+POST /login can log in as a user
+POST /login can log in as a user with just the local part of the id
+POST /login as non-existing user is rejected
+POST /login wrong password is rejected
+GET /events initially
+GET /initialSync initially
+Version responds 200 OK with valid structure
+PUT /profile/:user_id/displayname sets my name
+GET /profile/:user_id/displayname publicly accessible
+PUT /profile/:user_id/avatar_url sets my avatar
+GET /profile/:user_id/avatar_url publicly accessible
+GET /device/{deviceId} gives a 404 for unknown devices
+PUT /device/{deviceId} gives a 404 for unknown devices
+POST /createRoom makes a public room
+POST /createRoom makes a private room
+POST /createRoom makes a private room with invites
+POST /createRoom makes a room with a name
+POST /createRoom makes a room with a topic
+Can /sync newly created room
+GET /rooms/:room_id/state/m.room.member/:user_id fetches my membership
+GET /rooms/:room_id/state/m.room.power_levels fetches powerlevels
+POST /join/:room_alias can join a room
+POST /join/:room_id can join a room
+POST /join/:room_id can join a room with custom content
+POST /join/:room_alias can join a room with custom content
+POST /rooms/:room_id/join can join a room
+POST /rooms/:room_id/leave can leave a room
+POST /rooms/:room_id/invite can send an invite
+POST /rooms/:room_id/ban can ban a user
+POST /rooms/:room_id/send/:event_type sends a message
+PUT /rooms/:room_id/send/:event_type/:txn_id sends a message
+PUT /rooms/:room_id/send/:event_type/:txn_id deduplicates the same txn id
+GET /rooms/:room_id/state/m.room.power_levels can fetch levels
+PUT /rooms/:room_id/state/m.room.power_levels can set levels
+PUT power_levels should not explode if the old power levels were empty
+Both GET and PUT work
+POST /rooms/:room_id/read_markers can create read marker
+User signups are forbidden from starting with '_'
+Can logout all devices
+Request to logout with invalid an access token is rejected
+Request to logout without an access token is rejected
+Room creation reports m.room.create to myself
+Room creation reports m.room.member to myself
+New room members see their own join event
+Existing members see new members' join events
+setting 'm.room.power_levels' respects room powerlevel
+Unprivileged users can set m.room.topic if it only needs level 0
+Users cannot set ban powerlevel higher than their own
+Users cannot set kick powerlevel higher than their own
+Users cannot set redact powerlevel higher than their own
+Can get rooms/{roomId}/members for a departed room (SPEC-216)
+3pid invite join with wrong but valid signature are rejected
+3pid invite join valid signature but revoked keys are rejected
+3pid invite join valid signature but unreachable ID server are rejected
+Room members can override their displayname on a room-specific basis
+Room members can join a room with an overridden displayname
+displayname updates affect room member events
+avatar_url updates affect room member events
+Real non-joined user cannot call /events on shared room
+Real non-joined user cannot call /events on invited room
+Real non-joined user cannot call /events on joined room
+Real non-joined user cannot call /events on default room
+Real non-joined users can get state for world_readable rooms
+Real non-joined users can get individual state for world_readable rooms
+Real non-joined users can get individual state for world_readable rooms after leaving
+Real non-joined users cannot send messages to guest_access rooms if not joined
+Real users can sync from world_readable guest_access rooms if joined
+Real users can sync from default guest_access rooms if joined
+Can't forget room you're still in
+Can get rooms/{roomId}/members
+Can create filter
+Can download filter
+Can sync
+Can sync a joined room
+Newly joined room is included in an incremental sync
+User is offline if they set_presence=offline in their sync
+Changes to state are included in an incremental sync
+A change to displayname should appear in incremental /sync
+Current state appears in timeline in private history
+Current state appears in timeline in private history with many messages before
+Rooms a user is invited to appear in an initial sync
+Rooms a user is invited to appear in an incremental sync
+Sync can be polled for updates
+Sync is woken up for leaves
+Newly left rooms appear in the leave section of incremental sync
+We should see our own leave event, even if history_visibility is restricted (SYN-662)
+We should see our own leave event when rejecting an invite, even if history_visibility is restricted (riot-web/3462)
+Newly left rooms appear in the leave section of gapped sync
+Previously left rooms don't appear in the leave section of sync
+Left rooms appear in the leave section of full state sync
+Newly banned rooms appear in the leave section of incremental sync
+Newly banned rooms appear in the leave section of incremental sync
+local user can join room with version 1
+User can invite local user to room with version 1
+local user can join room with version 2
+User can invite local user to room with version 2
+local user can join room with version 3
+User can invite local user to room with version 3
+local user can join room with version 4
+User can invite local user to room with version 4
+Should reject keys claiming to belong to a different user
+Can add account data
+Can add account data to room
+Latest account data appears in v2 /sync
+New account data appears in incremental v2 /sync
+Checking local federation server
+Inbound federation can query profile data
+Outbound federation can send room-join requests
+Outbound federation can send events
+Inbound federation can backfill events
+Backfill checks the events requested belong to the room
+Can upload without a file name
+Can download without a file name locally
+Can upload with ASCII file name
+Can send image in room message
+AS cannot create users outside its own namespace
+Regular users cannot register within the AS namespace
+AS can't set displayname for random users
+AS user (not ghost) can join room without registering, with user_id query param
+Changing the actions of an unknown default rule fails with 404
+Changing the actions of an unknown rule fails with 404
+Enabling an unknown default rule fails with 404
+Trying to get push rules with unknown rule_id fails with 404
+Events come down the correct room
+local user can join room with version 5
+User can invite local user to room with version 5
+Inbound federation can receive room-join requests
+Typing events appear in initial sync
+Typing events appear in incremental sync
+Typing events appear in gapped sync
+Inbound federation of state requires event_id as a mandatory paramater
+Inbound federation of state_ids requires event_id as a mandatory paramater
+POST /register returns the same device_id as that in the request
+POST /login returns the same device_id as that in the request
+POST /createRoom with creation content
+User can create and send/receive messages in a room with version 1
+POST /createRoom ignores attempts to set the room version via creation_content
+Inbound federation rejects remote attempts to join local users to rooms
+Inbound federation rejects remote attempts to kick local users to rooms
+An event which redacts itself should be ignored
+A pair of events which redact each other should be ignored
+Full state sync includes joined rooms
+Can add tag
+Can remove tag
+Can list tags for a room
+Tags appear in an initial v2 /sync
+Newly updated tags appear in an incremental v2 /sync
+Deleted tags appear in an incremental v2 /sync

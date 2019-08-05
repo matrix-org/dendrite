@@ -12,7 +12,7 @@ Dendrite can be run in one of two configurations:
 
 ## Requirements
 
- - Go 1.8+
+ - Go 1.11+
  - Postgres 9.5+
  - For Kafka (optional if using the monolith server):
    - Unix-based system (https://kafka.apache.org/documentation/#os)
@@ -22,7 +22,7 @@ Dendrite can be run in one of two configurations:
 
 ## Setting up a development environment
 
-Assumes Go 1.8 and JDK 1.8 are already installed and are on PATH.
+Assumes Go 1.10+ and JDK 1.8+ are already installed and are on PATH.
 
 ```bash
 # Get the code
@@ -30,16 +30,15 @@ git clone https://github.com/matrix-org/dendrite
 cd dendrite
 
 # Build it
-go get github.com/constabulary/gb/...
-gb build
+./build.sh
 ```
 
 If using Kafka, install and start it (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
 ```bash
-MIRROR=http://apache.mirror.anlx.net/kafka/0.10.2.0/kafka_2.11-0.10.2.0.tgz
+KAFKA_URL=http://archive.apache.org/dist/kafka/2.1.0/kafka_2.11-2.1.0.tgz
 
 # Only download the kafka if it isn't already downloaded.
-test -f kafka.tgz || wget $MIRROR -O kafka.tgz
+test -f kafka.tgz || wget $KAFKA_URL -O kafka.tgz
 # Unpack the kafka over the top of any existing installation
 mkdir -p kafka && tar xzf kafka.tgz -C kafka --strip-components 1
 
@@ -72,7 +71,7 @@ Dendrite requires a postgres database engine, version 9.5 or later.
   ```
 * Create databases:
   ```bash
-  for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi naffka; do
+  for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi appservice naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
@@ -95,13 +94,15 @@ test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
 
 Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Things that will need editing include *at least*:
 * `server_name`
-* `database/*`
+* `database/*` (All lines in the database section must have the username and password of the user created with the `createuser` command above. eg:`dendrite:password@localhost`)
 
 
 ## Starting a monolith server
 
 It is possible to use 'naffka' as an in-process replacement to Kafka when using
-the monolith server. To do this, set `use_naffka: true` in `dendrite.yaml`.
+the monolith server. To do this, set `use_naffka: true` in `dendrite.yaml` and uncomment
+the necessary line related to naffka in the `database` section. Be sure to update the 
+database username and password if needed.
 
 The monolith server can be started as shown below. By default it listens for
 HTTP connections on port 8008, so point your client at
@@ -252,4 +253,15 @@ you want to support federation.
 
 ```bash
 ./bin/dendrite-federation-sender-server --config dendrite.yaml
+```
+
+### Run an appservice server 
+
+This sends events from the network to [application
+services](https://matrix.org/docs/spec/application_service/unstable.html)
+running locally.  This is only required if you want to support running
+application services on your homeserver.
+
+```bash
+./bin/dendrite-appservice-server --config dendrite.yaml
 ```

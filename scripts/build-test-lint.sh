@@ -4,20 +4,13 @@
 
 set -eu
 
-export GOPATH="$(pwd):$(pwd)/vendor"
-export PATH="$PATH:$(pwd)/bin"
-
-echo "Checking that it builds"
-gb build
-
 # Check that all the packages can build.
 # When `go build` is given multiple packages it won't output anything, and just
-# checks that everything builds. This seems to do a better job of handling
-# missing imports than `gb build` does.
-echo "Double checking it builds..."
-go build github.com/matrix-org/dendrite/cmd/...
+# checks that everything builds.
+echo "Checking that it builds..."
+go build ./cmd/...
 
 ./scripts/find-lint.sh
 
 echo "Testing..."
-gb test
+go test ./...
