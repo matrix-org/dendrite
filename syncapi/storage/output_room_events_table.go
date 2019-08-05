@@ -152,7 +152,6 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 			}).Warn("StateBetween: ignoring deleted state")
 		}
 
-		// TODO: Handle redacted events
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
 		if err != nil {
 			return nil, nil, err
@@ -271,7 +270,6 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 		if err := rows.Scan(&streamPos, &eventBytes, &deviceID, &txnID); err != nil {
 			return nil, err
 		}
-		// TODO: Handle redacted events
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
 		if err != nil {
 			return nil, err
