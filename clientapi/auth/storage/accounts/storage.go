@@ -230,7 +230,7 @@ func (d *Database) newMembership(
 		}
 
 		// Only "join" membership events can be considered as new memberships
-		if membership == "join" {
+		if membership == gomatrixserverlib.Join {
 			if err := d.saveMembership(ctx, txn, localpart, roomID, eventID); err != nil {
 				return err
 			}

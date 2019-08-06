@@ -202,7 +202,7 @@ func createInviteFrom3PIDInvite(
 	content := common.MemberContent{
 		AvatarURL:   profile.AvatarURL,
 		DisplayName: profile.DisplayName,
-		Membership:  "invite",
+		Membership:  gomatrixserverlib.Invite,
 		ThirdPartyInvite: &common.TPInvite{
 			Signed: inv.Signed,
 		},
