@@ -292,7 +292,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetProfile(req, accountDB, vars["userID"], asAPI)
+			return GetProfile(req, accountDB, &cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -302,7 +302,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetAvatarURL(req, accountDB, vars["userID"], asAPI)
+			return GetAvatarURL(req, accountDB, &cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -324,7 +324,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetDisplayName(req, accountDB, vars["userID"], asAPI)
+			return GetDisplayName(req, accountDB, &cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
