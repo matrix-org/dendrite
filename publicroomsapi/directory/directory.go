@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
 )
@@ -39,7 +40,7 @@ func GetVisibility(
 
 	var v roomVisibility
 	if isPublic {
-		v.Visibility = "public"
+		v.Visibility = gomatrixserverlib.Public
 	} else {
 		v.Visibility = "private"
 	}
@@ -61,7 +62,7 @@ func SetVisibility(
 		return *reqErr
 	}
 
-	isPublic := v.Visibility == "public"
+	isPublic := v.Visibility == gomatrixserverlib.Public
 	if err := publicRoomsDatabase.SetRoomVisibility(req.Context(), isPublic, roomID); err != nil {
 		return httputil.LogThenError(req, err)
 	}

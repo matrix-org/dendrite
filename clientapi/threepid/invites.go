@@ -91,7 +91,7 @@ func CheckAndProcessInvite(
 	producer *producers.RoomserverProducer, membership string, roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
-	if membership != "invite" || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
+	if membership != gomatrixserverlib.Invite || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
 		// If none of the 3PID-specific fields are supplied, it's a standard invite
 		// so return nil for it to be processed as such
 		return

@@ -160,3 +160,9 @@ An event which redacts itself should be ignored
 A pair of events which redact each other should be ignored
 Full state sync includes joined rooms
 A message sent after an initial sync appears in the timeline of an incremental sync.
+Can add tag
+Can remove tag
+Can list tags for a room
+Tags appear in an initial v2 /sync
+Newly updated tags appear in an incremental v2 /sync
+Deleted tags appear in an incremental v2 /sync
