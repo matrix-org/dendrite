@@ -22,7 +22,7 @@ import (
 // https://matrix.org/docs/spec/client_server/r0.3.0.html#post-matrix-client-r0-user-userid-filter
 // to SQL wildcards that can be used with LIKE()
 func filterConvertTypeWildcardToSQL(values []string) []string {
-	if len(values) == 0 {
+	if values == nil {
 		// Return nil instead of []string{} so IS NULL can work correctly when
 		// the return value is passed into SQL queries
 		return nil
