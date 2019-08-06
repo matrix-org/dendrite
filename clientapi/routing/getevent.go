@@ -111,7 +111,7 @@ func GetEvent(
 			if err != nil {
 				return httputil.LogThenError(req, err)
 			}
-			if membership == "join" {
+			if membership == gomatrixserverlib.Join {
 				return util.JSONResponse{
 					Code: http.StatusOK,
 					JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
@@ -122,6 +122,6 @@ func GetEvent(
 
 	return util.JSONResponse{
 		Code: http.StatusNotFound,
-		JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event."),
+		JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
 	}
 }
