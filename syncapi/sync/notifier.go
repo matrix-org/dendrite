@@ -93,16 +93,16 @@ func (n *Notifier) OnNewEvent(
 			} else {
 				// Keep the joined user map up-to-date
 				switch membership {
-				case "invite":
+				case gomatrixserverlib.Invite:
 					usersToNotify = append(usersToNotify, targetUserID)
-				case "join":
+				case gomatrixserverlib.Join:
 					// Manually append the new user's ID so they get notified
 					// along all members in the room
 					usersToNotify = append(usersToNotify, targetUserID)
 					n.addJoinedUser(ev.RoomID(), targetUserID)
-				case "leave":
+				case gomatrixserverlib.Leave:
 					fallthrough
-				case "ban":
+				case gomatrixserverlib.Ban:
 					n.removeJoinedUser(ev.RoomID(), targetUserID)
 				}
 			}

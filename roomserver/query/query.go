@@ -359,7 +359,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 			return nil, err
 		}
 
-		if membership == "join" {
+		if membership == gomatrixserverlib.Join {
 			events = append(events, event)
 		}
 	}

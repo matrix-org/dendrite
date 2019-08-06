@@ -70,7 +70,7 @@ func JoinRoomByIDOrAlias(
 		return httputil.LogThenError(req, err)
 	}
 
-	content["membership"] = "join"
+	content["membership"] = gomatrixserverlib.Join
 	content["displayname"] = profile.DisplayName
 	content["avatar_url"] = profile.AvatarURL
 

@@ -56,10 +56,6 @@ const (
 )
 
 const (
-	joinRulePublic = "public"
-	joinRuleInvite = "invite"
-)
-const (
 	historyVisibilityShared = "shared"
 	// TODO: These should be implemented once history visibility is implemented
 	// historyVisibilityWorldReadable = "world_readable"
@@ -201,7 +197,7 @@ func createRoom(
 	}
 
 	membershipContent := common.MemberContent{
-		Membership:  "join",
+		Membership:  gomatrixserverlib.Join,
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
 	}
@@ -209,19 +205,19 @@ func createRoom(
 	var joinRules, historyVisibility string
 	switch r.Preset {
 	case presetPrivateChat:
-		joinRules = joinRuleInvite
+		joinRules = gomatrixserverlib.Invite
 		historyVisibility = historyVisibilityShared
 	case presetTrustedPrivateChat:
-		joinRules = joinRuleInvite
+		joinRules = gomatrixserverlib.Invite
 		historyVisibility = historyVisibilityShared
 		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
 	case presetPublicChat:
-		joinRules = joinRulePublic
+		joinRules = gomatrixserverlib.Public
 		historyVisibility = historyVisibilityShared
 	default:
 		// Default room rules, r.Preset was previously checked for valid values so
 		// only a request with no preset should end up here.
-		joinRules = joinRuleInvite
+		joinRules = gomatrixserverlib.Invite
 		historyVisibility = historyVisibilityShared
 	}
 
