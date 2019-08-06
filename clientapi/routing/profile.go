@@ -264,7 +264,7 @@ func buildMembershipEvents(
 		}
 
 		content := common.MemberContent{
-			Membership: "join",
+			Membership: gomatrixserverlib.Join,
 		}
 
 		content.DisplayName = newProfile.DisplayName

@@ -23,7 +23,7 @@ func IsServerAllowed(
 ) bool {
 	for _, ev := range authEvents {
 		membership, err := ev.Membership()
-		if err != nil || membership != "join" {
+		if err != nil || membership != gomatrixserverlib.Join {
 			continue
 		}
 

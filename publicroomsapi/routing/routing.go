@@ -64,7 +64,7 @@ func Setup(apiMux *mux.Router, deviceDB *devices.Database, publicRoomsDB *storag
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
 		common.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
-			return directory.GetPublicRooms(req, publicRoomsDB)
+			return directory.GetPostPublicRooms(req, publicRoomsDB)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 }

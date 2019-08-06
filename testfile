@@ -149,3 +149,20 @@ Typing events appear in incremental sync
 Typing events appear in gapped sync
 Inbound federation of state requires event_id as a mandatory paramater
 Inbound federation of state_ids requires event_id as a mandatory paramater
+POST /register returns the same device_id as that in the request
+POST /login returns the same device_id as that in the request
+POST /createRoom with creation content
+User can create and send/receive messages in a room with version 1
+POST /createRoom ignores attempts to set the room version via creation_content
+Inbound federation rejects remote attempts to join local users to rooms
+Inbound federation rejects remote attempts to kick local users to rooms
+An event which redacts itself should be ignored
+A pair of events which redact each other should be ignored
+Full state sync includes joined rooms
+Can add tag
+Can remove tag
+Can list tags for a room
+Tags appear in an initial v2 /sync
+Newly updated tags appear in an incremental v2 /sync
+Deleted tags appear in an incremental v2 /sync
+/event/ on non world readable room does not work

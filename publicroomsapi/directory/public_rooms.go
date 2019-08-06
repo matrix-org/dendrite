@@ -42,8 +42,8 @@ type publicRoomRes struct {
 	Estimate  int64              `json:"total_room_count_estimate,omitempty"`
 }
 
-// GetPublicRooms implements GET /publicRooms
-func GetPublicRooms(
+// GetPostPublicRooms implements GET and POST /publicRooms
+func GetPostPublicRooms(
 	req *http.Request, publicRoomDatabase *storage.PublicRoomsServerDatabase,
 ) util.JSONResponse {
 	var limit int16
