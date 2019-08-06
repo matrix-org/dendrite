@@ -760,7 +760,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 	var deltas []stateDelta
 
 	// get all the state events ever between these two positions
-	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos)
+	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos, stateFilterPart)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -846,7 +846,7 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 	}
 
 	// Get all the state events ever between these two positions
-	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos)
+	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos, stateFilterPart)
 	if err != nil {
 		return nil, nil, err
 	}
