@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS roomserver_room_aliases (
     alias TEXT NOT NULL PRIMARY KEY,
     -- Room ID the alias refers to
     room_id TEXT NOT NULL,
-    -- ID of the user created this alias
+    -- User ID of the creator of this alias
     creator_id TEXT NOT NULL
 );
 

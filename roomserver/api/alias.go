@@ -64,7 +64,7 @@ type GetAliasesForRoomIDResponse struct {
 
 // GetCreatorIDForAliasRequest is a request to GetCreatorIDForAlias
 type GetCreatorIDForAliasRequest struct {
-	// The alias we want to find creator for
+	// The alias we want to find the creator of
 	Alias string `json:"alias"`
 }
 
