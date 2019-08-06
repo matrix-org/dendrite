@@ -292,7 +292,7 @@ func getProfile(
 	if domain != cfg.Matrix.ServerName {
 		profile, fedErr := federation.LookupProfile(ctx, domain, userID, "")
 		if fedErr != nil {
-			if x, ok := err.(gomatrix.HTTPError); ok {
+			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {
 					return nil, common.ErrProfileNoExists
 				}
