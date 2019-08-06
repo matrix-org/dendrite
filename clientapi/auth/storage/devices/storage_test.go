@@ -3,12 +3,13 @@ package devices
 import (
 	"context"
 	"fmt"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/stretchr/testify/assert"
 )
 
 var dataSource string
@@ -102,6 +103,7 @@ func createTestDevice(devSpecScheme *deviceSpec, count int) (devices []*authtype
 	db, err := NewDatabase(dataSource, "localhost")
 	if err != nil {
 		fmt.Println(err)
+		return nil, err
 	}
 
 	for i := 0; i < count; i++ {
