@@ -15,8 +15,13 @@
 package common
 
 import (
+	"errors"
 	"strconv"
 )
+
+// ErrProfileNoExists is returned when trying to lookup a user's profile that
+// doesn't exist locally.
+var ErrProfileNoExists = errors.New("no known profile for given user ID")
 
 // AccountData represents account data sent from the client API server to the
 // sync API server

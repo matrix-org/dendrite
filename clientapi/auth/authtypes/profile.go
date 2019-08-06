@@ -14,7 +14,7 @@
 
 package authtypes
 
-// Profile represents the profile for a Matrix account on this home server.
+// Profile represents the profile for a Matrix account.
 type Profile struct {
 	Localpart   string
 	DisplayName string
