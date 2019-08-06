@@ -50,7 +50,7 @@ func SendEvent(
 ) util.JSONResponse {
 	if txnID != nil {
 		// Try to fetch response from transactionsCache
-		if res, ok := txnCache.FetchTransaction(*txnID); ok {
+		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
 			return *res
 		}
 	}
@@ -83,7 +83,7 @@ func SendEvent(
 	}
 	// Add response to transactionsCache
 	if txnID != nil {
-		txnCache.AddTransaction(*txnID, &res)
+		txnCache.AddTransaction(device.AccessToken, *txnID, &res)
 	}
 
 	return res
