@@ -102,7 +102,7 @@ func SendMembership(
 	var returnData interface{} = struct{}{}
 
 	// The join membership requires the room id to be sent in the response
-	if membership == "join" {
+	if membership == gomatrixserverlib.Join {
 		returnData = struct {
 			RoomID string `json:"room_id"`
 		}{roomID}
@@ -141,7 +141,7 @@ func buildMembershipEvent(
 
 	// "unban" or "kick" isn't a valid membership value, change it to "leave"
 	if membership == "unban" || membership == "kick" {
-		membership = "leave"
+		membership = gomatrixserverlib.Leave
 	}
 
 	content := common.MemberContent{
@@ -192,7 +192,7 @@ func loadProfile(
 func getMembershipStateKey(
 	body threepid.MembershipRequest, device *authtypes.Device, membership string,
 ) (stateKey string, reason string, err error) {
-	if membership == "ban" || membership == "unban" || membership == "kick" || membership == "invite" {
+	if membership == gomatrixserverlib.Ban || membership == "unban" || membership == "kick" || membership == gomatrixserverlib.Invite {
 		// If we're in this case, the state key is contained in the request body,
 		// possibly along with a reason (for "kick" and "ban") so we need to parse
 		// it

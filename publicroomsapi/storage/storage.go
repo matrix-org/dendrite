@@ -185,7 +185,7 @@ func (d *PublicRoomsServerDatabase) updateNumJoinedUsers(
 		return err
 	}
 
-	if membership != "join" {
+	if membership != gomatrixserverlib.Join {
 		return nil
 	}
 

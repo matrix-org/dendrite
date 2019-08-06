@@ -165,4 +165,5 @@ Can list tags for a room
 Tags appear in an initial v2 /sync
 Newly updated tags appear in an incremental v2 /sync
 Deleted tags appear in an incremental v2 /sync
+/event/ on non world readable room does not work
 Outbound federation can query profile data
