@@ -212,7 +212,7 @@ func (s *currentRoomStateStatements) upsertRoomState(
 	containsURL := false
 	var content map[string]interface{}
 	if json.Unmarshal(event.Content(), &content) != nil {
-		// Set containsURL = true if url is present
+		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
 

@@ -44,11 +44,11 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     room_id TEXT NOT NULL,
     -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
     event_json TEXT NOT NULL,
-    -- The event type e.g 'm.room.member'
+    -- The event type e.g 'm.room.member'.
     type TEXT NOT NULL,
     -- The 'sender' property of the event.
     sender TEXT NOT NULL,
-	-- true if the event content contains a url key
+	-- true if the event content contains a url key.
     contains_url BOOL NOT NULL,
     -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
     -- if there is no delta.
@@ -231,7 +231,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 	containsURL := false
 	var content map[string]interface{}
 	if json.Unmarshal(event.Content(), &content) != nil {
-		// Set containsURL = true if url is present
+		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
 
