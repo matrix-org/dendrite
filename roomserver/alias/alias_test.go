@@ -30,7 +30,7 @@ type MockRoomserverAliasAPIDatabase struct {
 }
 
 // These methods can be essentially noop
-func (db MockRoomserverAliasAPIDatabase) SetRoomAlias(ctx context.Context, alias string, roomID string) error {
+func (db MockRoomserverAliasAPIDatabase) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
 	return nil
 }
 
@@ -41,6 +41,12 @@ func (db MockRoomserverAliasAPIDatabase) GetAliasesForRoomID(ctx context.Context
 
 func (db MockRoomserverAliasAPIDatabase) RemoveRoomAlias(ctx context.Context, alias string) error {
 	return nil
+}
+
+func (db *MockRoomserverAliasAPIDatabase) GetCreatorIDForAlias(
+	ctx context.Context, alias string,
+) (string, error) {
+	return "", nil
 }
 
 // This method needs to change depending on test case
