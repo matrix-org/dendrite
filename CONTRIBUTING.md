@@ -28,7 +28,11 @@ are run on [Buildkite](https://buildkite.com/matrix-dot-org/dendrite/) and
 [CircleCI](https://circleci.com/gh/matrix-org/dendrite/).
 
 If a job fails, click the "details" button and you should be taken to the job's
-logs. Scroll down to the failing step and you should see some log output. Scan
+logs.
+
+![Click the details button on the failing build step](docs/images/details-button-location.jpg)
+
+Scroll down to the failing step and you should see some log output. Scan
 the logs until you find what it's complaining about, fix it, submit a new
 commit, then rinse and repeat until CI passes.
 
