@@ -3,44 +3,34 @@
 # Runs the linters against dendrite
 
 # The linters can take a lot of resources and are slow, so they can be
-# configured using two environment variables:
+# configured using the following environment variables:
 #
 # - `DENDRITE_LINT_CONCURRENCY` - number of concurrent linters to run,
-#   gometalinter defaults this to 8
-# - `DENDRITE_LINT_DISABLE_GC` - if set then the the go gc will be disabled
-#   when running the linters, speeding them up but using much more memory.
+#   golangci-lint defaults this to NumCPU
+# - `GOGC` - how often to perform garbage collection during golangci-lint runs.
+#   Essentially a ratio of memory/speed. See https://github.com/golangci/golangci-lint#memory-usage-of-golangci-lint
+#   for more info.
 
 
 set -eux
 
 cd `dirname $0`/..
 
-export GOPATH="$(pwd):$(pwd)/vendor"
-
-# prefer the versions of gometalinter and the linters that we install
-# to anythign that ends up on the PATH.
-export PATH="$(pwd)/bin:$PATH"
-
 args=""
 if [ ${1:-""} = "fast" ]
-then args="--config=linter-fast.json"
-else args="--config=linter.json"
+then args="--fast"
 fi
 
-if [ -n "${DENDRITE_LINT_CONCURRENCY:-}" ]
-then args="$args --concurrency=$DENDRITE_LINT_CONCURRENCY"
-fi
+echo "Installing golangci-lint..."
 
-if [ -z "${DENDRITE_LINT_DISABLE_GC:-}" ]
-then args="$args --enable-gc"
-fi
-
-echo "Installing lint search engine..."
-gb build github.com/alecthomas/gometalinter/
-gometalinter --config=linter.json ./... --install
+# Make a backup of go.{mod,sum} first
+# TODO: Once go 1.13 is out, use go get's -mod=readonly option
+# https://github.com/golang/go/issues/30667
+cp go.mod go.mod.bak && cp go.sum go.sum.bak
+go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
 echo "Looking for lint..."
-gometalinter ./... $args
+golangci-lint run $args
 
-echo "Double checking spelling..."
-misspell -error src *.md
+# Restore go.{mod,sum}
+mv go.mod.bak go.mod && mv go.sum.bak go.sum

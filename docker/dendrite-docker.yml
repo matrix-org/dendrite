@@ -17,7 +17,6 @@ matrix:
     trusted_third_party_id_servers:
       - vector.im
       - matrix.org
-      - riot.im
 
 # The media repository config
 media:
@@ -86,7 +85,9 @@ kafka:
     topics:
         output_room_event: roomserverOutput
         output_client_data: clientapiOutput
+        output_typing_event: typingServerOutput
         user_updates: userUpdates
+
 
 # The postgres connection configs for connecting to the databases e.g a postgres:// URI
 database:
@@ -98,6 +99,7 @@ database:
     server_key: "postgres://dendrite:itsasecret@postgres/dendrite_serverkey?sslmode=disable"
     federation_sender: "postgres://dendrite:itsasecret@postgres/dendrite_federationsender?sslmode=disable"
     public_rooms_api: "postgres://dendrite:itsasecret@postgres/dendrite_publicroomsapi?sslmode=disable"
+    appservice: "postgres://dendrite:itsasecret@postgres/dendrite_appservice?sslmode=disable"
     # If using naffka you need to specify a naffka database
     naffka: "postgres://dendrite:itsasecret@postgres/dendrite_naffka?sslmode=disable"
 
@@ -117,7 +119,7 @@ listen:
 tracing:
     # Config for the jaeger opentracing reporter.
     # See https://godoc.org/github.com/uber/jaeger-client-go/config#Configuration
-    # for documtation.
+    # for documentation.
     jaeger:
         disabled: true
 
