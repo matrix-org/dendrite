@@ -22,7 +22,14 @@ import (
 // DefaultCleanupPeriod represents the default time duration after which cacheCleanService runs.
 const DefaultCleanupPeriod time.Duration = 30 * time.Minute
 
-type txnsMap map[string]*util.JSONResponse
+type txnsMap map[CacheKey]*util.JSONResponse
+
+// CacheKey is the type for the key in a transactions cache.
+// This is needed because the spec requires transaction IDs to have a per-access token scope.
+type CacheKey struct {
+	AccessToken string
+	TxnID       string
+}
 
 // Cache represents a temporary store for response entries.
 // Entries are evicted after a certain period, defined by cleanupPeriod.
@@ -50,14 +57,14 @@ func NewWithCleanupPeriod(cleanupPeriod time.Duration) *Cache {
 	return &t
 }
 
-// FetchTransaction looks up an entry for txnID in Cache.
+// FetchTransaction looks up an entry for the (accessToken, txnID) tuple in Cache.
 // Looks in both the txnMaps.
 // Returns (JSON response, true) if txnID is found, else the returned bool is false.
-func (t *Cache) FetchTransaction(txnID string) (*util.JSONResponse, bool) {
+func (t *Cache) FetchTransaction(accessToken, txnID string) (*util.JSONResponse, bool) {
 	t.RLock()
 	defer t.RUnlock()
 	for _, txns := range t.txnsMaps {
-		res, ok := txns[txnID]
+		res, ok := txns[CacheKey{accessToken, txnID}]
 		if ok {
 			return res, true
 		}
@@ -65,13 +72,13 @@ func (t *Cache) FetchTransaction(txnID string) (*util.JSONResponse, bool) {
 	return nil, false
 }
 
-// AddTransaction adds an entry for txnID in Cache for later access.
+// AddTransaction adds an entry for the (accessToken, txnID) tuple in Cache.
 // Adds to the front txnMap.
-func (t *Cache) AddTransaction(txnID string, res *util.JSONResponse) {
+func (t *Cache) AddTransaction(accessToken, txnID string, res *util.JSONResponse) {
 	t.Lock()
 	defer t.Unlock()
 
-	t.txnsMaps[0][txnID] = res
+	t.txnsMaps[0][CacheKey{accessToken, txnID}] = res
 }
 
 // cacheCleanService is responsible for cleaning up entries after cleanupPeriod.

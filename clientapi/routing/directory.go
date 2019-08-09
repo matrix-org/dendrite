@@ -164,13 +164,36 @@ func SetLocalAlias(
 }
 
 // RemoveLocalAlias implements DELETE /directory/room/{roomAlias}
-// TODO: Check if the user has the power level to remove an alias
 func RemoveLocalAlias(
 	req *http.Request,
 	device *authtypes.Device,
 	alias string,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 ) util.JSONResponse {
+
+	creatorQueryReq := roomserverAPI.GetCreatorIDForAliasRequest{
+		Alias: alias,
+	}
+	var creatorQueryRes roomserverAPI.GetCreatorIDForAliasResponse
+	if err := aliasAPI.GetCreatorIDForAlias(req.Context(), &creatorQueryReq, &creatorQueryRes); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if creatorQueryRes.UserID == "" {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Alias does not exist"),
+		}
+	}
+
+	if creatorQueryRes.UserID != device.UserID {
+		// TODO: Still allow deletion if user is admin
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("You do not have permission to delete this alias"),
+		}
+	}
+
 	queryReq := roomserverAPI.RemoveRoomAliasRequest{
 		Alias:  alias,
 		UserID: device.UserID,
