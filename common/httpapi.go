@@ -45,7 +45,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 }
 
 // MakeHTMLAPI adds Span metrics to the HTML Handler function
-// This is used to serve HTML template
+// This is used to serve HTML alongside JSON error messages
 func MakeHTMLAPI(metricsName string, f func(http.ResponseWriter, *http.Request) *util.JSONResponse) http.Handler {
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		span := opentracing.StartSpan(metricsName)

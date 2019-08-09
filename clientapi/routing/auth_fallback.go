@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2019 Parminder Singh <parmsingh129@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// RecaptchaTemplate is template for recaptcha auth
-const RecaptchaTemplate = `
+// recaptchaTemplate is an HTML webpage template for recaptcha auth
+const recaptchaTemplate = `
 <html>
 <head>
 <title>Authentication</title>
@@ -35,7 +35,6 @@ const RecaptchaTemplate = `
 <script src="https://www.google.com/recaptcha/api.js"
     async defer></script>
 <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
 <script>
 function captchaDone() {
     $('#registrationForm').submit();
@@ -43,7 +42,7 @@ function captchaDone() {
 </script>
 </head>
 <body>
-<form id="registrationForm" method="post" action="{{.MyUrl}}">
+<form id="registrationForm" method="post" action="{{.myUrl}}">
     <div>
         <p>
         Hello! We need to prevent computer programs and other automated
@@ -52,9 +51,9 @@ function captchaDone() {
         <p>
         Please verify that you're not a robot.
         </p>
-		<input type="hidden" name="session" value="{{.Session}}" />
+		<input type="hidden" name="session" value="{{.session}}" />
         <div class="g-recaptcha"
-            data-sitekey="{{.SiteKey}}"
+            data-sitekey="{{.siteKey}}"
             data-callback="captchaDone">
         </div>
         <noscript>
@@ -67,8 +66,9 @@ function captchaDone() {
 </html>
 `
 
-// SuccessTemplate is template for success page after auth flow ends
-const SuccessTemplate = `
+// successTemplate is an HTML template presented to the user after successful
+// recaptcha completion
+const successTemplate = `
 <html>
 <head>
 <title>Success!</title>
@@ -79,7 +79,7 @@ const SuccessTemplate = `
 if (window.onAuthDone) {
     window.onAuthDone();
 } else if (window.opener && window.opener.postMessage) {
-     window.opener.postMessage("authDone", "*");
+    window.opener.postMessage("authDone", "*");
 }
 </script>
 </head>
@@ -92,8 +92,8 @@ if (window.onAuthDone) {
 </html>
 `
 
-// ServeTemplate fills data in template and serves it in http.ResponseWriter
-func ServeTemplate(w http.ResponseWriter, templateHTML string, data map[string]string) {
+// serveTemplate fills template data and serves it using http.ResponseWriter
+func serveTemplate(w http.ResponseWriter, templateHTML string, data map[string]string) {
 	t := template.Must(template.New("response").Parse(templateHTML))
 	if err := t.Execute(w, data); err != nil {
 		panic(err)
@@ -108,48 +108,51 @@ func AuthFallback(
 	sessionID := req.URL.Query().Get("session")
 
 	if sessionID == "" {
-		_, err := w.Write([]byte("Session ID not provided"))
-		if err != nil {
-			res := httputil.LogThenError(req, err)
-			return &res
-		}
-		return nil
+		return writeErrorMessage(w, req,
+			"Session ID not provided",
+			http.StatusBadRequest,
+		)
 	}
 
-	ServeRecaptcha := func() {
+	serveRecaptcha := func() {
 		data := map[string]string{
-			"MyUrl":   req.URL.String(),
-			"Session": sessionID,
-			"SiteKey": cfg.Matrix.RecaptchaPublicKey,
+			"myUrl":   req.URL.String(),
+			"session": sessionID,
+			"siteKey": cfg.Matrix.RecaptchaPublicKey,
 		}
-		ServeTemplate(w, RecaptchaTemplate, data)
+		serveTemplate(w, recaptchaTemplate, data)
 	}
 
-	ServeSuccess := func() {
+	serveSuccess := func() {
 		data := map[string]string{}
-		ServeTemplate(w, SuccessTemplate, data)
+		serveTemplate(w, successTemplate, data)
 	}
 
-	if req.Method == "GET" {
+	if req.Method == http.MethodGet {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			if cfg.Matrix.RecaptchaPublicKey == "" {
-				_, err := w.Write([]byte("This Homeserver doesn't have a recaptcha public key"))
-				if err != nil {
-					res := httputil.LogThenError(req, err)
-					return &res
+			if cfg.Matrix.RecaptchaEnabled {
+				if cfg.Matrix.RecaptchaPublicKey == "" {
+					return writeErrorMessage(w, req,
+						"This Homeserver doesn't have a recaptcha public key",
+						http.StatusInternalServerError,
+					)
 				}
-				return nil
+			} else {
+				return writeErrorMessage(w, req,
+					"Recaptcha login is disabled on this Homeserver",
+					http.StatusBadRequest,
+				)
 			}
 
-			ServeRecaptcha()
+			serveRecaptcha()
 			return nil
 		}
 		return &util.JSONResponse{
-			Code: 404,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Unknown auth stage type"),
 		}
-	} else if req.Method == "POST" {
+	} else if req.Method == http.MethodPost {
 		clientIP := req.RemoteAddr
 		err := req.ParseForm()
 		if err != nil {
@@ -159,18 +162,32 @@ func AuthFallback(
 
 		response := req.Form.Get("g-recaptcha-response")
 		if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
-			ServeRecaptcha()
-			return nil
+			util.GetLogger(req.Context()).Error(err)
+			return err
 		}
 
 		// Success. Add recaptcha as a completed login flow
 		AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
 
-		ServeSuccess()
+		serveSuccess()
 		return nil
 	}
 	return &util.JSONResponse{
-		Code: 405,
+		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
+}
+
+// WriteErrorMessage writes an error response with the given header and message
+func writeErrorMessage(
+	w http.ResponseWriter, req *http.Request,
+	message string, header int,
+) *util.JSONResponse {
+	w.WriteHeader(header)
+	_, err := w.Write([]byte(message))
+	if err != nil {
+		res := httputil.LogThenError(req, err)
+		return &res
+	}
+	return nil
 }
