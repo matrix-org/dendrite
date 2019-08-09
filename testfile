@@ -168,3 +168,5 @@ Newly updated tags appear in an incremental v2 /sync
 Deleted tags appear in an incremental v2 /sync
 /event/ on non world readable room does not work
 Outbound federation can query profile data
+/event/ on joined room works
+/event/ does not allow access to events before the user joined
