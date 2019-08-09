@@ -7,7 +7,6 @@ services:
     build: ./
     volumes:
       - ..:/build
-      - ./build/pkg:/build/pkg
       - ./build/bin:/build/bin
     networks:
       - internal

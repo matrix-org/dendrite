@@ -12,7 +12,7 @@ Dendrite can be run in one of two configurations:
 
 ## Requirements
 
- - Go 1.10+
+ - Go 1.11+
  - Postgres 9.5+
  - For Kafka (optional if using the monolith server):
    - Unix-based system (https://kafka.apache.org/documentation/#os)
@@ -30,16 +30,15 @@ git clone https://github.com/matrix-org/dendrite
 cd dendrite
 
 # Build it
-go get github.com/constabulary/gb/...
-gb build
+./build.sh
 ```
 
 If using Kafka, install and start it (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
 ```bash
-MIRROR=http://apache.mirror.anlx.net/kafka/0.10.2.0/kafka_2.11-0.10.2.0.tgz
+KAFKA_URL=http://archive.apache.org/dist/kafka/2.1.0/kafka_2.11-2.1.0.tgz
 
 # Only download the kafka if it isn't already downloaded.
-test -f kafka.tgz || wget $MIRROR -O kafka.tgz
+test -f kafka.tgz || wget $KAFKA_URL -O kafka.tgz
 # Unpack the kafka over the top of any existing installation
 mkdir -p kafka && tar xzf kafka.tgz -C kafka --strip-components 1
 

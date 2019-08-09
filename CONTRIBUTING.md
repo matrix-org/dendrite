@@ -12,11 +12,46 @@ See [INSTALL.md](INSTALL.md) for instructions on setting up a running dev
 instance of dendrite, and [CODE_STYLE.md](CODE_STYLE.md) for the code style
 guide.
 
-We use `gb` for managing our dependencies, so `gb build` and `gb test` is how
-to build dendrite and run the unit tests respectively. Be aware that a list of
-all dendrite packages is the expected output for all tests succeeding with `gb
-test`. There are also [scripts](scripts) for [linting](scripts/find-lint.sh)
-and doing a [build/test/lint run](scripts/build-test-lint.sh).
+As of May 2019, we're not using `gb` anymore, which is the tool we had been
+using for managing our dependencies. We're now using Go modules. To build
+Dendrite, run the `build.sh` script at the root of this repository (which runs
+`go install` under the hood), and to run unit tests, run `go test ./...` (which
+should pick up any unit test and run it). There are also [scripts](scripts) for
+[linting](scripts/find-lint.sh) and doing a [build/test/lint
+run](scripts/build-test-lint.sh).
+
+## Continuous Integration
+
+When a Pull Request is submitted, continuous integration jobs are run
+automatically to ensure the code builds and is relatively well-written. Checks
+are run on [Buildkite](https://buildkite.com/matrix-dot-org/dendrite/) and
+[CircleCI](https://circleci.com/gh/matrix-org/dendrite/).
+
+If a job fails, click the "details" button and you should be taken to the job's
+logs.
+
+![Click the details button on the failing build step](docs/images/details-button-location.jpg)
+
+Scroll down to the failing step and you should see some log output. Scan
+the logs until you find what it's complaining about, fix it, submit a new
+commit, then rinse and repeat until CI passes.
+
+### Running CI Tests Locally
+
+To save waiting for CI to finish after every commit, it is ideal to run the
+checks locally before pushing, fixing errors first. This also saves other
+people time as only so many PRs can be tested at a given time.
+
+To execute what Buildkite tests, simply run `./scripts/build-test-lint.sh`.
+This script will build the code, lint it, and run `go test ./...` with race
+condition checking enabled. If something needs to be changed, fix it and then
+run the script again until it no longer complains. Be warned that the linting
+can take a significant amount of CPU and RAM.
+
+CircleCI simply runs [Sytest](https://github.com/matrix-org/sytest) with a test
+whitelist. See
+[docs/sytest.md](https://github.com/matrix-org/dendrite/blob/master/docs/sytest.md#using-a-sytest-docker-image)
+for instructions on setting it up to run locally.
 
 
 ## Picking Things To Do
@@ -33,18 +68,6 @@ nonetheless fairly well-contained.
 We ask people who are familiar with Dendrite to leave the [good first issue](https://github.com/matrix-org/dendrite/labels/good%20first%20issue)
 issues so that there is always a way for new people to come and get involved.
 
-## Contributing to dependencies
-
-Dependencies are located in `vendor/src` and are managed by `gb`. If you need
-to make some changes in those directories, you first need to open a PR in the
-dependency repository. Once your PR is merged, you need to run `gb vendor
-update $repo_url` (example: `gb vendor update github.com/matrix-org/gomatrix`)
-in the dendrite repository to update the dependency.
-
-You can then create a commit containing only the modified vendor files (along
-with the `vendor/manifest` file), name it with the command you just ran (ie
-`gb vendor update github.com/matrix-org/gomatrix`), and open a PR on Dendrite.
-
 ## Getting Help
 
 For questions related to developing on Dendrite we have a dedicated room on
@@ -57,4 +80,3 @@ For more general questions please use [#dendrite:matrix.org](https://matrix.to/#
 
 We ask that everyone who contributes to the project signs off their
 contributions, in accordance with the [DCO](https://github.com/matrix-org/matrix-doc/blob/master/CONTRIBUTING.rst#sign-off).
-
