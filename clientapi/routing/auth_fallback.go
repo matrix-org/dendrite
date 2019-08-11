@@ -131,18 +131,8 @@ func AuthFallback(
 	if req.Method == http.MethodGet {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			if cfg.Matrix.RecaptchaEnabled {
-				if cfg.Matrix.RecaptchaPublicKey == "" {
-					return writeErrorMessage(w, req,
-						"This Homeserver doesn't have a recaptcha public key",
-						http.StatusInternalServerError,
-					)
-				}
-			} else {
-				return writeErrorMessage(w, req,
-					"Recaptcha login is disabled on this Homeserver",
-					http.StatusBadRequest,
-				)
+			if err := checkRecaptchaEnabled(&cfg, w, req); err != nil {
+				return err
 			}
 
 			serveRecaptcha()
@@ -153,24 +143,36 @@ func AuthFallback(
 			JSON: jsonerror.NotFound("Unknown auth stage type"),
 		}
 	} else if req.Method == http.MethodPost {
-		clientIP := req.RemoteAddr
-		err := req.ParseForm()
-		if err != nil {
-			res := httputil.LogThenError(req, err)
-			return &res
+		// Handle Recaptcha
+		if authType == authtypes.LoginTypeRecaptcha {
+			if err := checkRecaptchaEnabled(&cfg, w, req); err != nil {
+				return err
+			}
+
+			clientIP := req.RemoteAddr
+			err := req.ParseForm()
+			if err != nil {
+				res := httputil.LogThenError(req, err)
+				return &res
+			}
+
+			response := req.Form.Get("g-recaptcha-response")
+			if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
+				util.GetLogger(req.Context()).Error(err)
+				return err
+			}
+
+			// Success. Add recaptcha as a completed login flow
+			AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
+
+			serveSuccess()
+			return nil
 		}
 
-		response := req.Form.Get("g-recaptcha-response")
-		if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
-			util.GetLogger(req.Context()).Error(err)
-			return err
+		return &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Unknown auth stage type"),
 		}
-
-		// Success. Add recaptcha as a completed login flow
-		AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
-
-		serveSuccess()
-		return nil
 	}
 	return &util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
@@ -178,7 +180,29 @@ func AuthFallback(
 	}
 }
 
-// WriteErrorMessage writes an error response with the given header and message
+// checkRecaptchaEnabled creates an error response if recaptcha is not usable on homeserver.
+func checkRecaptchaEnabled(
+	cfg *config.Dendrite,
+	w http.ResponseWriter,
+	req *http.Request,
+) *util.JSONResponse {
+	if cfg.Matrix.RecaptchaEnabled {
+		if cfg.Matrix.RecaptchaPublicKey == "" {
+			return writeErrorMessage(w, req,
+				"This Homeserver doesn't have a recaptcha public key",
+				http.StatusInternalServerError,
+			)
+		}
+	} else {
+		return writeErrorMessage(w, req,
+			"Recaptcha login is disabled on this Homeserver",
+			http.StatusBadRequest,
+		)
+	}
+	return nil
+}
+
+// writeErrorMessage writes an error response with the given header and message
 func writeErrorMessage(
 	w http.ResponseWriter, req *http.Request,
 	message string, header int,
