@@ -74,7 +74,6 @@ const successTemplate = `
 <title>Success!</title>
 <meta name='viewport' content='width=device-width, initial-scale=1,
     user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
 <script>
 if (window.onAuthDone) {
     window.onAuthDone();
