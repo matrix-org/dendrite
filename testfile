@@ -159,12 +159,17 @@ Inbound federation rejects remote attempts to kick local users to rooms
 An event which redacts itself should be ignored
 A pair of events which redact each other should be ignored
 Full state sync includes joined rooms
+A message sent after an initial sync appears in the timeline of an incremental sync.
 Can add tag
 Can remove tag
 Can list tags for a room
 Tags appear in an initial v2 /sync
 Newly updated tags appear in an incremental v2 /sync
 Deleted tags appear in an incremental v2 /sync
+/event/ on non world readable room does not work
+Outbound federation can query profile data
+/event/ on joined room works
+/event/ does not allow access to events before the user joined
 POST /rooms/:room_id/redact/:event_id as original message sender redacts message
 POST /rooms/:room_id/redact/:event_id as random user does not redact message
 POST /redact disallows redaction of event in different room

@@ -44,7 +44,10 @@ func OnIncomingStateRequest(req *http.Request, db *storage.SyncServerDatasource,
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 
-	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID)
+	stateFilterPart := gomatrixserverlib.DefaultFilterPart()
+	// TODO: stateFilterPart should not limit the number of state events (or only limits abusive number of events)
+
+	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID, &stateFilterPart)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

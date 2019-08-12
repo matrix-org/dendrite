@@ -25,14 +25,16 @@ CREATE TABLE IF NOT EXISTS roomserver_room_aliases (
     -- Alias of the room
     alias TEXT NOT NULL PRIMARY KEY,
     -- Room ID the alias refers to
-    room_id TEXT NOT NULL
+    room_id TEXT NOT NULL,
+    -- User ID of the creator of this alias
+    creator_id TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_room_aliases(room_id);
 `
 
 const insertRoomAliasSQL = "" +
-	"INSERT INTO roomserver_room_aliases (alias, room_id) VALUES ($1, $2)"
+	"INSERT INTO roomserver_room_aliases (alias, room_id, creator_id) VALUES ($1, $2, $3)"
 
 const selectRoomIDFromAliasSQL = "" +
 	"SELECT room_id FROM roomserver_room_aliases WHERE alias = $1"
@@ -40,14 +42,18 @@ const selectRoomIDFromAliasSQL = "" +
 const selectAliasesFromRoomIDSQL = "" +
 	"SELECT alias FROM roomserver_room_aliases WHERE room_id = $1"
 
+const selectCreatorIDFromAliasSQL = "" +
+	"SELECT creator_id FROM roomserver_room_aliases WHERE alias = $1"
+
 const deleteRoomAliasSQL = "" +
 	"DELETE FROM roomserver_room_aliases WHERE alias = $1"
 
 type roomAliasesStatements struct {
-	insertRoomAliasStmt         *sql.Stmt
-	selectRoomIDFromAliasStmt   *sql.Stmt
-	selectAliasesFromRoomIDStmt *sql.Stmt
-	deleteRoomAliasStmt         *sql.Stmt
+	insertRoomAliasStmt          *sql.Stmt
+	selectRoomIDFromAliasStmt    *sql.Stmt
+	selectAliasesFromRoomIDStmt  *sql.Stmt
+	selectCreatorIDFromAliasStmt *sql.Stmt
+	deleteRoomAliasStmt          *sql.Stmt
 }
 
 func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
@@ -59,14 +65,15 @@ func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
 		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
 		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},
 		{&s.selectAliasesFromRoomIDStmt, selectAliasesFromRoomIDSQL},
+		{&s.selectCreatorIDFromAliasStmt, selectCreatorIDFromAliasSQL},
 		{&s.deleteRoomAliasStmt, deleteRoomAliasSQL},
 	}.prepare(db)
 }
 
 func (s *roomAliasesStatements) insertRoomAlias(
-	ctx context.Context, alias string, roomID string,
+	ctx context.Context, alias string, roomID string, creatorUserID string,
 ) (err error) {
-	_, err = s.insertRoomAliasStmt.ExecContext(ctx, alias, roomID)
+	_, err = s.insertRoomAliasStmt.ExecContext(ctx, alias, roomID, creatorUserID)
 	return
 }
 
@@ -98,6 +105,16 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 		aliases = append(aliases, alias)
 	}
 
+	return
+}
+
+func (s *roomAliasesStatements) selectCreatorIDFromAlias(
+	ctx context.Context, alias string,
+) (creatorID string, err error) {
+	err = s.selectCreatorIDFromAliasStmt.QueryRowContext(ctx, alias).Scan(&creatorID)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
 	return
 }
 

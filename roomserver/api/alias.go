@@ -62,6 +62,18 @@ type GetAliasesForRoomIDResponse struct {
 	Aliases []string `json:"aliases"`
 }
 
+// GetCreatorIDForAliasRequest is a request to GetCreatorIDForAlias
+type GetCreatorIDForAliasRequest struct {
+	// The alias we want to find the creator of
+	Alias string `json:"alias"`
+}
+
+// GetCreatorIDForAliasResponse is a response to GetCreatorIDForAlias
+type GetCreatorIDForAliasResponse struct {
+	// The user ID of the alias creator
+	UserID string `json:"user_id"`
+}
+
 // RemoveRoomAliasRequest is a request to RemoveRoomAlias
 type RemoveRoomAliasRequest struct {
 	// ID of the user removing the alias
@@ -96,6 +108,13 @@ type RoomserverAliasAPI interface {
 		response *GetAliasesForRoomIDResponse,
 	) error
 
+	// Get the user ID of the creator of an alias
+	GetCreatorIDForAlias(
+		ctx context.Context,
+		req *GetCreatorIDForAliasRequest,
+		response *GetCreatorIDForAliasResponse,
+	) error
+
 	// Remove a room alias
 	RemoveRoomAlias(
 		ctx context.Context,
@@ -112,6 +131,9 @@ const RoomserverGetRoomIDForAliasPath = "/api/roomserver/GetRoomIDForAlias"
 
 // RoomserverGetAliasesForRoomIDPath is the HTTP path for the GetAliasesForRoomID API.
 const RoomserverGetAliasesForRoomIDPath = "/api/roomserver/GetAliasesForRoomID"
+
+// RoomserverGetCreatorIDForAliasPath is the HTTP path for the GetCreatorIDForAlias API.
+const RoomserverGetCreatorIDForAliasPath = "/api/roomserver/GetCreatorIDForAlias"
 
 // RoomserverRemoveRoomAliasPath is the HTTP path for the RemoveRoomAlias API.
 const RoomserverRemoveRoomAliasPath = "/api/roomserver/removeRoomAlias"
@@ -166,6 +188,19 @@ func (h *httpRoomserverAliasAPI) GetAliasesForRoomID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverGetAliasesForRoomIDPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// GetCreatorIDForAlias implements RoomserverAliasAPI
+func (h *httpRoomserverAliasAPI) GetCreatorIDForAlias(
+	ctx context.Context,
+	request *GetCreatorIDForAliasRequest,
+	response *GetCreatorIDForAliasResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetCreatorIDForAlias")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverGetCreatorIDForAliasPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

@@ -86,7 +86,7 @@ func main() {
 	// Build a m.room.member event.
 	b.Type = "m.room.member"
 	b.StateKey = userID
-	b.SetContent(map[string]string{"membership": "join"}) // nolint: errcheck
+	b.SetContent(map[string]string{"membership": gomatrixserverlib.Join}) // nolint: errcheck
 	b.AuthEvents = []gomatrixserverlib.EventReference{create}
 	member := buildAndOutput()
 

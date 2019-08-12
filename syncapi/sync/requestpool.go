@@ -141,12 +141,14 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.SyncP
 		return
 	}
 
-	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition)
+	accountDataFilter := gomatrixserverlib.DefaultFilterPart() // TODO: use filter provided in req instead
+	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
 	return
 }
 
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos int64,
+	accountDataFilter *gomatrixserverlib.FilterPart,
 ) (*types.Response, error) {
 	// TODO: Account data doesn't have a sync position of its own, meaning that
 	// account data might be sent multiple time to the client if multiple account
@@ -180,7 +182,7 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, req.since.PDUPosition, currentPos)
+	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, req.since.PDUPosition, currentPos, accountDataFilter)
 	if err != nil {
 		return nil, err
 	}
