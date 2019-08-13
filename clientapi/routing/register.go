@@ -91,6 +91,11 @@ func newSessionsDict() *sessionsDict {
 
 // AddCompletedSessionStage records that a session has completed an auth stage.
 func AddCompletedSessionStage(sessionID string, stage authtypes.LoginType) {
+	for _, completedStage := range sessions.GetCompletedStages(sessionID) {
+		if completedStage == stage {
+			return
+		}
+	}
 	sessions.sessions[sessionID] = append(sessions.GetCompletedStages(sessionID), stage)
 }
 
