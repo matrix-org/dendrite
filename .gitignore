@@ -7,18 +7,18 @@
 /.downloads
 
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
-*.o
 *.a
+*.o
 *.so
 
 # Folders
-/kafka
-/bin
-/pkg
 /_obj
 /_test
-/vendor/bin
+/bin
 /docker/build
+/kafka
+/pkg
+/vendor/bin
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -33,13 +33,13 @@ _cgo_export.*
 _testmain.go
 
 *.exe
-*.test
 *.prof
+*.test
 
 # Generated keys
-*.pem
-*.key
 *.crt
+*.key
+*.pem
 
 # Default configuration file
 dendrite.yaml
