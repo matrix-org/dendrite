@@ -107,7 +107,7 @@ func AuthFallback(
 	sessionID := req.URL.Query().Get("session")
 
 	if sessionID == "" {
-		return writeErrorMessage(w, req,
+		return writeHTTPMessage(w, req,
 			"Session ID not provided",
 			http.StatusBadRequest,
 		)
@@ -186,7 +186,7 @@ func checkRecaptchaEnabled(
 	req *http.Request,
 ) *util.JSONResponse {
 	if !cfg.Matrix.RecaptchaEnabled {
-		return writeErrorMessage(w, req,
+		return writeHTTPMessage(w, req,
 			"Recaptcha login is disabled on this Homeserver",
 			http.StatusBadRequest,
 		)
@@ -194,8 +194,9 @@ func checkRecaptchaEnabled(
 	return nil
 }
 
-// writeErrorMessage writes an error response with the given header and message
-func writeErrorMessage(
+// writeHTTPMessage writes the given header and message to the HTTP response writer.
+// Returns an error JSONResponse obtained through httputil.LogThenError if the writing failed, otherwise nil.
+func writeHTTPMessage(
 	w http.ResponseWriter, req *http.Request,
 	message string, header int,
 ) *util.JSONResponse {
