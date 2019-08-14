@@ -185,14 +185,7 @@ func checkRecaptchaEnabled(
 	w http.ResponseWriter,
 	req *http.Request,
 ) *util.JSONResponse {
-	if cfg.Matrix.RecaptchaEnabled {
-		if cfg.Matrix.RecaptchaPublicKey == "" {
-			return writeErrorMessage(w, req,
-				"This Homeserver doesn't have a recaptcha public key",
-				http.StatusInternalServerError,
-			)
-		}
-	} else {
+	if !cfg.Matrix.RecaptchaEnabled {
 		return writeErrorMessage(w, req,
 			"Recaptcha login is disabled on this Homeserver",
 			http.StatusBadRequest,
