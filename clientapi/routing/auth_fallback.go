@@ -99,7 +99,7 @@ func serveTemplate(w http.ResponseWriter, templateHTML string, data map[string]s
 	}
 }
 
-// AuthFallback implements GET on /auth/{authType}/fallback/web?session={sessionID}
+// AuthFallback implements GET /auth/{authType}/fallback/web?session={sessionID}
 func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string,
 	cfg config.Dendrite,
