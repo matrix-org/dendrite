@@ -44,17 +44,6 @@ func SetupClientAPIComponent(
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 ) {
-	if base.Cfg.Matrix.RecaptchaEnabled &&
-		(base.Cfg.Matrix.RecaptchaPublicKey == "" ||
-		base.Cfg.Matrix.RecaptchaPrivateKey == "" ||
-		base.Cfg.Matrix.RecaptchaSiteVerifyAPI == "") {
-		logrus.Panicf(
-			"Recaptcha configs are missing. " +
-				"Ensure that recaptcha_public_key, recaptcha_private_key and " +
-				"recaptcha_siteverify_api are specified",
-		)
-	}
-
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 	typingProducer := producers.NewTypingServerProducer(typingInputAPI)
 
