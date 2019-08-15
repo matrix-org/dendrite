@@ -144,7 +144,7 @@ func buildMembershipEvent(
 		membership = gomatrixserverlib.Leave
 	}
 
-	content := common.MemberContent{
+	content := gomatrixserverlib.MemberContent{
 		Membership:  membership,
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
