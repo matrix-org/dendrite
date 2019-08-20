@@ -63,7 +63,7 @@ type SyncServerDatasource struct {
 	typingCache *cache.TypingCache
 }
 
-// NewSyncServerDatabase creates a new sync server database
+// NewSyncServerDatasource creates a new sync server database
 func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error

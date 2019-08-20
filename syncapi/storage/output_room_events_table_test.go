@@ -3,14 +3,15 @@ package storage
 import (
 	"context"
 	"fmt"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/stretchr/testify/assert"
 )
 
 var dataSource string
@@ -57,7 +58,7 @@ func init() {
 const testEventID = "$test-event-id:test-domain.example.com"
 
 func Test_sanityCheckOutputRoomEvents(t *testing.T) {
-	db, err := NewSyncServerDatabase(dataSource)
+	db, err := NewSyncServerDatasource(dataSource)
 	assert.Nil(t, err)
 
 	err = db.events.prepare(db.db)
@@ -69,8 +70,8 @@ func Test_sanityCheckOutputRoomEvents(t *testing.T) {
 	truncateTable(t, db)
 }
 
-func TestSyncServerDatabase_selectEventsWithEventIDs(t *testing.T) {
-	db, err := NewSyncServerDatabase(dataSource)
+func TestSyncServerDatasource_selectEventsWithEventIDs(t *testing.T) {
+	db, err := NewSyncServerDatasource(dataSource)
 	assert.Nil(t, err)
 	insertTestEvent(t, db)
 	ctx := context.Background()
@@ -86,7 +87,7 @@ func TestSyncServerDatabase_selectEventsWithEventIDs(t *testing.T) {
 	})
 }
 
-func insertTestEvent(t *testing.T, db *SyncServerDatabase) {
+func insertTestEvent(t *testing.T, db *SyncServerDatasource) {
 	txn, err := db.db.Begin()
 	assert.Nil(t, err)
 
@@ -128,7 +129,7 @@ func insertTestEvent(t *testing.T, db *SyncServerDatabase) {
 	})
 }
 
-func selectTestEvent(t *testing.T, db *SyncServerDatabase) {
+func selectTestEvent(t *testing.T, db *SyncServerDatasource) {
 	ctx := context.Background()
 
 	var eventIDs = []string{testEventID}
@@ -141,7 +142,7 @@ func selectTestEvent(t *testing.T, db *SyncServerDatabase) {
 	})
 }
 
-func truncateTable(t *testing.T, db *SyncServerDatabase) {
+func truncateTable(t *testing.T, db *SyncServerDatasource) {
 	_, err := db.db.Exec("TRUNCATE syncapi_output_room_events")
 	assert.Nil(t, err)
 }
