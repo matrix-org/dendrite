@@ -332,7 +332,7 @@ func buildMembershipEvents(
 			StateKey: &userID,
 		}
 
-		content := common.MemberContent{
+		content := gomatrixserverlib.MemberContent{
 			Membership: gomatrixserverlib.Join,
 		}
 

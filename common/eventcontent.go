@@ -14,55 +14,7 @@
 
 package common
 
-// CreateContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-create
-type CreateContent struct {
-	Creator     string       `json:"creator"`
-	Federate    *bool        `json:"m.federate,omitempty"`
-	RoomVersion string       `json:"room_version,omitempty"`
-	Predecessor PreviousRoom `json:"predecessor,omitempty"`
-}
-
-// PreviousRoom is the "Previous Room" structure defined at https://matrix.org/docs/spec/client_server/r0.5.0#m-room-create
-type PreviousRoom struct {
-	RoomID  string `json:"room_id"`
-	EventID string `json:"event_id"`
-}
-
-// MemberContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-member
-type MemberContent struct {
-	Membership       string    `json:"membership"`
-	DisplayName      string    `json:"displayname,omitempty"`
-	AvatarURL        string    `json:"avatar_url,omitempty"`
-	Reason           string    `json:"reason,omitempty"`
-	ThirdPartyInvite *TPInvite `json:"third_party_invite,omitempty"`
-}
-
-// TPInvite is the "Invite" structure defined at http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-member
-type TPInvite struct {
-	DisplayName string         `json:"display_name"`
-	Signed      TPInviteSigned `json:"signed"`
-}
-
-// TPInviteSigned is the "signed" structure defined at http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-member
-type TPInviteSigned struct {
-	MXID       string                       `json:"mxid"`
-	Signatures map[string]map[string]string `json:"signatures"`
-	Token      string                       `json:"token"`
-}
-
-// ThirdPartyInviteContent is the content event for https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-third-party-invite
-type ThirdPartyInviteContent struct {
-	DisplayName    string      `json:"display_name"`
-	KeyValidityURL string      `json:"key_validity_url"`
-	PublicKey      string      `json:"public_key"`
-	PublicKeys     []PublicKey `json:"public_keys"`
-}
-
-// PublicKey is the PublicKeys structure in https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-third-party-invite
-type PublicKey struct {
-	KeyValidityURL string `json:"key_validity_url"`
-	PublicKey      string `json:"public_key"`
-}
+import "github.com/matrix-org/gomatrixserverlib"
 
 // NameContent is the event content for https://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-name
 type NameContent struct {
@@ -79,51 +31,26 @@ type GuestAccessContent struct {
 	GuestAccess string `json:"guest_access"`
 }
 
-// JoinRulesContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-join-rules
-type JoinRulesContent struct {
-	JoinRule string `json:"join_rule"`
-}
-
 // HistoryVisibilityContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-history-visibility
 type HistoryVisibilityContent struct {
 	HistoryVisibility string `json:"history_visibility"`
-}
-
-// PowerLevelContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-power-levels
-type PowerLevelContent struct {
-	EventsDefault int            `json:"events_default"`
-	Invite        int            `json:"invite"`
-	StateDefault  int            `json:"state_default"`
-	Redact        int            `json:"redact"`
-	Ban           int            `json:"ban"`
-	UsersDefault  int            `json:"users_default"`
-	Events        map[string]int `json:"events"`
-	Kick          int            `json:"kick"`
-	Users         map[string]int `json:"users"`
 }
 
 // InitialPowerLevelsContent returns the initial values for m.room.power_levels on room creation
 // if they have not been specified.
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-power-levels
 // https://github.com/matrix-org/synapse/blob/v0.19.2/synapse/handlers/room.py#L294
-func InitialPowerLevelsContent(roomCreator string) PowerLevelContent {
-	return PowerLevelContent{
-		EventsDefault: 0,
-		Invite:        0,
-		StateDefault:  50,
-		Redact:        50,
-		Ban:           50,
-		UsersDefault:  0,
-		Events: map[string]int{
-			"m.room.name":               50,
-			"m.room.power_levels":       100,
-			"m.room.history_visibility": 100,
-			"m.room.canonical_alias":    50,
-			"m.room.avatar":             50,
-		},
-		Kick:  50,
-		Users: map[string]int{roomCreator: 100},
+func InitialPowerLevelsContent(roomCreator string) (c gomatrixserverlib.PowerLevelContent) {
+	c.Defaults()
+	c.Events = map[string]int64{
+		"m.room.name":               50,
+		"m.room.power_levels":       100,
+		"m.room.history_visibility": 100,
+		"m.room.canonical_alias":    50,
+		"m.room.avatar":             50,
 	}
+	c.Users = map[string]int64{roomCreator: 100}
+	return c
 }
 
 // AliasesContent is the event content for http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-aliases

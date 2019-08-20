@@ -56,10 +56,10 @@ type idServerLookupResponse struct {
 
 // idServerLookupResponse represents the response described at https://matrix.org/docs/spec/client_server/r0.2.0.html#invitation-storage
 type idServerStoreInviteResponse struct {
-	PublicKey   string             `json:"public_key"`
-	Token       string             `json:"token"`
-	DisplayName string             `json:"display_name"`
-	PublicKeys  []common.PublicKey `json:"public_keys"`
+	PublicKey   string                        `json:"public_key"`
+	Token       string                        `json:"token"`
+	DisplayName string                        `json:"display_name"`
+	PublicKeys  []gomatrixserverlib.PublicKey `json:"public_keys"`
 }
 
 var (
@@ -342,7 +342,7 @@ func emit3PIDInviteEvent(
 	}
 
 	validityURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/pubkey/isvalid", body.IDServer)
-	content := common.ThirdPartyInviteContent{
+	content := gomatrixserverlib.ThirdPartyInviteContent{
 		DisplayName:    res.DisplayName,
 		KeyValidityURL: validityURL,
 		PublicKey:      res.PublicKey,

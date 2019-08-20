@@ -106,7 +106,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		}
 	}
 
-	var CreationContent common.CreateContent
+	var CreationContent gomatrixserverlib.CreateContent
 	err = json.Unmarshal(creationContentBytes, &CreationContent)
 	if err != nil {
 		return &util.JSONResponse{
@@ -196,7 +196,7 @@ func createRoom(
 		return httputil.LogThenError(req, err)
 	}
 
-	membershipContent := common.MemberContent{
+	membershipContent := gomatrixserverlib.MemberContent{
 		Membership:  gomatrixserverlib.Join,
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
@@ -246,7 +246,7 @@ func createRoom(
 		{"m.room.member", userID, membershipContent},
 		{"m.room.power_levels", "", common.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
-		{"m.room.join_rules", "", common.JoinRulesContent{JoinRule: joinRules}},
+		{"m.room.join_rules", "", gomatrixserverlib.JoinRuleContent{JoinRule: joinRules}},
 		{"m.room.history_visibility", "", common.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
 	}
 	if r.GuestCanJoin {
