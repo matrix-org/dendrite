@@ -33,9 +33,9 @@ type QueryJoinedHostServerNamesInRoomResponse struct {
 
 // FederationSenderQueryAPI is used to query information from the federation sender.
 type FederationSenderQueryAPI interface {
-	// Query the joined hosts in a room.
-	// The membership events accounting for each server's participation are
-	// also contained in the response.
+	// Query the joined hosts and the membership events accounting for their participation in a room.
+	// Note that if a server has multiple users in the room, it will have multiple entries in the returned slice.
+	// See `QueryJoinedHostServerNamesInRoom` for a de-duplicated version.
 	QueryJoinedHostsInRoom(
 		ctx context.Context,
 		request *QueryJoinedHostsInRoomRequest,
