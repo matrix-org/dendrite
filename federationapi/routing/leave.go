@@ -56,7 +56,7 @@ func MakeLeave(
 		Type:     "m.room.member",
 		StateKey: &userID,
 	}
-	err = builder.SetContent(map[string]interface{}{"membership": "leave"})
+	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Leave})
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
@@ -153,7 +153,7 @@ func SendLeave(
 	mem, err := event.Membership()
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
-	} else if mem != "leave" {
+	} else if mem != gomatrixserverlib.Leave {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The membership in the event content must be set to leave"),

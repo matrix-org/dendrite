@@ -30,49 +30,61 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/util"
 )
 
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
-	req *http.Request, accountDB *accounts.Database, userID string, asAPI appserviceAPI.AppServiceQueryAPI,
+	req *http.Request, accountDB *accounts.Database, cfg *config.Dendrite,
+	userID string,
+	asAPI appserviceAPI.AppServiceQueryAPI,
+	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	if req.Method != http.MethodGet {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
-	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
+	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
+		if err == common.ErrProfileNoExists {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
+			}
+		}
+
 		return httputil.LogThenError(req, err)
 	}
 
-	res := common.ProfileResponse{
-		AvatarURL:   profile.AvatarURL,
-		DisplayName: profile.DisplayName,
-	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: res,
+		JSON: common.ProfileResponse{
+			AvatarURL:   profile.AvatarURL,
+			DisplayName: profile.DisplayName,
+		},
 	}
 }
 
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
-	req *http.Request, accountDB *accounts.Database, userID string, asAPI appserviceAPI.AppServiceQueryAPI,
+	req *http.Request, accountDB *accounts.Database, cfg *config.Dendrite,
+	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
+	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
+	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
+		if err == common.ErrProfileNoExists {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
+			}
+		}
+
 		return httputil.LogThenError(req, err)
 	}
 
-	res := common.AvatarURL{
-		AvatarURL: profile.AvatarURL,
-	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: res,
+		JSON: common.AvatarURL{
+			AvatarURL: profile.AvatarURL,
+		},
 	}
 }
 
@@ -158,18 +170,27 @@ func SetAvatarURL(
 
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
-	req *http.Request, accountDB *accounts.Database, userID string, asAPI appserviceAPI.AppServiceQueryAPI,
+	req *http.Request, accountDB *accounts.Database, cfg *config.Dendrite,
+	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
+	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
+	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
+		if err == common.ErrProfileNoExists {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
+			}
+		}
+
 		return httputil.LogThenError(req, err)
 	}
-	res := common.DisplayName{
-		DisplayName: profile.DisplayName,
-	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: res,
+		JSON: common.DisplayName{
+			DisplayName: profile.DisplayName,
+		},
 	}
 }
 
@@ -253,6 +274,48 @@ func SetDisplayName(
 	}
 }
 
+// getProfile gets the full profile of a user by querying the database or a
+// remote homeserver.
+// Returns an error when something goes wrong or specifically
+// common.ErrProfileNoExists when the profile doesn't exist.
+func getProfile(
+	ctx context.Context, accountDB *accounts.Database, cfg *config.Dendrite,
+	userID string,
+	asAPI appserviceAPI.AppServiceQueryAPI,
+	federation *gomatrixserverlib.FederationClient,
+) (*authtypes.Profile, error) {
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if domain != cfg.Matrix.ServerName {
+		profile, fedErr := federation.LookupProfile(ctx, domain, userID, "")
+		if fedErr != nil {
+			if x, ok := fedErr.(gomatrix.HTTPError); ok {
+				if x.Code == http.StatusNotFound {
+					return nil, common.ErrProfileNoExists
+				}
+			}
+
+			return nil, fedErr
+		}
+
+		return &authtypes.Profile{
+			Localpart:   localpart,
+			DisplayName: profile.DisplayName,
+			AvatarURL:   profile.AvatarURL,
+		}, nil
+	}
+
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, accountDB)
+	if err != nil {
+		return nil, err
+	}
+
+	return profile, nil
+}
+
 func buildMembershipEvents(
 	ctx context.Context,
 	memberships []authtypes.Membership,
@@ -269,8 +332,8 @@ func buildMembershipEvents(
 			StateKey: &userID,
 		}
 
-		content := common.MemberContent{
-			Membership: "join",
+		content := gomatrixserverlib.MemberContent{
+			Membership: gomatrixserverlib.Join,
 		}
 
 		content.DisplayName = newProfile.DisplayName

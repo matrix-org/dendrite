@@ -33,13 +33,16 @@ import (
 type RoomserverAliasAPIDatabase interface {
 	// Save a given room alias with the room ID it refers to.
 	// Returns an error if there was a problem talking to the database.
-	SetRoomAlias(ctx context.Context, alias string, roomID string) error
+	SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error
 	// Look up the room ID a given alias refers to.
 	// Returns an error if there was a problem talking to the database.
 	GetRoomIDForAlias(ctx context.Context, alias string) (string, error)
 	// Look up all aliases referring to a given room ID.
 	// Returns an error if there was a problem talking to the database.
 	GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error)
+	// Get the user ID of the creator of an alias.
+	// Returns an error if there was a problem talking to the database.
+	GetCreatorIDForAlias(ctx context.Context, alias string) (string, error)
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(ctx context.Context, alias string) error
@@ -73,7 +76,7 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	response.AliasExists = false
 
 	// Save the new alias
-	if err := r.DB.SetRoomAlias(ctx, request.Alias, request.RoomID); err != nil {
+	if err := r.DB.SetRoomAlias(ctx, request.Alias, request.RoomID, request.UserID); err != nil {
 		return err
 	}
 
@@ -130,6 +133,22 @@ func (r *RoomserverAliasAPI) GetAliasesForRoomID(
 	}
 
 	response.Aliases = aliases
+	return nil
+}
+
+// GetCreatorIDForAlias implements alias.RoomserverAliasAPI
+func (r *RoomserverAliasAPI) GetCreatorIDForAlias(
+	ctx context.Context,
+	request *roomserverAPI.GetCreatorIDForAliasRequest,
+	response *roomserverAPI.GetCreatorIDForAliasResponse,
+) error {
+	// Look up the aliases in the database for the given RoomID
+	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
+	if err != nil {
+		return err
+	}
+
+	response.UserID = creatorID
 	return nil
 }
 
@@ -272,6 +291,34 @@ func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.GetRoomIDForAlias(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		roomserverAPI.RoomserverGetCreatorIDForAliasPath,
+		common.MakeInternalAPI("GetCreatorIDForAlias", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.GetCreatorIDForAliasRequest
+			var response roomserverAPI.GetCreatorIDForAliasResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.GetCreatorIDForAlias(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		roomserverAPI.RoomserverGetAliasesForRoomIDPath,
+		common.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.GetAliasesForRoomIDRequest
+			var response roomserverAPI.GetAliasesForRoomIDResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.GetAliasesForRoomID(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

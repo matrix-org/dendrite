@@ -95,6 +95,16 @@ services:
     networks:
       - internal
 
+  typing_server:
+    container_name: dendrite_typing_server
+    hostname: typing_server
+    entrypoint: ["bash", "./docker/services/typing-server.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    networks:
+      - internal
+
   federation_api_proxy:
     container_name: dendrite_federation_api_proxy
     hostname: federation_api_proxy

@@ -27,7 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
@@ -38,11 +37,11 @@ import (
 )
 
 type invite struct {
-	MXID   string                `json:"mxid"`
-	RoomID string                `json:"room_id"`
-	Sender string                `json:"sender"`
-	Token  string                `json:"token"`
-	Signed common.TPInviteSigned `json:"signed"`
+	MXID   string                                         `json:"mxid"`
+	RoomID string                                         `json:"room_id"`
+	Sender string                                         `json:"sender"`
+	Token  string                                         `json:"token"`
+	Signed gomatrixserverlib.MemberThirdPartyInviteSigned `json:"signed"`
 }
 
 type invites struct {
@@ -194,16 +193,16 @@ func createInviteFrom3PIDInvite(
 		StateKey: &inv.MXID,
 	}
 
-	profile, err := appserviceAPI.RetreiveUserProfile(ctx, inv.MXID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, inv.MXID, asAPI, accountDB)
 	if err != nil {
 		return nil, err
 	}
 
-	content := common.MemberContent{
+	content := gomatrixserverlib.MemberContent{
 		AvatarURL:   profile.AvatarURL,
 		DisplayName: profile.DisplayName,
-		Membership:  "invite",
-		ThirdPartyInvite: &common.TPInvite{
+		Membership:  gomatrixserverlib.Invite,
+		ThirdPartyInvite: &gomatrixserverlib.MemberThirdPartyInvite{
 			Signed: inv.Signed,
 		},
 	}
@@ -330,7 +329,7 @@ func sendToRemoteServer(
 func fillDisplayName(
 	builder *gomatrixserverlib.EventBuilder, authEvents gomatrixserverlib.AuthEvents,
 ) error {
-	var content common.MemberContent
+	var content gomatrixserverlib.MemberContent
 	if err := json.Unmarshal(builder.Content, &content); err != nil {
 		return err
 	}
@@ -343,7 +342,7 @@ func fillDisplayName(
 		return nil
 	}
 
-	var thirdPartyInviteContent common.ThirdPartyInviteContent
+	var thirdPartyInviteContent gomatrixserverlib.ThirdPartyInviteContent
 	if err := json.Unmarshal(thirdPartyInviteEvent.Content(), &thirdPartyInviteContent); err != nil {
 		return err
 	}

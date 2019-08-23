@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -55,10 +56,6 @@ const (
 )
 
 const (
-	joinRulePublic = "public"
-	joinRuleInvite = "invite"
-)
-const (
 	historyVisibilityShared = "shared"
 	// TODO: These should be implemented once history visibility is implemented
 	// historyVisibilityWorldReadable = "world_readable"
@@ -94,6 +91,27 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("preset must be any of 'private_chat', 'trusted_private_chat', 'public_chat'"),
+		}
+	}
+
+	// Validate creation_content fields defined in the spec by marshalling the
+	// creation_content map into bytes and then unmarshalling the bytes into
+	// common.CreateContent.
+
+	creationContentBytes, err := json.Marshal(r.CreationContent)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("malformed creation_content"),
+		}
+	}
+
+	var CreationContent gomatrixserverlib.CreateContent
+	err = json.Unmarshal(creationContentBytes, &CreationContent)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("malformed creation_content"),
 		}
 	}
 
@@ -154,7 +172,17 @@ func createRoom(
 			JSON: jsonerror.InvalidArgumentValue(err.Error()),
 		}
 	}
-	// TODO: visibility/presets/raw initial state/creation content
+
+	// Clobber keys: creator, room_version
+
+	if r.CreationContent == nil {
+		r.CreationContent = make(map[string]interface{}, 2)
+	}
+
+	r.CreationContent["creator"] = userID
+	r.CreationContent["room_version"] = "1" // TODO: We set this to 1 before we support Room versioning
+
+	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!
 
@@ -163,13 +191,13 @@ func createRoom(
 		"roomID": roomID,
 	}).Info("Creating new room")
 
-	profile, err := appserviceAPI.RetreiveUserProfile(req.Context(), userID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
-	membershipContent := common.MemberContent{
-		Membership:  "join",
+	membershipContent := gomatrixserverlib.MemberContent{
+		Membership:  gomatrixserverlib.Join,
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
 	}
@@ -177,19 +205,19 @@ func createRoom(
 	var joinRules, historyVisibility string
 	switch r.Preset {
 	case presetPrivateChat:
-		joinRules = joinRuleInvite
+		joinRules = gomatrixserverlib.Invite
 		historyVisibility = historyVisibilityShared
 	case presetTrustedPrivateChat:
-		joinRules = joinRuleInvite
+		joinRules = gomatrixserverlib.Invite
 		historyVisibility = historyVisibilityShared
 		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
 	case presetPublicChat:
-		joinRules = joinRulePublic
+		joinRules = gomatrixserverlib.Public
 		historyVisibility = historyVisibilityShared
 	default:
 		// Default room rules, r.Preset was previously checked for valid values so
 		// only a request with no preset should end up here.
-		joinRules = joinRuleInvite
+		joinRules = gomatrixserverlib.Invite
 		historyVisibility = historyVisibilityShared
 	}
 
@@ -214,11 +242,11 @@ func createRoom(
 	// harder to reason about, hence sticking to a strict static ordering.
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
 	eventsToMake := []fledglingEvent{
-		{"m.room.create", "", common.CreateContent{Creator: userID}},
+		{"m.room.create", "", r.CreationContent},
 		{"m.room.member", userID, membershipContent},
 		{"m.room.power_levels", "", common.InitialPowerLevelsContent(userID)},
 		// TODO: m.room.canonical_alias
-		{"m.room.join_rules", "", common.JoinRulesContent{JoinRule: joinRules}},
+		{"m.room.join_rules", "", gomatrixserverlib.JoinRuleContent{JoinRule: joinRules}},
 		{"m.room.history_visibility", "", common.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
 	}
 	if r.GuestCanJoin {
