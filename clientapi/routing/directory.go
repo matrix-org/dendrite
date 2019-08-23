@@ -71,18 +71,24 @@ func DirectoryRoom(
 
 	if res.RoomID == "" {
 		// If we don't know it locally, do a federation query.
-		fedRes, fedErr := federation.LookupRoomAlias(req.Context(), domain, roomAlias)
-		if fedErr != nil {
-			switch fedErr.(type) {
-			case gomatrix.HTTPError:
-				// TODO: Return 502 if the remote server errored.
-				// TODO: Return 504 if the remote server timed out.
-				return httputil.LogThenError(req, fedErr)
-			default:
-				return httputil.LogThenError(req, fedErr)
+		// But don't send the query to ourselves.
+		if domain != cfg.Matrix.ServerName {
+			fedRes, fedErr := federation.LookupRoomAlias(req.Context(), domain, roomAlias)
+			if fedErr != nil {
+				switch fedErr.(type) {
+				case gomatrix.HTTPError:
+					// TODO: Return 502 if the remote server errored.
+					// TODO: Return 504 if the remote server timed out.
+					return httputil.LogThenError(req, fedErr)
+				default:
+					return httputil.LogThenError(req, fedErr)
+				}
 			}
+			res.RoomID = fedRes.RoomID
+			res.fillServers(fedRes.Servers)
 		}
-		if fedRes.RoomID == "" {
+
+		if res.RoomID == "" {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound(
@@ -90,9 +96,6 @@ func DirectoryRoom(
 				),
 			}
 		}
-
-		res.RoomID = fedRes.RoomID
-		res.fillServers(fedRes.Servers)
 	} else {
 		joinedHostsReq := federationSenderAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: res.RoomID}
 		var joinedHostsRes federationSenderAPI.QueryJoinedHostServerNamesInRoomResponse
