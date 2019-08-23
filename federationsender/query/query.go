@@ -2,10 +2,14 @@ package query
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 // FederationSenderQueryDatabase has the APIs needed to implement the query API.
@@ -52,4 +56,36 @@ func (f *FederationSenderQueryAPI) QueryJoinedHostServerNamesInRoom(
 	}
 
 	return
+}
+
+// SetupHTTP adds the FederationSenderQueryAPI handlers to the http.ServeMux.
+func (f *FederationSenderQueryAPI) SetupHTTP(servMux *http.ServeMux) {
+	servMux.Handle(
+		api.FederationSenderQueryJoinedHostsInRoomPath,
+		common.MakeInternalAPI("QueryJoinedHostsInRoom", func(req *http.Request) util.JSONResponse {
+			var request api.QueryJoinedHostsInRoomRequest
+			var response api.QueryJoinedHostsInRoomResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := f.QueryJoinedHostsInRoom(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.FederationSenderQueryJoinedHostServerNamesInRoomPath,
+		common.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
+			var request api.QueryJoinedHostServerNamesInRoomRequest
+			var response api.QueryJoinedHostServerNamesInRoomResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := f.QueryJoinedHostServerNamesInRoom(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }
