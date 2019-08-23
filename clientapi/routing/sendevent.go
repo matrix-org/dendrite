@@ -60,18 +60,18 @@ func SendEvent(
 		return *resErr
 	}
 
-	var txnAndDeviceID *api.TransactionID
+	var txnAndSessionID *api.TransactionID
 	if txnID != nil {
-		txnAndDeviceID = &api.TransactionID{
+		txnAndSessionID = &api.TransactionID{
 			TransactionID: *txnID,
-			DeviceID:      device.ID,
+			SessionID:     device.SessionID,
 		}
 	}
 
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	eventID, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndDeviceID,
+		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndSessionID,
 	)
 	if err != nil {
 		return httputil.LogThenError(req, err)
