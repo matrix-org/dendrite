@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/transactions"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -43,6 +44,7 @@ func SetupClientAPIComponent(
 	typingInputAPI typingServerAPI.TypingServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
+	fedSenderAPI federationSenderAPI.FederationSenderQueryAPI,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 	typingProducer := producers.NewTypingServerProducer(typingInputAPI)
@@ -67,6 +69,6 @@ func SetupClientAPIComponent(
 	routing.Setup(
 		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
-		syncProducer, typingProducer, transactionsCache,
+		syncProducer, typingProducer, transactionsCache, fedSenderAPI,
 	)
 }

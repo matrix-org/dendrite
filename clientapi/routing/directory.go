@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,6 +34,13 @@ type roomDirectoryResponse struct {
 	Servers []string `json:"servers"`
 }
 
+func (r *roomDirectoryResponse) fillServers(servers []gomatrixserverlib.ServerName) {
+	r.Servers = make([]string, len(servers))
+	for i, s := range servers {
+		r.Servers[i] = string(s)
+	}
+}
+
 // DirectoryRoom looks up a room alias
 func DirectoryRoom(
 	req *http.Request,
@@ -40,6 +48,7 @@ func DirectoryRoom(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverAliasAPI,
+	fedSenderAPI federationSenderAPI.FederationSenderQueryAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
@@ -49,52 +58,53 @@ func DirectoryRoom(
 		}
 	}
 
-	if domain == cfg.Matrix.ServerName {
-		// Query the roomserver API to check if the alias exists locally
-		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
-		var queryRes roomserverAPI.GetRoomIDForAliasResponse
-		if err = rsAPI.GetRoomIDForAlias(req.Context(), &queryReq, &queryRes); err != nil {
-			return httputil.LogThenError(req, err)
-		}
+	var res roomDirectoryResponse
 
-		// List any roomIDs found associated with this alias
-		if len(queryRes.RoomID) > 0 {
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: roomDirectoryResponse{
-					RoomID: queryRes.RoomID,
-					Servers: []string{}, // TODO-aliases
-				},
-			}
-		}
-	} else {
-		// Query the federation for this room alias
-		resp, err := federation.LookupRoomAlias(req.Context(), domain, roomAlias)
-		if err != nil {
-			switch err.(type) {
+	// Query the roomserver API to check if the alias exists locally.
+	queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
+	var queryRes roomserverAPI.GetRoomIDForAliasResponse
+	if err = rsAPI.GetRoomIDForAlias(req.Context(), &queryReq, &queryRes); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	res.RoomID = queryRes.RoomID
+
+	if res.RoomID == "" {
+		// If we don't know it locally, do a federation query.
+		fedRes, fedErr := federation.LookupRoomAlias(req.Context(), domain, roomAlias)
+		if fedErr != nil {
+			switch fedErr.(type) {
 			case gomatrix.HTTPError:
-			default:
 				// TODO: Return 502 if the remote server errored.
 				// TODO: Return 504 if the remote server timed out.
-				return httputil.LogThenError(req, err)
+				return httputil.LogThenError(req, fedErr)
+			default:
+				return httputil.LogThenError(req, fedErr)
 			}
 		}
-		if len(resp.RoomID) > 0 {
+		if fedRes.RoomID == "" {
 			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: roomDirectoryResponse{
-					RoomID: resp.RoomID,
-					Servers: []string{}, // TODO-aliases
-				},
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound(
+					fmt.Sprintf("Room alias %s not found", roomAlias),
+				),
 			}
 		}
+
+		res.RoomID = fedRes.RoomID
+		res.fillServers(fedRes.Servers)
+	} else {
+		joinedHostsReq := federationSenderAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: res.RoomID}
+		var joinedHostsRes federationSenderAPI.QueryJoinedHostServerNamesInRoomResponse
+		if err = fedSenderAPI.QueryJoinedHostServerNamesInRoom(req.Context(), &joinedHostsReq, &joinedHostsRes); err != nil {
+			return httputil.LogThenError(req, err)
+		}
+		res.fillServers(joinedHostsRes.ServerNames)
 	}
 
 	return util.JSONResponse{
-		Code: http.StatusNotFound,
-		JSON: jsonerror.NotFound(
-			fmt.Sprintf("Room alias %s not found", roomAlias),
-		),
+		Code: http.StatusOK,
+		JSON: res,
 	}
 }
 
