@@ -73,6 +73,7 @@ func Test_sanityCheckOutputRoomEvents(t *testing.T) {
 func TestSyncServerDatasource_selectEventsWithEventIDs(t *testing.T) {
 	db, err := NewSyncServerDatasource(dataSource)
 	assert.Nil(t, err)
+	truncateTable(t, db)
 	insertTestEvent(t, db)
 	ctx := context.Background()
 	txn, err := db.db.Begin()
@@ -85,6 +86,9 @@ func TestSyncServerDatasource_selectEventsWithEventIDs(t *testing.T) {
 	assert.Condition(t, func() bool {
 		return len(events) > 0
 	})
+
+	err = txn.Commit()
+	assert.Nil(t, err)
 }
 
 func insertTestEvent(t *testing.T, db *SyncServerDatasource) {
