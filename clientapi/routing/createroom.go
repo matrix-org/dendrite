@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -137,10 +138,35 @@ func CreateRoom(
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
 	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
+	queryAPI roomserverAPI.RoomserverQueryAPI,
 ) util.JSONResponse {
-	// TODO (#267): Check room ID doesn't clash with an existing one, and we
-	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+
+	// Generate the room ID for our new room and reserve it from the roomserver.
+	// Keep trying until we have a roomID which is unused, give up after 10 tries.
+	var roomID string
+	var try int
+	for ; roomID == "" && try <= 10; try++ {
+		checkRoomID := util.RandomString(16)
+		checkRoomID = fmt.Sprintf("!%s:%s", checkRoomID, cfg.Matrix.ServerName)
+
+		queryReq := roomserverAPI.QueryReserveRoomIDRequest{RoomID: checkRoomID}
+		var queryResp roomserverAPI.QueryReserveRoomIDResponse
+
+		err := queryAPI.QueryReserveRoomID(req.Context(), &queryReq, &queryResp)
+		if err != nil {
+			return httputil.LogThenError(req, err)
+		}
+
+		if queryResp.Success {
+			roomID = checkRoomID
+		}
+	}
+
+	if roomID == "" {
+		return httputil.LogThenError(req, errors.New(
+			"failed to determine a unused roomID for new room"))
+	}
+
 	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI, asAPI)
 }
 

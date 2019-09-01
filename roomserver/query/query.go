@@ -16,8 +16,10 @@ package query
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -85,6 +87,10 @@ type RoomserverQueryAPIDatabase interface {
 	EventStateKeys(
 		context.Context, []types.EventStateKeyNID,
 	) (map[types.EventStateKeyNID]string, error)
+	// Lookup if the roomID has been reserved, and when that reservation was made.
+	GetRoomIDReserved(ctx context.Context, roomID string) (time.Time, error)
+	// Reserve the room ID.
+	ReserveRoomID(ctx context.Context, roomID string) (success bool, err error)
 }
 
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
@@ -654,6 +660,37 @@ func getAuthChain(
 	}
 
 	return authEvents, nil
+}
+
+// QueryReserveRoomID implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryReserveRoomID(
+	ctx context.Context,
+	request *api.QueryReserveRoomIDRequest,
+	response *api.QueryReserveRoomIDResponse,
+) error {
+	// Check if room already exists.
+	// TODO: This is racey as some other request can create the
+	// room in between this check and the reservation below.
+	nid, err := r.DB.RoomNID(ctx, request.RoomID)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if nid != 0 {
+		response.Success = false
+		return nil
+	}
+
+	// Try to reserve room.
+	success, err := r.DB.ReserveRoomID(ctx, request.RoomID)
+	if err != nil {
+		// TODO: handle errors
+		return err
+	}
+
+	response.Success = success
+
+	return nil
 }
 
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.

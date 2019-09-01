@@ -155,6 +155,19 @@ type QueryInvitesForUserResponse struct {
 	InviteSenderUserIDs []string `json:"invite_sender_user_ids"`
 }
 
+// QueryReserveRoomIDRequest is a request to QueryReserveRoomID
+type QueryReserveRoomIDRequest struct {
+	// The room ID to check and reserve.
+	RoomID string `json:"room_id"`
+}
+
+// QueryReserveRoomIDResponse is a response to QueryServerAllowedToSeeEvent
+type QueryReserveRoomIDResponse struct {
+	// Whether the room ID has been reserved.
+	// False means that the room ID is already is use, or already reserved.
+	Success bool `json:"success"`
+}
+
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent
 type QueryServerAllowedToSeeEventRequest struct {
 	// The event ID to look up invites in.
@@ -303,6 +316,13 @@ type RoomserverQueryAPI interface {
 		request *QueryBackfillRequest,
 		response *QueryBackfillResponse,
 	) error
+
+	// Query if a room ID is available and reserve it.
+	QueryReserveRoomID(
+		ctx context.Context,
+		request *QueryReserveRoomIDRequest,
+		response *QueryReserveRoomIDResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -334,6 +354,9 @@ const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthC
 
 // RoomserverQueryBackfillPath is the HTTP path for the QueryMissingEvents API
 const RoomserverQueryBackfillPath = "/api/roomserver/QueryBackfill"
+
+// RoomserverQueryReserveRoomIDPath is the HTTP path for the QueryReserveRoomID API
+const RoomserverQueryReserveRoomIDPath = "/api/roomserver/queryReserveRoomID"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -476,5 +499,18 @@ func (h *httpRoomserverQueryAPI) QueryBackfill(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMissingEventsPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryReserveRoomID implements RoomserverQueryAPI
+func (h *httpRoomserverQueryAPI) QueryReserveRoomID(
+	ctx context.Context,
+	request *QueryReserveRoomIDRequest,
+	response *QueryReserveRoomIDResponse,
+) (err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryReserveRoomID")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryReserveRoomIDPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
