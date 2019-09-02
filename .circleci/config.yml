@@ -18,7 +18,7 @@ jobs:
             mv .circleci/server.key .
       - run:
           name: Run sytest with whitelisted tests
-          command: /dendrite_sytest.sh
+          command: /bootstrap.sh dendrite
 
       - store_artifacts:
           path: /logs
