@@ -15,6 +15,7 @@
 package roomserver
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -36,6 +37,7 @@ func SetupRoomServerComponent(
 	base *basecomponent.BaseDendrite,
 ) (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
 	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
+	fmt.Println(base.Cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}

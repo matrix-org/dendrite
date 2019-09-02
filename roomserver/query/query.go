@@ -89,7 +89,7 @@ type RoomserverQueryAPIDatabase interface {
 	) (map[types.EventStateKeyNID]string, error)
 	// Lookup if the roomID has been reserved, and when that reservation was made.
 	GetRoomIDReserved(ctx context.Context, roomID string) (time.Time, error)
-	// Reserve the room ID.
+	// Mark the room ID as reserved.
 	ReserveRoomID(ctx context.Context, roomID string) (success bool, err error)
 }
 
@@ -662,7 +662,10 @@ func getAuthChain(
 	return authEvents, nil
 }
 
-// QueryReserveRoomID implements api.RoomserverQueryAPI
+// QueryReserveRoomID marks the given roomID as reserved if it is not
+// yet already reserved. Fails if the room already exists or ID is
+// already reserved.
+// Implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryReserveRoomID(
 	ctx context.Context,
 	request *api.QueryReserveRoomIDRequest,
