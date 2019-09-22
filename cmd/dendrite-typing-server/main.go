@@ -32,5 +32,9 @@ func main() {
 
 	typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.TypingServer))
+	if base.Cfg.Bind.TypingServer != "" {
+		base.SetupAndServeHTTP(string(base.Cfg.Bind.TypingServer))
+	} else {
+		base.SetupAndServeHTTP(string(base.Cfg.Listen.TypingServer))
+	}
 }

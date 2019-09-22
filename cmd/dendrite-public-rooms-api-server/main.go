@@ -28,5 +28,9 @@ func main() {
 
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.PublicRoomsAPI))
+	if base.Cfg.Bind.PublicRoomsAPI != "" {
+		base.SetupAndServeHTTP(string(base.Cfg.Bind.PublicRoomsAPI))
+	} else {
+		base.SetupAndServeHTTP(string(base.Cfg.Listen.PublicRoomsAPI))
+	}
 }

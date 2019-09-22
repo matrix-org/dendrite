@@ -35,5 +35,9 @@ func main() {
 		base, accountDB, deviceDB, federation, alias, query, cache,
 	)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender))
+	if base.Cfg.Bind.AppServiceAPI != "" {
+		base.SetupAndServeHTTP(string(base.Cfg.Bind.AppServiceAPI))
+	} else {
+		base.SetupAndServeHTTP(string(base.Cfg.Listen.AppServiceAPI))
+	}
 }

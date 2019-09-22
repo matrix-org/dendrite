@@ -194,6 +194,21 @@ type Dendrite struct {
 		Password string `yaml:"turn_password"`
 	} `yaml:"turn"`
 
+	// The internal addresses the components will listen on.
+	// These should not be exposed externally as they expose metrics and debugging APIs.
+	// Falls back to addresses listed in Listen if not specified
+	Bind struct {
+		MediaAPI         Address `yaml:"media_api"`
+		ClientAPI        Address `yaml:"client_api"`
+		FederationAPI    Address `yaml:"federation_api"`
+		AppServiceAPI    Address `yaml:"appservice_api"`
+		SyncAPI          Address `yaml:"sync_api"`
+		RoomServer       Address `yaml:"room_server"`
+		FederationSender Address `yaml:"federation_sender"`
+		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
+		TypingServer     Address `yaml:"typing_server"`
+	} `yaml:"bind"`
+
 	// The addresses for talking to other microservices.
 	Listen struct {
 		MediaAPI         Address `yaml:"media_api"`
@@ -206,20 +221,6 @@ type Dendrite struct {
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
 		TypingServer     Address `yaml:"typing_server"`
 	} `yaml:"listen"`
-
-	// The internal addresses the components will listen on.
-	// These should not be exposed externally as they expose metrics and debugging APIs.
-	Bind struct {
-		MediaAPI         Address `yaml:"media_api"`
-		ClientAPI        Address `yaml:"client_api"`
-		FederationAPI    Address `yaml:"federation_api"`
-		AppServiceAPI    Address `yaml:"appservice_api"`
-		SyncAPI          Address `yaml:"sync_api"`
-		RoomServer       Address `yaml:"room_server"`
-		FederationSender Address `yaml:"federation_sender"`
-		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
-		TypingServer     Address `yaml:"typing_server"`
-	} `yaml:"bind"`
 
 	// The config for tracing the dendrite servers.
 	Tracing struct {
