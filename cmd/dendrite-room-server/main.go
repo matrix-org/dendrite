@@ -28,5 +28,5 @@ func main() {
 
 	roomserver.SetupRoomServerComponent(base)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Listen.RoomServer))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer))
 }

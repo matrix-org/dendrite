@@ -28,5 +28,5 @@ func main() {
 
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Listen.MediaAPI))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.MediaAPI))
 }

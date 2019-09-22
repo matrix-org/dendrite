@@ -32,5 +32,5 @@ func main() {
 
 	typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 
-	base.SetupAndServeHTTP(string(base.Cfg.Listen.TypingServer))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.TypingServer))
 }
