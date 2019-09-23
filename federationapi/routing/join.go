@@ -176,9 +176,9 @@ func SendJoin(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: map[string]interface{}{
-			"state":      stateAndAuthChainRepsonse.StateEvents,
-			"auth_chain": stateAndAuthChainRepsonse.AuthChainEvents,
+		JSON: gomatrixserverlib.RespSendJoin{
+			StateEvents: stateAndAuthChainRepsonse.StateEvents,
+			AuthEvents:  stateAndAuthChainRepsonse.AuthChainEvents,
 		},
 	}
 }
