@@ -112,7 +112,7 @@ func insertTestEvent(t *testing.T, db *SyncServerDatasource) {
 
 	var addState, removeState []string
 	transactionID := api.TransactionID{
-		DeviceID:      "test-device-id",
+		SessionID:      0x11223344,
 		TransactionID: "test-transaction-id",
 	}
 
