@@ -3,6 +3,9 @@
 # Hidden files
 .*
 
+# Backup files
+*~
+
 # Downloads
 /.downloads
 
