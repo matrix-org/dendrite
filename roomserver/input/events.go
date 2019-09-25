@@ -32,7 +32,7 @@ type RoomEventDatabase interface {
 	StoreEvent(
 		ctx context.Context,
 		event gomatrixserverlib.Event,
-		txnAndDeviceID *api.TransactionID,
+		txnAndSessionID *api.TransactionID,
 		authEventNIDs []types.EventNID,
 	) (types.RoomNID, types.StateAtEvent, error)
 	// Look up the state entries for a list of string event IDs
@@ -67,7 +67,7 @@ type RoomEventDatabase interface {
 	// Returns an empty string if no such event exists.
 	GetTransactionEventID(
 		ctx context.Context, transactionID string,
-		deviceID string, userID string,
+		sessionID int64, userID string,
 	) (string, error)
 }
 
@@ -100,7 +100,7 @@ func processRoomEvent(
 	if input.TransactionID != nil {
 		tdID := input.TransactionID
 		eventID, err = db.GetTransactionEventID(
-			ctx, tdID.TransactionID, tdID.DeviceID, input.Event.Sender(),
+			ctx, tdID.TransactionID, tdID.SessionID, input.Event.Sender(),
 		)
 		// On error OR event with the transaction already processed/processesing
 		if err != nil || eventID != "" {

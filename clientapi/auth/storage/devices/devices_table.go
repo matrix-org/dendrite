@@ -27,11 +27,19 @@ import (
 )
 
 const devicesSchema = `
+-- This sequence is used for automatic allocation of session_id.
+CREATE SEQUENCE IF NOT EXISTS device_session_id_seq START 1;
+
 -- Stores data about devices.
 CREATE TABLE IF NOT EXISTS device_devices (
     -- The access token granted to this device. This has to be the primary key
     -- so we can distinguish which device is making a given request.
     access_token TEXT NOT NULL PRIMARY KEY,
+    -- The auto-allocated unique ID of the session identified by the access token.
+    -- This can be used as a secure substitution of the access token in situations
+    -- where data is associated with access tokens (e.g. transaction storage),
+    -- so we don't have to store users' access tokens everywhere.
+    session_id BIGINT NOT NULL DEFAULT nextval('device_session_id_seq'),
     -- The device identifier. This only needs to uniquely identify a device for a given user, not globally.
     -- access_tokens will be clobbered based on the device ID for a user.
     device_id TEXT NOT NULL,
@@ -51,10 +59,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(loca
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name) VALUES ($1, $2, $3, $4, $5)"
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name) VALUES ($1, $2, $3, $4, $5)" +
+	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
-	"SELECT device_id, localpart FROM device_devices WHERE access_token = $1"
+	"SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"
 
 const selectDeviceByIDSQL = "" +
 	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
@@ -120,14 +129,16 @@ func (s *devicesStatements) insertDevice(
 	displayName *string,
 ) (*authtypes.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
+	var sessionID int64
 	stmt := common.TxStmt(txn, s.insertDeviceStmt)
-	if _, err := stmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName); err != nil {
+	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName).Scan(&sessionID); err != nil {
 		return nil, err
 	}
 	return &authtypes.Device{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
+		SessionID:   sessionID,
 	}, nil
 }
 
@@ -161,7 +172,7 @@ func (s *devicesStatements) selectDeviceByToken(
 	var dev authtypes.Device
 	var localpart string
 	stmt := s.selectDeviceByTokenStmt
-	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.ID, &localpart)
+	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.SessionID, &dev.ID, &localpart)
 	if err == nil {
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		dev.AccessToken = accessToken

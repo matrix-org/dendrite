@@ -22,5 +22,9 @@ type Device struct {
 	// This uniquely identifies the device from all other devices and clients.
 	AccessToken string
 	DisplayName string
+	// The unique ID of the session identified by the access token.
+	// Can be used as a secure substitution in places where data needs to be
+	// associated with access tokens.
+	SessionID int64
 	// TODO: last used timestamp, keys, etc
 }
