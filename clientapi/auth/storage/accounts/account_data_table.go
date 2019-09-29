@@ -122,11 +122,10 @@ func (s *accountDataStatements) selectAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
 ) (data *gomatrixserverlib.ClientEvent, err error) {
 	stmt := s.selectAccountDataByTypeStmt
-	row := stmt.QueryRowContext(ctx, localpart, roomID, dataType)
 
 	var content []byte
 
-	err = row.Scan(&content)
+	err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&content)
 	if err != nil {
 		return
 	}
