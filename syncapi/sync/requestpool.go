@@ -196,13 +196,13 @@ func (rp *RequestPool) appendAccountData(
 		events := []gomatrixserverlib.ClientEvent{}
 		// Request the missing data from the database
 		for _, dataType := range dataTypes {
-			evs, err := rp.accountDB.GetAccountDataByType(
+			event, err := rp.accountDB.GetAccountDataByType(
 				req.ctx, localpart, roomID, dataType,
 			)
 			if err != nil {
 				return nil, err
 			}
-			events = append(events, evs...)
+			events = append(events, *event)
 		}
 
 		// Append the data to the response
