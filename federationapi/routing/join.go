@@ -58,7 +58,7 @@ func MakeJoin(
 		Type:     "m.room.member",
 		StateKey: &userID,
 	}
-	err = builder.SetContent(map[string]interface{}{"membership": "join"})
+	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Join})
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}

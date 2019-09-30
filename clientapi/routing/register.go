@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
@@ -70,12 +71,17 @@ func init() {
 }
 
 // sessionsDict keeps track of completed auth stages for each session.
+// It shouldn't be passed by value because it contains a mutex.
 type sessionsDict struct {
+	sync.Mutex
 	sessions map[string][]authtypes.LoginType
 }
 
 // GetCompletedStages returns the completed stages for a session.
-func (d sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType {
+func (d *sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType {
+	d.Lock()
+	defer d.Unlock()
+
 	if completedStages, ok := d.sessions[sessionID]; ok {
 		return completedStages
 	}
@@ -83,15 +89,23 @@ func (d sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType
 	return make([]authtypes.LoginType, 0)
 }
 
-// AddCompletedStage records that a session has completed an auth stage.
-func (d *sessionsDict) AddCompletedStage(sessionID string, stage authtypes.LoginType) {
-	d.sessions[sessionID] = append(d.GetCompletedStages(sessionID), stage)
-}
-
 func newSessionsDict() *sessionsDict {
 	return &sessionsDict{
 		sessions: make(map[string][]authtypes.LoginType),
 	}
+}
+
+// AddCompletedSessionStage records that a session has completed an auth stage.
+func AddCompletedSessionStage(sessionID string, stage authtypes.LoginType) {
+	sessions.Lock()
+	defer sessions.Unlock()
+
+	for _, completedStage := range sessions.sessions[sessionID] {
+		if completedStage == stage {
+			return
+		}
+	}
+	sessions.sessions[sessionID] = append(sessions.sessions[sessionID], stage)
 }
 
 var (
@@ -115,7 +129,10 @@ type registerRequest struct {
 	// user-interactive auth params
 	Auth authDict `json:"auth"`
 
+	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
+	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
+	DeviceID           *string `json:"device_id"`
 
 	// Prevent this user from logging in
 	InhibitLogin common.WeakBoolean `json:"inhibit_login"`
@@ -521,7 +538,7 @@ func handleRegistrationFlow(
 		}
 
 		// Add Recaptcha to the list of completed registration stages
-		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeRecaptcha)
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
 
 	case authtypes.LoginTypeSharedSecret:
 		// Check shared secret against config
@@ -534,7 +551,7 @@ func handleRegistrationFlow(
 		}
 
 		// Add SharedSecret to the list of completed registration stages
-		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeSharedSecret)
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeSharedSecret)
 
 	case "":
 		// Extract the access token from the request, if there's one to extract
@@ -564,7 +581,7 @@ func handleRegistrationFlow(
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
-		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeDummy)
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
 
 	default:
 		return util.JSONResponse{
@@ -620,7 +637,7 @@ func handleApplicationServiceRegistration(
 	// application service registration is entirely separate.
 	return completeRegistration(
 		req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
-		r.InhibitLogin, r.InitialDisplayName,
+		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 	)
 }
 
@@ -640,7 +657,7 @@ func checkAndCompleteFlow(
 		// This flow was completed, registration can continue
 		return completeRegistration(
 			req.Context(), accountDB, deviceDB, r.Username, r.Password, "",
-			r.InhibitLogin, r.InitialDisplayName,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 		)
 	}
 
@@ -691,10 +708,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -732,13 +749,19 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 	return nil
 }
 
+// completeRegistration runs some rudimentary checks against the submitted
+// input, then if successful creates an account and a newly associated device
+// We pass in each individual part of the request here instead of just passing a
+// registerRequest, as this function serves requests encoded as both
+// registerRequests and legacyRegisterRequests, which share some attributes but
+// not all
 func completeRegistration(
 	ctx context.Context,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
 	username, password, appserviceID string,
 	inhibitLogin common.WeakBoolean,
-	displayName *string,
+	displayName, deviceID *string,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
@@ -767,6 +790,9 @@ func completeRegistration(
 		}
 	}
 
+	// Increment prometheus counter for created users
+	amtRegUsers.Inc()
+
 	// Check whether inhibit_login option is set. If so, don't create an access
 	// token or a device for this user
 	if inhibitLogin {
@@ -787,17 +813,13 @@ func completeRegistration(
 		}
 	}
 
-	// TODO: Use the device ID in the request.
-	dev, err := deviceDB.CreateDevice(ctx, username, nil, token, displayName)
+	dev, err := deviceDB.CreateDevice(ctx, username, deviceID, token, displayName)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
 		}
 	}
-
-	// Increment prometheus counter for created users
-	amtRegUsers.Inc()
 
 	return util.JSONResponse{
 		Code: http.StatusOK,

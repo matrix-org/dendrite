@@ -20,13 +20,13 @@ package api
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/matrix-org/dendrite/common"
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	opentracing "github.com/opentracing/opentracing-go"
 )
@@ -134,9 +134,9 @@ func (h *httpAppServiceQueryAPI) UserIDExists(
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// RetreiveUserProfile is a wrapper that queries both the local database and
+// RetrieveUserProfile is a wrapper that queries both the local database and
 // application services for a given user's profile
-func RetreiveUserProfile(
+func RetrieveUserProfile(
 	ctx context.Context,
 	userID string,
 	asAPI AppServiceQueryAPI,
@@ -164,7 +164,7 @@ func RetreiveUserProfile(
 
 	// If no user exists, return
 	if !userResp.UserIDExists {
-		return nil, errors.New("no known profile for given user ID")
+		return nil, common.ErrProfileNoExists
 	}
 
 	// Try to query the user from the local database again

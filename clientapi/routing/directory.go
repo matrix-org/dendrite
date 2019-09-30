@@ -117,12 +117,16 @@ func SetLocalAlias(
 	// 1. The new method for checking for things matching an AS's namespace
 	// 2. Using an overall Regex object for all AS's just like we did for usernames
 	for _, appservice := range cfg.Derived.ApplicationServices {
-		if aliasNamespaces, ok := appservice.NamespaceMap["aliases"]; ok {
-			for _, namespace := range aliasNamespaces {
-				if namespace.Exclusive && namespace.RegexpObject.MatchString(alias) {
-					return util.JSONResponse{
-						Code: http.StatusBadRequest,
-						JSON: jsonerror.ASExclusive("Alias is reserved by an application service"),
+		// Don't prevent AS from creating aliases in its own namespace
+		// Note that Dendrite uses SenderLocalpart as UserID for AS users
+		if device.UserID != appservice.SenderLocalpart {
+			if aliasNamespaces, ok := appservice.NamespaceMap["aliases"]; ok {
+				for _, namespace := range aliasNamespaces {
+					if namespace.Exclusive && namespace.RegexpObject.MatchString(alias) {
+						return util.JSONResponse{
+							Code: http.StatusBadRequest,
+							JSON: jsonerror.ASExclusive("Alias is reserved by an application service"),
+						}
 					}
 				}
 			}
@@ -160,13 +164,36 @@ func SetLocalAlias(
 }
 
 // RemoveLocalAlias implements DELETE /directory/room/{roomAlias}
-// TODO: Check if the user has the power level to remove an alias
 func RemoveLocalAlias(
 	req *http.Request,
 	device *authtypes.Device,
 	alias string,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 ) util.JSONResponse {
+
+	creatorQueryReq := roomserverAPI.GetCreatorIDForAliasRequest{
+		Alias: alias,
+	}
+	var creatorQueryRes roomserverAPI.GetCreatorIDForAliasResponse
+	if err := aliasAPI.GetCreatorIDForAlias(req.Context(), &creatorQueryReq, &creatorQueryRes); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if creatorQueryRes.UserID == "" {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Alias does not exist"),
+		}
+	}
+
+	if creatorQueryRes.UserID != device.UserID {
+		// TODO: Still allow deletion if user is admin
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("You do not have permission to delete this alias"),
+		}
+	}
+
 	queryReq := roomserverAPI.RemoveRoomAliasRequest{
 		Alias:  alias,
 		UserID: device.UserID,

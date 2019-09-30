@@ -20,6 +20,41 @@ should pick up any unit test and run it). There are also [scripts](scripts) for
 [linting](scripts/find-lint.sh) and doing a [build/test/lint
 run](scripts/build-test-lint.sh).
 
+## Continuous Integration
+
+When a Pull Request is submitted, continuous integration jobs are run
+automatically to ensure the code builds and is relatively well-written. Checks
+are run on [Buildkite](https://buildkite.com/matrix-dot-org/dendrite/) and
+[CircleCI](https://circleci.com/gh/matrix-org/dendrite/). The Buildkite
+pipeline can be found in Matrix.org's [pipelines
+repository](https://github.com/matrix-org/pipelines).
+
+If a job fails, click the "details" button and you should be taken to the job's
+logs.
+
+![Click the details button on the failing build step](docs/images/details-button-location.jpg)
+
+Scroll down to the failing step and you should see some log output. Scan
+the logs until you find what it's complaining about, fix it, submit a new
+commit, then rinse and repeat until CI passes.
+
+### Running CI Tests Locally
+
+To save waiting for CI to finish after every commit, it is ideal to run the
+checks locally before pushing, fixing errors first. This also saves other
+people time as only so many PRs can be tested at a given time.
+
+To execute what Buildkite tests, simply run `./scripts/build-test-lint.sh`.
+This script will build the code, lint it, and run `go test ./...` with race
+condition checking enabled. If something needs to be changed, fix it and then
+run the script again until it no longer complains. Be warned that the linting
+can take a significant amount of CPU and RAM.
+
+CircleCI simply runs [Sytest](https://github.com/matrix-org/sytest) with a test
+whitelist. See
+[docs/sytest.md](https://github.com/matrix-org/dendrite/blob/master/docs/sytest.md#using-a-sytest-docker-image)
+for instructions on setting it up to run locally.
+
 
 ## Picking Things To Do
 

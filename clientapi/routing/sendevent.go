@@ -50,7 +50,7 @@ func SendEvent(
 ) util.JSONResponse {
 	if txnID != nil {
 		// Try to fetch response from transactionsCache
-		if res, ok := txnCache.FetchTransaction(*txnID); ok {
+		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
 			return *res
 		}
 	}
@@ -60,18 +60,18 @@ func SendEvent(
 		return *resErr
 	}
 
-	var txnAndDeviceID *api.TransactionID
+	var txnAndSessionID *api.TransactionID
 	if txnID != nil {
-		txnAndDeviceID = &api.TransactionID{
+		txnAndSessionID = &api.TransactionID{
 			TransactionID: *txnID,
-			DeviceID:      device.ID,
+			SessionID:     device.SessionID,
 		}
 	}
 
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	eventID, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndDeviceID,
+		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndSessionID,
 	)
 	if err != nil {
 		return httputil.LogThenError(req, err)
@@ -83,7 +83,7 @@ func SendEvent(
 	}
 	// Add response to transactionsCache
 	if txnID != nil {
-		txnCache.AddTransaction(*txnID, &res)
+		txnCache.AddTransaction(device.AccessToken, *txnID, &res)
 	}
 
 	return res

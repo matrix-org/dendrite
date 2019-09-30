@@ -20,10 +20,11 @@ require (
 	github.com/jaegertracing/jaeger-client-go v0.0.0-20170921145708-3ad49a1d839b
 	github.com/jaegertracing/jaeger-lib v0.0.0-20170920222118-21a3da6d66fe
 	github.com/klauspost/crc32 v0.0.0-20161016154125-cb6bfca970f6
+	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/lib/pq v0.0.0-20170918175043-23da1db4f16d
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
-	github.com/matrix-org/gomatrix v0.0.0-20190130130140-385f072fe9af
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20190619132215-178ed5e3b8e2
+	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20190814163046-d6285a18401f
 	github.com/matrix-org/naffka v0.0.0-20171115094957-662bfd0841d0
 	github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5
 	github.com/matttproud/golang_protobuf_extensions v1.0.1
@@ -40,8 +41,9 @@ require (
 	github.com/prometheus/common v0.0.0-20170108231212-dd2f054febf4
 	github.com/prometheus/procfs v0.0.0-20170128160123-1878d9fbb537
 	github.com/rcrowley/go-metrics v0.0.0-20161128210544-1f30fe9094a5
-	github.com/sirupsen/logrus v1.3.0
-	github.com/stretchr/testify v1.2.2
+	github.com/sirupsen/logrus v1.4.2
+	github.com/stretchr/objx v0.2.0 // indirect
+	github.com/stretchr/testify v1.3.0
 	github.com/tidwall/gjson v1.1.5
 	github.com/tidwall/match v1.0.1
 	github.com/tidwall/sjson v1.0.3
@@ -54,7 +56,7 @@ require (
 	go.uber.org/zap v1.7.1
 	golang.org/x/crypto v0.0.0-20190131182504-b8fe1690c613
 	golang.org/x/net v0.0.0-20190301231341-16b79f2e4e95
-	golang.org/x/sys v0.0.0-20180905080454-ebe1bf3edb33
+	golang.org/x/sys v0.0.0-20190712062909-fae7ac547cb7
 	gopkg.in/Shopify/sarama.v1 v1.11.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20170727041045-23bcc3c4eae3

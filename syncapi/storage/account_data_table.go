@@ -18,9 +18,9 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
-
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const accountDataSchema = `
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
     CONSTRAINT syncapi_account_data_unique UNIQUE (user_id, room_id, type)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id);
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id, type);
 `
 
 const insertAccountDataSQL = "" +
@@ -55,7 +55,9 @@ const insertAccountDataSQL = "" +
 const selectAccountDataInRangeSQL = "" +
 	"SELECT room_id, type FROM syncapi_account_data_type" +
 	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC"
+	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
+	" ORDER BY id ASC LIMIT $6"
 
 const selectMaxAccountDataIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_account_data_type"
@@ -94,7 +96,8 @@ func (s *accountDataStatements) insertAccountData(
 func (s *accountDataStatements) selectAccountDataInRange(
 	ctx context.Context,
 	userID string,
-	oldPos, newPos types.StreamPosition,
+	oldPos, newPos int64,
+	accountDataFilterPart *gomatrixserverlib.FilterPart,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
@@ -105,7 +108,11 @@ func (s *accountDataStatements) selectAccountDataInRange(
 		oldPos--
 	}
 
-	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos)
+	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos,
+		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataFilterPart.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataFilterPart.NotTypes)),
+		accountDataFilterPart.Limit,
+	)
 	if err != nil {
 		return
 	}

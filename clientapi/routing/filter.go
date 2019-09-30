@@ -17,13 +17,10 @@ package routing
 import (
 	"net/http"
 
-	"encoding/json"
-
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -32,12 +29,6 @@ import (
 func GetFilter(
 	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string, filterID string,
 ) util.JSONResponse {
-	if req.Method != http.MethodGet {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -49,7 +40,7 @@ func GetFilter(
 		return httputil.LogThenError(req, err)
 	}
 
-	res, err := accountDB.GetFilter(req.Context(), localpart, filterID)
+	filter, err := accountDB.GetFilter(req.Context(), localpart, filterID)
 	if err != nil {
 		//TODO better error handling. This error message is *probably* right,
 		// but if there are obscure db errors, this will also be returned,
@@ -58,11 +49,6 @@ func GetFilter(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotFound("No such filter"),
 		}
-	}
-	filter := gomatrix.Filter{}
-	err = json.Unmarshal(res, &filter)
-	if err != nil {
-		return httputil.LogThenError(req, err)
 	}
 
 	return util.JSONResponse{
@@ -79,12 +65,6 @@ type filterResponse struct {
 func PutFilter(
 	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string,
 ) util.JSONResponse {
-	if req.Method != http.MethodPost {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
 	if userID != device.UserID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -97,21 +77,21 @@ func PutFilter(
 		return httputil.LogThenError(req, err)
 	}
 
-	var filter gomatrix.Filter
+	var filter gomatrixserverlib.Filter
 
 	if reqErr := httputil.UnmarshalJSONRequest(req, &filter); reqErr != nil {
 		return *reqErr
 	}
 
-	filterArray, err := json.Marshal(filter)
-	if err != nil {
+	// Validate generates a user-friendly error
+	if err = filter.Validate(); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Filter is malformed"),
+			JSON: jsonerror.BadJSON("Invalid filter: " + err.Error()),
 		}
 	}
 
-	filterID, err := accountDB.PutFilter(req.Context(), localpart, filterArray)
+	filterID, err := accountDB.PutFilter(req.Context(), localpart, &filter)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}

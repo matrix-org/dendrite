@@ -17,13 +17,13 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"sort"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -44,11 +44,17 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     room_id TEXT NOT NULL,
     -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
     event_json TEXT NOT NULL,
+    -- The event type e.g 'm.room.member'.
+    type TEXT NOT NULL,
+    -- The 'sender' property of the event.
+    sender TEXT NOT NULL,
+	-- true if the event content contains a url key.
+    contains_url BOOL NOT NULL,
     -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
     -- if there is no delta.
     add_state_ids TEXT[],
     remove_state_ids TEXT[],
-    device_id TEXT,  -- The local device that sent the event, if any
+    session_id BIGINT,  -- The client session that sent the event, if any
     transaction_id TEXT  -- The transaction id used to send the event, if any
 );
 -- for event selection
@@ -57,14 +63,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_ev
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
-	" room_id, event_id, event_json, add_state_ids, remove_state_ids, device_id, transaction_id" +
-	") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"
+	"room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id" +
+	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id"
 
 const selectEventsSQL = "" +
 	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectRecentEventsSQL = "" +
-	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
+	"SELECT id, event_json, session_id, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
@@ -76,7 +82,13 @@ const selectStateInRangeSQL = "" +
 	"SELECT id, event_json, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
-	" ORDER BY id ASC"
+	" AND ( $3::text[] IS NULL OR     sender  = ANY($3)  )" +
+	" AND ( $4::text[] IS NULL OR NOT(sender  = ANY($4)) )" +
+	" AND ( $5::text[] IS NULL OR     type LIKE ANY($5)  )" +
+	" AND ( $6::text[] IS NULL OR NOT(type LIKE ANY($6)) )" +
+	" AND ( $7::bool IS NULL   OR     contains_url = $7  )" +
+	" ORDER BY id ASC" +
+	" LIMIT $8"
 
 type outputRoomEventsStatements struct {
 	insertEventStmt        *sql.Stmt
@@ -109,15 +121,24 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-// selectStateInRange returns the state events between the two given stream positions, exclusive of oldPos, inclusive of newPos.
+// selectStateInRange returns the state events between the two given PDU stream positions, exclusive of oldPos, inclusive of newPos.
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
-	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, oldPos, newPos int64,
+	stateFilterPart *gomatrixserverlib.FilterPart,
 ) (map[string]map[string]bool, map[string]streamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 
-	rows, err := stmt.QueryContext(ctx, oldPos, newPos)
+	rows, err := stmt.QueryContext(
+		ctx, oldPos, newPos,
+		pq.StringArray(stateFilterPart.Senders),
+		pq.StringArray(stateFilterPart.NotSenders),
+		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
+		stateFilterPart.ContainsURL,
+		stateFilterPart.Limit,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -171,7 +192,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 
 		eventIDToEvent[ev.EventID()] = streamEvent{
 			Event:          ev,
-			streamPosition: types.StreamPosition(streamPos),
+			streamPosition: streamPos,
 		}
 	}
 
@@ -200,10 +221,19 @@ func (s *outputRoomEventsStatements) insertEvent(
 	event *gomatrixserverlib.Event, addState, removeState []string,
 	transactionID *api.TransactionID,
 ) (streamPos int64, err error) {
-	var deviceID, txnID *string
+	var txnID *string
+	var sessionID *int64
 	if transactionID != nil {
-		deviceID = &transactionID.DeviceID
+		sessionID = &transactionID.SessionID
 		txnID = &transactionID.TransactionID
+	}
+
+	// Parse content as JSON and search for an "url" key
+	containsURL := false
+	var content map[string]interface{}
+	if json.Unmarshal(event.Content(), &content) != nil {
+		// Set containsURL to true if url is present
+		_, containsURL = content["url"]
 	}
 
 	stmt := common.TxStmt(txn, s.insertEventStmt)
@@ -212,9 +242,12 @@ func (s *outputRoomEventsStatements) insertEvent(
 		event.RoomID(),
 		event.EventID(),
 		event.JSON(),
+		event.Type(),
+		event.Sender(),
+		containsURL,
 		pq.StringArray(addState),
 		pq.StringArray(removeState),
-		deviceID,
+		sessionID,
 		txnID,
 	).Scan(&streamPos)
 	return
@@ -223,7 +256,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 // RecentEventsInRoom returns the most recent events in the given room, up to a maximum of 'limit'.
 func (s *outputRoomEventsStatements) selectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	roomID string, fromPos, toPos int64, limit int,
 ) ([]streamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectRecentEventsStmt)
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
@@ -236,7 +269,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 		return nil, err
 	}
 	// The events need to be returned from oldest to latest, which isn't
-	// necessary the way the SQL query returns them, so a sort is necessary to
+	// necessarily the way the SQL query returns them, so a sort is necessary to
 	// ensure the events are in the right order in the slice.
 	sort.SliceStable(events, func(i int, j int) bool {
 		return events[i].streamPosition < events[j].streamPosition
@@ -264,11 +297,11 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 		var (
 			streamPos     int64
 			eventBytes    []byte
-			deviceID      *string
+			sessionID     *int64
 			txnID         *string
 			transactionID *api.TransactionID
 		)
-		if err := rows.Scan(&streamPos, &eventBytes, &deviceID, &txnID); err != nil {
+		if err := rows.Scan(&streamPos, &eventBytes, &sessionID, &txnID); err != nil {
 			return nil, err
 		}
 		// TODO: Handle redacted events
@@ -277,16 +310,16 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 			return nil, err
 		}
 
-		if deviceID != nil && txnID != nil {
+		if sessionID != nil && txnID != nil {
 			transactionID = &api.TransactionID{
-				DeviceID:      *deviceID,
+				SessionID:     *sessionID,
 				TransactionID: *txnID,
 			}
 		}
 
 		result = append(result, streamEvent{
 			Event:          ev,
-			streamPosition: types.StreamPosition(streamPos),
+			streamPosition: streamPos,
 			transactionID:  transactionID,
 		})
 	}

@@ -20,7 +20,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -29,13 +28,6 @@ import (
 func Logout(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
-	if req.Method != http.MethodPost {
-		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
-
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return httputil.LogThenError(req, err)

@@ -18,7 +18,6 @@ import (
 	"net/http"
 
 	"context"
-	"database/sql"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -42,10 +41,12 @@ type flow struct {
 }
 
 type passwordRequest struct {
-	User               string  `json:"user"`
-	Password           string  `json:"password"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
+	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
-	DeviceID           string  `json:"device_id"`
+	DeviceID           *string `json:"device_id"`
 }
 
 type loginResponse struct {
@@ -110,7 +111,7 @@ func Login(
 			return httputil.LogThenError(req, err)
 		}
 
-		dev, err := getDevice(req.Context(), r, deviceDB, acc, localpart, token)
+		dev, err := getDevice(req.Context(), r, deviceDB, acc, token)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -134,20 +135,16 @@ func Login(
 	}
 }
 
-// check if device exists else create one
+// getDevice returns a new or existing device
 func getDevice(
 	ctx context.Context,
 	r passwordRequest,
 	deviceDB *devices.Database,
 	acc *authtypes.Account,
-	localpart, token string,
+	token string,
 ) (dev *authtypes.Device, err error) {
-	dev, err = deviceDB.GetDeviceByID(ctx, localpart, r.DeviceID)
-	if err == sql.ErrNoRows {
-		// device doesn't exist, create one
-		dev, err = deviceDB.CreateDevice(
-			ctx, acc.Localpart, nil, token, r.InitialDisplayName,
-		)
-	}
+	dev, err = deviceDB.CreateDevice(
+		ctx, acc.Localpart, r.DeviceID, token, r.InitialDisplayName,
+	)
 	return
 }
