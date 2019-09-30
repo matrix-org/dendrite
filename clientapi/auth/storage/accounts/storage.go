@@ -263,11 +263,11 @@ func (d *Database) GetAccountData(ctx context.Context, localpart string) (
 
 // GetAccountDataByType returns account data matching a given
 // localpart, room ID and type.
-// If no account data could be found, returns an empty array
+// If no account data could be found, returns nil
 // Returns an error if there was an issue with the retrieval
 func (d *Database) GetAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
-) (data []gomatrixserverlib.ClientEvent, err error) {
+) (data *gomatrixserverlib.ClientEvent, err error) {
 	return d.accountDatas.selectAccountDataByType(
 		ctx, localpart, roomID, dataType,
 	)

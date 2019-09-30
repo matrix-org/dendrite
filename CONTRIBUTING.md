@@ -25,7 +25,9 @@ run](scripts/build-test-lint.sh).
 When a Pull Request is submitted, continuous integration jobs are run
 automatically to ensure the code builds and is relatively well-written. Checks
 are run on [Buildkite](https://buildkite.com/matrix-dot-org/dendrite/) and
-[CircleCI](https://circleci.com/gh/matrix-org/dendrite/).
+[CircleCI](https://circleci.com/gh/matrix-org/dendrite/). The Buildkite
+pipeline can be found in Matrix.org's [pipelines
+repository](https://github.com/matrix-org/pipelines).
 
 If a job fails, click the "details" button and you should be taken to the job's
 logs.

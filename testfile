@@ -171,6 +171,7 @@ Outbound federation can query profile data
 /event/ on joined room works
 /event/ does not allow access to events before the user joined
 Federation key API allows unsigned requests for keys
+Can paginate public room list
 GET /directory/room/:room_alias yields room ID
 PUT /directory/room/:room_alias creates alias
 Room aliases can contain Unicode
