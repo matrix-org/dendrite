@@ -171,3 +171,4 @@ Outbound federation can query profile data
 /event/ on joined room works
 /event/ does not allow access to events before the user joined
 Federation key API allows unsigned requests for keys
+Can paginate public room list
