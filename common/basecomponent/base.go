@@ -32,6 +32,7 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/sirupsen/logrus"
@@ -105,6 +106,12 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 // server over HTTP
 func (b *BaseDendrite) CreateHTTPTypingServerAPIs() typingServerAPI.TypingServerInputAPI {
 	return typingServerAPI.NewTypingServerInputAPIHTTP(b.Cfg.TypingServerURL(), nil)
+}
+
+// CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
+// the federation sender over HTTP
+func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
+	return federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), nil)
 }
 
 // CreateDeviceDB creates a new instance of the device database. Should only be
