@@ -2,6 +2,7 @@ package devices
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -61,6 +62,7 @@ type deviceSpec struct {
 }
 
 func TestDatabase_GetDevicesByLocalpart(t *testing.T) {
+	dropTable(dataSource)
 	db, err := NewDatabase(dataSource, "localhost")
 	assert.Nil(t, err)
 
@@ -121,4 +123,12 @@ func createTestDevice(devSpecScheme *deviceSpec, count int) (devices []*authtype
 		}
 	}
 	return devices, nil
+}
+
+func dropTable(dataSource string) {
+	if db, err := sql.Open("postgres", dataSource); err == nil && db != nil {
+		_, _ = db.Exec("DROP TABLE device_devices;")
+	} else {
+		panic("Error! Unable to refresh the database!")
+	}
 }

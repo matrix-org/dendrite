@@ -43,3 +43,5 @@ require (
 	gopkg.in/h2non/bimg.v1 v1.0.18
 	gopkg.in/yaml.v2 v2.2.2
 )
+
+go 1.13

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -58,6 +59,7 @@ func init() {
 const testEventID = "$test-event-id:test-domain.example.com"
 
 func Test_sanityCheckOutputRoomEvents(t *testing.T) {
+	dropTable(dataSource)
 	db, err := NewSyncServerDatasource(dataSource)
 	assert.Nil(t, err)
 
@@ -144,6 +146,14 @@ func selectTestEvent(t *testing.T, db *SyncServerDatasource) {
 	assert.Condition(t, func() bool {
 		return len(res) > 0
 	})
+}
+
+func dropTable(dataSource string) {
+	if db, err := sql.Open("postgres", dataSource); err == nil && db != nil {
+		_, _ = db.Exec("DROP TABLE syncapi_output_room_events;")
+	} else {
+		panic("Error! Unable to refresh the database!")
+	}
 }
 
 func truncateTable(t *testing.T, db *SyncServerDatasource) {
