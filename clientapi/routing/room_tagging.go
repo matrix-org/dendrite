@@ -59,7 +59,7 @@ func GetTags(
 		return httputil.LogThenError(req, err)
 	}
 
-	if len(data) == 0 {
+	if data == nil {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
@@ -68,7 +68,7 @@ func GetTags(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: data[0].Content,
+		JSON: data.Content,
 	}
 }
 
@@ -103,8 +103,8 @@ func PutTag(
 	}
 
 	var tagContent gomatrix.TagContent
-	if len(data) > 0 {
-		if err = json.Unmarshal(data[0].Content, &tagContent); err != nil {
+	if data != nil {
+		if err = json.Unmarshal(data.Content, &tagContent); err != nil {
 			return httputil.LogThenError(req, err)
 		}
 	} else {
@@ -155,7 +155,7 @@ func DeleteTag(
 	}
 
 	// If there are no tags in the database, exit
-	if len(data) == 0 {
+	if data == nil {
 		// Spec only defines 200 responses for this endpoint so we don't return anything else.
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -164,7 +164,7 @@ func DeleteTag(
 	}
 
 	var tagContent gomatrix.TagContent
-	err = json.Unmarshal(data[0].Content, &tagContent)
+	err = json.Unmarshal(data.Content, &tagContent)
 	if err != nil {
 		return httputil.LogThenError(req, err)
 	}
@@ -204,7 +204,7 @@ func obtainSavedTags(
 	userID string,
 	roomID string,
 	accountDB *accounts.Database,
-) (string, []gomatrixserverlib.ClientEvent, error) {
+) (string, *gomatrixserverlib.ClientEvent, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return "", nil, err

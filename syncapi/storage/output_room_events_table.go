@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
     -- if there is no delta.
     add_state_ids TEXT[],
     remove_state_ids TEXT[],
-    device_id TEXT,  -- The local device that sent the event, if any
+    session_id BIGINT,  -- The client session that sent the event, if any
     transaction_id TEXT  -- The transaction id used to send the event, if any
 );
 -- for event selection
@@ -63,7 +63,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_ev
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
-	"room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, device_id, transaction_id" +
+	"room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id" +
 	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id"
 
 const selectEventsSQL = "" +
@@ -71,7 +71,7 @@ const selectEventsSQL = "" +
 	" FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectRecentEventsSQL = "" +
-	"SELECT id, event_json, device_id, transaction_id FROM syncapi_output_room_events" +
+	"SELECT id, event_json, session_id, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
@@ -221,9 +221,10 @@ func (s *outputRoomEventsStatements) insertEvent(
 	event *gomatrixserverlib.Event, addState, removeState []string,
 	transactionID *api.TransactionID,
 ) (streamPos int64, err error) {
-	var deviceID, txnID *string
+	var txnID *string
+	var sessionID *int64
 	if transactionID != nil {
-		deviceID = &transactionID.DeviceID
+		sessionID = &transactionID.SessionID
 		txnID = &transactionID.TransactionID
 	}
 
@@ -246,7 +247,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 		containsURL,
 		pq.StringArray(addState),
 		pq.StringArray(removeState),
-		deviceID,
+		sessionID,
 		txnID,
 	).Scan(&streamPos)
 	return
@@ -296,11 +297,11 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 		var (
 			streamPos     int64
 			eventBytes    []byte
-			deviceID      *string
+			sessionID     *int64
 			txnID         *string
 			transactionID *api.TransactionID
 		)
-		if err := rows.Scan(&streamPos, &eventBytes, &deviceID, &txnID); err != nil {
+		if err := rows.Scan(&streamPos, &eventBytes, &sessionID, &txnID); err != nil {
 			return nil, err
 		}
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
@@ -308,9 +309,9 @@ func rowsToStreamEvents(rows *sql.Rows) ([]streamEvent, error) {
 			return nil, err
 		}
 
-		if deviceID != nil && txnID != nil {
+		if sessionID != nil && txnID != nil {
 			transactionID = &api.TransactionID{
-				DeviceID:      *deviceID,
+				SessionID:     *sessionID,
 				TransactionID: *txnID,
 			}
 		}

@@ -15,11 +15,15 @@
 package federationsender
 
 import (
+	"net/http"
+
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
+	"github.com/matrix-org/dendrite/federationsender/query"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -29,8 +33,8 @@ import (
 func SetupFederationSenderComponent(
 	base *basecomponent.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
-	queryAPI api.RoomserverQueryAPI,
-) {
+	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
+) api.FederationSenderQueryAPI {
 	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
@@ -40,7 +44,7 @@ func SetupFederationSenderComponent(
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,
-		federationSenderDB, queryAPI,
+		federationSenderDB, rsQueryAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
@@ -52,4 +56,11 @@ func SetupFederationSenderComponent(
 	if err := tsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
+
+	queryAPI := query.FederationSenderQueryAPI{
+		DB: federationSenderDB,
+	}
+	queryAPI.SetupHTTP(http.DefaultServeMux)
+
+	return &queryAPI
 }

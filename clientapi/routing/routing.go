@@ -267,6 +267,13 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
+	r0mux.Handle("/auth/{authType}/fallback/web",
+		common.MakeHTMLAPI("auth_fallback", func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
+			vars := mux.Vars(req)
+			return AuthFallback(w, req, vars["authType"], cfg)
+		}),
+	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
+
 	r0mux.Handle("/pushrules/",
 		common.MakeExternalAPI("push_rules", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement push rules API

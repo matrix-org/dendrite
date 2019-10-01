@@ -498,6 +498,11 @@ func (config *Dendrite) checkMatrix(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "matrix.server_name", string(config.Matrix.ServerName))
 	checkNotEmpty(configErrs, "matrix.private_key", string(config.Matrix.PrivateKeyPath))
 	checkNotZero(configErrs, "matrix.federation_certificates", int64(len(config.Matrix.FederationCertificatePaths)))
+	if config.Matrix.RecaptchaEnabled {
+		checkNotEmpty(configErrs, "matrix.recaptcha_public_key", string(config.Matrix.RecaptchaPublicKey))
+		checkNotEmpty(configErrs, "matrix.recaptcha_private_key", string(config.Matrix.RecaptchaPrivateKey))
+		checkNotEmpty(configErrs, "matrix.recaptcha_siteverify_api", string(config.Matrix.RecaptchaSiteVerifyAPI))
+	}
 }
 
 // checkMedia verifies the parameters media.* are valid.

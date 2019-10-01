@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -41,6 +42,24 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	}
 
 	return http.HandlerFunc(withSpan)
+}
+
+// MakeHTMLAPI adds Span metrics to the HTML Handler function
+// This is used to serve HTML alongside JSON error messages
+func MakeHTMLAPI(metricsName string, f func(http.ResponseWriter, *http.Request) *util.JSONResponse) http.Handler {
+	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		span := opentracing.StartSpan(metricsName)
+		defer span.Finish()
+		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
+		if err := f(w, req); err != nil {
+			h := util.MakeJSONAPI(util.NewJSONRequestHandler(func(req *http.Request) util.JSONResponse {
+				return *err
+			}))
+			h.ServeHTTP(w, req)
+		}
+	}
+
+	return prometheus.InstrumentHandler(metricsName, http.HandlerFunc(withSpan))
 }
 
 // MakeInternalAPI turns a util.JSONRequestHandler function into an http.Handler.

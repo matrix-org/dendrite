@@ -48,7 +48,7 @@ func Open(dataSourceName string) (*Database, error) {
 // StoreEvent implements input.EventDatabase
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
-	txnAndDeviceID *api.TransactionID, authEventNIDs []types.EventNID,
+	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
 ) (types.RoomNID, types.StateAtEvent, error) {
 	var (
 		roomNID          types.RoomNID
@@ -59,10 +59,10 @@ func (d *Database) StoreEvent(
 		err              error
 	)
 
-	if txnAndDeviceID != nil {
+	if txnAndSessionID != nil {
 		if err = d.statements.insertTransaction(
-			ctx, txnAndDeviceID.TransactionID,
-			txnAndDeviceID.DeviceID, event.Sender(), event.EventID(),
+			ctx, txnAndSessionID.TransactionID,
+			txnAndSessionID.SessionID, event.Sender(), event.EventID(),
 		); err != nil {
 			return 0, types.StateAtEvent{}, err
 		}
@@ -496,9 +496,9 @@ func (d *Database) GetLatestEventsForUpdate(
 // GetTransactionEventID implements input.EventDatabase
 func (d *Database) GetTransactionEventID(
 	ctx context.Context, transactionID string,
-	deviceID string, userID string,
+	sessionID int64, userID string,
 ) (string, error) {
-	eventID, err := d.statements.selectTransactionEventID(ctx, transactionID, deviceID, userID)
+	eventID, err := d.statements.selectTransactionEventID(ctx, transactionID, sessionID, userID)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}

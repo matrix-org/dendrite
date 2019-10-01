@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
@@ -70,12 +71,17 @@ func init() {
 }
 
 // sessionsDict keeps track of completed auth stages for each session.
+// It shouldn't be passed by value because it contains a mutex.
 type sessionsDict struct {
+	sync.Mutex
 	sessions map[string][]authtypes.LoginType
 }
 
 // GetCompletedStages returns the completed stages for a session.
-func (d sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType {
+func (d *sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType {
+	d.Lock()
+	defer d.Unlock()
+
 	if completedStages, ok := d.sessions[sessionID]; ok {
 		return completedStages
 	}
@@ -83,21 +89,23 @@ func (d sessionsDict) GetCompletedStages(sessionID string) []authtypes.LoginType
 	return make([]authtypes.LoginType, 0)
 }
 
-// AddCompletedStage records that a session has completed an auth stage.
-func (d *sessionsDict) AddCompletedStage(sessionID string, stage authtypes.LoginType) {
-	// Return if the stage is already present
-	for _, completedStage := range d.GetCompletedStages(sessionID) {
-		if completedStage == stage {
-			return
-		}
-	}
-	d.sessions[sessionID] = append(d.GetCompletedStages(sessionID), stage)
-}
-
 func newSessionsDict() *sessionsDict {
 	return &sessionsDict{
 		sessions: make(map[string][]authtypes.LoginType),
 	}
+}
+
+// AddCompletedSessionStage records that a session has completed an auth stage.
+func AddCompletedSessionStage(sessionID string, stage authtypes.LoginType) {
+	sessions.Lock()
+	defer sessions.Unlock()
+
+	for _, completedStage := range sessions.sessions[sessionID] {
+		if completedStage == stage {
+			return
+		}
+	}
+	sessions.sessions[sessionID] = append(sessions.sessions[sessionID], stage)
 }
 
 var (
@@ -530,7 +538,7 @@ func handleRegistrationFlow(
 		}
 
 		// Add Recaptcha to the list of completed registration stages
-		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeRecaptcha)
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
 
 	case authtypes.LoginTypeSharedSecret:
 		// Check shared secret against config
@@ -543,7 +551,7 @@ func handleRegistrationFlow(
 		}
 
 		// Add SharedSecret to the list of completed registration stages
-		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeSharedSecret)
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeSharedSecret)
 
 	case "":
 		// Extract the access token from the request, if there's one to extract
@@ -573,7 +581,7 @@ func handleRegistrationFlow(
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
-		sessions.AddCompletedStage(sessionID, authtypes.LoginTypeDummy)
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
 
 	default:
 		return util.JSONResponse{
