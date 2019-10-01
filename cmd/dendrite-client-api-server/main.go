@@ -44,9 +44,6 @@ func main() {
 		alias, input, query, typingInputAPI, asQuery, transactions.New(),
 	)
 
-	if base.Cfg.Bind.ClientAPI != "" {
-		base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI))
-	} else {
-		base.SetupAndServeHTTP(string(base.Cfg.Listen.ClientAPI))
-	}
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))
+
 }

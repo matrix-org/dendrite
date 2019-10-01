@@ -28,9 +28,6 @@ func main() {
 
 	roomserver.SetupRoomServerComponent(base)
 
-	if base.Cfg.Bind.RoomServer != "" {
-		base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer))
-	} else {
-		base.SetupAndServeHTTP(string(base.Cfg.Listen.RoomServer))
-	}
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer), string(base.Cfg.Listen.RoomServer))
+
 }

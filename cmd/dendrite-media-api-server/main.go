@@ -28,9 +28,6 @@ func main() {
 
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 
-	if base.Cfg.Bind.MediaAPI != "" {
-		base.SetupAndServeHTTP(string(base.Cfg.Bind.MediaAPI))
-	} else {
-		base.SetupAndServeHTTP(string(base.Cfg.Listen.MediaAPI))
-	}
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.MediaAPI), string(base.Cfg.Listen.MediaAPI))
+
 }

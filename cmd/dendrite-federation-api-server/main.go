@@ -39,9 +39,6 @@ func main() {
 		alias, input, query, asQuery,
 	)
 
-	if base.Cfg.Bind.FederationAPI != "" {
-		base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI))
-	} else {
-		base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationAPI))
-	}
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))
+
 }

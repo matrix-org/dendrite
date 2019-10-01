@@ -35,9 +35,6 @@ func main() {
 		base, accountDB, deviceDB, federation, alias, query, cache,
 	)
 
-	if base.Cfg.Bind.AppServiceAPI != "" {
-		base.SetupAndServeHTTP(string(base.Cfg.Bind.AppServiceAPI))
-	} else {
-		base.SetupAndServeHTTP(string(base.Cfg.Listen.AppServiceAPI))
-	}
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.AppServiceAPI), string(base.Cfg.Listen.AppServiceAPI))
+
 }

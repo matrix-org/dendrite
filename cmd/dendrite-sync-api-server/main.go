@@ -31,9 +31,6 @@ func main() {
 
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
 
-	if base.Cfg.Bind.SyncAPI != "" {
-		base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI))
-	} else {
-		base.SetupAndServeHTTP(string(base.Cfg.Listen.SyncAPI))
-	}
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
+
 }
