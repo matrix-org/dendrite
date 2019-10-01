@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -75,14 +74,9 @@ func DirectoryRoom(
 		if domain != cfg.Matrix.ServerName {
 			fedRes, fedErr := federation.LookupRoomAlias(req.Context(), domain, roomAlias)
 			if fedErr != nil {
-				switch fedErr.(type) {
-				case gomatrix.HTTPError:
-					// TODO: Return 502 if the remote server errored.
-					// TODO: Return 504 if the remote server timed out.
-					return httputil.LogThenError(req, fedErr)
-				default:
-					return httputil.LogThenError(req, fedErr)
-				}
+				// TODO: Return 502 if the remote server errored.
+				// TODO: Return 504 if the remote server timed out.
+				return httputil.LogThenError(req, fedErr)
 			}
 			res.RoomID = fedRes.RoomID
 			res.fillServers(fedRes.Servers)
