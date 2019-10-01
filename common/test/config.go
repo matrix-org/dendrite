@@ -91,6 +91,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	// the table names are globally unique. But we might not want to
 	// rely on that in the future.
 	cfg.Database.Account = config.DataSource(database)
+	cfg.Database.AppService = config.DataSource(database)
 	cfg.Database.Device = config.DataSource(database)
 	cfg.Database.MediaAPI = config.DataSource(database)
 	cfg.Database.RoomServer = config.DataSource(database)
@@ -99,6 +100,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Database.PublicRoomsAPI = config.DataSource(database)
 
 	cfg.Listen.ClientAPI = assignAddress()
+	cfg.Listen.AppServiceAPI = assignAddress()
 	cfg.Listen.FederationAPI = assignAddress()
 	cfg.Listen.MediaAPI = assignAddress()
 	cfg.Listen.RoomServer = assignAddress()
