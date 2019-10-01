@@ -151,7 +151,8 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
-
+	// If a separate bind address is defined, listen on that. Otherwise use
+	// the listen address
 	var addr string
 	if bindaddr != "" {
 		addr = bindaddr
