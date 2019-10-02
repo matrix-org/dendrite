@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/transactions"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -59,6 +60,7 @@ func Setup(
 	syncProducer *producers.SyncAPIProducer,
 	typingProducer *producers.TypingServerProducer,
 	transactionsCache *transactions.Cache,
+	federationSender federationSenderAPI.FederationSenderQueryAPI,
 ) {
 
 	apiMux.Handle("/_matrix/client/versions",
@@ -207,7 +209,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI)
+			return DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI, federationSender)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
