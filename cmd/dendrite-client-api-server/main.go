@@ -45,5 +45,6 @@ func main() {
 		alias, input, query, typingInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Listen.ClientAPI))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))
+
 }

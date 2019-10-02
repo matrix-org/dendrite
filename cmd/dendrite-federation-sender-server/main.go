@@ -32,5 +32,6 @@ func main() {
 		base, federation, query,
 	)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationSender))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender), string(base.Cfg.Listen.FederationSender))
+
 }
