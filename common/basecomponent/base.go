@@ -19,6 +19,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/publicroomsapi/storage"
+
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
@@ -28,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 
 	"github.com/gorilla/mux"
-	sarama "gopkg.in/Shopify/sarama.v1"
+	"gopkg.in/Shopify/sarama.v1"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
@@ -133,6 +135,14 @@ func (b *BaseDendrite) CreateAccountsDB() *accounts.Database {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
+	return db
+}
+
+func (b *BaseDendrite) CreatePublicRoomsDB() *storage.PublicRoomsServerDatabase {
+	db, err := storage.NewPublicRoomsServerDatabase(string(b.Cfg.Database.PublicRoomsAPI))
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to public rooms db")
+	}
 	return db
 }
 

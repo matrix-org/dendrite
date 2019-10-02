@@ -25,8 +25,9 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	deviceDB := base.CreateDeviceDB()
+	publicRoomsDB := base.CreatePublicRoomsDB()
 
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.PublicRoomsAPI), string(base.Cfg.Listen.PublicRoomsAPI))
 

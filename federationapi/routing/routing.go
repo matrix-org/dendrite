@@ -17,6 +17,9 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/publicroomsapi/directory"
+	"github.com/matrix-org/dendrite/publicroomsapi/storage"
+
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -50,6 +53,7 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
+	publicRoomsDB *storage.PublicRoomsServerDatabase,
 ) {
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
@@ -271,4 +275,11 @@ func Setup(
 			return Backfill(httpReq, request, query, vars["roomID"], cfg)
 		},
 	)).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/publicRooms", common.MakeFedAPI(
+		"federation_publicRooms", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			return directory.GetPostPublicRooms(httpReq, publicRoomsDB)
+		},
+	)).Methods(http.MethodGet, http.MethodPost)
 }

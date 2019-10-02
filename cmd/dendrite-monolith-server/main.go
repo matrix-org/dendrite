@@ -51,6 +51,7 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
+	publicRoomsDB := base.CreatePublicRoomsDB()
 	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
@@ -67,9 +68,9 @@ func main() {
 		federation, &keyRing, alias, input, query,
 		typingInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery)
+	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, publicRoomsDB, federation, &keyRing, alias, input, query, asQuery)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)

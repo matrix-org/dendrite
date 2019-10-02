@@ -27,6 +27,7 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
+	publicRoomsDB := base.CreatePublicRoomsDB()
 	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
@@ -35,7 +36,7 @@ func main() {
 	asQuery := base.CreateHTTPAppServiceAPIs()
 
 	federationapi.SetupFederationAPIComponent(
-		base, accountDB, deviceDB, federation, &keyRing,
+		base, accountDB, deviceDB, publicRoomsDB, federation, &keyRing,
 		alias, input, query, asQuery,
 	)
 

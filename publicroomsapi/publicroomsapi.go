@@ -19,7 +19,6 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/publicroomsapi/routing"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
-	"github.com/sirupsen/logrus"
 )
 
 // SetupPublicRoomsAPIComponent sets up and registers HTTP handlers for the PublicRoomsAPI
@@ -27,11 +26,8 @@ import (
 func SetupPublicRoomsAPIComponent(
 	base *basecomponent.BaseDendrite,
 	deviceDB *devices.Database,
+	publicRoomsDB *storage.PublicRoomsServerDatabase,
 ) {
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
-	}
 
 	routing.Setup(base.APIMux, deviceDB, publicRoomsDB)
 }
