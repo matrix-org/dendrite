@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/common/basecomponent"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,13 +50,13 @@ Arguments:
 `
 
 var (
-	syncServerURL     = flag.String("sync-api-server-url", "", "The base URL of the listening 'dendrite-sync-api-server' process. E.g. 'http://localhost:4200'")
-	clientAPIURL      = flag.String("client-api-server-url", "", "The base URL of the listening 'dendrite-client-api-server' process. E.g. 'http://localhost:4321'")
-	mediaAPIURL       = flag.String("media-api-server-url", "", "The base URL of the listening 'dendrite-media-api-server' process. E.g. 'http://localhost:7779'")
-	publicRoomsAPIURL = flag.String("public-rooms-api-server-url", "", "The base URL of the listening 'dendrite-public-rooms-api-server' process. E.g. 'http://localhost:7775'")
-	bindAddress       = flag.String("bind-address", ":8008", "The listening port for the proxy.")
-	certFile          = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile           = flag.String("tls-key", "", "The PEM private key to use for TLS")
+	syncServerURL     = flag.String("sync-api-server-url", basecomponent.EnvParse("DENDRITE_SYNC_API_SERVER_URL", ""), "The base URL of the listening 'dendrite-sync-api-server' process. E.g. 'http://localhost:4200'")
+	clientAPIURL      = flag.String("client-api-server-url", basecomponent.EnvParse("DENDRITE_CLIENT_API_URL", ""), "The base URL of the listening 'dendrite-client-api-server' process. E.g. 'http://localhost:4321'")
+	mediaAPIURL       = flag.String("media-api-server-url", basecomponent.EnvParse("DENDRITE_MEDIA_API_URL", ""), "The base URL of the listening 'dendrite-media-api-server' process. E.g. 'http://localhost:7779'")
+	publicRoomsAPIURL = flag.String("public-rooms-api-server-url", basecomponent.EnvParse("DENDRITE_PUBLIC_ROOMS_API_URL", ""), "The base URL of the listening 'dendrite-public-rooms-api-server' process. E.g. 'http://localhost:7775'")
+	bindAddress       = flag.String("bind-address", basecomponent.EnvParse("DENDRITE_CLIENT_API_PROXY_ADDRESS", ":8008"), "The listening port for the proxy.")
+	certFile          = flag.String("tls-cert", basecomponent.EnvParse("DENDRITE_TLS_CERT_FILE", ""), "The PEM formatted X509 certificate to use for TLS")
+	keyFile           = flag.String("tls-key", basecomponent.EnvParse("DENDRITE_TLS_KEY_FILE", ""), "The PEM private key to use for TLS")
 )
 
 func makeProxy(targetURL string) (*httputil.ReverseProxy, error) {

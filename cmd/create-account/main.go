@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -34,11 +35,11 @@ Arguments:
 `
 
 var (
-	database      = flag.String("database", "", "The location of the account database.")
-	username      = flag.String("username", "", "The user ID localpart to register e.g 'alice' in '@alice:localhost'.")
-	password      = flag.String("password", "", "Optional. The password to register with. If not specified, this account will be password-less.")
-	serverNameStr = flag.String("servername", "localhost", "The Matrix server domain which will form the domain part of the user ID.")
-	accessToken   = flag.String("token", "", "Optional. The desired access_token to have. If not specified, a random access_token will be made.")
+	database      = flag.String("database", basecomponent.EnvParse("DENDRITE_CREATE_ACCOUNT_DATABASE", ""), "The location of the account database.")
+	username      = flag.String("username", basecomponent.EnvParse("DENDRITE_CREATE_ACCOUNT_USERNAME", ""), "The user ID localpart to register e.g 'alice' in '@alice:localhost'.")
+	password      = flag.String("password", basecomponent.EnvParse("DENDRITE_CREATE_ACCOUNT_PASSWORD", ""), "Optional. The password to register with. If not specified, this account will be password-less.")
+	serverNameStr = flag.String("servername", basecomponent.EnvParse("DENDRITE_CREATE_ACCOUNT_SERVERNAME", "localhost"), "The Matrix server domain which will form the domain part of the user ID.")
+	accessToken   = flag.String("token", basecomponent.EnvParse("DENDRITE_CREATE_ACCOUNT_ACCESS_TOKEN", ""), "Optional. The desired access_token to have. If not specified, a random access_token will be made.")
 )
 
 func main() {

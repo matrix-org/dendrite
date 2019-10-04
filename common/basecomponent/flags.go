@@ -16,13 +16,14 @@ package basecomponent
 
 import (
 	"flag"
+	"os"
 
 	"github.com/matrix-org/dendrite/common/config"
 
 	"github.com/sirupsen/logrus"
 )
 
-var configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
+var configPath = flag.String("config", EnvParse("DENDRITE_CONFIG_FILE", "dendrite.yaml"), "The path to the config file. For more information, see the config file in this repository.")
 
 // ParseFlags parses the commandline flags and uses them to create a config.
 // If running as a monolith use `ParseMonolithFlags` instead.
@@ -58,4 +59,13 @@ func ParseMonolithFlags() *config.Dendrite {
 	}
 
 	return cfg
+}
+
+// EnvParse returns the value of the environmentvariable if it exists, otherwise `def`.
+func EnvParse(env string, def string) string {
+	cnf, exists := os.LookupEnv(env)
+	if !exists {
+		cnf = def
+	}
+	return cnf
 }

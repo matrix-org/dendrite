@@ -20,6 +20,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/matrix-org/dendrite/common/basecomponent"
+
 	"github.com/matrix-org/dendrite/common/test"
 )
 
@@ -32,9 +34,9 @@ Arguments:
 `
 
 var (
-	tlsCertFile    = flag.String("tls-cert", "", "An X509 certificate file to generate for use for TLS")
-	tlsKeyFile     = flag.String("tls-key", "", "An RSA private key file to generate for use for TLS")
-	privateKeyFile = flag.String("private-key", "", "An Ed25519 private key to generate for use for object signing")
+	tlsCertFile    = flag.String("tls-cert", basecomponent.EnvParse("DENDRITE_GENKEYS_TLS_CERT_OUT", ""), "An X509 certificate file to generate for use for TLS")
+	tlsKeyFile     = flag.String("tls-key", basecomponent.EnvParse("DENDRITE_GENKEYS_TLS_KEY_OUT", ""), "An RSA private key file to generate for use for TLS")
+	privateKeyFile = flag.String("private-key", basecomponent.EnvParse("DENDRITE_GENKEYS_PEM_OUT", ""), "An Ed25519 private key to generate for use for object signing")
 )
 
 func main() {

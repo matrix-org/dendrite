@@ -38,10 +38,10 @@ import (
 )
 
 var (
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
+	httpBindAddr  = flag.String("http-bind-address", basecomponent.EnvParse("DENDRITE_MONOLITH_HTTP_BIND_ADDRESS", ":8008"), "The HTTP listening port for the server")
+	httpsBindAddr = flag.String("https-bind-address", basecomponent.EnvParse("DENDRITE_MONOLITH_HTTPS_BIND_ADDRESS", ":8448"), "The HTTPS listening port for the server")
+	certFile      = flag.String("tls-cert", basecomponent.EnvParse("DENDRITE_TLS_CERT_FILE", ""), "The PEM formatted X509 certificate to use for TLS")
+	keyFile       = flag.String("tls-key", basecomponent.EnvParse("DENDRITE_TLS_KEY_FILE", ""), "The PEM private key to use for TLS")
 )
 
 func main() {

@@ -21,6 +21,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/matrix-org/dendrite/common/basecomponent"
+
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -34,7 +36,7 @@ Arguments:
 
 var (
 	brokerList = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The comma separated list of brokers in the Kafka cluster. You can also set the KAFKA_PEERS environment variable")
-	topic      = flag.String("topic", "", "REQUIRED: the topic to produce to")
+	topic      = flag.String("topic", basecomponent.EnvParse("DENDRITE_KAFKAPROD_TOPIC", ""), "REQUIRED: the topic to produce to")
 	partition  = flag.Int("partition", 0, "The partition to produce to. All the messages will be written to this partition.")
 )
 

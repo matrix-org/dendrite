@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/common/basecomponent"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,11 +50,11 @@ Arguments:
 `
 
 var (
-	federationAPIURL = flag.String("federation-api-url", "", "The base URL of the listening 'dendrite-federation-api-server' process. E.g. 'http://localhost:4200'")
-	mediaAPIURL      = flag.String("media-api-server-url", "", "The base URL of the listening 'dendrite-media-api-server' process. E.g. 'http://localhost:7779'")
-	bindAddress      = flag.String("bind-address", ":8448", "The listening port for the proxy.")
-	certFile         = flag.String("tls-cert", "server.crt", "The PEM formatted X509 certificate to use for TLS")
-	keyFile          = flag.String("tls-key", "server.key", "The PEM private key to use for TLS")
+	federationAPIURL = flag.String("federation-api-url", basecomponent.EnvParse("DENDRITE_FEDERATION_API_URL", ""), "The base URL of the listening 'dendrite-federation-api-server' process. E.g. 'http://localhost:4200'")
+	mediaAPIURL      = flag.String("media-api-server-url", basecomponent.EnvParse("DENDRITE_MEDIA_API_URL", ""), "The base URL of the listening 'dendrite-media-api-server' process. E.g. 'http://localhost:7779'")
+	bindAddress      = flag.String("bind-address", basecomponent.EnvParse("DENDRITE_FEDERATION_PROXY_ADDRESS", ":8448"), "The listening port for the proxy.")
+	certFile         = flag.String("tls-cert", basecomponent.EnvParse("DENDRITE_TLS_CERT_FILE", "server.crt"), "The PEM formatted X509 certificate to use for TLS")
+	keyFile          = flag.String("tls-key", basecomponent.EnvParse("DENDRITE_TLS_KEY_FILE", "server.key"), "The PEM private key to use for TLS")
 )
 
 func makeProxy(targetURL string) (*httputil.ReverseProxy, error) {

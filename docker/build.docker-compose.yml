@@ -1,0 +1,120 @@
+###############################
+#  Used for building images
+
+version: "3.4"
+services:
+  dendrite-build:
+    image: dendrite-build
+    build:
+      context: ..
+      target: build
+      dockerfile: ./docker/dockerfiles/build.Dockerfile
+  monolith:
+    image: monolith:latest
+    build:
+      context: ..
+      target: monolith
+      dockerfile: ./docker/dockerfiles/monolith.Dockerfile
+
+  client-api-proxy:
+    image: client-api-proxy:latest
+    build:
+      context: ..
+      target: client-api-proxy
+      dockerfile: ./docker/dockerfiles/client-api-proxy.Dockerfile
+
+  client-api:
+    image: client-api:latest
+    build:
+      context: ..
+      target: client-api
+      dockerfile: ./docker/dockerfiles/client-api.Dockerfile
+
+  media-api:
+    image: media-api:latest
+    build:
+      context: ..
+      target: media-api
+      dockerfile: ./docker/dockerfiles/media-api.Dockerfile
+
+  public-rooms-api:
+    image: public-rooms-api:latest
+    build:
+      context: ..
+      target: public-rooms-api
+      dockerfile: ./docker/dockerfiles/public-rooms-api.Dockerfile
+
+  sync-api:
+    image: sync-api:latest
+    build:
+      context: ..
+      target: sync-api
+      dockerfile: ./docker/dockerfiles/sync-api.Dockerfile
+
+  room-server:
+    image: room-server:latest
+    build:
+      context: ..
+      target: room-server
+      dockerfile: ./docker/dockerfiles/room-server.Dockerfile
+
+  typing-server:
+    image: typing-server:latest
+    build:
+      context: ..
+      target: typing-server
+      dockerfile: ./docker/dockerfiles/typing-server.Dockerfile
+
+  federation-api-proxy:
+    image: federation-api-proxy:latest
+    build:
+      context: ..
+      target: federation-api-proxy
+      dockerfile: ./docker/dockerfiles/federation-api-proxy.Dockerfile
+
+  federation-api:
+    image: federation-api:latest
+    build:
+      context: ..
+      target: federation-api
+      dockerfile: ./docker/dockerfiles/federation-api.Dockerfile
+
+  federation-sender:
+    image: federation-sender:latest
+    build:
+      context: ..
+      target: federation-sender
+      dockerfile: ./docker/dockerfiles/federation-sender.Dockerfile
+
+  appservice-server:
+    image: appservice-server:latest
+    build:
+      context: ..
+      target: appservice-server
+      dockerfile: ./docker/dockerfiles/appservice-server.Dockerfile
+
+  generate-keys-tool:
+    image: generate-keys-tool:latest
+    build:
+      context: ..
+      target: generate-keys-tool
+      dockerfile: ./docker/dockerfiles/generate-keys-tool.Dockerfile
+
+  create-account-tool:
+    image: create-account-tool:latest
+    build:
+      context: ..
+      target: create-account-tool
+      dockerfile: ./docker/dockerfiles/create-account-tool.Dockerfile
+  create-room-events-tool:
+    image: create-room-events-tool:latest
+    build:
+      context: ..
+      target: create-room-events-tool
+      dockerfile: ./docker/dockerfiles/create-room-events-tool.Dockerfile
+  kafka-producer:
+    image: kafka-producer:latest
+    build:
+      context: ..
+      target: kafka-producer
+      dockerfile: ./docker/dockerfiles/kafka-producer.Dockerfile

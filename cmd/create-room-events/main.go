@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/ed25519"
@@ -40,13 +41,13 @@ Arguments:
 `
 
 var (
-	serverName       = flag.String("server-name", "localhost", "The name of the matrix server to generate events for")
-	keyID            = flag.String("key-id", "ed25519:auto", "The ID of the key used to sign the events")
-	privateKeyString = flag.String("private-key", defaultKey, "Base64 encoded private key to sign events with")
-	roomID           = flag.String("room-id", "!roomid:$SERVER_NAME", "The room ID to generate events in")
-	userID           = flag.String("user-id", "@userid:$SERVER_NAME", "The user ID to use as the event sender")
+	serverName       = flag.String("server-name", basecomponent.EnvParse("DENDRITE_CREATE_ROOM_EVENTS_SERVERNAME", "localhost"), "The name of the matrix server to generate events for")
+	keyID            = flag.String("key-id", basecomponent.EnvParse("DENDRITE_CREATE_ROOM_EVENTS_KEYID", "ed25519:auto"), "The ID of the key used to sign the events")
+	privateKeyString = flag.String("private-key", basecomponent.EnvParse("DENDRITE_CREATE_ROOM_EVENTS_PRIVATE_KEY", defaultKey), "Base64 encoded private key to sign events with")
+	roomID           = flag.String("room-id", basecomponent.EnvParse("DENDRITE_CREATE_ROOM_EVENTS_ROOMID", "!roomid:$SERVER_NAME"), "The room ID to generate events in")
+	userID           = flag.String("user-id", basecomponent.EnvParse("DENDRITE_CREATE_ROOM_EVENTS_USERID", "@userid:$SERVER_NAME"), "The user ID to use as the event sender")
 	messageCount     = flag.Int("message-count", 10, "The number of m.room.messsage events to generate")
-	format           = flag.String("Format", "InputRoomEvent", "The output format to use for the messages: InputRoomEvent or Event")
+	format           = flag.String("Format", basecomponent.EnvParse("DENDRITE_CREATE_ROOM_EVENTS_FORMAT", "InputRoomEvent"), "The output format to use for the messages: InputRoomEvent or Event")
 )
 
 // By default we use a private key of 0.
