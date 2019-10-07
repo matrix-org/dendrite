@@ -177,16 +177,16 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 // CurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) selectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	stateFilterPart *gomatrixserverlib.FilterPart,
+	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]gomatrixserverlib.Event, error) {
 	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
-		pq.StringArray(stateFilterPart.Senders),
-		pq.StringArray(stateFilterPart.NotSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
-		stateFilterPart.ContainsURL,
-		stateFilterPart.Limit,
+		pq.StringArray(stateFilter.Senders),
+		pq.StringArray(stateFilter.NotSenders),
+		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
+		stateFilter.ContainsURL,
+		stateFilter.Limit,
 	)
 	if err != nil {
 		return nil, err
