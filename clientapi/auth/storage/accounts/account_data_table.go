@@ -125,6 +125,10 @@ func (s *accountDataStatements) selectAccountDataByType(
 	var content []byte
 
 	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&content); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+
 		return
 	}
 
