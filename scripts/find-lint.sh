@@ -31,13 +31,13 @@ go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
 # Run linting
 echo "Looking for lint..."
-# If we're running locally, continue the script even if linting fails
-if [ -z ${CI+x} ]; then
-    golangci-lint run $args || echo "Linting script failed, removing module backups"
-else
-    # Otherwise, a linting fail should fail the CI step
-    golangci-lint run $args 
-fi
+
+# Capture exit code to ensure go.{mod,sum} is restored before exiting
+exit_code=0
+
+golangci-lint run $args || exit_code=1
 
 # Restore go.{mod,sum}
 mv go.mod.bak go.mod && mv go.sum.bak go.sum
+
+exit $exit_code
