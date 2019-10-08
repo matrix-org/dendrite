@@ -32,7 +32,7 @@ go get github.com/golangci/golangci-lint/cmd/golangci-lint
 # Run linting
 echo "Looking for lint..."
 # If we're running in CI, a linting fail should fail the CI step
-if [ -n "$CI" ]; then
+if [ -n "${CI}" ]; then
     golangci-lint run $args 
 else
     # Otherwise continue the script even if linting fails
