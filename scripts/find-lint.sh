@@ -30,7 +30,9 @@ cp go.mod go.mod.bak && cp go.sum go.sum.bak
 go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
 echo "Looking for lint..."
-golangci-lint run $args
+# Run linting
+# Ensure module files or moved back even if the linting command fails
+golangci-lint run $args || echo "Linting execution failed..."
 
 # Restore go.{mod,sum}
 mv go.mod.bak go.mod && mv go.sum.bak go.sum
