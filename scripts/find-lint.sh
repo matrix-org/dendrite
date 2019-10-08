@@ -29,10 +29,15 @@ echo "Installing golangci-lint..."
 cp go.mod go.mod.bak && cp go.sum go.sum.bak
 go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
-echo "Looking for lint..."
 # Run linting
-# Ensure module files or moved back even if the linting command fails
-golangci-lint run $args || echo "Linting execution failed..."
+echo "Looking for lint..."
+# If we're running in CI, a linting fail should fail the CI step
+if [ -n "$CI" ]; then
+    golangci-lint run $args 
+else
+    # Otherwise continue the script even if linting fails
+    golangci-lint run $args || echo "Linting script failed, removing module backups"
+fi
 
 # Restore go.{mod,sum}
 mv go.mod.bak go.mod && mv go.sum.bak go.sum
