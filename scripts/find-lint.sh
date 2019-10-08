@@ -31,12 +31,12 @@ go get github.com/golangci/golangci-lint/cmd/golangci-lint
 
 # Run linting
 echo "Looking for lint..."
-# If we're running in CI, a linting fail should fail the CI step
-if [ -n "${CI}" ]; then
-    golangci-lint run $args 
-else
-    # Otherwise continue the script even if linting fails
+# If we're running locally, continue the script even if linting fails
+if [ -z ${CI+x} ]; then
     golangci-lint run $args || echo "Linting script failed, removing module backups"
+else
+    # Otherwise, a linting fail should fail the CI step
+    golangci-lint run $args 
 fi
 
 # Restore go.{mod,sum}
