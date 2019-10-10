@@ -119,6 +119,19 @@ type Dendrite struct {
 		ThumbnailSizes []ThumbnailSize `yaml:"thumbnail_sizes"`
 	} `yaml:"media"`
 
+	// The configuration to use for Prometheus metrics
+	Metrics struct {
+		// Whether or not the metrics are enabled
+		Enabled bool `yaml:"enabled"`
+		// Use BasicAuth for Authorization
+		BasicAuth struct {
+			// Authorization via Static Username & Password
+			// Hardcoded Username and Password
+			Username string `yaml:"username"`
+			Password string `yaml:"password"`
+		} `yaml:"basicAuth"`
+	} `yaml:"metrics"`
+
 	// The configuration for talking to kafka.
 	Kafka struct {
 		// A list of kafka addresses to connect to.
