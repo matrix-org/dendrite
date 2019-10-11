@@ -13,6 +13,7 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 )
 
 // BasicAuth is used for authorization on /metrics handlers
@@ -125,6 +126,9 @@ func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler, cfg *config.Dendr
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
 func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
+	if b.Username == "" || b.Password == "" {
+		logrus.Info("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Serve without authorization if either Username or Password is unset
 		if b.Username == "" || b.Password == "" {
