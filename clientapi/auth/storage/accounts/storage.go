@@ -122,7 +122,7 @@ func (d *Database) SetDisplayName(
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, nil.
 func (d *Database) CreateAccount(
-	ctx context.Context, localpart, plaintextPassword, appserviceID string,
+	ctx context.Context, isGuest bool, localpart, plaintextPassword, appserviceID string,
 ) (*authtypes.Account, error) {
 	var err error
 
@@ -140,7 +140,7 @@ func (d *Database) CreateAccount(
 		}
 		return nil, err
 	}
-	return d.accounts.insertAccount(ctx, localpart, hash, appserviceID)
+	return d.accounts.insertAccount(ctx, isGuest, localpart, hash, appserviceID)
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given

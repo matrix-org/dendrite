@@ -56,6 +56,12 @@ var (
 			Help: "Total number of registered users",
 		},
 	)
+	amtGuestUsers = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "dendrite_clientapi_guest_users_total",
+			Help: "Total number of guest users",
+		},
+	)
 )
 
 const (
@@ -68,6 +74,7 @@ const (
 func init() {
 	// Register prometheus metrics. They must be registered to be exposed.
 	prometheus.MustRegister(amtRegUsers)
+	prometheus.MustRegister(amtGuestUsers)
 }
 
 // sessionsDict keeps track of completed auth stages for each session.
@@ -443,18 +450,24 @@ func Register(
 	deviceDB *devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
 
-	// Retrieve or generate the sessionID
-	sessionID := r.Auth.Session
-	if sessionID == "" {
-		// Generate a new, random session ID
-		sessionID = util.RandomString(sessionIDLength)
+	var isGuest bool
+	switch req.URL.Query().Get("kind") {
+	case "user", "":
+		isGuest = false
+	case "guest":
+		isGuest = true
+		// Guest registration ignores all JSON body except initial_device_display_name
+		r = registerRequest{
+			InitialDisplayName: r.InitialDisplayName,
+		}
+	default:
+		return util.MessageResponse(http.StatusBadRequest, "kind must be either 'user' or 'guest'")
 	}
 
 	// Don't allow numeric usernames less than MAX_INT64.
@@ -497,12 +510,27 @@ func Register(
 
 	logger := util.GetLogger(req.Context())
 	logger.WithFields(log.Fields{
+		"guest":      isGuest,
 		"username":   r.Username,
 		"auth.type":  r.Auth.Type,
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
+	if isGuest {
+		// Immediately register a guest account
+		return handleGuestRegistration(req, r, cfg, accountDB, deviceDB)
+	} else {
+		// Start registration flow
+
+		// Retrieve or generate the sessionID
+		sessionID := r.Auth.Session
+		if sessionID == "" {
+			// Generate a new, random session ID
+			sessionID = util.RandomString(sessionIDLength)
+		}
+
+		return handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
+	}
 }
 
 // handleRegistrationFlow will direct and complete registration flow stages
@@ -597,6 +625,27 @@ func handleRegistrationFlow(
 		req, r, sessionID, cfg, accountDB, deviceDB)
 }
 
+// Registers immediately a guest account, if guest registration is enabled on the server
+func handleGuestRegistration(
+	req *http.Request,
+	r registerRequest,
+	cfg *config.Dendrite,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+) util.JSONResponse {
+
+	// Exit if guest registration is forbidden
+	if cfg.Matrix.GuestAccessDisabled {
+		return util.MessageResponse(http.StatusForbidden, "Guest access has been disabled")
+	}
+
+	// Create guest user
+	return completeRegistration(
+		req.Context(), accountDB, deviceDB, true, r.Username, r.Password, "",
+		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+	)
+}
+
 // handleApplicationServiceRegistration handles the registration of an
 // application service's user by validating the AS from its access token and
 // registering the user. Its two first parameters must be the two return values
@@ -636,7 +685,7 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
+		req.Context(), accountDB, deviceDB, false, r.Username, "", appserviceID,
 		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 	)
 }
@@ -656,7 +705,7 @@ func checkAndCompleteFlow(
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), accountDB, deviceDB, r.Username, r.Password, "",
+			req.Context(), accountDB, deviceDB, false, r.Username, r.Password, "",
 			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 		)
 	}
@@ -708,10 +757,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, false, r.Username, r.Password, "", false, nil, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil, nil)
+		return completeRegistration(req.Context(), accountDB, deviceDB, false, r.Username, r.Password, "", false, nil, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -759,6 +808,7 @@ func completeRegistration(
 	ctx context.Context,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
+	isGuest bool,
 	username, password, appserviceID string,
 	inhibitLogin common.WeakBoolean,
 	displayName, deviceID *string,
@@ -777,7 +827,7 @@ func completeRegistration(
 		}
 	}
 
-	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
+	acc, err := accountDB.CreateAccount(ctx, isGuest, username, password, appserviceID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -791,7 +841,11 @@ func completeRegistration(
 	}
 
 	// Increment prometheus counter for created users
-	amtRegUsers.Inc()
+	if isGuest {
+		amtRegUsers.Inc()
+	} else {
+		amtGuestUsers.Inc()
+	}
 
 	// Check whether inhibit_login option is set. If so, don't create an access
 	// token or a device for this user

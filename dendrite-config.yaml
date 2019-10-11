@@ -18,6 +18,9 @@ matrix:
       - vector.im
       - matrix.org
 
+    # Setting this to false will allow guest user to register on the server
+    guest_access_disabled: true
+
 # The media repository config
 media:
     # The base path to where the media files will be stored. May be relative or absolute.

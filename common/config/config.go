@@ -99,6 +99,9 @@ type Dendrite struct {
 		// If set disables new users from registering (except via shared
 		// secrets)
 		RegistrationDisabled bool `yaml:"registration_disabled"`
+		// If set disables new users from registering (except via shared
+		// secrets)
+		GuestAccessDisabled bool `yaml:"guest_access_disabled"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.

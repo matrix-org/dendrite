@@ -118,7 +118,7 @@ func generateAppServiceAccount(
 	ctx := context.Background()
 
 	// Create an account for the application service
-	acc, err := accountsDB.CreateAccount(ctx, as.SenderLocalpart, "", as.ID)
+	acc, err := accountsDB.CreateAccount(ctx, false, as.SenderLocalpart, "", as.ID)
 	if err != nil {
 		return err
 	} else if acc == nil {

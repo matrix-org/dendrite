@@ -182,3 +182,20 @@ Regular users cannot create room aliases within the AS namespace
 Deleting a non-existent alias should return a 404
 Users can't delete other's aliases
 Outbound federation can query room alias directory
+Guest user cannot call /events globally
+Guest users can join guest_access rooms
+Guest user can set display names
+Guest user cannot upgrade other users
+Guest non-joined user cannot call /events on shared room
+Guest non-joined user cannot call /events on invited room
+Guest non-joined user cannot call /events on joined room
+Guest non-joined user cannot call /events on default room
+Guest non-joined users can get state for world_readable rooms
+Guest non-joined users can get individual state for world_readable rooms
+Guest non-joined users cannot room initalSync for non-world_readable rooms
+Guest non-joined users can get individual state for world_readable rooms after leaving
+Guest non-joined users cannot send messages to guest_access rooms if not joined
+Guest users can sync from world_readable guest_access rooms if joined
+Guest users can sync from default guest_access rooms if joined
+Real non-joined users cannot room initalSync for non-world_readable rooms
+Newly joined room is included in an incremental sync after invite
