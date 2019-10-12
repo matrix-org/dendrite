@@ -182,3 +182,4 @@ Regular users cannot create room aliases within the AS namespace
 Deleting a non-existent alias should return a 404
 Users can't delete other's aliases
 Outbound federation can query room alias directory
+Newly joined room is included in an incremental sync after invite
