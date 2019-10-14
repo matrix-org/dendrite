@@ -76,6 +76,33 @@ type Response struct {
 		Invite map[string]InviteResponse `json:"invite"`
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
+	ToDevice ToDevice       `json:"to_device"`
+	SignNum  map[string]int `json:"device_one_time_keys_count"`
+}
+
+// StdHolder represents send to device response from db
+type StdHolder struct {
+	StreamID int64
+	Sender   string
+	EventTyp string
+	Event    []byte
+}
+
+// StdRequest represents send to device request format
+type StdRequest struct {
+	Sender map[string]map[string]interface{} `json:"messages"`
+}
+
+// ToDevice represents a middleware for response send to device
+type ToDevice struct {
+	StdEvent []StdEvent `json:"events"`
+}
+
+// StdEvent represents send to device event format
+type StdEvent struct {
+	Sender  string      `json:"sender"`
+	Type    string      `json:"type"`
+	Content interface{} `json:"content"`
 }
 
 // NewResponse creates an empty response with initialised maps.
@@ -106,7 +133,8 @@ func (r *Response) IsEmpty() bool {
 		len(r.Rooms.Invite) == 0 &&
 		len(r.Rooms.Leave) == 0 &&
 		len(r.AccountData.Events) == 0 &&
-		len(r.Presence.Events) == 0
+		len(r.Presence.Events) == 0 &&
+		len(r.ToDevice.StdEvent) == 0
 }
 
 // JoinResponse represents a /sync response for a room which is under the 'join' key.

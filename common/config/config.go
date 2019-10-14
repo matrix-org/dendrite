@@ -172,6 +172,8 @@ type Dendrite struct {
 		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
 		// The Naffka database is used internally by the naffka library, if used.
 		Naffka DataSource `yaml:"naffka,omitempty"`
+		// Encryption api database
+		EncryptAPI DataSource `yaml:"encrypt_api"`
 	} `yaml:"database"`
 
 	// TURN Server Config

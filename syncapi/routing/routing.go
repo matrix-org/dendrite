@@ -22,20 +22,27 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
+	encryptoapi "github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/util"
 )
 
 const pathPrefixR0 = "/_matrix/client/r0"
+const pathPrefixUnstable = "/_matrix/client/unstable"
 
 // Setup configures the given mux with sync-server listeners
+<<<<<<< HEAD:syncapi/routing/routing.go
 //
 // Due to Setup being used to call many other functions, a gocyclo nolint is
 // applied:
 // nolint: gocyclo
 func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatasource, deviceDB *devices.Database) {
+=======
+func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatabase, deviceDB *devices.Database, notifier *sync.Notifier, encryptDB *encryptoapi.Database) {
+>>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/syncapi/routing/routing.go
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	unstablemux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	authData := auth.Data{
 		AccountDB:   nil,
@@ -45,7 +52,7 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServer
 
 	// TODO: Add AS support for all handlers below.
 	r0mux.Handle("/sync", common.MakeAuthAPI("sync", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		return srp.OnIncomingSyncRequest(req, device)
+		return srp.OnIncomingSyncRequest(req, device, encryptDB)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -71,4 +78,13 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServer
 		}
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], vars["stateKey"])
 	})).Methods(http.MethodGet, http.MethodOptions)
+
+	unstablemux.Handle("/sendToDevice/{eventType}/{txnId}",
+		common.MakeAuthAPI("look up changes", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars := mux.Vars(req)
+			eventType := vars["eventType"]
+			txnID := vars["txnId"]
+			return SendToDevice(req, device.UserID, syncDB, deviceDB, eventType, txnID, notifier)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
 }

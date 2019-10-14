@@ -29,7 +29,7 @@ func main() {
 
 	_, _, query := base.CreateHTTPRoomserverAPIs()
 
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
+	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, nil)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
 
