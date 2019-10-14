@@ -72,7 +72,6 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
-<<<<<<< HEAD:syncapi/syncapi.go
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
 		base.Cfg, base.KafkaConsumer, notifier, syncDB,
 	)
@@ -80,8 +79,6 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start typing server consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB)
-=======
+	// routing.Setup(base.APIMux, requestPool, syncDB, deviceDB)
 	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, notifier, encryptDB)
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/syncapi/syncapi.go
 }

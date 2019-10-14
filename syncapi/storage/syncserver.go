@@ -27,12 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
-<<<<<<< HEAD:syncapi/storage/syncserver.go
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-=======
-	"encoding/json"
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/syncapi/storage/syncserver.go
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/typingserver/cache"
@@ -55,7 +51,7 @@ type streamEvent struct {
 	transactionID  *api.TransactionID
 }
 
-// SyncServerDatabase represents a sync server datasource which manages
+// SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	db *sql.DB
@@ -64,14 +60,11 @@ type SyncServerDatasource struct {
 	events      outputRoomEventsStatements
 	roomstate   currentRoomStateStatements
 	invites     inviteEventsStatements
-<<<<<<< HEAD:syncapi/storage/syncserver.go
 	typingCache *cache.TypingCache
-=======
 	stdMsg      stdEventsStatements
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/syncapi/storage/syncserver.go
 }
 
-// NewSyncServerDatabase creates a new sync server database
+// NewSyncServerDatasource creates a new sync server database
 func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
@@ -93,13 +86,10 @@ func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, er
 	if err := d.invites.prepare(d.db); err != nil {
 		return nil, err
 	}
-<<<<<<< HEAD:syncapi/storage/syncserver.go
 	d.typingCache = cache.NewTypingCache()
-=======
 	if err := d.stdMsg.prepare(d.db); err != nil {
 		return nil, err
 	}
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/syncapi/storage/syncserver.go
 	return &d, nil
 }
 
@@ -235,22 +225,22 @@ func (d *SyncServerDatasource) syncPositionTx(
 	if maxInviteID > maxEventID {
 		maxEventID = maxInviteID
 	}
-<<<<<<< HEAD:syncapi/storage/syncserver.go
+
+	// E2EE changes look
+	// maxStdID, err := d.stdMsg.selectMaxStdID(ctx, txn)
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// if maxStdID > maxID {
+	// 	maxID = maxStdID
+	// }
+	// return types.StreamPosition(maxID), nil
 	sp.PDUPosition = maxEventID
 
 	sp.TypingPosition = d.typingCache.GetLatestSyncPosition()
 
 	return
-=======
-	maxStdID, err := d.stdMsg.selectMaxStdID(ctx, txn)
-	if err != nil {
-		return 0, err
-	}
-	if maxStdID > maxID {
-		maxID = maxStdID
-	}
-	return types.StreamPosition(maxID), nil
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/syncapi/storage/syncserver.go
+
 }
 
 // addPDUDeltaToResponse adds all PDU deltas to a sync response.
@@ -977,7 +967,7 @@ del / maxID / select in range / insert
 */
 
 // DelStdMessage delete message for a given maxID, those below would be deleted
-func (d *SyncServerDatabase) DelStdMessage(
+func (d *SyncServerDatasource) DelStdMessage(
 	ctx context.Context, targetUID, targetDevice string, maxID int64,
 ) (err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
@@ -988,7 +978,7 @@ func (d *SyncServerDatabase) DelStdMessage(
 }
 
 // InsertStdMessage insert std message
-func (d *SyncServerDatabase) InsertStdMessage(
+func (d *SyncServerDatasource) InsertStdMessage(
 	ctx context.Context, stdEvent types.StdHolder, transactionID, targetUID, targetDevice string,
 ) (pos int64, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
@@ -1000,7 +990,7 @@ func (d *SyncServerDatabase) InsertStdMessage(
 }
 
 // SelectMaxStdID select maximum id in std stream
-func (d *SyncServerDatabase) SelectMaxStdID(
+func (d *SyncServerDatasource) SelectMaxStdID(
 	ctx context.Context,
 ) (maxID int64, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
@@ -1012,7 +1002,7 @@ func (d *SyncServerDatabase) SelectMaxStdID(
 }
 
 // SelectRangedStd select a range of std messages
-func (d *SyncServerDatabase) SelectRangedStd(
+func (d *SyncServerDatasource) SelectRangedStd(
 	ctx context.Context,
 	targetUserID, targetDeviceID string,
 	endPos int64,
@@ -1028,7 +1018,7 @@ func (d *SyncServerDatabase) SelectRangedStd(
 // StdEXT : send to device extension process
 func StdEXT(
 	ctx context.Context,
-	syncDB *SyncServerDatabase,
+	syncDB *SyncServerDatasource,
 	respIn types.Response,
 	userID, deviceID string,
 	since int64,

@@ -18,26 +18,20 @@ import (
 	"flag"
 	"net/http"
 
-<<<<<<< HEAD:cmd/dendrite-monolith-server/main.go
 	"github.com/matrix-org/dendrite/appservice"
-=======
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/typingserver"
 
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/cmd/dendrite-monolith-server/main.go
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/matrix-org/dendrite/typingserver"
 	"github.com/matrix-org/dendrite/typingserver/cache"
 
 	"github.com/matrix-org/dendrite/encryptoapi"
@@ -80,12 +74,9 @@ func main() {
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
-<<<<<<< HEAD:cmd/dendrite-monolith-server/main.go
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
-=======
+	// syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, encryptDB)
 	//appservice.SetupAppServiceAPIComponent(base, accountDB, deviceDB, federation, alias, query, transactions.New())
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/cmd/dendrite-monolith-server/main.go
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 

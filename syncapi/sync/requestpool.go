@@ -45,13 +45,8 @@ func NewRequestPool(db *storage.SyncServerDatasource, n *Notifier, adb *accounts
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
-<<<<<<< HEAD:syncapi/sync/requestpool.go
-func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtypes.Device) util.JSONResponse {
-	var syncData *types.Response
-
-=======
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtypes.Device, encryptDB *encryptoapi.Database) util.JSONResponse {
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/syncapi/sync/requestpool.go
+	var syncData *types.Response	
 	// Extract values from request
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
@@ -120,16 +115,14 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// of calculating the sync only to get timed out before we
 		// can respond
 
-<<<<<<< HEAD:syncapi/sync/requestpool.go
-		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
-=======
+		// syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
 
 		// std extension consideration
-		syncData = storage.StdEXT(syncReq.ctx, rp.db, *syncData, syncReq.device.UserID, syncReq.device.ID, int64(currPos))
+		// Have to check which "position" must be used here
+		// syncData = storage.StdEXT(syncReq.ctx, rp.db, *syncData, syncReq.device.UserID, syncReq.device.ID, int64(currPos))
 		syncData = KeyCountEXT(syncReq.ctx, encryptDB, *syncData, syncReq.device.UserID, syncReq.device.ID)
 
->>>>>>> 8b4b3c6fc46900e9bfe5e234eda309200662b34a:src/github.com/matrix-org/dendrite/syncapi/sync/requestpool.go
 		if err != nil {
 			return httputil.LogThenError(req, err)
 		}
