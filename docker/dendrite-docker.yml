@@ -115,6 +115,7 @@ listen:
     public_rooms_api: "public_rooms_api:7775"
     federation_sender: "federation_sender:7776"
     typing_server: "typing_server:7777"
+    user_directory_api: "localhost:7779"
 
 # The configuration for tracing the dendrite components.
 tracing:

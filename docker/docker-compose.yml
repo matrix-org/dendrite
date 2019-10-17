@@ -134,6 +134,18 @@ services:
     networks:
       - internal
 
+  userdirectory_api:
+    container_name: dendrite_userdirectory_api
+    hostname: userdirectory_api
+    entrypoint: ["bash", "./docker/services/userdirectory-api.sh"]
+    build: ./
+    volumes:
+      - ..:/build
+    depends_on:
+      - postgres
+    networks:
+      - internal
+
   federation_sender:
     container_name: dendrite_federation_sender
     hostname: federation_sender

@@ -18,6 +18,12 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/clientapi/userutil"
+
+	"github.com/matrix-org/gomatrixserverlib"
+
+	searchtypes "github.com/matrix-org/dendrite/userdirectoryapi/types"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
@@ -39,6 +45,9 @@ const insertProfileSQL = "" +
 const selectProfileByLocalpartSQL = "" +
 	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart = $1"
 
+const selectSearchTermLikeLocalpartOrDisplayName = "" +
+	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
+
 const setAvatarURLSQL = "" +
 	"UPDATE account_profiles SET avatar_url = $1 WHERE localpart = $2"
 
@@ -46,10 +55,11 @@ const setDisplayNameSQL = "" +
 	"UPDATE account_profiles SET display_name = $1 WHERE localpart = $2"
 
 type profilesStatements struct {
-	insertProfileStmt            *sql.Stmt
-	selectProfileByLocalpartStmt *sql.Stmt
-	setAvatarURLStmt             *sql.Stmt
-	setDisplayNameStmt           *sql.Stmt
+	insertProfileStmt                              *sql.Stmt
+	selectProfileByLocalpartStmt                   *sql.Stmt
+	selectSearchTermLikeLocalpartOrDisplayNameStmt *sql.Stmt
+	setAvatarURLStmt                               *sql.Stmt
+	setDisplayNameStmt                             *sql.Stmt
 }
 
 func (s *profilesStatements) prepare(db *sql.DB) (err error) {
@@ -67,6 +77,9 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.setDisplayNameStmt, err = db.Prepare(setDisplayNameSQL); err != nil {
+		return
+	}
+	if s.selectSearchTermLikeLocalpartOrDisplayNameStmt, err = db.Prepare(selectSearchTermLikeLocalpartOrDisplayName); err != nil {
 		return
 	}
 	return
@@ -90,6 +103,37 @@ func (s *profilesStatements) selectProfileByLocalpart(
 		return nil, err
 	}
 	return &profile, nil
+}
+
+func (s *profilesStatements) selectSearchTermLikeLocalpartOrDisplayName(
+	ctx context.Context, searchTerm string, limit int8, serverName gomatrixserverlib.ServerName,
+) (*[]searchtypes.SearchResult, bool, error) {
+	//increase limit by one to find out if the query was limited
+	rows, err := s.selectSearchTermLikeLocalpartOrDisplayNameStmt.QueryContext(ctx, searchTerm, limit+1)
+	if err != nil {
+		return nil, false, err
+	}
+	searchResults := []searchtypes.SearchResult{}
+	counter := int8(1)
+	limited := false
+	for rows.Next() {
+		if counter > limit {
+			limited = true
+			break
+		}
+		var r searchtypes.SearchResult
+		err = rows.Scan(
+			&r.UserId, &r.DisplayName, &r.AvatarUrl,
+		)
+		r.UserId = userutil.MakeUserID(r.UserId, serverName)
+		if err != nil {
+			return &searchResults, false, err
+		}
+		searchResults = append(searchResults, r)
+		counter++
+	}
+
+	return &searchResults, limited, nil
 }
 
 func (s *profilesStatements) setAvatarURL(

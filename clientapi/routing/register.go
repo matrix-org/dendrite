@@ -517,7 +517,6 @@ func handleRegistrationFlow(
 	deviceDB *devices.Database,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
-	// TODO: Enable registration config flag
 	// TODO: Guest account upgrading
 
 	// TODO: Handle loading of previous session parameters from database.

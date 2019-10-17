@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -206,6 +206,7 @@ type Dendrite struct {
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
+		UserDirectoryAPI Address `yaml:"user_directory_api"`
 		TypingServer     Address `yaml:"typing_server"`
 	} `yaml:"bind"`
 
@@ -219,6 +220,7 @@ type Dendrite struct {
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
+		UserDirectoryAPI Address `yaml:"user_directory_api"`
 		TypingServer     Address `yaml:"typing_server"`
 	} `yaml:"listen"`
 

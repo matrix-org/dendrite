@@ -18,6 +18,8 @@ import (
 	"flag"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/userdirectoryapi"
+
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common"
@@ -71,6 +73,7 @@ func main() {
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
+	userdirectoryapi.SetupUserDirectoryApi(base, accountDB, deviceDB)
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 

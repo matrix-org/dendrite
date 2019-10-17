@@ -63,6 +63,7 @@ listen:
   media_api: "localhost:7774"
   appservice_api: "localhost:7777"
   typing_server: "localhost:7778"
+  user_directory_api: "localhost:7779"
 logging:
   - type: "file"
     level: "info"

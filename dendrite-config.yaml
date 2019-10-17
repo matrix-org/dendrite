@@ -115,6 +115,7 @@ listen:
     federation_sender: "localhost:7776"
     appservice_api: "localhost:7777"
     typing_server: "localhost:7778"
+    user_directory_api: "localhost:7779"
 
 # The configuration for tracing the dendrite components.
 tracing:
