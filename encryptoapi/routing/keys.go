@@ -18,6 +18,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -27,9 +31,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/pkg/errors"
-	"net/http"
-	"strings"
-	"time"
 )
 
 const (
@@ -256,6 +257,17 @@ func ClaimOneTimeKeys(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: claimRp,
+	}
+}
+
+// ChangesInKeys returns the changes in the keys after last sync
+func ChangesInKeys(req *http.Request,
+	encryptionDB *storage.Database,
+) util.JSONResponse {
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
 	}
 }
 

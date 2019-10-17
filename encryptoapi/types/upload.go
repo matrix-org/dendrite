@@ -46,12 +46,12 @@ type KeyObject struct {
 	Signature map[string]map[string]string `json:"signatures"`
 }
 
-// OneTimeKey structure
-type OneTimeKey struct {
-	//KeyString map[string]string
-	//KeyObject map[string]KeyObject
-	KeySth map[string]interface{}
-}
+// // OneTimeKey structure
+// type OneTimeKey struct {
+// 	//KeyString map[string]string
+// 	//KeyObject map[string]KeyObject
+// 	KeySth map[string]interface{}
+// }
 
 // OneTimeKeySpecific structure
 type OneTimeKeySpecific struct {

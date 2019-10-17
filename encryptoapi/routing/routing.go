@@ -52,7 +52,6 @@ func Setup(
 
 	unstablemux.Handle("/keys/query",
 		common.MakeAuthAPI("query keys", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			//vars := mux.Vars(req)
 			return QueryPKeys(req, encryptionDB, device.ID, deviceDB)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
@@ -62,5 +61,11 @@ func Setup(
 			return ClaimOneTimeKeys(req, encryptionDB)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	unstablemux.Handle("/keys/changes",
+		common.MakeAuthAPI("get changes", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return ChangesInKeys(req, encryptionDB)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 }
