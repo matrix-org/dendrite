@@ -16,9 +16,10 @@ package sync
 
 import (
 	"context"
+	"sync"
+
 	encryptoapi "github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"sync"
 )
 
 type keyCounter struct {
@@ -55,10 +56,10 @@ func KeyCountEXT(
 	respOut = &respIn
 	// when extension works at the very beginning
 	resp, err := encryptionDB.SyncOneTimeCount(ctx, userID, deviceID)
-	CounterWrite(userID, resp)
 	if err != nil {
 		return
 	}
+	CounterWrite(userID, resp)
 	respOut.SignNum = resp
 	return
 }

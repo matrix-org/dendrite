@@ -78,12 +78,18 @@ func UploadPKeys(
 		&keySpecific,
 		userID, deviceID)
 	// numMap is algorithm-num map
-	numMap := (QueryOneTimeKeys(
+	numMap, ok := (QueryOneTimeKeys(
 		req.Context(),
 		TYPESUM,
 		userID,
 		deviceID,
 		encryptionDB)).(map[string]int)
+	if !ok {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: struct{}{},
+		}
+	}
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadGateway,

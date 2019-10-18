@@ -46,7 +46,7 @@ func NewRequestPool(db *storage.SyncServerDatasource, n *Notifier, adb *accounts
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtypes.Device, encryptDB *encryptoapi.Database) util.JSONResponse {
-	var syncData *types.Response	
+	var syncData *types.Response
 	// Extract values from request
 	logger := util.GetLogger(req.Context())
 	userID := device.UserID
@@ -115,12 +115,11 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// of calculating the sync only to get timed out before we
 		// can respond
 
-		// syncData, err = rp.currentSyncForUser(*syncReq, currPos)
-		syncData, err := rp.currentSyncForUser(*syncReq, currPos)
+		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 
 		// std extension consideration
 		// Have to check which "position" must be used here
-		// syncData = storage.StdEXT(syncReq.ctx, rp.db, *syncData, syncReq.device.UserID, syncReq.device.ID, int64(currPos))
+		syncData = storage.StdEXT(syncReq.ctx, rp.db, *syncData, syncReq.device.UserID, syncReq.device.ID, currPos.TypingPosition) // int64(currPos))
 		syncData = KeyCountEXT(syncReq.ctx, encryptDB, *syncData, syncReq.device.UserID, syncReq.device.ID)
 
 		if err != nil {
