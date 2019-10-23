@@ -45,6 +45,12 @@ func SendMembership(
 	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
+	if req.Body==nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("Content is nil"),
+		}
+	}
 	var body threepid.MembershipRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
