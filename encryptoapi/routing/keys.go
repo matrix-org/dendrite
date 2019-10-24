@@ -60,7 +60,8 @@ type KeyNotifier struct {
 
 var keyProducer = &KeyNotifier{}
 
-// UploadPKeys this function is for user upload his device key, and one-time-key to a limit at 50 set as default
+// UploadPKeys enables the user to upload his device
+// and one time keys with limit at 50 set as default
 func UploadPKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
@@ -78,7 +79,7 @@ func UploadPKeys(
 		&keySpecific,
 		userID, deviceID)
 	// numMap is algorithm-num map
-	numMap, ok := (QueryOneTimeKeys(
+	numMap, ok := (queryOneTimeKeys(
 		req.Context(),
 		TYPESUM,
 		userID,
@@ -106,7 +107,7 @@ func UploadPKeys(
 	}
 }
 
-// QueryPKeys this function is for user query other's device key
+// QueryPKeys enables the user to query for other devices's keys
 func QueryPKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
@@ -122,6 +123,7 @@ func QueryPKeys(
 		return *reqErr
 	}
 
+	// FED must return the keys from the other user
 	/*
 		federation consideration: when user id is in federation, a
 		query is needed to ask fed for keys.
@@ -146,6 +148,11 @@ func QueryPKeys(
 			queryRp.Failure["@alice:localhost"] = "ran out of offered time"
 		case <-make(chan interface{}):
 			// todo : here goes federation chan , still a mocked one
+		}
+		// probably some other better error to tell it timed out in FED
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: struct{}{},
 		}
 	}
 
@@ -193,7 +200,7 @@ func QueryPKeys(
 	}
 }
 
-// ClaimOneTimeKeys claim for one time key that may be used in session exchange in olm encryption
+// ClaimOneTimeKeys enables user to claim one time keys for sessions.
 func ClaimOneTimeKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
@@ -206,6 +213,7 @@ func ClaimOneTimeKeys(
 		return *reqErr
 	}
 
+	// not sure what FED should return here
 	/*
 		federation consideration: when user id is in federation, a query is needed to ask fed for keys
 		domain --------+ fed (keys)
@@ -227,20 +235,25 @@ func ClaimOneTimeKeys(
 		case <-make(chan interface{}):
 			// todo : here goes federation chan , still a mocked one
 		}
+		// probably some other better error to tell it timed out in FED
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: struct{}{},
+		}
 	}
 
 	content := claimRq.ClaimDetail
 	for uid, detail := range content {
-		for deviceID, al := range detail {
-			var alTyp int
-			if strings.Contains(al, "signed") {
-				alTyp = ONETIMEKEYOBJECT
+		for deviceID, alg := range detail {
+			var algTyp int
+			if strings.Contains(alg, "signed") {
+				algTyp = ONETIMEKEYOBJECT
 			} else {
-				alTyp = ONETIMEKEYSTRING
+				algTyp = ONETIMEKEYSTRING
 			}
-			key, err := pickOne(req.Context(), *encryptionDB, uid, deviceID, al)
+			key, err := pickOne(req.Context(), *encryptionDB, uid, deviceID, alg)
 			if err != nil {
-				claimRp.Failures[uid] = fmt.Sprintf("%s:%s", "fail to get keys for device ", deviceID)
+				claimRp.Failures[uid] = fmt.Sprintf("%s: %s", "failed to get keys for device", deviceID)
 			}
 			claimRp.ClaimBody[uid] = make(map[string]map[string]interface{})
 			keyPreMap := claimRp.ClaimBody[uid]
@@ -248,14 +261,14 @@ func ClaimOneTimeKeys(
 			if keymap == nil {
 				keymap = make(map[string]interface{})
 			}
-			switch alTyp {
+			switch algTyp {
 			case ONETIMEKEYSTRING:
-				keymap[fmt.Sprintf("%s:%s", al, key.KeyID)] = key.Key
+				keymap[fmt.Sprintf("%s:%s", alg, key.KeyID)] = key.Key
 			case ONETIMEKEYOBJECT:
 				sig := make(map[string]map[string]string)
 				sig[uid] = make(map[string]string)
 				sig[uid][fmt.Sprintf("%s:%s", "ed25519", deviceID)] = key.Signature
-				keymap[fmt.Sprintf("%s:%s", al, key.KeyID)] = types.KeyObject{Key: key.Key, Signature: sig}
+				keymap[fmt.Sprintf("%s:%s", alg, key.KeyID)] = types.KeyObject{Key: key.Key, Signature: sig}
 			}
 			claimRp.ClaimBody[uid][deviceID] = keymap
 		}
@@ -267,13 +280,34 @@ func ClaimOneTimeKeys(
 }
 
 // ChangesInKeys returns the changes in the keys after last sync
-func ChangesInKeys(req *http.Request,
+// each user maintains a chain of the changes when provided by FED
+func ChangesInKeys(
+	req *http.Request,
 	encryptionDB *storage.Database,
 ) util.JSONResponse {
+	// assuming federation has added keys to the DB,
+	// extracting from the DB here
+
+	// get from FED/Req
+	var readID int
+	var userID string
+	keyChanges, err := encryptionDB.GetKeyChanges(req.Context(), readID, userID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: struct{}{},
+		}
+	}
+
+	changesRes := types.ChangesResponse{}
+	changesRes.Changed = keyChanges.Changed
+	changesRes.Left = keyChanges.Left
+
+	// delete the extracted keys from the DB
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: changesRes,
 	}
 }
 
@@ -294,8 +328,8 @@ func checkUpload(req *types.UploadEncryptSpecific, typ int) bool {
 	return true
 }
 
-// QueryOneTimeKeys todo: complete this field through claim type
-func QueryOneTimeKeys(
+// queryOneTimeKeys todo: complete this field through claim type
+func queryOneTimeKeys(
 	ctx context.Context,
 	typ int,
 	userID, deviceID string,
@@ -320,7 +354,8 @@ func persistKeys(
 	userID,
 	deviceID string,
 ) (err error) {
-	// in order to persist keys , a check filtering duplicate should be processed
+	// in order to persist keys , a check,
+	// filtering the duplicates should be processed.
 	// true stands for counterparts are in request
 	// situation 1: only device keys
 	// situation 2: both device keys and one time keys
@@ -333,11 +368,11 @@ func persistKeys(
 			return
 		}
 		if checkUpload(body, BODYONETIMEKEY) {
-			if err = bothKeyProcess(ctx, body, userID, deviceID, database, deviceKeys); err != nil {
+			if err = persistBothKeys(ctx, body, userID, deviceID, database, deviceKeys); err != nil {
 				return
 			}
 		} else {
-			if err = dkeyProcess(ctx, userID, deviceID, database, deviceKeys); err != nil {
+			if err = persistDeviceKeys(ctx, userID, deviceID, database, deviceKeys); err != nil {
 				return
 			}
 		}
@@ -345,11 +380,11 @@ func persistKeys(
 		upnotify(userID)
 	} else {
 		if checkUpload(body, BODYONETIMEKEY) {
-			if err = otmKeyProcess(ctx, body, userID, deviceID, database); err != nil {
+			if err = persistOneTimeKeys(ctx, body, userID, deviceID, database); err != nil {
 				return
 			}
 		} else {
-			return errors.New("failed to touch keys")
+			return errors.New("failed to persist keys")
 		}
 	}
 	return err
@@ -454,56 +489,27 @@ func presetDeviceKeysQueryMap(
 	return deviceKeysQueryMap
 }
 
-func bothKeyProcess(
+func persistBothKeys(
 	ctx context.Context,
 	body *types.UploadEncryptSpecific,
 	userID, deviceID string,
 	database *storage.Database,
 	deviceKeys types.DeviceKeys,
 ) (err error) {
-	// insert one time keys firstly
-	onetimeKeys := body.OneTimeKey
-	for alKeyID, val := range onetimeKeys.KeyString {
-		al := (strings.Split(alKeyID, ":"))[0]
-		keyID := (strings.Split(alKeyID, ":"))[1]
-		keyInfo := val
-		keyStringTyp := ONETIMEKEYSTR
-		sig := ""
-		err = database.InsertKey(ctx, deviceID, userID, keyID, keyStringTyp, keyInfo, al, sig)
-		if err != nil {
-			return
-		}
-	}
-	for alKeyID, val := range onetimeKeys.KeyObject {
-		al := (strings.Split(alKeyID, ":"))[0]
-		keyID := (strings.Split(alKeyID, ":"))[1]
-		keyInfo := val.Key
-		keyObjectTyp := ONETIMEKEYSTR
-		sig := val.Signature[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
-		err = database.InsertKey(ctx, deviceID, userID, keyID, keyObjectTyp, keyInfo, al, sig)
-		if err != nil {
-			return
-		}
+	// insert one time keys
+	err = persistOneTimeKeys(ctx, body, userID, deviceID, database)
+	if err != nil {
+		return
 	}
 	// insert device keys
-	keys := deviceKeys.Keys
-	sigs := deviceKeys.Signature
-	for alDevice, key := range keys {
-		al := (strings.Split(alDevice, ":"))[0]
-		keyTyp := DEVICEKEYSTR
-		keyInfo := key
-		keyID := ""
-		sig := sigs[userID][fmt.Sprintf("%s:%s", "ed25519", deviceID)]
-		err = database.InsertKey(
-			ctx, deviceID, userID, keyID, keyTyp, keyInfo, al, sig)
-		if err != nil {
-			return
-		}
+	err = persistDeviceKeys(ctx, userID, deviceID, database, deviceKeys)
+	if err != nil {
+		return
 	}
 	return
 }
 
-func dkeyProcess(
+func persistDeviceKeys(
 	ctx context.Context,
 	userID, deviceID string,
 	database *storage.Database,
@@ -522,7 +528,7 @@ func dkeyProcess(
 	return
 }
 
-func otmKeyProcess(
+func persistOneTimeKeys(
 	ctx context.Context,
 	body *types.UploadEncryptSpecific,
 	userID, deviceID string,

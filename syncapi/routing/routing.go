@@ -80,7 +80,8 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServer
 	// 		vars := mux.Vars(req)
 	// 		eventType := vars["eventType"]
 	// 		txnID := vars["txnId"]
-	// 		return SendToDevice(req, device.UserID, syncDB, deviceDB, eventType, txnID, notifier)
+	// 		roomID := vars["roomId"]
+	// 		return SendToDevice(req, device.UserID, roomID, syncDB, deviceDB, eventType, txnID, notifier)
 	// 	}),
 	// ).Methods(http.MethodPut, http.MethodOptions)
 }

@@ -1,4 +1,4 @@
-// Copyright 2018 Vector Creations Ltd
+// Copyright FadeAce and Sumukha PK 2019
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/encryptoapi/types"
@@ -35,6 +36,15 @@ CREATE TABLE IF NOT EXISTS encrypt_keys (
     signature TEXT 				NOT NULL
 );
 `
+const changesTable = `
+CREATE TABLE IF NOT EXISTS key_changes (
+	read_id INT	                NOT NULL,
+	user_id TEXT PRIMARY KEY    NOT NULL,
+	neighbor_user_id TEXT		NOT NULL,
+	status TEXT					NOT NULL
+);
+`
+
 const insertkeySQL = `
 INSERT INTO encrypt_keys (device_id, user_id, key_id, key_type, key_info, algorithm, signature)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -43,11 +53,11 @@ const selectkeySQL = `
 SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys 
 WHERE user_id = $1 AND device_id = $2
 `
-const deleteSinglekeySQL = `
+const selectSinglekeySQL = `
 SELECT user_id, device_id, key_id, key_type, key_info, algorithm, signature FROM encrypt_keys 
 WHERE user_id = $1 AND device_id = $2 AND algorithm = $3
 `
-const selectSinglekeySQL = `
+const deleteSinglekeySQL = `
 DELETE FROM encrypt_keys 
 WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 AND key_id = $4
 `
@@ -63,6 +73,12 @@ const selectCountOneTimeKey = `
 SELECT algorithm, COUNT(algorithm) FROM encrypt_keys WHERE user_id = $1 AND device_id = $2 AND key_type = 'one_time_key'
 GROUP BY algorithm
 `
+const insertChangesSQL = `
+INSERT INTO changesTable (read_id, user_id) VALUES ($1, $2)
+`
+const selectChangesSQL = `
+SELECT read_id, user_id
+`
 
 type keyStatements struct {
 	insertKeyStmt             *sql.Stmt
@@ -72,10 +88,16 @@ type keyStatements struct {
 	selectSingleKeyStmt       *sql.Stmt
 	deleteSingleKeyStmt       *sql.Stmt
 	selectCountOneTimeKeyStmt *sql.Stmt
+	insertChangesStmt         *sql.Stmt
+	selectChangesStmt         *sql.Stmt
 }
 
 func (s *keyStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(keysSchema)
+	if err != nil {
+		return
+	}
+	_, err = db.Exec(changesTable)
 	if err != nil {
 		return
 	}
@@ -91,19 +113,25 @@ func (s *keyStatements) prepare(db *sql.DB) (err error) {
 	if s.selectAllKeyStmt, err = db.Prepare(selectAllkeysSQL); err != nil {
 		return
 	}
-	if s.deleteSingleKeyStmt, err = db.Prepare(selectSinglekeySQL); err != nil {
+	if s.deleteSingleKeyStmt, err = db.Prepare(deleteSinglekeySQL); err != nil {
 		return
 	}
-	if s.selectSingleKeyStmt, err = db.Prepare(deleteSinglekeySQL); err != nil {
+	if s.selectSingleKeyStmt, err = db.Prepare(selectSinglekeySQL); err != nil {
 		return
 	}
 	if s.selectCountOneTimeKeyStmt, err = db.Prepare(selectCountOneTimeKey); err != nil {
 		return
 	}
+	if s.insertChangesStmt, err = db.Prepare(insertChangesSQL); err != nil {
+		return
+	}
+	if s.selectChangesStmt, err = db.Prepare(selectChangesSQL); err != nil {
+		return
+	}
 	return
 }
 
-// insert keys
+// insertKeys inserts keys
 func (s *keyStatements) insertKey(
 	ctx context.Context, txn *sql.Tx,
 	deviceID, userID, keyID, keyTyp, keyInfo, algorithm, signature string,
@@ -113,18 +141,18 @@ func (s *keyStatements) insertKey(
 	return err
 }
 
-// select by user and device
+// selectKey selects by user and device
 func (s *keyStatements) selectKey(
 	ctx context.Context,
 	txn *sql.Tx,
 	deviceID, userID string,
 ) ([]types.KeyHolder, error) {
-	holders := []types.KeyHolder{}
 	stmt := common.TxStmt(txn, s.selectKeyStmt)
 	rows, err := stmt.QueryContext(ctx, userID, deviceID)
 	if err != nil {
 		return nil, err
 	}
+	holders := []types.KeyHolder{}
 	for rows.Next() {
 		single := &types.KeyHolder{}
 		if err = rows.Scan(
@@ -141,10 +169,13 @@ func (s *keyStatements) selectKey(
 		holders = append(holders, *single)
 	}
 	err = rows.Close()
+	if err != nil {
+		return nil, err
+	}
 	return holders, err
 }
 
-// select single one for claim usage
+// selectSingleKey selects single key for claim usage
 func (s *keyStatements) selectSingleKey(
 	ctx context.Context,
 	userID, deviceID, algorithm string,
@@ -170,7 +201,7 @@ func (s *keyStatements) selectSingleKey(
 	return holder, err
 }
 
-// select details by given an array of devices
+// selectInKeys selects details based on an array of devices
 func (s *keyStatements) selectInKeys(
 	ctx context.Context,
 	userID string,
@@ -225,7 +256,7 @@ func injectKeyHolder(rows *sql.Rows, keyHolder []types.KeyHolder) (holders []typ
 	return
 }
 
-// select by user and device
+// selectOneTimeKeyCount selects by user and device
 func (s *keyStatements) selectOneTimeKeyCount(
 	ctx context.Context,
 	userID, deviceID string,
@@ -248,4 +279,60 @@ func (s *keyStatements) selectOneTimeKeyCount(
 	}
 	err = rows.Close()
 	return holders, err
+}
+
+// insertChanges inserts into the changes table
+func (s *keyStatements) insertChanges(
+	ctx context.Context, txn *sql.Tx,
+	readID int, userID string, status string,
+) error {
+	stmt := common.TxStmt(txn, s.insertChangesStmt)
+	_, err := stmt.ExecContext(ctx, readID, userID, status)
+	return err
+}
+
+// selectChanges returns data from the DB
+func (s *keyStatements) selectChanges(
+	ctx context.Context, txn *sql.Tx,
+	readID int, userID string,
+) (types.KeyChanges, error) {
+	stmt := common.TxStmt(txn, s.selectChangesStmt)
+	rows, err := stmt.QueryContext(ctx, readID, userID)
+	if err != nil {
+		return types.KeyChanges{}, err
+	}
+	keyChanges := newKeyChanges()
+	for rows.Next() {
+		var rID, uID, nUID, status string
+		if err = rows.Scan(
+			&rID,
+			&uID,
+			&nUID,
+			&status,
+		); err != nil {
+			return types.KeyChanges{}, err
+		}
+		if keyChanges.UserID == "" {
+			keyChanges.UserID = uID
+		}
+		if status == "changed" {
+			keyChanges.Changed = append(keyChanges.Changed, nUID)
+		} else if status == "left" {
+			keyChanges.Left = append(keyChanges.Left, nUID)
+		}
+	}
+	err = rows.Close()
+	if err != nil {
+		return types.KeyChanges{}, err
+	}
+	return keyChanges, nil
+}
+
+func newKeyChanges() types.KeyChanges {
+	return types.KeyChanges{
+		UserID:         "",
+		NeighborUserID: "",
+		Changed:        []string{},
+		Left:           []string{},
+	}
 }

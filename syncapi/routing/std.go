@@ -2,6 +2,8 @@ package routing
 
 // import (
 // 	"encoding/json"
+// 	"net/http"
+
 // 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 // 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 // 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -10,13 +12,13 @@ package routing
 // 	"github.com/matrix-org/dendrite/syncapi/types"
 // 	"github.com/matrix-org/gomatrixserverlib"
 // 	"github.com/matrix-org/util"
-// 	"net/http"
 // )
 
 // // SendToDevice this is a function for calling process of send-to-device messages those bypassed DAG
 // func SendToDevice(
 // 	req *http.Request,
 // 	sender string,
+// 	roomID string,
 // 	syncDB *storage.SyncServerDatasource,
 // 	deviceDB *devices.Database,
 // 	eventType, txnID string,
@@ -48,7 +50,7 @@ package routing
 // 				Event:    jsonBuffer,
 // 				EventTyp: eventType,
 // 			}
-// 			var pos int64
+// 			// var pos int64
 
 // 			// wildcard all devices
 // 			if device == "*" {
@@ -58,7 +60,8 @@ package routing
 // 				deviceCollection, err = deviceDB.GetDevicesByLocalpart(ctx, localpart)
 // 				for _, val := range deviceCollection {
 // 					pos, err = syncDB.InsertStdMessage(ctx, ev, txnID, uid, val.ID)
-// 					notifier.OnNewEvent(nil, uid, types.StreamPosition(pos))
+// 					// NEEDS MAJOR CHANGES
+// 					// notifier.OnNewEvent(nil, roomID, uid, types.StreamPosition(pos))
 // 				}
 // 				if err != nil {
 // 					return util.JSONResponse{
@@ -78,7 +81,8 @@ package routing
 // 					JSON: struct{}{},
 // 				}
 // 			}
-// 			notifier.OnNewEvent(nil, uid, types.StreamPosition(pos))
+// 			// NEEDS MAJOR CHANGES
+// 			// notifier.OnNewEvent(nil, roomID, uid, types.StreamPosition(pos))
 // 		}
 // 	}
 

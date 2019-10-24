@@ -31,3 +31,11 @@ type AlHolder struct {
 	DeviceID,
 	SupportedAlgorithm string
 }
+
+// KeyChanges holds the changed keys data
+type KeyChanges struct {
+	UserID         string
+	NeighborUserID string
+	Changed        []string
+	Left           []string
+}

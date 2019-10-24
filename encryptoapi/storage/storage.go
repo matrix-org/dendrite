@@ -17,9 +17,10 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"strings"
+
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/encryptoapi/types"
-	"strings"
 )
 
 // Database represents a presence database.
@@ -127,5 +128,28 @@ func (d *Database) SyncOneTimeCount(
 	userID, deviceID string,
 ) (holder map[string]int, err error) {
 	holder, err = d.keyStatements.selectOneTimeKeyCount(ctx, userID, deviceID)
+	return
+}
+
+// InsertChanges inserts the changes to the DB
+func (d *Database) InsertChanges(
+	ctx context.Context,
+	readID int, userID, status string,
+) error {
+	err := common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.keyStatements.insertChanges(ctx, txn, readID, userID, status)
+	})
+	return err
+}
+
+// GetKeyChanges gets the changed keys from the DB
+func (d *Database) GetKeyChanges(
+	ctx context.Context,
+	readID int, userID string,
+) (keyChanges types.KeyChanges, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) (err error) {
+		keyChanges, err = d.keyStatements.selectChanges(ctx, txn, readID, userID)
+		return
+	})
 	return
 }
