@@ -41,3 +41,39 @@ func NewTransaction() Transaction {
 
 	return Transaction{OriginServerTS: ts}
 }
+
+// QueryRequest is the request for /query
+type QueryRequest struct {
+	DeviceKeys map[string][]string `json:"device_keys"`
+}
+
+// UnsignedDeviceInfo is the struct for UDI
+type UnsignedDeviceInfo struct {
+	DeviceDisplayName string `json:"device_display_name"`
+}
+
+// DeviceKeys has the data of the keys of the device
+type DeviceKeys struct {
+	UserID     string                       `json:"user_id"`
+	DeviceID   string                       `json:"edvice_id"`
+	Algorithms []string                     `json:"algorithms"`
+	Keys       map[string]string            `json:"keys"`
+	Signatures map[string]map[string]string `json:"signatures"`
+	Unsigned   UnsignedDeviceInfo           `json:"unsigned"`
+}
+
+// QueryResponse is the response for /query
+type QueryResponse struct {
+	DeviceKeys map[string]DeviceKeys `json:"device_keys"`
+}
+
+// KeyHolder structure
+type KeyHolder struct {
+	UserID,
+	DeviceID,
+	Signature,
+	KeyAlgorithm,
+	KeyID,
+	Key,
+	KeyType string
+}

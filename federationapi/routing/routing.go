@@ -271,4 +271,27 @@ func Setup(
 			return Backfill(httpReq, request, query, vars["roomID"], cfg)
 		},
 	)).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/keys/claim", common.MakeFedAPI(
+		"federation_claim_e2ee_keys", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			// vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			// if err != nil {
+			// 	return util.ErrorResponse(err)
+			// }
+			return ClaimKeys(httpReq, request)
+		},
+	)).Methods(http.MethodPost)
+
+	v1fedmux.Handle("/keys/query", common.MakeFedAPI(
+		"federation_query_e2ee_keys", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			// vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			// if err != nil {
+			// 	return util.ErrorResponse(err)
+			// }
+			return QueryKeys(httpReq, request)
+		},
+	)).Methods(http.MethodPost)
+
 }

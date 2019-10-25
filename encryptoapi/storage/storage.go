@@ -59,7 +59,7 @@ func (d *Database) InsertKey(
 	return
 }
 
-// SelectOneTimeKeyCount for key upload response usage a map from key algorithm to sum to counterpart
+// SelectOneTimeKeyCount provides the number of un-claimed OTKeys
 func (d *Database) SelectOneTimeKeyCount(
 	ctx context.Context,
 	deviceID, userID string,

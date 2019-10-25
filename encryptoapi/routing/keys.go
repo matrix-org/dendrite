@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/matrix-org/dendrite/encryptoapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/pkg/errors"
 )
@@ -79,6 +78,7 @@ func UploadPKeys(
 		&keySpecific,
 		userID, deviceID)
 	// numMap is algorithm-num map
+	// this gets the number of unclaimed OTkeys
 	numMap, ok := (queryOneTimeKeys(
 		req.Context(),
 		TYPESUM,
@@ -116,13 +116,12 @@ func QueryPKeys(
 ) util.JSONResponse {
 	var err error
 	var queryRq types.QueryRequest
-	queryRp := types.QueryResponse{}
-	queryRp.Failure = make(map[string]interface{})
-	queryRp.DeviceKeys = make(map[string]map[string]types.DeviceKeysQuery)
 	if reqErr := httputil.UnmarshalJSONRequest(req, &queryRq); reqErr != nil {
 		return *reqErr
 	}
 
+	sendDKToFed := queryRq.DeviceKeys
+	queryRp.Failure = make(map[string]interface{})
 	// FED must return the keys from the other user
 	/*
 		federation consideration: when user id is in federation, a
@@ -156,44 +155,12 @@ func QueryPKeys(
 		}
 	}
 
-	// query one's device key from user corresponding to uid
-	for uid, arr := range queryRq.DeviceKeys {
-		queryRp.DeviceKeys[uid] = make(map[string]types.DeviceKeysQuery)
-		deviceKeysQueryMap := queryRp.DeviceKeys[uid]
-		// backward compatible to old interface
-		midArr := []string{}
-		// figure out device list from devices described as device which is actually deviceID
-		for device := range arr.(map[string]interface{}) {
-			midArr = append(midArr, device)
-		}
-		// all device keys
-		dkeys, _ := encryptionDB.QueryInRange(req.Context(), uid, midArr)
-		// build response for them
+	//
+	//
+	//
+	//
+	// Forward the request to the federation server and get the required info
 
-		for _, key := range dkeys {
-
-			deviceKeysQueryMap = presetDeviceKeysQueryMap(deviceKeysQueryMap, uid, key)
-			// load for accomplishment
-			single := deviceKeysQueryMap[key.DeviceID]
-			resKey := fmt.Sprintf("%s:%s", key.KeyAlgorithm, key.DeviceID)
-			resBody := key.Key
-			single.Keys[resKey] = resBody
-			single.DeviceID = key.DeviceID
-			single.UserID = key.UserID
-			single.Signature[uid][fmt.Sprintf("%s:%s", "ed25519", key.DeviceID)] = key.Signature
-			single.Algorithm, err = takeAL(req.Context(), *encryptionDB, key.UserID, key.DeviceID)
-			localpart, _, _ := gomatrixserverlib.SplitID('@', uid)
-			device, _ := deviceDB.GetDeviceByID(req.Context(), localpart, deviceID)
-			single.Unsigned.Info = device.DisplayName
-			deviceKeysQueryMap[key.DeviceID] = single
-		}
-	}
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: queryRp,
-		}
-	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: queryRp,
@@ -426,15 +393,6 @@ func persistAl(
 	return
 }
 
-func takeAL(
-	ctx context.Context,
-	encryptDB storage.Database,
-	uid, device string,
-) (al []string, err error) {
-	al, err = encryptDB.SelectAl(ctx, uid, device)
-	return
-}
-
 func pickOne(
 	ctx context.Context,
 	encryptDB storage.Database,
@@ -458,35 +416,6 @@ func InitNotifier(base *basecomponent.BaseDendrite) {
 	keyProducer.base = base
 	pro, _ := sarama.NewAsyncProducer(base.Cfg.Kafka.Addresses, nil)
 	keyProducer.ch = pro
-}
-
-func presetDeviceKeysQueryMap(
-	deviceKeysQueryMap map[string]types.DeviceKeysQuery,
-	uid string,
-	key types.KeyHolder,
-) map[string]types.DeviceKeysQuery {
-	// preset for complicated nested map struct
-	if _, ok := deviceKeysQueryMap[key.DeviceID]; !ok {
-		// make consistency
-		deviceKeysQueryMap[key.DeviceID] = types.DeviceKeysQuery{}
-	}
-	if deviceKeysQueryMap[key.DeviceID].Signature == nil {
-		mid := make(map[string]map[string]string)
-		midmap := deviceKeysQueryMap[key.DeviceID]
-		midmap.Signature = mid
-		deviceKeysQueryMap[key.DeviceID] = midmap
-	}
-	if deviceKeysQueryMap[key.DeviceID].Keys == nil {
-		mid := make(map[string]string)
-		midmap := deviceKeysQueryMap[key.DeviceID]
-		midmap.Keys = mid
-		deviceKeysQueryMap[key.DeviceID] = midmap
-	}
-	if _, ok := deviceKeysQueryMap[key.DeviceID].Signature[uid]; !ok {
-		// make consistency
-		deviceKeysQueryMap[key.DeviceID].Signature[uid] = make(map[string]string)
-	}
-	return deviceKeysQueryMap
 }
 
 func persistBothKeys(
