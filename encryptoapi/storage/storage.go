@@ -102,7 +102,7 @@ func (d *Database) InsertAl(
 }
 
 // SelectAl select algorithms
-func (d *Database) SelectAl(
+func (d *Database) SelectAlgo(
 	ctx context.Context, uid, device string,
 ) (res []string, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) (err error) {

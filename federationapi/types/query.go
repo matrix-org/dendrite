@@ -1,4 +1,4 @@
-// Copyright 2018 Vector Creations Ltd
+// Copyright 2019 Sumukha PK
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,30 +14,38 @@
 
 package types
 
-// QueryRequest structure
+// QueryRequest is the request for /query
 type QueryRequest struct {
-	Timeout    int64                  `json:"timeout"`
-	DeviceKeys map[string]interface{} `json:"device_keys"`
-	Token      string                 `json:"token"`
+	DeviceKeys map[string][]string `json:"device_keys"`
 }
 
-// QueryResponse structure
-type QueryResponse struct {
-	Failure    map[string]interface{}                `json:"failures"`
-	DeviceKeys map[string]map[string]DeviceKeysQuery `json:"device_keys"`
+// UnsignedDeviceInfo is the struct for UDI
+type UnsignedDeviceInfo struct {
+	DeviceDisplayName string `json:"device_display_name"`
 }
 
-// DeviceKeysQuery structure
-type DeviceKeysQuery struct {
+// DeviceKeys has the data of the keys of the device
+type DeviceKeys struct {
 	UserID     string                       `json:"user_id"`
-	DeviceID   string                       `json:"device_id"`
-	Algorithm  []string                     `json:"algorithms"`
+	DeviceID   string                       `json:"edvice_id"`
+	Algorithms []string                     `json:"algorithms"`
 	Keys       map[string]string            `json:"keys"`
 	Signatures map[string]map[string]string `json:"signatures"`
 	Unsigned   UnsignedDeviceInfo           `json:"unsigned"`
 }
 
-// UnsignedDeviceInfo structure
-type UnsignedDeviceInfo struct {
-	Info string `json:"device_display_name"`
+// QueryResponse is the response for /query
+type QueryResponse struct {
+	DeviceKeys map[string]map[string]DeviceKeys `json:"device_keys"`
+}
+
+// KeyHolder structure
+type KeyHolder struct {
+	UserID,
+	DeviceID,
+	Signature,
+	KeyAlgorithm,
+	KeyID,
+	Key,
+	KeyType string
 }

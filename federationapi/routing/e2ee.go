@@ -19,8 +19,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/encryptoapi/storage"
+	ecTypes "github.com/matrix-org/dendrite/encryptoapi/types"
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -42,46 +45,51 @@ func ClaimKeys(
 // QueryKeys provides the public identity keys and supported algorithms.
 func QueryKeys(
 	httpReq *http.Request,
-	request *gomatrixserverlib.FederationRequest,
 	encryptionDB *storage.Database,
+	deviceID string,
+	deviceDB *devices.Database,
 ) util.JSONResponse {
 	var err error
-	var queryRq types.QueryRequest
-	if reqErr := httputil.UnmarshalJSONRequest(httpReq, &queryRq); reqErr != nil {
+	var queryReq types.QueryRequest
+	if reqErr := httputil.UnmarshalJSONRequest(httpReq, &queryReq); reqErr != nil {
 		return *reqErr
 	}
-	queryRp := types.QueryResponse{}
+	queryRes := types.QueryResponse{}
 
-	queryRp.DeviceKeys = make(map[string]map[string]types.DeviceKeys)
-	// query one's device key from user corresponding to uid
-	for uid, arr := range queryRq.DeviceKeys {
-		queryRp.DeviceKeys[uid] = make(map[string]types.DeviceKeys)
-		deviceKeysQueryMap := queryRp.DeviceKeys[uid]
+	queryRes.DeviceKeys = make(map[string]map[string]types.DeviceKeys)
+	// iterate through all demanded device keys
+	for uid, arr := range queryReq.DeviceKeys {
+		queryRes.DeviceKeys[uid] = make(map[string]types.DeviceKeys)
+		deviceKeysQueryMap := queryRes.DeviceKeys[uid]
 		// backward compatible to old interface
-		midArr := []string{}
+		// midArr := []string{}
 		// figure out device list from devices described as device which is actually deviceID
-		for device := range arr.(map[string]interface{}) {
-			midArr = append(midArr, device)
-		}
+		// for device := range arr.(map[string]interface{}) {
+		// 	midArr = append(midArr, device)
+		// }
 		// all device keys
-		dkeys, _ := encryptionDB.QueryInRange(httpReq.Context(), uid, midArr)
+		dkeys, err := encryptionDB.QueryInRange(httpReq.Context(), uid, arr)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: struct{}{},
+			}
+		}
 		// build response for them
-
 		for _, key := range dkeys {
-
 			deviceKeysQueryMap = presetDeviceKeysQueryMap(deviceKeysQueryMap, uid, key)
-			// load for accomplishment
+			// group the keys as intended in the response
 			single := deviceKeysQueryMap[key.DeviceID]
 			resKey := fmt.Sprintf("%s:%s", key.KeyAlgorithm, key.DeviceID)
 			resBody := key.Key
 			single.Keys[resKey] = resBody
 			single.DeviceID = key.DeviceID
 			single.UserID = key.UserID
-			single.Signature[uid][fmt.Sprintf("%s:%s", "ed25519", key.DeviceID)] = key.Signature
-			single.Algorithm, err = takeAL(httpReq.Context(), *encryptionDB, key.UserID, key.DeviceID)
+			single.Signatures[uid][fmt.Sprintf("%s:%s", "ed25519", key.DeviceID)] = key.Signature
+			single.Algorithms, err = takeAlgo(httpReq.Context(), *encryptionDB, key.UserID, key.DeviceID)
 			localpart, _, _ := gomatrixserverlib.SplitID('@', uid)
-			device, _ := deviceDB.GetDeviceByID(req.Context(), localpart, deviceID)
-			single.Unsigned.Info = device.DisplayName
+			device, _ := deviceDB.GetDeviceByID(httpReq.Context(), localpart, deviceID)
+			single.Unsigned.DeviceDisplayName = device.DisplayName
 			deviceKeysQueryMap[key.DeviceID] = single
 		}
 	}
@@ -94,24 +102,24 @@ func QueryKeys(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: queryRes,
 	}
 }
 
 func presetDeviceKeysQueryMap(
 	deviceKeysQueryMap map[string]types.DeviceKeys,
 	uid string,
-	key types.KeyHolder,
+	key ecTypes.KeyHolder,
 ) map[string]types.DeviceKeys {
 	// preset for complicated nested map struct
 	if _, ok := deviceKeysQueryMap[key.DeviceID]; !ok {
 		// make consistency
-		deviceKeysQueryMap[key.DeviceID] = types.DeviceKeysQuery{}
+		deviceKeysQueryMap[key.DeviceID] = types.DeviceKeys{}
 	}
-	if deviceKeysQueryMap[key.DeviceID].Signature == nil {
+	if deviceKeysQueryMap[key.DeviceID].Signatures == nil {
 		mid := make(map[string]map[string]string)
 		midmap := deviceKeysQueryMap[key.DeviceID]
-		midmap.Signature = mid
+		midmap.Signatures = mid
 		deviceKeysQueryMap[key.DeviceID] = midmap
 	}
 	if deviceKeysQueryMap[key.DeviceID].Keys == nil {
@@ -120,18 +128,18 @@ func presetDeviceKeysQueryMap(
 		midmap.Keys = mid
 		deviceKeysQueryMap[key.DeviceID] = midmap
 	}
-	if _, ok := deviceKeysQueryMap[key.DeviceID].Signature[uid]; !ok {
+	if _, ok := deviceKeysQueryMap[key.DeviceID].Signatures[uid]; !ok {
 		// make consistency
-		deviceKeysQueryMap[key.DeviceID].Signature[uid] = make(map[string]string)
+		deviceKeysQueryMap[key.DeviceID].Signatures[uid] = make(map[string]string)
 	}
 	return deviceKeysQueryMap
 }
 
-func takeAL(
+func takeAlgo(
 	ctx context.Context,
 	encryptDB storage.Database,
 	uid, device string,
 ) (al []string, err error) {
-	al, err = encryptDB.SelectAl(ctx, uid, device)
+	al, err = encryptDB.SelectAlgo(ctx, uid, device)
 	return
 }

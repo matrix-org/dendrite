@@ -210,7 +210,7 @@ func (s *keyStatements) selectInKeys(
 	holders := []types.KeyHolder{}
 	stmt := s.selectAllKeyStmt
 	if len(arr) == 0 {
-		// mapping for all device keys
+		// empty array indicates - get all devices from corresponding user
 		rowsP, err := stmt.QueryContext(ctx, userID, "device_key")
 		if err != nil {
 			return nil, err

@@ -107,7 +107,11 @@ func UploadPKeys(
 	}
 }
 
-// QueryPKeys enables the user to query for other devices's keys
+// QueryPKeys returns the public identity keys
+// and supported algorithms of "intended user"
+// This just forwards the request to the Federation,
+// and waits/checks for timeouts and failures. Response
+// of the FedSenderAPI is bundled with the failures and returned.
 func QueryPKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
@@ -119,8 +123,14 @@ func QueryPKeys(
 	if reqErr := httputil.UnmarshalJSONRequest(req, &queryRq); reqErr != nil {
 		return *reqErr
 	}
+	queryRp := types.QueryResponse{}
 
-	sendDKToFed := queryRq.DeviceKeys
+	// sendDKToFed := queryRq.DeviceKeys
+
+	var obtainedFromFed types.QueryResponse
+	obtainedKeysFromFed := obtainedFromFed.DeviceKeys
+	queryRp.DeviceKeys = obtainedKeysFromFed
+
 	queryRp.Failure = make(map[string]interface{})
 	// FED must return the keys from the other user
 	/*
