@@ -24,9 +24,9 @@ require (
 	github.com/lib/pq v0.0.0-20170918175043-23da1db4f16d
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20190814163046-d6285a18401f
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20191016163103-1f7afc6251d9
 	github.com/matrix-org/naffka v0.0.0-20171115094957-662bfd0841d0
-	github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5
+	github.com/matrix-org/util v0.0.0-20190711121626-527ce5ddefc7
 	github.com/matttproud/golang_protobuf_extensions v1.0.1
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
 	github.com/nicksnyder/go-i18n v1.8.1
@@ -44,9 +44,9 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.3.0
-	github.com/tidwall/gjson v1.1.5
+	github.com/tidwall/gjson v1.3.2
 	github.com/tidwall/match v1.0.1
-	github.com/tidwall/sjson v1.0.3
+	github.com/tidwall/sjson v1.0.4
 	github.com/uber-go/atomic v1.3.0
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0
@@ -54,9 +54,9 @@ require (
 	go.uber.org/atomic v1.3.0
 	go.uber.org/multierr v0.0.0-20170829224307-fb7d312c2c04
 	go.uber.org/zap v1.7.1
-	golang.org/x/crypto v0.0.0-20190131182504-b8fe1690c613
-	golang.org/x/net v0.0.0-20190301231341-16b79f2e4e95
-	golang.org/x/sys v0.0.0-20190712062909-fae7ac547cb7
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
+	golang.org/x/sys v0.0.0-20191026070338-33540a1f6037
 	gopkg.in/Shopify/sarama.v1 v1.11.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20170727041045-23bcc3c4eae3

@@ -51,7 +51,7 @@ type streamEvent struct {
 	transactionID  *api.TransactionID
 }
 
-// SyncServerDatabase represents a sync server datasource which manages
+// SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	db *sql.DB
@@ -63,7 +63,7 @@ type SyncServerDatasource struct {
 	typingCache *cache.TypingCache
 }
 
-// NewSyncServerDatabase creates a new sync server database
+// NewSyncServerDatasource creates a new sync server database
 func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
@@ -185,10 +185,10 @@ func (d *SyncServerDatasource) GetStateEvent(
 // Returns an empty slice if no state events could be found for this room.
 // Returns an error if there was an issue with the retrieval.
 func (d *SyncServerDatasource) GetStateEventsForRoom(
-	ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.FilterPart,
+	ctx context.Context, roomID string, stateFilter *gomatrixserverlib.StateFilter,
 ) (stateEvents []gomatrixserverlib.Event, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
+		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilter)
 		return err
 	})
 	return
@@ -245,7 +245,7 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	var succeeded bool
 	defer common.EndTransaction(txn, &succeeded)
 
-	stateFilterPart := gomatrixserverlib.DefaultFilterPart() // TODO: use filter provided in request
+	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
 	// Work out which rooms to return in the response. This is done by getting not only the currently
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 PDU stream positions.
@@ -255,11 +255,11 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	var joinedRoomIDs []string
 	if !wantFullState {
 		deltas, joinedRoomIDs, err = d.getStateDeltas(
-			ctx, &device, txn, fromPos, toPos, device.UserID, &stateFilterPart,
+			ctx, &device, txn, fromPos, toPos, device.UserID, &stateFilter,
 		)
 	} else {
 		deltas, joinedRoomIDs, err = d.getStateDeltasForFullStateSync(
-			ctx, &device, txn, fromPos, toPos, device.UserID, &stateFilterPart,
+			ctx, &device, txn, fromPos, toPos, device.UserID, &stateFilter,
 		)
 	}
 	if err != nil {
@@ -410,12 +410,12 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		return
 	}
 
-	stateFilterPart := gomatrixserverlib.DefaultFilterPart() // TODO: use filter provided in request
+	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
 		var stateEvents []gomatrixserverlib.Event
-		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, &stateFilterPart)
+		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, &stateFilter)
 		if err != nil {
 			return
 		}
@@ -495,9 +495,9 @@ var txReadOnlySnapshot = sql.TxOptions{
 // If there was an issue with the retrieval, returns an error
 func (d *SyncServerDatasource) GetAccountDataInRange(
 	ctx context.Context, userID string, oldPos, newPos int64,
-	accountDataFilterPart *gomatrixserverlib.FilterPart,
+	accountDataStateFilter *gomatrixserverlib.StateFilter,
 ) (map[string][]string, error) {
-	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos, accountDataFilterPart)
+	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos, accountDataStateFilter)
 }
 
 // UpsertAccountData keeps track of new or updated account data, by saving the type
@@ -742,7 +742,7 @@ func (d *SyncServerDatasource) fetchMissingStateEvents(
 func (d *SyncServerDatasource) getStateDeltas(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
 	fromPos, toPos int64, userID string,
-	stateFilterPart *gomatrixserverlib.FilterPart,
+	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
@@ -755,7 +755,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 	var deltas []stateDelta
 
 	// get all the state events ever between these two positions
-	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos, stateFilterPart)
+	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos, stateFilter)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -775,7 +775,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 				if membership == gomatrixserverlib.Join {
 					// send full room state down instead of a delta
 					var s []streamEvent
-					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilterPart)
+					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)
 					if err != nil {
 						return nil, nil, err
 					}
@@ -817,7 +817,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
 	fromPos, toPos int64, userID string,
-	stateFilterPart *gomatrixserverlib.FilterPart,
+	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
 	joinedRoomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
 	if err != nil {
@@ -829,7 +829,7 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 
 	// Add full states for all joined rooms
 	for _, joinedRoomID := range joinedRoomIDs {
-		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilterPart)
+		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
 		if stateErr != nil {
 			return nil, nil, stateErr
 		}
@@ -841,7 +841,7 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 	}
 
 	// Get all the state events ever between these two positions
-	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos, stateFilterPart)
+	stateNeeded, eventMap, err := d.events.selectStateInRange(ctx, txn, fromPos, toPos, stateFilter)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -872,9 +872,9 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 
 func (d *SyncServerDatasource) currentStateStreamEventsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	stateFilterPart *gomatrixserverlib.FilterPart,
+	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]streamEvent, error) {
-	allState, err := d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
+	allState, err := d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilter)
 	if err != nil {
 		return nil, err
 	}

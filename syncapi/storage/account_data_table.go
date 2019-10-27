@@ -97,7 +97,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	ctx context.Context,
 	userID string,
 	oldPos, newPos int64,
-	accountDataFilterPart *gomatrixserverlib.FilterPart,
+	accountDataStateFilter *gomatrixserverlib.StateFilter,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
@@ -109,9 +109,9 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	}
 
 	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos,
-		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataFilterPart.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataFilterPart.NotTypes)),
-		accountDataFilterPart.Limit,
+		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataStateFilter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataStateFilter.NotTypes)),
+		accountDataStateFilter.Limit,
 	)
 	if err != nil {
 		return

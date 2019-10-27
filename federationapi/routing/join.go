@@ -179,6 +179,7 @@ func SendJoin(
 		JSON: gomatrixserverlib.RespSendJoin{
 			StateEvents: stateAndAuthChainRepsonse.StateEvents,
 			AuthEvents:  stateAndAuthChainRepsonse.AuthChainEvents,
+			Origin:      cfg.Matrix.ServerName,
 		},
 	}
 }
