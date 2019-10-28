@@ -1,4 +1,4 @@
-// Copyright 2018 Vector Creations Ltd
+// Copyright 2019 Sumukha PK
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,16 @@ package types
 
 // ClaimRequest structure
 type ClaimRequest struct {
-	Timeout     int64                        `json:"timeout"`
 	OneTimeKeys map[string]map[string]string `json:"one_time_keys"`
 }
 
 // ClaimResponse structure
 type ClaimResponse struct {
-	Failures    map[string]interface{}                       `json:"failures"`
-	OneTimeKeys map[string]map[string]map[string]interface{} `json:"one_time_keys"`
+	OneTimeKeys map[string]map[string]map[string]interface{}
+}
+
+// KeyObject structure
+type KeyObject struct {
+	Key        string            `json:"key"`
+	Signatures map[string]string `json:"signatures"`
 }

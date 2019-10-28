@@ -1,4 +1,4 @@
-// Copyright Sumukha PK 2019
+// Copyright 2019 Sumukha PK
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 
@@ -29,16 +30,72 @@ import (
 	"github.com/matrix-org/util"
 )
 
+const (
+	// ONETIMEKEYSTRING key string
+	ONETIMEKEYSTRING = iota
+	// ONETIMEKEYOBJECT key object
+	ONETIMEKEYOBJECT
+)
+
+// ONETIMEKEYSTR stands for storage string property
+const ONETIMEKEYSTR = "one_time_key"
+
+// DEVICEKEYSTR stands for storage string property
+const DEVICEKEYSTR = "device_key"
+
 // ClaimKeys provides the e2ee keys of the user
 func ClaimKeys(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	encryptionDB *storage.Database,
 ) util.JSONResponse {
+	var claimReq types.ClaimRequest
+	claimRes := types.ClaimResponse{}
+	claimRes.OneTimeKeys = make(map[string]map[string]map[string]interface{})
+	if reqErr := httputil.UnmarshalJSONRequest(httpReq, &claimReq); reqErr != nil {
+		return *reqErr
+	}
+
+	content := claimReq.OneTimeKeys
+	for uid, detail := range content {
+		for deviceID, alg := range detail {
+			var algTyp int
+			if strings.Contains(alg, "signed") {
+				algTyp = ONETIMEKEYOBJECT
+			} else {
+				algTyp = ONETIMEKEYSTRING
+			}
+			key, err := pickOne(httpReq.Context(), *encryptionDB, uid, deviceID, alg)
+			if err != nil {
+				// send a better response in order to capture failures on the other part
+				return util.JSONResponse{
+					Code: http.StatusInternalServerError,
+					JSON: struct{}{},
+				}
+				// claimRes.Failures[uid] = fmt.Sprintf("%s: %s", "failed to get keys for device", deviceID)
+			}
+			claimRes.OneTimeKeys[uid] = make(map[string]map[string]interface{})
+			keyPreMap := claimRes.OneTimeKeys[uid]
+			keymap := keyPreMap[deviceID]
+			if keymap == nil {
+				keymap = make(map[string]interface{})
+			}
+			switch algTyp {
+			case ONETIMEKEYSTRING:
+				keymap[fmt.Sprintf("%s:%s", alg, key.KeyID)] = key.Key
+			case ONETIMEKEYOBJECT:
+				sig := make(map[string]map[string]string)
+				sig[uid] = make(map[string]string)
+				sig[uid][fmt.Sprintf("%s:%s", "ed25519", deviceID)] = key.Signature
+				keymap[fmt.Sprintf("%s:%s", alg, key.KeyID)] = types.KeyObject{Key: key.Key, Signatures: sig}
+			}
+			claimRes.OneTimeKeys[uid][deviceID] = keymap
+		}
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: claimRes,
 	}
 }
 
@@ -141,5 +198,14 @@ func takeAlgo(
 	uid, device string,
 ) (al []string, err error) {
 	al, err = encryptDB.SelectAlgo(ctx, uid, device)
+	return
+}
+
+func pickOne(
+	ctx context.Context,
+	encryptDB storage.Database,
+	uid, device, al string,
+) (key types.KeyHolder, err error) {
+	key, err = encryptDB.SelectOneTimeKeySingle(ctx, uid, device, al)
 	return
 }

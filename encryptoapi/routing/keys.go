@@ -183,12 +183,16 @@ func ClaimOneTimeKeys(
 	encryptionDB *storage.Database,
 ) util.JSONResponse {
 	var claimRq types.ClaimRequest
-	claimRp := types.ClaimResponse{}
-	claimRp.Failures = make(map[string]interface{})
-	claimRp.ClaimBody = make(map[string]map[string]map[string]interface{})
+	claimRes := types.ClaimResponse{}
+	claimRes.Failures = make(map[string]interface{})
+	claimRes.OneTimeKeys = make(map[string]map[string]map[string]interface{})
 	if reqErr := httputil.UnmarshalJSONRequest(req, &claimRq); reqErr != nil {
 		return *reqErr
 	}
+
+	var obtainedFromFed types.QueryResponse
+	obtainedKeysFromFed := obtainedFromFed.DeviceKeys
+	claimRes.OneTimeKeys = obtainedKeysFromFed
 
 	// not sure what FED should return here
 	/*
@@ -206,9 +210,9 @@ func ClaimOneTimeKeys(
 		}()
 		select {
 		case <-stimuCh:
-			claimRp.Failures = make(map[string]interface{})
+			claimRes.Failures = make(map[string]interface{})
 			// todo: key in this map is restricted to username at the end, yet a mocked one.
-			claimRp.Failures["@alice:localhost"] = "ran out of offered time"
+			claimRes.Failures["@alice:localhost"] = "ran out of offered time"
 		case <-make(chan interface{}):
 			// todo : here goes federation chan , still a mocked one
 		}
@@ -219,40 +223,9 @@ func ClaimOneTimeKeys(
 		}
 	}
 
-	content := claimRq.ClaimDetail
-	for uid, detail := range content {
-		for deviceID, alg := range detail {
-			var algTyp int
-			if strings.Contains(alg, "signed") {
-				algTyp = ONETIMEKEYOBJECT
-			} else {
-				algTyp = ONETIMEKEYSTRING
-			}
-			key, err := pickOne(req.Context(), *encryptionDB, uid, deviceID, alg)
-			if err != nil {
-				claimRp.Failures[uid] = fmt.Sprintf("%s: %s", "failed to get keys for device", deviceID)
-			}
-			claimRp.ClaimBody[uid] = make(map[string]map[string]interface{})
-			keyPreMap := claimRp.ClaimBody[uid]
-			keymap := keyPreMap[deviceID]
-			if keymap == nil {
-				keymap = make(map[string]interface{})
-			}
-			switch algTyp {
-			case ONETIMEKEYSTRING:
-				keymap[fmt.Sprintf("%s:%s", alg, key.KeyID)] = key.Key
-			case ONETIMEKEYOBJECT:
-				sig := make(map[string]map[string]string)
-				sig[uid] = make(map[string]string)
-				sig[uid][fmt.Sprintf("%s:%s", "ed25519", deviceID)] = key.Signature
-				keymap[fmt.Sprintf("%s:%s", alg, key.KeyID)] = types.KeyObject{Key: key.Key, Signature: sig}
-			}
-			claimRp.ClaimBody[uid][deviceID] = keymap
-		}
-	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: claimRp,
+		JSON: claimRes,
 	}
 }
 
@@ -400,15 +373,6 @@ func persistAl(
 	al []string,
 ) (err error) {
 	err = encryptDB.InsertAl(ctx, uid, device, al)
-	return
-}
-
-func pickOne(
-	ctx context.Context,
-	encryptDB storage.Database,
-	uid, device, al string,
-) (key types.KeyHolder, err error) {
-	key, err = encryptDB.SelectOneTimeKeySingle(ctx, uid, device, al)
 	return
 }
 
