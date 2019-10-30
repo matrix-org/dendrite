@@ -91,6 +91,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	// the table names are globally unique. But we might not want to
 	// rely on that in the future.
 	cfg.Database.Account = config.DataSource(database)
+	cfg.Database.AppService = config.DataSource(database)
 	cfg.Database.Device = config.DataSource(database)
 	cfg.Database.MediaAPI = config.DataSource(database)
 	cfg.Database.RoomServer = config.DataSource(database)
@@ -99,12 +100,23 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Database.PublicRoomsAPI = config.DataSource(database)
 
 	cfg.Listen.ClientAPI = assignAddress()
+	cfg.Listen.AppServiceAPI = assignAddress()
 	cfg.Listen.FederationAPI = assignAddress()
 	cfg.Listen.MediaAPI = assignAddress()
 	cfg.Listen.RoomServer = assignAddress()
 	cfg.Listen.SyncAPI = assignAddress()
 	cfg.Listen.PublicRoomsAPI = assignAddress()
 	cfg.Listen.TypingServer = assignAddress()
+
+	// Bind to the same address as the listen address
+	// All microservices are run on the same host in testing
+	cfg.Bind.ClientAPI = cfg.Listen.ClientAPI
+	cfg.Bind.FederationAPI = cfg.Listen.FederationAPI
+	cfg.Bind.MediaAPI = cfg.Listen.MediaAPI
+	cfg.Bind.RoomServer = cfg.Listen.RoomServer
+	cfg.Bind.SyncAPI = cfg.Listen.SyncAPI
+	cfg.Bind.PublicRoomsAPI = cfg.Listen.PublicRoomsAPI
+	cfg.Bind.TypingServer = cfg.Listen.TypingServer
 
 	return &cfg, port, nil
 }

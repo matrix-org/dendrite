@@ -39,5 +39,6 @@ func main() {
 		alias, input, query, asQuery,
 	)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Listen.FederationAPI))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))
+
 }

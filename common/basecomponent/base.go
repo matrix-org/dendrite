@@ -32,6 +32,7 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/sirupsen/logrus"
@@ -107,6 +108,12 @@ func (b *BaseDendrite) CreateHTTPTypingServerAPIs() typingServerAPI.TypingServer
 	return typingServerAPI.NewTypingServerInputAPIHTTP(b.Cfg.TypingServerURL(), nil)
 }
 
+// CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
+// the federation sender over HTTP
+func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
+	return federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), nil)
+}
+
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
 func (b *BaseDendrite) CreateDeviceDB() *devices.Database {
@@ -150,7 +157,16 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
-func (b *BaseDendrite) SetupAndServeHTTP(addr string) {
+func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
+	// If a separate bind address is defined, listen on that. Otherwise use
+	// the listen address
+	var addr string
+	if bindaddr != "" {
+		addr = bindaddr
+	} else {
+		addr = listenaddr
+	}
+
 	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux))
 	logrus.Infof("Starting %s server on %s", b.componentName, addr)
 
