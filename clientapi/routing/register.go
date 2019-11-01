@@ -934,7 +934,7 @@ type availableResponse struct {
 // RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	accountDB *accounts.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")

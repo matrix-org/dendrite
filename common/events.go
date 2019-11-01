@@ -39,7 +39,7 @@ var ErrRoomNoExists = errors.New("Room does not exist")
 // Returns an error if something else went wrong
 func BuildEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite, evTime time.Time,
+	builder *gomatrixserverlib.EventBuilder, cfg *config.Dendrite, evTime time.Time,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
 	err := AddPrevEventsToEvent(ctx, builder, queryAPI, queryRes)

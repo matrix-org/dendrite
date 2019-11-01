@@ -86,7 +86,7 @@ var (
 // can be emitted.
 func CheckAndProcessInvite(
 	ctx context.Context,
-	device *authtypes.Device, body *MembershipRequest, cfg config.Dendrite,
+	device *authtypes.Device, body *MembershipRequest, cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, db *accounts.Database,
 	producer *producers.RoomserverProducer, membership string, roomID string,
 	evTime time.Time,
@@ -137,7 +137,7 @@ func CheckAndProcessInvite(
 // Returns an error if a check or a request failed.
 func queryIDServer(
 	ctx context.Context,
-	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
+	db *accounts.Database, cfg *config.Dendrite, device *authtypes.Device,
 	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	if err = isTrusted(body.IDServer, cfg); err != nil {
@@ -206,7 +206,7 @@ func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServe
 // Returns an error if the request failed to send or if the response couldn't be parsed.
 func queryIDServerStoreInvite(
 	ctx context.Context,
-	db *accounts.Database, cfg config.Dendrite, device *authtypes.Device,
+	db *accounts.Database, cfg *config.Dendrite, device *authtypes.Device,
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name
@@ -330,7 +330,7 @@ func checkIDServerSignatures(
 func emit3PIDInviteEvent(
 	ctx context.Context,
 	body *MembershipRequest, res *idServerStoreInviteResponse,
-	device *authtypes.Device, roomID string, cfg config.Dendrite,
+	device *authtypes.Device, roomID string, cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
 	evTime time.Time,
 ) error {

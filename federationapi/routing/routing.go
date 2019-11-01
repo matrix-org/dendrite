@@ -41,7 +41,7 @@ const (
 // nolint: gocyclo
 func Setup(
 	apiMux *mux.Router,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query roomserverAPI.RoomserverQueryAPI,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
