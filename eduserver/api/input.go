@@ -15,6 +15,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
@@ -57,11 +58,11 @@ type EDUServerInputAPI interface {
 const EDUServerInputTypingEventPath = "/api/eduserver/input"
 
 // NewEDUServerInputAPIHTTP creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
-func NewEDUServerInputAPIHTTP(eduServerURL string, httpClient *http.Client) EDUServerInputAPI {
+func NewEDUServerInputAPIHTTP(eduServerURL string, httpClient *http.Client) (EDUServerInputAPI, error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		return nil, errors.New("NewTypingServerInputAPIHTTP: httpClient is <nil>")
 	}
-	return &httpEDUServerInputAPI{eduServerURL, httpClient}
+	return &httpEDUServerInputAPI{eduServerURL, httpClient}, nil
 }
 
 type httpEDUServerInputAPI struct {

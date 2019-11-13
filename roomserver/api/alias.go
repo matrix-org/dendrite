@@ -16,6 +16,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
@@ -139,12 +140,12 @@ const RoomserverGetCreatorIDForAliasPath = "/api/roomserver/GetCreatorIDForAlias
 const RoomserverRemoveRoomAliasPath = "/api/roomserver/removeRoomAlias"
 
 // NewRoomserverAliasAPIHTTP creates a RoomserverAliasAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil then it uses the http.DefaultClient
-func NewRoomserverAliasAPIHTTP(roomserverURL string, httpClient *http.Client) RoomserverAliasAPI {
+// If httpClient is nil an error is returned
+func NewRoomserverAliasAPIHTTP(roomserverURL string, httpClient *http.Client) (RoomserverAliasAPI, error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		return nil, errors.New("NewRoomserverAliasAPIHTTP: httpClient is <nil>")
 	}
-	return &httpRoomserverAliasAPI{roomserverURL, httpClient}
+	return &httpRoomserverAliasAPI{roomserverURL, httpClient}, nil
 }
 
 type httpRoomserverAliasAPI struct {

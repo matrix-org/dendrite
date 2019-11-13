@@ -18,6 +18,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
@@ -406,12 +407,12 @@ const RoomserverQueryRoomVersionCapabilitiesPath = "/api/roomserver/queryRoomVer
 const RoomserverQueryRoomVersionForRoomPath = "/api/roomserver/queryRoomVersionForRoom"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil then it uses the http.DefaultClient
-func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client) RoomserverQueryAPI {
+// If httpClient is nil an error is returned
+func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client) (RoomserverQueryAPI, error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		return nil, errors.New("NewRoomserverQueryAPIHTTP: httpClient is <nil>")
 	}
-	return &httpRoomserverQueryAPI{roomserverURL, httpClient}
+	return &httpRoomserverQueryAPI{roomserverURL, httpClient}, nil
 }
 
 type httpRoomserverQueryAPI struct {
