@@ -154,12 +154,12 @@ func SendJoin(
 
 	// Fetch the state and auth chain. We do this before we send the events
 	// on, in case this fails.
-	var stateAndAuthChainRepsonse api.QueryStateAndAuthChainResponse
+	var stateAndAuthChainResponse api.QueryStateAndAuthChainResponse
 	err = query.QueryStateAndAuthChain(httpReq.Context(), &api.QueryStateAndAuthChainRequest{
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
-	}, &stateAndAuthChainRepsonse)
+	}, &stateAndAuthChainResponse)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
 	}
@@ -177,8 +177,8 @@ func SendJoin(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: gomatrixserverlib.RespSendJoin{
-			StateEvents: stateAndAuthChainRepsonse.StateEvents,
-			AuthEvents:  stateAndAuthChainRepsonse.AuthChainEvents,
+			StateEvents: stateAndAuthChainResponse.StateEvents,
+			AuthEvents:  stateAndAuthChainResponse.AuthChainEvents,
 			Origin:      cfg.Matrix.ServerName,
 		},
 	}
