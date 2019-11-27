@@ -40,9 +40,14 @@ type flow struct {
 	Stages []string `json:"stages"`
 }
 
+type loginIdentifier struct {
+	Type string `json:"type"`
+	User string `json:"user"`
+}
+
 type passwordRequest struct {
-	User     string `json:"user"`
-	Password string `json:"password"`
+	Identifier loginIdentifier `json:"identifier"`
+	Password   string          `json:"password"`
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
@@ -79,16 +84,16 @@ func Login(
 		if resErr != nil {
 			return *resErr
 		}
-		if r.User == "" {
+		if r.Identifier.User == "" {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.BadJSON("'user' must be supplied."),
 			}
 		}
 
-		util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
+		util.GetLogger(req.Context()).WithField("user", r.Identifier.User).Info("Processing login request")
 
-		localpart, err := userutil.ParseUsernameParam(r.User, &cfg.Matrix.ServerName)
+		localpart, err := userutil.ParseUsernameParam(r.Identifier.User, &cfg.Matrix.ServerName)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
