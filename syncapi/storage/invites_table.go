@@ -9,6 +9,9 @@ import (
 )
 
 const inviteEventsSchema = `
+-- This sequence is shared between all the tables generated from kafka logs.
+CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
+
 CREATE TABLE IF NOT EXISTS syncapi_invite_events (
 	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
 	event_id TEXT NOT NULL,
