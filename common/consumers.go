@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	sarama "gopkg.in/Shopify/sarama.v1"
+	sarama "github.com/Shopify/sarama"
 )
 
 // A PartitionOffset is the offset into a partition of the input log.

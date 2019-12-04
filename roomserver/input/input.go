@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/util"
-	sarama "gopkg.in/Shopify/sarama.v1"
+	sarama "github.com/Shopify/sarama"
 )
 
 // RoomserverInputAPI implements api.RoomserverInputAPI

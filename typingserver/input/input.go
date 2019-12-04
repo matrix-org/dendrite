@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/typingserver/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"gopkg.in/Shopify/sarama.v1"
+	"github.com/Shopify/sarama"
 )
 
 // TypingServerInputAPI implements api.TypingServerInputAPI

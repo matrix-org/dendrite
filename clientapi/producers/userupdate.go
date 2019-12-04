@@ -17,7 +17,7 @@ package producers
 import (
 	"encoding/json"
 
-	sarama "gopkg.in/Shopify/sarama.v1"
+	sarama "github.com/Shopify/sarama"
 )
 
 // UserUpdateProducer produces events related to user updates.

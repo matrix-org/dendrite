@@ -28,7 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 
 	"github.com/gorilla/mux"
-	sarama "gopkg.in/Shopify/sarama.v1"
+	sarama "github.com/Shopify/sarama"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
