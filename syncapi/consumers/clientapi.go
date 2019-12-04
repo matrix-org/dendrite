@@ -18,13 +18,13 @@ import (
 	"context"
 	"encoding/json"
 
+	sarama "github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
-	sarama "github.com/Shopify/sarama"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.

@@ -18,12 +18,12 @@ import (
 	"context"
 	"encoding/json"
 
+	sarama "github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	log "github.com/sirupsen/logrus"
-	sarama "github.com/Shopify/sarama"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
