@@ -26,8 +26,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	log "github.com/sirupsen/logrus"
 	sarama "github.com/Shopify/sarama"
+	log "github.com/sirupsen/logrus"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
