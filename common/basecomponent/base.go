@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
+	
 	"github.com/matrix-org/naffka"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
