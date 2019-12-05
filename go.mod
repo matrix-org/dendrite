@@ -1,6 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
+	github.com/PC25/naffka v0.0.0-20191204155648-20998d509638
 	github.com/Shopify/sarama v1.24.1
 	github.com/alecthomas/gometalinter v2.0.2+incompatible
 	github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf

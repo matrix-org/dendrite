@@ -4,6 +4,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/OpenPeeDeeP/depguard v1.0.1 h1:VlW4R6jmBIv3/u1JNlawEvJMM4J+dPORPaZasQee8Us=
 github.com/OpenPeeDeeP/depguard v1.0.1/go.mod h1:xsIw86fROiiwelg+jB2uM9PiKihMMmUx/1V+TNhjQvM=
+github.com/PC25/naffka v0.0.0-20191204155648-20998d509638 h1:Fux5vtVHzDykSMh3ngtpAOFq+Lm80+GftBFEFT5KAcU=
+github.com/PC25/naffka v0.0.0-20191204155648-20998d509638/go.mod h1:WmZZjPXh+eUtcj7/7qUGy/VnIcLUtjDCmD5C0onZW0I=
 github.com/Shopify/sarama v0.0.0-20170127151855-574d3147eee3 h1:j6BAEHYn1kUyW2j7kY0mOJ/R8A0qWwXpvUAEHGemm/g=
 github.com/Shopify/sarama v0.0.0-20170127151855-574d3147eee3/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/sarama v1.24.1 h1:svn9vfN3R1Hz21WR2Gj0VW9ehaDGkiOS+VqlIcZOkMI=

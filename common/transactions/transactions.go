@@ -86,7 +86,7 @@ func (t *Cache) AddTransaction(accessToken, txnID string, res *util.JSONResponse
 // This cycles the txnMaps forward, i.e. back map is assigned the front and front is assigned an empty map.
 func cacheCleanService(t *Cache) {
 	ticker := time.NewTicker(t.cleanupPeriod)
-	for range ticker {
+	for range ticker.C {
 		t.Lock()
 		t.txnsMaps[1] = t.txnsMaps[0]
 		t.txnsMaps[0] = make(txnsMap)

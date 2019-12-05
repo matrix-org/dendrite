@@ -59,7 +59,7 @@ func MakeHTMLAPI(metricsName string, f func(http.ResponseWriter, *http.Request) 
 		}
 	}
 
-	return prometheus.InstrumentHandlerDuration(metricsName, http.HandlerFunc(withSpan))
+	return prometheus.InstrumentHandler(metricsName, http.HandlerFunc(withSpan))
 }
 
 // MakeInternalAPI turns a util.JSONRequestHandler function into an http.Handler.

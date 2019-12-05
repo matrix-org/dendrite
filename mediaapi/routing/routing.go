@@ -83,7 +83,7 @@ func makeDownloadAPI(
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) http.HandlerFunc {
-	return prometheus.InstrumentHandlerDuration(name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	return prometheus.InstrumentHandler(name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		req = util.RequestWithLogging(req)
 
 		// Set common headers returned regardless of the outcome of the request
