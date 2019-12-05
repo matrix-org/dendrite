@@ -1,7 +1,6 @@
 module github.com/matrix-org/dendrite
 
 require (
-	github.com/PC25/naffka v0.0.0-20191204155648-20998d509638
 	github.com/Shopify/sarama v1.24.1
 	github.com/alecthomas/gometalinter v2.0.2+incompatible
 	github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf
@@ -29,7 +28,7 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20190814163046-d6285a18401f
-	github.com/matrix-org/naffka v0.0.0-20171115094957-662bfd0841d0
+	github.com/matrix-org/naffka v0.0.0-20191205105323-f77009d5f2e8
 	github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5
 	github.com/matttproud/golang_protobuf_extensions v1.0.1
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
