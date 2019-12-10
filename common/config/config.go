@@ -240,17 +240,7 @@ type Dendrite struct {
 
 	// Any information derived from the configuration options for later use.
 	Derived struct {
-		Registration struct {
-			// Flows is a slice of flows, which represent one possible way that the client can authenticate a request.
-			// http://matrix.org/docs/spec/HEAD/client_server/r0.3.0.html#user-interactive-authentication-api
-			// As long as the generated flows only rely on config file options,
-			// we can generate them on startup and store them until needed
-			Flows []authtypes.Flow `json:"flows"`
-
-			// Params that need to be returned to the client during
-			// registration in order to complete registration stages.
-			Params map[string]interface{} `json:"params"`
-		}
+		Registration UserInteractiveAuthConfig
 
 		// Application services parsed from their config files
 		// The paths of which were given above in the main config file
@@ -268,6 +258,23 @@ type Dendrite struct {
 		// Note: An Exclusive Regex for room ID isn't necessary as we aren't blocking
 		// servers from creating RoomIDs in exclusive application service namespaces
 	} `yaml:"-"`
+}
+
+// UserInteractiveAuthConfig is a configuration for user interactive Flow API.
+// It contains sets of auth flows, which represent the possible ways a client
+// can authenticate via User Interactive Authentication as well as any
+// parameters returned to the client during this process.
+// http://matrix.org/docs/spec/HEAD/client_server/r0.3.0.html#user-interactive-authentication-api
+type UserInteractiveAuthConfig struct {
+	// Flows is a slice of flows, which represent one possible way that the client can authenticate a request.
+	// http://matrix.org/docs/spec/HEAD/client_server/r0.3.0.html#user-interactive-authentication-api
+	// As long as the generated flows only rely on config file options,
+	// we can generate them on startup and store them until needed
+	Flows []authtypes.Flow `json:"flows"`
+
+	// Params that need to be returned to the client
+	// in order to complete auth stages.
+	Params map[string]interface{} `json:"params"`
 }
 
 // A Path on the filesystem.
