@@ -40,9 +40,14 @@ type flow struct {
 	Stages []string `json:"stages"`
 }
 
+type identifier struct {
+	Type string `json:"type"`
+	User string `json:"user"`
+}
 type passwordRequest struct {
-	User     string `json:"user"`
-	Password string `json:"password"`
+	User       string      `json:"user"`
+	Password   string      `json:"password"`
+	Identifier *identifier `json:"identifier"`
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
@@ -79,6 +84,22 @@ func Login(
 		if resErr != nil {
 			return *resErr
 		}
+
+		if r.Identifier != nil {
+			// go over identifier types
+			switch r.Identifier.Type {
+			case "m.type.user":
+				// depreciate user in favor of identifier field
+				// https://matrix.org/docs/spec/client_server/unstable#post-matrix-client-r0-login
+				r.User = r.Identifier.User
+			default:
+				return util.JSONResponse{
+					Code: http.StatusNotImplemented,
+					JSON: jsonerror.Unknown("unknown/unimplemented identifier type"),
+				}
+			}
+		}
+
 		if r.User == "" {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
