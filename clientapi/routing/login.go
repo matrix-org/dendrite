@@ -89,7 +89,7 @@ func Login(
 			// go over identifier types
 			switch r.Identifier.Type {
 			case "m.type.user":
-				// depreciate user in favor of identifier field
+				// depreciate user in favour of identifier field
 				// https://matrix.org/docs/spec/client_server/unstable#post-matrix-client-r0-login
 				r.User = r.Identifier.User
 			default:
