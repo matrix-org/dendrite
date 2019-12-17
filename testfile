@@ -73,7 +73,6 @@ Can get rooms/{roomId}/members for a departed room (SPEC-216)
 3pid invite join valid signature but unreachable ID server are rejected
 Room members can override their displayname on a room-specific basis
 Room members can join a room with an overridden displayname
-displayname updates affect room member events
 avatar_url updates affect room member events
 Real non-joined user cannot call /events on shared room
 Real non-joined user cannot call /events on invited room
@@ -125,9 +124,6 @@ New account data appears in incremental v2 /sync
 Checking local federation server
 Inbound federation can query profile data
 Outbound federation can send room-join requests
-Outbound federation can send events
-Inbound federation can backfill events
-Backfill checks the events requested belong to the room
 Can upload without a file name
 Can download without a file name locally
 Can upload with ASCII file name
@@ -156,8 +152,6 @@ User can create and send/receive messages in a room with version 1
 POST /createRoom ignores attempts to set the room version via creation_content
 Inbound federation rejects remote attempts to join local users to rooms
 Inbound federation rejects remote attempts to kick local users to rooms
-An event which redacts itself should be ignored
-A pair of events which redact each other should be ignored
 Full state sync includes joined rooms
 A message sent after an initial sync appears in the timeline of an incremental sync.
 Can add tag
@@ -182,3 +176,8 @@ Regular users cannot create room aliases within the AS namespace
 Deleting a non-existent alias should return a 404
 Users can't delete other's aliases
 Outbound federation can query room alias directory
+After deactivating account, can't log in with an email
+Newly joined room is included in an incremental sync after invite
+Outbound federation can query v1 /send_join
+Inbound /v1/make_join rejects remote attempts to join local users to rooms
+Inbound federation rejects invites which are not signed by the sender
