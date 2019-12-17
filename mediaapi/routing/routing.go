@@ -113,5 +113,5 @@ func makeDownloadAPI(
 				name == "thumbnail",
 			)
 		},
-	))
+		))
 }
