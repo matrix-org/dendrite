@@ -99,7 +99,7 @@ func makeDownloadAPI(
 		util.SetCORSHeaders(w)
 		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 		w.Header().Set("Content-Type", "application/json")
-		vars := mux.Vars(req)
+		vars, _ := common.URLDecodeMapValues(mux.Vars(req))
 		Download(
 			w,
 			req,
