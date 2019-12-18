@@ -67,7 +67,6 @@ func RoomAliasToID(
 				return httputil.LogThenError(httpReq, err)
 			}
 
-			// TODO: List servers that are aware of this room alias
 			resp = gomatrixserverlib.RespDirectory{
 				RoomID:  queryRes.RoomID,
 				Servers: serverQueryRes.ServerNames,
