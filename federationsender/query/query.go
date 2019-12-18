@@ -50,6 +50,8 @@ func (f *FederationSenderQueryAPI) QueryJoinedHostServerNamesInRoom(
 		response.ServerNames = append(response.ServerNames, host.ServerName)
 	}
 
+	// TODO: remove duplicates?
+
 	return
 }
 
