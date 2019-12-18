@@ -45,14 +45,9 @@ func (f *FederationSenderQueryAPI) QueryJoinedHostServerNamesInRoom(
 		return
 	}
 
-	serverNamesSet := make(map[gomatrixserverlib.ServerName]bool, len(joinedHosts))
+	response.ServerNames = make([]gomatrixserverlib.ServerName, 0, len(joinedHosts))
 	for _, host := range joinedHosts {
-		serverNamesSet[host.ServerName] = true
-	}
-
-	response.ServerNames = make([]gomatrixserverlib.ServerName, 0, len(serverNamesSet))
-	for name := range serverNamesSet {
-		response.ServerNames = append(response.ServerNames, name)
+		response.ServerNames = append(response.ServerNames, host.ServerName)
 	}
 
 	return
