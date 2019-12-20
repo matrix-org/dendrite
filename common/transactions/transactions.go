@@ -85,7 +85,7 @@ func (t *Cache) AddTransaction(accessToken, txnID string, res *util.JSONResponse
 // It guarantees that an entry will be present in cache for at least cleanupPeriod & at most 2 * cleanupPeriod.
 // This cycles the txnMaps forward, i.e. back map is assigned the front and front is assigned an empty map.
 func cacheCleanService(t *Cache) {
-	ticker := time.Tick(t.cleanupPeriod)
+	ticker := time.NewTicker(t.cleanupPeriod).C
 	for range ticker {
 		t.Lock()
 		t.txnsMaps[1] = t.txnsMaps[0]
