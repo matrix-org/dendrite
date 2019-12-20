@@ -33,6 +33,7 @@ import (
 const (
 	pathPrefixV2Keys       = "/_matrix/key/v2"
 	pathPrefixV1Federation = "/_matrix/federation/v1"
+	pathPrefixV2Federation = "/_matrix/federation/v2"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -55,6 +56,7 @@ func Setup(
 ) {
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
+	v2fedmux := apiMux.PathPrefix(pathPrefixV2Federation).Subrouter()
 
 	localKeys := common.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
 		return LocalKeys(cfg)
@@ -200,7 +202,7 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/send_join/{roomID}/{userID}", common.MakeFedAPI(
+	v2fedmux.Handle("/send_join/{roomID}/{userID}", common.MakeFedAPI(
 		"federation_send_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
@@ -230,7 +232,7 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/send_leave/{roomID}/{userID}", common.MakeFedAPI(
+	v2fedmux.Handle("/send_leave/{roomID}/{userID}", common.MakeFedAPI(
 		"federation_send_leave", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
