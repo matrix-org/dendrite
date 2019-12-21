@@ -146,3 +146,54 @@ func UpdateDeviceByID(
 		JSON: struct{}{},
 	}
 }
+
+func DeleteDeviceById(
+	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	deviceID string,
+) util.JSONResponse {
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+	ctx := req.Context()
+
+	defer req.Body.Close() // nolint: errcheck
+
+	if err := deviceDB.RemoveDevice(ctx, deviceID, localpart); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+func DeleteDevices(
+	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+) util.JSONResponse {
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	ctx := req.Context()
+	d := struct {
+		Devices []string `json:"devices"`
+	}{}
+
+	if err := json.NewDecoder(req.Body).Decode(&d); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	defer req.Body.Close() // nolint: errcheck
+
+	if err := deviceDB.RemoveDevices(ctx, localpart, d.Devices); err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
