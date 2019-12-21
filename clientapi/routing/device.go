@@ -147,6 +147,7 @@ func UpdateDeviceByID(
 	}
 }
 
+// DeleteDeviceById handles DELETE requests to /devices/{deviceId}
 func DeleteDeviceById(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 	deviceID string,
@@ -169,6 +170,7 @@ func DeleteDeviceById(
 	}
 }
 
+// DeleteDevices handles POST requests to /delete_devices
 func DeleteDevices(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
