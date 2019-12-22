@@ -19,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
 	// TODO: Are we really wanting to pull in the producer from clientapi
@@ -39,6 +40,7 @@ func SetupFederationAPIComponent(
 	inputAPI roomserverAPI.RoomserverInputAPI,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
+	federationSenderAPI federationSenderAPI.FederationSenderQueryAPI,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 

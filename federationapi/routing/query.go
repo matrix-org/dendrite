@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,6 +34,7 @@ func RoomAliasToID(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	senderAPI federationSenderAPI.FederationSenderQueryAPI,
 ) util.JSONResponse {
 	roomAlias := httpReq.FormValue("room_alias")
 	if roomAlias == "" {
@@ -59,10 +61,15 @@ func RoomAliasToID(
 		}
 
 		if queryRes.RoomID != "" {
-			// TODO: List servers that are aware of this room alias
+			serverQueryReq := federationSenderAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: queryRes.RoomID}
+			var serverQueryRes federationSenderAPI.QueryJoinedHostServerNamesInRoomResponse
+			if err = senderAPI.QueryJoinedHostServerNamesInRoom(httpReq.Context(), &serverQueryReq, &serverQueryRes); err != nil {
+				return httputil.LogThenError(httpReq, err)
+			}
+
 			resp = gomatrixserverlib.RespDirectory{
 				RoomID:  queryRes.RoomID,
-				Servers: []gomatrixserverlib.ServerName{},
+				Servers: serverQueryRes.ServerNames,
 			}
 		} else {
 			// If no alias was found, return an error

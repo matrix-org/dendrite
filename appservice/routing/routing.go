@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixApp = "/_matrix/app/r0"
+const pathPrefixApp = "/_matrix/app/v1"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.

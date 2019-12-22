@@ -11,6 +11,7 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -59,7 +60,16 @@ func MakeHTMLAPI(metricsName string, f func(http.ResponseWriter, *http.Request) 
 		}
 	}
 
-	return prometheus.InstrumentHandler(metricsName, http.HandlerFunc(withSpan))
+	return promhttp.InstrumentHandlerCounter(
+		promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: metricsName,
+				Help: "Total number of http requests for HTML resources",
+			},
+			[]string{"code"},
+		),
+		http.HandlerFunc(withSpan),
+	)
 }
 
 // MakeInternalAPI turns a util.JSONRequestHandler function into an http.Handler.
