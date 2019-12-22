@@ -17,14 +17,16 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 	})
 
 	tests := []struct {
-		name string
-		args args
-		want int
+		name    string
+		args    args
+		want    int
+		reqAuth bool
 	}{
 		{
-			name: "no user or password setup",
-			args: args{h: dummyHandler},
-			want: http.StatusOK,
+			name:    "no user or password setup",
+			args:    args{h: dummyHandler},
+			want:    http.StatusOK,
+			reqAuth: false,
 		},
 		{
 			name: "only user set",
@@ -32,7 +34,8 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 				h: dummyHandler,
 				b: BasicAuth{Username: "test"}, // no basic auth
 			},
-			want: http.StatusOK,
+			want:    http.StatusOK,
+			reqAuth: false,
 		},
 		{
 			name: "only pass set",
@@ -40,7 +43,8 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 				h: dummyHandler,
 				b: BasicAuth{Password: "test"}, // no basic auth
 			},
-			want: http.StatusOK,
+			want:    http.StatusOK,
+			reqAuth: false,
 		},
 		{
 			name: "credentials correct",
@@ -48,7 +52,8 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 				h: dummyHandler,
 				b: BasicAuth{Username: "test", Password: "test"}, // basic auth enabled
 			},
-			want: http.StatusOK,
+			want:    http.StatusOK,
+			reqAuth: true,
 		},
 		{
 			name: "credentials wrong",
@@ -56,7 +61,17 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 				h: dummyHandler,
 				b: BasicAuth{Username: "test1", Password: "test"}, // basic auth enabled
 			},
-			want: http.StatusForbidden,
+			want:    http.StatusForbidden,
+			reqAuth: true,
+		},
+		{
+			name: "no basic auth in request",
+			args: args{
+				h: dummyHandler,
+				b: BasicAuth{Username: "test", Password: "test"}, // basic auth enabled
+			},
+			want:    http.StatusForbidden,
+			reqAuth: false,
 		},
 	}
 	for _, tt := range tests {
@@ -64,7 +79,9 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 			baHandler := WrapHandlerInBasicAuth(tt.args.h, tt.args.b)
 
 			req := httptest.NewRequest("GET", "http://localhost/metrics", nil)
-			req.SetBasicAuth("test", "test")
+			if tt.reqAuth {
+				req.SetBasicAuth("test", "test")
+			}
 
 			w := httptest.NewRecorder()
 			baHandler(w, req)
