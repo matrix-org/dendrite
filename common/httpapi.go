@@ -129,7 +129,7 @@ func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
 	if b.Username == "" || b.Password == "" {
 		logrus.Info("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		// Serve without authorization if either Username or Password is unset
 		if b.Username == "" || b.Password == "" {
 			h.ServeHTTP(w, r)
@@ -142,7 +142,7 @@ func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
 			return
 		}
 		h.ServeHTTP(w, r)
-	})
+	}
 }
 
 // WrapHandlerInCORS adds CORS headers to all responses, including all error
