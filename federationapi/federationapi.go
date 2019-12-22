@@ -46,6 +46,7 @@ func SetupFederationAPIComponent(
 
 	routing.Setup(
 		base.APIMux, base.Cfg, queryAPI, aliasAPI, asAPI,
-		roomserverProducer, *keyRing, federation, accountsDB, deviceDB,
+		roomserverProducer, federationSenderAPI, *keyRing,
+		federation, accountsDB, deviceDB,
 	)
 }
