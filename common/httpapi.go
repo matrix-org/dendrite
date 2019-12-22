@@ -137,7 +137,7 @@ func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler, cfg *config.Dendr
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
 func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
 	if b.Username == "" || b.Password == "" {
-		logrus.Info("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
+		logrus.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Serve without authorization if either Username or Password is unset
