@@ -164,6 +164,13 @@ func SendJoin(
 		return httputil.LogThenError(httpReq, err)
 	}
 
+	if !stateAndAuthChainResponse.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Room does not exist"),
+		}
+	}
+
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName

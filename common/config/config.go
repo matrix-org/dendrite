@@ -196,6 +196,20 @@ type Dendrite struct {
 
 	// The internal addresses the components will listen on.
 	// These should not be exposed externally as they expose metrics and debugging APIs.
+	// Falls back to addresses listed in Listen if not specified
+	Bind struct {
+		MediaAPI         Address `yaml:"media_api"`
+		ClientAPI        Address `yaml:"client_api"`
+		FederationAPI    Address `yaml:"federation_api"`
+		AppServiceAPI    Address `yaml:"appservice_api"`
+		SyncAPI          Address `yaml:"sync_api"`
+		RoomServer       Address `yaml:"room_server"`
+		FederationSender Address `yaml:"federation_sender"`
+		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
+		TypingServer     Address `yaml:"typing_server"`
+	} `yaml:"bind"`
+
+	// The addresses for talking to other microservices.
 	Listen struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
@@ -676,6 +690,15 @@ func (config *Dendrite) TypingServerURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return "http://" + string(config.Listen.TypingServer)
+}
+
+// FederationSenderURL returns an HTTP URL for where the federation sender is listening.
+func (config *Dendrite) FederationSenderURL() string {
+	// Hard code the typing server to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.FederationSender)
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.

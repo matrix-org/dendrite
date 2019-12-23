@@ -120,28 +120,21 @@ func (s *accountDataStatements) selectAccountData(
 
 func (s *accountDataStatements) selectAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
-) (data []gomatrixserverlib.ClientEvent, err error) {
-	data = []gomatrixserverlib.ClientEvent{}
-
+) (data *gomatrixserverlib.ClientEvent, err error) {
 	stmt := s.selectAccountDataByTypeStmt
-	rows, err := stmt.QueryContext(ctx, localpart, roomID, dataType)
-	if err != nil {
+	var content []byte
+
+	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&content); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+
 		return
 	}
 
-	for rows.Next() {
-		var content []byte
-
-		if err = rows.Scan(&content); err != nil {
-			return
-		}
-
-		ac := gomatrixserverlib.ClientEvent{
-			Type:    dataType,
-			Content: content,
-		}
-
-		data = append(data, ac)
+	data = &gomatrixserverlib.ClientEvent{
+		Type:    dataType,
+		Content: content,
 	}
 
 	return

@@ -28,5 +28,6 @@ func main() {
 
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Listen.PublicRoomsAPI))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.PublicRoomsAPI), string(base.Cfg.Listen.PublicRoomsAPI))
+
 }

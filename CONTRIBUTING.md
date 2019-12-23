@@ -23,11 +23,10 @@ run](scripts/build-test-lint.sh).
 ## Continuous Integration
 
 When a Pull Request is submitted, continuous integration jobs are run
-automatically to ensure the code builds and is relatively well-written. Checks
-are run on [Buildkite](https://buildkite.com/matrix-dot-org/dendrite/) and
-[CircleCI](https://circleci.com/gh/matrix-org/dendrite/). The Buildkite
-pipeline can be found in Matrix.org's [pipelines
-repository](https://github.com/matrix-org/pipelines).
+automatically to ensure the code builds and is relatively well-written. The
+jobs are run on [Buildkite](https://buildkite.com/matrix-dot-org/dendrite/),
+and the Buildkite pipeline configuration can be found in Matrix.org's
+[pipelines repository](https://github.com/matrix-org/pipelines).
 
 If a job fails, click the "details" button and you should be taken to the job's
 logs.
@@ -44,16 +43,20 @@ To save waiting for CI to finish after every commit, it is ideal to run the
 checks locally before pushing, fixing errors first. This also saves other
 people time as only so many PRs can be tested at a given time.
 
-To execute what Buildkite tests, simply run `./scripts/build-test-lint.sh`.
-This script will build the code, lint it, and run `go test ./...` with race
+To execute what Buildkite tests, first run `./scripts/build-test-lint.sh`;
+this script will build the code, lint it, and run `go test ./...` with race
 condition checking enabled. If something needs to be changed, fix it and then
 run the script again until it no longer complains. Be warned that the linting
 can take a significant amount of CPU and RAM.
 
-CircleCI simply runs [Sytest](https://github.com/matrix-org/sytest) with a test
-whitelist. See
+Once the code builds, run [Sytest](https://github.com/matrix-org/sytest)
+according to the guide in
 [docs/sytest.md](https://github.com/matrix-org/dendrite/blob/master/docs/sytest.md#using-a-sytest-docker-image)
-for instructions on setting it up to run locally.
+so you can see whether something is being broken and whether there are newly
+passing tests.
+
+If these two steps report no problems, the code should be able to pass the CI
+tests.
 
 
 ## Picking Things To Do
