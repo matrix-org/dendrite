@@ -5,13 +5,17 @@ considerations.
 
 ## Linters
 
-We use `golangci-lint` to run a number of linters, the exact list can be found under linters
-in [.golangci.yml](.golangci.yml). [Installation](https://github.com/golangci/golangci-lint#install) and [Editor Integration](https://github.com/golangci/golangci-lint#editor-integration) for it can be found in the readme of golangci-lint.
+We use `golangci-lint` to run a number of linters, the exact list can be found
+under linters in [.golangci.yml](.golangci.yml).
+[Installation](https://github.com/golangci/golangci-lint#install) and [Editor
+Integration](https://github.com/golangci/golangci-lint#editor-integration) for
+it can be found in the readme of golangci-lint.
 
 For rare cases where a linter is giving a spurious warning, it can be disabled
-for that line or statement using a [comment directive](https://github.com/golangci/golangci-lint#nolint), e.g.
-`var bad_name int //nolint:golint,unused`. This should be used sparingly and only when its clear
-that the lint warning is spurious.
+for that line or statement using a [comment
+directive](https://github.com/golangci/golangci-lint#nolint), e.g.  `var
+bad_name int //nolint:golint,unused`. This should be used sparingly and only
+when its clear that the lint warning is spurious.
 
 The linters can be run using [scripts/find-lint.sh](scripts/find-lint.sh)
 (see file for docs) or as part of a build/test/lint cycle using
