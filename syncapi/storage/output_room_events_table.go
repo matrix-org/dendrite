@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrix"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -126,7 +127,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
 	ctx context.Context, txn *sql.Tx, oldPos, newPos int64,
-	stateFilterPart *gomatrixserverlib.FilterPart,
+	stateFilterPart *gomatrix.FilterPart,
 ) (map[string]map[string]bool, map[string]streamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 
