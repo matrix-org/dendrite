@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/encryptoapi/storage"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -50,6 +51,7 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient,
 	accountDB *accounts.Database,
 	deviceDB *devices.Database,
+	encryptionDB *storage.Database,
 ) {
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
@@ -279,7 +281,7 @@ func Setup(
 			// if err != nil {
 			// 	return util.ErrorResponse(err)
 			// }
-			return ClaimKeys(httpReq, request)
+			return ClaimKeys(httpReq, request, encryptionDB)
 		},
 	)).Methods(http.MethodPost)
 
@@ -290,7 +292,7 @@ func Setup(
 			// if err != nil {
 			// 	return util.ErrorResponse(err)
 			// }
-			return QueryKeys(httpReq, request)
+			return QueryKeys(httpReq, request, encryptionDB)
 		},
 	)).Methods(http.MethodPost)
 

@@ -64,7 +64,7 @@ func Setup(
 
 	unstablemux.Handle("/keys/changes",
 		common.MakeAuthAPI("get changes", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return ChangesInKeys(req, encryptionDB)
+			return ChangesInKeys(req, encryptionDB, device.ID, deviceDB)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
