@@ -46,6 +46,14 @@ func SendMembership(
 	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
 	var body threepid.MembershipRequest
+
+	if req.Body == http.NoBody {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("No request body"),
+		}
+	}
+
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
 	}
