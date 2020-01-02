@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrix"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -67,7 +68,7 @@ const insertEventSQL = "" +
 	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id"
 
 const selectEventsSQL = "" +
-	"SELECT id, event_json FROM syncapi_output_room_events WHERE event_id = ANY($1)"
+	"SELECT id, event_json, session_id, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectRecentEventsSQL = "" +
 	"SELECT id, event_json, session_id, transaction_id FROM syncapi_output_room_events" +
@@ -126,7 +127,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
 	ctx context.Context, txn *sql.Tx, oldPos, newPos int64,
-	stateFilterPart *gomatrixserverlib.FilterPart,
+	stateFilterPart *gomatrix.FilterPart,
 ) (map[string]map[string]bool, map[string]streamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 

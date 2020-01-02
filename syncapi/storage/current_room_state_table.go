@@ -84,7 +84,10 @@ const selectStateEventSQL = "" +
 	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
-	"SELECT added_at, event_json FROM syncapi_current_room_state WHERE event_id = ANY($1)"
+	// TODO: The session_id and transaction_id blanks are here because otherwise the rowsToStreamEvents
+	//       expects there to be exactly four columns. We need a better solution to this long term.
+	//       - neilalexander, 2 Jan 2020
+	"SELECT added_at, event_json, 0 AS session_id, '' AS transaction_id FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt             *sql.Stmt
