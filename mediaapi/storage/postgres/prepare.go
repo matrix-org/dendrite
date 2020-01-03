@@ -14,7 +14,7 @@
 
 // FIXME: This should be made common!
 
-package storage
+package postgres
 
 import (
 	"database/sql"
