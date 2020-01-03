@@ -30,7 +30,7 @@ import (
 // OutputTypingEventConsumer consumes events that originated in the typing server.
 type OutputTypingEventConsumer struct {
 	typingConsumer *common.ContinualConsumer
-	db             *storage.SyncServerDatasource
+	db             storage.Database
 	notifier       *sync.Notifier
 }
 
@@ -40,7 +40,7 @@ func NewOutputTypingEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
-	store *storage.SyncServerDatasource,
+	store storage.Database,
 ) *OutputTypingEventConsumer {
 
 	consumer := common.ContinualConsumer{
