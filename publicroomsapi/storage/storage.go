@@ -19,12 +19,14 @@ import (
 	"errors"
 	"net/url"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/postgres"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
+	common.PartitionStorer
 	GetRoomVisibility(ctx context.Context, roomID string) (bool, error)
 	SetRoomVisibility(ctx context.Context, visible bool, roomID string) error
 	CountPublicRooms(ctx context.Context) (int64, error)
