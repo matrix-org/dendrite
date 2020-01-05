@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,67 +16,29 @@ package keydb
 
 import (
 	"context"
-	"database/sql"
+	"errors"
+	"net/url"
 
+	"github.com/matrix-org/dendrite/common/keydb/postgres"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// A Database implements gomatrixserverlib.KeyDatabase and is used to store
-// the public keys for other matrix servers.
-type Database struct {
-	statements serverKeyStatements
+type Database interface {
+	FetcherName() string
+	FetchKeys(ctx context.Context, requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error)
+	StoreKeys(ctx context.Context, keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult) error
 }
 
-// NewDatabase prepares a new key database.
-// It creates the necessary tables if they don't already exist.
-// It prepares all the SQL statements that it will use.
-// Returns an error if there was a problem talking to the database.
-func NewDatabase(dataSourceName string) (*Database, error) {
-	db, err := sql.Open("postgres", dataSourceName)
+// NewDatabase opens a database connection.
+func NewDatabase(dataSourceName string) (Database, error) {
+	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return nil, err
 	}
-	d := &Database{}
-	err = d.statements.prepare(db)
-	if err != nil {
-		return nil, err
+	switch uri.Scheme {
+	case "postgres":
+		return postgres.NewDatabase(dataSourceName)
+	default:
+		return nil, errors.New("unknown schema")
 	}
-	return d, nil
-}
-
-// FetcherName implements KeyFetcher
-func (d Database) FetcherName() string {
-	return "KeyDatabase"
-}
-
-// FetchKeys implements gomatrixserverlib.KeyDatabase
-func (d *Database) FetchKeys(
-	ctx context.Context,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
-) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
-	return d.statements.bulkSelectServerKeys(ctx, requests)
-}
-
-// StoreKeys implements gomatrixserverlib.KeyDatabase
-func (d *Database) StoreKeys(
-	ctx context.Context,
-	keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
-) error {
-	// TODO: Inserting all the keys within a single transaction may
-	// be more efficient since the transaction overhead can be quite
-	// high for a single insert statement.
-	var lastErr error
-	for request, keys := range keyMap {
-		if err := d.statements.upsertServerKeys(ctx, request, keys); err != nil {
-			// Rather than returning immediately on error we try to insert the
-			// remaining keys.
-			// Since we are inserting the keys outside of a transaction it is
-			// possible for some of the inserts to succeed even though some
-			// of the inserts have failed.
-			// Ensuring that we always insert all the keys we can means that
-			// this behaviour won't depend on the iteration order of the map.
-			lastErr = err
-		}
-	}
-	return lastErr
 }

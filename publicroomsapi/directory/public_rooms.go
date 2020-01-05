@@ -44,7 +44,7 @@ type publicRoomRes struct {
 
 // GetPostPublicRooms implements GET and POST /publicRooms
 func GetPostPublicRooms(
-	req *http.Request, publicRoomDatabase *storage.PublicRoomsServerDatabase,
+	req *http.Request, publicRoomDatabase storage.Database,
 ) util.JSONResponse {
 	var limit int16
 	var offset int64

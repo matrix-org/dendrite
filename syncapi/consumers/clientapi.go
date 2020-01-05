@@ -30,7 +30,7 @@ import (
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
 	clientAPIConsumer *common.ContinualConsumer
-	db                *storage.SyncServerDatasource
+	db                storage.Database
 	notifier          *sync.Notifier
 }
 
@@ -39,7 +39,7 @@ func NewOutputClientDataConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
-	store *storage.SyncServerDatasource,
+	store storage.Database,
 ) *OutputClientDataConsumer {
 
 	consumer := common.ContinualConsumer{
