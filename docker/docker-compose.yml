@@ -158,8 +158,6 @@ services:
       POSTGRES_USER: dendrite
     networks:
       - internal
-    ports:
-      - "15432:5432"
 
   zookeeper:
     container_name: dendrite_zk
