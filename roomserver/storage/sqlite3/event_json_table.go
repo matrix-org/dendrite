@@ -40,7 +40,7 @@ const insertEventJSONSQL = `
 const bulkSelectEventJSONSQL = `
 	SELECT event_nid, event_json FROM roomserver_event_json
 	  WHERE event_nid IN ($1)
-	  ORDER BY event_nid ASC"
+	  ORDER BY event_nid ASC
 `
 
 type eventJSONStatements struct {
