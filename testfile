@@ -197,3 +197,9 @@ Regular users cannot create room aliases within the AS namespace
 Deleting a non-existent alias should return a 404
 Users can't delete other's aliases
 Outbound federation can query room alias directory
+After deactivating account, can't log in with an email
+Remote room alias queries can handle Unicode
+Newly joined room is included in an incremental sync after invite
+Outbound federation can query v1 /send_join
+Inbound /v1/make_join rejects remote attempts to join local users to rooms
+Inbound federation rejects invites which are not signed by the sender
