@@ -16,6 +16,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -60,14 +61,14 @@ type Database interface {
 func Open(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return nil, err
+		// if the scheme doesn't match, fall back to postgres in case the config has
+		// postgres key=value connection strings
+		return postgres.Open(dataSourceName)
 	}
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.Open(dataSourceName)
 	default:
-		// if the scheme doesn't match, fall back to postgres in case the config has
-		// postgres key=value connection strings
-		return postgres.Open(dataSourceName)
+		return nil, errors.New("unknown schema")
 	}
 }
