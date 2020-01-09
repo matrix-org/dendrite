@@ -141,7 +141,7 @@ func (b *BaseDendrite) CreateAccountsDB() *accounts.Database {
 func (b *BaseDendrite) CreateKeyDB() *keydb.Database {
 	db, err := keydb.NewDatabase(string(b.Cfg.Database.ServerKey))
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to keys db")
+		logrus.WithError(err).Panicf("failed to connect to keys db: %s", b.Cfg.Database.ServerKey)
 	}
 
 	return db

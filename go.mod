@@ -2,6 +2,7 @@ module github.com/matrix-org/dendrite
 
 require (
 	github.com/Shopify/sarama v0.0.0-20170127151855-574d3147eee3
+	github.com/Shopify/toxiproxy v2.1.4+incompatible // indirect
 	github.com/alecthomas/gometalinter v2.0.2+incompatible
 	github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4
 	github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7
