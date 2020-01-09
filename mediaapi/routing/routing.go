@@ -43,7 +43,7 @@ const pathPrefixR0 = "/_matrix/media/r0"
 func Setup(
 	apiMux *mux.Router,
 	cfg *config.Dendrite,
-	db *storage.Database,
+	db storage.Database,
 	deviceDB *devices.Database,
 	client *gomatrixserverlib.Client,
 ) {
@@ -80,7 +80,7 @@ func Setup(
 func makeDownloadAPI(
 	name string,
 	cfg *config.Dendrite,
-	db *storage.Database,
+	db storage.Database,
 	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,

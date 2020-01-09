@@ -141,7 +141,7 @@ func (n *Notifier) GetListener(req syncRequest) UserStreamListener {
 }
 
 // Load the membership states required to notify users correctly.
-func (n *Notifier) Load(ctx context.Context, db *storage.SyncServerDatasource) error {
+func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	roomToUsers, err := db.AllJoinedUsersInRooms(ctx)
 	if err != nil {
 		return err

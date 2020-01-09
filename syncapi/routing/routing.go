@@ -34,7 +34,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // Due to Setup being used to call many other functions, a gocyclo nolint is
 // applied:
 // nolint: gocyclo
-func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB *storage.SyncServerDatasource, deviceDB *devices.Database) {
+func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database, deviceDB *devices.Database) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{

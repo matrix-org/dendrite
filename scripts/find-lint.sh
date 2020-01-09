@@ -27,10 +27,17 @@ echo "Installing golangci-lint..."
 # TODO: Once go 1.13 is out, use go get's -mod=readonly option
 # https://github.com/golang/go/issues/30667
 cp go.mod go.mod.bak && cp go.sum go.sum.bak
-go get github.com/golangci/golangci-lint/cmd/golangci-lint
+go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.19.1
 
+# Run linting
 echo "Looking for lint..."
-golangci-lint run $args
+
+# Capture exit code to ensure go.{mod,sum} is restored before exiting
+exit_code=0
+
+golangci-lint run $args || exit_code=1
 
 # Restore go.{mod,sum}
 mv go.mod.bak go.mod && mv go.sum.bak go.sum
+
+exit $exit_code
