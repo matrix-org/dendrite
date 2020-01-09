@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
+	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -66,6 +67,8 @@ func Open(dataSourceName string) (Database, error) {
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.Open(dataSourceName)
+	case "file":
+		return sqlite3.Open(dataSourceName)
 	default:
 		return nil, errors.New("unknown schema")
 	}
