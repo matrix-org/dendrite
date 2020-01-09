@@ -203,3 +203,5 @@ Newly joined room is included in an incremental sync after invite
 Outbound federation can query v1 /send_join
 Inbound /v1/make_join rejects remote attempts to join local users to rooms
 Inbound federation rejects invites which are not signed by the sender
+Inbound federation can query room alias directory
+Inbound federation can receive v2 /send_join
