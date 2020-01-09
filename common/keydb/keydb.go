@@ -16,7 +16,6 @@ package keydb
 
 import (
 	"context"
-	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/common/keydb/postgres"
@@ -39,6 +38,8 @@ func NewDatabase(dataSourceName string) (Database, error) {
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName)
 	default:
-		return nil, errors.New("unknown schema")
+		// if the scheme doesn't match, fall back to postgres in case the config has
+		// postgres key=value connection strings
+		return postgres.NewDatabase(dataSourceName)
 	}
 }

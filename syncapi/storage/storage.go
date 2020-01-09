@@ -16,7 +16,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"time"
 
@@ -58,6 +57,8 @@ func NewSyncServerDatasource(dataSourceName string) (Database, error) {
 	case "postgres":
 		return postgres.NewSyncServerDatasource(dataSourceName)
 	default:
-		return nil, errors.New("unknown schema")
+		// if the scheme doesn't match, fall back to postgres in case the config has
+		// postgres key=value connection strings
+		return postgres.NewSyncServerDatasource(dataSourceName)
 	}
 }

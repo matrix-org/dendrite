@@ -16,7 +16,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/common"
@@ -45,6 +44,8 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
 	case "postgres":
 		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
 	default:
-		return nil, errors.New("unknown schema")
+		// if the scheme doesn't match, fall back to postgres in case the config has
+		// postgres key=value connection strings
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
 	}
 }
