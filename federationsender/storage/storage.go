@@ -42,6 +42,6 @@ func NewDatabase(dataSourceName string) (Database, error) {
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName)
 	default:
-		return errors.New("unknown schema")
+		return nil, errors.New("unknown schema")
 	}
 }
