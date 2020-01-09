@@ -16,7 +16,6 @@ package keydb
 
 import (
 	"context"
-	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/common/keydb/postgres"
@@ -33,12 +32,12 @@ type Database interface {
 func NewDatabase(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return nil, err
+		return postgres.NewDatabase(dataSourceName)
 	}
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName)
 	default:
-		return nil, errors.New("unknown schema")
+		return postgres.NewDatabase(dataSourceName)
 	}
 }

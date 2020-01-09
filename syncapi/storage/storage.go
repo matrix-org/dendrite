@@ -16,7 +16,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"time"
 
@@ -53,12 +52,12 @@ type Database interface {
 func NewSyncServerDatasource(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return nil, err
+		return postgres.NewSyncServerDatasource(dataSourceName)
 	}
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewSyncServerDatasource(dataSourceName)
 	default:
-		return nil, errors.New("unknown schema")
+		return postgres.NewSyncServerDatasource(dataSourceName)
 	}
 }
