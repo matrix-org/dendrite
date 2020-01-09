@@ -33,7 +33,9 @@ type Database interface {
 func NewDatabase(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return nil, err
+		// if the scheme doesn't match, fall back to postgres in case the config has
+		// postgres key=value connection strings
+		return postgres.NewDatabase(dataSourceName)
 	}
 	switch uri.Scheme {
 	case "postgres":
