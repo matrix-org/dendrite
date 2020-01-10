@@ -609,48 +609,52 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	return err
 }
 
-// getAuthChain fetches the auth chain for the given auth events.
-// An auth chain is the list of all events that are referenced in the
-// auth_events section, and all their auth_events, recursively.
-// The returned set of events contain the given events.
-// Will *not* error if we don't have all auth events.
+// getAuthChain fetches the auth chain for the given auth events. An auth chain
+// is the list of all events that are referenced in the auth_events section, and
+// all their auth_events, recursively. The returned set of events contain the
+// given events. Will *not* error if we don't have all auth events.
 func getAuthChain(
 	ctx context.Context, dB RoomserverQueryAPIEventDB, authEventIDs []string,
 ) ([]gomatrixserverlib.Event, error) {
-	var authEvents []gomatrixserverlib.Event
-
-	// List of event ids to fetch. These will be added to the result and
-	// their auth events will be fetched (if they haven't been previously)
+	// List of event IDs to fetch. On each pass, these events will be requested
+	// from the database and the `eventsToFetch` will be updated with any new
+	// events that we have learned about and need to find. When `eventsToFetch`
+	// is eventually empty, we should have reached the end of the chain.
 	eventsToFetch := authEventIDs
+	authEventsMap := make(map[string]gomatrixserverlib.Event)
 
-	// Set of events we've already fetched.
-	fetchedEventMap := make(map[string]bool)
-
-	// Check if there's anything left to do
 	for len(eventsToFetch) > 0 {
-		// Convert eventIDs to events. First need to fetch NIDs
+		// Try to retrieve the events from the database.
 		events, err := dB.EventsFromIDs(ctx, eventsToFetch)
 		if err != nil {
 			return nil, err
 		}
 
-		// Work out a) which events we should add to the returned list of
-		// events and b) which of the auth events we haven't seen yet and
-		// add them to the list of events to fetch.
+		// We've now fetched these events so clear out `eventsToFetch`. Soon we may
+		// add newly discovered events to this for the next pass.
 		eventsToFetch = eventsToFetch[:0]
-		for _, event := range events {
-			fetchedEventMap[event.EventID()] = true
-			authEvents = append(authEvents, event.Event)
 
-			// Now we need to fetch any auth events that we haven't
-			// previously seen.
-			for _, authEventID := range event.AuthEventIDs() {
-				if !fetchedEventMap[authEventID] {
-					fetchedEventMap[authEventID] = true
-					eventsToFetch = append(eventsToFetch, authEventID)
+		for _, event := range events {
+			// Store the event in the event map - this prevents us from requesting it
+			// from the database again.
+			authEventsMap[event.EventID()] = event.Event
+
+			// Extract all of the auth events from the newly obtained event. If we
+			// don't already have a record of the event, record it in the list of
+			// events we want to request for the next pass.
+			for _, authEvent := range event.AuthEvents() {
+				if _, ok := authEventsMap[authEvent.EventID]; !ok {
+					eventsToFetch = append(eventsToFetch, authEvent.EventID)
 				}
 			}
 		}
+	}
+
+	// We've now retrieved all of the events we can. Flatten them down into an
+	// array and return them.
+	var authEvents []gomatrixserverlib.Event
+	for _, event := range authEventsMap {
+		authEvents = append(authEvents, event)
 	}
 
 	return authEvents, nil

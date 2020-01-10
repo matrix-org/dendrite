@@ -22,6 +22,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -183,7 +184,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 // CurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) selectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	stateFilterPart *gomatrixserverlib.FilterPart,
+	stateFilterPart *gomatrix.FilterPart,
 ) ([]gomatrixserverlib.Event, error) {
 	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
