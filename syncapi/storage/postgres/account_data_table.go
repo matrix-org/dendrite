@@ -21,7 +21,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrix"
 )
 
 const accountDataSchema = `
@@ -98,7 +98,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	ctx context.Context,
 	userID string,
 	oldPos, newPos int64,
-	accountDataFilterPart *gomatrixserverlib.FilterPart,
+	accountDataFilterPart *gomatrix.FilterPart,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
