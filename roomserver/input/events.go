@@ -94,6 +94,7 @@ func processRoomEvent(
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(ctx, db, event, input.AuthEventIDs)
 	if err != nil {
+		fmt.Println("failed checkAuthEvents:", err)
 		return
 	}
 
@@ -104,6 +105,7 @@ func processRoomEvent(
 		)
 		// On error OR event with the transaction already processed/processesing
 		if err != nil || eventID != "" {
+			fmt.Println("failed GetTransactionEventID:", err)
 			return
 		}
 	}
@@ -111,6 +113,7 @@ func processRoomEvent(
 	// Store the event
 	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
+		fmt.Println("failed StoreEvent:", err)
 		return
 	}
 
@@ -118,6 +121,7 @@ func processRoomEvent(
 		// For outliers we can stop after we've stored the event itself as it
 		// doesn't have any associated state to store and we don't need to
 		// notify anyone about it.
+		fmt.Println("kind is outlier")
 		return event.EventID(), nil
 	}
 
@@ -126,6 +130,7 @@ func processRoomEvent(
 		// Lets calculate one.
 		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event)
 		if err != nil {
+			fmt.Println("failed to calculate and set state")
 			return
 		}
 	}
@@ -155,15 +160,18 @@ func calculateAndSetState(
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
 		if entries, err = db.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
+			fmt.Println("failed StateEntriesForEventIDs")
 			return err
 		}
 
 		if stateAtEvent.BeforeStateSnapshotNID, err = db.AddState(ctx, roomNID, nil, entries); err != nil {
+			fmt.Println("failed AddState")
 			return err
 		}
 	} else {
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
 		if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, db, event, roomNID); err != nil {
+			fmt.Println("Failed CalculateAndStoreStateBeforeEvent")
 			return err
 		}
 	}

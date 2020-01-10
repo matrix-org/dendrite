@@ -558,6 +558,7 @@ func CalculateAndStoreStateBeforeEvent(
 
 	prevStates, err := db.StateAtEventIDs(ctx, prevEventIDs)
 	if err != nil {
+		fmt.Println("Failed stateAtEventIDs", err)
 		return 0, err
 	}
 
@@ -579,6 +580,7 @@ func CalculateAndStoreStateAfterEvents(
 		// 2) There weren't any prev_events for this event so the state is
 		// empty.
 		metrics.algorithm = "empty_state"
+		fmt.Println("there were't any prev_events!")
 		return metrics.stop(db.AddState(ctx, roomNID, nil, nil))
 	}
 
@@ -590,6 +592,7 @@ func CalculateAndStoreStateAfterEvents(
 			// as the previous events.
 			// This should be the common case.
 			metrics.algorithm = "no_change"
+			fmt.Println("none of the previous events were state events")
 			return metrics.stop(prevState.BeforeStateSnapshotNID, nil)
 		}
 		// The previous event was a state event so we need to store a copy
@@ -599,6 +602,7 @@ func CalculateAndStoreStateAfterEvents(
 		)
 		if err != nil {
 			metrics.algorithm = "_load_state_blocks"
+			fmt.Println("failed StateBlockNIDs", err)
 			return metrics.stop(0, err)
 		}
 		stateBlockNIDs := stateBlockNIDLists[0].StateBlockNIDs
@@ -639,6 +643,7 @@ func calculateAndStoreStateAfterManyEvents(
 		calculateStateAfterManyEvents(ctx, db, prevStates)
 	metrics.algorithm = algorithm
 	if err != nil {
+		fmt.Println("failed calculateStateAfterManyEvents", err)
 		return metrics.stop(0, err)
 	}
 
@@ -658,6 +663,7 @@ func calculateStateAfterManyEvents(
 	combined, err = LoadCombinedStateAfterEvents(ctx, db, prevStates)
 	if err != nil {
 		algorithm = "_load_combined_state"
+		fmt.Println("failed LoadCombinedStateAfterEvents")
 		return
 	}
 
@@ -688,6 +694,7 @@ func calculateStateAfterManyEvents(
 		resolved, err = resolveConflicts(ctx, db, notConflicted, conflicts)
 		if err != nil {
 			algorithm = "_resolve_conflicts"
+			fmt.Println("failed resolveConflicts", err)
 			return
 		}
 		algorithm = "full_state_with_conflicts"

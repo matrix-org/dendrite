@@ -28,13 +28,16 @@ const stateSnapshotSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
     state_snapshot_nid INTEGER PRIMARY KEY AUTOINCREMENT,
     room_nid INTEGER NOT NULL,
-    state_block_nids TEXT NOT NULL
+    state_block_nids TEXT NOT NULL DEFAULT '{}'
   );
 `
 
 const insertStateSQL = `
 	INSERT INTO roomserver_state_snapshots (room_nid, state_block_nids)
 	  VALUES ($1, $2);
+`
+
+const insertStateResultSQL = `
 	SELECT state_snapshot_nid FROM roomserver_state_snapshots
 		WHERE rowid = last_insert_rowid();
 `
@@ -48,6 +51,7 @@ const bulkSelectStateBlockNIDsSQL = "" +
 
 type stateSnapshotStatements struct {
 	insertStateStmt              *sql.Stmt
+	insertStateResultStmt        *sql.Stmt
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 
@@ -59,6 +63,7 @@ func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
 
 	return statementList{
 		{&s.insertStateStmt, insertStateSQL},
+		{&s.insertStateResultStmt, insertStateResultSQL},
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
 	}.prepare(db)
 }
@@ -70,7 +75,9 @@ func (s *stateSnapshotStatements) insertState(
 	for i := range stateBlockNIDs {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
-	err = s.insertStateStmt.QueryRowContext(ctx, int64(roomNID), pq.Int64Array(nids)).Scan(&stateNID)
+	if _, err = s.insertStateStmt.ExecContext(ctx, int64(roomNID), pq.Int64Array(nids)); err == nil {
+		err = s.insertStateResultStmt.QueryRowContext(ctx).Scan(&stateNID)
+	}
 	return
 }
 

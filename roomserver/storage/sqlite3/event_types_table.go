@@ -54,6 +54,9 @@ const eventTypesSchema = `
 const insertEventTypeNIDSQL = `
 	INSERT INTO roomserver_event_types (event_type) VALUES ($1)
 	  ON CONFLICT DO NOTHING;
+`
+
+const insertEventTypeNIDResultSQL = `
 	SELECT event_type_nid FROM roomserver_event_types
 		WHERE rowid = last_insert_rowid();
 `
@@ -70,9 +73,10 @@ const bulkSelectEventTypeNIDSQL = `
 `
 
 type eventTypeStatements struct {
-	insertEventTypeNIDStmt     *sql.Stmt
-	selectEventTypeNIDStmt     *sql.Stmt
-	bulkSelectEventTypeNIDStmt *sql.Stmt
+	insertEventTypeNIDStmt       *sql.Stmt
+	insertEventTypeNIDResultStmt *sql.Stmt
+	selectEventTypeNIDStmt       *sql.Stmt
+	bulkSelectEventTypeNIDStmt   *sql.Stmt
 }
 
 func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
@@ -83,6 +87,7 @@ func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
 
 	return statementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
+		{&s.insertEventTypeNIDResultStmt, insertEventTypeNIDResultSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
 		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
 	}.prepare(db)
@@ -92,7 +97,10 @@ func (s *eventTypeStatements) insertEventTypeNID(
 	ctx context.Context, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.insertEventTypeNIDStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	var err error
+	if _, err = s.insertEventTypeNIDStmt.ExecContext(ctx, eventType); err == nil {
+		err = s.insertEventTypeNIDResultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
+	}
 	return types.EventTypeNID(eventTypeNID), err
 }
 

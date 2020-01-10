@@ -38,6 +38,9 @@ const eventStateKeysSchema = `
 const insertEventStateKeyNIDSQL = `
 	INSERT INTO roomserver_event_state_keys (event_state_key) VALUES ($1)
 	  ON CONFLICT DO NOTHING;
+`
+
+const insertEventStateKeyNIDResultSQL = `
 	SELECT event_state_key_nid FROM roomserver_event_state_keys
 		WHERE rowid = last_insert_rowid();
 `
@@ -62,10 +65,11 @@ const bulkSelectEventStateKeySQL = `
 `
 
 type eventStateKeyStatements struct {
-	insertEventStateKeyNIDStmt     *sql.Stmt
-	selectEventStateKeyNIDStmt     *sql.Stmt
-	bulkSelectEventStateKeyNIDStmt *sql.Stmt
-	bulkSelectEventStateKeyStmt    *sql.Stmt
+	insertEventStateKeyNIDStmt       *sql.Stmt
+	insertEventStateKeyNIDResultStmt *sql.Stmt
+	selectEventStateKeyNIDStmt       *sql.Stmt
+	bulkSelectEventStateKeyNIDStmt   *sql.Stmt
+	bulkSelectEventStateKeyStmt      *sql.Stmt
 }
 
 func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
@@ -75,6 +79,7 @@ func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
 	}
 	return statementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
+		{&s.insertEventStateKeyNIDResultStmt, insertEventStateKeyNIDResultSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyStmt, bulkSelectEventStateKeySQL},
@@ -85,8 +90,12 @@ func (s *eventStateKeyStatements) insertEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := common.TxStmt(txn, s.insertEventStateKeyNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
+	var err error
+	insertStmt := common.TxStmt(txn, s.insertEventStateKeyNIDStmt)
+	selectStmt := common.TxStmt(txn, s.insertEventStateKeyNIDResultStmt)
+	if _, err = insertStmt.ExecContext(ctx, eventStateKey); err == nil {
+		err = selectStmt.QueryRowContext(ctx).Scan(&eventStateKeyNID)
+	}
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
@@ -109,7 +118,6 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
-
 	result := make(map[string]types.EventStateKeyNID, len(eventStateKeys))
 	for rows.Next() {
 		var stateKey string
@@ -134,7 +142,6 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
-
 	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
 	for rows.Next() {
 		var stateKey string

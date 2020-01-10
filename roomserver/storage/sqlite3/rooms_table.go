@@ -28,7 +28,7 @@ const roomsSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_rooms (
     room_nid INTEGER PRIMARY KEY AUTOINCREMENT,
     room_id TEXT NOT NULL UNIQUE,
-    latest_event_nids TEXT NOT NULL DEFAULT '',
+    latest_event_nids TEXT NOT NULL DEFAULT '{}',
     last_event_sent_nid INTEGER NOT NULL DEFAULT 0,
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0
   );
@@ -38,6 +38,9 @@ const roomsSchema = `
 const insertRoomNIDSQL = `
 	INSERT INTO roomserver_rooms (room_id) VALUES ($1)
 	  ON CONFLICT DO NOTHING;
+`
+
+const insertRoomNIDResultSQL = `
 	SELECT room_nid FROM roomserver_rooms
 		WHERE rowid = last_insert_rowid();
 `
@@ -56,6 +59,7 @@ const updateLatestEventNIDsSQL = "" +
 
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
+	insertRoomNIDResultStmt            *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
@@ -69,6 +73,7 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 	}
 	return statementList{
 		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
+		{&s.insertRoomNIDResultStmt, insertRoomNIDResultSQL},
 		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
@@ -80,8 +85,12 @@ func (s *roomStatements) insertRoomNID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (types.RoomNID, error) {
 	var roomNID int64
-	stmt := common.TxStmt(txn, s.insertRoomNIDStmt)
-	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
+	var err error
+	insertStmt := common.TxStmt(txn, s.insertRoomNIDStmt)
+	resultStmt := common.TxStmt(txn, s.insertRoomNIDResultStmt)
+	if _, err = insertStmt.ExecContext(ctx, roomID); err == nil {
+		err = resultStmt.QueryRowContext(ctx).Scan(&roomNID)
+	}
 	return types.RoomNID(roomNID), err
 }
 

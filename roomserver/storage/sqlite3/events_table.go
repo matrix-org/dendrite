@@ -37,7 +37,7 @@ const eventsSchema = `
     depth INTEGER NOT NULL,
     event_id TEXT NOT NULL UNIQUE,
     reference_sha256 BLOB NOT NULL,
-    auth_event_nids TEXT NOT NULL
+    auth_event_nids TEXT NOT NULL DEFAULT '{}'
   );
 `
 
@@ -45,6 +45,9 @@ const insertEventSQL = `
 	INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth)
 	  VALUES ($1, $2, $3, $4, $5, $6, $7)
 	  ON CONFLICT DO NOTHING;
+`
+
+const insertEventResultSQL = `
 	SELECT event_nid, state_snapshot_nid FROM roomserver_events
 		WHERE rowid = last_insert_rowid();
 `
@@ -94,6 +97,7 @@ const selectMaxEventDepthSQL = "" +
 
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
+	insertEventResultStmt                  *sql.Stmt
 	selectEventStmt                        *sql.Stmt
 	bulkSelectStateEventByIDStmt           *sql.Stmt
 	bulkSelectStateAtEventByIDStmt         *sql.Stmt
@@ -116,6 +120,7 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 
 	return statementList{
 		{&s.insertEventStmt, insertEventSQL},
+		{&s.insertEventResultStmt, insertEventResultSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
 		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
@@ -143,10 +148,13 @@ func (s *eventStatements) insertEvent(
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
-	err := s.insertEventStmt.QueryRowContext(
+	var err error
+	if _, err = s.insertEventStmt.ExecContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
 		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
-	).Scan(&eventNID, &stateNID)
+	); err == nil {
+		err = s.insertEventResultStmt.QueryRowContext(ctx).Scan(&eventNID, &stateNID)
+	}
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 

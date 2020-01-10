@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -244,9 +245,11 @@ func (d *Database) AddState(
 	if len(state) > 0 {
 		stateBlockNID, err := d.statements.selectNextStateBlockNID(ctx)
 		if err != nil {
+			fmt.Println("d.statements.selectNextStateBlockNID", err)
 			return 0, err
 		}
 		if err = d.statements.bulkInsertStateData(ctx, stateBlockNID, state); err != nil {
+			fmt.Println("d.statements.bulkInsertStateData", err)
 			return 0, err
 		}
 		stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
