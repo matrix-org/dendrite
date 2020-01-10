@@ -118,6 +118,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 
 	for rows.Next() {
 		var dataType string
@@ -133,7 +134,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 			data[roomID] = []string{dataType}
 		}
 	}
-
+	err = rows.Err()
 	return
 }
 

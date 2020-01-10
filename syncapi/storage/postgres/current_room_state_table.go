@@ -154,7 +154,7 @@ func (s *currentRoomStateStatements) selectJoinedUsers(
 		users = append(users, userID)
 		result[roomID] = users
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.

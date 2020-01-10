@@ -151,6 +151,7 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 	if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 
 	for rows.Next() {
 		var eNID types.EventNID
@@ -159,6 +160,7 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 		}
 		eventNIDs = append(eventNIDs, eNID)
 	}
+	err = rows.Err()
 	return
 }
 func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
@@ -170,6 +172,7 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 	if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 
 	for rows.Next() {
 		var eNID types.EventNID
@@ -178,6 +181,7 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 		}
 		eventNIDs = append(eventNIDs, eNID)
 	}
+	err = rows.Err()
 	return
 }
 
