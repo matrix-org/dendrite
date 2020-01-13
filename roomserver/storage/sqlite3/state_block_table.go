@@ -28,7 +28,7 @@ import (
 
 const stateDataSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_state_block (
-    state_block_nid INTEGER NOT NULL,
+    state_block_nid INTEGER PRIMARY KEY AUTOINCREMENT,
     event_type_nid INTEGER NOT NULL,
     event_state_key_nid INTEGER NOT NULL,
     event_nid INTEGER NOT NULL,
@@ -41,7 +41,10 @@ const insertStateDataSQL = "" +
 	" VALUES ($1, $2, $3, $4)"
 
 const selectNextStateBlockNIDSQL = `
-	SELECT seq+1 FROM sqlite_sequence WHERE name = 'roomserver_state_block'
+	SELECT COALESCE((
+		SELECT seq AS state_block_nid FROM sqlite_sequence
+		WHERE name = 'roomserver_state_block'), 0
+	) AS state_block_nid
 `
 
 // Bulk state lookup by numeric state block ID.

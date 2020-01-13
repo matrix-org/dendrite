@@ -88,7 +88,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	for i := range stateNIDs {
 		nids[i] = int64(stateNIDs[i])
 	}
-	rows, err := s.bulkSelectStateBlockNIDsStmt.QueryContext(ctx, pq.Int64Array(nids))
+	rows, err := s.bulkSelectStateBlockNIDsStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
 	if err != nil {
 		return nil, err
 	}
