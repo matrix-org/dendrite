@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -52,9 +53,9 @@ func Open(dataSourceName string) (*Database, error) {
 	if d.db, err = sql.Open("sqlite3", cs); err != nil {
 		return nil, err
 	}
-	//d.db.Exec("PRAGMA journal_mode=WAL;")
+	d.db.Exec("PRAGMA journal_mode=WAL;")
 	//d.db.Exec("PRAGMA parser_trace = true;")
-	d.db.SetMaxOpenConns(1)
+	//d.db.SetMaxOpenConns(1)
 	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}
@@ -84,43 +85,59 @@ func (d *Database) StoreEvent(
 		}
 	}
 
-	if roomNID, err = d.assignRoomNID(ctx, nil, event.RoomID()); err != nil {
+	err = common.WithTransaction(d.db, func(tx *sql.Tx) error {
+		roomNID, err = d.assignRoomNID(ctx, tx, event.RoomID())
+		return err
+	})
+	if err != nil {
 		return 0, types.StateAtEvent{}, err
 	}
 
-	if eventTypeNID, err = d.assignEventTypeNID(ctx, event.Type()); err != nil {
+	err = common.WithTransaction(d.db, func(tx *sql.Tx) error {
+		eventTypeNID, err = d.assignEventTypeNID(ctx, tx, event.Type())
+		return err
+	})
+	if err != nil {
 		return 0, types.StateAtEvent{}, err
 	}
 
-	eventStateKey := event.StateKey()
-	// Assigned a numeric ID for the state_key if there is one present.
-	// Otherwise set the numeric ID for the state_key to 0.
-	if eventStateKey != nil {
-		if eventStateKeyNID, err = d.assignStateKeyNID(ctx, nil, *eventStateKey); err != nil {
-			return 0, types.StateAtEvent{}, err
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		eventStateKey := event.StateKey()
+		// Assigned a numeric ID for the state_key if there is one present.
+		// Otherwise set the numeric ID for the state_key to 0.
+		if eventStateKey != nil {
+			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, txn, *eventStateKey); err != nil {
+				return err
+			}
 		}
-	}
 
-	if eventNID, stateNID, err = d.statements.insertEvent(
-		ctx,
-		roomNID,
-		eventTypeNID,
-		eventStateKeyNID,
-		event.EventID(),
-		event.EventReference().EventSHA256,
-		authEventNIDs,
-		event.Depth(),
-	); err != nil {
-		if err == sql.ErrNoRows {
-			// We've already inserted the event so select the numeric event ID
-			eventNID, stateNID, err = d.statements.selectEvent(ctx, event.EventID())
+		if eventNID, stateNID, err = d.statements.insertEvent(
+			ctx,
+			txn,
+			roomNID,
+			eventTypeNID,
+			eventStateKeyNID,
+			event.EventID(),
+			event.EventReference().EventSHA256,
+			authEventNIDs,
+			event.Depth(),
+		); err != nil {
+			if err == sql.ErrNoRows {
+				// We've already inserted the event so select the numeric event ID
+				eventNID, stateNID, err = d.statements.selectEvent(ctx, txn, event.EventID())
+			}
+			if err != nil {
+				return err
+			}
 		}
-		if err != nil {
-			return 0, types.StateAtEvent{}, err
-		}
-	}
 
-	if err = d.statements.insertEventJSON(ctx, eventNID, event.JSON()); err != nil {
+		if err = d.statements.insertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
 		return 0, types.StateAtEvent{}, err
 	}
 
@@ -138,9 +155,9 @@ func (d *Database) StoreEvent(
 
 func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx, roomID string,
-) (types.RoomNID, error) {
+) (roomNID types.RoomNID, err error) {
 	// Check if we already have a numeric ID in the database.
-	roomNID, err := d.statements.selectRoomNID(ctx, txn, roomID)
+	roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
 		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID)
@@ -149,30 +166,30 @@ func (d *Database) assignRoomNID(
 			roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
 		}
 	}
-	return roomNID, err
+	return
 }
 
 func (d *Database) assignEventTypeNID(
-	ctx context.Context, eventType string,
-) (types.EventTypeNID, error) {
+	ctx context.Context, txn *sql.Tx, eventType string,
+) (eventTypeNID types.EventTypeNID, err error) {
 	// Check if we already have a numeric ID in the database.
-	eventTypeNID, err := d.statements.selectEventTypeNID(ctx, eventType)
+	eventTypeNID, err = d.statements.selectEventTypeNID(ctx, txn, eventType)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventTypeNID, err = d.statements.insertEventTypeNID(ctx, eventType)
+		eventTypeNID, err = d.statements.insertEventTypeNID(ctx, txn, eventType)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventTypeNID, err = d.statements.selectEventTypeNID(ctx, eventType)
+			eventTypeNID, err = d.statements.selectEventTypeNID(ctx, txn, eventType)
 		}
 	}
-	return eventTypeNID, err
+	return
 }
 
 func (d *Database) assignStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
-) (types.EventStateKeyNID, error) {
+) (eventStateKeyNID types.EventStateKeyNID, err error) {
 	// Check if we already have a numeric ID in the database.
-	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(ctx, txn, eventStateKey)
+	eventStateKeyNID, err = d.statements.selectEventStateKeyNID(ctx, txn, eventStateKey)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
 		eventStateKeyNID, err = d.statements.insertEventStateKeyNID(ctx, txn, eventStateKey)
@@ -181,61 +198,69 @@ func (d *Database) assignStateKeyNID(
 			eventStateKeyNID, err = d.statements.selectEventStateKeyNID(ctx, txn, eventStateKey)
 		}
 	}
-	return eventStateKeyNID, err
+	return
 }
 
 // StateEntriesForEventIDs implements input.EventDatabase
 func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateEntry, error) {
-	return d.statements.bulkSelectStateEventByID(ctx, eventIDs)
+	return d.statements.bulkSelectStateEventByID(ctx, nil, eventIDs)
 }
 
 // EventTypeNIDs implements state.RoomStateDatabase
 func (d *Database) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
-	return d.statements.bulkSelectEventTypeNID(ctx, eventTypes)
+	return d.statements.bulkSelectEventTypeNID(ctx, nil, eventTypes)
 }
 
 // EventStateKeyNIDs implements state.RoomStateDatabase
 func (d *Database) EventStateKeyNIDs(
 	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
-	return d.statements.bulkSelectEventStateKeyNID(ctx, eventStateKeys)
+	return d.statements.bulkSelectEventStateKeyNID(ctx, nil, eventStateKeys)
 }
 
 // EventStateKeys implements query.RoomserverQueryAPIDatabase
 func (d *Database) EventStateKeys(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
-	return d.statements.bulkSelectEventStateKey(ctx, eventStateKeyNIDs)
+	return d.statements.bulkSelectEventStateKey(ctx, nil, eventStateKeyNIDs)
 }
 
 // EventNIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) EventNIDs(
 	ctx context.Context, eventIDs []string,
 ) (map[string]types.EventNID, error) {
-	return d.statements.bulkSelectEventNID(ctx, eventIDs)
+	return d.statements.bulkSelectEventNID(ctx, nil, eventIDs)
 }
 
 // Events implements input.EventDatabase
 func (d *Database) Events(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]types.Event, error) {
-	eventJSONs, err := d.statements.bulkSelectEventJSON(ctx, eventNIDs)
-	if err != nil {
-		return nil, err
-	}
+	var eventJSONs []eventJSONPair
+	var err error
 	results := make([]types.Event, len(eventJSONs))
-	for i, eventJSON := range eventJSONs {
-		result := &results[i]
-		result.EventNID = eventJSON.EventNID
-		// TODO: Use NewEventFromTrustedJSON for efficiency
-		result.Event, err = gomatrixserverlib.NewEventFromUntrustedJSON(eventJSON.EventJSON)
+	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
 		if err != nil {
-			return nil, err
+			return nil
 		}
+		for i, eventJSON := range eventJSONs {
+			result := &results[i]
+			result.EventNID = eventJSON.EventNID
+			// TODO: Use NewEventFromTrustedJSON for efficiency
+			result.Event, err = gomatrixserverlib.NewEventFromUntrustedJSON(eventJSON.EventJSON)
+			if err != nil {
+				return nil
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return []types.Event{}, err
 	}
 	return results, nil
 }
@@ -246,62 +271,68 @@ func (d *Database) AddState(
 	roomNID types.RoomNID,
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
-) (types.StateSnapshotNID, error) {
-	if len(state) > 0 {
-		stateBlockNID, err := d.statements.selectNextStateBlockNID(ctx)
-		if err != nil {
-			return 0, err
+) (stateNID types.StateSnapshotNID, err error) {
+	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if len(state) > 0 {
+			stateBlockNID, err := d.statements.selectNextStateBlockNID(ctx, txn)
+			if err != nil {
+				return err
+			}
+			if err = d.statements.bulkInsertStateData(ctx, txn, stateBlockNID, state); err != nil {
+				return err
+			}
+			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
 		}
-		if err = d.statements.bulkInsertStateData(ctx, stateBlockNID, state); err != nil {
-			return 0, err
-		}
-		stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
+		stateNID, err = d.statements.insertState(ctx, txn, roomNID, stateBlockNIDs)
+		return nil
+	})
+	if err != nil {
+		return 0, err
 	}
-
-	return d.statements.insertState(ctx, roomNID, stateBlockNIDs)
+	return
 }
 
 // SetState implements input.EventDatabase
 func (d *Database) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return d.statements.updateEventState(ctx, eventNID, stateNID)
+	return d.statements.updateEventState(ctx, nil, eventNID, stateNID)
 }
 
 // StateAtEventIDs implements input.EventDatabase
 func (d *Database) StateAtEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateAtEvent, error) {
-	return d.statements.bulkSelectStateAtEventByID(ctx, eventIDs)
+	return d.statements.bulkSelectStateAtEventByID(ctx, nil, eventIDs)
 }
 
 // StateBlockNIDs implements state.RoomStateDatabase
 func (d *Database) StateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
-	return d.statements.bulkSelectStateBlockNIDs(ctx, stateNIDs)
+	return d.statements.bulkSelectStateBlockNIDs(ctx, nil, stateNIDs)
 }
 
 // StateEntries implements state.RoomStateDatabase
 func (d *Database) StateEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectStateBlockEntries(ctx, stateBlockNIDs)
+	return d.statements.bulkSelectStateBlockEntries(ctx, nil, stateBlockNIDs)
 }
 
 // SnapshotNIDFromEventID implements state.RoomStateDatabase
 func (d *Database) SnapshotNIDFromEventID(
 	ctx context.Context, eventID string,
-) (types.StateSnapshotNID, error) {
-	_, stateNID, err := d.statements.selectEvent(ctx, eventID)
-	return stateNID, err
+) (stateNID types.StateSnapshotNID, err error) {
+	_, stateNID, err = d.statements.selectEvent(ctx, nil, eventID)
+	return
 }
 
 // EventIDs implements input.RoomEventDatabase
 func (d *Database) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) (map[types.EventNID]string, error) {
-	return d.statements.bulkSelectEventID(ctx, eventNIDs)
+	return d.statements.bulkSelectEventID(ctx, nil, eventNIDs)
 }
 
 // GetLatestEventsForUpdate implements input.EventDatabase
@@ -403,21 +434,25 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(
 	for i := range latest {
 		eventNIDs[i] = latest[i].EventNID
 	}
-	return u.d.statements.updateLatestEventNIDs(u.ctx, u.txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID)
+	// TODO: transaction was removed here - is this wise?
+	return u.d.statements.updateLatestEventNIDs(u.ctx, nil, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID)
 }
 
 // HasEventBeenSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (bool, error) {
-	return u.d.statements.selectEventSentToOutput(u.ctx, u.txn, eventNID)
+	// TODO: transaction was removed here - is this wise?
+	return u.d.statements.selectEventSentToOutput(u.ctx, nil, eventNID)
 }
 
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
-	return u.d.statements.updateEventSentToOutput(u.ctx, u.txn, eventNID)
+	// TODO: transaction was removed here - is this wise?
+	return u.d.statements.updateEventSentToOutput(u.ctx, nil, eventNID)
 }
 
 func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID) (types.MembershipUpdater, error) {
-	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomNID, targetUserNID)
+	// TODO: transaction was removed here - is this wise?
+	return u.d.membershipUpdaterTxn(u.ctx, nil, u.roomNID, targetUserNID)
 }
 
 // RoomNID implements query.RoomserverQueryAPIDB
@@ -432,20 +467,24 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 // LatestEventIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
-) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error) {
-	eventNIDs, currentStateSnapshotNID, err := d.statements.selectLatestEventNIDs(ctx, roomNID)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	references, err := d.statements.bulkSelectEventReference(ctx, eventNIDs)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	depth, err := d.statements.selectMaxEventDepth(ctx, eventNIDs)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	return references, currentStateSnapshotNID, depth, nil
+) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		var eventNIDs []types.EventNID
+		eventNIDs, currentStateSnapshotNID, err = d.statements.selectLatestEventNIDs(ctx, txn, roomNID)
+		if err != nil {
+			return err
+		}
+		references, err = d.statements.bulkSelectEventReference(ctx, txn, eventNIDs)
+		if err != nil {
+			return err
+		}
+		depth, err = d.statements.selectMaxEventDepth(ctx, txn, eventNIDs)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return
 }
 
 // GetInvitesForUser implements query.RoomserverQueryAPIDatabase
@@ -459,29 +498,29 @@ func (d *Database) GetInvitesForUser(
 
 // SetRoomAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
-	return d.statements.insertRoomAlias(ctx, alias, roomID, creatorUserID)
+	return d.statements.insertRoomAlias(ctx, nil, alias, roomID, creatorUserID)
 }
 
 // GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
-	return d.statements.selectRoomIDFromAlias(ctx, alias)
+	return d.statements.selectRoomIDFromAlias(ctx, nil, alias)
 }
 
 // GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
 func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
-	return d.statements.selectAliasesFromRoomID(ctx, roomID)
+	return d.statements.selectAliasesFromRoomID(ctx, nil, roomID)
 }
 
 // GetCreatorIDForAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) GetCreatorIDForAlias(
 	ctx context.Context, alias string,
 ) (string, error) {
-	return d.statements.selectCreatorIDFromAlias(ctx, alias)
+	return d.statements.selectCreatorIDFromAlias(ctx, nil, alias)
 }
 
 // RemoveRoomAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
-	return d.statements.deleteRoomAlias(ctx, alias)
+	return d.statements.deleteRoomAlias(ctx, nil, alias)
 }
 
 // StateEntriesForTuples implements state.RoomStateDatabase
@@ -491,7 +530,7 @@ func (d *Database) StateEntriesForTuples(
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
 	return d.statements.bulkSelectFilteredStateBlockEntries(
-		ctx, stateBlockNIDs, stateKeyTuples,
+		ctx, nil, stateBlockNIDs, stateKeyTuples,
 	)
 }
 
@@ -666,36 +705,46 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 func (d *Database) GetMembership(
 	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
 ) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
-	requestSenderUserNID, err := d.assignStateKeyNID(ctx, nil, requestSenderUserID)
-	if err != nil {
-		return
-	}
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		requestSenderUserNID, err := d.assignStateKeyNID(ctx, txn, requestSenderUserID)
+		if err != nil {
+			return err
+		}
 
-	senderMembershipEventNID, senderMembership, err :=
-		d.statements.selectMembershipFromRoomAndTarget(
-			ctx, roomNID, requestSenderUserNID,
-		)
-	if err == sql.ErrNoRows {
-		// The user has never been a member of that room
-		return 0, false, nil
-	} else if err != nil {
-		return
-	}
+		membershipEventNID, _, err =
+			d.statements.selectMembershipFromRoomAndTarget(
+				ctx, txn, roomNID, requestSenderUserNID,
+			)
+		if err == sql.ErrNoRows {
+			// The user has never been a member of that room
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		stillInRoom = true
+		return nil
+	})
 
-	return senderMembershipEventNID, senderMembership == membershipStateJoin, nil
+	return
 }
 
 // GetMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
 func (d *Database) GetMembershipEventNIDsForRoom(
 	ctx context.Context, roomNID types.RoomNID, joinOnly bool,
-) ([]types.EventNID, error) {
-	if joinOnly {
-		return d.statements.selectMembershipsFromRoomAndMembership(
-			ctx, roomNID, membershipStateJoin,
-		)
-	}
+) (eventNIDs []types.EventNID, err error) {
+	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if joinOnly {
+			eventNIDs, err = d.statements.selectMembershipsFromRoomAndMembership(
+				ctx, txn, roomNID, membershipStateJoin,
+			)
+			return nil
+		}
 
-	return d.statements.selectMembershipsFromRoom(ctx, roomNID)
+		eventNIDs, err = d.statements.selectMembershipsFromRoom(ctx, txn, roomNID)
+		return nil
+	})
+	return
 }
 
 // EventsFromIDs implements query.RoomserverQueryAPIEventDB

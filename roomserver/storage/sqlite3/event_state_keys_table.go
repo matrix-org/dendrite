@@ -118,10 +118,10 @@ func (s *eventStateKeyStatements) selectEventStateKeyNID(
 }
 
 func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
-	ctx context.Context, eventStateKeys []string,
+	ctx context.Context, txn *sql.Tx, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
-	rows, err := s.bulkSelectEventStateKeyNIDStmt.QueryContext(
-		ctx, pq.StringArray(eventStateKeys),
+	rows, err := common.TxStmt(txn, s.bulkSelectEventStateKeyNIDStmt).QueryContext(
+		ctx, sqliteInStr(pq.StringArray(eventStateKeys)),
 	)
 	if err != nil {
 		fmt.Println("bulkSelectEventStateKeyNID s.bulkSelectEventStateKeyNIDStmt.QueryContext:", err)
@@ -142,13 +142,13 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 }
 
 func (s *eventStateKeyStatements) bulkSelectEventStateKey(
-	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
+	ctx context.Context, txn *sql.Tx, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
 	nIDs := make(pq.Int64Array, len(eventStateKeyNIDs))
 	for i := range eventStateKeyNIDs {
 		nIDs[i] = int64(eventStateKeyNIDs[i])
 	}
-	rows, err := s.bulkSelectEventStateKeyStmt.QueryContext(ctx, nIDs)
+	rows, err := common.TxStmt(txn, s.bulkSelectEventStateKeyStmt).QueryContext(ctx, nIDs)
 	if err != nil {
 		fmt.Println("bulkSelectEventStateKey s.bulkSelectEventStateKeyStmt.QueryContext:", err)
 		return nil, err

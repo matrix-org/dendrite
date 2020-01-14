@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -94,28 +95,32 @@ func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *eventTypeStatements) insertEventTypeNID(
-	ctx context.Context, eventType string,
+	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
 	var err error
-	if _, err = s.insertEventTypeNIDStmt.ExecContext(ctx, eventType); err == nil {
-		err = s.insertEventTypeNIDResultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
+	insertStmt := common.TxStmt(tx, s.insertEventTypeNIDStmt)
+	resultStmt := common.TxStmt(tx, s.insertEventTypeNIDResultStmt)
+	if _, err = insertStmt.ExecContext(ctx, eventType); err == nil {
+		err = resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
 	}
 	return types.EventTypeNID(eventTypeNID), err
 }
 
 func (s *eventTypeStatements) selectEventTypeNID(
-	ctx context.Context, eventType string,
+	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.selectEventTypeNIDStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	selectStmt := common.TxStmt(tx, s.selectEventTypeNIDStmt)
+	err := selectStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
 func (s *eventTypeStatements) bulkSelectEventTypeNID(
-	ctx context.Context, eventTypes []string,
+	ctx context.Context, tx *sql.Tx, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
-	rows, err := s.bulkSelectEventTypeNIDStmt.QueryContext(ctx, pq.StringArray(eventTypes))
+	selectStmt := common.TxStmt(tx, s.bulkSelectEventTypeNIDStmt)
+	rows, err := selectStmt.QueryContext(ctx, sqliteInStr(pq.StringArray(eventTypes)))
 	if err != nil {
 		return nil, err
 	}

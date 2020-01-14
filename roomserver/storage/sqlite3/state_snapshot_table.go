@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -69,14 +70,16 @@ func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *stateSnapshotStatements) insertState(
-	ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
 ) (stateNID types.StateSnapshotNID, err error) {
 	nids := make([]int64, len(stateBlockNIDs))
 	for i := range stateBlockNIDs {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
-	if _, err = s.insertStateStmt.ExecContext(ctx, int64(roomNID), pq.Int64Array(nids)); err == nil {
-		err = s.insertStateResultStmt.QueryRowContext(ctx).Scan(&stateNID)
+	insertStmt := common.TxStmt(txn, s.insertStateStmt)
+	resultStmt := common.TxStmt(txn, s.insertStateResultStmt)
+	if _, err = insertStmt.ExecContext(ctx, int64(roomNID), pq.Int64Array(nids)); err == nil {
+		err = resultStmt.QueryRowContext(ctx).Scan(&stateNID)
 		if err != nil {
 			fmt.Println("insertState s.insertStateResultStmt.QueryRowContext:", err)
 		}
@@ -87,13 +90,14 @@ func (s *stateSnapshotStatements) insertState(
 }
 
 func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
-	ctx context.Context, stateNIDs []types.StateSnapshotNID,
+	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
 	nids := make([]int64, len(stateNIDs))
 	for i := range stateNIDs {
 		nids[i] = int64(stateNIDs[i])
 	}
-	rows, err := s.bulkSelectStateBlockNIDsStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
+	selectStmt := common.TxStmt(txn, s.bulkSelectStateBlockNIDsStmt)
+	rows, err := selectStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
 	if err != nil {
 		fmt.Println("bulkSelectStateBlockNIDs s.bulkSelectStateBlockNIDsStmt.QueryContext:", err)
 		return nil, err

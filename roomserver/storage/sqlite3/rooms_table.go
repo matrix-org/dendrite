@@ -113,11 +113,11 @@ func (s *roomStatements) selectRoomNID(
 }
 
 func (s *roomStatements) selectLatestEventNIDs(
-	ctx context.Context, roomNID types.RoomNID,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.EventNID, types.StateSnapshotNID, error) {
 	var nids pq.Int64Array
 	var stateSnapshotNID int64
-	stmt := s.selectLatestEventNIDsStmt
+	stmt := common.TxStmt(txn, s.selectLatestEventNIDsStmt)
 	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &stateSnapshotNID)
 	if err != nil {
 		fmt.Println("selectLatestEventNIDs stmt.QueryRowContext:", err)

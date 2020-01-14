@@ -96,8 +96,8 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *membershipStatements) insertMembership(
-	ctx context.Context,
-	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+	ctx context.Context, txn *sql.Tx,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) error {
 	stmt := common.TxStmt(txn, s.insertMembershipStmt)
 	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID)
@@ -108,8 +108,8 @@ func (s *membershipStatements) insertMembership(
 }
 
 func (s *membershipStatements) selectMembershipForUpdate(
-	ctx context.Context,
-	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+	ctx context.Context, txn *sql.Tx,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (membership membershipState, err error) {
 	stmt := common.TxStmt(txn, s.selectMembershipForUpdateStmt)
 	err = stmt.QueryRowContext(
@@ -122,10 +122,11 @@ func (s *membershipStatements) selectMembershipForUpdate(
 }
 
 func (s *membershipStatements) selectMembershipFromRoomAndTarget(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventNID types.EventNID, membership membershipState, err error) {
-	err = s.selectMembershipFromRoomAndTargetStmt.QueryRowContext(
+	selectStmt := common.TxStmt(txn, s.selectMembershipFromRoomAndTargetStmt)
+	err = selectStmt.QueryRowContext(
 		ctx, roomNID, targetUserNID,
 	).Scan(&membership, &eventNID)
 	if err != nil {
@@ -135,9 +136,11 @@ func (s *membershipStatements) selectMembershipFromRoomAndTarget(
 }
 
 func (s *membershipStatements) selectMembershipsFromRoom(
-	ctx context.Context, roomNID types.RoomNID,
+	ctx context.Context, txn *sql.Tx,
+	roomNID types.RoomNID,
 ) (eventNIDs []types.EventNID, err error) {
-	rows, err := s.selectMembershipsFromRoomStmt.QueryContext(ctx, roomNID)
+	selectStmt := common.TxStmt(txn, s.selectMembershipsFromRoomStmt)
+	rows, err := selectStmt.QueryContext(ctx, roomNID)
 	if err != nil {
 		fmt.Println("selectMembershipsFromRoom s.selectMembershipsFromRoomStmt.QueryContext:", err)
 		return
@@ -154,10 +157,10 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 	return
 }
 func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, membership membershipState,
 ) (eventNIDs []types.EventNID, err error) {
-	stmt := s.selectMembershipsFromRoomAndMembershipStmt
+	stmt := common.TxStmt(txn, s.selectMembershipsFromRoomAndMembershipStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, membership)
 	if err != nil {
 		fmt.Println("selectMembershipsFromRoomAndMembership stmt.QueryContext:", err)
@@ -176,8 +179,8 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 }
 
 func (s *membershipStatements) updateMembership(
-	ctx context.Context,
-	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+	ctx context.Context, txn *sql.Tx,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	senderUserNID types.EventStateKeyNID, membership membershipState,
 	eventNID types.EventNID,
 ) error {

@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 )
@@ -93,12 +94,12 @@ func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *stateBlockStatements) bulkInsertStateData(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	stateBlockNID types.StateBlockNID,
 	entries []types.StateEntry,
 ) error {
 	for _, entry := range entries {
-		_, err := s.insertStateDataStmt.ExecContext(
+		_, err := common.TxStmt(txn, s.insertStateDataStmt).ExecContext(
 			ctx,
 			int64(stateBlockNID),
 			int64(entry.EventTypeNID),
@@ -115,20 +116,23 @@ func (s *stateBlockStatements) bulkInsertStateData(
 
 func (s *stateBlockStatements) selectNextStateBlockNID(
 	ctx context.Context,
+	txn *sql.Tx,
 ) (types.StateBlockNID, error) {
 	var stateBlockNID int64
-	err := s.selectNextStateBlockNIDStmt.QueryRowContext(ctx).Scan(&stateBlockNID)
+	selectStmt := common.TxStmt(txn, s.selectNextStateBlockNIDStmt)
+	err := selectStmt.QueryRowContext(ctx).Scan(&stateBlockNID)
 	return types.StateBlockNID(stateBlockNID), err
 }
 
 func (s *stateBlockStatements) bulkSelectStateBlockEntries(
-	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
+	ctx context.Context, txn *sql.Tx, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
 	nids := make([]int64, len(stateBlockNIDs))
 	for i := range stateBlockNIDs {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
-	rows, err := s.bulkSelectStateBlockEntriesStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
+	selectStmt := common.TxStmt(txn, s.bulkSelectStateBlockEntriesStmt)
+	rows, err := selectStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
 	if err != nil {
 		fmt.Println("bulkSelectStateBlockEntries s.bulkSelectStateBlockEntriesStmt.QueryContext:", err)
 		return nil, err
@@ -173,7 +177,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 }
 
 func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	stateBlockNIDs []types.StateBlockNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
@@ -182,7 +186,8 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	sort.Sort(tuples)
 
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
-	rows, err := s.bulkSelectFilteredStateBlockEntriesStmt.QueryContext(
+	selectStmt := common.TxStmt(txn, s.bulkSelectFilteredStateBlockEntriesStmt)
+	rows, err := selectStmt.QueryContext(
 		ctx,
 		stateBlockNIDsAsArray(stateBlockNIDs),
 		eventTypeNIDArray,

@@ -16,6 +16,7 @@ package input
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -35,16 +36,19 @@ func checkAuthEvents(
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("authStateEntries:", authStateEntries)
 	// TODO: check for duplicate state keys here.
 
 	// Work out which of the state events we actually need.
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event})
+	fmt.Println("stateNeeded:", stateNeeded)
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("authEvents:", authEvents)
 
 	// Check if the event is allowed.
 	if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {

@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -61,9 +62,9 @@ func (s *eventJSONStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *eventJSONStatements) insertEventJSON(
-	ctx context.Context, eventNID types.EventNID, eventJSON []byte,
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, eventJSON []byte,
 ) error {
-	_, err := s.insertEventJSONStmt.ExecContext(ctx, int64(eventNID), eventJSON)
+	_, err := common.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
 	return err
 }
 
@@ -73,9 +74,9 @@ type eventJSONPair struct {
 }
 
 func (s *eventJSONStatements) bulkSelectEventJSON(
-	ctx context.Context, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]eventJSONPair, error) {
-	rows, err := s.bulkSelectEventJSONStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+	rows, err := common.TxStmt(txn, s.bulkSelectEventJSONStmt).QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		fmt.Println("bulkSelectEventJSON s.bulkSelectEventJSONStmt.QueryContext:", err)
 		return nil, err
