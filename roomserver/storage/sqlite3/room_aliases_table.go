@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 const roomAliasesSchema = `
@@ -76,6 +77,9 @@ func (s *roomAliasesStatements) insertRoomAlias(
 	ctx context.Context, alias string, roomID string, creatorUserID string,
 ) (err error) {
 	_, err = s.insertRoomAliasStmt.ExecContext(ctx, alias, roomID, creatorUserID)
+	if err != nil {
+		fmt.Println("insertRoomAlias s.insertRoomAliasStmt.ExecContent:", err)
+	}
 	return
 }
 
@@ -95,12 +99,14 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 	aliases = []string{}
 	rows, err := s.selectAliasesFromRoomIDStmt.QueryContext(ctx, roomID)
 	if err != nil {
+		fmt.Println("selectAliasesFromRoomID s.selectAliasesFromRoomIDStmt.QueryContext:", err)
 		return
 	}
 
 	for rows.Next() {
 		var alias string
 		if err = rows.Scan(&alias); err != nil {
+			fmt.Println("selectAliasesFromRoomID rows.Scan:", err)
 			return
 		}
 

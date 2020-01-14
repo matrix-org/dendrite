@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -95,6 +96,11 @@ func (s *eventStateKeyStatements) insertEventStateKeyNID(
 	selectStmt := common.TxStmt(txn, s.insertEventStateKeyNIDResultStmt)
 	if _, err = insertStmt.ExecContext(ctx, eventStateKey); err == nil {
 		err = selectStmt.QueryRowContext(ctx).Scan(&eventStateKeyNID)
+		if err != nil {
+			fmt.Println("insertEventStateKeyNID selectStmt.QueryRowContext:", err)
+		}
+	} else {
+		fmt.Println("insertEventStateKeyNID insertStmt.ExecContext:", err)
 	}
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
@@ -105,6 +111,9 @@ func (s *eventStateKeyStatements) selectEventStateKeyNID(
 	var eventStateKeyNID int64
 	stmt := common.TxStmt(txn, s.selectEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
+	if err != nil {
+		fmt.Println("selectEventStateKeyNID stmt.QueryRowContext:", err)
+	}
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
@@ -115,6 +124,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 		ctx, pq.StringArray(eventStateKeys),
 	)
 	if err != nil {
+		fmt.Println("bulkSelectEventStateKeyNID s.bulkSelectEventStateKeyNIDStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -123,6 +133,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 		var stateKey string
 		var stateKeyNID int64
 		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
+			fmt.Println("bulkSelectEventStateKeyNID rows.Scan:", err)
 			return nil, err
 		}
 		result[stateKey] = types.EventStateKeyNID(stateKeyNID)
@@ -139,6 +150,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	}
 	rows, err := s.bulkSelectEventStateKeyStmt.QueryContext(ctx, nIDs)
 	if err != nil {
+		fmt.Println("bulkSelectEventStateKey s.bulkSelectEventStateKeyStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -147,6 +159,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 		var stateKey string
 		var stateKeyNID int64
 		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
+			fmt.Println("bulkSelectEventStateKey rows.Scan:", err)
 			return nil, err
 		}
 		result[types.EventStateKeyNID(stateKeyNID)] = stateKey

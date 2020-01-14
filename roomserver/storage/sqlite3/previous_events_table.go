@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -78,6 +79,9 @@ func (s *previousEventStatements) insertPreviousEvent(
 	_, err := stmt.ExecContext(
 		ctx, previousEventID, previousEventReferenceSHA256, int64(eventNID),
 	)
+	if err != nil {
+		fmt.Println("insertPreviousEvent stmt.ExecContext:", err)
+	}
 	return err
 }
 
@@ -88,5 +92,8 @@ func (s *previousEventStatements) selectPreviousEventExists(
 ) error {
 	var ok int64
 	stmt := common.TxStmt(txn, s.selectPreviousEventExistsStmt)
+	defer func() {
+		fmt.Println("SELECTED PREVIOUS EVENT EXISTS", ok)
+	}()
 	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
 }

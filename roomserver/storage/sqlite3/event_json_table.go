@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -76,6 +77,7 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 ) ([]eventJSONPair, error) {
 	rows, err := s.bulkSelectEventJSONStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
+		fmt.Println("bulkSelectEventJSON s.bulkSelectEventJSONStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -90,6 +92,7 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 		result := &results[i]
 		var eventNID int64
 		if err := rows.Scan(&eventNID, &result.EventJSON); err != nil {
+			fmt.Println("bulkSelectEventJSON rows.Scan:", err)
 			return nil, err
 		}
 		result.EventNID = types.EventNID(eventNID)

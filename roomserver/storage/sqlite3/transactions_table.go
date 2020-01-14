@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 const transactionsSchema = `
@@ -66,6 +67,9 @@ func (s *transactionStatements) insertTransaction(
 	_, err = s.insertTransactionStmt.ExecContext(
 		ctx, transactionID, sessionID, userID, eventID,
 	)
+	if err != nil {
+		fmt.Println("insertTransaction s.insertTransactionStmt.ExecContent:", err)
+	}
 	return
 }
 
@@ -78,5 +82,8 @@ func (s *transactionStatements) selectTransactionEventID(
 	err = s.selectTransactionEventIDStmt.QueryRowContext(
 		ctx, transactionID, sessionID, userID,
 	).Scan(&eventID)
+	if err != nil {
+		fmt.Println("selectTransactionEventID s.selectTransactionEventIDStmt.QueryRowContext:", err)
+	}
 	return
 }

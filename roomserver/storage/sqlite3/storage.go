@@ -18,6 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -39,16 +41,20 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	var cs string
 	if uri.Opaque != "" { // file:filename.db
-		if d.db, err = sql.Open("sqlite3", uri.Opaque); err != nil {
-			return nil, err
-		}
+		cs = fmt.Sprintf("%s?cache=shared&_busy_timeout=9999999", uri.Opaque)
+	} else if uri.Path != "" { // file:///path/to/filename.db
+		cs = fmt.Sprintf("%s?cache=shared&_busy_timeout=9999999", uri.Path)
+	} else {
+		return nil, errors.New("no filename or path in connect string")
 	}
-	if uri.Path != "" { // file:///path/to/filename.db
-		if d.db, err = sql.Open("sqlite3", uri.Path); err != nil {
-			return nil, err
-		}
+	if d.db, err = sql.Open("sqlite3", cs); err != nil {
+		return nil, err
 	}
+	//d.db.Exec("PRAGMA journal_mode=WAL;")
+	//d.db.Exec("PRAGMA parser_trace = true;")
+	d.db.SetMaxOpenConns(1)
 	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}

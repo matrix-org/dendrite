@@ -42,7 +42,7 @@ const insertStateDataSQL = "" +
 
 const selectNextStateBlockNIDSQL = `
 	SELECT COALESCE((
-		SELECT seq AS state_block_nid FROM sqlite_sequence
+		SELECT seq+1 AS state_block_nid FROM sqlite_sequence
 		WHERE name = 'roomserver_state_block'), 0
 	) AS state_block_nid
 `
@@ -106,6 +106,7 @@ func (s *stateBlockStatements) bulkInsertStateData(
 			int64(entry.EventNID),
 		)
 		if err != nil {
+			fmt.Println("bulkInsertStateData s.insertStateDataStmt.ExecContext:", err)
 			return err
 		}
 	}
@@ -127,8 +128,9 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	for i := range stateBlockNIDs {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
-	rows, err := s.bulkSelectStateBlockEntriesStmt.QueryContext(ctx, pq.Int64Array(nids))
+	rows, err := s.bulkSelectStateBlockEntriesStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
 	if err != nil {
+		fmt.Println("bulkSelectStateBlockEntries s.bulkSelectStateBlockEntriesStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -148,8 +150,10 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 		if err := rows.Scan(
 			&stateBlockNID, &eventTypeNID, &eventStateKeyNID, &eventNID,
 		); err != nil {
+			fmt.Println("bulkSelectStateBlockEntries rows.Scan:", err)
 			return nil, err
 		}
+		fmt.Println("state block NID", stateBlockNID, "event type NID", eventTypeNID, "event state key NID", eventStateKeyNID, "event NID", eventNID)
 		entry.EventTypeNID = types.EventTypeNID(eventTypeNID)
 		entry.EventStateKeyNID = types.EventStateKeyNID(eventStateKeyNID)
 		entry.EventNID = types.EventNID(eventNID)
@@ -162,8 +166,8 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 		}
 		current.StateEntries = append(current.StateEntries, entry)
 	}
-	if i != len(stateBlockNIDs) {
-		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(stateBlockNIDs))
+	if i != len(nids) {
+		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(nids))
 	}
 	return results, nil
 }
@@ -182,9 +186,10 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 		ctx,
 		stateBlockNIDsAsArray(stateBlockNIDs),
 		eventTypeNIDArray,
-		eventStateKeyNIDArray,
+		sqliteIn(eventStateKeyNIDArray),
 	)
 	if err != nil {
+		fmt.Println("bulkSelectFilteredStateBlockEntries s.bulkSelectFilteredStateBlockEntriesStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -202,6 +207,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 		if err := rows.Scan(
 			&stateBlockNID, &eventTypeNID, &eventStateKeyNID, &eventNID,
 		); err != nil {
+			fmt.Println("bulkSelectFilteredStateBlockEntries rows.Scan:", err)
 			return nil, err
 		}
 		entry.EventTypeNID = types.EventTypeNID(eventTypeNID)

@@ -77,6 +77,11 @@ func (s *stateSnapshotStatements) insertState(
 	}
 	if _, err = s.insertStateStmt.ExecContext(ctx, int64(roomNID), pq.Int64Array(nids)); err == nil {
 		err = s.insertStateResultStmt.QueryRowContext(ctx).Scan(&stateNID)
+		if err != nil {
+			fmt.Println("insertState s.insertStateResultStmt.QueryRowContext:", err)
+		}
+	} else {
+		fmt.Println("insertState s.insertStateStmt.ExecContext:", err)
 	}
 	return
 }
@@ -90,6 +95,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	}
 	rows, err := s.bulkSelectStateBlockNIDsStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
 	if err != nil {
+		fmt.Println("bulkSelectStateBlockNIDs s.bulkSelectStateBlockNIDsStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -99,6 +105,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 		result := &results[i]
 		var stateBlockNIDs pq.Int64Array
 		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDs); err != nil {
+			fmt.Println("bulkSelectStateBlockNIDs rows.Scan:", err)
 			return nil, err
 		}
 		result.StateBlockNIDs = make([]types.StateBlockNID, len(stateBlockNIDs))

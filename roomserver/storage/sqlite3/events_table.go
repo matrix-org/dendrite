@@ -247,6 +247,9 @@ func (s *eventStatements) updateEventState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
 	_, err := s.updateEventStateStmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
+	if err != nil {
+		fmt.Println("updateEventState s.updateEventStateStmt.ExecContext:", err)
+	}
 	return err
 }
 
@@ -255,12 +258,20 @@ func (s *eventStatements) selectEventSentToOutput(
 ) (sentToOutput bool, err error) {
 	stmt := common.TxStmt(txn, s.selectEventSentToOutputStmt)
 	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
+	//err = s.selectEventSentToOutputStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
+	if err != nil {
+		fmt.Println("selectEventSentToOutput stmt.QueryRowContext:", err)
+	}
 	return
 }
 
 func (s *eventStatements) updateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
 	stmt := common.TxStmt(txn, s.updateEventSentToOutputStmt)
 	_, err := stmt.ExecContext(ctx, int64(eventNID))
+	//_, err := s.updateEventSentToOutputStmt.ExecContext(ctx, int64(eventNID))
+	if err != nil {
+		fmt.Println("updateEventSentToOutput stmt.QueryRowContext:", err)
+	}
 	return err
 }
 
@@ -269,6 +280,9 @@ func (s *eventStatements) selectEventID(
 ) (eventID string, err error) {
 	stmt := common.TxStmt(txn, s.selectEventIDStmt)
 	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&eventID)
+	if err != nil {
+		fmt.Println("selectEventID stmt.QueryRowContext:", err)
+	}
 	return
 }
 
@@ -276,8 +290,9 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]types.StateAtEventAndReference, error) {
 	stmt := common.TxStmt(txn, s.bulkSelectStateAtEventAndReferenceStmt)
-	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+	rows, err := stmt.QueryContext(ctx, sqliteIn(eventNIDsAsArray(eventNIDs)))
 	if err != nil {
+		fmt.Println("bulkSelectStateAtEventAndREference stmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -295,6 +310,7 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 		if err = rows.Scan(
 			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID, &eventSHA256,
 		); err != nil {
+			fmt.Println("bulkSelectStateAtEventAndReference rows.Scan:", err)
 			return nil, err
 		}
 		result := &results[i]
@@ -314,8 +330,9 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 func (s *eventStatements) bulkSelectEventReference(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]gomatrixserverlib.EventReference, error) {
-	rows, err := s.bulkSelectEventReferenceStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+	rows, err := s.bulkSelectEventReferenceStmt.QueryContext(ctx, sqliteIn(eventNIDsAsArray(eventNIDs)))
 	if err != nil {
+		fmt.Println("bulkSelectEventReference s.bulkSelectEventReferenceStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -324,6 +341,7 @@ func (s *eventStatements) bulkSelectEventReference(
 	for ; rows.Next(); i++ {
 		result := &results[i]
 		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
+			fmt.Println("bulkSelectEventReference rows.Scan:", err)
 			return nil, err
 		}
 	}
@@ -335,8 +353,9 @@ func (s *eventStatements) bulkSelectEventReference(
 
 // bulkSelectEventID returns a map from numeric event ID to string event ID.
 func (s *eventStatements) bulkSelectEventID(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
-	rows, err := s.bulkSelectEventIDStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+	rows, err := s.bulkSelectEventIDStmt.QueryContext(ctx, sqliteIn(eventNIDsAsArray(eventNIDs)))
 	if err != nil {
+		fmt.Println("bulkSelectEventID s.bulkSelectEventIDStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -346,6 +365,7 @@ func (s *eventStatements) bulkSelectEventID(ctx context.Context, eventNIDs []typ
 		var eventNID int64
 		var eventID string
 		if err = rows.Scan(&eventNID, &eventID); err != nil {
+			fmt.Println("bulkSelectEventID rows.Scan:", err)
 			return nil, err
 		}
 		results[types.EventNID(eventNID)] = eventID
@@ -361,6 +381,7 @@ func (s *eventStatements) bulkSelectEventID(ctx context.Context, eventNIDs []typ
 func (s *eventStatements) bulkSelectEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error) {
 	rows, err := s.bulkSelectEventNIDStmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
+		fmt.Println("bulkSelectEventNID s.bulkSelectEventNIDStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -369,6 +390,7 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, eventIDs []str
 		var eventID string
 		var eventNID int64
 		if err = rows.Scan(&eventID, &eventNID); err != nil {
+			fmt.Println("bulkSelectEventNID rows.Scan:", err)
 			return nil, err
 		}
 		results[eventID] = types.EventNID(eventNID)
@@ -379,8 +401,9 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, eventIDs []str
 func (s *eventStatements) selectMaxEventDepth(ctx context.Context, eventNIDs []types.EventNID) (int64, error) {
 	var result int64
 	stmt := s.selectMaxEventDepthStmt
-	err := stmt.QueryRowContext(ctx, eventNIDsAsArray(eventNIDs)).Scan(&result)
+	err := stmt.QueryRowContext(ctx, sqliteIn(eventNIDsAsArray(eventNIDs))).Scan(&result)
 	if err != nil {
+		fmt.Println("selectMaxEventDepth stmt.QueryRowContext:", err)
 		return 0, err
 	}
 	return result, nil
