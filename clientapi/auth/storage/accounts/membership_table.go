@@ -127,6 +127,5 @@ func (s *membershipStatements) selectMembershipsByLocalpart(
 		}
 		memberships = append(memberships, m)
 	}
-	err = rows.Err()
-	return
+	return memberships, rows.Err()
 }

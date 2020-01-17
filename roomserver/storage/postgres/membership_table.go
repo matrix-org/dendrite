@@ -160,9 +160,9 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 		}
 		eventNIDs = append(eventNIDs, eNID)
 	}
-	err = rows.Err()
-	return
+	return eventNIDs, rows.Err()
 }
+
 func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 	ctx context.Context,
 	roomNID types.RoomNID, membership membershipState,
@@ -181,8 +181,7 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 		}
 		eventNIDs = append(eventNIDs, eNID)
 	}
-	err = rows.Err()
-	return
+	return eventNIDs, rows.Err()
 }
 
 func (s *membershipStatements) updateMembership(

@@ -111,8 +111,7 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 			Medium:  medium,
 		})
 	}
-	err = rows.Err()
-	return
+	return threepids, rows.Err()
 }
 
 func (s *threepidStatements) insertThreePID(

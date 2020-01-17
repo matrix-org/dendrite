@@ -134,8 +134,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 			data[roomID] = []string{dataType}
 		}
 	}
-	err = rows.Err()
-	return
+	return data, rows.Err()
 }
 
 func (s *accountDataStatements) selectMaxAccountDataID(

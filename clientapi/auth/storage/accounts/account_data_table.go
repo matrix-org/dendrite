@@ -115,8 +115,7 @@ func (s *accountDataStatements) selectAccountData(
 			global = append(global, ac)
 		}
 	}
-	err = rows.Err()
-	return
+	return global, rooms, rows.Err()
 }
 
 func (s *accountDataStatements) selectAccountDataByType(
