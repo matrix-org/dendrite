@@ -13,10 +13,12 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/lib/pq v0.0.0-20170918175043-23da1db4f16d
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
+	github.com/matrix-org/go-sqlite3-js v0.0.0-20200119033421-beabc8946bf7
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20200110113524-5f9a44f2fc67
 	github.com/matrix-org/naffka v0.0.0-20171115094957-662bfd0841d0
 	github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5
+	github.com/mattn/go-sqlite3 v2.0.2+incompatible
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
 	github.com/opentracing/opentracing-go v0.0.0-20170806192116-8ebe5d4e236e
 	github.com/pierrec/lz4 v0.0.0-20161206202305-5c9560bfa9ac // indirect

@@ -26,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/matrix-org/go-sqlite3-js/sqlite3_js"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -50,7 +50,7 @@ func Open(dataSourceName string) (*Database, error) {
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sql.Open("sqlite3", cs); err != nil {
+	if d.db, err = sql.Open("sqlite3_js", cs); err != nil {
 		return nil, err
 	}
 	d.db.Exec("PRAGMA journal_mode=WAL;")
