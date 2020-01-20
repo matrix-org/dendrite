@@ -82,5 +82,4 @@ func SetupSyncAPIComponent(
 	}
 
 	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, federation, queryAPI, cfg)
-	//routing.Setup(base.APIMux, requestPool, syncDB, deviceDB)
 }

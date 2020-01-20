@@ -160,17 +160,6 @@ type Response struct {
 	} `json:"rooms"`
 }
 
-/*
-
-func NewResponse(pos StreamPosition) *Response {
-	res := Response{}
-	// Fill next_batch with a pagination token. Since this is a response to a sync request, we can assume
-	// we'll always return a stream token.
-	res.NextBatch = NewPaginationTokenFromTypeAndPosition(PaginationTokenTypeStream, pos).String()
-}
-
-*/
-
 // NewResponse creates an empty response with initialised maps.
 func NewResponse(pos SyncPosition) *Response {
 	res := Response{
@@ -188,6 +177,10 @@ func NewResponse(pos SyncPosition) *Response {
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
 	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
+
+	// Fill next_batch with a pagination token. Since this is a response to a sync request, we can assume
+	// we'll always return a stream token.
+	res.NextBatch = NewPaginationTokenFromTypeAndPosition(PaginationTokenTypeStream, pos).String()
 
 	return &res
 }
