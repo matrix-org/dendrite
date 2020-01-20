@@ -46,26 +46,21 @@ type stateDelta struct {
 	membershipPos int64
 }
 
-// Same as gomatrixserverlib.Event but also has the PDU stream position for this event.
-type streamEvent struct {
-	gomatrixserverlib.Event
-	streamPosition int64
-	transactionID  *api.TransactionID
-}
-
-// SyncServerDatabase represents a sync server datasource which manages
+// SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	db *sql.DB
 	common.PartitionOffsetStatements
-	accountData accountDataStatements
-	events      outputRoomEventsStatements
-	roomstate   currentRoomStateStatements
-	invites     inviteEventsStatements
-	typingCache *cache.TypingCache
+	accountData         accountDataStatements
+	events              outputRoomEventsStatements
+	roomstate           currentRoomStateStatements
+	invites             inviteEventsStatements
+	typingCache         *cache.TypingCache
+	topology            outputRoomEventsTopologyStatements
+	backwardExtremities backwardExtremitiesStatements
 }
 
-// NewSyncServerDatabase creates a new sync server database
+// NewSyncServerDatasource creates a new sync server database
 func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
@@ -85,6 +80,12 @@ func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, er
 		return nil, err
 	}
 	if err := d.invites.prepare(d.db); err != nil {
+		return nil, err
+	}
+	if err := d.topology.prepare(d.db); err != nil {
+		return nil, err
+	}
+	if err := d.backwardExtremities.prepare(d.db); err != nil {
 		return nil, err
 	}
 	d.typingCache = cache.NewTypingCache()
@@ -109,7 +110,7 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 
 	// We don't include a device here as we only include transaction IDs in
 	// incremental syncs.
-	return streamEventsToEvents(nil, streamEvents), nil
+	return d.StreamEventsToEvents(nil, streamEvents), nil
 }
 
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
@@ -120,15 +121,56 @@ func (d *SyncServerDatasource) WriteEvent(
 	ev *gomatrixserverlib.Event,
 	addStateEvents []gomatrixserverlib.Event,
 	addStateEventIDs, removeStateEventIDs []string,
-	transactionID *api.TransactionID,
+	transactionID *api.TransactionID, excludeFromSync bool,
 ) (pduPosition int64, returnErr error) {
 	returnErr = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var err error
-		pos, err := d.events.insertEvent(ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID)
+		pos, err := d.events.insertEvent(
+			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
+		)
 		if err != nil {
 			return err
 		}
 		pduPosition = pos
+
+		if err = d.topology.insertEventInTopology(ctx, ev); err != nil {
+			return err
+		}
+
+		// If the event is already known as a backward extremity, don't consider
+		// it as such anymore now that we have it.
+		isBackwardExtremity, err := d.backwardExtremities.isBackwardExtremity(ctx, ev.RoomID(), ev.EventID())
+		if err != nil {
+			return err
+		}
+		if isBackwardExtremity {
+			if err = d.backwardExtremities.deleteBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+				return err
+			}
+		}
+
+		// Check if we have all of the event's previous events. If an event is
+		// missing, add it to the room's backward extremities.
+		prevEvents, err := d.events.selectEvents(ctx, nil, ev.PrevEventIDs())
+		if err != nil {
+			return err
+		}
+		var found bool
+		for _, eID := range ev.PrevEventIDs() {
+			found = false
+			for _, prevEv := range prevEvents {
+				if eID == prevEv.EventID() {
+					found = true
+				}
+			}
+
+			// If the event is missing, consider it a backward extremity.
+			if !found {
+				if err = d.backwardExtremities.insertsBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+					return err
+				}
+			}
+		}
 
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
 			// Nothing to do, the event may have just been a message event.
@@ -196,9 +238,136 @@ func (d *SyncServerDatasource) GetStateEventsForRoom(
 	return
 }
 
+// GetEventsInRange retrieves all of the events on a given ordering using the
+// given extremities and limit.
+func (d *SyncServerDatasource) GetEventsInRange(
+	ctx context.Context,
+	from, to *types.PaginationToken,
+	roomID string, limit int,
+	backwardOrdering bool,
+) (events []types.StreamEvent, err error) {
+	// If the pagination token's type is types.PaginationTokenTypeTopology, the
+	// events must be retrieved from the rooms' topology table rather than the
+	// table contaning the syncapi server's whole stream of events.
+	if from.Type == types.PaginationTokenTypeTopology {
+		// Determine the backward and forward limit, i.e. the upper and lower
+		// limits to the selection in the room's topology, from the direction.
+		var backwardLimit, forwardLimit types.StreamPosition
+		if backwardOrdering {
+			// Backward ordering is antichronological (latest event to oldest
+			// one).
+			backwardLimit = to.Position
+			forwardLimit = from.Position
+		} else {
+			// Forward ordering is chronological (oldest event to latest one).
+			backwardLimit = from.Position
+			forwardLimit = to.Position
+		}
+
+		// Select the event IDs from the defined range.
+		var eIDs []string
+		eIDs, err = d.topology.selectEventIDsInRange(
+			ctx, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
+		)
+		if err != nil {
+			return
+		}
+
+		// Retrieve the events' contents using their IDs.
+		events, err = d.events.selectEvents(ctx, nil, eIDs)
+		return
+	}
+
+	// If the pagination token's type is types.PaginationTokenTypeStream, the
+	// events must be retrieved from the table contaning the syncapi server's
+	// whole stream of events.
+
+	if backwardOrdering {
+		// When using backward ordering, we want the most recent events first.
+		if events, err = d.events.selectRecentEvents(
+			ctx, nil, roomID, to.Position, from.Position, limit, false, false,
+		); err != nil {
+			return
+		}
+	} else {
+		// When using forward ordering, we want the least recent events first.
+		if events, err = d.events.selectEarlyEvents(
+			ctx, nil, roomID, from.Position, to.Position, limit,
+		); err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 // SyncPosition returns the latest positions for syncing.
 func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (types.SyncPosition, error) {
 	return d.syncPositionTx(ctx, nil)
+}
+
+// BackwardExtremitiesForRoom returns the event IDs of all of the backward
+// extremities we know of for a given room.
+func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
+	ctx context.Context, roomID string,
+) (backwardExtremities []string, err error) {
+	return d.backwardExtremities.selectBackwardExtremitiesForRoom(ctx, roomID)
+}
+
+// MaxTopologicalPosition returns the highest topological position for a given
+// room.
+func (d *SyncServerDatasource) MaxTopologicalPosition(
+	ctx context.Context, roomID string,
+) (types.StreamPosition, error) {
+	return d.topology.selectMaxPositionInTopology(ctx, roomID)
+}
+
+// EventsAtTopologicalPosition returns all of the events matching a given
+// position in the topology of a given room.
+func (d *SyncServerDatasource) EventsAtTopologicalPosition(
+	ctx context.Context, roomID string, pos types.StreamPosition,
+) ([]types.StreamEvent, error) {
+	eIDs, err := d.topology.selectEventIDsFromPosition(ctx, roomID, pos)
+	if err != nil {
+		return nil, err
+	}
+
+	return d.events.selectEvents(ctx, nil, eIDs)
+}
+
+func (d *SyncServerDatasource) EventPositionInTopology(
+	ctx context.Context, eventID string,
+) (types.StreamPosition, error) {
+	return d.topology.selectPositionInTopology(ctx, eventID)
+}
+
+// SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
+func (d *SyncServerDatasource) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
+	return d.syncStreamPositionTx(ctx, nil)
+}
+
+func (d *SyncServerDatasource) syncStreamPositionTx(
+	ctx context.Context, txn *sql.Tx,
+) (types.StreamPosition, error) {
+	maxID, err := d.events.selectMaxEventID(ctx, txn)
+	if err != nil {
+		return 0, err
+	}
+	maxAccountDataID, err := d.accountData.selectMaxAccountDataID(ctx, txn)
+	if err != nil {
+		return 0, err
+	}
+	if maxAccountDataID > maxID {
+		maxID = maxAccountDataID
+	}
+	maxInviteID, err := d.invites.selectMaxInviteID(ctx, txn)
+	if err != nil {
+		return 0, err
+	}
+	if maxInviteID > maxID {
+		maxID = maxInviteID
+	}
+	return types.StreamPosition(maxID), nil
 }
 
 func (d *SyncServerDatasource) syncPositionTx(
@@ -399,9 +568,16 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	defer common.EndTransaction(txn, &succeeded)
 
 	// Get the current sync position which we will base the sync response on.
-	toPos, err = d.syncPositionTx(ctx, txn)
+	/*
+		toPos, err = d.syncPositionTx(ctx, txn)
+		if err != nil {
+			return
+		}
+	*/
+	// Get the current stream position which we will base the sync response on.
+	pos, err := d.syncStreamPositionTx(ctx, txn)
 	if err != nil {
-		return
+		return nil, types.SyncPosition{}, []string{}, err
 	}
 
 	res = types.NewResponse(toPos)
@@ -423,21 +599,38 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		}
 		// TODO: When filters are added, we may need to call this multiple times to get enough events.
 		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-		var recentStreamEvents []streamEvent
+		var recentStreamEvents []types.StreamEvent
 		recentStreamEvents, err = d.events.selectRecentEvents(
-			ctx, txn, roomID, 0, toPos.PDUPosition, numRecentEventsPerRoom,
+			ctx, txn, roomID, types.StreamPosition(0), pos,
+			numRecentEventsPerRoom, true, true,
+			//ctx, txn, roomID, 0, toPos.PDUPosition, numRecentEventsPerRoom,
 		)
 		if err != nil {
 			return
 		}
 
+		// Retrieve the backward topology position, i.e. the position of the
+		// oldest event in the room's topology.
+		var backwardTopologyPos types.StreamPosition
+		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
+		if err != nil {
+			return nil, types.SyncPosition{}, []string{}, err
+		}
+		if backwardTopologyPos-1 <= 0 {
+			backwardTopologyPos = types.StreamPosition(1)
+		} else {
+			backwardTopologyPos = backwardTopologyPos - 1
+		}
+
 		// We don't include a device here as we don't need to send down
 		// transaction IDs for complete syncs
-		recentEvents := streamEventsToEvents(nil, recentStreamEvents)
-
+		recentEvents := d.StreamEventsToEvents(nil, recentStreamEvents)
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
-		if prevPDUPos := recentStreamEvents[0].streamPosition - 1; prevPDUPos > 0 {
+		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
+			types.PaginationTokenTypeTopology, backwardTopologyPos,
+		).String()
+		if prevPDUPos := recentStreamEvents[0].StreamPosition - 1; prevPDUPos > 0 {
 			// Use the short form of batch token for prev_batch
 			jr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
 		} else {
@@ -598,12 +791,13 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		endPos = delta.membershipPos
 	}
 	recentStreamEvents, err := d.events.selectRecentEvents(
-		ctx, txn, delta.roomID, fromPos, endPos, numRecentEventsPerRoom,
+		ctx, txn, delta.roomID, types.StreamPosition(fromPos), types.StreamPosition(endPos),
+		numRecentEventsPerRoom, true, true,
 	)
 	if err != nil {
 		return err
 	}
-	recentEvents := streamEventsToEvents(device, recentStreamEvents)
+	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 
 	var prevPDUPos int64
@@ -618,18 +812,35 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		// state events but no recent events.
 		prevPDUPos = toPos - 1
 	} else {
-		prevPDUPos = recentStreamEvents[0].streamPosition - 1
+		prevPDUPos = recentStreamEvents[0].StreamPosition - 1
 	}
 
 	if prevPDUPos <= 0 {
 		prevPDUPos = 1
 	}
 
+	// Retrieve the backward topology position, i.e. the position of the
+	// oldest event in the room's topology.
+	var backwardTopologyPos types.StreamPosition
+	backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
+	if err != nil {
+		return err
+	}
+	if backwardTopologyPos-1 <= 0 {
+		backwardTopologyPos = types.StreamPosition(1)
+	} else {
+		backwardTopologyPos = backwardTopologyPos - 1
+	}
+
 	switch delta.membership {
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
+
+		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
+			types.PaginationTokenTypeTopology, backwardTopologyPos,
+		).String()
 		// Use the short form of batch token for prev_batch
-		jr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
+		//jr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -640,8 +851,11 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		// TODO: recentEvents may contain events that this user is not allowed to see because they are
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
+		lr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
+			types.PaginationTokenTypeStream, backwardTopologyPos,
+		).String()
 		// Use the short form of batch token for prev_batch
-		lr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
+		//lr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -656,9 +870,9 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 func (d *SyncServerDatasource) fetchStateEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomIDToEventIDSet map[string]map[string]bool,
-	eventIDToEvent map[string]streamEvent,
-) (map[string][]streamEvent, error) {
-	stateBetween := make(map[string][]streamEvent)
+	eventIDToEvent map[string]types.StreamEvent,
+) (map[string][]types.StreamEvent, error) {
+	stateBetween := make(map[string][]types.StreamEvent)
 	missingEvents := make(map[string][]string)
 	for roomID, ids := range roomIDToEventIDSet {
 		events := stateBetween[roomID]
@@ -700,7 +914,7 @@ func (d *SyncServerDatasource) fetchStateEvents(
 
 func (d *SyncServerDatasource) fetchMissingStateEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
-) ([]streamEvent, error) {
+) ([]types.StreamEvent, error) {
 	// Fetch from the events table first so we pick up the stream ID for the
 	// event.
 	events, err := d.events.selectEvents(ctx, txn, eventIDs)
@@ -776,19 +990,25 @@ func (d *SyncServerDatasource) getStateDeltas(
 			if membership := getMembershipFromEvent(&ev.Event, userID); membership != "" {
 				if membership == gomatrixserverlib.Join {
 					// send full room state down instead of a delta
-					var s []streamEvent
+					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilterPart)
 					if err != nil {
 						return nil, nil, err
 					}
+					/*
+						s = make([]StreamEvent, len(allState))
+						for i := 0; i < len(s); i++ {
+							s[i] = StreamEvent{Event: allState[i], StreamPosition: types.StreamPosition(0)}
+						}
+					*/
 					state[roomID] = s
 					continue // we'll add this room in when we do joined rooms
 				}
 
 				deltas = append(deltas, stateDelta{
 					membership:    membership,
-					membershipPos: ev.streamPosition,
-					stateEvents:   streamEventsToEvents(device, stateStreamEvents),
+					membershipPos: ev.StreamPosition,
+					stateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
 					roomID:        roomID,
 				})
 				break
@@ -804,7 +1024,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, stateDelta{
 			membership:  gomatrixserverlib.Join,
-			stateEvents: streamEventsToEvents(device, state[joinedRoomID]),
+			stateEvents: d.StreamEventsToEvents(device, state[joinedRoomID]),
 			roomID:      joinedRoomID,
 		})
 	}
@@ -837,7 +1057,7 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 		}
 		deltas = append(deltas, stateDelta{
 			membership:  gomatrixserverlib.Join,
-			stateEvents: streamEventsToEvents(device, s),
+			stateEvents: d.StreamEventsToEvents(device, s),
 			roomID:      joinedRoomID,
 		})
 	}
@@ -858,8 +1078,8 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 				if membership != gomatrixserverlib.Join { // We've already added full state for all joined rooms above.
 					deltas = append(deltas, stateDelta{
 						membership:    membership,
-						membershipPos: ev.streamPosition,
-						stateEvents:   streamEventsToEvents(device, stateStreamEvents),
+						membershipPos: ev.StreamPosition,
+						stateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
 						roomID:        roomID,
 					})
 				}
@@ -875,29 +1095,29 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 func (d *SyncServerDatasource) currentStateStreamEventsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilterPart *gomatrix.FilterPart,
-) ([]streamEvent, error) {
+) ([]types.StreamEvent, error) {
 	allState, err := d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
 	if err != nil {
 		return nil, err
 	}
-	s := make([]streamEvent, len(allState))
+	s := make([]types.StreamEvent, len(allState))
 	for i := 0; i < len(s); i++ {
-		s[i] = streamEvent{Event: allState[i], streamPosition: 0}
+		s[i] = types.StreamEvent{Event: allState[i], StreamPosition: 0}
 	}
 	return s, nil
 }
 
-// streamEventsToEvents converts streamEvent to Event. If device is non-nil and
+// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 // matches the streamevent.transactionID device then the transaction ID gets
 // added to the unsigned section of the output event.
-func streamEventsToEvents(device *authtypes.Device, in []streamEvent) []gomatrixserverlib.Event {
+func (d *SyncServerDatasource) StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.Event {
 	out := make([]gomatrixserverlib.Event, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].Event
-		if device != nil && in[i].transactionID != nil {
-			if device.UserID == in[i].Sender() && device.SessionID == in[i].transactionID.SessionID {
+		if device != nil && in[i].TransactionID != nil {
+			if device.UserID == in[i].Sender() && device.SessionID == in[i].TransactionID.SessionID {
 				err := out[i].SetUnsignedField(
-					"transaction_id", in[i].transactionID.TransactionID,
+					"transaction_id", in[i].TransactionID.TransactionID,
 				)
 				if err != nil {
 					logrus.WithFields(logrus.Fields{

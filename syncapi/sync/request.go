@@ -17,6 +17,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,6 +32,12 @@ import (
 
 const defaultSyncTimeout = time.Duration(0)
 const defaultTimelineLimit = 20
+
+var (
+	// ErrNotStreamToken is returned if a pagination token isn't of type
+	// types.PaginationTokenTypeStream
+	ErrNotStreamToken = fmt.Errorf("The provided pagination token has the wrong prefix (should be s)")
+)
 
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
@@ -72,6 +79,23 @@ func getTimeout(timeoutMS string) time.Duration {
 		return defaultSyncTimeout
 	}
 	return time.Duration(i) * time.Millisecond
+}
+
+// getPaginationToken tries to parse a 'since' token taken from the API to a
+// pagination token. If the string is empty then (nil, nil) is returned.
+// Returns an error if the parsed token's type isn't types.PaginationTokenTypeStream.
+func getPaginationToken(since string) (*types.StreamPosition, error) {
+	if since == "" {
+		return nil, nil
+	}
+	p, err := types.NewPaginationTokenFromString(since)
+	if err != nil {
+		return nil, err
+	}
+	if p.Type != types.PaginationTokenTypeStream {
+		return nil, ErrNotStreamToken
+	}
+	return &(p.Position), nil
 }
 
 // getSyncStreamPosition tries to parse a 'since' token taken from the API to a

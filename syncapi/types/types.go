@@ -16,10 +16,22 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
+
+var (
+	// ErrInvalidPaginationTokenType is returned when an attempt at creating a
+	// new instance of PaginationToken with an invalid type (i.e. neither "s"
+	// nor "t").
+	ErrInvalidPaginationTokenType = fmt.Errorf("Pagination token has an unknown prefix (should be either s or t)")
+)
+
+// StreamPosition represents the offset in the sync stream a client is at.
+type StreamPosition int64
 
 // SyncPosition contains the PDU and EDU stream sync positions for a client.
 type SyncPosition struct {
@@ -27,6 +39,14 @@ type SyncPosition struct {
 	PDUPosition int64
 	// TypingPosition is the client's position for typing notifications.
 	TypingPosition int64
+}
+
+// Same as gomatrixserverlib.Event but also has the PDU stream position for this event.
+type StreamEvent struct {
+	gomatrixserverlib.Event
+	StreamPosition  int64
+	TransactionID   *api.TransactionID
+	ExcludeFromSync bool
 }
 
 // String implements the Stringer interface.
@@ -55,6 +75,68 @@ func (sp SyncPosition) WithUpdates(other SyncPosition) SyncPosition {
 	return ret
 }
 
+// PaginationTokenType represents the type of a pagination token.
+// It can be either "s" (representing a position in the whole stream of events)
+// or "t" (representing a position in a room's topology/depth).
+type PaginationTokenType string
+
+const (
+	// PaginationTokenTypeStream represents a position in the server's whole
+	// stream of events
+	PaginationTokenTypeStream PaginationTokenType = "s"
+	// PaginationTokenTypeTopology represents a position in a room's topology.
+	PaginationTokenTypeTopology PaginationTokenType = "t"
+)
+
+// PaginationToken represents a pagination token, used for interactions with
+// /sync or /messages, for example.
+type PaginationToken struct {
+	Position StreamPosition
+	Type     PaginationTokenType
+}
+
+// NewPaginationTokenFromString takes a string of the form "xyyyy..." where "x"
+// represents the type of a pagination token and "yyyy..." the token itself, and
+// parses it in order to create a new instance of PaginationToken. Returns an
+// error if the token couldn't be parsed into an int64, or if the token type
+// isn't a known type (returns ErrInvalidPaginationTokenType in the latter
+// case).
+func NewPaginationTokenFromString(s string) (p *PaginationToken, err error) {
+	p = new(PaginationToken)
+
+	// Parse the token (aka position).
+	position, err := strconv.ParseInt(s[1:], 10, 64)
+	if err != nil {
+		return
+	}
+	p.Position = StreamPosition(position)
+
+	// Check if the type is among the known ones.
+	p.Type = PaginationTokenType(s[:1])
+	if p.Type != PaginationTokenTypeStream && p.Type != PaginationTokenTypeTopology {
+		err = ErrInvalidPaginationTokenType
+	}
+
+	return
+}
+
+// NewPaginationTokenFromTypeAndPosition takes a PaginationTokenType and a
+// StreamPosition and returns an instance of PaginationToken.
+func NewPaginationTokenFromTypeAndPosition(
+	t PaginationTokenType, pos StreamPosition,
+) (p *PaginationToken) {
+	return &PaginationToken{
+		Type:     t,
+		Position: pos,
+	}
+}
+
+// String translates a PaginationToken to a string of the "xyyyy..." (see
+// NewPaginationToken to know what it represents).
+func (p *PaginationToken) String() string {
+	return fmt.Sprintf("%s%d", p.Type, p.Position)
+}
+
 // PrevEventRef represents a reference to a previous event in a state event upgrade
 type PrevEventRef struct {
 	PrevContent   json.RawMessage `json:"prev_content"`
@@ -77,6 +159,17 @@ type Response struct {
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
 }
+
+/*
+
+func NewResponse(pos StreamPosition) *Response {
+	res := Response{}
+	// Fill next_batch with a pagination token. Since this is a response to a sync request, we can assume
+	// we'll always return a stream token.
+	res.NextBatch = NewPaginationTokenFromTypeAndPosition(PaginationTokenTypeStream, pos).String()
+}
+
+*/
 
 // NewResponse creates an empty response with initialised maps.
 func NewResponse(pos SyncPosition) *Response {

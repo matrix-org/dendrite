@@ -33,7 +33,7 @@ type Database interface {
 	common.PartitionStorer
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
 	Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error)
-	WriteEvent(ctx context.Context, ev *gomatrixserverlib.Event, addStateEvents []gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string, transactionID *api.TransactionID) (pduPosition int64, returnErr error)
+	WriteEvent(context.Context, *gomatrixserverlib.Event, []gomatrixserverlib.Event, []string, []string, *api.TransactionID, bool) (int64, error)
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.Event, error)
 	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrix.FilterPart) (stateEvents []gomatrixserverlib.Event, err error)
 	SyncPosition(ctx context.Context) (types.SyncPosition, error)
@@ -46,6 +46,11 @@ type Database interface {
 	SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn)
 	AddTypingUser(userID, roomID string, expireTime *time.Time) int64
 	RemoveTypingUser(userID, roomID string) int64
+	GetEventsInRange(ctx context.Context, from, to *types.PaginationToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
+	EventPositionInTopology(ctx context.Context, eventID string) (types.StreamPosition, error)
+	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities []string, err error)
+	MaxTopologicalPosition(ctx context.Context, roomID string) (types.StreamPosition, error)
+	StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.Event
 }
 
 // NewPublicRoomsServerDatabase opens a database connection.

@@ -26,10 +26,11 @@ func main() {
 
 	deviceDB := base.CreateDeviceDB()
 	accountDB := base.CreateAccountsDB()
+	federation := base.CreateFederationClient()
 
 	_, _, query := base.CreateHTTPRoomserverAPIs()
 
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query)
+	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
 
