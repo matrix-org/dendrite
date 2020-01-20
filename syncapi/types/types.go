@@ -180,7 +180,7 @@ func NewResponse(pos SyncPosition) *Response {
 
 	// Fill next_batch with a pagination token. Since this is a response to a sync request, we can assume
 	// we'll always return a stream token.
-	res.NextBatch = NewPaginationTokenFromTypeAndPosition(PaginationTokenTypeStream, pos).String()
+	//res.NextBatch = NewPaginationTokenFromTypeAndPosition(PaginationTokenTypeStream, pos).String()
 
 	return &res
 }
