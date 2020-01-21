@@ -59,7 +59,7 @@ Once the tests are complete, run the helper script to see if you need to add
 any newly passing test names to `testfile` in the project's root directory:
 
 ```sh
-../dendrite/show-expected-fail-tests.sh results.tap ../dendrite/testfile
+../dendrite/show-expected-fail-tests.sh results.tap ../dendrite/testfile ../dendrite/sytest-blacklist
 ```
 
 If the script prints nothing/exits with 0, then you're good to go.
