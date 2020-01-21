@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -86,7 +87,7 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 
 func (s *inviteEventsStatements) insertInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.Event,
-) (streamPos int64, err error) {
+) (streamPos types.StreamPosition, err error) {
 	err = s.insertInviteEventStmt.QueryRowContext(
 		ctx,
 		inviteEvent.RoomID(),
@@ -107,7 +108,7 @@ func (s *inviteEventsStatements) deleteInviteEvent(
 // selectInviteEventsInRange returns a map of room ID to invite event for the
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) selectInviteEventsInRange(
-	ctx context.Context, txn *sql.Tx, targetUserID string, startPos, endPos int64,
+	ctx context.Context, txn *sql.Tx, targetUserID string, startPos, endPos types.StreamPosition,
 ) (map[string]gomatrixserverlib.Event, error) {
 	stmt := common.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, startPos, endPos)

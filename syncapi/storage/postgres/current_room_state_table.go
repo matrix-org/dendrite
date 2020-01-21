@@ -214,7 +214,7 @@ func (s *currentRoomStateStatements) deleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) upsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.Event, membership *string, addedAt int64,
+	event gomatrixserverlib.Event, membership *string, addedAt types.StreamPosition,
 ) error {
 	// Parse content as JSON and search for an "url" key
 	containsURL := false

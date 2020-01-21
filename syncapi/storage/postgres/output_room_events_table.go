@@ -151,7 +151,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
-	ctx context.Context, txn *sql.Tx, oldPos, newPos int64,
+	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
 	stateFilterPart *gomatrix.FilterPart,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
@@ -180,7 +180,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 
 	for rows.Next() {
 		var (
-			streamPos       int64
+			streamPos       types.StreamPosition
 			eventBytes      []byte
 			excludeFromSync bool
 			addIDs          pq.StringArray
@@ -248,7 +248,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 	ctx context.Context, txn *sql.Tx,
 	event *gomatrixserverlib.Event, addState, removeState []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
-) (streamPos int64, err error) {
+) (streamPos types.StreamPosition, err error) {
 	var txnID *string
 	var sessionID *int64
 	if transactionID != nil {
@@ -360,7 +360,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 	var result []types.StreamEvent
 	for rows.Next() {
 		var (
-			streamPos       int64
+			streamPos       types.StreamPosition
 			eventBytes      []byte
 			excludeFromSync bool
 			sessionID       *int64

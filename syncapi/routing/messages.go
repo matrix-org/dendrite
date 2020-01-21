@@ -236,10 +236,10 @@ func (r *messagesReq) retrieveEvents() (
 	// Generate pagination tokens to send to the client using the positions
 	// retrieved previously.
 	start = types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeTopology, startPos,
+		types.PaginationTokenTypeTopology, startPos, 0,
 	)
 	end = types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeTopology, endPos,
+		types.PaginationTokenTypeTopology, endPos, 0,
 	)
 
 	if r.backwardOrdering {
@@ -248,13 +248,13 @@ func (r *messagesReq) retrieveEvents() (
 		// we consider a left to right chronological order), tokens need to refer
 		// to them by the event on their left, therefore we need to decrement the
 		// end position we send in the response if we're going backward.
-		end.Position--
+		end.PDUPosition--
 	}
 
 	// The lowest token value is 1, therefore we need to manually set it to that
 	// value if we're below it.
-	if end.Position < types.StreamPosition(1) {
-		end.Position = types.StreamPosition(1)
+	if end.PDUPosition < types.StreamPosition(1) {
+		end.PDUPosition = types.StreamPosition(1)
 	}
 
 	return
@@ -303,10 +303,10 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 			if r.wasToProvided {
 				// The condition in the SQL query is a strict "greater than" so
 				// we need to check against to-1.
-				isSetLargeEnough = (r.to.Position-1 == types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition))
+				isSetLargeEnough = (r.to.PDUPosition-1 == types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition))
 			}
 		} else {
-			isSetLargeEnough = (r.from.Position-1 == types.StreamPosition(streamEvents[0].StreamPosition))
+			isSetLargeEnough = (r.from.PDUPosition-1 == types.StreamPosition(streamEvents[0].StreamPosition))
 		}
 	}
 
@@ -456,7 +456,7 @@ func setToDefault(
 	roomID string,
 ) (to *types.PaginationToken, err error) {
 	if backwardOrdering {
-		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 1)
+		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 1, 0)
 	} else {
 		var pos types.StreamPosition
 		pos, err = db.MaxTopologicalPosition(ctx, roomID)
@@ -464,7 +464,7 @@ func setToDefault(
 			return
 		}
 
-		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, pos)
+		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, pos, 0)
 	}
 
 	return

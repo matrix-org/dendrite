@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,46 +34,12 @@ var (
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
 
-// SyncPosition contains the PDU and EDU stream sync positions for a client.
-type SyncPosition struct {
-	// PDUPosition is the stream position for PDUs the client is at.
-	PDUPosition int64
-	// TypingPosition is the client's position for typing notifications.
-	TypingPosition int64
-}
-
 // Same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
 	gomatrixserverlib.Event
-	StreamPosition  int64
+	StreamPosition  StreamPosition
 	TransactionID   *api.TransactionID
 	ExcludeFromSync bool
-}
-
-// String implements the Stringer interface.
-func (sp SyncPosition) String() string {
-	return strconv.FormatInt(sp.PDUPosition, 10) + "_" +
-		strconv.FormatInt(sp.TypingPosition, 10)
-}
-
-// IsAfter returns whether one SyncPosition refers to states newer than another SyncPosition.
-func (sp SyncPosition) IsAfter(other SyncPosition) bool {
-	return sp.PDUPosition > other.PDUPosition ||
-		sp.TypingPosition > other.TypingPosition
-}
-
-// WithUpdates returns a copy of the SyncPosition with updates applied from another SyncPosition.
-// If the latter SyncPosition contains a field that is not 0, it is considered an update,
-// and its value will replace the corresponding value in the SyncPosition on which WithUpdates is called.
-func (sp SyncPosition) WithUpdates(other SyncPosition) SyncPosition {
-	ret := sp
-	if other.PDUPosition != 0 {
-		ret.PDUPosition = other.PDUPosition
-	}
-	if other.TypingPosition != 0 {
-		ret.TypingPosition = other.TypingPosition
-	}
-	return ret
 }
 
 // PaginationTokenType represents the type of a pagination token.
@@ -91,8 +58,10 @@ const (
 // PaginationToken represents a pagination token, used for interactions with
 // /sync or /messages, for example.
 type PaginationToken struct {
-	Position StreamPosition
-	Type     PaginationTokenType
+	//Position StreamPosition
+	Type              PaginationTokenType
+	PDUPosition       StreamPosition
+	EDUTypingPosition StreamPosition
 }
 
 // NewPaginationTokenFromString takes a string of the form "xyyyy..." where "x"
@@ -104,17 +73,32 @@ type PaginationToken struct {
 func NewPaginationTokenFromString(s string) (p *PaginationToken, err error) {
 	p = new(PaginationToken)
 
-	// Parse the token (aka position).
-	position, err := strconv.ParseInt(s[1:], 10, 64)
-	if err != nil {
-		return
-	}
-	p.Position = StreamPosition(position)
-
 	// Check if the type is among the known ones.
 	p.Type = PaginationTokenType(s[:1])
 	if p.Type != PaginationTokenTypeStream && p.Type != PaginationTokenTypeTopology {
 		err = ErrInvalidPaginationTokenType
+		return
+	}
+
+	// Parse the token (aka position).
+	positions := strings.Split(s[:1], "_")
+
+	// Try to get the PDU position.
+	if len(positions) >= 1 {
+		if pduPos, err := strconv.ParseInt(positions[0], 10, 64); err != nil {
+			return nil, err
+		} else {
+			p.PDUPosition = StreamPosition(pduPos)
+		}
+	}
+
+	// Try to get the typing position.
+	if len(positions) >= 2 {
+		if typPos, err := strconv.ParseInt(positions[1], 10, 64); err != nil {
+			return nil, err
+		} else {
+			p.EDUTypingPosition = StreamPosition(typPos)
+		}
 	}
 
 	return
@@ -123,18 +107,39 @@ func NewPaginationTokenFromString(s string) (p *PaginationToken, err error) {
 // NewPaginationTokenFromTypeAndPosition takes a PaginationTokenType and a
 // StreamPosition and returns an instance of PaginationToken.
 func NewPaginationTokenFromTypeAndPosition(
-	t PaginationTokenType, pos StreamPosition,
+	t PaginationTokenType, pdupos StreamPosition, typpos StreamPosition,
 ) (p *PaginationToken) {
 	return &PaginationToken{
-		Type:     t,
-		Position: pos,
+		Type:              t,
+		PDUPosition:       pdupos,
+		EDUTypingPosition: typpos,
 	}
 }
 
 // String translates a PaginationToken to a string of the "xyyyy..." (see
 // NewPaginationToken to know what it represents).
 func (p *PaginationToken) String() string {
-	return fmt.Sprintf("%s%d", p.Type, p.Position)
+	return fmt.Sprintf("%s%d_%d", p.Type, p.PDUPosition, p.EDUTypingPosition)
+}
+
+// WithUpdates returns a copy of the SyncPosition with updates applied from another SyncPosition.
+// If the latter SyncPosition contains a field that is not 0, it is considered an update,
+// and its value will replace the corresponding value in the SyncPosition on which WithUpdates is called.
+func (sp *PaginationToken) WithUpdates(other PaginationToken) PaginationToken {
+	ret := *sp
+	if other.PDUPosition != 0 {
+		ret.PDUPosition = other.PDUPosition
+	}
+	if other.EDUTypingPosition != 0 {
+		ret.EDUTypingPosition = other.EDUTypingPosition
+	}
+	return ret
+}
+
+// IsAfter returns whether one SyncPosition refers to states newer than another SyncPosition.
+func (sp *PaginationToken) IsAfter(other PaginationToken) bool {
+	return sp.PDUPosition > other.PDUPosition ||
+		sp.EDUTypingPosition > other.EDUTypingPosition
 }
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
@@ -161,7 +166,7 @@ type Response struct {
 }
 
 // NewResponse creates an empty response with initialised maps.
-func NewResponse(pos SyncPosition) *Response {
+func NewResponse(pos PaginationToken) *Response {
 	res := Response{
 		NextBatch: pos.String(),
 	}
@@ -180,7 +185,11 @@ func NewResponse(pos SyncPosition) *Response {
 
 	// Fill next_batch with a pagination token. Since this is a response to a sync request, we can assume
 	// we'll always return a stream token.
-	//res.NextBatch = NewPaginationTokenFromTypeAndPosition(PaginationTokenTypeStream, pos).String()
+	res.NextBatch = NewPaginationTokenFromTypeAndPosition(
+		PaginationTokenTypeStream,
+		StreamPosition(pos.PDUPosition),
+		StreamPosition(pos.EDUTypingPosition),
+	).String()
 
 	return &res
 }
