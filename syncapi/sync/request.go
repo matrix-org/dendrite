@@ -79,23 +79,6 @@ func getTimeout(timeoutMS string) time.Duration {
 	return time.Duration(i) * time.Millisecond
 }
 
-// getPaginationToken tries to parse a 'since' token taken from the API to a
-// pagination token. If the string is empty then (nil, nil) is returned.
-// Returns an error if the parsed token's type isn't types.PaginationTokenTypeStream.
-func getSyncStreamPosition(since string) (*types.StreamPosition, error) {
-	if since == "" {
-		return nil, nil
-	}
-	p, err := getPaginationToken(since)
-	if err != nil {
-		return nil, err
-	}
-	if p.Type != types.PaginationTokenTypeStream {
-		return nil, ErrNotStreamToken
-	}
-	return &(p.PDUPosition), nil
-}
-
 // getSyncStreamPosition tries to parse a 'since' token taken from the API to a
 // types.PaginationToken. If the string is empty then (nil, nil) is returned.
 // There are two forms of tokens: The full length form containing all PDU and EDU

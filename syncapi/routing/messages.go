@@ -257,7 +257,7 @@ func (r *messagesReq) retrieveEvents() (
 		end.PDUPosition = types.StreamPosition(1)
 	}
 
-	return
+	return clientEvents, start, end, err
 }
 
 // handleEmptyEventsSlice handles the case where the initial request to the

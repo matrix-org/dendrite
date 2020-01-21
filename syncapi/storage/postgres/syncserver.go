@@ -116,6 +116,7 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 // when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 // Returns an error if there was a problem inserting this event.
+// nolint: gocyclo
 func (d *SyncServerDatasource) WriteEvent(
 	ctx context.Context,
 	ev *gomatrixserverlib.Event,
@@ -179,7 +180,8 @@ func (d *SyncServerDatasource) WriteEvent(
 
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition)
 	})
-	return
+
+	return pduPosition, returnErr
 }
 
 func (d *SyncServerDatasource) updateRoomState(
@@ -838,7 +840,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
 		).String()
 		// Use the short form of batch token for prev_batch
-		//jr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
+		jr.Timeline.PrevBatch = strconv.FormatInt(int64(prevPDUPos), 10)
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -853,7 +855,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 			types.PaginationTokenTypeStream, backwardTopologyPos, 0,
 		).String()
 		// Use the short form of batch token for prev_batch
-		//lr.Timeline.PrevBatch = strconv.FormatInt(prevPDUPos, 10)
+		lr.Timeline.PrevBatch = strconv.FormatInt(int64(prevPDUPos), 10)
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
