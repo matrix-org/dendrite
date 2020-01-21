@@ -48,9 +48,11 @@ type Database interface {
 	RemoveTypingUser(userID, roomID string) types.StreamPosition
 	GetEventsInRange(ctx context.Context, from, to *types.PaginationToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
 	EventPositionInTopology(ctx context.Context, eventID string) (types.StreamPosition, error)
+	EventsAtTopologicalPosition(ctx context.Context, roomID string, pos types.StreamPosition) ([]types.StreamEvent, error)
 	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities []string, err error)
 	MaxTopologicalPosition(ctx context.Context, roomID string) (types.StreamPosition, error)
 	StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.Event
+	SyncStreamPosition(ctx context.Context) (types.StreamPosition, error)
 }
 
 // NewPublicRoomsServerDatabase opens a database connection.
