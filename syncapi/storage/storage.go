@@ -16,7 +16,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -35,11 +35,11 @@ type Database interface {
 	Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error)
 	WriteEvent(ctx context.Context, ev *gomatrixserverlib.Event, addStateEvents []gomatrixserverlib.Event, addStateEventIDs, removeStateEventIDs []string, transactionID *api.TransactionID) (pduPosition int64, returnErr error)
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.Event, error)
-	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.FilterPart) (stateEvents []gomatrixserverlib.Event, err error)
+	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrix.FilterPart) (stateEvents []gomatrixserverlib.Event, err error)
 	SyncPosition(ctx context.Context) (types.SyncPosition, error)
 	IncrementalSync(ctx context.Context, device authtypes.Device, fromPos, toPos types.SyncPosition, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
 	CompleteSync(ctx context.Context, userID string, numRecentEventsPerRoom int) (*types.Response, error)
-	GetAccountDataInRange(ctx context.Context, userID string, oldPos, newPos int64, accountDataFilterPart *gomatrixserverlib.FilterPart) (map[string][]string, error)
+	GetAccountDataInRange(ctx context.Context, userID string, oldPos, newPos int64, accountDataFilterPart *gomatrix.FilterPart) (map[string][]string, error)
 	UpsertAccountData(ctx context.Context, userID, roomID, dataType string) (int64, error)
 	AddInviteEvent(ctx context.Context, inviteEvent gomatrixserverlib.Event) (int64, error)
 	RetireInviteEvent(ctx context.Context, inviteEventID string) error
@@ -52,14 +52,12 @@ type Database interface {
 func NewSyncServerDatasource(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		// if the scheme doesn't match, fall back to postgres in case the config has
-		// postgres key=value connection strings
 		return postgres.NewSyncServerDatasource(dataSourceName)
 	}
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewSyncServerDatasource(dataSourceName)
 	default:
-		return nil, errors.New("unknown schema")
+		return postgres.NewSyncServerDatasource(dataSourceName)
 	}
 }
