@@ -566,12 +566,11 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	defer common.EndTransaction(txn, &succeeded)
 
 	// Get the current sync position which we will base the sync response on.
-	/*
-		toPos, err = d.syncPositionTx(ctx, txn)
-		if err != nil {
-			return
-		}
-	*/
+	toPos, err = d.syncPositionTx(ctx, txn)
+	if err != nil {
+		return
+	}
+
 	// Get the current stream position which we will base the sync response on.
 	pos, err := d.syncStreamPositionTx(ctx, txn)
 	if err != nil {
@@ -628,6 +627,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
 			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
 		).String()
+		// TODO: do we want short-form here? adds complexity elsewhere
 		if prevPDUPos := recentStreamEvents[0].StreamPosition - 1; prevPDUPos > 0 {
 			// Use the short form of batch token for prev_batch
 			jr.Timeline.PrevBatch = strconv.FormatInt(int64(prevPDUPos), 10)

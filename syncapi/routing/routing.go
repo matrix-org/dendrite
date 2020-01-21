@@ -81,7 +81,10 @@ func Setup(
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/messages", common.MakeAuthAPI("room_messages", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars := mux.Vars(req)
+		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
 		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], federation, queryAPI, cfg)
 	})).Methods(http.MethodGet, http.MethodOptions)
 }

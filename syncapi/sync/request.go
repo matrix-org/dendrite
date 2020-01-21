@@ -52,7 +52,7 @@ func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, e
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
-	since, err := getSyncStreamPosition(req.URL.Query().Get("since"))
+	since, err := getPaginationToken(req.URL.Query().Get("since"))
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +82,11 @@ func getTimeout(timeoutMS string) time.Duration {
 // getPaginationToken tries to parse a 'since' token taken from the API to a
 // pagination token. If the string is empty then (nil, nil) is returned.
 // Returns an error if the parsed token's type isn't types.PaginationTokenTypeStream.
-func getPaginationToken(since string) (*types.StreamPosition, error) {
+func getSyncStreamPosition(since string) (*types.StreamPosition, error) {
 	if since == "" {
 		return nil, nil
 	}
-	p, err := types.NewPaginationTokenFromString(since)
+	p, err := getPaginationToken(since)
 	if err != nil {
 		return nil, err
 	}
@@ -101,15 +101,10 @@ func getPaginationToken(since string) (*types.StreamPosition, error) {
 // There are two forms of tokens: The full length form containing all PDU and EDU
 // positions separated by "_", and the short form containing only the PDU
 // position. Short form can be used for, e.g., `prev_batch` tokens.
-func getSyncStreamPosition(since string) (*types.PaginationToken, error) {
+func getPaginationToken(since string) (*types.PaginationToken, error) {
 	if since == "" {
 		return nil, nil
 	}
 
-	pos, err := types.NewPaginationTokenFromString(since)
-	if err != nil {
-		return nil, err
-	}
-
-	return pos, nil
+	return types.NewPaginationTokenFromString(since)
 }

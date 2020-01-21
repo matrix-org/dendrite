@@ -76,12 +76,18 @@ func NewPaginationTokenFromString(s string) (p *PaginationToken, err error) {
 	// Check if the type is among the known ones.
 	p.Type = PaginationTokenType(s[:1])
 	if p.Type != PaginationTokenTypeStream && p.Type != PaginationTokenTypeTopology {
-		err = ErrInvalidPaginationTokenType
-		return
+		if pduPos, perr := strconv.ParseInt(s, 10, 64); perr != nil {
+			return nil, ErrInvalidPaginationTokenType
+		} else {
+			// TODO: should this be topograpical?
+			p.Type = PaginationTokenTypeTopology
+			p.PDUPosition = StreamPosition(pduPos)
+			return
+		}
 	}
 
 	// Parse the token (aka position).
-	positions := strings.Split(s[:1], "_")
+	positions := strings.Split(s[1:], "_")
 
 	// Try to get the PDU position.
 	if len(positions) >= 1 {
