@@ -203,3 +203,16 @@ Newly joined room is included in an incremental sync after invite
 Outbound federation can query v1 /send_join
 Inbound /v1/make_join rejects remote attempts to join local users to rooms
 Inbound federation rejects invites which are not signed by the sender
+Local room members see posted message events
+Fetching eventstream a second time doesn't yield the message again
+Local non-members don't see posted message events
+Remote room members also see posted message events
+Lazy loading parameters in the filter are strictly boolean
+remote user can join room with version 1
+remote user can join room with version 2
+remote user can join room with version 3
+remote user can join room with version 4
+remote user can join room with version 5
+Inbound federation can query room alias directory
+Outbound federation can query v2 /send_join
+Inbound federation can receive v2 /send_join
