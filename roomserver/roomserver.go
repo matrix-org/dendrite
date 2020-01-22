@@ -34,7 +34,7 @@ import (
 // APIs directly instead of having to use HTTP.
 func SetupRoomServerComponent(
 	base *basecomponent.BaseDendrite,
-) (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
+) (api.RoomserverAliasAPI, api.RoomserverCanonicalAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
 	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
@@ -64,5 +64,14 @@ func SetupRoomServerComponent(
 
 	aliasAPI.SetupHTTP(http.DefaultServeMux)
 
-	return &aliasAPI, &inputAPI, &queryAPI
+	canonicalAliasAPI := canonicalAlias.RoomserverCanonicalAliasAPI{
+		DB:            roomserverDB,
+		Cfg:           base.Cfg,
+		InputAPI:      &inputAPI,
+		QueryAPI:      &queryAPI,
+		AppserviceAPI: &asAPI,
+	}
+	canonicalAliasAPI.SetupHTTP(http.DefaultServeMux)
+
+	return &aliasAPI, &canonicalAliasAPI, &inputAPI, &queryAPI
 }
