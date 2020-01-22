@@ -37,35 +37,35 @@ CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
 
 -- Stores output room events received from the roomserver.
 CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
-		-- An incrementing ID which denotes the position in the log that this event resides at.
-		-- NB: 'serial' makes no guarantees to increment by 1 every time, only that it increments.
-		--     This isn't a problem for us since we just want to order by this field.
-		id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
-		-- The event ID for the event
-		event_id TEXT NOT NULL,
-		-- The 'room_id' key for the event.
-		room_id TEXT NOT NULL,
-		-- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
-		event_json TEXT NOT NULL,
-		-- The event type e.g 'm.room.member'.
-		type TEXT NOT NULL,
-		-- The 'sender' property of the event.
-		sender TEXT NOT NULL,
-		-- true if the event content contains a url key.
-		contains_url BOOL NOT NULL,
-		-- A list of event IDs which represent a delta of added/removed room state. This can be NULL
-		-- if there is no delta.
-		add_state_ids TEXT[],
-		remove_state_ids TEXT[],
-		-- The client session that sent the event, if any
-		session_id BIGINT,
-		-- The transaction id used to send the event, if any
-		transaction_id TEXT,
-		-- Should the event be excluded from responses to /sync requests. Useful for
-		-- events retrieved through backfilling that have a position in the stream
-		-- that relates to the moment these were retrieved rather than the moment these
-		-- were emitted.
-		exclude_from_sync BOOL DEFAULT FALSE
+  -- An incrementing ID which denotes the position in the log that this event resides at.
+  -- NB: 'serial' makes no guarantees to increment by 1 every time, only that it increments.
+  --     This isn't a problem for us since we just want to order by this field.
+  id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
+  -- The event ID for the event
+  event_id TEXT NOT NULL,
+  -- The 'room_id' key for the event.
+  room_id TEXT NOT NULL,
+  -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
+  event_json TEXT NOT NULL,
+  -- The event type e.g 'm.room.member'.
+  type TEXT NOT NULL,
+  -- The 'sender' property of the event.
+  sender TEXT NOT NULL,
+  -- true if the event content contains a url key.
+  contains_url BOOL NOT NULL,
+  -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
+  -- if there is no delta.
+  add_state_ids TEXT[],
+  remove_state_ids TEXT[],
+  -- The client session that sent the event, if any
+  session_id BIGINT,
+  -- The transaction id used to send the event, if any
+  transaction_id TEXT,
+  -- Should the event be excluded from responses to /sync requests. Useful for
+  -- events retrieved through backfilling that have a position in the stream
+  -- that relates to the moment these were retrieved rather than the moment these
+  -- were emitted.
+  exclude_from_sync BOOL DEFAULT FALSE
 );
 -- for event selection
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(event_id);
