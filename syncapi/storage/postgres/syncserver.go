@@ -777,6 +777,26 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 	return nil
 }
 
+// Retrieve the backward topology position, i.e. the position of the
+// oldest event in the room's topology.
+func (d *SyncServerDatasource) getBackwardTopologyPos(
+	ctx context.Context,
+	events []types.StreamEvent,
+) (pos types.StreamPosition, err error) {
+	if len(events) > 0 {
+		pos, err = d.topology.selectPositionInTopology(ctx, events[0].EventID())
+		if err != nil {
+			return
+		}
+	}
+	if pos-1 <= 0 {
+		pos = types.StreamPosition(1)
+	} else {
+		pos = pos - 1
+	}
+	return
+}
+
 // addRoomDeltaToResponse adds a room state delta to a sync response
 func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	ctx context.Context,
@@ -826,19 +846,10 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		prevPDUPos = 1
 	}
 
-	// Retrieve the backward topology position, i.e. the position of the
-	// oldest event in the room's topology.
 	var backwardTopologyPos types.StreamPosition
-	if len(recentStreamEvents) > 0 {
-		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
-		if err != nil {
-			return err
-		}
-	}
-	if backwardTopologyPos-1 <= 0 {
-		backwardTopologyPos = types.StreamPosition(1)
-	} else {
-		backwardTopologyPos = backwardTopologyPos - 1
+	backwardTopologyPos, err = d.getBackwardTopologyPos(ctx, recentStreamEvents)
+	if err != nil {
+		return err
 	}
 
 	switch delta.membership {
