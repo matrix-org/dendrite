@@ -8,7 +8,7 @@
 #
 # For each of these files, lines starting with '#' are ignored.
 #
-# Usage ./show-expected-fail-tests.sh results.tap testfile [blacklist_file]
+# Usage ./show-expected-fail-tests.sh results.tap whitelist [blacklist]
 
 results_file=$1
 whitelist_file=$2
