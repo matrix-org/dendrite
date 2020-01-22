@@ -1,0 +1,14 @@
+# Blacklisted due to flakiness
+Remote users can join room by alias
+
+# Blacklisted due to flakiness
+POST /login can log in as a user with just the local part of the id
+
+# Blacklisted due to flakiness
+avatar_url updates affect room member events
+
+# Blacklisted due to flakiness
+Room members can override their displayname on a room-specific basis
+
+# Blacklisted due to flakiness
+Alias creators can delete alias with no ops
