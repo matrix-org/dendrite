@@ -17,10 +17,7 @@ POST /register rejects registration of usernames with 'é'
 POST /register rejects registration of usernames with '\n'
 POST /register rejects registration of usernames with '''
 GET /login yields a set of flows
-POST /login can log in as a user
 POST /login can log in as a user with just the local part of the id
-POST /login as non-existing user is rejected
-POST /login wrong password is rejected
 GET /events initially
 GET /initialSync initially
 Version responds 200 OK with valid structure
@@ -55,7 +52,6 @@ PUT power_levels should not explode if the old power levels were empty
 Both GET and PUT work
 POST /rooms/:room_id/read_markers can create read marker
 User signups are forbidden from starting with '_'
-Can logout all devices
 Request to logout with invalid an access token is rejected
 Request to logout without an access token is rejected
 Room creation reports m.room.create to myself
@@ -158,7 +154,6 @@ Typing events appear in incremental sync
 Typing events appear in gapped sync
 Inbound federation of state requires event_id as a mandatory paramater
 Inbound federation of state_ids requires event_id as a mandatory paramater
-POST /register returns the same device_id as that in the request
 POST /login returns the same device_id as that in the request
 POST /createRoom with creation content
 User can create and send/receive messages in a room with version 1
@@ -200,7 +195,6 @@ Outbound federation can query room alias directory
 After deactivating account, can't log in with an email
 Remote room alias queries can handle Unicode
 Newly joined room is included in an incremental sync after invite
-Outbound federation can query v1 /send_join
 Inbound /v1/make_join rejects remote attempts to join local users to rooms
 Inbound federation rejects invites which are not signed by the sender
 Local room members see posted message events
