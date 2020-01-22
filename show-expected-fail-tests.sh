@@ -17,7 +17,7 @@ blacklist_file=$3
 fail_build=0
 
 if [ $# -lt 2 ]; then
-	echo "Usage: $0 results.tap testfile [blacklist]"
+	echo "Usage: $0 results.tap whitelist [blacklist]"
 	exit 1
 fi
 
@@ -54,13 +54,13 @@ fi
 
 passed_but_expected_fail=$(grep ' # TODO passed but expected fail' ${results_file} | sed -E 's/^ok [0-9]+ (\(expected fail\) )?//' | sed -E 's/( \([0-9]+ subtests\))? # TODO passed but expected fail$//')
 tests_to_add=""
-already_in_testfile=""
+already_in_whitelist=""
 
 while read -r test_name; do
 	# Ignore empty lines
 	[ "${test_name}" = "" ] && continue
 
-	grep "${test_name}" "${testfile}" > /dev/null 2>&1
+	grep "${test_name}" "${whitelist_file}" > /dev/null 2>&1
 	if [ "$?" != "0" ]; then
 		# Check if this test name is blacklisted
 		if printf '%s\n' "${blacklisted_tests[@]}" | grep -q -P "^${test_name}$"; then
@@ -72,18 +72,18 @@ while read -r test_name; do
 		tests_to_add="${tests_to_add}${test_name}\n"
 		fail_build=1
 	else
-		already_in_testfile="${already_in_testfile}${test_name}\n"
+		already_in_whitelist="${already_in_whitelist}${test_name}\n"
 	fi
 done <<< "${passed_but_expected_fail}"
 
 if [ -n "${tests_to_add}" ]; then
-	echo "ERROR: The following passed tests are not present in testfile. Please append them to the file:"
+	echo "ERROR: The following passed tests are not present in $2. Please append them to the file:"
 	echo -e "${tests_to_add}"
 fi
 
-if [ -n "${already_in_testfile}" ]; then
-	echo "WARN: Tests in testfile still marked as expected fail:"
-	echo -e "${already_in_testfile}"
+if [ -n "${already_in_whitelist}" ]; then
+	echo "WARN: Tests in the whitelist still marked as expected fail:"
+	echo -e "${already_in_whitelist}"
 fi
 
 exit ${fail_build}
