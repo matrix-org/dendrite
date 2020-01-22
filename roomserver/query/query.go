@@ -839,7 +839,7 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(
-		api.RoomserverQueryServersInRoomAtEvent,
+		api.RoomserverQueryServersInRoomAtEventPath,
 		common.MakeInternalAPI("QueryServersInRoomAtEvent", func(req *http.Request) util.JSONResponse {
 			var request api.QueryServersInRoomAtEventRequest
 			var response api.QueryServersInRoomAtEventResponse

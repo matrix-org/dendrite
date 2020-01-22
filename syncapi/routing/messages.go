@@ -55,7 +55,7 @@ const defaultMessagesLimit = 10
 
 // OnIncomingMessagesRequest implements the /messages endpoint from the
 // client-server API.
-// See: https://matrix.org/docs/spec/client_server/r0.4.0.html#get-matrix-client-r0-rooms-roomid-messages
+// See: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-client-r0-rooms-roomid-messages
 func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string,
 	federation *gomatrixserverlib.FederationClient,
@@ -303,10 +303,12 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 			if r.wasToProvided {
 				// The condition in the SQL query is a strict "greater than" so
 				// we need to check against to-1.
-				isSetLargeEnough = (r.to.PDUPosition-1 == types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition))
+				streamPos := types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition)
+				isSetLargeEnough = (r.to.PDUPosition-1 == streamPos)
 			}
 		} else {
-			isSetLargeEnough = (r.from.PDUPosition-1 == types.StreamPosition(streamEvents[0].StreamPosition))
+			streamPos := types.StreamPosition(streamEvents[0].StreamPosition)
+			isSetLargeEnough = (r.from.PDUPosition-1 == streamPos)
 		}
 	}
 
@@ -381,7 +383,7 @@ func (r *messagesReq) containsBackwardExtremity(events []types.StreamEvent) (boo
 
 // backfill performs a backfill request over the federation on another
 // homeserver in the room.
-// See: https://matrix.org/docs/spec/server_server/unstable.html#get-matrix-federation-v1-backfill-roomid
+// See: https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid
 // It also stores the PDUs retrieved from the remote homeserver's response to
 // the database.
 // Returns with an empty string if the remote homeserver didn't return with any

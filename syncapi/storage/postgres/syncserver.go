@@ -113,6 +113,45 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 	return d.StreamEventsToEvents(nil, streamEvents), nil
 }
 
+func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev *gomatrixserverlib.Event) error {
+	// If the event is already known as a backward extremity, don't consider
+	// it as such anymore now that we have it.
+	isBackwardExtremity, err := d.backwardExtremities.isBackwardExtremity(ctx, ev.RoomID(), ev.EventID())
+	if err != nil {
+		return err
+	}
+	if isBackwardExtremity {
+		if err = d.backwardExtremities.deleteBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+			return err
+		}
+	}
+
+	// Check if we have all of the event's previous events. If an event is
+	// missing, add it to the room's backward extremities.
+	prevEvents, err := d.events.selectEvents(ctx, nil, ev.PrevEventIDs())
+	if err != nil {
+		return err
+	}
+	var found bool
+	for _, eID := range ev.PrevEventIDs() {
+		found = false
+		for _, prevEv := range prevEvents {
+			if eID == prevEv.EventID() {
+				found = true
+			}
+		}
+
+		// If the event is missing, consider it a backward extremity.
+		if !found {
+			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 // when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 // Returns an error if there was a problem inserting this event.
@@ -134,43 +173,12 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
+		if err := d.handleBackwardExtremities(ctx, ev); err != nil {
+			return err
+		}
+
 		if err = d.topology.insertEventInTopology(ctx, ev); err != nil {
 			return err
-		}
-
-		// If the event is already known as a backward extremity, don't consider
-		// it as such anymore now that we have it.
-		isBackwardExtremity, err := d.backwardExtremities.isBackwardExtremity(ctx, ev.RoomID(), ev.EventID())
-		if err != nil {
-			return err
-		}
-		if isBackwardExtremity {
-			if err = d.backwardExtremities.deleteBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
-				return err
-			}
-		}
-
-		// Check if we have all of the event's previous events. If an event is
-		// missing, add it to the room's backward extremities.
-		prevEvents, err := d.events.selectEvents(ctx, nil, ev.PrevEventIDs())
-		if err != nil {
-			return err
-		}
-		var found bool
-		for _, eID := range ev.PrevEventIDs() {
-			found = false
-			for _, prevEv := range prevEvents {
-				if eID == prevEv.EventID() {
-					found = true
-				}
-			}
-
-			// If the event is missing, consider it a backward extremity.
-			if !found {
-				if err = d.backwardExtremities.insertsBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
-					return err
-				}
-			}
 		}
 
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
@@ -996,9 +1004,12 @@ func (d *SyncServerDatasource) getStateDeltas(
 						return nil, nil, err
 					}
 					/*
-						s = make([]StreamEvent, len(allState))
+						s = make([]types.StreamEvent, len(allState))
 						for i := 0; i < len(s); i++ {
-							s[i] = StreamEvent{Event: allState[i], StreamPosition: types.StreamPosition(0)}
+							s[i] = types.StreamEvent{
+								Event:          allState[i],
+								StreamPosition: types.StreamPosition(0),
+							}
 						}
 					*/
 					state[roomID] = s

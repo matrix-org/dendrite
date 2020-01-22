@@ -70,18 +70,17 @@ type PaginationToken struct {
 // error if the token couldn't be parsed into an int64, or if the token type
 // isn't a known type (returns ErrInvalidPaginationTokenType in the latter
 // case).
-func NewPaginationTokenFromString(s string) (p *PaginationToken, err error) {
-	p = new(PaginationToken)
+func NewPaginationTokenFromString(s string) (token *PaginationToken, err error) {
+	token = new(PaginationToken)
 
 	// Check if the type is among the known ones.
-	p.Type = PaginationTokenType(s[:1])
-	if p.Type != PaginationTokenTypeStream && p.Type != PaginationTokenTypeTopology {
+	token.Type = PaginationTokenType(s[:1])
+	if token.Type != PaginationTokenTypeStream && token.Type != PaginationTokenTypeTopology {
 		if pduPos, perr := strconv.ParseInt(s, 10, 64); perr != nil {
 			return nil, ErrInvalidPaginationTokenType
 		} else {
-			// TODO: should this be topograpical?
-			p.Type = PaginationTokenTypeTopology
-			p.PDUPosition = StreamPosition(pduPos)
+			token.Type = PaginationTokenTypeStream
+			token.PDUPosition = StreamPosition(pduPos)
 			return
 		}
 	}
@@ -94,7 +93,7 @@ func NewPaginationTokenFromString(s string) (p *PaginationToken, err error) {
 		if pduPos, err := strconv.ParseInt(positions[0], 10, 64); err != nil {
 			return nil, err
 		} else {
-			p.PDUPosition = StreamPosition(pduPos)
+			token.PDUPosition = StreamPosition(pduPos)
 		}
 	}
 
@@ -103,7 +102,7 @@ func NewPaginationTokenFromString(s string) (p *PaginationToken, err error) {
 		if typPos, err := strconv.ParseInt(positions[1], 10, 64); err != nil {
 			return nil, err
 		} else {
-			p.EDUTypingPosition = StreamPosition(typPos)
+			token.EDUTypingPosition = StreamPosition(typPos)
 		}
 	}
 
@@ -128,11 +127,11 @@ func (p *PaginationToken) String() string {
 	return fmt.Sprintf("%s%d_%d", p.Type, p.PDUPosition, p.EDUTypingPosition)
 }
 
-// WithUpdates returns a copy of the SyncPosition with updates applied from another SyncPosition.
-// If the latter SyncPosition contains a field that is not 0, it is considered an update,
-// and its value will replace the corresponding value in the SyncPosition on which WithUpdates is called.
-func (sp *PaginationToken) WithUpdates(other PaginationToken) PaginationToken {
-	ret := *sp
+// WithUpdates returns a copy of the PaginationToken with updates applied from another PaginationToken.
+// If the latter PaginationToken contains a field that is not 0, it is considered an update,
+// and its value will replace the corresponding value in the PaginationToken on which WithUpdates is called.
+func (pt *PaginationToken) WithUpdates(other PaginationToken) PaginationToken {
+	ret := *pt
 	if other.PDUPosition != 0 {
 		ret.PDUPosition = other.PDUPosition
 	}
@@ -142,7 +141,7 @@ func (sp *PaginationToken) WithUpdates(other PaginationToken) PaginationToken {
 	return ret
 }
 
-// IsAfter returns whether one SyncPosition refers to states newer than another SyncPosition.
+// IsAfter returns whether one PaginationToken refers to states newer than another PaginationToken.
 func (sp *PaginationToken) IsAfter(other PaginationToken) bool {
 	return sp.PDUPosition > other.PDUPosition ||
 		sp.EDUTypingPosition > other.EDUTypingPosition
@@ -172,9 +171,9 @@ type Response struct {
 }
 
 // NewResponse creates an empty response with initialised maps.
-func NewResponse(pos PaginationToken) *Response {
+func NewResponse(token PaginationToken) *Response {
 	res := Response{
-		NextBatch: pos.String(),
+		NextBatch: token.String(),
 	}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
@@ -193,8 +192,8 @@ func NewResponse(pos PaginationToken) *Response {
 	// we'll always return a stream token.
 	res.NextBatch = NewPaginationTokenFromTypeAndPosition(
 		PaginationTokenTypeStream,
-		StreamPosition(pos.PDUPosition),
-		StreamPosition(pos.EDUTypingPosition),
+		StreamPosition(token.PDUPosition),
+		StreamPosition(token.EDUTypingPosition),
 	).String()
 
 	return &res

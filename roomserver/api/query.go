@@ -352,11 +352,11 @@ const RoomserverQueryMissingEventsPath = "/api/roomserver/queryMissingEvents"
 // RoomserverQueryStateAndAuthChainPath is the HTTP path for the QueryStateAndAuthChain API
 const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthChain"
 
-// RoomserverQueryBackfillPath is the HTTP path for the QueryMissingEvents API
+// RoomserverQueryBackfillPath is the HTTP path for the QueryBackfillPath API
 const RoomserverQueryBackfillPath = "/api/roomserver/queryBackfill"
 
-// RoomserverQueryServersInRoomAtEvent is the HTTP path for the QueryServersInRoomAtEvent API
-const RoomserverQueryServersInRoomAtEvent = "/api/roomserver/queryServersInRoomAtEvents"
+// RoomserverQueryServersInRoomAtEventPath is the HTTP path for the QueryServersInRoomAtEvent API
+const RoomserverQueryServersInRoomAtEventPath = "/api/roomserver/queryServersInRoomAtEvents"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -511,6 +511,6 @@ func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBackfill")
 	defer span.Finish()
 
-	apiURL := h.roomserverURL + RoomserverQueryServersInRoomAtEvent
+	apiURL := h.roomserverURL + RoomserverQueryServersInRoomAtEventPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
