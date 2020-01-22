@@ -508,7 +508,7 @@ func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
 	request *QueryServersInRoomAtEventRequest,
 	response *QueryServersInRoomAtEventResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBackfill")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServersInRoomAtEvent")
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServersInRoomAtEventPath
