@@ -49,6 +49,11 @@ type Database interface {
 	GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error)
 	GetCreatorIDForAlias(ctx context.Context, alias string) (string, error)
 	RemoveRoomAlias(ctx context.Context, alias string) error
+	SetRoomCanonicalAlias(ctx context.Context, canonical_alias string, roomID string, creatorUserID string) error
+	GetRoomIDForCanonicalAlias(ctx context.Context, canonical_alias string) (string, error)
+	GetCanonicalAliasForRoomID(ctx context.Context, roomID string) (string, error)
+	GetCreatorIDForCanonicalAlias(ctx context.Context, canonical_alias string) (string, error)
+	RemoveRoomCanonicalAlias(ctx context.Context, canonical_alias string) error
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	MembershipUpdater(ctx context.Context, roomID, targetUserID string) (types.MembershipUpdater, error)
 	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error)
