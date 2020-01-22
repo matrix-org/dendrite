@@ -1002,15 +1002,6 @@ func (d *SyncServerDatasource) getStateDeltas(
 					if err != nil {
 						return nil, nil, err
 					}
-					/*
-						s = make([]types.StreamEvent, len(allState))
-						for i := 0; i < len(s); i++ {
-							s[i] = types.StreamEvent{
-								Event:          allState[i],
-								StreamPosition: types.StreamPosition(0),
-							}
-						}
-					*/
 					state[roomID] = s
 					continue // we'll add this room in when we do joined rooms
 				}
