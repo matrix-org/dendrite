@@ -20,108 +20,99 @@ import (
 	"database/sql"
 )
 
-const roomAliasesSchema = `
--- Stores room aliases and room IDs they refer to
-CREATE TABLE IF NOT EXISTS roomserver_room_aliases (
-    -- Alias of the room
-    alias TEXT NOT NULL PRIMARY KEY,
-    -- Room ID the alias refers to
+const roomCanonicalAliasSchema = `
+-- Stores room canonical alias and room IDs they refer to
+CREATE TABLE IF NOT EXISTS roomserver_canonical_aliases (
+    -- Canonical alias of the room
+    canonical_alias TEXT NOT NULL PRIMARY KEY,
+    -- Room ID the canonical_alias refers to
     room_id TEXT NOT NULL,
-    -- User ID of the creator of this alias
+    -- User ID of the creator of this canonical_alias
     creator_id TEXT NOT NULL
+
+    FOREIGN KEY (canonical_alias) REFERENCES roomserver_room_aliases(alias)
 );
 
-CREATE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_room_aliases(room_id);
+CREATE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_canonical_aliases(room_id);
 `
 
-const insertRoomAliasSQL = "" +
-	"INSERT INTO roomserver_room_aliases (alias, room_id, creator_id) VALUES ($1, $2, $3)"
+const insertRoomCanonicalAliasSQL = "" +
+	"INSERT INTO roomserver_canonical_aliases (canonical_alias, room_id, creator_id) VALUES ($1, $2, $3)"
 
-const selectRoomIDFromAliasSQL = "" +
-	"SELECT room_id FROM roomserver_room_aliases WHERE alias = $1"
+const selectRoomIDFromCanonicalAliasSQL = "" +
+	"SELECT room_id FROM roomserver_canonical_aliases WHERE canonical_alias = $1"
 
-const selectAliasesFromRoomIDSQL = "" +
-	"SELECT alias FROM roomserver_room_aliases WHERE room_id = $1"
+const selectCanonicalAliasFromRoomIDSQL = "" +
+	"SELECT canonical_alias FROM roomserver_canonical_aliases WHERE room_id = $1"
 
-const selectCreatorIDFromAliasSQL = "" +
-	"SELECT creator_id FROM roomserver_room_aliases WHERE alias = $1"
+const selectCreatorIDFromCanonicalAliasSQL = "" +
+	"SELECT creator_id FROM roomserver_canonical_aliases WHERE canonical_alias = $1"
 
-const deleteRoomAliasSQL = "" +
-	"DELETE FROM roomserver_room_aliases WHERE alias = $1"
+const deleteRoomCanonicalAliasSQL = "" +
+	"DELETE FROM roomserver_canonical_aliases WHERE canonical_alias = $1"
 
-type roomAliasesStatements struct {
-	insertRoomAliasStmt          *sql.Stmt
-	selectRoomIDFromAliasStmt    *sql.Stmt
-	selectAliasesFromRoomIDStmt  *sql.Stmt
-	selectCreatorIDFromAliasStmt *sql.Stmt
-	deleteRoomAliasStmt          *sql.Stmt
+type roomCanonicalAliasStatements struct {
+	insertRoomCanonicalAliasStmt          *sql.Stmt
+	selectRoomIDFromCanonicalAliasStmt    *sql.Stmt
+	selectCanonicalAliasFromRoomIDStmt    *sql.Stmt
+	selectCreaterIDFromCanonicalAliasStmt *sql.Stmt
+	deleteRoomCanonicalAliasStmt          *sql.Stmt
 }
 
-func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(roomAliasesSchema)
+func (s *roomCanonicalAliasStatements) prepare(db *sql.DB) (err error) {
+	_, err = db.Exec(roomCanonicalAliasSchema)
 	if err != nil {
 		return
 	}
 	return statementList{
-		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
-		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},
-		{&s.selectAliasesFromRoomIDStmt, selectAliasesFromRoomIDSQL},
-		{&s.selectCreatorIDFromAliasStmt, selectCreatorIDFromAliasSQL},
-		{&s.deleteRoomAliasStmt, deleteRoomAliasSQL},
+		{&s.insertRoomCanonicalAliasStmt, insertRoomCanonicalAliasSQL},
+		{&s.selectRoomIDFromCanonicalAliasStmt, selectRoomIDFromCanonicalAliasSQL},
+		{&s.selectCanonicalAliasFromRoomIDStmt, selectCanonicalAliasFromRoomIDSQL},
+		{&s.selectCreaterIDFromCanonicalAliasStmt, selectCreatorIDFromCanonicalAliasSQL},
+		{&s.deleteRoomCanonicalAliasStmt, deleteRoomCanonicalAliasSQL},
 	}.prepare(db)
 }
 
-func (s *roomAliasesStatements) insertRoomAlias(
-	ctx context.Context, alias string, roomID string, creatorUserID string,
+func (s *roomCanonicalAliasStatements) insertRoomCanonicalAlias(
+	ctx context.Context, canonical_alias string, roomID string, creatorUserID string,
 ) (err error) {
-	_, err = s.insertRoomAliasStmt.ExecContext(ctx, alias, roomID, creatorUserID)
+	_, err = s.insertRoomCanonicalAliasStmt.ExecContext(ctx, canonical_alias, roomID, creatorUserID)
 	return
 }
 
-func (s *roomAliasesStatements) selectRoomIDFromAlias(
-	ctx context.Context, alias string,
+func (s *roomCanonicalAliasStatements) selectRoomIDFromCanonicalAlias(
+	ctx context.Context, canonical_alias string,
 ) (roomID string, err error) {
-	err = s.selectRoomIDFromAliasStmt.QueryRowContext(ctx, alias).Scan(&roomID)
+	err = s.selectRoomIDFromCanonicalAliasStmt.QueryRowContext(ctx, canonical_alias).Scan(&roomID)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
 	return
 }
 
-func (s *roomAliasesStatements) selectAliasesFromRoomID(
+func (s *roomCanonicalAliasStatements) selectCanonicalAliasFromRoomID(
 	ctx context.Context, roomID string,
-) (aliases []string, err error) {
-	aliases = []string{}
-	rows, err := s.selectAliasesFromRoomIDStmt.QueryContext(ctx, roomID)
-	if err != nil {
-		return
-	}
-
-	for rows.Next() {
-		var alias string
-		if err = rows.Scan(&alias); err != nil {
-			return
-		}
-
-		aliases = append(aliases, alias)
-	}
-
-	return
-}
-
-func (s *roomAliasesStatements) selectCreatorIDFromAlias(
-	ctx context.Context, alias string,
-) (creatorID string, err error) {
-	err = s.selectCreatorIDFromAliasStmt.QueryRowContext(ctx, alias).Scan(&creatorID)
+) (canonical_alias string, err error) {
+	err = s.selectCanonicalAliasFromRoomIDStmt.QueryRowContext(ctx, roomID).Scan(&canonical_alias)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
 	return
 }
 
-func (s *roomAliasesStatements) deleteRoomAlias(
-	ctx context.Context, alias string,
+func (s *roomCanonicalAliasStatements) selectCreatorIDFromCanonicalAlias(
+	ctx context.Context, canonical_alias string,
+) (creatorID string, err error) {
+	err = s.selectCreaterIDFromCanonicalAliasStmt.QueryRowContext(ctx, canonical_alias).Scan(&creatorID)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return
+}
+
+func (s *roomCanonicalAliasStatements) deleteRoomCanonicalAlias(
+	ctx context.Context, canonical_alias string,
 ) (err error) {
-	_, err = s.deleteRoomAliasStmt.ExecContext(ctx, alias)
+	_, err = s.deleteRoomCanonicalAliasStmt.ExecContext(ctx, canonical_alias)
 	return
 }

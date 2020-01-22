@@ -29,6 +29,7 @@ type statements struct {
 	stateBlockStatements
 	previousEventStatements
 	roomAliasesStatements
+	roomCanonicalStatements
 	inviteStatements
 	membershipStatements
 	transactionStatements
@@ -47,6 +48,7 @@ func (s *statements) prepare(db *sql.DB) error {
 		s.stateBlockStatements.prepare,
 		s.previousEventStatements.prepare,
 		s.roomAliasesStatements.prepare,
+		s.roomCanonicalAliasStatements.prepare,
 		s.inviteStatements.prepare,
 		s.membershipStatements.prepare,
 		s.transactionStatements.prepare,
