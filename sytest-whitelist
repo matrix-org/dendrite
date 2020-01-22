@@ -66,7 +66,6 @@ Can get rooms/{roomId}/members for a departed room (SPEC-216)
 3pid invite join with wrong but valid signature are rejected
 3pid invite join valid signature but revoked keys are rejected
 3pid invite join valid signature but unreachable ID server are rejected
-Room members can override their displayname on a room-specific basis
 Room members can join a room with an overridden displayname
 displayname updates affect room member events
 Real non-joined user cannot call /events on shared room
