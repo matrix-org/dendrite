@@ -17,7 +17,6 @@ POST /register rejects registration of usernames with 'é'
 POST /register rejects registration of usernames with '\n'
 POST /register rejects registration of usernames with '''
 GET /login yields a set of flows
-POST /login can log in as a user with just the local part of the id
 GET /events initially
 GET /initialSync initially
 Version responds 200 OK with valid structure
@@ -70,7 +69,6 @@ Can get rooms/{roomId}/members for a departed room (SPEC-216)
 Room members can override their displayname on a room-specific basis
 Room members can join a room with an overridden displayname
 displayname updates affect room member events
-avatar_url updates affect room member events
 Real non-joined user cannot call /events on shared room
 Real non-joined user cannot call /events on invited room
 Real non-joined user cannot call /events on joined room
