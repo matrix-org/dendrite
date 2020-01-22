@@ -17,10 +17,6 @@ POST /register rejects registration of usernames with 'é'
 POST /register rejects registration of usernames with '\n'
 POST /register rejects registration of usernames with '''
 GET /login yields a set of flows
-POST /login can log in as a user
-POST /login can log in as a user with just the local part of the id
-POST /login as non-existing user is rejected
-POST /login wrong password is rejected
 GET /events initially
 GET /initialSync initially
 Version responds 200 OK with valid structure
@@ -55,7 +51,6 @@ PUT power_levels should not explode if the old power levels were empty
 Both GET and PUT work
 POST /rooms/:room_id/read_markers can create read marker
 User signups are forbidden from starting with '_'
-Can logout all devices
 Request to logout with invalid an access token is rejected
 Request to logout without an access token is rejected
 Room creation reports m.room.create to myself
@@ -71,10 +66,8 @@ Can get rooms/{roomId}/members for a departed room (SPEC-216)
 3pid invite join with wrong but valid signature are rejected
 3pid invite join valid signature but revoked keys are rejected
 3pid invite join valid signature but unreachable ID server are rejected
-Room members can override their displayname on a room-specific basis
 Room members can join a room with an overridden displayname
 displayname updates affect room member events
-avatar_url updates affect room member events
 Real non-joined user cannot call /events on shared room
 Real non-joined user cannot call /events on invited room
 Real non-joined user cannot call /events on joined room
@@ -159,7 +152,6 @@ Typing events appear in gapped sync
 Inbound federation of state requires event_id as a mandatory paramater
 Inbound federation of state_ids requires event_id as a mandatory paramater
 POST /register returns the same device_id as that in the request
-POST /login returns the same device_id as that in the request
 POST /createRoom with creation content
 User can create and send/receive messages in a room with version 1
 POST /createRoom ignores attempts to set the room version via creation_content
@@ -191,7 +183,6 @@ GET /directory/room/:room_alias yields room ID
 PUT /directory/room/:room_alias creates alias
 Room aliases can contain Unicode
 Creators can delete alias
-Alias creators can delete alias with no ops
 Alias creators can delete canonical alias with no ops
 Regular users cannot create room aliases within the AS namespace
 Deleting a non-existent alias should return a 404
@@ -200,6 +191,18 @@ Outbound federation can query room alias directory
 After deactivating account, can't log in with an email
 Remote room alias queries can handle Unicode
 Newly joined room is included in an incremental sync after invite
-Outbound federation can query v1 /send_join
 Inbound /v1/make_join rejects remote attempts to join local users to rooms
 Inbound federation rejects invites which are not signed by the sender
+Local room members see posted message events
+Fetching eventstream a second time doesn't yield the message again
+Local non-members don't see posted message events
+Remote room members also see posted message events
+Lazy loading parameters in the filter are strictly boolean
+remote user can join room with version 1
+remote user can join room with version 2
+remote user can join room with version 3
+remote user can join room with version 4
+remote user can join room with version 5
+Inbound federation can query room alias directory
+Outbound federation can query v2 /send_join
+Inbound federation can receive v2 /send_join
