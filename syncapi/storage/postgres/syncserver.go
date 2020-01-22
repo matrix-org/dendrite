@@ -829,9 +829,11 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
 	var backwardTopologyPos types.StreamPosition
-	backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
-	if err != nil {
-		return err
+	if len(recentStreamEvents) > 0 {
+		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
+		if err != nil {
+			return err
+		}
 	}
 	if backwardTopologyPos-1 <= 0 {
 		backwardTopologyPos = types.StreamPosition(1)
