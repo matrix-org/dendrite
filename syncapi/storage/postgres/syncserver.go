@@ -155,7 +155,6 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 // when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 // Returns an error if there was a problem inserting this event.
-// nolint: gocyclo
 func (d *SyncServerDatasource) WriteEvent(
 	ctx context.Context,
 	ev *gomatrixserverlib.Event,

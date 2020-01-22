@@ -16,7 +16,6 @@ package sync
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -30,12 +29,6 @@ import (
 
 const defaultSyncTimeout = time.Duration(0)
 const defaultTimelineLimit = 20
-
-var (
-	// ErrNotStreamToken is returned if a pagination token isn't of type
-	// types.PaginationTokenTypeStream
-	ErrNotStreamToken = fmt.Errorf("The provided pagination token has the wrong prefix (should be s)")
-)
 
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
