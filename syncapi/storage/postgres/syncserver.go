@@ -172,11 +172,11 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.handleBackwardExtremities(ctx, ev); err != nil {
+		if err = d.topology.insertEventInTopology(ctx, ev); err != nil {
 			return err
 		}
 
-		if err = d.topology.insertEventInTopology(ctx, ev); err != nil {
+		if err = d.handleBackwardExtremities(ctx, ev); err != nil {
 			return err
 		}
 
