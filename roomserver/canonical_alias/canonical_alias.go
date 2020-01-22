@@ -1,0 +1,352 @@
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package canonical_alias
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+)
+
+// RoomserverCanonicalAliasAPIDatabase has the storage APIs needed to implement the alias API.
+type RoomserverCanonicalAPIDatabase interface {
+	// Save a given canonical room alias with the room ID it refers to.
+	// Returns an error if there was a problem talking to the database.
+	SetRoomCanonicalAlias(ctx context.Context, canonical_alias string, roomID string, creatorUserID string) error
+	// Look up the room ID a given canonical alias refers to.
+	// Returns an error if there was a problem talking to the database.
+	GetRoomIDForCanonicalAlias(ctx context.Context, canonical_alias string) (string, error)
+	// Look up the canonical alias referring to a given room ID.
+	// Returns an error if there was a problem talking to the database.
+	GetCanonicalAliasForRoomID(ctx context.Context, roomID string) (string, error)
+	// Get the user ID of the creator of the canonical alias.
+	// Returns an error if there was a problem talking to the database.
+	GetCreatorIDForCanonicalAlias(ctx context.Context, canonical_alias string) (string, error)
+	// Remove a given room canonical alias.
+	// Returns an error if there was a problem talking to the database.
+	RemoveRoomCanonicalAlias(ctx context.Context, canonical_alias string) error
+}
+
+// RoomserverCanonicalAliasAPI is an implementation of alias.RoomserverCanonicalAliasAPI
+type RoomserverCanonicalAliasAPI struct {
+	DB            RoomserverCanonicalAPIDatabase
+	Cfg           *config.Dendrite
+	InputAPI      roomserverAPI.RoomserverInputAPI
+	QueryAPI      roomserverAPI.RoomserverQueryAPI
+	AppserviceAPI appserviceAPI.AppServiceQueryAPI
+}
+
+// SetRoomCanonicalAlias implements alias.RoomserverCanonicalAliasAPI
+func (r *RoomserverCanonicalAliasAPI) SetRoomAlias(
+	ctx context.Context,
+	request *roomserverAPI.SetRoomAliasRequest,
+	response *roomserverAPI.SetRoomAliasResponse,
+) error {
+	// SPEC: Room with `m.room.canonical_alias` with empty alias field should be
+	// treated same as room without a canonical alias.
+	if request.CanonicalAlias == "" {
+		return r.RemoveCanonicalAlias(ctx, request, response)
+	}
+
+	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.CanonicalAlias)
+	if err != nil {
+		return err
+	}
+
+	// Check if alias exists
+	if len(roomID) == 0 {
+		response.AliasExists = false
+		return nil
+	}
+	response.AliasExists = true
+
+	// The alias belongs to a different room
+	if roomID != request.roomID {
+		// RFC: Is there a standard bool for wrong room?
+		response.CorrectRoom = false
+		return nil
+	}
+
+	response.CorrectRoom = true
+
+	// Save the new canonical alias
+	if err := r.DB.SetRoomCanonicalAlias(ctx, request.CanonicalAlias, request.RoomID, request.UserID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetRoomIDForAlias implements alias.RoomserverCanonicalAliasAPI
+func (r *RoomserverCanonicalAliasAPI) GetRoomIDForAlias(
+	ctx context.Context,
+	request *roomserverAPI.GetRoomIDForAliasRequest,
+	response *roomserverAPI.GetRoomIDForAliasResponse,
+) error {
+	// Look up the room ID in the database
+	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
+	if err != nil {
+		return err
+	}
+
+	if roomID == "" {
+		// No room found locally, try our application services by making a call to
+		// the appservice component
+		aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
+		var aliasResp appserviceAPI.RoomAliasExistsResponse
+		if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
+			return err
+		}
+
+		if aliasResp.AliasExists {
+			roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	response.RoomID = roomID
+	return nil
+}
+
+// GetAliasesForRoomID implements alias.RoomserverCanonicalAliasAPI
+func (r *RoomserverCanonicalAliasAPI) GetAliasesForRoomID(
+	ctx context.Context,
+	request *roomserverAPI.GetAliasesForRoomIDRequest,
+	response *roomserverAPI.GetAliasesForRoomIDResponse,
+) error {
+	// Look up the aliases in the database for the given RoomID
+	aliases, err := r.DB.GetAliasesForRoomID(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+
+	response.Aliases = aliases
+	return nil
+}
+
+// GetCreatorIDForAlias implements alias.RoomserverCanonicalAliasAPI
+func (r *RoomserverCanonicalAliasAPI) GetCreatorIDForAlias(
+	ctx context.Context,
+	request *roomserverAPI.GetCreatorIDForAliasRequest,
+	response *roomserverAPI.GetCreatorIDForAliasResponse,
+) error {
+	// Look up the aliases in the database for the given RoomID
+	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
+	if err != nil {
+		return err
+	}
+
+	response.UserID = creatorID
+	return nil
+}
+
+// RemoveRoomAlias implements alias.RoomserverCanonicalAliasAPI
+func (r *RoomserverCanonicalAliasAPI) RemoveRoomAlias(
+	ctx context.Context,
+	request *roomserverAPI.RemoveRoomAliasRequest,
+	response *roomserverAPI.RemoveRoomAliasResponse,
+) error {
+	// Look up the room ID in the database
+	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
+	if err != nil {
+		return err
+	}
+
+	// Remove the dalias from the database
+	if err := r.DB.RemoveRoomAlias(ctx, request.Alias); err != nil {
+		return err
+	}
+
+	// Send an updated m.room.aliases event
+	// At this point we've already committed the alias to the database so we
+	// shouldn't cancel this request.
+	// TODO: Ensure that we send unsent events when if server restarts.
+	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID)
+}
+
+type roomAliasesContent struct {
+	Aliases []string `json:"aliases"`
+}
+
+// Build the updated m.room.aliases event to send to the room after addition or
+// removal of an alias
+func (r *RoomserverCanonicalAliasAPI) sendUpdatedAliasesEvent(
+	ctx context.Context, userID string, roomID string,
+) error {
+	serverName := string(r.Cfg.Matrix.ServerName)
+
+	builder := gomatrixserverlib.EventBuilder{
+		Sender:   userID,
+		RoomID:   roomID,
+		Type:     "m.room.aliases",
+		StateKey: &serverName,
+	}
+
+	// Retrieve the updated list of aliases, marhal it and set it as the
+	// event's content
+	aliases, err := r.DB.GetAliasesForRoomID(ctx, roomID)
+	if err != nil {
+		return err
+	}
+	content := roomAliasesContent{Aliases: aliases}
+	rawContent, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+	err = builder.SetContent(json.RawMessage(rawContent))
+	if err != nil {
+		return err
+	}
+
+	// Get needed state events and depth
+	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
+	if err != nil {
+		return err
+	}
+	req := roomserverAPI.QueryLatestEventsAndStateRequest{
+		RoomID:       roomID,
+		StateToFetch: eventsNeeded.Tuples(),
+	}
+	var res roomserverAPI.QueryLatestEventsAndStateResponse
+	if err = r.QueryAPI.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
+		return err
+	}
+	builder.Depth = res.Depth
+	builder.PrevEvents = res.LatestEvents
+
+	// Add auth events
+	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	for i := range res.StateEvents {
+		err = authEvents.AddEvent(&res.StateEvents[i])
+		if err != nil {
+			return err
+		}
+	}
+	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
+	if err != nil {
+		return err
+	}
+	builder.AuthEvents = refs
+
+	// Build the event
+	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
+	now := time.Now()
+	event, err := builder.Build(
+		eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Create the request
+	ire := roomserverAPI.InputRoomEvent{
+		Kind:         roomserverAPI.KindNew,
+		Event:        event,
+		AuthEventIDs: event.AuthEventIDs(),
+		SendAsServer: serverName,
+	}
+	inputReq := roomserverAPI.InputRoomEventsRequest{
+		InputRoomEvents: []roomserverAPI.InputRoomEvent{ire},
+	}
+	var inputRes roomserverAPI.InputRoomEventsResponse
+
+	// Send the request
+	return r.InputAPI.InputRoomEvents(ctx, &inputReq, &inputRes)
+}
+
+// SetupHTTP adds the RoomserverCanonicalAliasAPI handlers to the http.ServeMux.
+func (r *RoomserverCanonicalAliasAPI) SetupHTTP(servMux *http.ServeMux) {
+	servMux.Handle(
+		roomserverAPI.RoomserverSetRoomAliasPath,
+		common.MakeInternalAPI("setRoomAlias", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.SetRoomAliasRequest
+			var response roomserverAPI.SetRoomAliasResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.SetRoomAlias(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		roomserverAPI.RoomserverGetRoomIDForAliasPath,
+		common.MakeInternalAPI("GetRoomIDForAlias", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.GetRoomIDForAliasRequest
+			var response roomserverAPI.GetRoomIDForAliasResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.GetRoomIDForAlias(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		roomserverAPI.RoomserverGetCreatorIDForAliasPath,
+		common.MakeInternalAPI("GetCreatorIDForAlias", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.GetCreatorIDForAliasRequest
+			var response roomserverAPI.GetCreatorIDForAliasResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.GetCreatorIDForAlias(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		roomserverAPI.RoomserverGetAliasesForRoomIDPath,
+		common.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.GetAliasesForRoomIDRequest
+			var response roomserverAPI.GetAliasesForRoomIDResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.GetAliasesForRoomID(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		roomserverAPI.RoomserverRemoveRoomAliasPath,
+		common.MakeInternalAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
+			var request roomserverAPI.RemoveRoomAliasRequest
+			var response roomserverAPI.RemoveRoomAliasResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.RemoveRoomAlias(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+}
