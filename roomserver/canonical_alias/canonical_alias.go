@@ -84,11 +84,11 @@ func (r *RoomserverCanonicalAliasAPI) SetRoomAlias(
 	// The alias belongs to a different room
 	if roomID != request.roomID {
 		// RFC: Is there a standard bool for wrong room?
-		response.CorrectRoom = false
+		response.DifferentRoom = true
 		return nil
 	}
 
-	response.CorrectRoom = true
+	response.DifferentRoom = false
 
 	// Save the new canonical alias
 	if err := r.DB.SetRoomCanonicalAlias(ctx, request.CanonicalAlias, request.RoomID, request.UserID); err != nil {
