@@ -9,3 +9,6 @@ avatar_url updates affect room member events
 
 # Blacklisted due to flakiness
 Room members can override their displayname on a room-specific basis
+
+# Blacklisted due to flakiness
+Alias creators can delete alias with no ops
