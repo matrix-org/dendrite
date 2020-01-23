@@ -660,6 +660,41 @@ func getAuthChain(
 	return authEvents, nil
 }
 
+// QueryServersInRoomAtEvent implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryServersInRoomAtEvent(
+	ctx context.Context,
+	request *api.QueryServersInRoomAtEventRequest,
+	response *api.QueryServersInRoomAtEventResponse,
+) error {
+	// getMembershipsBeforeEventNID requires a NID, so retrieving the NID for
+	// the event is necessary.
+	NIDs, err := r.DB.EventNIDs(ctx, []string{request.EventID})
+	if err != nil {
+		return err
+	}
+
+	// Retrieve all "m.room.member" state events of "join" membership, which
+	// contains the list of users in the room before the event, therefore all
+	// the servers in it at that moment.
+	events, err := r.getMembershipsBeforeEventNID(ctx, NIDs[request.EventID], true)
+	if err != nil {
+		return err
+	}
+
+	// Store the server names in a temporary map to avoid duplicates.
+	servers := make(map[gomatrixserverlib.ServerName]bool)
+	for _, event := range events {
+		servers[event.Origin()] = true
+	}
+
+	// Populate the response.
+	for server := range servers {
+		response.Servers = append(response.Servers, server)
+	}
+
+	return nil
+}
+
 // SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
 // nolint: gocyclo
 func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
@@ -798,6 +833,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryBackfill(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryServersInRoomAtEventPath,
+		common.MakeInternalAPI("QueryServersInRoomAtEvent", func(req *http.Request) util.JSONResponse {
+			var request api.QueryServersInRoomAtEventRequest
+			var response api.QueryServersInRoomAtEventResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryServersInRoomAtEvent(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

@@ -35,7 +35,7 @@ type UserStream struct {
 	// Closed when there is an update.
 	signalChannel chan struct{}
 	// The last sync position that there may have been an update for the user
-	pos types.SyncPosition
+	pos types.PaginationToken
 	// The last time when we had some listeners waiting
 	timeOfLastChannel time.Time
 	// The number of listeners waiting
@@ -51,7 +51,7 @@ type UserStreamListener struct {
 }
 
 // NewUserStream creates a new user stream
-func NewUserStream(userID string, currPos types.SyncPosition) *UserStream {
+func NewUserStream(userID string, currPos types.PaginationToken) *UserStream {
 	return &UserStream{
 		UserID:            userID,
 		timeOfLastChannel: time.Now(),
@@ -85,7 +85,7 @@ func (s *UserStream) GetListener(ctx context.Context) UserStreamListener {
 }
 
 // Broadcast a new sync position for this user.
-func (s *UserStream) Broadcast(pos types.SyncPosition) {
+func (s *UserStream) Broadcast(pos types.PaginationToken) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -120,7 +120,7 @@ func (s *UserStream) TimeOfLastNonEmpty() time.Time {
 
 // GetStreamPosition returns last sync position which the UserStream was
 // notified about
-func (s *UserStreamListener) GetSyncPosition() types.SyncPosition {
+func (s *UserStreamListener) GetSyncPosition() types.PaginationToken {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
 
@@ -132,7 +132,7 @@ func (s *UserStreamListener) GetSyncPosition() types.SyncPosition {
 // sincePos specifies from which point we want to be notified about. If there
 // has already been an update after sincePos we'll return a closed channel
 // immediately.
-func (s *UserStreamListener) GetNotifyChannel(sincePos types.SyncPosition) <-chan struct{} {
+func (s *UserStreamListener) GetNotifyChannel(sincePos types.PaginationToken) <-chan struct{} {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
 

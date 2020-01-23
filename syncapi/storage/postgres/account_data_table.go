@@ -21,6 +21,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrix"
 )
 
@@ -89,7 +90,7 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 func (s *accountDataStatements) insertAccountData(
 	ctx context.Context,
 	userID, roomID, dataType string,
-) (pos int64, err error) {
+) (pos types.StreamPosition, err error) {
 	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
 	return
 }
@@ -97,7 +98,7 @@ func (s *accountDataStatements) insertAccountData(
 func (s *accountDataStatements) selectAccountDataInRange(
 	ctx context.Context,
 	userID string,
-	oldPos, newPos int64,
+	oldPos, newPos types.StreamPosition,
 	accountDataFilterPart *gomatrix.FilterPart,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)

@@ -22,8 +22,11 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -34,7 +37,12 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // Due to Setup being used to call many other functions, a gocyclo nolint is
 // applied:
 // nolint: gocyclo
-func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database, deviceDB *devices.Database) {
+func Setup(
+	apiMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
+	deviceDB *devices.Database, federation *gomatrixserverlib.FederationClient,
+	queryAPI api.RoomserverQueryAPI,
+	cfg *config.Dendrite,
+) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
@@ -70,5 +78,13 @@ func Setup(apiMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database, d
 			return util.ErrorResponse(err)
 		}
 		return OnIncomingStateTypeRequest(req, syncDB, vars["roomID"], vars["type"], vars["stateKey"])
+	})).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/rooms/{roomID}/messages", common.MakeAuthAPI("room_messages", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], federation, queryAPI, cfg)
 	})).Methods(http.MethodGet, http.MethodOptions)
 }

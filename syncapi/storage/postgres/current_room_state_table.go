@@ -22,6 +22,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -87,10 +88,10 @@ const selectStateEventSQL = "" +
 
 const selectEventsWithEventIDsSQL = "" +
 	// TODO: The session_id and transaction_id blanks are here because otherwise
-	// the rowsToStreamEvents expects there to be exactly four columns. We need to
+	// the rowsToStreamEvents expects there to be exactly five columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT added_at, event_json, 0 AS session_id, '' AS transaction_id" +
+	"SELECT added_at, event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
 	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
 type currentRoomStateStatements struct {
@@ -213,7 +214,7 @@ func (s *currentRoomStateStatements) deleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) upsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.Event, membership *string, addedAt int64,
+	event gomatrixserverlib.Event, membership *string, addedAt types.StreamPosition,
 ) error {
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
@@ -242,7 +243,7 @@ func (s *currentRoomStateStatements) upsertRoomState(
 
 func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
-) ([]streamEvent, error) {
+) ([]types.StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectEventsWithEventIDsStmt)
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {

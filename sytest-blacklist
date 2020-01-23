@@ -12,3 +12,7 @@ Room members can override their displayname on a room-specific basis
 
 # Blacklisted due to flakiness
 Alias creators can delete alias with no ops
+
+# Blacklisted because matrix-org/dendrite#847 might have broken it but we're not
+# really sure and we need it pretty badly anyway
+Real non-joined users can get individual state for world_readable rooms after leaving

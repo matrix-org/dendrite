@@ -36,7 +36,7 @@ type Notifier struct {
 	// Protects currPos and userStreams.
 	streamLock *sync.Mutex
 	// The latest sync position
-	currPos types.SyncPosition
+	currPos types.PaginationToken
 	// A map of user_id => UserStream which can be used to wake a given user's /sync request.
 	userStreams map[string]*UserStream
 	// The last time we cleaned out stale entries from the userStreams map
@@ -46,7 +46,7 @@ type Notifier struct {
 // NewNotifier creates a new notifier set to the given sync position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
 // the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
-func NewNotifier(pos types.SyncPosition) *Notifier {
+func NewNotifier(pos types.PaginationToken) *Notifier {
 	return &Notifier{
 		currPos:             pos,
 		roomIDToJoinedUsers: make(map[string]userIDSet),
@@ -68,7 +68,7 @@ func NewNotifier(pos types.SyncPosition) *Notifier {
 // event type it handles, leaving other fields as 0.
 func (n *Notifier) OnNewEvent(
 	ev *gomatrixserverlib.Event, roomID string, userIDs []string,
-	posUpdate types.SyncPosition,
+	posUpdate types.PaginationToken,
 ) {
 	// update the current position then notify relevant /sync streams.
 	// This needs to be done PRIOR to waking up users as they will read this value.
@@ -151,7 +151,7 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 }
 
 // CurrentPosition returns the current sync position
-func (n *Notifier) CurrentPosition() types.SyncPosition {
+func (n *Notifier) CurrentPosition() types.PaginationToken {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
@@ -173,7 +173,7 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	}
 }
 
-func (n *Notifier) wakeupUsers(userIDs []string, newPos types.SyncPosition) {
+func (n *Notifier) wakeupUsers(userIDs []string, newPos types.PaginationToken) {
 	for _, userID := range userIDs {
 		stream := n.fetchUserStream(userID, false)
 		if stream != nil {
