@@ -579,12 +579,6 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		return
 	}
 
-	// Get the current stream position which we will base the sync response on.
-	pos, err := d.syncStreamPositionTx(ctx, txn)
-	if err != nil {
-		return nil, types.PaginationToken{}, []string{}, err
-	}
-
 	res = types.NewResponse(toPos)
 
 	// Extract room state and recent events for all rooms the user is joined to.
@@ -606,7 +600,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 		var recentStreamEvents []types.StreamEvent
 		recentStreamEvents, err = d.events.selectRecentEvents(
-			ctx, txn, roomID, types.StreamPosition(0), pos,
+			ctx, txn, roomID, types.StreamPosition(0), toPos.PDUPosition,
 			numRecentEventsPerRoom, true, true,
 			//ctx, txn, roomID, 0, toPos.PDUPosition, numRecentEventsPerRoom,
 		)
