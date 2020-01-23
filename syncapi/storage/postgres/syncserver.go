@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -634,16 +633,8 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
+			types.PaginationTokenTypeStream, backwardTopologyPos, 0,
 		).String()
-		// TODO: do we want short-form here? adds complexity elsewhere
-		if prevPDUPos := recentStreamEvents[0].StreamPosition - 1; prevPDUPos > 0 {
-			// Use the short form of batch token for prev_batch
-			jr.Timeline.PrevBatch = strconv.FormatInt(int64(prevPDUPos), 10)
-		} else {
-			// Use the short form of batch token for prev_batch
-			jr.Timeline.PrevBatch = "1"
-		}
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
 		jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
@@ -857,10 +848,8 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		jr := types.NewJoinResponse()
 
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
+			types.PaginationTokenTypeStream, backwardTopologyPos, 0,
 		).String()
-		// Use the short form of batch token for prev_batch
-		jr.Timeline.PrevBatch = strconv.FormatInt(int64(prevPDUPos), 10)
 		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -874,8 +863,6 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		lr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
 			types.PaginationTokenTypeStream, backwardTopologyPos, 0,
 		).String()
-		// Use the short form of batch token for prev_batch
-		lr.Timeline.PrevBatch = strconv.FormatInt(int64(prevPDUPos), 10)
 		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
