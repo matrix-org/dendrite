@@ -5,20 +5,20 @@ import "testing"
 func TestNewPaginationTokenFromString(t *testing.T) {
 	shouldPass := map[string]PaginationToken{
 		"2": PaginationToken{
-			Type:        PaginationTokenType("s"),
+			Type:        PaginationTokenTypeStream,
 			PDUPosition: 2,
 		},
 		"s4": PaginationToken{
-			Type:        PaginationTokenType("s"),
+			Type:        PaginationTokenTypeStream,
 			PDUPosition: 4,
 		},
 		"s3_1": PaginationToken{
-			Type:              PaginationTokenType("s"),
+			Type:              PaginationTokenTypeStream,
 			PDUPosition:       3,
 			EDUTypingPosition: 1,
 		},
 		"t3_1_4": PaginationToken{
-			Type:              PaginationTokenType("t"),
+			Type:              PaginationTokenTypeTopology,
 			PDUPosition:       3,
 			EDUTypingPosition: 1,
 		},
