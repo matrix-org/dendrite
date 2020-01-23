@@ -812,25 +812,6 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 
-	var prevPDUPos types.StreamPosition
-
-	if len(recentEvents) == 0 {
-		if len(delta.stateEvents) == 0 {
-			// Don't bother appending empty room entries
-			return nil
-		}
-
-		// If full_state=true and since is already up to date, then we'll have
-		// state events but no recent events.
-		prevPDUPos = toPos - 1
-	} else {
-		prevPDUPos = recentStreamEvents[0].StreamPosition - 1
-	}
-
-	if prevPDUPos <= 0 {
-		prevPDUPos = 1
-	}
-
 	var backwardTopologyPos types.StreamPosition
 	backwardTopologyPos, err = d.getBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
