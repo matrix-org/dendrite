@@ -74,7 +74,7 @@ Real non-joined user cannot call /events on joined room
 Real non-joined user cannot call /events on default room
 Real non-joined users can get state for world_readable rooms
 Real non-joined users can get individual state for world_readable rooms
-Real non-joined users can get individual state for world_readable rooms after leaving
+#Real non-joined users can get individual state for world_readable rooms after leaving
 Real non-joined users cannot send messages to guest_access rooms if not joined
 Real users can sync from world_readable guest_access rooms if joined
 Real users can sync from default guest_access rooms if joined
