@@ -206,3 +206,7 @@ remote user can join room with version 5
 Inbound federation can query room alias directory
 Outbound federation can query v2 /send_join
 Inbound federation can receive v2 /send_join
+Message history can be paginated
+Getting messages going forward is limited for a departed room (SPEC-216)
+m.room.history_visibility == "world_readable" allows/forbids appropriately for Real users
+Backfill works correctly with history visibility set to joined
