@@ -344,6 +344,11 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 // considers the event itself a backward extremity if at least one of the parent
 // events doesn't exist in the database.
 // Returns an error if there was an issue with talking to the database.
+//
+// This function is unused but currently set to nolint for now until we are
+// absolutely sure that the changes in matrix-org/dendrite#847 are behaving
+// properly.
+// nolint:unused
 func (r *messagesReq) containsBackwardExtremity(events []types.StreamEvent) (bool, error) {
 	// Select the earliest retrieved event.
 	var ev *types.StreamEvent
