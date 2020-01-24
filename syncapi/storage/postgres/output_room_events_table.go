@@ -393,5 +393,5 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			ExcludeFromSync: excludeFromSync,
 		})
 	}
-	return result, nil
+	return result, rows.Err()
 }
