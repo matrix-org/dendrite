@@ -67,8 +67,6 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   -- were emitted.
   exclude_from_sync BOOL DEFAULT FALSE
 );
--- for event selection
--- CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(event_id);
 `
 
 const insertEventSQL = "" +
