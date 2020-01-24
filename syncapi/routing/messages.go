@@ -222,13 +222,13 @@ func (r *messagesReq) retrieveEvents() (
 	// reliable way to define it), it would be easier and less troublesome to
 	// only have to change it in one place, i.e. the database.
 	startPos, err := r.db.EventPositionInTopology(
-		r.ctx, streamEvents[0].EventID(),
+		r.ctx, events[0].EventID(),
 	)
 	if err != nil {
 		return
 	}
 	endPos, err := r.db.EventPositionInTopology(
-		r.ctx, streamEvents[len(streamEvents)-1].EventID(),
+		r.ctx, events[len(events)-1].EventID(),
 	)
 	if err != nil {
 		return

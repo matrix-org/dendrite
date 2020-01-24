@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   --     This isn't a problem for us since we just want to order by this field.
   id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
   -- The event ID for the event
-  event_id TEXT NOT NULL,
+  event_id TEXT NOT NULL CONSTRAINT syncapi_event_id_idx UNIQUE,
   -- The 'room_id' key for the event.
   room_id TEXT NOT NULL,
   -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
@@ -67,14 +67,14 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   -- were emitted.
   exclude_from_sync BOOL DEFAULT FALSE
 );
--- for event selection
-CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_output_room_events(event_id);
 `
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
 	"room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
-	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id"
+	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) " +
+	"ON CONFLICT ON CONSTRAINT syncapi_event_id_idx DO UPDATE SET exclude_from_sync = $11 " +
+	"RETURNING id"
 
 const selectEventsSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)"

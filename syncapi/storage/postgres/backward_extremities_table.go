@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS syncapi_backward_extremities (
 
 const insertBackwardExtremitySQL = "" +
 	"INSERT INTO syncapi_backward_extremities (room_id, event_id)" +
-	" VALUES ($1, $2)"
+	" VALUES ($1, $2)" +
+	" ON CONFLICT DO NOTHING"
 
 const selectBackwardExtremitiesForRoomSQL = "" +
 	"SELECT event_id FROM syncapi_backward_extremities WHERE room_id = $1"
