@@ -766,7 +766,7 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 func (d *SyncServerDatasource) getBackwardTopologyPos(
 	ctx context.Context,
 	events []types.StreamEvent,
-) (pos types.StreamPosition, err error) {
+) (pos types.StreamPosition) {
 	if len(events) > 0 {
 		pos, _ = d.topology.selectPositionInTopology(ctx, events[0].EventID())
 	}
@@ -807,12 +807,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	}
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
-
-	var backwardTopologyPos types.StreamPosition
-	backwardTopologyPos, err = d.getBackwardTopologyPos(ctx, recentStreamEvents)
-	if err != nil {
-		return err
-	}
+	backwardTopologyPos := d.getBackwardTopologyPos(ctx, recentStreamEvents)
 
 	switch delta.membership {
 	case gomatrixserverlib.Join:
