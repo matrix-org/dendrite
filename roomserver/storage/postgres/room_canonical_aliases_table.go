@@ -111,8 +111,8 @@ func (s *roomCanonicalAliasStatements) selectCreatorIDFromCanonicalAlias(
 }
 
 func (s *roomCanonicalAliasStatements) deleteRoomCanonicalAlias(
-	ctx context.Context, canonical_alias string,
+	ctx context.Context, roomID string,
 ) (err error) {
-	_, err = s.deleteRoomCanonicalAliasStmt.ExecContext(ctx, canonical_alias)
+	_, err = s.deleteRoomCanonicalAliasStmt.ExecContext(ctx, roomID)
 	return
 }

@@ -70,7 +70,7 @@ type GetCreatorIDForCanonicalAliasRequest struct {
 }
 
 // GetCreatorIDForCanonicalAliasResponse is a response to GetCreatorIDForCanonicalAlias
-type GetCreatorIDForAliasResponse struct {
+type GetCreatorIDForCanonicalAliasResponse struct {
 	// The user ID of the canonical alias creator
 	UserID string `json:"user_id"`
 }
@@ -102,7 +102,7 @@ type RoomserverCanonicalAliasAPI interface {
 	GetCreatorIDForCanonicalAlias(
 		ctx context.Context,
 		req *GetCreatorIDForCanonicalAliasRequest,
-		response *GetCreatorIDForCanonicalAliasAliasResponse,
+		response *GetCreatorIDForCanonicalAliasResponse,
 	) error
 }
 

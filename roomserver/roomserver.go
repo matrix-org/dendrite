@@ -22,6 +22,7 @@ import (
 	asQuery "github.com/matrix-org/dendrite/appservice/query"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/alias"
+	"github.com/matrix-org/dendrite/roomserver/canonical_alias"
 	"github.com/matrix-org/dendrite/roomserver/input"
 	"github.com/matrix-org/dendrite/roomserver/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"

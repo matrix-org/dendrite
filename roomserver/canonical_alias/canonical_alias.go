@@ -17,15 +17,12 @@ package canonical_alias
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"time"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -58,7 +55,7 @@ type RoomserverCanonicalAliasAPI struct {
 }
 
 // SetRoomCanonicalAlias implements alias.RoomserverCanonicalAliasAPI
-func (r *RoomserverCanonicalAliasAPI) SetRoomAlias(
+func (r *RoomserverCanonicalAliasAPI) SetRoomCanonicalAlias(
 	ctx context.Context,
 	request *roomserverAPI.SetRoomCanonicalAliasRequest,
 	response *roomserverAPI.SetRoomCanonicalAliasResponse,
@@ -66,7 +63,7 @@ func (r *RoomserverCanonicalAliasAPI) SetRoomAlias(
 	// SPEC: Room with `m.room.canonical_alias` with empty alias field should be
 	// treated same as room without a canonical alias.
 	if request.CanonicalAlias == "" {
-		return r.db.RemoveCanonicalAlias(ctx, request.RoomID)
+		return r.DB.RemoveCanonicalAlias(ctx, request.RoomID)
 	}
 
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.CanonicalAlias)

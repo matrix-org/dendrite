@@ -29,7 +29,7 @@ type statements struct {
 	stateBlockStatements
 	previousEventStatements
 	roomAliasesStatements
-	roomCanonicalStatements
+	roomCanonicalAliasStatements
 	inviteStatements
 	membershipStatements
 	transactionStatements
