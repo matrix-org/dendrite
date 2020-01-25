@@ -40,7 +40,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_topological_position_idx ON sync
 const insertEventInTopologySQL = "" +
 	"INSERT INTO syncapi_output_room_events_topology (event_id, topological_position, room_id)" +
 	" VALUES ($1, $2, $3)" +
-	" ON CONFLICT DO NOTHING"
+	" ON CONFLICT (topological_position, room_id) DO UPDATE SET event_id = $1"
 
 const selectEventIDsInRangeASCSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events_topology" +
