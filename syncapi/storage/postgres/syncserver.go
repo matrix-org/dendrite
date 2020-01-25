@@ -446,7 +446,6 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	for _, delta := range deltas {
 		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
 		if err != nil {
-
 			return nil, err
 		}
 	}
