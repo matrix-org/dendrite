@@ -82,7 +82,9 @@ func (r *Request) Do() (err error) {
 	if err != nil {
 		return err
 	}
-	defer (func() { err = res.Body.Close() })()
+	defer (func() { 
+		if err == nil { err = res.Body.Close() }
+	})()
 
 	if res.StatusCode != r.WantedStatusCode {
 		return fmt.Errorf("incorrect status code. Expected: %d  Got: %d", r.WantedStatusCode, res.StatusCode)

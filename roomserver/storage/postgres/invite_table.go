@@ -120,7 +120,9 @@ func (s *inviteStatements) updateInviteRetired(
 	if err != nil {
 		return nil, err
 	}
-	defer (func() { err = rows.Close() })()
+	defer (func() { 
+		if err == nil {err = rows.Close()} 
+	})()
 	for rows.Next() {
 		var inviteEventID string
 		if err := rows.Scan(&inviteEventID); err != nil {
