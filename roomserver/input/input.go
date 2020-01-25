@@ -21,10 +21,10 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/util"
-	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // RoomserverInputAPI implements api.RoomserverInputAPI

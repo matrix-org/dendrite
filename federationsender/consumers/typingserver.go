@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationsender/queue"
@@ -23,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/Shopify/sarama.v1"
 )
 
 // OutputTypingEventConsumer consumes events that originate in typing server.

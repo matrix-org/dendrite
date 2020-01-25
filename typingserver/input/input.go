@@ -18,12 +18,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/dendrite/typingserver/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"gopkg.in/Shopify/sarama.v1"
 )
 
 // TypingServerInputAPI implements api.TypingServerInputAPI
