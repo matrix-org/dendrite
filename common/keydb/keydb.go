@@ -16,6 +16,7 @@ package keydb
 
 import (
 	"context"
+	"crypto/ed25519"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/common/keydb/postgres"
@@ -29,15 +30,20 @@ type Database interface {
 }
 
 // NewDatabase opens a database connection.
-func NewDatabase(dataSourceName string) (Database, error) {
+func NewDatabase(
+	dataSourceName string,
+	serverName gomatrixserverlib.ServerName,
+	serverKey ed25519.PublicKey,
+	serverKeyID gomatrixserverlib.KeyID,
+) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewDatabase(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
 	}
 	switch uri.Scheme {
 	case "postgres":
-		return postgres.NewDatabase(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
 	default:
-		return postgres.NewDatabase(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
 	}
 }

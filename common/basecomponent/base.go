@@ -15,6 +15,7 @@
 package basecomponent
 
 import (
+	"crypto/ed25519"
 	"database/sql"
 	"io"
 	"net/http"
@@ -139,7 +140,12 @@ func (b *BaseDendrite) CreateAccountsDB() *accounts.Database {
 // CreateKeyDB creates a new instance of the key database. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateKeyDB() keydb.Database {
-	db, err := keydb.NewDatabase(string(b.Cfg.Database.ServerKey))
+	db, err := keydb.NewDatabase(
+		string(b.Cfg.Database.ServerKey),
+		b.Cfg.Matrix.ServerName,
+		b.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
+		b.Cfg.Matrix.KeyID,
+	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to keys db")
 	}
