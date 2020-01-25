@@ -33,6 +33,8 @@ import (
 	"github.com/matrix-org/dendrite/typingserver"
 	"github.com/matrix-org/dendrite/typingserver/cache"
 
+	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -80,17 +82,38 @@ func main() {
 	http.Handle("/", httpHandler)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
-	go func() {
-		logrus.Info("Listening on ", *httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(*httpBindAddr, nil))
-	}()
-	// Handle HTTPS if certificate and key are provided
-	go func() {
-		if *certFile != "" && *keyFile != "" {
-			logrus.Info("Listening on ", *httpsBindAddr)
-			logrus.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, nil))
+	// go func() {
+	// 	logrus.Info("Listening on ", *httpBindAddr)
+	// 	logrus.Fatal(http.ListenAndServe(*httpBindAddr, nil))
+	// }()
+
+	// Expose the matrix APIs via libp2p-js
+	if base.P2PLocalNode != nil {
+		go func() {
+			logrus.Info("Listening on libp2p-js host ID ", base.P2PLocalNode.Id)
+
+			listener := go_http_js_libp2p.NewP2pListener(base.P2PLocalNode)
+			defer listener.Close()
+			s := &http.Server{}
+			s.Serve(listener)
+		}()
+
+		go func() {
+			logrus.Info("Listening for service-worker fetch traffic")
+
+			listener := go_http_js_libp2p.NewFetchListener()
+			s := &http.Server{}
+			go s.Serve(listener)
 		}
-	}()
+	}
+
+	// Handle HTTPS if certificate and key are provided
+	// go func() {
+	// 	if *certFile != "" && *keyFile != "" {
+	// 		logrus.Info("Listening on ", *httpsBindAddr)
+	// 		logrus.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, nil))
+	// 	}
+	// }()
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
 	select {}
