@@ -17,9 +17,10 @@ package postgres
 
 import (
 	"context"
-	"crypto/ed25519"
 	"database/sql"
 	"math"
+
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )

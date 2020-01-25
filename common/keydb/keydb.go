@@ -16,8 +16,9 @@ package keydb
 
 import (
 	"context"
-	"crypto/ed25519"
 	"net/url"
+
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/common/keydb/postgres"
 	"github.com/matrix-org/gomatrixserverlib"

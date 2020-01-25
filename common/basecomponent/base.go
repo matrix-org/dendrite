@@ -15,10 +15,11 @@
 package basecomponent
 
 import (
-	"crypto/ed25519"
 	"database/sql"
 	"io"
 	"net/http"
+
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
