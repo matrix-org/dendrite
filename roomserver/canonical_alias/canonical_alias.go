@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -42,16 +41,14 @@ type RoomserverCanonicalAPIDatabase interface {
 	GetCreatorIDForCanonicalAlias(ctx context.Context, canonical_alias string) (string, error)
 	// Remove a given room canonical alias.
 	// Returns an error if there was a problem talking to the database.
-	RemoveRoomCanonicalAlias(ctx context.Context, canonical_alias string) error
+	RemoveRoomCanonicalAlias(ctx context.Context, roomID string) error
 }
 
 // RoomserverCanonicalAliasAPI is an implementation of alias.RoomserverCanonicalAliasAPI
 type RoomserverCanonicalAliasAPI struct {
-	DB            RoomserverCanonicalAPIDatabase
-	Cfg           *config.Dendrite
-	InputAPI      roomserverAPI.RoomserverInputAPI
-	QueryAPI      roomserverAPI.RoomserverQueryAPI
-	AppserviceAPI appserviceAPI.AppServiceQueryAPI
+	DB       RoomserverCanonicalAPIDatabase
+	Cfg      *config.Dendrite
+	AliasAPI roomserverAPI.RoomserverAliasAPI
 }
 
 // SetRoomCanonicalAlias implements alias.RoomserverCanonicalAliasAPI
@@ -63,32 +60,41 @@ func (r *RoomserverCanonicalAliasAPI) SetRoomCanonicalAlias(
 	// SPEC: Room with `m.room.canonical_alias` with empty alias field should be
 	// treated same as room without a canonical alias.
 	if request.CanonicalAlias == "" {
-		return r.DB.RemoveCanonicalAlias(ctx, request.RoomID)
+		return r.DB.RemoveRoomCanonicalAlias(ctx, request.RoomID)
 	}
 
-	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.CanonicalAlias)
+	aliasReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: request.CanonicalAlias}
+	var aliasResp roomserverAPI.GetRoomIDForAliasResponse
+	err := r.AliasAPI.GetRoomIDForAlias(ctx, &aliasReq, &aliasResp)
 	if err != nil {
 		return err
 	}
 
-	// Check if alias exists
-	if len(roomID) == 0 {
-		response.AliasExists = false
-		return nil
-	}
-	response.AliasExists = true
-
-	// The alias belongs to a different room
-	if roomID != request.roomID {
-		// RFC: Is there a standard bool for wrong room?
-		response.DifferentRoom = true
+	// Check if the alias has been assigned to a different room
+	if len(aliasResp.RoomID) > 0 && aliasResp.RoomID != request.RoomID {
+		response.CanonicalAliasExists = true
 		return nil
 	}
 
-	response.DifferentRoom = false
+	// Create alias if not already assigned
+	if aliasResp.RoomID == "" {
+		// RFC: Creating an alias if not already is convienent for users
+		// but makes the code coupled with changes in alias.go
+		setAliasReq := roomserverAPI.SetRoomAliasRequest{
+			Alias:  request.CanonicalAlias,
+			RoomID: request.RoomID,
+			UserID: request.UserID,
+		}
+		var setAliasResp roomserverAPI.SetRoomAliasResponse
+		err = r.AliasAPI.SetRoomAlias(ctx, &setAliasReq, &setAliasResp)
+		if err != nil {
+			return err
+		}
+	}
 
 	// Save the new canonical alias
-	if err := r.DB.SetRoomCanonicalAlias(ctx, request.CanonicalAlias, request.RoomID, request.UserID); err != nil {
+	err = r.DB.SetRoomCanonicalAlias(ctx, request.CanonicalAlias, request.RoomID, request.UserID)
+	if err != nil {
 		return err
 	}
 
@@ -102,29 +108,12 @@ func (r *RoomserverCanonicalAliasAPI) GetRoomIDForCanonicalAlias(
 	response *roomserverAPI.GetRoomIDForCanonicalAliasResponse,
 ) error {
 	// Look up the room ID in the database
-	roomID, err := r.DB.GetRoomIDForCanonicalAlias(ctx, request.Alias)
+	roomID, err := r.DB.GetRoomIDForCanonicalAlias(ctx, request.CanonicalAlias)
 	if err != nil {
 		return err
 	}
 
 	// RFC: Should we search in application service for canonical aliases?`
-	if roomID == "" {
-		// No room found locally, try our application services by making a call to
-		// the appservice component
-		aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
-		var aliasResp appserviceAPI.RoomAliasExistsResponse
-		if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
-			return err
-		}
-
-		if aliasResp.AliasExists {
-			roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
 	response.RoomID = roomID
 	return nil
 }
@@ -151,7 +140,7 @@ func (r *RoomserverCanonicalAliasAPI) GetCreatorIDForCanonicalAlias(
 	request *roomserverAPI.GetCreatorIDForCanonicalAliasRequest,
 	response *roomserverAPI.GetCreatorIDForCanonicalAliasResponse,
 ) error {
-	// Look up the aliases in the database for the given RoomID
+	// Look up the creator id in the database for the given CanonicalAlias
 	creatorID, err := r.DB.GetCreatorIDForCanonicalAlias(ctx, request.CanonicalAlias)
 	if err != nil {
 		return err

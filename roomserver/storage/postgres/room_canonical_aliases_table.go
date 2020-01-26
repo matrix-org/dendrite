@@ -49,7 +49,7 @@ const selectCreatorIDFromCanonicalAliasSQL = "" +
 	"SELECT creator_id FROM roomserver_canonical_aliases WHERE canonical_alias = $1"
 
 const deleteRoomCanonicalAliasSQL = "" +
-	"DELETE FROM roomserver_canonical_aliases WHERE canonical_alias = $1"
+	"DELETE FROM roomserver_canonical_aliases WHERE room_id = $1"
 
 type roomCanonicalAliasStatements struct {
 	insertRoomCanonicalAliasStmt          *sql.Stmt

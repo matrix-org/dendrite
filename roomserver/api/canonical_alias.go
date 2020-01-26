@@ -34,10 +34,8 @@ type SetRoomCanonicalAliasRequest struct {
 
 // SetRoomCanonicalAliasResponse is a response to SetRoomCanonicalAlias
 type SetRoomCanonicalAliasResponse struct {
-	// Does the alias already refer to a room?
-	AliasExists bool `json:"alias_exists"`
-	// Does the alias refer to a different room?
-	DifferentRoom bool `json:"different_room"`
+	// Does the canonical alias already belong to a room?
+	CanonicalAliasExists bool `json:"canonical_alias_exists"`
 }
 
 // GetRoomIDForCanonicalAliasRequest is a request to GetRoomIDForCanonicalAlias

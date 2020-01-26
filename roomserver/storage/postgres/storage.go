@@ -491,8 +491,8 @@ func (d *Database) GetCreatorIDForCanonicalAlias(
 }
 
 // RemoveRoomCanonicalAlias implements alias.RoomserverCanonicalAliasAPIDB
-func (d *Database) RemoveRoomCanonicalAlias(ctx context.Context, canonical_alias string) error {
-	return d.statements.deleteRoomCanonicalAlias(ctx, canonical_alias)
+func (d *Database) RemoveRoomCanonicalAlias(ctx context.Context, roomID string) error {
+	return d.statements.deleteRoomCanonicalAlias(ctx, roomID)
 }
 
 // StateEntriesForTuples implements state.RoomStateDatabase

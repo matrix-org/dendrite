@@ -65,12 +65,10 @@ func SetupRoomServerComponent(
 
 	aliasAPI.SetupHTTP(http.DefaultServeMux)
 
-	canonicalAliasAPI := canonicalAlias.RoomserverCanonicalAliasAPI{
-		DB:            roomserverDB,
-		Cfg:           base.Cfg,
-		InputAPI:      &inputAPI,
-		QueryAPI:      &queryAPI,
-		AppserviceAPI: &asAPI,
+	canonicalAliasAPI := canonical_alias.RoomserverCanonicalAliasAPI{
+		DB:       roomserverDB,
+		Cfg:      base.Cfg,
+		AliasAPI: &aliasAPI,
 	}
 	canonicalAliasAPI.SetupHTTP(http.DefaultServeMux)
 
