@@ -16,7 +16,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/common"
@@ -39,12 +38,12 @@ type Database interface {
 func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return nil, err
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
 	}
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
 	default:
-		return nil, errors.New("unknown schema")
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
 	}
 }

@@ -42,15 +42,16 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerData
 	if db, err = sql.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
-	partitions := common.PartitionOffsetStatements{}
-	if err = partitions.Prepare(db, "publicroomsapi"); err != nil {
+	storage := PublicRoomsServerDatabase{
+		db: db,
+	}
+	if err = storage.PartitionOffsetStatements.Prepare(db, "publicroomsapi"); err != nil {
 		return nil, err
 	}
-	statements := publicRoomsStatements{}
-	if err = statements.prepare(db); err != nil {
+	if err = storage.statements.prepare(db); err != nil {
 		return nil, err
 	}
-	return &PublicRoomsServerDatabase{db, partitions, statements}, nil
+	return &storage, nil
 }
 
 // GetRoomVisibility returns the room visibility as a boolean: true if the room

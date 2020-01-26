@@ -18,6 +18,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"math"
+
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -32,13 +35,40 @@ type Database struct {
 // It creates the necessary tables if they don't already exist.
 // It prepares all the SQL statements that it will use.
 // Returns an error if there was a problem talking to the database.
-func NewDatabase(dataSourceName string) (*Database, error) {
+func NewDatabase(
+	dataSourceName string,
+	serverName gomatrixserverlib.ServerName,
+	serverKey ed25519.PublicKey,
+	serverKeyID gomatrixserverlib.KeyID,
+) (*Database, error) {
 	db, err := sql.Open("postgres", dataSourceName)
 	if err != nil {
 		return nil, err
 	}
 	d := &Database{}
 	err = d.statements.prepare(db)
+	if err != nil {
+		return nil, err
+	}
+	// Store our own keys so that we don't end up making HTTP requests to find our
+	// own keys
+	index := gomatrixserverlib.PublicKeyLookupRequest{
+		ServerName: serverName,
+		KeyID:      serverKeyID,
+	}
+	value := gomatrixserverlib.PublicKeyLookupResult{
+		VerifyKey: gomatrixserverlib.VerifyKey{
+			Key: gomatrixserverlib.Base64String(serverKey),
+		},
+		ValidUntilTS: math.MaxUint64 >> 1,
+		ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
+	}
+	err = d.StoreKeys(
+		context.Background(),
+		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{
+			index: value,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

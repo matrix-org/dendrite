@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -129,7 +130,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	}
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.SyncPosition) (res *types.Response, err error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.PaginationToken) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
@@ -141,14 +142,14 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.SyncP
 		return
 	}
 
-	accountDataFilter := gomatrixserverlib.DefaultFilterPart() // TODO: use filter provided in req instead
-	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
+	accountDataFilter := gomatrix.DefaultFilterPart() // TODO: use filter provided in req instead
+	res, err = rp.appendAccountData(res, req.device.UserID, req, int64(latestPos.PDUPosition), &accountDataFilter)
 	return
 }
 
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos int64,
-	accountDataFilter *gomatrixserverlib.FilterPart,
+	accountDataFilter *gomatrix.FilterPart,
 ) (*types.Response, error) {
 	// TODO: Account data doesn't have a sync position of its own, meaning that
 	// account data might be sent multiple time to the client if multiple account
@@ -182,7 +183,11 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(req.ctx, userID, req.since.PDUPosition, currentPos, accountDataFilter)
+	dataTypes, err := rp.db.GetAccountDataInRange(
+		req.ctx, userID,
+		types.StreamPosition(req.since.PDUPosition), types.StreamPosition(currentPos),
+		accountDataFilter,
+	)
 	if err != nil {
 		return nil, err
 	}

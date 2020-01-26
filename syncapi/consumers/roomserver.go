@@ -133,6 +133,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
+		false,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -144,7 +145,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&ev, "", nil, types.SyncPosition{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(&ev, "", nil, types.PaginationToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -161,7 +162,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&msg.Event, "", nil, types.SyncPosition{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(&msg.Event, "", nil, types.PaginationToken{PDUPosition: pduPos})
 	return nil
 }
 
