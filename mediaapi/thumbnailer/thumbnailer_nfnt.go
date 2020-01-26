@@ -18,6 +18,7 @@ package thumbnailer
 
 import (
 	"context"
+	"fmt"
 	"image"
 	"image/draw"
 
@@ -125,7 +126,14 @@ func writeFile(img image.Image, dst string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer (func() { err = out.Close() })()
+	defer (func() {
+		finalErr := out.Close()
+		if err != nil && finalErr != nil {
+			err = fmt.Errorf("%s\n%s", err, finalErr)
+		} else if err == nil {
+			err = finalErr
+		}
+	})()
 
 	return jpeg.Encode(out, img, &jpeg.Options{
 		Quality: 85,

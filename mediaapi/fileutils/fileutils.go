@@ -112,8 +112,14 @@ func WriteTempFile(reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, a
 	if err != nil {
 		return
 	}
-	defer (func() { err = tmpFile.Close() })()
-
+	defer (func() {
+		finalErr := tmpFile.Close()
+		if err != nil && finalErr != nil {
+			err = fmt.Errorf("%s\n%s", err, finalErr)
+		} else if err == nil {
+			err = finalErr
+		}
+	})()
 	// The amount of data read is limited to maxFileSizeBytes. At this point, if there is more data it will be truncated.
 	limitedReader := io.LimitReader(reqReader, int64(maxFileSizeBytes))
 	// Hash the file data. The hash will be returned. The hash is useful as a

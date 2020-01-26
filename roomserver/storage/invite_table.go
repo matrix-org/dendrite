@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -119,7 +120,14 @@ func (s *inviteStatements) updateInviteRetired(
 	if err != nil {
 		return nil, err
 	}
-	defer (func() { err = rows.Close() })()
+	defer (func() {
+		finalErr := rows.Close()
+		if err != nil && finalErr != nil {
+			err = fmt.Errorf("%s\n%s", err, finalErr)
+		} else if err == nil {
+			err = finalErr
+		}
+	})()
 	for rows.Next() {
 		var inviteEventID string
 		if err := rows.Scan(&inviteEventID); err != nil {

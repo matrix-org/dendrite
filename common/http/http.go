@@ -39,7 +39,14 @@ func PostJSON(
 
 	res, err := httpClient.Do(req.WithContext(ctx))
 	if res != nil {
-		defer (func() { err = res.Body.Close() })()
+		defer (func() {
+			finalErr := res.Body.Close()
+			if err != nil && finalErr != nil {
+				err = fmt.Errorf("%s\n%s", err, finalErr)
+			} else if err == nil {
+				err = finalErr
+			}
+		})()
 	}
 	if err != nil {
 		return err
