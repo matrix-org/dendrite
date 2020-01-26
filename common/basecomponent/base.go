@@ -17,6 +17,7 @@ package basecomponent
 import (
 	"database/sql"
 	"io"
+	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common/keydb"
@@ -74,7 +75,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 
 	var node *go_http_js_libp2p.P2pLocalNode
 	if cfg.Matrix.ServerName == "p2p-js" {
-		node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment")
+		node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", []string{"/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/"})
 		cfg.Matrix.ServerName = gomatrixserverlib.ServerName(node.Id)
 	}
 
@@ -161,10 +162,10 @@ func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
-	if b.P2PLocalNode != nil {
+	if b.P2pLocalNode != nil {
 		fmt.Println("Running in js-libp2p federation mode")
 		fmt.Println("Warning: Federation with non-libp2p homeservers will not work in this mode yet!")
-		tr := go_http_js_libp2p.NewP2pTransport(b.P2PLocalNode)
+		tr := go_http_js_libp2p.NewP2pTransport(b.P2pLocalNode)
 		return gomatrixserverlib.NewFederationClientWithTransport(
 			b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey, tr,
 		)
