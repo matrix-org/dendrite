@@ -30,7 +30,7 @@ import (
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
 	clientAPIConsumer *common.ContinualConsumer
-	db                *storage.SyncServerDatasource
+	db                storage.Database
 	notifier          *sync.Notifier
 }
 
@@ -39,7 +39,7 @@ func NewOutputClientDataConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
-	store *storage.SyncServerDatasource,
+	store storage.Database,
 ) *OutputClientDataConsumer {
 
 	consumer := common.ContinualConsumer{
@@ -90,7 +90,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		}).Panicf("could not save account data")
 	}
 
-	s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.SyncPosition{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.PaginationToken{PDUPosition: pduPos})
 
 	return nil
 }
