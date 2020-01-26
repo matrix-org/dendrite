@@ -42,4 +42,6 @@ require (
 
 replace github.com/matrix-org/go-http-js-libp2p v0.0.0-20200125063821-6eb06b102bda => ../go-http-js-libp2p
 
+replace github.com/matrix-org/gomatrixserverlib v0.0.0-20200124100636-0c2ec91d1df5 => ../gomatrixserverlib
+
 go 1.13

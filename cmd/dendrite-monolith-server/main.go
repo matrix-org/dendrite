@@ -88,11 +88,11 @@ func main() {
 	// }()
 
 	// Expose the matrix APIs via libp2p-js
-	if base.P2PLocalNode != nil {
+	if base.P2pLocalNode != nil {
 		go func() {
-			logrus.Info("Listening on libp2p-js host ID ", base.P2PLocalNode.Id)
+			logrus.Info("Listening on libp2p-js host ID ", base.P2pLocalNode.Id)
 
-			listener := go_http_js_libp2p.NewP2pListener(base.P2PLocalNode)
+			listener := go_http_js_libp2p.NewP2pListener(base.P2pLocalNode)
 			defer listener.Close()
 			s := &http.Server{}
 			s.Serve(listener)
@@ -104,7 +104,7 @@ func main() {
 			listener := go_http_js_libp2p.NewFetchListener()
 			s := &http.Server{}
 			go s.Serve(listener)
-		}
+		}()
 	}
 
 	// Handle HTTPS if certificate and key are provided
