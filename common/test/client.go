@@ -82,8 +82,8 @@ func (r *Request) Do() (err error) {
 	if err != nil {
 		return err
 	}
-	defer (func() { 
-		if err == nil { err = res.Body.Close() }
+	defer (func() {
+		err = res.Body.Close()
 	})()
 
 	if res.StatusCode != r.WantedStatusCode {

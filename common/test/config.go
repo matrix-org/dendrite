@@ -143,7 +143,9 @@ func NewMatrixKey(matrixKeyPath string) (err error) {
 	}
 
 	defer (func() {
-		if err == nil {err = keyOut.Close()}
+		if err == nil {
+			err = keyOut.Close()
+		}
 	})()
 
 	err = pem.Encode(keyOut, &pem.Block{
