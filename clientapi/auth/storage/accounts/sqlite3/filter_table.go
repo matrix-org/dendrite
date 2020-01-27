@@ -28,13 +28,11 @@ CREATE TABLE IF NOT EXISTS account_filter (
 	-- The filter
 	filter TEXT NOT NULL,
 	-- The ID
-	id SERIAL,
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	-- The localpart of the Matrix user ID associated to this filter
 	localpart TEXT NOT NULL,
 
-	PRIMARY KEY(id, localpart),
-
-	UNIQUE (id)
+	UNIQUE (id, localpart)
 );
 
 CREATE INDEX IF NOT EXISTS account_filter_localpart ON account_filter(localpart);
@@ -49,10 +47,14 @@ const selectFilterIDByContentSQL = "" +
 const insertFilterSQL = "" +
 	"INSERT INTO account_filter (filter, localpart) VALUES ($1, $2)"
 
+const selectLastInsertedFilterIDSQL = "" +
+	"SELECT id FROM account_filter WHERE rowid = last_insert_rowid()"
+
 type filterStatements struct {
-	selectFilterStmt            *sql.Stmt
-	selectFilterIDByContentStmt *sql.Stmt
-	insertFilterStmt            *sql.Stmt
+	selectFilterStmt               *sql.Stmt
+	selectLastInsertedFilterIDStmt *sql.Stmt
+	selectFilterIDByContentStmt    *sql.Stmt
+	insertFilterStmt               *sql.Stmt
 }
 
 func (s *filterStatements) prepare(db *sql.DB) (err error) {
@@ -61,6 +63,9 @@ func (s *filterStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
+		return
+	}
+	if s.selectLastInsertedFilterIDStmt, err = db.Prepare(selectLastInsertedFilterIDSQL); err != nil {
 		return
 	}
 	if s.selectFilterIDByContentStmt, err = db.Prepare(selectFilterIDByContentSQL); err != nil {
@@ -123,7 +128,12 @@ func (s *filterStatements) insertFilter(
 	}
 
 	// Otherwise insert the filter and return the new ID
-	err = s.insertFilterStmt.QueryRowContext(ctx, filterJSON, localpart).
-		Scan(&filterID)
+	if _, err = s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart); err != nil {
+		return "", err
+	}
+	row := s.selectLastInsertedFilterIDStmt.QueryRowContext(ctx)
+	if err := row.Scan(&filterID); err != nil {
+		return "", err
+	}
 	return
 }
