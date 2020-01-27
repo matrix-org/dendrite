@@ -7,6 +7,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts/postgres"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts/sqlite3"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -44,11 +45,10 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName, serverName)
 	case "file":
-	//	return sqlite3.NewDatabase(dataSourceName, serverName)
+		return sqlite3.NewDatabase(dataSourceName, serverName)
 	default:
 		return postgres.NewDatabase(dataSourceName, serverName)
 	}
-	return nil, errors.New("this shouldn't happen")
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving
