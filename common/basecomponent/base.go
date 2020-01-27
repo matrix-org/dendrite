@@ -18,6 +18,7 @@ import (
 	"database/sql"
 	"io"
 	"net/http"
+	"net/url"
 
 	"golang.org/x/crypto/ed25519"
 
@@ -68,7 +69,13 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}
 
-	kafkaConsumer, kafkaProducer := setupKafka(cfg)
+	var kafkaConsumer sarama.Consumer
+	var kafkaProducer sarama.SyncProducer
+	if cfg.Kafka.UseNaffka {
+		kafkaConsumer, kafkaProducer = setupNaffka(cfg)
+	} else {
+		kafkaConsumer, kafkaProducer = setupKafka(cfg)
+	}
 
 	return &BaseDendrite{
 		componentName: componentName,
@@ -186,28 +193,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 	logrus.Infof("Stopped %s server on %s", b.componentName, addr)
 }
 
-// setupKafka creates kafka consumer/producer pair from the config. Checks if
-// should use naffka.
+// setupKafka creates kafka consumer/producer pair from the config.
 func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	if cfg.Kafka.UseNaffka {
-		db, err := sql.Open("postgres", string(cfg.Database.Naffka))
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to open naffka database")
-		}
-
-		naffkaDB, err := naffka.NewPostgresqlDatabase(db)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to setup naffka database")
-		}
-
-		naff, err := naffka.New(naffkaDB)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to setup naffka")
-		}
-
-		return naff, naff
-	}
-
 	consumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start kafka consumer")
@@ -219,4 +206,45 @@ func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 	}
 
 	return consumer, producer
+}
+
+// setupNaffka creates kafka consumer/producer pair from the config.
+func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
+	var err error
+	var db *sql.DB
+	var naffkaDB *naffka.DatabaseImpl
+
+	uri, err := url.Parse(string(cfg.Database.Naffka))
+	if err != nil || uri.Scheme == "postgres" {
+		db, err = sql.Open("postgres", string(cfg.Database.Naffka))
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to open naffka database")
+		}
+
+		naffkaDB, err = naffka.NewPostgresqlDatabase(db)
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to setup naffka database")
+		}
+	} else if uri.Scheme == "file" {
+		db, err = sql.Open("sqlite3", string(cfg.Database.Naffka))
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to open naffka database")
+		}
+
+		naffkaDB, err = naffka.NewSqliteDatabase(db)
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to setup naffka database")
+		}
+	}
+
+	if naffkaDB == nil {
+		panic("naffka connection string not understood")
+	}
+
+	naff, err := naffka.New(naffkaDB)
+	if err != nil {
+		logrus.WithError(err).Panic("Failed to setup naffka")
+	}
+
+	return naff, naff
 }
