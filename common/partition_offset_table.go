@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS ${prefix}_partition_offsets (
     partition INTEGER NOT NULL,
     -- The 64-bit offset.
     partition_offset BIGINT NOT NULL,
-    CONSTRAINT UNIQUE (topic, partition)
+    UNIQUE (topic, partition)
 );
 `
 

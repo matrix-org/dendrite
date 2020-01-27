@@ -26,7 +26,7 @@ import (
 
 const inviteEventsSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_invite_events (
-	id BIGINT PRIMARY KEY DEFAULT AUTOINCREMENT, -- nextval('syncapi_stream_id'),
+	id INTEGER PRIMARY KEY DEFAULT AUTOINCREMENT, -- nextval('syncapi_stream_id'),
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,

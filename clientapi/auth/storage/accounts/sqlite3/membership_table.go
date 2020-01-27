@@ -33,11 +33,10 @@ CREATE TABLE IF NOT EXISTS account_memberships (
     event_id TEXT NOT NULL,
 
     -- A user can only be member of a room once
-    PRIMARY KEY (localpart, room_id)
-);
+    PRIMARY KEY (localpart, room_id),
 
--- Use index to process deletion by ID more efficiently
-CREATE UNIQUE INDEX IF NOT EXISTS account_membership_event_id ON account_memberships(event_id);
+		UNIQUE (event_id)
+);
 `
 
 const insertMembershipSQL = `
@@ -52,7 +51,7 @@ const selectMembershipInRoomByLocalpartSQL = "" +
 	"SELECT event_id FROM account_memberships WHERE localpart = $1 AND room_id = $2"
 
 const deleteMembershipsByEventIDsSQL = "" +
-	"DELETE FROM account_memberships WHERE event_id = ANY($1)"
+	"DELETE FROM account_memberships WHERE event_id IN ($1)"
 
 type membershipStatements struct {
 	deleteMembershipsByEventIDsStmt       *sql.Stmt

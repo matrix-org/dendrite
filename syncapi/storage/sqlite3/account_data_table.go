@@ -27,11 +27,11 @@ import (
 
 const accountDataSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
-    id BIGINT PRIMARY KEY AUTOINCREMENT, -- DEFAULT nextval('syncapi_stream_id'),
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     type TEXT NOT NULL,
-    CONSTRAINT syncapi_account_data_unique UNIQUE (user_id, room_id, type)
+    UNIQUE (user_id, room_id, type)
 );
 
 -- CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id, type);
@@ -39,15 +39,15 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
 
 const insertAccountDataSQL = "" +
 	"INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($1, $2, $3)" +
-	" ON CONFLICT DO UPDATE" +
-	" SET id = EXCLUDED.id" +
-	" RETURNING id"
+	" ON CONFLICT (user_id, room_id, type) DO UPDATE" +
+	" SET id = EXCLUDED.id;" +
+	"SELECT id FROM syncapi_account_data_type WHERE rowid = last_insert_rowid()"
 
 const selectAccountDataInRangeSQL = "" +
 	"SELECT room_id, type FROM syncapi_account_data_type" +
 	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
+	//	" AND ( $4 IS NULL OR     type LIKE ANY($4)  )" +
+	//	" AND ( $5 IS NULL OR NOT(type LIKE ANY($5)) )" +
 	" ORDER BY id ASC LIMIT $6"
 
 const selectMaxAccountDataIDSQL = "" +

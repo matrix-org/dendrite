@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     -- part of the current state of the room.
     added_at BIGINT,
     -- Clobber based on 3-uple of room_id, type and state_key
-    CONSTRAINT syncapi_room_state_unique UNIQUE (room_id, type, state_key)
+    UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
 -- CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_state(event_id, room_id, type, sender, contains_url);
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
 const upsertRoomStateSQL = "" +
 	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, event_json, membership, added_at)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
-	" ON CONFLICT" + // ON CONSTRAINT syncapi_room_state_unique" +
+	" ON CONFLICT (event_id, room_id, type, sender, contains_url)" +
 	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, event_json = $7, membership = $8, added_at = $9"
 
 const deleteRoomStateByEventIDSQL = "" +
@@ -73,11 +73,11 @@ const selectRoomIDsWithMembershipSQL = "" +
 
 const selectCurrentStateSQL = "" +
 	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1" +
-	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
-	" AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) )" +
-	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
-	" AND ( $6::bool IS NULL   OR     contains_url = $6  )" +
+	" AND ( $2 IS NULL OR     sender  = ANY($2)  )" +
+	" AND ( $3 IS NULL OR NOT(sender  = ANY($3)) )" +
+	" AND ( $4 IS NULL OR     type LIKE ANY($4)  )" +
+	" AND ( $5 IS NULL OR NOT(type LIKE ANY($5)) )" +
+	" AND ( $6 IS NULL OR     contains_url = $6  )" +
 	" LIMIT $7"
 
 const selectJoinedUsersSQL = "" +

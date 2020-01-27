@@ -23,6 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // The length of generated device IDs
@@ -38,7 +40,7 @@ type Database struct {
 func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if db, err = sql.Open("sqlite3", dataSourceName); err != nil {
 		return nil, err
 	}
 	d := devicesStatements{}

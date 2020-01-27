@@ -28,7 +28,7 @@ import (
 
 const devicesSchema = `
 -- This sequence is used for automatic allocation of session_id.
-CREATE SEQUENCE IF NOT EXISTS device_session_id_seq START 1;
+-- CREATE SEQUENCE IF NOT EXISTS device_session_id_seq START 1;
 
 -- Stores data about devices.
 CREATE TABLE IF NOT EXISTS device_devices (
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS device_devices (
     -- This can be used as a secure substitution of the access token in situations
     -- where data is associated with access tokens (e.g. transaction storage),
     -- so we don't have to store users' access tokens everywhere.
-    session_id BIGINT NOT NULL DEFAULT nextval('device_session_id_seq'),
+    session_id BIGINT,
     -- The device identifier. This only needs to uniquely identify a device for a given user, not globally.
     -- access_tokens will be clobbered based on the device ID for a user.
     device_id TEXT NOT NULL,
@@ -50,17 +50,16 @@ CREATE TABLE IF NOT EXISTS device_devices (
     -- When this devices was first recognised on the network, as a unix timestamp (ms resolution).
     created_ts BIGINT NOT NULL,
     -- The display name, human friendlier than device_id and updatable
-    display_name TEXT
+    display_name TEXT,
     -- TODO: device keys, device display names, last used ts and IP address?, token restrictions (if 3rd-party OAuth app)
-);
 
--- Device IDs must be unique for a given user.
-CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(localpart, device_id);
+		UNIQUE (localpart, device_id)
+);
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name) VALUES ($1, $2, $3, $4, $5)" +
-	" RETURNING session_id"
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name) VALUES ($1, $2, $3, $4, $5);" +
+	"SELECT last_insert_rowid() AS session_id"
 
 const selectDeviceByTokenSQL = "" +
 	"SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"

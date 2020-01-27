@@ -25,7 +25,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	// Import the postgres database driver.
-	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // Database represents an account database
@@ -45,7 +45,7 @@ type Database struct {
 func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if db, err = sql.Open("sqlite3", dataSourceName); err != nil {
 		return nil, err
 	}
 	partitions := common.PartitionOffsetStatements{}

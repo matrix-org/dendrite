@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS keydb_server_keys (
 	expired_ts BIGINT NOT NULL,
 	-- The base64-encoded public key.
 	server_key TEXT NOT NULL,
-	CONSTRAINT UNIQUE (server_name, server_key_id)
+	UNIQUE (server_name, server_key_id)
 );
 
 CREATE INDEX IF NOT EXISTS keydb_server_name_and_key_id ON keydb_server_keys (server_name_and_key_id);
