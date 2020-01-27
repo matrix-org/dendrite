@@ -51,8 +51,8 @@ func Setup(
 	federationSenderAPI federationSenderAPI.FederationSenderQueryAPI,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) {
 	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()

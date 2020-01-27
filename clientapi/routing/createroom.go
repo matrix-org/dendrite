@@ -135,7 +135,7 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
@@ -149,7 +149,7 @@ func CreateRoom(
 func createRoom(
 	req *http.Request, device *authtypes.Device,
 	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())

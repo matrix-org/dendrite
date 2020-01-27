@@ -41,8 +41,8 @@ import (
 // component.
 func SetupAppServiceAPIComponent(
 	base *basecomponent.BaseDendrite,
-	accountsDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountsDB accounts.Database,
+	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	roomserverAliasAPI roomserverAPI.RoomserverAliasAPI,
 	roomserverQueryAPI roomserverAPI.RoomserverQueryAPI,
@@ -111,8 +111,8 @@ func SetupAppServiceAPIComponent(
 // `sender_localpart` field of each application service if it doesn't
 // exist already
 func generateAppServiceAccount(
-	accountsDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountsDB accounts.Database,
+	deviceDB devices.Database,
 	as config.ApplicationService,
 ) error {
 	ctx := context.Background()

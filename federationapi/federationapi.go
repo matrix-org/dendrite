@@ -32,8 +32,8 @@ import (
 // FederationAPI component.
 func SetupFederationAPIComponent(
 	base *basecomponent.BaseDendrite,
-	accountsDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountsDB accounts.Database,
+	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,

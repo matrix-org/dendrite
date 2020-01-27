@@ -2,11 +2,12 @@ package accounts
 
 import (
 	"context"
+	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts/postgres"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/mediaapi/storage/postgres"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -34,17 +35,22 @@ type Database interface {
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*authtypes.Account, error)
 }
 
-func Open(dataSourceName string) (Database, error) {
+func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.Open(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, serverName)
 	}
 	switch uri.Scheme {
 	case "postgres":
-		return postgres.Open(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, serverName)
 	case "file":
-	//	return sqlite3.Open(dataSourceName)
+	//	return sqlite3.NewDatabase(dataSourceName, serverName)
 	default:
-		return postgres.Open(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, serverName)
 	}
+	return nil, errors.New("this shouldn't happen")
 }
+
+// Err3PIDInUse is the error returned when trying to save an association involving
+// a third-party identifier which is already associated to a local user.
+var Err3PIDInUse = errors.New("This third-party identifier is already in use")

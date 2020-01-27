@@ -118,7 +118,7 @@ func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.Fede
 
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
-func (b *BaseDendrite) CreateDeviceDB() *devices.Database {
+func (b *BaseDendrite) CreateDeviceDB() devices.Database {
 	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to devices db")
@@ -129,7 +129,7 @@ func (b *BaseDendrite) CreateDeviceDB() *devices.Database {
 
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
-func (b *BaseDendrite) CreateAccountsDB() *accounts.Database {
+func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")

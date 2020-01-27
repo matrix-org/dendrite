@@ -33,12 +33,12 @@ import (
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
 	db        storage.Database
-	accountDB *accounts.Database
+	accountDB accounts.Database
 	notifier  *Notifier
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db storage.Database, n *Notifier, adb *accounts.Database) *RequestPool {
+func NewRequestPool(db storage.Database, n *Notifier, adb accounts.Database) *RequestPool {
 	return &RequestPool{db, adb, n}
 }
 

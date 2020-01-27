@@ -34,8 +34,8 @@ import (
 // component.
 func SetupClientAPIComponent(
 	base *basecomponent.BaseDendrite,
-	deviceDB *devices.Database,
-	accountsDB *accounts.Database,
+	deviceDB devices.Database,
+	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
