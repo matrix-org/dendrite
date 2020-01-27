@@ -71,14 +71,8 @@ github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26 h1:Hr3zjRsq2bh
 github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26/go.mod h1:3fxX6gUjWyI/2Bt7J1OLhpCzOfO/bB3AiX0cJtEKud0=
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200124100636-0c2ec91d1df5 h1:kmRjpmFOenVpOaV/DRlo9p6z/IbOKlUC+hhKsAAh8Qg=
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200124100636-0c2ec91d1df5/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
-github.com/matrix-org/naffka v0.0.0-20200127181638-7bc0d2da4cbf h1:yI/mCJkuBCNmYfTxrh65yMv1cZ1Sv3pRupBcQgawAOc=
-github.com/matrix-org/naffka v0.0.0-20200127181638-7bc0d2da4cbf/go.mod h1:cXoYQIENbdWIQHt1SyCo6Bl3C3raHwJ0wgVrXHSqf+A=
-github.com/matrix-org/naffka v0.0.0-20200127184217-922c1d71368e h1:/L+cpenI6bCYTo2Ljp/o+0027MfxQOm33OvxgX0uoCc=
-github.com/matrix-org/naffka v0.0.0-20200127184217-922c1d71368e/go.mod h1:cXoYQIENbdWIQHt1SyCo6Bl3C3raHwJ0wgVrXHSqf+A=
-github.com/matrix-org/naffka v0.0.0-20200127185919-42bbc99f1dae h1:UAZ91pICTaJKQCTEUeICHvZ1Ttfsi7+Pxx5mkB+1uwA=
-github.com/matrix-org/naffka v0.0.0-20200127185919-42bbc99f1dae/go.mod h1:cXoYQIENbdWIQHt1SyCo6Bl3C3raHwJ0wgVrXHSqf+A=
-github.com/matrix-org/naffka v0.0.0-20200127193556-abd5119028e1 h1:JgIX6fkFwEzVMWE8hf71blUeE67PBuv0M3gR7JqnYUY=
-github.com/matrix-org/naffka v0.0.0-20200127193556-abd5119028e1/go.mod h1:cXoYQIENbdWIQHt1SyCo6Bl3C3raHwJ0wgVrXHSqf+A=
+github.com/matrix-org/naffka v0.0.0-20200127221512-0716baaabaf1 h1:osLoFdOy+ChQqVUn2PeTDETFftVkl4w9t/OW18g3lnk=
+github.com/matrix-org/naffka v0.0.0-20200127221512-0716baaabaf1/go.mod h1:cXoYQIENbdWIQHt1SyCo6Bl3C3raHwJ0wgVrXHSqf+A=
 github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5 h1:W7l5CP4V7wPyPb4tYE11dbmeAOwtFQBTW0rf4OonOS8=
 github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5/go.mod h1:lePuOiXLNDott7NZfnQvJk0lAZ5HgvIuWGhel6J+RLA=
 github.com/mattn/go-sqlite3 v2.0.2+incompatible h1:qzw9c2GNT8UFrgWNDhCTqRqYUSmu/Dav/9Z58LGpk7U=
