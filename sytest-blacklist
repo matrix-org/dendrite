@@ -8,6 +8,9 @@ POST /login can log in as a user with just the local part of the id
 avatar_url updates affect room member events
 
 # Blacklisted due to flakiness
+displayname updates affect room member events
+
+# Blacklisted due to flakiness
 Room members can override their displayname on a room-specific basis
 
 # Blacklisted due to flakiness
