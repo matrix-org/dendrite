@@ -30,31 +30,19 @@ import (
 const currentRoomStateSchema = `
 -- Stores the current room state for every room.
 CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
-    -- The 'room_id' key for the state event.
     room_id TEXT NOT NULL,
-    -- The state event ID
     event_id TEXT NOT NULL,
-    -- The state event type e.g 'm.room.member'
     type TEXT NOT NULL,
-    -- The 'sender' property of the event.
     sender TEXT NOT NULL,
-	-- true if the event content contains a url key
-    contains_url BOOL NOT NULL,
-    -- The state_key value for this state event e.g ''
+    contains_url BOOL NOT NULL DEFAULT false,
     state_key TEXT NOT NULL,
-    -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
     event_json TEXT NOT NULL,
-    -- The 'content.membership' value if this event is an m.room.member event. For other
-    -- events, this will be NULL.
     membership TEXT,
-    -- The serial ID of the output_room_events table when this event became
-    -- part of the current state of the room.
     added_at BIGINT,
-    -- Clobber based on 3-uple of room_id, type and state_key
     UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
--- CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_state(event_id, room_id, type, sender, contains_url);
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_state(event_id, room_id, type, sender, contains_url);
 -- for querying membership states of users
 -- CREATE INDEX IF NOT EXISTS syncapi_membership_idx ON syncapi_current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
 `
@@ -73,10 +61,10 @@ const selectRoomIDsWithMembershipSQL = "" +
 
 const selectCurrentStateSQL = "" +
 	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1" +
-	" AND ( $2 IS NULL OR     sender  = ANY($2)  )" +
-	" AND ( $3 IS NULL OR NOT(sender  = ANY($3)) )" +
-	" AND ( $4 IS NULL OR     type LIKE ANY($4)  )" +
-	" AND ( $5 IS NULL OR NOT(type LIKE ANY($5)) )" +
+	" AND ( $2 IS NULL OR     sender IN ($2)  )" +
+	" AND ( $3 IS NULL OR NOT(sender IN ($3)) )" +
+	" AND ( $4 IS NULL OR     type   IN ($4)  )" +
+	" AND ( $5 IS NULL OR NOT(type   IN ($5)) )" +
 	" AND ( $6 IS NULL OR     contains_url = $6  )" +
 	" LIMIT $7"
 
@@ -92,9 +80,10 @@ const selectEventsWithEventIDsSQL = "" +
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
 	"SELECT added_at, event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
-	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
+	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 type currentRoomStateStatements struct {
+	streamIDStatements              *streamIDStatements
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
@@ -104,7 +93,8 @@ type currentRoomStateStatements struct {
 	selectStateEventStmt            *sql.Stmt
 }
 
-func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
+func (s *currentRoomStateStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
+	s.streamIDStatements = streamID
 	_, err = db.Exec(currentRoomStateSchema)
 	if err != nil {
 		return

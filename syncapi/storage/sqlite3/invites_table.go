@@ -26,26 +26,24 @@ import (
 
 const inviteEventsSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_invite_events (
-	id INTEGER PRIMARY KEY DEFAULT AUTOINCREMENT, -- nextval('syncapi_stream_id'),
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,
 	event_json TEXT NOT NULL
 );
 
--- For looking up the invites for a given user.
--- CREATE INDEX IF NOT EXISTS syncapi_invites_target_user_id_idx
---	ON syncapi_invite_events (target_user_id, id);
-
--- For deleting old invites
--- CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx
---	ON syncapi_invite_events (event_id);
+CREATE INDEX IF NOT EXISTS syncapi_invites_target_user_id_idx ON syncapi_invite_events (target_user_id, id);
+CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx ON syncapi_invite_events (event_id);
 `
 
 const insertInviteEventSQL = "" +
-	"INSERT INTO syncapi_invite_events (" +
-	" room_id, event_id, target_user_id, event_json" +
-	") VALUES ($1, $2, $3, $4) RETURNING id"
+	"INSERT INTO syncapi_invite_events" +
+	" (room_id, event_id, target_user_id, event_json)" +
+	" VALUES ($1, $2, $3, $4)"
+
+const selectLastInsertedInviteEventSQL = "" +
+	"SELECT id FROM syncapi_invite_events WHERE rowid = last_insert_rowid()"
 
 const deleteInviteEventSQL = "" +
 	"DELETE FROM syncapi_invite_events WHERE event_id = $1"
@@ -59,18 +57,24 @@ const selectMaxInviteIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_invite_events"
 
 type inviteEventsStatements struct {
-	insertInviteEventStmt         *sql.Stmt
-	selectInviteEventsInRangeStmt *sql.Stmt
-	deleteInviteEventStmt         *sql.Stmt
-	selectMaxInviteIDStmt         *sql.Stmt
+	streamIDStatements                *streamIDStatements
+	insertInviteEventStmt             *sql.Stmt
+	selectLastInsertedInviteEventStmt *sql.Stmt
+	selectInviteEventsInRangeStmt     *sql.Stmt
+	deleteInviteEventStmt             *sql.Stmt
+	selectMaxInviteIDStmt             *sql.Stmt
 }
 
-func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
+func (s *inviteEventsStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
+	s.streamIDStatements = streamID
 	_, err = db.Exec(inviteEventsSchema)
 	if err != nil {
 		return
 	}
 	if s.insertInviteEventStmt, err = db.Prepare(insertInviteEventSQL); err != nil {
+		return
+	}
+	if s.selectLastInsertedInviteEventStmt, err = db.Prepare(selectLastInsertedInviteEventSQL); err != nil {
 		return
 	}
 	if s.selectInviteEventsInRangeStmt, err = db.Prepare(selectInviteEventsInRangeSQL); err != nil {
@@ -88,13 +92,17 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 func (s *inviteEventsStatements) insertInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.Event,
 ) (streamPos types.StreamPosition, err error) {
-	err = s.insertInviteEventStmt.QueryRowContext(
+	_, err = s.insertInviteEventStmt.ExecContext(
 		ctx,
 		inviteEvent.RoomID(),
 		inviteEvent.EventID(),
 		*inviteEvent.StateKey(),
 		inviteEvent.JSON(),
-	).Scan(&streamPos)
+	)
+	if err != nil {
+		return
+	}
+	err = s.selectLastInsertedInviteEventStmt.QueryRowContext(ctx).Scan(&streamPos)
 	return
 }
 

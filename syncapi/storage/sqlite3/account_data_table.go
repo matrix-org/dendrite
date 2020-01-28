@@ -33,33 +33,32 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
     type TEXT NOT NULL,
     UNIQUE (user_id, room_id, type)
 );
-
--- CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id, type);
 `
 
 const insertAccountDataSQL = "" +
-	"INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($1, $2, $3)" +
+	"INSERT INTO syncapi_account_data_type (id, user_id, room_id, type) VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (user_id, room_id, type) DO UPDATE" +
-	" SET id = EXCLUDED.id;" +
-	"SELECT id FROM syncapi_account_data_type WHERE rowid = last_insert_rowid()"
+	" SET id = EXCLUDED.id"
 
 const selectAccountDataInRangeSQL = "" +
 	"SELECT room_id, type FROM syncapi_account_data_type" +
 	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	//	" AND ( $4 IS NULL OR     type LIKE ANY($4)  )" +
-	//	" AND ( $5 IS NULL OR NOT(type LIKE ANY($5)) )" +
+	" AND ( $4 IS NULL OR     type IN ($4)  )" +
+	" AND ( $5 IS NULL OR NOT(type IN ($5)) )" +
 	" ORDER BY id ASC LIMIT $6"
 
 const selectMaxAccountDataIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_account_data_type"
 
 type accountDataStatements struct {
+	streamIDStatements           *streamIDStatements
 	insertAccountDataStmt        *sql.Stmt
 	selectAccountDataInRangeStmt *sql.Stmt
 	selectMaxAccountDataIDStmt   *sql.Stmt
 }
 
-func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
+func (s *accountDataStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
+	s.streamIDStatements = streamID
 	_, err = db.Exec(accountDataSchema)
 	if err != nil {
 		return
@@ -77,10 +76,15 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *accountDataStatements) insertAccountData(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
-	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
+	pos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	if err != nil {
+		return
+	}
+	insertStmt := common.TxStmt(txn, s.insertAccountDataStmt)
+	_, err = insertStmt.ExecContext(ctx, pos, userID, roomID, dataType)
 	return
 }
 

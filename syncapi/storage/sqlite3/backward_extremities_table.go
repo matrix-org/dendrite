@@ -17,14 +17,14 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+
+	"github.com/matrix-org/dendrite/common"
 )
 
 const backwardExtremitiesSchema = `
 -- Stores output room events received from the roomserver.
 CREATE TABLE IF NOT EXISTS syncapi_backward_extremities (
-	-- The 'room_id' key for the event.
 	room_id TEXT NOT NULL,
-	-- The event ID for the event.
 	event_id TEXT NOT NULL,
 
 	PRIMARY KEY(room_id, event_id)
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS syncapi_backward_extremities (
 const insertBackwardExtremitySQL = "" +
 	"INSERT INTO syncapi_backward_extremities (room_id, event_id)" +
 	" VALUES ($1, $2)" +
-	" ON CONFLICT DO NOTHING"
+	" ON CONFLICT (room_id, event_id) DO NOTHING"
 
 const selectBackwardExtremitiesForRoomSQL = "" +
 	"SELECT event_id FROM syncapi_backward_extremities WHERE room_id = $1"
@@ -46,7 +46,8 @@ const isBackwardExtremitySQL = "" +
 	")"
 
 const deleteBackwardExtremitySQL = "" +
-	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND event_id = $2"
+	"DELETE FROM syncapi_backward_extremities" +
+	" WHERE room_id = $1 AND event_id = $2"
 
 type backwardExtremitiesStatements struct {
 	insertBackwardExtremityStmt          *sql.Stmt
@@ -76,18 +77,20 @@ func (s *backwardExtremitiesStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *backwardExtremitiesStatements) insertsBackwardExtremity(
-	ctx context.Context, roomID, eventID string,
+	ctx context.Context, txn *sql.Tx, roomID, eventID string,
 ) (err error) {
-	_, err = s.insertBackwardExtremityStmt.ExecContext(ctx, roomID, eventID)
+	stmt := common.TxStmt(txn, s.insertBackwardExtremityStmt)
+	_, err = stmt.ExecContext(ctx, roomID, eventID)
 	return
 }
 
 func (s *backwardExtremitiesStatements) selectBackwardExtremitiesForRoom(
-	ctx context.Context, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) (eventIDs []string, err error) {
 	eventIDs = make([]string, 0)
 
-	rows, err := s.selectBackwardExtremitiesForRoomStmt.QueryContext(ctx, roomID)
+	stmt := common.TxStmt(txn, s.selectBackwardExtremitiesForRoomStmt)
+	rows, err := stmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return
 	}
@@ -105,15 +108,17 @@ func (s *backwardExtremitiesStatements) selectBackwardExtremitiesForRoom(
 }
 
 func (s *backwardExtremitiesStatements) isBackwardExtremity(
-	ctx context.Context, roomID, eventID string,
+	ctx context.Context, txn *sql.Tx, roomID, eventID string,
 ) (isBE bool, err error) {
-	err = s.isBackwardExtremityStmt.QueryRowContext(ctx, roomID, eventID).Scan(&isBE)
+	stmt := common.TxStmt(txn, s.isBackwardExtremityStmt)
+	err = stmt.QueryRowContext(ctx, roomID, eventID).Scan(&isBE)
 	return
 }
 
 func (s *backwardExtremitiesStatements) deleteBackwardExtremity(
-	ctx context.Context, roomID, eventID string,
+	ctx context.Context, txn *sql.Tx, roomID, eventID string,
 ) (err error) {
-	_, err = s.insertBackwardExtremityStmt.ExecContext(ctx, roomID, eventID)
+	stmt := common.TxStmt(txn, s.deleteBackwardExtremityStmt)
+	_, err = stmt.ExecContext(ctx, roomID, eventID)
 	return
 }

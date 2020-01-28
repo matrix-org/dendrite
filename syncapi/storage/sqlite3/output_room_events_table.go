@@ -32,52 +32,34 @@ import (
 )
 
 const outputRoomEventsSchema = `
--- This sequence is shared between all the tables generated from kafka logs.
-CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
-
 -- Stores output room events received from the roomserver.
 CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
-  -- An incrementing ID which denotes the position in the log that this event resides at.
-  -- NB: 'serial' makes no guarantees to increment by 1 every time, only that it increments.
-  --     This isn't a problem for us since we just want to order by this field.
-  id INTEGER PRIMARY KEY AUTOINCREMENT, -- DEFAULT nextval('syncapi_stream_id'),
-  -- The event ID for the event
-  event_id TEXT NOT NULL UNIQUE, -- CONSTRAINT syncapi_event_id_idx UNIQUE,
-  -- The 'room_id' key for the event.
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id TEXT NOT NULL UNIQUE,
   room_id TEXT NOT NULL,
-  -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
   event_json TEXT NOT NULL,
-  -- The event type e.g 'm.room.member'.
   type TEXT NOT NULL,
-  -- The 'sender' property of the event.
   sender TEXT NOT NULL,
-  -- true if the event content contains a url key.
   contains_url BOOL NOT NULL,
-  -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
-  -- if there is no delta.
   add_state_ids TEXT[],
   remove_state_ids TEXT[],
-  -- The client session that sent the event, if any
   session_id BIGINT,
-  -- The transaction id used to send the event, if any
   transaction_id TEXT,
-  -- Should the event be excluded from responses to /sync requests. Useful for
-  -- events retrieved through backfilling that have a position in the stream
-  -- that relates to the moment these were retrieved rather than the moment these
-  -- were emitted.
   exclude_from_sync BOOL DEFAULT FALSE
 );
 `
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
-	"room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
-	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) " +
-	"ON CONFLICT DO UPDATE SET exclude_from_sync = $11 " +
-	"RETURNING id"
+	"id, room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
+	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
+	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = $11"
+
+const selectLastInsertedEventSQL = "" +
+	"SELECT id FROM syncapi_output_room_events WHERE rowid = last_insert_rowid()"
 
 const selectEventsSQL = "" +
-	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)"
+	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
 
 const selectRecentEventsSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
@@ -98,20 +80,33 @@ const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
+/*
+	$1 = oldPos,
+	$2 = newPos,
+	$3 = pq.StringArray(stateFilterPart.Senders),
+	$4 = pq.StringArray(stateFilterPart.NotSenders),
+	$5 = pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
+	$6 = pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
+	$7 = stateFilterPart.ContainsURL,
+	$8 = stateFilterPart.Limit,
+*/
 const selectStateInRangeSQL = "" +
 	"SELECT id, event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
-	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
-	" AND ( $3::text[] IS NULL OR     sender  = ANY($3)  )" +
-	" AND ( $4::text[] IS NULL OR NOT(sender  = ANY($4)) )" +
-	" AND ( $5::text[] IS NULL OR     type LIKE ANY($5)  )" +
-	" AND ( $6::text[] IS NULL OR NOT(type LIKE ANY($6)) )" +
-	" AND ( $7::bool IS NULL   OR     contains_url = $7  )" +
+	" WHERE (id > $1 AND id <= $2)" + // old/new pos
+	" AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
+	" AND ( $3 IS NULL OR     sender  IN ($3)  )" + // sender
+	" AND ( $4 IS NULL OR NOT(sender  IN ($4)) )" + // not sender
+	" AND ( $5 IS NULL OR     type    IN ($5)  )" + // type
+	" AND ( $6 IS NULL OR NOT(type    IN ($6)) )" + // not type
+	" AND ( $7 IS NULL OR     contains_url = $7)" + // contains URL?
 	" ORDER BY id ASC" +
-	" LIMIT $8"
+	" LIMIT $8" // limit
 
 type outputRoomEventsStatements struct {
+	streamIDStatements            *streamIDStatements
 	insertEventStmt               *sql.Stmt
+	selectLastInsertedEventStmt   *sql.Stmt
 	selectEventsStmt              *sql.Stmt
 	selectMaxEventIDStmt          *sql.Stmt
 	selectRecentEventsStmt        *sql.Stmt
@@ -120,12 +115,16 @@ type outputRoomEventsStatements struct {
 	selectStateInRangeStmt        *sql.Stmt
 }
 
-func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
+func (s *outputRoomEventsStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
+	s.streamIDStatements = streamID
 	_, err = db.Exec(outputRoomEventsSchema)
 	if err != nil {
 		return
 	}
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
+		return
+	}
+	if s.selectLastInsertedEventStmt, err = db.Prepare(selectLastInsertedEventSQL); err != nil {
 		return
 	}
 	if s.selectEventsStmt, err = db.Prepare(selectEventsSQL); err != nil {
@@ -266,9 +265,16 @@ func (s *outputRoomEventsStatements) insertEvent(
 		_, containsURL = content["url"]
 	}
 
-	stmt := common.TxStmt(txn, s.insertEventStmt)
-	err = stmt.QueryRowContext(
+	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	if err != nil {
+		return
+	}
+
+	insertStmt := common.TxStmt(txn, s.insertEventStmt)
+	selectStmt := common.TxStmt(txn, s.selectLastInsertedEventStmt)
+	_, err = insertStmt.ExecContext(
 		ctx,
+		streamPos,
 		event.RoomID(),
 		event.EventID(),
 		event.JSON(),
@@ -280,7 +286,11 @@ func (s *outputRoomEventsStatements) insertEvent(
 		sessionID,
 		txnID,
 		excludeFromSync,
-	).Scan(&streamPos)
+	)
+	if err != nil {
+		return
+	}
+	err = selectStmt.QueryRowContext(ctx).Scan(&streamPos)
 	return
 }
 
@@ -349,13 +359,19 @@ func (s *outputRoomEventsStatements) selectEarlyEvents(
 func (s *outputRoomEventsStatements) selectEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
+	var returnEvents []types.StreamEvent
 	stmt := common.TxStmt(txn, s.selectEventsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
-	if err != nil {
-		return nil, err
+	for _, eventID := range eventIDs {
+		rows, err := stmt.QueryContext(ctx, eventID)
+		if err != nil {
+			return nil, err
+		}
+		if streamEvents, err := rowsToStreamEvents(rows); err == nil {
+			returnEvents = append(returnEvents, streamEvents...)
+		}
+		rows.Close()
 	}
-	defer rows.Close() // nolint: errcheck
-	return rowsToStreamEvents(rows)
+	return returnEvents, nil
 }
 
 func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {

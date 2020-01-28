@@ -54,6 +54,7 @@ type stateDelta struct {
 type SyncServerDatasource struct {
 	db *sql.DB
 	common.PartitionOffsetStatements
+	streamID            streamIDStatements
 	accountData         accountDataStatements
 	events              outputRoomEventsStatements
 	roomstate           currentRoomStateStatements
@@ -86,16 +87,19 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
 		return nil, err
 	}
-	if err = d.accountData.prepare(d.db); err != nil {
+	if err = d.streamID.prepare(d.db); err != nil {
 		return nil, err
 	}
-	if err = d.events.prepare(d.db); err != nil {
+	if err = d.accountData.prepare(d.db, &d.streamID); err != nil {
 		return nil, err
 	}
-	if err := d.roomstate.prepare(d.db); err != nil {
+	if err = d.events.prepare(d.db, &d.streamID); err != nil {
 		return nil, err
 	}
-	if err := d.invites.prepare(d.db); err != nil {
+	if err := d.roomstate.prepare(d.db, &d.streamID); err != nil {
+		return nil, err
+	}
+	if err := d.invites.prepare(d.db, &d.streamID); err != nil {
 		return nil, err
 	}
 	if err := d.topology.prepare(d.db); err != nil {
@@ -129,22 +133,22 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 	return d.StreamEventsToEvents(nil, streamEvents), nil
 }
 
-func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev *gomatrixserverlib.Event) error {
+func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.Event) error {
 	// If the event is already known as a backward extremity, don't consider
 	// it as such anymore now that we have it.
-	isBackwardExtremity, err := d.backwardExtremities.isBackwardExtremity(ctx, ev.RoomID(), ev.EventID())
+	isBackwardExtremity, err := d.backwardExtremities.isBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID())
 	if err != nil {
 		return err
 	}
 	if isBackwardExtremity {
-		if err = d.backwardExtremities.deleteBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+		if err = d.backwardExtremities.deleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 			return err
 		}
 	}
 
 	// Check if we have all of the event's previous events. If an event is
 	// missing, add it to the room's backward extremities.
-	prevEvents, err := d.events.selectEvents(ctx, nil, ev.PrevEventIDs())
+	prevEvents, err := d.events.selectEvents(ctx, txn, ev.PrevEventIDs())
 	if err != nil {
 		return err
 	}
@@ -159,7 +163,7 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 				return err
 			}
 		}
@@ -184,20 +188,24 @@ func (d *SyncServerDatasource) WriteEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
 		)
 		if err != nil {
+			fmt.Println("d.events.insertEvent:", err)
 			return err
 		}
 		pduPosition = pos
 
-		if err = d.topology.insertEventInTopology(ctx, ev); err != nil {
+		if err = d.topology.insertEventInTopology(ctx, txn, ev); err != nil {
+			fmt.Println("d.topology.insertEventInTopology:", err)
 			return err
 		}
 
-		if err = d.handleBackwardExtremities(ctx, ev); err != nil {
+		if err = d.handleBackwardExtremities(ctx, txn, ev); err != nil {
+			fmt.Println("d.handleBackwardExtremities:", err)
 			return err
 		}
 
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
 			// Nothing to do, the event may have just been a message event.
+			fmt.Println("nothing to do")
 			return nil
 		}
 
@@ -292,7 +300,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		// Select the event IDs from the defined range.
 		var eIDs []string
 		eIDs, err = d.topology.selectEventIDsInRange(
-			ctx, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
+			ctx, nil, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
 		)
 		if err != nil {
 			return
@@ -336,7 +344,7 @@ func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (types.Paginati
 func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
 	ctx context.Context, roomID string,
 ) (backwardExtremities []string, err error) {
-	return d.backwardExtremities.selectBackwardExtremitiesForRoom(ctx, roomID)
+	return d.backwardExtremities.selectBackwardExtremitiesForRoom(ctx, nil, roomID)
 }
 
 // MaxTopologicalPosition returns the highest topological position for a given
@@ -344,7 +352,7 @@ func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
 func (d *SyncServerDatasource) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
 ) (types.StreamPosition, error) {
-	return d.topology.selectMaxPositionInTopology(ctx, roomID)
+	return d.topology.selectMaxPositionInTopology(ctx, nil, roomID)
 }
 
 // EventsAtTopologicalPosition returns all of the events matching a given
@@ -352,7 +360,7 @@ func (d *SyncServerDatasource) MaxTopologicalPosition(
 func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 	ctx context.Context, roomID string, pos types.StreamPosition,
 ) ([]types.StreamEvent, error) {
-	eIDs, err := d.topology.selectEventIDsFromPosition(ctx, roomID, pos)
+	eIDs, err := d.topology.selectEventIDsFromPosition(ctx, nil, roomID, pos)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +371,7 @@ func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 func (d *SyncServerDatasource) EventPositionInTopology(
 	ctx context.Context, eventID string,
 ) (types.StreamPosition, error) {
-	return d.topology.selectPositionInTopology(ctx, eventID)
+	return d.topology.selectPositionInTopology(ctx, nil, eventID)
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
@@ -627,7 +635,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		// Retrieve the backward topology position, i.e. the position of the
 		// oldest event in the room's topology.
 		var backwardTopologyPos types.StreamPosition
-		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
+		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 		if err != nil {
 			return nil, types.PaginationToken{}, []string{}, err
 		}
@@ -712,7 +720,13 @@ func (d *SyncServerDatasource) GetAccountDataInRange(
 func (d *SyncServerDatasource) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (types.StreamPosition, error) {
-	return d.accountData.insertAccountData(ctx, userID, roomID, dataType)
+	txn, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return types.StreamPosition(0), err
+	}
+	var succeeded bool
+	defer common.EndTransaction(txn, &succeeded)
+	return d.accountData.insertAccountData(ctx, txn, userID, roomID, dataType)
 }
 
 // AddInviteEvent stores a new invite event for a user.
@@ -781,11 +795,11 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 // Retrieve the backward topology position, i.e. the position of the
 // oldest event in the room's topology.
 func (d *SyncServerDatasource) getBackwardTopologyPos(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	events []types.StreamEvent,
 ) (pos types.StreamPosition) {
 	if len(events) > 0 {
-		pos, _ = d.topology.selectPositionInTopology(ctx, events[0].EventID())
+		pos, _ = d.topology.selectPositionInTopology(ctx, txn, events[0].EventID())
 	}
 	if pos-1 <= 0 {
 		pos = types.StreamPosition(1)
@@ -824,7 +838,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	}
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
-	backwardTopologyPos := d.getBackwardTopologyPos(ctx, recentStreamEvents)
+	backwardTopologyPos := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
 
 	switch delta.membership {
 	case gomatrixserverlib.Join:
