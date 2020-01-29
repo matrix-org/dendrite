@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS account_data (
 
 const insertAccountDataSQL = `
 	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
-	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
+	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = EXCLUDED.content
 `
 
 const selectAccountDataSQL = "" +

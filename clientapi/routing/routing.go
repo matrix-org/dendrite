@@ -430,26 +430,6 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
-	r0mux.Handle("/user/{userID}/account_data/{type}",
-		common.MakeAuthAPI("user_account_data", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
-			if err != nil {
-				return util.ErrorResponse(err)
-			}
-			return GetAccountData(req, accountDB, device, vars["userID"], "", vars["type"])
-		}),
-	).Methods(http.MethodGet)
-
-	r0mux.Handle("/user/{userID}/rooms/{roomID}/account_data/{type}",
-		common.MakeAuthAPI("user_account_data", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
-			if err != nil {
-				return util.ErrorResponse(err)
-			}
-			return GetAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"])
-		}),
-	).Methods(http.MethodGet)
-
 	r0mux.Handle("/rooms/{roomID}/members",
 		common.MakeAuthAPI("rooms_members", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(req))
