@@ -531,9 +531,6 @@ func handleGuestRegistration(
 			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
 		}
 	}
-	//we don't allow guests to specify their own device_id
-	deviceId := "guest_device"
-
 	token, err := tokens.GenerateLoginToken(tokens.TokenOptions{
 		ServerPrivateKey: cfg.Matrix.PrivateKey.Seed(),
 		ServerName:       string(acc.ServerName),
@@ -546,7 +543,8 @@ func handleGuestRegistration(
 			JSON: jsonerror.Unknown("Failed to generate access token"),
 		}
 	}
-	dev, err := deviceDB.CreateDevice(req.Context(), acc.Localpart, &deviceId, token, r.InitialDisplayName)
+	//we don't allow guests to specify their own device_id
+	dev, err := deviceDB.CreateDevice(req.Context(), acc.Localpart, nil, token, r.InitialDisplayName)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
