@@ -611,16 +611,21 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	if err != nil {
 		return
 	}
+	fmt.Println("Joined rooms:", joinedRoomIDs)
 
 	stateFilterPart := gomatrix.DefaultFilterPart() // TODO: use filter provided in request
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
+		fmt.Println("WE'RE ON", roomID)
+
 		var stateEvents []gomatrixserverlib.Event
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, &stateFilterPart)
 		if err != nil {
+			fmt.Println("d.roomstate.selectCurrentState:", err)
 			return
 		}
+		//fmt.Println("State events:", stateEvents)
 		// TODO: When filters are added, we may need to call this multiple times to get enough events.
 		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 		var recentStreamEvents []types.StreamEvent
@@ -629,16 +634,20 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 			numRecentEventsPerRoom, true, true,
 		)
 		if err != nil {
+			fmt.Println("d.events.selectRecentEvents:", err)
 			return
 		}
+		//fmt.Println("Recent stream events:", recentStreamEvents)
 
 		// Retrieve the backward topology position, i.e. the position of the
 		// oldest event in the room's topology.
 		var backwardTopologyPos types.StreamPosition
 		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 		if err != nil {
+			fmt.Println("d.topology.selectPositionInTopology:", err)
 			return nil, types.PaginationToken{}, []string{}, err
 		}
+		fmt.Println("Backward topology position:", backwardTopologyPos)
 		if backwardTopologyPos-1 <= 0 {
 			backwardTopologyPos = types.StreamPosition(1)
 		} else {
@@ -660,6 +669,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	}
 
 	if err = d.addInvitesToResponse(ctx, txn, userID, 0, toPos.PDUPosition, res); err != nil {
+		fmt.Println("d.addInvitesToResponse:", err)
 		return
 	}
 

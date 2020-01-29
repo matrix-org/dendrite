@@ -95,11 +95,11 @@ const selectStateInRangeSQL = "" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2)" + // old/new pos
 	" AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
-	" AND ( $3 IS NULL OR     sender  IN ($3)  )" + // sender
-	" AND ( $4 IS NULL OR NOT(sender  IN ($4)) )" + // not sender
-	" AND ( $5 IS NULL OR     type    IN ($5)  )" + // type
-	" AND ( $6 IS NULL OR NOT(type    IN ($6)) )" + // not type
-	" AND ( $7 IS NULL OR     contains_url = $7)" + // contains URL?
+	/*	" AND ( $3 IS NULL OR     sender  IN ($3)  )" + // sender
+		" AND ( $4 IS NULL OR NOT(sender  IN ($4)) )" + // not sender
+		" AND ( $5 IS NULL OR     type    IN ($5)  )" + // type
+		" AND ( $6 IS NULL OR NOT(type    IN ($6)) )" + // not type
+		" AND ( $7 IS NULL OR     contains_url = $7)" + // contains URL? */
 	" ORDER BY id ASC" +
 	" LIMIT $8" // limit
 
@@ -159,11 +159,11 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 
 	rows, err := stmt.QueryContext(
 		ctx, oldPos, newPos,
-		pq.StringArray(stateFilterPart.Senders),
+		/*pq.StringArray(stateFilterPart.Senders),
 		pq.StringArray(stateFilterPart.NotSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
-		stateFilterPart.ContainsURL,
+		stateFilterPart.ContainsURL,*/
 		stateFilterPart.Limit,
 	)
 	if err != nil {
