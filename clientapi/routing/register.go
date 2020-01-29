@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -449,6 +450,9 @@ func Register(
 	if resErr != nil {
 		return *resErr
 	}
+	if req.URL.Query().Get("kind") == "guest" {
+		return handleGuestRegistration(req, r, cfg, accountDB, deviceDB)
+	}
 
 	// Retrieve or generate the sessionID
 	sessionID := r.Auth.Session
@@ -503,6 +507,61 @@ func Register(
 	}).Info("Processing registration request")
 
 	return handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
+}
+
+func handleGuestRegistration(
+	req *http.Request,
+	r registerRequest,
+	cfg *config.Dendrite,
+	accountDB *accounts.Database,
+	deviceDB *devices.Database,
+) util.JSONResponse {
+
+	//Generate numeric local part for guest user
+	id, err := accountDB.GetNewNumericLocalpart(req.Context())
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	localpart := strconv.FormatInt(id, 10)
+	acc, err := accountDB.CreateAccount(req.Context(), localpart, "", "")
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
+		}
+	}
+	//we don't allow guests to specify their own device_id
+	deviceId := "guest_device"
+
+	token, err := tokens.GenerateLoginToken(tokens.TokenOptions{
+		ServerPrivateKey: cfg.Matrix.PrivateKey.Seed(),
+		ServerName:       string(acc.ServerName),
+		UserID:           acc.UserID,
+	})
+
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("Failed to generate access token"),
+		}
+	}
+	dev, err := deviceDB.CreateDevice(req.Context(), acc.Localpart, &deviceId, token, r.InitialDisplayName)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+		}
+	}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: registerResponse{
+			UserID:      dev.UserID,
+			AccessToken: dev.AccessToken,
+			HomeServer:  acc.ServerName,
+			DeviceID:    dev.ID,
+		},
+	}
 }
 
 // handleRegistrationFlow will direct and complete registration flow stages
