@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -43,7 +42,6 @@ func GetAccountData(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		fmt.Println("Failed to split ID:", err)
 		return httputil.LogThenError(req, err)
 	}
 
