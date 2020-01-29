@@ -28,6 +28,38 @@ import (
 	"github.com/matrix-org/util"
 )
 
+// GetAccountData implements GET /user/{userId}/[rooms/{roomid}/]account_data/{type}
+func GetAccountData(
+	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	userID string, roomID string, dataType string,
+) util.JSONResponse {
+	if userID != device.UserID {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("userID does not match the current user"),
+		}
+	}
+
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return httputil.LogThenError(req, err)
+	}
+
+	if data, err := accountDB.GetAccountDataByType(
+		req.Context(), localpart, roomID, dataType,
+	); err == nil {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: data,
+		}
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusNotFound,
+		JSON: jsonerror.Forbidden("data not found"),
+	}
+}
+
 // SaveAccountData implements PUT /user/{userId}/[rooms/{roomId}/]account_data/{type}
 func SaveAccountData(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
