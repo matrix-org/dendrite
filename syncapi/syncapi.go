@@ -21,7 +21,9 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
@@ -37,6 +39,8 @@ func SetupSyncAPIComponent(
 	deviceDB *devices.Database,
 	accountsDB *accounts.Database,
 	queryAPI api.RoomserverQueryAPI,
+	federation *gomatrixserverlib.FederationClient,
+	cfg *config.Dendrite,
 ) {
 	syncDB, err := storage.NewSyncServerDatasource(string(base.Cfg.Database.SyncAPI))
 	if err != nil {
@@ -77,5 +81,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start typing server consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB)
+	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, federation, queryAPI, cfg)
 }

@@ -30,7 +30,7 @@ type roomVisibility struct {
 
 // GetVisibility implements GET /directory/list/room/{roomID}
 func GetVisibility(
-	req *http.Request, publicRoomsDatabase *storage.PublicRoomsServerDatabase,
+	req *http.Request, publicRoomsDatabase storage.Database,
 	roomID string,
 ) util.JSONResponse {
 	isPublic, err := publicRoomsDatabase.GetRoomVisibility(req.Context(), roomID)
@@ -54,7 +54,7 @@ func GetVisibility(
 // SetVisibility implements PUT /directory/list/room/{roomID}
 // TODO: Check if user has the power level to edit the room visibility
 func SetVisibility(
-	req *http.Request, publicRoomsDatabase *storage.PublicRoomsServerDatabase,
+	req *http.Request, publicRoomsDatabase storage.Database,
 	roomID string,
 ) util.JSONResponse {
 	var v roomVisibility

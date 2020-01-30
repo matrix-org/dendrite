@@ -26,7 +26,9 @@ func main() {
 
 	deviceDB := base.CreateDeviceDB()
 
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB)
+	_, _, query := base.CreateHTTPRoomserverAPIs()
+
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, query)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.PublicRoomsAPI), string(base.Cfg.Listen.PublicRoomsAPI))
 

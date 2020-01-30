@@ -136,7 +136,7 @@ func isThumbnailExists(
 	dst types.Path,
 	config types.ThumbnailSize,
 	mediaMetadata *types.MediaMetadata,
-	db *storage.Database,
+	db storage.Database,
 	logger *log.Entry,
 ) (bool, error) {
 	thumbnailMetadata, err := db.GetThumbnail(
