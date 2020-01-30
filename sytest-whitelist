@@ -227,3 +227,4 @@ Guest non-joined users cannot send messages to guest_access rooms if not joined
 Guest users can sync from world_readable guest_access rooms if joined
 Guest users can sync from default guest_access rooms if joined
 Real non-joined users cannot room initalSync for non-world_readable rooms
+Push rules come down in an initial /sync
