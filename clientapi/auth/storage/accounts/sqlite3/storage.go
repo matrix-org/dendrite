@@ -181,6 +181,18 @@ func (d *Database) UpdateMemberships(
 			}
 		}
 
+		if err := d.SaveAccountData(ctx, localpart, "", "m.push_rules", `{
+			"global": {
+				"content": [],
+				"override": [],
+				"room": [],
+				"sender": [],
+				"underride": []
+			}
+		}`); err != nil {
+			return nil, err
+		}
+
 		return nil
 	})
 }
