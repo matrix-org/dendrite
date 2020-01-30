@@ -556,10 +556,14 @@ func CalculateAndStoreStateBeforeEvent(
 		prevEventIDs[i] = prevEventRefs[i].EventID
 	}
 
+	fmt.Println("Previous event IDs:", prevEventIDs)
+
 	prevStates, err := db.StateAtEventIDs(ctx, prevEventIDs)
 	if err != nil {
 		return 0, err
 	}
+
+	fmt.Println("Previous states:", prevStates)
 
 	// The state before this event will be the state after the events that came before it.
 	return CalculateAndStoreStateAfterEvents(ctx, db, roomNID, prevStates)
@@ -574,7 +578,6 @@ func CalculateAndStoreStateAfterEvents(
 	prevStates []types.StateAtEvent,
 ) (types.StateSnapshotNID, error) {
 	metrics := calculateStateMetrics{startTime: time.Now(), prevEventLength: len(prevStates)}
-
 	if len(prevStates) == 0 {
 		// 2) There weren't any prev_events for this event so the state is
 		// empty.
@@ -592,6 +595,7 @@ func CalculateAndStoreStateAfterEvents(
 			metrics.algorithm = "no_change"
 			return metrics.stop(prevState.BeforeStateSnapshotNID, nil)
 		}
+
 		// The previous event was a state event so we need to store a copy
 		// of the previous state updated with that event.
 		stateBlockNIDLists, err := db.StateBlockNIDs(
@@ -614,6 +618,7 @@ func CalculateAndStoreStateAfterEvents(
 		// So fall through to calculateAndStoreStateAfterManyEvents
 	}
 
+	fmt.Println("Falling through to calculateAndStoreStateAfterManyEvents")
 	return calculateAndStoreStateAfterManyEvents(ctx, db, roomNID, prevStates, metrics)
 }
 

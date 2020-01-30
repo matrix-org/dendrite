@@ -19,7 +19,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"runtime/debug"
 	"sort"
+	"strings"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -44,7 +46,7 @@ const insertStateDataSQL = "" +
 const selectNextStateBlockNIDSQL = `
 	SELECT COALESCE((
 		SELECT seq+1 AS state_block_nid FROM sqlite_sequence
-		WHERE name = 'roomserver_state_block'), 0
+		WHERE name = 'roomserver_state_block'), 1
 	) AS state_block_nid
 `
 
@@ -73,6 +75,7 @@ const bulkSelectFilteredStateBlockEntriesSQL = "" +
 	" ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
 
 type stateBlockStatements struct {
+	db                                      *sql.DB
 	insertStateDataStmt                     *sql.Stmt
 	selectNextStateBlockNIDStmt             *sql.Stmt
 	bulkSelectStateBlockEntriesStmt         *sql.Stmt
@@ -80,6 +83,7 @@ type stateBlockStatements struct {
 }
 
 func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
 	_, err = db.Exec(stateDataSchema)
 	if err != nil {
 		return
@@ -108,6 +112,7 @@ func (s *stateBlockStatements) bulkInsertStateData(
 		)
 		if err != nil {
 			fmt.Println("bulkInsertStateData s.insertStateDataStmt.ExecContext:", err)
+			debug.PrintStack()
 			return err
 		}
 	}
@@ -127,12 +132,25 @@ func (s *stateBlockStatements) selectNextStateBlockNID(
 func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	ctx context.Context, txn *sql.Tx, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
-	nids := make([]int64, len(stateBlockNIDs))
-	for i := range stateBlockNIDs {
-		nids[i] = int64(stateBlockNIDs[i])
+	///////////////
+	nids := make([]interface{}, len(stateBlockNIDs))
+	for k, v := range stateBlockNIDs {
+		nids[k] = v
 	}
-	selectStmt := common.TxStmt(txn, s.bulkSelectStateBlockEntriesStmt)
-	rows, err := selectStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
+	selectOrig := strings.Replace(bulkSelectStateBlockEntriesSQL, "($1)", queryVariadic(len(nids)), 1)
+	selectPrep, err := s.db.Prepare(selectOrig)
+	if err != nil {
+		return nil, err
+	}
+	///////////////
+	/*
+		nids := make([]int64, len(stateBlockNIDs))
+		for i := range stateBlockNIDs {
+			nids[i] = int64(stateBlockNIDs[i])
+		}
+	*/
+	selectStmt := common.TxStmt(txn, selectPrep)
+	rows, err := selectStmt.QueryContext(ctx, nids...)
 	if err != nil {
 		fmt.Println("bulkSelectStateBlockEntries s.bulkSelectStateBlockEntriesStmt.QueryContext:", err)
 		return nil, err

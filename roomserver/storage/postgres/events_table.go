@@ -262,7 +262,9 @@ func (s *eventStatements) bulkSelectStateAtEventByID(
 func (s *eventStatements) updateEventState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
+	fmt.Println("updateEventState eventNID", eventNID, "stateNID", stateNID)
 	_, err := s.updateEventStateStmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
+	fmt.Println("Errors?", err)
 	return err
 }
 

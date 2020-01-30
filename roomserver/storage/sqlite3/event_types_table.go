@@ -18,8 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -74,6 +74,7 @@ const bulkSelectEventTypeNIDSQL = `
 `
 
 type eventTypeStatements struct {
+	db                           *sql.DB
 	insertEventTypeNIDStmt       *sql.Stmt
 	insertEventTypeNIDResultStmt *sql.Stmt
 	selectEventTypeNIDStmt       *sql.Stmt
@@ -81,6 +82,7 @@ type eventTypeStatements struct {
 }
 
 func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
 	_, err = db.Exec(eventTypesSchema)
 	if err != nil {
 		return
@@ -119,8 +121,20 @@ func (s *eventTypeStatements) selectEventTypeNID(
 func (s *eventTypeStatements) bulkSelectEventTypeNID(
 	ctx context.Context, tx *sql.Tx, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
-	selectStmt := common.TxStmt(tx, s.bulkSelectEventTypeNIDStmt)
-	rows, err := selectStmt.QueryContext(ctx, sqliteInStr(pq.StringArray(eventTypes)))
+	///////////////
+	iEventTypes := make([]interface{}, len(eventTypes))
+	for k, v := range eventTypes {
+		iEventTypes[k] = v
+	}
+	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", queryVariadic(len(iEventTypes)), 1)
+	selectPrep, err := s.db.Prepare(selectOrig)
+	if err != nil {
+		return nil, err
+	}
+	///////////////
+
+	selectStmt := common.TxStmt(tx, selectPrep)
+	rows, err := selectStmt.QueryContext(ctx, iEventTypes...)
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/matrix-org/dendrite/common"
 )
 
 const transactionsSchema = `
@@ -58,13 +60,14 @@ func (s *transactionStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *transactionStatements) insertTransaction(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	transactionID string,
 	sessionID int64,
 	userID string,
 	eventID string,
 ) (err error) {
-	_, err = s.insertTransactionStmt.ExecContext(
+	stmt := common.TxStmt(txn, s.insertTransactionStmt)
+	_, err = stmt.ExecContext(
 		ctx, transactionID, sessionID, userID, eventID,
 	)
 	if err != nil {
@@ -74,12 +77,13 @@ func (s *transactionStatements) insertTransaction(
 }
 
 func (s *transactionStatements) selectTransactionEventID(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	transactionID string,
 	sessionID int64,
 	userID string,
 ) (eventID string, err error) {
-	err = s.selectTransactionEventIDStmt.QueryRowContext(
+	stmt := common.TxStmt(txn, s.selectTransactionEventIDStmt)
+	err = stmt.QueryRowContext(
 		ctx, transactionID, sessionID, userID,
 	).Scan(&eventID)
 	if err != nil {

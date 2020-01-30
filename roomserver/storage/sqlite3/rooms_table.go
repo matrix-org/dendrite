@@ -41,11 +41,6 @@ const insertRoomNIDSQL = `
 	  ON CONFLICT DO NOTHING;
 `
 
-const insertRoomNIDResultSQL = `
-	SELECT room_nid FROM roomserver_rooms
-		WHERE rowid = last_insert_rowid();
-`
-
 const selectRoomNIDSQL = "" +
 	"SELECT room_nid FROM roomserver_rooms WHERE room_id = $1"
 
@@ -60,7 +55,6 @@ const updateLatestEventNIDsSQL = "" +
 
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
-	insertRoomNIDResultStmt            *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
@@ -74,7 +68,6 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 	}
 	return statementList{
 		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
-		{&s.insertRoomNIDResultStmt, insertRoomNIDResultSQL},
 		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
@@ -85,19 +78,14 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 func (s *roomStatements) insertRoomNID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (types.RoomNID, error) {
-	var roomNID int64
 	var err error
 	insertStmt := common.TxStmt(txn, s.insertRoomNIDStmt)
-	resultStmt := common.TxStmt(txn, s.insertRoomNIDResultStmt)
 	if _, err = insertStmt.ExecContext(ctx, roomID); err == nil {
-		err = resultStmt.QueryRowContext(ctx).Scan(&roomNID)
-		if err != nil {
-			fmt.Println("insertRoomNID resultStmt.QueryRowContext:", err)
-		}
+		return s.selectRoomNID(ctx, txn, roomID)
 	} else {
 		fmt.Println("insertRoomNID insertStmt.ExecContext:", err)
+		return types.RoomNID(0), err
 	}
-	return types.RoomNID(roomNID), err
 }
 
 func (s *roomStatements) selectRoomNID(
@@ -106,9 +94,6 @@ func (s *roomStatements) selectRoomNID(
 	var roomNID int64
 	stmt := common.TxStmt(txn, s.selectRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
-	if err != nil {
-		fmt.Println("selectRoomNID stmt.QueryRowContext:", err)
-	}
 	return types.RoomNID(roomNID), err
 }
 

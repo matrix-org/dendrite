@@ -17,6 +17,7 @@ package sqlite3
 
 import (
 	"database/sql"
+	"fmt"
 )
 
 type statements struct {
@@ -57,4 +58,17 @@ func (s *statements) prepare(db *sql.DB) error {
 	}
 
 	return nil
+}
+
+// Hack of the century
+func queryVariadic(count int) string {
+	str := "("
+	for i := 1; i <= count; i++ {
+		str += fmt.Sprintf("$%d", i)
+		if i < count {
+			str += ", "
+		}
+	}
+	str += ")"
+	return str
 }

@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -51,12 +52,14 @@ const bulkSelectStateBlockNIDsSQL = "" +
 	" WHERE state_snapshot_nid IN ($1) ORDER BY state_snapshot_nid ASC"
 
 type stateSnapshotStatements struct {
+	db                           *sql.DB
 	insertStateStmt              *sql.Stmt
 	insertStateResultStmt        *sql.Stmt
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 
 func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
 	_, err = db.Exec(stateSnapshotSchema)
 	if err != nil {
 		return
@@ -92,12 +95,25 @@ func (s *stateSnapshotStatements) insertState(
 func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
-	nids := make([]int64, len(stateNIDs))
-	for i := range stateNIDs {
-		nids[i] = int64(stateNIDs[i])
+	///////////////
+	nids := make([]interface{}, len(stateNIDs))
+	for k, v := range stateNIDs {
+		nids[k] = v
 	}
-	selectStmt := common.TxStmt(txn, s.bulkSelectStateBlockNIDsStmt)
-	rows, err := selectStmt.QueryContext(ctx, sqliteIn(pq.Int64Array(nids)))
+	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", queryVariadic(len(nids)), 1)
+	selectPrep, err := s.db.Prepare(selectOrig)
+	if err != nil {
+		return nil, err
+	}
+	///////////////
+	/*
+		nids := make([]int64, len(stateNIDs))
+		for i := range stateNIDs {
+			nids[i] = int64(stateNIDs[i])
+		}
+	*/
+	selectStmt := common.TxStmt(txn, selectPrep)
+	rows, err := selectStmt.QueryContext(ctx, nids...)
 	if err != nil {
 		fmt.Println("bulkSelectStateBlockNIDs s.bulkSelectStateBlockNIDsStmt.QueryContext:", err)
 		return nil, err

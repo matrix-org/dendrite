@@ -44,18 +44,18 @@ func Open(dataSourceName string) (*Database, error) {
 	}
 	var cs string
 	if uri.Opaque != "" { // file:filename.db
-		cs = fmt.Sprintf("%s?cache=shared&_busy_timeout=9999999", uri.Opaque)
+		cs = fmt.Sprintf("%s", uri.Opaque)
 	} else if uri.Path != "" { // file:///path/to/filename.db
-		cs = fmt.Sprintf("%s?cache=shared&_busy_timeout=9999999", uri.Path)
+		cs = fmt.Sprintf("%s", uri.Path)
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
 	if d.db, err = sql.Open("sqlite3", cs); err != nil {
 		return nil, err
 	}
-	d.db.Exec("PRAGMA journal_mode=WAL;")
+	//d.db.Exec("PRAGMA journal_mode=WAL;")
 	//d.db.Exec("PRAGMA parser_trace = true;")
-	//d.db.SetMaxOpenConns(1)
+	d.db.SetMaxOpenConns(1)
 	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}
@@ -76,32 +76,24 @@ func (d *Database) StoreEvent(
 		err              error
 	)
 
-	if txnAndSessionID != nil {
-		if err = d.statements.insertTransaction(
-			ctx, txnAndSessionID.TransactionID,
-			txnAndSessionID.SessionID, event.Sender(), event.EventID(),
-		); err != nil {
-			return 0, types.StateAtEvent{}, err
-		}
-	}
-
-	err = common.WithTransaction(d.db, func(tx *sql.Tx) error {
-		roomNID, err = d.assignRoomNID(ctx, tx, event.RoomID())
-		return err
-	})
-	if err != nil {
-		return 0, types.StateAtEvent{}, err
-	}
-
-	err = common.WithTransaction(d.db, func(tx *sql.Tx) error {
-		eventTypeNID, err = d.assignEventTypeNID(ctx, tx, event.Type())
-		return err
-	})
-	if err != nil {
-		return 0, types.StateAtEvent{}, err
-	}
-
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if txnAndSessionID != nil {
+			if err = d.statements.insertTransaction(
+				ctx, txn, txnAndSessionID.TransactionID,
+				txnAndSessionID.SessionID, event.Sender(), event.EventID(),
+			); err != nil {
+				return err
+			}
+		}
+
+		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID()); err != nil {
+			return err
+		}
+
+		if eventTypeNID, err = d.assignEventTypeNID(ctx, txn, event.Type()); err != nil {
+			return err
+		}
+
 		eventStateKey := event.StateKey()
 		// Assigned a numeric ID for the state_key if there is one present.
 		// Otherwise set the numeric ID for the state_key to 0.
@@ -161,8 +153,8 @@ func (d *Database) assignRoomNID(
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
 		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID)
-		if err == sql.ErrNoRows {
-			// We raced with another insert so run the select again.
+		if err == nil {
+			// Now get the numeric ID back out of the database
 			roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
 		}
 	}
@@ -242,10 +234,11 @@ func (d *Database) Events(
 ) ([]types.Event, error) {
 	var eventJSONs []eventJSONPair
 	var err error
-	results := make([]types.Event, len(eventJSONs))
+	results := make([]types.Event, len(eventNIDs))
 	common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
-		if err != nil {
+		if err != nil || len(eventJSONs) == 0 {
+			fmt.Println("d.statements.bulkSelectEventJSON:", err)
 			return nil
 		}
 		for i, eventJSON := range eventJSONs {
@@ -372,7 +365,7 @@ func (d *Database) GetTransactionEventID(
 	ctx context.Context, transactionID string,
 	sessionID int64, userID string,
 ) (string, error) {
-	eventID, err := d.statements.selectTransactionEventID(ctx, transactionID, sessionID, userID)
+	eventID, err := d.statements.selectTransactionEventID(ctx, nil, transactionID, sessionID, userID)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
