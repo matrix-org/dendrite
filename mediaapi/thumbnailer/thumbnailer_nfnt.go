@@ -123,9 +123,7 @@ func readFile(src string) (image.Image, error) {
 
 func writeFile(img image.Image, dst string) (err error) {
 	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
+
 	defer (func() {
 		finalErr := out.Close()
 		if err != nil && finalErr != nil {
@@ -134,6 +132,10 @@ func writeFile(img image.Image, dst string) (err error) {
 			err = finalErr
 		}
 	})()
+
+	if err != nil {
+		return err
+	}
 
 	return jpeg.Encode(out, img, &jpeg.Options{
 		Quality: 85,

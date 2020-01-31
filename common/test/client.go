@@ -79,9 +79,7 @@ func (r *Request) Do() (err error) {
 		},
 	}
 	res, err := client.Do(r.Req)
-	if err != nil {
-		return err
-	}
+
 	defer (func() {
 		finalErr := res.Body.Close()
 		if err != nil && finalErr != nil {
@@ -90,6 +88,10 @@ func (r *Request) Do() (err error) {
 			err = finalErr
 		}
 	})()
+
+	if err != nil {
+		return err
+	}
 
 	if res.StatusCode != r.WantedStatusCode {
 		return fmt.Errorf("incorrect status code. Expected: %d  Got: %d", r.WantedStatusCode, res.StatusCode)

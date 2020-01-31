@@ -118,9 +118,7 @@ func (s *inviteStatements) updateInviteRetired(
 ) (eventIDs []string, err error) {
 	stmt := common.TxStmt(txn, s.updateInviteRetiredStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
-	if err != nil {
-		return nil, err
-	}
+
 	defer (func() {
 		finalErr := rows.Close()
 		if err != nil && finalErr != nil {
@@ -129,6 +127,10 @@ func (s *inviteStatements) updateInviteRetired(
 			err = finalErr
 		}
 	})()
+
+	if err != nil {
+		return nil, err
+	}
 	for rows.Next() {
 		var inviteEventID string
 		if err := rows.Scan(&inviteEventID); err != nil {

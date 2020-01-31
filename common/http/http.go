@@ -38,19 +38,20 @@ func PostJSON(
 	req.Header.Set("Content-Type", "application/json")
 
 	res, err := httpClient.Do(req.WithContext(ctx))
-	if res != nil {
-		defer (func() {
-			finalErr := res.Body.Close()
-			if err != nil && finalErr != nil {
-				err = fmt.Errorf("%s\n%s", err, finalErr)
-			} else if err == nil {
-				err = finalErr
-			}
-		})()
-	}
+
+	defer (func() {
+		finalErr := res.Body.Close()
+		if err != nil && finalErr != nil {
+			err = fmt.Errorf("%s\n%s", err, finalErr)
+		} else if err == nil {
+			err = finalErr
+		}
+	})()
+
 	if err != nil {
 		return err
 	}
+
 	if res.StatusCode != http.StatusOK {
 		var errorBody struct {
 			Message string `json:"message"`
