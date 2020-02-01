@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
@@ -79,9 +80,24 @@ func SaveAccountData(
 
 	defer req.Body.Close() // nolint: errcheck
 
+	if req.Body == http.NoBody {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("Content not JSON"),
+		}
+	}
+
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return httputil.LogThenError(req, err)
+	}
+
+	var rawJson json.RawMessage
+	if err = json.Unmarshal(body, &rawJson); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("Bad JSON content"),
+		}
 	}
 
 	if err := accountDB.SaveAccountData(
