@@ -447,6 +447,7 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	numRecentEventsPerRoom int,
 	wantFullState bool,
 	res *types.Response,
+	ignoredUsers []string,
 ) (joinedRoomIDs []string, err error) {
 	txn, err := d.db.BeginTx(ctx, &txReadOnlySnapshot)
 	if err != nil {
@@ -481,7 +482,7 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	}
 
 	for _, delta := range deltas {
-		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res)
+		err = d.addRoomDeltaToResponse(ctx, &device, txn, fromPos, toPos, delta, numRecentEventsPerRoom, res, ignoredUsers)
 		if err != nil {
 			return nil, err
 		}
@@ -558,6 +559,7 @@ func (d *SyncServerDatasource) IncrementalSync(
 	fromPos, toPos types.PaginationToken,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
+	ignoredUsers []string,
 ) (*types.Response, error) {
 	nextBatchPos := fromPos.WithUpdates(toPos)
 	res := types.NewResponse(nextBatchPos)
@@ -566,7 +568,7 @@ func (d *SyncServerDatasource) IncrementalSync(
 	var err error
 	if fromPos.PDUPosition != toPos.PDUPosition || wantFullState {
 		joinedRoomIDs, err = d.addPDUDeltaToResponse(
-			ctx, device, fromPos.PDUPosition, toPos.PDUPosition, numRecentEventsPerRoom, wantFullState, res,
+			ctx, device, fromPos.PDUPosition, toPos.PDUPosition, numRecentEventsPerRoom, wantFullState, res, ignoredUsers,
 		)
 	} else {
 		joinedRoomIDs, err = d.roomstate.selectRoomIDsWithMembership(
@@ -686,7 +688,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 
 // CompleteSync returns a complete /sync API response for the given user.
 func (d *SyncServerDatasource) CompleteSync(
-	ctx context.Context, userID string, numRecentEventsPerRoom int,
+	ctx context.Context, userID string, numRecentEventsPerRoom int, ignoredUsers []string,
 ) (*types.Response, error) {
 	res, toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
 		ctx, userID, numRecentEventsPerRoom,
@@ -840,6 +842,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	delta stateDelta,
 	numRecentEventsPerRoom int,
 	res *types.Response,
+	ignoredUsers []string,
 ) error {
 	endPos := toPos
 	if delta.membershipPos > 0 && delta.membership == gomatrixserverlib.Leave {

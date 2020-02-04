@@ -15,6 +15,7 @@
 package sync
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -132,11 +133,25 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.PaginationToken) (res *types.Response, err error) {
-	// TODO: handle ignored users
+	localpart, _, err := gomatrixserverlib.SplitID('@', req.device.UserID)
+	if err != nil {
+		return nil, err
+	}
+	var ignoredUserList []string
+	if data, err := rp.accountDB.GetAccountDataByType(req.ctx, localpart, "", "m.ignored_user_list");
+		err == nil && data != nil {
+		var ignoredUserMap map[string]map[string]interface{}
+		if err = json.Unmarshal(data.Content, &ignoredUserMap); err == nil {
+			ignoredUserList = make([]string, 0, len(ignoredUserMap))
+			for ignoredUser := range ignoredUserMap["ignored_users"] {
+				ignoredUserList = append(ignoredUserList, ignoredUser)
+			}
+		}
+	}
 	if req.since == nil {
-		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
+		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit, ignoredUserList)
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit, req.wantFullState)
+		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit, req.wantFullState, ignoredUserList)
 	}
 
 	if err != nil {
