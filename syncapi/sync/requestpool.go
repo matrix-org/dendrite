@@ -135,13 +135,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.PaginationToken) (res *types.Response, err error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', req.device.UserID)
 	if err != nil {
-		return nil, err
+		return
 	}
 	var ignoredUserList []string
-	if data, err := rp.accountDB.GetAccountDataByType(req.ctx, localpart, "", "m.ignored_user_list");
-		err == nil && data != nil {
+	if data, e := rp.accountDB.GetAccountDataByType(req.ctx, localpart, "", "m.ignored_user_list"); e == nil && data != nil {
 		var ignoredUserMap map[string]map[string]interface{}
-		if err = json.Unmarshal(data.Content, &ignoredUserMap); err == nil {
+		if e = json.Unmarshal(data.Content, &ignoredUserMap); e == nil {
 			ignoredUserList = make([]string, 0, len(ignoredUserMap))
 			for ignoredUser := range ignoredUserMap["ignored_users"] {
 				ignoredUserList = append(ignoredUserList, ignoredUser)
