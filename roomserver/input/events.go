@@ -1,4 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
+// Copyright 2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -151,7 +153,7 @@ func calculateAndSetState(
 	event gomatrixserverlib.Event,
 ) error {
 	// TODO: get the correct room version
-	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
 	if err != nil {
 		return err
 	}
@@ -169,7 +171,7 @@ func calculateAndSetState(
 		}
 	} else {
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-		if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, event, roomNID); err != nil {
+		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, roomNID); err != nil {
 			return err
 		}
 	}

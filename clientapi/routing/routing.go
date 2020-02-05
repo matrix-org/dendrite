@@ -551,4 +551,10 @@ func Setup(
 			return DeleteTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
+
+	r0mux.Handle("/capabilities",
+		common.MakeAuthAPI("capabilities", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return GetCapabilities(req, queryAPI)
+		}),
+	).Methods(http.MethodGet)
 }
