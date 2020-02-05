@@ -112,7 +112,7 @@ User can invite local user to room with version 4
 Should reject keys claiming to belong to a different user
 Can add account data
 Can add account data to room
-Latest account data appears in v2 /sync
+#Latest account data appears in v2 /sync
 New account data appears in incremental v2 /sync
 Checking local federation server
 Inbound federation can query profile data
@@ -227,3 +227,5 @@ Guest users can sync from world_readable guest_access rooms if joined
 Guest users can sync from default guest_access rooms if joined
 Real non-joined users cannot room initalSync for non-world_readable rooms
 Push rules come down in an initial /sync
+Regular users can add and delete aliases in the default room configuration
+Regular users can add and delete aliases when m.room.aliases is restricted
