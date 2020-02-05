@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.12.5-alpine3.9
+FROM docker.io/golang:1.13.6-alpine
 
 RUN mkdir /build
 
