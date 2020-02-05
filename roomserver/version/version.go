@@ -31,7 +31,7 @@ type RoomVersionDescription struct {
 	EnforceSigningKeyValidity bool
 }
 
-var roomVersions = map[string]RoomVersionDescription{
+var roomVersions = map[RoomVersionID]RoomVersionDescription{
 	RoomVersionV1: RoomVersionDescription{
 		Supported:                 true,
 		Stable:                    true,
@@ -69,13 +69,13 @@ var roomVersions = map[string]RoomVersionDescription{
 	},
 }
 
-func GetRoomVersions() map[string]RoomVersionDescription {
+func GetRoomVersions() map[RoomVersionID]RoomVersionDescription {
 	return roomVersions
 }
 
-func GetSupportedRoomVersions() map[string]RoomVersionDescription {
-	versions := make(map[string]RoomVersionDescription)
-	for id, version := range GetRoomVersionDescriptions() {
+func GetSupportedRoomVersions() map[RoomVersionID]RoomVersionDescription {
+	versions := make(map[RoomVersionID]RoomVersionDescription)
+	for id, version := range GetRoomVersions() {
 		if version.Supported {
 			versions[id] = version
 		}
