@@ -736,7 +736,7 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	response.DefaultRoomVersion = string(version.GetDefaultRoomVersion())
 	response.AvailableRoomVersions = make(map[string]string)
 	for v, desc := range version.GetSupportedRoomVersions() {
-		sv := strconv.Itoa(v)
+		sv := strconv.Itoa(int(v))
 		if desc.Stable {
 			response.AvailableRoomVersions[sv] = "stable"
 		} else {
