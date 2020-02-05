@@ -171,27 +171,32 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
+	// TODO: get the correct room version
+	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, u.db)
+	if err != nil {
+		return err
+	}
 
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
 	for i := range u.latest {
 		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
 	u.newStateNID, err = state.CalculateAndStoreStateAfterEvents(
-		u.ctx, u.db, u.roomNID, latestStateAtEvents,
+		u.ctx, u.roomNID, latestStateAtEvents,
 	)
 	if err != nil {
 		return err
 	}
 
 	u.removed, u.added, err = state.DifferenceBetweeenStateSnapshots(
-		u.ctx, u.db, u.oldStateNID, u.newStateNID,
+		u.ctx, u.oldStateNID, u.newStateNID,
 	)
 	if err != nil {
 		return err
 	}
 
 	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = state.DifferenceBetweeenStateSnapshots(
-		u.ctx, u.db, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
+		u.ctx, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
 	)
 	return err
 }

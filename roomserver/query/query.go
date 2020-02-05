@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -39,7 +40,7 @@ type RoomserverQueryAPIEventDB interface {
 
 // RoomserverQueryAPIDatabase has the storage APIs needed to implement the query API.
 type RoomserverQueryAPIDatabase interface {
-	state.RoomStateDatabase
+	database.RoomStateDatabase
 	RoomserverQueryAPIEventDB
 	// Look up the numeric ID for the room.
 	// Returns 0 if the room doesn't exists.
@@ -98,6 +99,11 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
+	// TODO: get the correct room version
+	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	if err != nil {
+		return err
+	}
 	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -116,7 +122,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 
 	// Look up the currrent state for the requested tuples.
 	stateEntries, err := state.LoadStateAtSnapshotForStringTuples(
-		ctx, r.DB, currentStateSnapshotNID, request.StateToFetch,
+		ctx, currentStateSnapshotNID, request.StateToFetch,
 	)
 	if err != nil {
 		return err
@@ -137,6 +143,11 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
 ) error {
+	// TODO: get the correct room version
+	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	if err != nil {
+		return err
+	}
 	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -160,7 +171,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 
 	// Look up the currrent state for the requested tuples.
 	stateEntries, err := state.LoadStateAfterEventsForStringTuples(
-		ctx, r.DB, prevStates, request.StateToFetch,
+		ctx, prevStates, request.StateToFetch,
 	)
 	if err != nil {
 		return err
@@ -315,6 +326,11 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	ctx context.Context, eventNID types.EventNID, joinedOnly bool,
 ) ([]types.Event, error) {
+	// TODO: get the correct room version
+	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	if err != nil {
+		return []types.Event{}, err
+	}
 	events := []types.Event{}
 	// Lookup the event NID
 	eIDs, err := r.DB.EventIDs(ctx, []types.EventNID{eventNID})
@@ -329,7 +345,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	}
 
 	// Fetch the state as it was when this event was fired
-	stateEntries, err := state.LoadCombinedStateAfterEvents(ctx, r.DB, prevState)
+	stateEntries, err := state.LoadCombinedStateAfterEvents(ctx, prevState)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +432,13 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName,
 ) (bool, error) {
-	stateEntries, err := state.LoadStateAtEvent(ctx, r.DB, eventID)
+	// TODO: get the correct room version
+	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	if err != nil {
+		return false, err
+	}
+
+	stateEntries, err := state.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		return false, err
 	}
@@ -570,6 +592,12 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	request *api.QueryStateAndAuthChainRequest,
 	response *api.QueryStateAndAuthChainResponse,
 ) error {
+	// TODO: get the correct room version
+	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	if err != nil {
+		return err
+	}
+
 	response.QueryStateAndAuthChainRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -593,7 +621,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 
 	// Look up the currrent state for the requested tuples.
 	stateEntries, err := state.LoadCombinedStateAfterEvents(
-		ctx, r.DB, prevStates,
+		ctx, prevStates,
 	)
 	if err != nil {
 		return err

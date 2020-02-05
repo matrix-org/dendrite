@@ -21,13 +21,14 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
 type RoomEventDatabase interface {
-	state.RoomStateDatabase
+	database.RoomStateDatabase
 	// Stores a matrix room event in the database
 	StoreEvent(
 		ctx context.Context,
@@ -149,7 +150,12 @@ func calculateAndSetState(
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
-	var err error
+	// TODO: get the correct room version
+	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
+	if err != nil {
+		return err
+	}
+
 	if input.HasState {
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
@@ -163,7 +169,7 @@ func calculateAndSetState(
 		}
 	} else {
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-		if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, db, event, roomNID); err != nil {
+		if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, event, roomNID); err != nil {
 			return err
 		}
 	}
