@@ -18,56 +18,74 @@ const (
 )
 
 const (
-	EventFormatV1 EventFormatID = iota + 1
-	EventFormatV2
-	EventFormatV3
+	EventFormatV1 EventFormatID = iota + 1 // original event ID formatting
+	EventFormatV2                          // event ID is event hash
+	EventFormatV3                          // event ID is URL-safe base64 event hash
 )
 
 type RoomVersionDescription struct {
-	Supported       bool
-	Stable          bool
-	StateResolution state.StateResolutionVersion
-	EventFormat     EventFormatID
+	Supported                 bool
+	Stable                    bool
+	StateResolution           state.StateResolutionVersion
+	EventFormat               EventFormatID
+	EnforceSigningKeyValidity bool
 }
 
-func GetRoomVersionDescription(version RoomVersionID) (desc RoomVersionDescription, err error) {
-	switch version {
-	case RoomVersionV1:
-		desc = RoomVersionDescription{
-			Supported:       true,
-			Stable:          true,
-			StateResolution: state.StateResolutionAlgorithmV1,
-			EventFormat:     EventFormatV1,
+var roomVersions = map[string]RoomVersionDescription{
+	RoomVersionV1: RoomVersionDescription{
+		Supported:                 true,
+		Stable:                    true,
+		StateResolution:           state.StateResolutionAlgorithmV1,
+		EventFormat:               EventFormatV1,
+		EnforceSigningKeyValidity: false,
+	},
+	RoomVersionV2: RoomVersionDescription{
+		Supported:                 false,
+		Stable:                    true,
+		StateResolution:           state.StateResolutionAlgorithmV2,
+		EventFormat:               EventFormatV1,
+		EnforceSigningKeyValidity: false,
+	},
+	RoomVersionV3: RoomVersionDescription{
+		Supported:                 false,
+		Stable:                    true,
+		StateResolution:           state.StateResolutionAlgorithmV2,
+		EventFormat:               EventFormatV2,
+		EnforceSigningKeyValidity: false,
+	},
+	RoomVersionV4: RoomVersionDescription{
+		Supported:                 false,
+		Stable:                    true,
+		StateResolution:           state.StateResolutionAlgorithmV2,
+		EventFormat:               EventFormatV3,
+		EnforceSigningKeyValidity: false,
+	},
+	RoomVersionV5: RoomVersionDescription{
+		Supported:                 false,
+		Stable:                    true,
+		StateResolution:           state.StateResolutionAlgorithmV2,
+		EventFormat:               EventFormatV3,
+		EnforceSigningKeyValidity: true,
+	},
+}
+
+func GetRoomVersions() map[string]RoomVersionDescription {
+	return roomVersions
+}
+
+func GetSupportedRoomVersions() map[string]RoomVersionDescription {
+	versions := make(map[string]RoomVersionDescription)
+	for id, version := range GetRoomVersionDescriptions() {
+		if version.Supported {
+			versions[id] = version
 		}
-	case RoomVersionV2:
-		desc = RoomVersionDescription{
-			Supported:       false,
-			Stable:          true,
-			StateResolution: state.StateResolutionAlgorithmV2,
-			EventFormat:     EventFormatV1,
-		}
-	case RoomVersionV3:
-		desc = RoomVersionDescription{
-			Supported:       false,
-			Stable:          true,
-			StateResolution: state.StateResolutionAlgorithmV2,
-			EventFormat:     EventFormatV1,
-		}
-	case RoomVersionV4:
-		desc = RoomVersionDescription{
-			Supported:       false,
-			Stable:          true,
-			StateResolution: state.StateResolutionAlgorithmV2,
-			EventFormat:     EventFormatV2,
-		}
-	case RoomVersionV5:
-		desc = RoomVersionDescription{
-			Supported:       false,
-			Stable:          true,
-			StateResolution: state.StateResolutionAlgorithmV2,
-			EventFormat:     EventFormatV3,
-		}
-	default:
+	}
+	return versions
+}
+
+func GetSupportedRoomVersion(version RoomVersionID) (desc RoomVersionDescription, err error) {
+	if version, ok := roomVersions[version]; ok {
+		desc = version
 	}
 	if !desc.Supported {
 		err = errors.New("unsupported room version")
