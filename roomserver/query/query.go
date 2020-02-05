@@ -724,13 +724,21 @@ func (r *RoomserverQueryAPI) QueryServersInRoomAtEvent(
 	return nil
 }
 
-// QueryDefaultRoomVersion implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryDefaultRoomVersion(
+// QueryRoomVersionCapabilities implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	ctx context.Context,
-	request *api.QueryDefaultRoomVersionRequest,
-	response *api.QueryDefaultRoomVersionResponse,
+	request *api.QueryRoomVersionCapabilitiesRequest,
+	response *api.QueryRoomVersionCapabilitiesResponse,
 ) error {
-	response.RoomVersion = int64(version.GetDefaultRoomVersion())
+	response.DefaultRoomVersion = string(version.GetDefaultRoomVersion())
+	response.AvailableRoomVersions = make(map[string]string)
+	for v, desc := range version.GetSupportedRoomVersions() {
+		if desc.Stable {
+			response.AvailableRoomVersions[string(v)] = "stable"
+		} else {
+			response.AvailableRoomVersions[string(v)] = "unstable"
+		}
+	}
 	return nil
 }
 
@@ -886,6 +894,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryServersInRoomAtEvent(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryRoomVersionCapabilitiesPath,
+		common.MakeInternalAPI("QueryRoomVersionCapabilities", func(req *http.Request) util.JSONResponse {
+			var request api.QueryRoomVersionCapabilitiesRequest
+			var response api.QueryRoomVersionCapabilitiesResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryRoomVersionCapabilities(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
