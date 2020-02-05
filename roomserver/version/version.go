@@ -83,6 +83,10 @@ var roomVersions = map[RoomVersionID]RoomVersionDescription{
 	},
 }
 
+func GetDefaultRoomVersion() RoomVersionID {
+	return RoomVersionV1
+}
+
 func GetRoomVersions() map[RoomVersionID]RoomVersionDescription {
 	return roomVersions
 }
