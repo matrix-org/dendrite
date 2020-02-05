@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -735,10 +736,11 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	response.DefaultRoomVersion = string(version.GetDefaultRoomVersion())
 	response.AvailableRoomVersions = make(map[string]string)
 	for v, desc := range version.GetSupportedRoomVersions() {
+		sv := strconv.Itoa(v)
 		if desc.Stable {
-			response.AvailableRoomVersions[string(v)] = "stable"
+			response.AvailableRoomVersions[sv] = "stable"
 		} else {
-			response.AvailableRoomVersions[string(v)] = "unstable"
+			response.AvailableRoomVersions[sv] = "unstable"
 		}
 	}
 	return nil
