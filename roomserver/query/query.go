@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -720,6 +721,16 @@ func (r *RoomserverQueryAPI) QueryServersInRoomAtEvent(
 		response.Servers = append(response.Servers, server)
 	}
 
+	return nil
+}
+
+// QueryDefaultRoomVersion implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryDefaultRoomVersion(
+	ctx context.Context,
+	request *api.QueryDefaultRoomVersionRequest,
+	response *api.QueryDefaultRoomVersionResponse,
+) error {
+	response.RoomVersion = int64(version.GetDefaultRoomVersion())
 	return nil
 }
 

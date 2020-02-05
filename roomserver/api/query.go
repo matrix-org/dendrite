@@ -244,6 +244,14 @@ type QueryServersInRoomAtEventResponse struct {
 	Servers []gomatrixserverlib.ServerName `json:"servers"`
 }
 
+// QueryDefaultRoomVersion asks for the default room version
+type QueryDefaultRoomVersionRequest struct{}
+
+// QueryDefaultRoomVersionResponse is a response to QueryServersInRoomAtEventResponse
+type QueryDefaultRoomVersionResponse struct {
+	RoomVersion int64
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -323,6 +331,13 @@ type RoomserverQueryAPI interface {
 		request *QueryServersInRoomAtEventRequest,
 		response *QueryServersInRoomAtEventResponse,
 	) error
+
+	// Asks for the default room version as preferred by the server.
+	QueryDefaultRoomVersion(
+		ctx context.Context,
+		request *QueryDefaultRoomVersionRequest,
+		response *QueryDefaultRoomVersionResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -357,6 +372,9 @@ const RoomserverQueryBackfillPath = "/api/roomserver/queryBackfill"
 
 // RoomserverQueryServersInRoomAtEventPath is the HTTP path for the QueryServersInRoomAtEvent API
 const RoomserverQueryServersInRoomAtEventPath = "/api/roomserver/queryServersInRoomAtEvents"
+
+// RoomserverQueryDefaultRoomVersionPath is the HTTP path for the QueryDefaultRoomVersion API
+const RoomserverQueryDefaultRoomVersionPath = "/api/roomserver/queryDefaultRoomVersion"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -512,5 +530,18 @@ func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServersInRoomAtEventPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryServersInRoomAtEvent implements RoomServerQueryAPI
+func (h *httpRoomserverQueryAPI) QueryDefaultRoomVersion(
+	ctx context.Context,
+	request *QueryDefaultRoomVersionRequest,
+	response *QueryDefaultRoomVersionResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryDefaultRoomVersion")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryDefaultRoomVersionPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
