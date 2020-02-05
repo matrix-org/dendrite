@@ -103,7 +103,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
 	// TODO: get the correct room version
-	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	}
 
 	// Look up the currrent state for the requested tuples.
-	stateEntries, err := state.LoadStateAtSnapshotForStringTuples(
+	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
 		ctx, currentStateSnapshotNID, request.StateToFetch,
 	)
 	if err != nil {
@@ -147,7 +147,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	response *api.QueryStateAfterEventsResponse,
 ) error {
 	// TODO: get the correct room version
-	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	response.PrevEventsExist = true
 
 	// Look up the currrent state for the requested tuples.
-	stateEntries, err := state.LoadStateAfterEventsForStringTuples(
+	stateEntries, err := roomState.LoadStateAfterEventsForStringTuples(
 		ctx, prevStates, request.StateToFetch,
 	)
 	if err != nil {
@@ -330,7 +330,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	ctx context.Context, eventNID types.EventNID, joinedOnly bool,
 ) ([]types.Event, error) {
 	// TODO: get the correct room version
-	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
 	if err != nil {
 		return []types.Event{}, err
 	}
@@ -348,7 +348,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	}
 
 	// Fetch the state as it was when this event was fired
-	stateEntries, err := state.LoadCombinedStateAfterEvents(ctx, prevState)
+	stateEntries, err := roomState.LoadCombinedStateAfterEvents(ctx, prevState)
 	if err != nil {
 		return nil, err
 	}
@@ -436,12 +436,12 @@ func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName,
 ) (bool, error) {
 	// TODO: get the correct room version
-	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
 	if err != nil {
 		return false, err
 	}
 
-	stateEntries, err := state.LoadStateAtEvent(ctx, eventID)
+	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		return false, err
 	}
@@ -596,7 +596,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	response *api.QueryStateAndAuthChainResponse,
 ) error {
 	// TODO: get the correct room version
-	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
 	if err != nil {
 		return err
 	}
@@ -623,7 +623,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	response.PrevEventsExist = true
 
 	// Look up the currrent state for the requested tuples.
-	stateEntries, err := state.LoadCombinedStateAfterEvents(
+	stateEntries, err := roomState.LoadCombinedStateAfterEvents(
 		ctx, prevStates,
 	)
 	if err != nil {

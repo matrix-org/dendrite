@@ -174,7 +174,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 func (u *latestEventsUpdater) latestState() error {
 	var err error
 	// TODO: get the correct room version
-	state, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, u.db)
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, u.db)
 	if err != nil {
 		return err
 	}
@@ -183,21 +183,21 @@ func (u *latestEventsUpdater) latestState() error {
 	for i := range u.latest {
 		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
-	u.newStateNID, err = state.CalculateAndStoreStateAfterEvents(
+	u.newStateNID, err = roomState.CalculateAndStoreStateAfterEvents(
 		u.ctx, u.roomNID, latestStateAtEvents,
 	)
 	if err != nil {
 		return err
 	}
 
-	u.removed, u.added, err = state.DifferenceBetweeenStateSnapshots(
+	u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
 		u.ctx, u.oldStateNID, u.newStateNID,
 	)
 	if err != nil {
 		return err
 	}
 
-	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = state.DifferenceBetweeenStateSnapshots(
+	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = roomState.DifferenceBetweeenStateSnapshots(
 		u.ctx, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
 	)
 	return err
