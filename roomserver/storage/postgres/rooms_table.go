@@ -40,9 +40,9 @@ CREATE TABLE IF NOT EXISTS roomserver_rooms (
     -- The state of the room after the current set of latest events.
     -- This will be 0 if there are no latest events in the room.
     state_snapshot_nid BIGINT NOT NULL DEFAULT 0,
-		-- The version of the room, which will assist in determining the state resolution
-		-- algorithm, event ID format, etc.
-		room_version BIGINT NOT NULL DEFAULT 1
+    -- The version of the room, which will assist in determining the state resolution
+    -- algorithm, event ID format, etc.
+    room_version BIGINT NOT NULL DEFAULT 1
 );
 `
 
