@@ -80,12 +80,12 @@ const selectEventsSQL = "" +
 
 const selectRecentEventsSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
+	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND sender != ALL($5)" +
 	" ORDER BY id DESC LIMIT $4"
 
 const selectRecentEventsForSyncSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
+	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE AND sender != ALL($5)" +
 	" ORDER BY id DESC LIMIT $4"
 
 const selectEarlyEventsSQL = "" +
@@ -290,7 +290,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 func (s *outputRoomEventsStatements) selectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, fromPos, toPos types.StreamPosition, limit int,
-	chronologicalOrder bool, onlySyncEvents bool,
+	chronologicalOrder bool, onlySyncEvents bool, ignoredUsers []string,
 ) ([]types.StreamEvent, error) {
 	var stmt *sql.Stmt
 	if onlySyncEvents {
@@ -299,7 +299,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
 	}
 
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit, pq.StringArray(ignoredUsers))
 	if err != nil {
 		return nil, err
 	}

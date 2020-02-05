@@ -292,7 +292,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 	if backwardOrdering {
 		// When using backward ordering, we want the most recent events first.
 		if events, err = d.events.selectRecentEvents(
-			ctx, nil, roomID, to.PDUPosition, from.PDUPosition, limit, false, false,
+			ctx, nil, roomID, to.PDUPosition, from.PDUPosition, limit, false, false, nil,
 		); err != nil {
 			return
 		}
@@ -612,12 +612,11 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		var recentStreamEvents []types.StreamEvent
 		recentStreamEvents, err = d.events.selectRecentEvents(
 			ctx, txn, roomID, types.StreamPosition(0), toPos.PDUPosition,
-			numRecentEventsPerRoom, true, true,
+			numRecentEventsPerRoom, true, true, ignoredUsers,
 		)
 		if err != nil {
 			return
 		}
-		recentStreamEvents = removeIgnoredUserEvents(recentStreamEvents, ignoredUsers)
 
 		// Retrieve the backward topology position, i.e. the position of the
 		// oldest event in the room's topology.
@@ -649,26 +648,6 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 
 	succeeded = true
 	return res, toPos, joinedRoomIDs, err
-}
-
-func removeIgnoredUserEvents(events []types.StreamEvent, ignoredUsers []string) []types.StreamEvent {
-	if len(ignoredUsers) == 0 {
-		return events
-	}
-	eventsWithoutIgnoredUsers := make([]types.StreamEvent, 0, len(events))
-	for _, event := range events {
-		isSenderIgnored := false
-		for _, ignoredUser := range ignoredUsers {
-			if ignoredUser == event.Sender() {
-				isSenderIgnored = true
-				break
-			}
-		}
-		if !isSenderIgnored {
-			eventsWithoutIgnoredUsers = append(eventsWithoutIgnoredUsers, event)
-		}
-	}
-	return eventsWithoutIgnoredUsers
 }
 
 // CompleteSync returns a complete /sync API response for the given user.
@@ -830,12 +809,11 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	}
 	recentStreamEvents, err := d.events.selectRecentEvents(
 		ctx, txn, delta.roomID, types.StreamPosition(fromPos), types.StreamPosition(endPos),
-		numRecentEventsPerRoom, true, true,
+		numRecentEventsPerRoom, true, true, ignoredUsers,
 	)
 	if err != nil {
 		return err
 	}
-	recentStreamEvents = removeIgnoredUserEvents(recentStreamEvents, ignoredUsers)
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 	backwardTopologyPos := d.getBackwardTopologyPos(ctx, recentStreamEvents)

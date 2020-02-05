@@ -138,9 +138,13 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Pagin
 		return
 	}
 	var ignoredUserList []string
-	if data, e := rp.accountDB.GetAccountDataByType(req.ctx, localpart, "", "m.ignored_user_list"); e == nil && data != nil {
+	data, err := rp.accountDB.GetAccountDataByType(req.ctx, localpart, "", "m.ignored_user_list")
+	if err != nil {
+		return
+	}
+	if data != nil {
 		var ignoredUserMap map[string]map[string]interface{}
-		if e = json.Unmarshal(data.Content, &ignoredUserMap); e == nil {
+		if err = json.Unmarshal(data.Content, &ignoredUserMap); err == nil {
 			ignoredUserList = make([]string, 0, len(ignoredUserMap))
 			for ignoredUser := range ignoredUserMap["ignored_users"] {
 				ignoredUserList = append(ignoredUserList, ignoredUser)
