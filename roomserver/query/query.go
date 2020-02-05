@@ -733,7 +733,7 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
 ) error {
-	response.DefaultRoomVersion = string(version.GetDefaultRoomVersion())
+	response.DefaultRoomVersion = strconv.Itoa(int(version.GetDefaultRoomVersion()))
 	response.AvailableRoomVersions = make(map[string]string)
 	for v, desc := range version.GetSupportedRoomVersions() {
 		sv := strconv.Itoa(int(v))
