@@ -33,11 +33,10 @@ import (
 const pathPrefixR0 = "/_matrix/client/r0"
 
 func Setup(apiMux *mux.Router, accountDB *accounts.Database, deviceDB *devices.Database) {
-
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
-		AccountDB:   nil,
+		AccountDB:   accountDB,
 		DeviceDB:    deviceDB,
 		AppServices: nil,
 	}
@@ -45,6 +44,6 @@ func Setup(apiMux *mux.Router, accountDB *accounts.Database, deviceDB *devices.D
 	r0mux.Handle("/user_directory/search",
 		common.MakeAuthAPI("user_directory_search", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return search.Search(req, accountDB)
-		})).Methods(http.MethodPost)
-
+		}),
+	).Methods(http.MethodPost)
 }

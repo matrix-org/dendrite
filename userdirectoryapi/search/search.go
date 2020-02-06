@@ -35,6 +35,7 @@ type userSearchRequest struct {
 	SearchTerm string `json:"search_term"`
 	Limit      int8   `json:"limit"`
 }
+
 type userSearchResponse struct {
 	Results *[]searchtypes.SearchResult `json:"results"`
 	Limited bool                        `json:"limited"`
@@ -76,5 +77,4 @@ func mapProfilesToResponse(results *[]searchtypes.SearchResult, limited bool) ut
 		Code: http.StatusOK,
 		JSON: userSearchResponse{results, limited},
 	}
-
 }
