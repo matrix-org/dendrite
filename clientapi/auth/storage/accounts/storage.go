@@ -205,6 +205,17 @@ func (d *Database) CreateAccount(
 		}
 		return nil, err
 	}
+	if err := d.SaveAccountData(ctx, localpart, "", "m.push_rules", `{
+		"global": {
+			"content": [],
+			"override": [],
+			"room": [],
+			"sender": [],
+			"underride": []
+		}
+	}`); err != nil {
+		return nil, err
+	}
 	return d.accounts.insertAccount(ctx, localpart, hash, appserviceID)
 }
 

@@ -53,7 +53,7 @@ type uploadResponse struct {
 // This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
 // Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
 // TODO: We should time out requests if they have not received any data within a configured timeout period.
-func Upload(req *http.Request, cfg *config.Dendrite, db *storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) util.JSONResponse {
+func Upload(req *http.Request, cfg *config.Dendrite, db storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) util.JSONResponse {
 	r, resErr := parseAndValidateRequest(req, cfg)
 	if resErr != nil {
 		return *resErr
@@ -96,7 +96,7 @@ func (r *uploadRequest) doUpload(
 	ctx context.Context,
 	reqReader io.Reader,
 	cfg *config.Dendrite,
-	db *storage.Database,
+	db storage.Database,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) *util.JSONResponse {
 	r.Logger.WithFields(log.Fields{
@@ -214,7 +214,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 	ctx context.Context,
 	tmpDir types.Path,
 	absBasePath config.Path,
-	db *storage.Database,
+	db storage.Database,
 	thumbnailSizes []config.ThumbnailSize,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,

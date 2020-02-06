@@ -30,7 +30,7 @@ import (
 // OutputTypingEventConsumer consumes events that originated in the typing server.
 type OutputTypingEventConsumer struct {
 	typingConsumer *common.ContinualConsumer
-	db             *storage.SyncServerDatasource
+	db             storage.Database
 	notifier       *sync.Notifier
 }
 
@@ -40,7 +40,7 @@ func NewOutputTypingEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
-	store *storage.SyncServerDatasource,
+	store storage.Database,
 ) *OutputTypingEventConsumer {
 
 	consumer := common.ContinualConsumer{
@@ -63,7 +63,12 @@ func NewOutputTypingEventConsumer(
 // Start consuming from typing api
 func (s *OutputTypingEventConsumer) Start() error {
 	s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
-		s.notifier.OnNewEvent(nil, roomID, nil, types.SyncPosition{TypingPosition: latestSyncPosition})
+		s.notifier.OnNewEvent(
+			nil, roomID, nil,
+			types.PaginationToken{
+				EDUTypingPosition: types.StreamPosition(latestSyncPosition),
+			},
+		)
 	})
 
 	return s.typingConsumer.Start()
@@ -83,7 +88,7 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		"typing":  output.Event.Typing,
 	}).Debug("received data from typing server")
 
-	var typingPos int64
+	var typingPos types.StreamPosition
 	typingEvent := output.Event
 	if typingEvent.Typing {
 		typingPos = s.db.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime)
@@ -91,6 +96,6 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		typingPos = s.db.RemoveTypingUser(typingEvent.UserID, typingEvent.RoomID)
 	}
 
-	s.notifier.OnNewEvent(nil, output.Event.RoomID, nil, types.SyncPosition{TypingPosition: typingPos})
+	s.notifier.OnNewEvent(nil, output.Event.RoomID, nil, types.PaginationToken{EDUTypingPosition: typingPos})
 	return nil
 }
