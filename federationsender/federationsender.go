@@ -40,7 +40,7 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
-	queues := queue.NewOutgoingQueues(base.Cfg.Matrix.ServerName, federation)
+	queues := queue.NewOutgoingQueues(federationSenderDB, base.Cfg.Matrix.ServerName, federation)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,

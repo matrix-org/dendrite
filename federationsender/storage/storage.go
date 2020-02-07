@@ -17,16 +17,21 @@ package storage
 import (
 	"context"
 	"net/url"
+	"time"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
 	common.PartitionStorer
 	UpdateRoom(ctx context.Context, roomID, oldEventID, newEventID string, addHosts []types.JoinedHost, removeHosts []string) (joinedHosts []types.JoinedHost, err error)
 	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
+	QueueEventForRetry(ctx context.Context, originServer, destinationServer string, event gomatrixserverlib.Event, attempts int, retryAt time.Time) error
+	SelectRetryEventsPending(ctx context.Context) ([]*types.PendingPDU, error)
+	DeleteRetryExpiredEvents(ctx context.Context) error
 }
 
 // NewDatabase opens a new database

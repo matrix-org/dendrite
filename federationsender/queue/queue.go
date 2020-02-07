@@ -15,9 +15,14 @@
 package queue
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/matrix-org/dendrite/federationsender/storage"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -25,20 +30,53 @@ import (
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
-	origin gomatrixserverlib.ServerName
-	client *gomatrixserverlib.FederationClient
-	// The queuesMutex protects queues
+	db          storage.Database
+	origin      gomatrixserverlib.ServerName
+	client      *gomatrixserverlib.FederationClient
 	queuesMutex sync.Mutex
-	queues      map[gomatrixserverlib.ServerName]*destinationQueue
+	queues      map[gomatrixserverlib.ServerName]*destinationQueue // protected by queuesMutex
 }
 
 // NewOutgoingQueues makes a new OutgoingQueues
-func NewOutgoingQueues(origin gomatrixserverlib.ServerName, client *gomatrixserverlib.FederationClient) *OutgoingQueues {
-	return &OutgoingQueues{
+func NewOutgoingQueues(
+	db storage.Database,
+	origin gomatrixserverlib.ServerName,
+	client *gomatrixserverlib.FederationClient,
+) *OutgoingQueues {
+	queues := OutgoingQueues{
+		db:     db,
 		origin: origin,
 		client: client,
 		queues: map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
+
+	go queues.processRetries()
+	return &queues
+}
+
+func (oqs *OutgoingQueues) QueueEvent(
+	destination gomatrixserverlib.ServerName,
+	event gomatrixserverlib.Event,
+	retryAt time.Time,
+) error {
+	if time.Until(retryAt) < time.Second*5 {
+		return errors.New("can't queue for less than 5 seconds")
+	}
+
+	return oqs.db.QueueEventForRetry(
+		context.Background(), // context
+		string(oqs.origin),   // origin servername
+		string(destination),  // destination servername
+		event,                // event
+		0,                    // attempts
+		retryAt,              // retry at time
+	)
+}
+
+func (oqs *OutgoingQueues) RemoveQueue(name gomatrixserverlib.ServerName) {
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+	delete(oqs.queues, name)
 }
 
 // SendEvent sends an event to the destinations
@@ -64,9 +102,10 @@ func (oqs *OutgoingQueues) SendEvent(
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
 	for _, destination := range destinations {
-		oq := oqs.queues[destination]
-		if oq == nil {
+		oq, ok := oqs.queues[destination]
+		if !ok {
 			oq = &destinationQueue{
+				parent:      oqs,
 				origin:      oqs.origin,
 				destination: destination,
 				client:      oqs.client,
@@ -74,7 +113,9 @@ func (oqs *OutgoingQueues) SendEvent(
 			oqs.queues[destination] = oq
 		}
 
-		oq.sendEvent(ev)
+		oq.sendEvent(&types.PendingPDU{
+			PDU: ev,
+		})
 	}
 
 	return nil
@@ -115,10 +156,34 @@ func (oqs *OutgoingQueues) SendEDU(
 			oqs.queues[destination] = oq
 		}
 
-		oq.sendEDU(e)
+		oq.sendEDU(&types.PendingEDU{
+			EDU: e,
+		})
 	}
 
 	return nil
+}
+
+func (oqs *OutgoingQueues) processRetries() {
+	ctx := context.Background()
+	for {
+		time.Sleep(time.Second * 5)
+		fmt.Println("trying to process retries")
+
+		retries, err := oqs.db.SelectRetryEventsPending(ctx)
+		if err != nil {
+			fmt.Println("failed:", err)
+			continue
+		}
+
+		fmt.Println("there are", len(retries), "PDUs to retry sending")
+
+		for _, retry := range retries {
+			fmt.Println("retrying:", retry)
+		}
+
+		oqs.db.DeleteRetryExpiredEvents(ctx)
+	}
 }
 
 // filterDestinations removes our own server from the list of destinations.

@@ -16,6 +16,7 @@ package types
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -42,4 +43,22 @@ func (e EventIDMismatchError) Error() string {
 		"mismatched last sent event ID: had %q in database got %q from room server",
 		e.DatabaseID, e.RoomServerID,
 	)
+}
+
+type Queueable struct {
+	RetryNID    int64
+	Origin      gomatrixserverlib.ServerName
+	Destination gomatrixserverlib.ServerName
+	Attempts    int
+	LastAttempt time.Time
+}
+
+type PendingPDU struct {
+	Queueable
+	PDU *gomatrixserverlib.Event
+}
+
+type PendingEDU struct {
+	Queueable
+	EDU *gomatrixserverlib.EDU
 }

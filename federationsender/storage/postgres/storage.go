@@ -18,15 +18,19 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"time"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // Database stores information needed by the federation sender
 type Database struct {
 	joinedHostsStatements
 	roomStatements
+	retryStatements
 	common.PartitionOffsetStatements
 	db *sql.DB
 }
@@ -52,6 +56,10 @@ func (d *Database) prepare() error {
 	}
 
 	if err = d.roomStatements.prepare(d.db); err != nil {
+		return err
+	}
+
+	if err = d.retryStatements.prepare(d.db); err != nil {
 		return err
 	}
 
@@ -119,4 +127,37 @@ func (d *Database) GetJoinedHosts(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
 	return d.selectJoinedHosts(ctx, roomID)
+}
+
+func (d *Database) QueueEventForRetry(
+	ctx context.Context,
+	originServer, destinationServer string, event gomatrixserverlib.Event,
+	attempts int, retryAt time.Time,
+) error {
+	eventJSON, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	if err := d.upsertRetryEvent(
+		ctx, nil,
+		originServer, destinationServer,
+		eventJSON, attempts, retryAt.UTC().Unix(),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *Database) DeleteRetryEvent(ctx context.Context, retryNID int64) error {
+	return d.deleteRetryEvent(ctx, nil, retryNID)
+}
+
+func (d *Database) SelectRetryEventsPending(ctx context.Context) (
+	[]*types.PendingPDU, error,
+) {
+	return d.selectRetryEventsPending(ctx, nil)
+}
+
+func (d *Database) DeleteRetryExpiredEvents(ctx context.Context) error {
+	return d.deleteRetryExpiredEvents(ctx, nil)
 }

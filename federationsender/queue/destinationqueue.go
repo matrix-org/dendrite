@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -29,23 +30,22 @@ import (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
-	client      *gomatrixserverlib.FederationClient
-	origin      gomatrixserverlib.ServerName
-	destination gomatrixserverlib.ServerName
-	// The running mutex protects running, sentCounter, lastTransactionIDs and
-	// pendingEvents, pendingEDUs.
+	parent             *OutgoingQueues
+	client             *gomatrixserverlib.FederationClient
+	origin             gomatrixserverlib.ServerName
+	destination        gomatrixserverlib.ServerName
 	runningMutex       sync.Mutex
-	running            bool
-	sentCounter        int
-	lastTransactionIDs []gomatrixserverlib.TransactionID
-	pendingEvents      []*gomatrixserverlib.Event
-	pendingEDUs        []*gomatrixserverlib.EDU
+	running            bool                              // protected by runningMutex
+	sentCounter        int                               // protected by runningMutex
+	lastTransactionIDs []gomatrixserverlib.TransactionID // protected by runningMutex
+	pendingEvents      []*types.PendingPDU               // protected by runningMutex
+	pendingEDUs        []*types.PendingEDU               // protected by runningMutex
 }
 
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.Event) {
+func (oq *destinationQueue) sendEvent(ev *types.PendingPDU) {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
 	oq.pendingEvents = append(oq.pendingEvents, ev)
@@ -58,7 +58,7 @@ func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.Event) {
 // sendEDU adds the EDU event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending event to that destination.
-func (oq *destinationQueue) sendEDU(e *gomatrixserverlib.EDU) {
+func (oq *destinationQueue) sendEDU(e *types.PendingEDU) {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
 	oq.pendingEDUs = append(oq.pendingEDUs, e)
@@ -73,7 +73,9 @@ func (oq *destinationQueue) backgroundSend() {
 		t := oq.next()
 		if t == nil {
 			// If the queue is empty then stop processing for this destination.
-			// TODO: Remove this destination from the queue map.
+			oq.parent.queuesMutex.Lock()
+			delete(oq.parent.queues, oq.destination)
+			oq.parent.queuesMutex.Unlock()
 			return
 		}
 
@@ -116,13 +118,13 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	oq.lastTransactionIDs = []gomatrixserverlib.TransactionID{t.TransactionID}
 
 	for _, pdu := range oq.pendingEvents {
-		t.PDUs = append(t.PDUs, *pdu)
+		t.PDUs = append(t.PDUs, *pdu.PDU)
 	}
 	oq.pendingEvents = nil
 	oq.sentCounter += len(t.PDUs)
 
 	for _, edu := range oq.pendingEDUs {
-		t.EDUs = append(t.EDUs, *edu)
+		t.EDUs = append(t.EDUs, *edu.EDU)
 	}
 	oq.pendingEDUs = nil
 	oq.sentCounter += len(t.EDUs)
