@@ -298,7 +298,9 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	} else {
 		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
 	}
-
+	if ignoredUsers == nil {
+		ignoredUsers = []string{}
+	}
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit, pq.StringArray(ignoredUsers))
 	if err != nil {
 		return nil, err
