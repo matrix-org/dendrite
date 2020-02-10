@@ -79,7 +79,6 @@ func (oq *destinationQueue) backgroundSend() {
 			return
 		}
 
-		// TODO: handle retries.
 		// TODO: blacklist uncooperative servers.
 
 		_, err := oq.client.SendTransaction(context.TODO(), *t)
@@ -88,6 +87,15 @@ func (oq *destinationQueue) backgroundSend() {
 				"destination": oq.destination,
 				log.ErrorKey:  err,
 			}).Info("problem sending transaction")
+
+			for _, pdu := range (*t).PDUs {
+				if err := oq.parent.QueueEvent((*t).Destination, pdu); err != nil {
+					log.WithFields(log.Fields{
+						"destination": (*t).Destination,
+						log.ErrorKey:  err,
+					}).Warn("Error queuing PDU")
+				}
+			}
 		}
 	}
 }

@@ -16,7 +16,6 @@ package queue
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -26,6 +25,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
+
+const retryInterval = time.Second * 5
 
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
@@ -57,19 +58,14 @@ func NewOutgoingQueues(
 func (oqs *OutgoingQueues) QueueEvent(
 	destination gomatrixserverlib.ServerName,
 	event gomatrixserverlib.Event,
-	retryAt time.Time,
 ) error {
-	if time.Until(retryAt) < time.Second*5 {
-		return errors.New("can't queue for less than 5 seconds")
-	}
-
 	return oqs.db.QueueEventForRetry(
-		context.Background(), // context
-		string(oqs.origin),   // origin servername
-		string(destination),  // destination servername
-		event,                // event
-		0,                    // attempts
-		retryAt,              // retry at time
+		context.Background(),            // context
+		string(oqs.origin),              // origin servername
+		string(destination),             // destination servername
+		event,                           // event
+		0,                               // attempts
+		time.Now().Add(retryInterval*2), // retry at time
 	)
 }
 
@@ -149,6 +145,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		oq := oqs.queues[destination]
 		if oq == nil {
 			oq = &destinationQueue{
+				parent:      oqs,
 				origin:      oqs.origin,
 				destination: destination,
 				client:      oqs.client,
@@ -167,22 +164,41 @@ func (oqs *OutgoingQueues) SendEDU(
 func (oqs *OutgoingQueues) processRetries() {
 	ctx := context.Background()
 	for {
-		time.Sleep(time.Second * 5)
-		fmt.Println("trying to process retries")
+		time.Sleep(retryInterval)
+		if err := oqs.db.DeleteRetryExpiredEvents(ctx); err != nil {
+			log.WithFields(log.Fields{
+				log.ErrorKey: err,
+			}).Warn("Error cleaning expired retry events")
+		}
 
 		retries, err := oqs.db.SelectRetryEventsPending(ctx)
 		if err != nil {
-			fmt.Println("failed:", err)
+			log.WithFields(log.Fields{
+				log.ErrorKey: err,
+			}).Warn("Error selecting pending retry events")
 			continue
 		}
 
-		fmt.Println("there are", len(retries), "PDUs to retry sending")
-
-		for _, retry := range retries {
-			fmt.Println("retrying:", retry)
+		if len(retries) == 0 {
+			continue
 		}
 
-		oqs.db.DeleteRetryExpiredEvents(ctx)
+		log.WithFields(log.Fields{
+			"pending": len(retries),
+		}).Info("Retrying failed PDU sends")
+
+		for _, retry := range retries {
+			if err := oqs.SendEvent(
+				retry.PDU,
+				retry.Origin,
+				[]gomatrixserverlib.ServerName{retry.Destination},
+			); err != nil {
+				log.WithFields(log.Fields{
+					"destination": retry.Destination,
+					log.ErrorKey:  err,
+				}).Warn("Error resending retry event")
+			}
+		}
 	}
 }
 

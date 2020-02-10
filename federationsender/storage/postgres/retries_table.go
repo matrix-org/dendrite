@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/matrix-org/dendrite/common"
@@ -40,7 +41,9 @@ INSERT INTO federationsender_retry
 	(origin_server_name, destination_server_name, event_json, attempts, retry_at)
 	VALUES ($1, $2, $3, $4, $5)
 	ON CONFLICT ON CONSTRAINT federationsender_retry_unique
-  DO UPDATE SET attempts = $4, retry_at = $5
+  DO UPDATE SET
+    attempts = federationsender_retry.attempts+1,
+    retry_at = $5
 `
 
 const deleteEventSQL = `
@@ -49,10 +52,11 @@ const deleteEventSQL = `
 
 const selectEventsForRetry = `
   SELECT * FROM federationsender_retry WHERE retry_at >= $1 AND attempts < 5
+    ORDER BY retry_at
 `
 
 const deleteExpiredEvents = `
-	DELETE FROM federationsender_retry WHERE attempts > 5
+	DELETE FROM federationsender_retry WHERE attempts >= 5 OR retry_at < $1
 `
 
 type retryStatements struct {
@@ -116,10 +120,14 @@ func (s *retryStatements) selectRetryEventsPending(
 	defer rows.Close()
 	for rows.Next() {
 		var entry types.PendingPDU
+		var rawEvent []byte
 		if err = rows.Scan(
 			&entry.RetryNID, &entry.Origin, &entry.Destination,
-			&entry.PDU, &entry.Attempts, &entry.Attempts,
+			&rawEvent, &entry.Attempts, &entry.Attempts,
 		); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(rawEvent, &entry.PDU); err != nil {
 			return nil, err
 		}
 		pending = append(pending, &entry)
@@ -131,6 +139,6 @@ func (s *retryStatements) deleteRetryExpiredEvents(
 	ctx context.Context, txn *sql.Tx,
 ) error {
 	stmt := common.TxStmt(txn, s.deleteExpiredEventsStmt)
-	_, err := stmt.ExecContext(ctx)
+	_, err := stmt.ExecContext(ctx, time.Now().UTC().Unix())
 	return err
 }
