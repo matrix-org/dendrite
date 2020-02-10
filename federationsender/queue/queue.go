@@ -164,12 +164,13 @@ func (oqs *OutgoingQueues) SendEDU(
 func (oqs *OutgoingQueues) processRetries() {
 	ctx := context.Background()
 	for {
-		time.Sleep(retryInterval)
 		if err := oqs.db.DeleteRetryExpiredEvents(ctx); err != nil {
 			log.WithFields(log.Fields{
 				log.ErrorKey: err,
 			}).Warn("Error cleaning expired retry events")
 		}
+
+		time.Sleep(retryInterval)
 
 		retries, err := oqs.db.SelectRetryEventsPending(ctx)
 		if err != nil {
