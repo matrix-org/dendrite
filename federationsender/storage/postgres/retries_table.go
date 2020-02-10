@@ -117,7 +117,7 @@ func (s *retryStatements) selectRetryEventsPending(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint: errcheck
 	for rows.Next() {
 		var entry types.PendingPDU
 		var rawEvent []byte
@@ -127,7 +127,7 @@ func (s *retryStatements) selectRetryEventsPending(
 		); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(rawEvent, &entry.PDU); err != nil {
+		if err = json.Unmarshal(rawEvent, &entry.PDU); err != nil {
 			return nil, err
 		}
 		pending = append(pending, &entry)
