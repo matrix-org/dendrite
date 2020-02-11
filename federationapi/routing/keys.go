@@ -27,7 +27,7 @@ import (
 
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
-func LocalKeys(cfg config.Dendrite) util.JSONResponse {
+func LocalKeys(cfg *config.Dendrite) util.JSONResponse {
 	keys, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -35,7 +35,7 @@ func LocalKeys(cfg config.Dendrite) util.JSONResponse {
 	return util.JSONResponse{Code: http.StatusOK, JSON: keys}
 }
 
-func localKeys(cfg config.Dendrite, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
+func localKeys(cfg *config.Dendrite, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
 
 	keys.ServerName = cfg.Matrix.ServerName

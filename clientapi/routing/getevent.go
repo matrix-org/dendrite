@@ -31,7 +31,7 @@ type getEventRequest struct {
 	device         *authtypes.Device
 	roomID         string
 	eventID        string
-	cfg            config.Dendrite
+	cfg            *config.Dendrite
 	federation     *gomatrixserverlib.FederationClient
 	keyRing        gomatrixserverlib.KeyRing
 	requestedEvent gomatrixserverlib.Event
@@ -44,7 +44,7 @@ func GetEvent(
 	device *authtypes.Device,
 	roomID string,
 	eventID string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.KeyRing,
