@@ -29,6 +29,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const pathPrefixR0 = "/_matrix/media/r0"
@@ -41,7 +43,7 @@ const pathPrefixR0 = "/_matrix/media/r0"
 func Setup(
 	apiMux *mux.Router,
 	cfg *config.Dendrite,
-	db *storage.Database,
+	db storage.Database,
 	deviceDB *devices.Database,
 	client *gomatrixserverlib.Client,
 ) {
@@ -78,19 +80,25 @@ func Setup(
 func makeDownloadAPI(
 	name string,
 	cfg *config.Dendrite,
-	db *storage.Database,
+	db storage.Database,
 	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) http.HandlerFunc {
-	return prometheus.InstrumentHandler(name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	counterVec := promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: name,
+			Help: "Total number of media_api requests for either thumbnails or full downloads",
+		},
+		[]string{"code"},
+	)
+	httpHandler := func(w http.ResponseWriter, req *http.Request) {
 		req = util.RequestWithLogging(req)
 
 		// Set common headers returned regardless of the outcome of the request
 		util.SetCORSHeaders(w)
 		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 		w.Header().Set("Content-Type", "application/json")
-
 		vars, _ := common.URLDecodeMapValues(mux.Vars(req))
 		Download(
 			w,
@@ -104,5 +112,6 @@ func makeDownloadAPI(
 			activeThumbnailGeneration,
 			name == "thumbnail",
 		)
-	}))
+	}
+	return promhttp.InstrumentHandlerCounter(counterVec, http.HandlerFunc(httpHandler))
 }
