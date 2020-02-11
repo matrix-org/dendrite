@@ -81,6 +81,7 @@ Can't forget room you're still in
 Can get rooms/{roomId}/members
 Can create filter
 Can download filter
+Lazy loading parameters in the filter are strictly boolean
 Can sync
 Can sync a joined room
 Newly joined room is included in an incremental sync
