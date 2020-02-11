@@ -40,6 +40,10 @@ type deviceUpdateJSON struct {
 	DisplayName *string `json:"display_name"`
 }
 
+type devicesDeleteJSON struct {
+	Devices []string `json:"devices"`
+}
+
 // GetDeviceByID handles /devices/{deviceID}
 func GetDeviceByID(
 	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
@@ -180,17 +184,15 @@ func DeleteDevices(
 	}
 
 	ctx := req.Context()
-	d := struct {
-		Devices []string `json:"devices"`
-	}{}
+	payload := devicesDeleteJSON{}
 
-	if err := json.NewDecoder(req.Body).Decode(&d); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
 	defer req.Body.Close() // nolint: errcheck
 
-	if err := deviceDB.RemoveDevices(ctx, localpart, d.Devices); err != nil {
+	if err := deviceDB.RemoveDevices(ctx, localpart, payload.Devices); err != nil {
 		return httputil.LogThenError(req, err)
 	}
 
