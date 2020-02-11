@@ -104,13 +104,16 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	for ; rows.Next(); i++ {
 		result := &results[i]
 		var stateBlockNIDs pq.Int64Array
-		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDs); err != nil {
+		if err = rows.Scan(&result.StateSnapshotNID, &stateBlockNIDs); err != nil {
 			return nil, err
 		}
 		result.StateBlockNIDs = make([]types.StateBlockNID, len(stateBlockNIDs))
 		for k := range stateBlockNIDs {
 			result.StateBlockNIDs[k] = types.StateBlockNID(stateBlockNIDs[k])
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	if i != len(stateNIDs) {
 		return nil, fmt.Errorf("storage: state NIDs missing from the database (%d != %d)", i, len(stateNIDs))
