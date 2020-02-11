@@ -1,4 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
+// Copyright 2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -230,6 +232,29 @@ type QueryBackfillResponse struct {
 	Events []gomatrixserverlib.Event `json:"events"`
 }
 
+// QueryServersInRoomAtEventRequest is a request to QueryServersInRoomAtEvent
+type QueryServersInRoomAtEventRequest struct {
+	// ID of the room to retrieve member servers for.
+	RoomID string `json:"room_id"`
+	// ID of the event for which to retrieve member servers.
+	EventID string `json:"event_id"`
+}
+
+// QueryServersInRoomAtEventResponse is a response to QueryServersInRoomAtEvent
+type QueryServersInRoomAtEventResponse struct {
+	// Servers present in the room for these events.
+	Servers []gomatrixserverlib.ServerName `json:"servers"`
+}
+
+// QueryRoomVersionCapabilities asks for the default room version
+type QueryRoomVersionCapabilitiesRequest struct{}
+
+// QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
+type QueryRoomVersionCapabilitiesResponse struct {
+	DefaultRoomVersion    string            `json:"default"`
+	AvailableRoomVersions map[string]string `json:"available"`
+}
+
 // RoomserverQueryAPI is used to query information from the room server.
 type RoomserverQueryAPI interface {
 	// Query the latest events and state for a room from the room server.
@@ -303,6 +328,19 @@ type RoomserverQueryAPI interface {
 		request *QueryBackfillRequest,
 		response *QueryBackfillResponse,
 	) error
+
+	QueryServersInRoomAtEvent(
+		ctx context.Context,
+		request *QueryServersInRoomAtEventRequest,
+		response *QueryServersInRoomAtEventResponse,
+	) error
+
+	// Asks for the default room version as preferred by the server.
+	QueryRoomVersionCapabilities(
+		ctx context.Context,
+		request *QueryRoomVersionCapabilitiesRequest,
+		response *QueryRoomVersionCapabilitiesResponse,
+	) error
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -332,8 +370,14 @@ const RoomserverQueryMissingEventsPath = "/api/roomserver/queryMissingEvents"
 // RoomserverQueryStateAndAuthChainPath is the HTTP path for the QueryStateAndAuthChain API
 const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthChain"
 
-// RoomserverQueryBackfillPath is the HTTP path for the QueryBackfill API
-const RoomserverQueryBackfillPath = "/api/roomserver/QueryBackfill"
+// RoomserverQueryBackfillPath is the HTTP path for the QueryBackfillPath API
+const RoomserverQueryBackfillPath = "/api/roomserver/queryBackfill"
+
+// RoomserverQueryServersInRoomAtEventPath is the HTTP path for the QueryServersInRoomAtEvent API
+const RoomserverQueryServersInRoomAtEventPath = "/api/roomserver/queryServersInRoomAtEvents"
+
+// RoomserverQueryRoomVersionCapabilitiesPath is the HTTP path for the QueryRoomVersionCapabilities API
+const RoomserverQueryRoomVersionCapabilitiesPath = "/api/roomserver/queryRoomVersionCapabilities"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -476,5 +520,31 @@ func (h *httpRoomserverQueryAPI) QueryBackfill(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryBackfillPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryServersInRoomAtEvent implements RoomServerQueryAPI
+func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
+	ctx context.Context,
+	request *QueryServersInRoomAtEventRequest,
+	response *QueryServersInRoomAtEventResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServersInRoomAtEvent")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryServersInRoomAtEventPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryServersInRoomAtEvent implements RoomServerQueryAPI
+func (h *httpRoomserverQueryAPI) QueryRoomVersionCapabilities(
+	ctx context.Context,
+	request *QueryRoomVersionCapabilitiesRequest,
+	response *QueryRoomVersionCapabilitiesResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomVersionCapabilities")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryRoomVersionCapabilitiesPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

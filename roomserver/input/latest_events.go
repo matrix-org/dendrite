@@ -1,4 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
+// Copyright 2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -171,27 +173,32 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
+	// TODO: get the correct room version
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, u.db)
+	if err != nil {
+		return err
+	}
 
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
 	for i := range u.latest {
 		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
-	u.newStateNID, err = state.CalculateAndStoreStateAfterEvents(
-		u.ctx, u.db, u.roomNID, latestStateAtEvents,
+	u.newStateNID, err = roomState.CalculateAndStoreStateAfterEvents(
+		u.ctx, u.roomNID, latestStateAtEvents,
 	)
 	if err != nil {
 		return err
 	}
 
-	u.removed, u.added, err = state.DifferenceBetweeenStateSnapshots(
-		u.ctx, u.db, u.oldStateNID, u.newStateNID,
+	u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
+		u.ctx, u.oldStateNID, u.newStateNID,
 	)
 	if err != nil {
 		return err
 	}
 
-	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = state.DifferenceBetweeenStateSnapshots(
-		u.ctx, u.db, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
+	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = roomState.DifferenceBetweeenStateSnapshots(
+		u.ctx, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
 	)
 	return err
 }
