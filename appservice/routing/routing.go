@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixApp = "/_matrix/app/r0"
+const pathPrefixApp = "/_matrix/app/v1"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -36,7 +36,7 @@ const pathPrefixApp = "/_matrix/app/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, cfg config.Dendrite, // nolint: unparam
+	apiMux *mux.Router, cfg *config.Dendrite, // nolint: unparam
 	queryAPI api.RoomserverQueryAPI, aliasAPI api.RoomserverAliasAPI, // nolint: unparam
 	accountDB *accounts.Database, // nolint: unparam
 	federation *gomatrixserverlib.FederationClient, // nolint: unparam

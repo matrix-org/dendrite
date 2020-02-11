@@ -39,7 +39,7 @@ func JoinRoomByIDOrAlias(
 	req *http.Request,
 	device *authtypes.Device,
 	roomIDOrAlias string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
@@ -98,7 +98,7 @@ type joinRoomReq struct {
 	evTime     time.Time
 	content    map[string]interface{}
 	userID     string
-	cfg        config.Dendrite
+	cfg        *config.Dendrite
 	federation *gomatrixserverlib.FederationClient
 	producer   *producers.RoomserverProducer
 	queryAPI   roomserverAPI.RoomserverQueryAPI
@@ -320,7 +320,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	}
 
 	if err = r.producer.SendEventWithState(
-		r.req.Context(), gomatrixserverlib.RespState(respSendJoin), event,
+		r.req.Context(), gomatrixserverlib.RespState(respSendJoin.RespState), event,
 	); err != nil {
 		res := httputil.LogThenError(r.req, err)
 		return &res, nil

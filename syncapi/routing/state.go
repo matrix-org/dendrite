@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -40,11 +41,11 @@ type stateEventInStateResp struct {
 // TODO: Check if the user is in the room. If not, check if the room's history
 // is publicly visible. Current behaviour is returning an empty array if the
 // user cannot see the room's history.
-func OnIncomingStateRequest(req *http.Request, db *storage.SyncServerDatasource, roomID string) util.JSONResponse {
+func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID string) util.JSONResponse {
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 
-	stateFilterPart := gomatrixserverlib.DefaultFilterPart()
+	stateFilterPart := gomatrix.DefaultFilterPart()
 	// TODO: stateFilterPart should not limit the number of state events (or only limits abusive number of events)
 
 	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID, &stateFilterPart)
@@ -87,7 +88,7 @@ func OnIncomingStateRequest(req *http.Request, db *storage.SyncServerDatasource,
 // /rooms/{roomID}/state/{type}/{statekey} request. It will look in current
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
-func OnIncomingStateTypeRequest(req *http.Request, db *storage.SyncServerDatasource, roomID string, evType, stateKey string) util.JSONResponse {
+func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID string, evType, stateKey string) util.JSONResponse {
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 

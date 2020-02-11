@@ -17,11 +17,11 @@ package routing
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -34,7 +34,7 @@ func Backfill(
 	request *gomatrixserverlib.FederationRequest,
 	query api.RoomserverQueryAPI,
 	roomID string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var res api.QueryBackfillResponse
 	var eIDs []string
@@ -90,9 +90,11 @@ func Backfill(
 		}
 	}
 
-	txn := types.NewTransaction()
-	txn.Origin = cfg.Matrix.ServerName
-	txn.PDUs = evs
+	txn := gomatrixserverlib.Transaction{
+		Origin:         cfg.Matrix.ServerName,
+		PDUs:           evs,
+		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+	}
 
 	// Send the events to the client.
 	return util.JSONResponse{

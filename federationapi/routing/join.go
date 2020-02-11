@@ -33,7 +33,7 @@ import (
 func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	roomID, userID string,
 ) util.JSONResponse {
@@ -97,7 +97,7 @@ func MakeJoin(
 func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
@@ -154,14 +154,21 @@ func SendJoin(
 
 	// Fetch the state and auth chain. We do this before we send the events
 	// on, in case this fails.
-	var stateAndAuthChainRepsonse api.QueryStateAndAuthChainResponse
+	var stateAndAuthChainResponse api.QueryStateAndAuthChainResponse
 	err = query.QueryStateAndAuthChain(httpReq.Context(), &api.QueryStateAndAuthChainRequest{
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
-	}, &stateAndAuthChainRepsonse)
+	}, &stateAndAuthChainResponse)
 	if err != nil {
 		return httputil.LogThenError(httpReq, err)
+	}
+
+	if !stateAndAuthChainResponse.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Room does not exist"),
+		}
 	}
 
 	// Send the events to the room server.
@@ -177,8 +184,8 @@ func SendJoin(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"state":      stateAndAuthChainRepsonse.StateEvents,
-			"auth_chain": stateAndAuthChainRepsonse.AuthChainEvents,
+			"state":      stateAndAuthChainResponse.StateEvents,
+			"auth_chain": stateAndAuthChainResponse.AuthChainEvents,
 		},
 	}
 }
