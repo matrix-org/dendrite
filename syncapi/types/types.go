@@ -16,43 +16,142 @@ package types
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// SyncPosition contains the PDU and EDU stream sync positions for a client.
-type SyncPosition struct {
-	// PDUPosition is the stream position for PDUs the client is at.
-	PDUPosition int64
-	// TypingPosition is the client's position for typing notifications.
-	TypingPosition int64
+var (
+	// ErrInvalidPaginationTokenType is returned when an attempt at creating a
+	// new instance of PaginationToken with an invalid type (i.e. neither "s"
+	// nor "t").
+	ErrInvalidPaginationTokenType = fmt.Errorf("Pagination token has an unknown prefix (should be either s or t)")
+	// ErrInvalidPaginationTokenLen is returned when the pagination token is an
+	// invalid length
+	ErrInvalidPaginationTokenLen = fmt.Errorf("Pagination token has an invalid length")
+)
+
+// StreamPosition represents the offset in the sync stream a client is at.
+type StreamPosition int64
+
+// Same as gomatrixserverlib.Event but also has the PDU stream position for this event.
+type StreamEvent struct {
+	gomatrixserverlib.Event
+	StreamPosition  StreamPosition
+	TransactionID   *api.TransactionID
+	ExcludeFromSync bool
 }
 
-// String implements the Stringer interface.
-func (sp SyncPosition) String() string {
-	return strconv.FormatInt(sp.PDUPosition, 10) + "_" +
-		strconv.FormatInt(sp.TypingPosition, 10)
+// PaginationTokenType represents the type of a pagination token.
+// It can be either "s" (representing a position in the whole stream of events)
+// or "t" (representing a position in a room's topology/depth).
+type PaginationTokenType string
+
+const (
+	// PaginationTokenTypeStream represents a position in the server's whole
+	// stream of events
+	PaginationTokenTypeStream PaginationTokenType = "s"
+	// PaginationTokenTypeTopology represents a position in a room's topology.
+	PaginationTokenTypeTopology PaginationTokenType = "t"
+)
+
+// PaginationToken represents a pagination token, used for interactions with
+// /sync or /messages, for example.
+type PaginationToken struct {
+	//Position StreamPosition
+	Type              PaginationTokenType
+	PDUPosition       StreamPosition
+	EDUTypingPosition StreamPosition
 }
 
-// IsAfter returns whether one SyncPosition refers to states newer than another SyncPosition.
-func (sp SyncPosition) IsAfter(other SyncPosition) bool {
-	return sp.PDUPosition > other.PDUPosition ||
-		sp.TypingPosition > other.TypingPosition
+// NewPaginationTokenFromString takes a string of the form "xyyyy..." where "x"
+// represents the type of a pagination token and "yyyy..." the token itself, and
+// parses it in order to create a new instance of PaginationToken. Returns an
+// error if the token couldn't be parsed into an int64, or if the token type
+// isn't a known type (returns ErrInvalidPaginationTokenType in the latter
+// case).
+func NewPaginationTokenFromString(s string) (token *PaginationToken, err error) {
+	if len(s) == 0 {
+		return nil, ErrInvalidPaginationTokenLen
+	}
+
+	token = new(PaginationToken)
+	var positions []string
+
+	switch t := PaginationTokenType(s[:1]); t {
+	case PaginationTokenTypeStream, PaginationTokenTypeTopology:
+		token.Type = t
+		positions = strings.Split(s[1:], "_")
+	default:
+		token.Type = PaginationTokenTypeStream
+		positions = strings.Split(s, "_")
+	}
+
+	// Try to get the PDU position.
+	if len(positions) >= 1 {
+		if pduPos, err := strconv.ParseInt(positions[0], 10, 64); err != nil {
+			return nil, err
+		} else if pduPos < 0 {
+			return nil, errors.New("negative PDU position not allowed")
+		} else {
+			token.PDUPosition = StreamPosition(pduPos)
+		}
+	}
+
+	// Try to get the typing position.
+	if len(positions) >= 2 {
+		if typPos, err := strconv.ParseInt(positions[1], 10, 64); err != nil {
+			return nil, err
+		} else if typPos < 0 {
+			return nil, errors.New("negative EDU typing position not allowed")
+		} else {
+			token.EDUTypingPosition = StreamPosition(typPos)
+		}
+	}
+
+	return
 }
 
-// WithUpdates returns a copy of the SyncPosition with updates applied from another SyncPosition.
-// If the latter SyncPosition contains a field that is not 0, it is considered an update,
-// and its value will replace the corresponding value in the SyncPosition on which WithUpdates is called.
-func (sp SyncPosition) WithUpdates(other SyncPosition) SyncPosition {
-	ret := sp
+// NewPaginationTokenFromTypeAndPosition takes a PaginationTokenType and a
+// StreamPosition and returns an instance of PaginationToken.
+func NewPaginationTokenFromTypeAndPosition(
+	t PaginationTokenType, pdupos StreamPosition, typpos StreamPosition,
+) (p *PaginationToken) {
+	return &PaginationToken{
+		Type:              t,
+		PDUPosition:       pdupos,
+		EDUTypingPosition: typpos,
+	}
+}
+
+// String translates a PaginationToken to a string of the "xyyyy..." (see
+// NewPaginationToken to know what it represents).
+func (p *PaginationToken) String() string {
+	return fmt.Sprintf("%s%d_%d", p.Type, p.PDUPosition, p.EDUTypingPosition)
+}
+
+// WithUpdates returns a copy of the PaginationToken with updates applied from another PaginationToken.
+// If the latter PaginationToken contains a field that is not 0, it is considered an update,
+// and its value will replace the corresponding value in the PaginationToken on which WithUpdates is called.
+func (pt *PaginationToken) WithUpdates(other PaginationToken) PaginationToken {
+	ret := *pt
 	if other.PDUPosition != 0 {
 		ret.PDUPosition = other.PDUPosition
 	}
-	if other.TypingPosition != 0 {
-		ret.TypingPosition = other.TypingPosition
+	if other.EDUTypingPosition != 0 {
+		ret.EDUTypingPosition = other.EDUTypingPosition
 	}
 	return ret
+}
+
+// IsAfter returns whether one PaginationToken refers to states newer than another PaginationToken.
+func (sp *PaginationToken) IsAfter(other PaginationToken) bool {
+	return sp.PDUPosition > other.PDUPosition ||
+		sp.EDUTypingPosition > other.EDUTypingPosition
 }
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
@@ -79,9 +178,9 @@ type Response struct {
 }
 
 // NewResponse creates an empty response with initialised maps.
-func NewResponse(pos SyncPosition) *Response {
+func NewResponse(token PaginationToken) *Response {
 	res := Response{
-		NextBatch: pos.String(),
+		NextBatch: token.String(),
 	}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
@@ -95,6 +194,14 @@ func NewResponse(pos SyncPosition) *Response {
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
 	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
+
+	// Fill next_batch with a pagination token. Since this is a response to a sync request, we can assume
+	// we'll always return a stream token.
+	res.NextBatch = NewPaginationTokenFromTypeAndPosition(
+		PaginationTokenTypeStream,
+		StreamPosition(token.PDUPosition),
+		StreamPosition(token.EDUTypingPosition),
+	).String()
 
 	return &res
 }
