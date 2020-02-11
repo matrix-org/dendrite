@@ -34,7 +34,7 @@ func Send(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	txnID gomatrixserverlib.TransactionID,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
