@@ -102,7 +102,7 @@ func serveTemplate(w http.ResponseWriter, templateHTML string, data map[string]s
 // AuthFallback implements GET and POST /auth/{authType}/fallback/web?session={sessionID}
 func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 ) *util.JSONResponse {
 	sessionID := req.URL.Query().Get("session")
 
@@ -130,7 +130,7 @@ func AuthFallback(
 	if req.Method == http.MethodGet {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			if err := checkRecaptchaEnabled(&cfg, w, req); err != nil {
+			if err := checkRecaptchaEnabled(cfg, w, req); err != nil {
 				return err
 			}
 
@@ -144,7 +144,7 @@ func AuthFallback(
 	} else if req.Method == http.MethodPost {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			if err := checkRecaptchaEnabled(&cfg, w, req); err != nil {
+			if err := checkRecaptchaEnabled(cfg, w, req); err != nil {
 				return err
 			}
 
@@ -156,7 +156,7 @@ func AuthFallback(
 			}
 
 			response := req.Form.Get("g-recaptcha-response")
-			if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
+			if err := validateRecaptcha(cfg, response, clientIP); err != nil {
 				util.GetLogger(req.Context()).Error(err)
 				return err
 			}
