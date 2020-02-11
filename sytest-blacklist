@@ -22,3 +22,9 @@ Real non-joined users can get individual state for world_readable rooms after le
 
 # Blacklisted until matrix-org/dendrite#862 is reverted due to Riot bug
 Latest account data appears in v2 /sync
+
+# Blacklisted due to flakiness
+Outbound federation can backfill events
+
+# Blacklisted due to alias work on Synapse
+Alias creators can delete canonical alias with no ops

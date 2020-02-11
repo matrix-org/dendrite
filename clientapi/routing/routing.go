@@ -503,6 +503,22 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
+	r0mux.Handle("/devices/{deviceID}",
+		common.MakeAuthAPI("delete_device", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return DeleteDeviceById(req, deviceDB, device, vars["deviceID"])
+		}),
+	).Methods(http.MethodDelete, http.MethodOptions)
+
+	r0mux.Handle("/delete_devices",
+		common.MakeAuthAPI("delete_devices", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return DeleteDevices(req, deviceDB, device)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	// Stub implementations for sytest
 	r0mux.Handle("/events",
 		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {
