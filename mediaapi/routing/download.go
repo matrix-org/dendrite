@@ -67,7 +67,7 @@ func Download(
 	origin gomatrixserverlib.ServerName,
 	mediaID types.MediaID,
 	cfg *config.Dendrite,
-	db *storage.Database,
+	db storage.Database,
 	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
@@ -192,7 +192,7 @@ func (r *downloadRequest) doDownload(
 	ctx context.Context,
 	w http.ResponseWriter,
 	cfg *config.Dendrite,
-	db *storage.Database,
+	db storage.Database,
 	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
@@ -235,7 +235,7 @@ func (r *downloadRequest) respondFromLocalFile(
 	absBasePath config.Path,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
-	db *storage.Database,
+	db storage.Database,
 	dynamicThumbnails bool,
 	thumbnailSizes []config.ThumbnailSize,
 ) (*types.MediaMetadata, error) {
@@ -325,7 +325,7 @@ func (r *downloadRequest) getThumbnailFile(
 	filePath types.Path,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
-	db *storage.Database,
+	db storage.Database,
 	dynamicThumbnails bool,
 	thumbnailSizes []config.ThumbnailSize,
 ) (*os.File, *types.ThumbnailMetadata, error) {
@@ -407,7 +407,7 @@ func (r *downloadRequest) generateThumbnail(
 	thumbnailSize types.ThumbnailSize,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
-	db *storage.Database,
+	db storage.Database,
 ) (*types.ThumbnailMetadata, error) {
 	r.Logger.WithFields(log.Fields{
 		"Width":        thumbnailSize.Width,
@@ -443,7 +443,7 @@ func (r *downloadRequest) getRemoteFile(
 	ctx context.Context,
 	client *gomatrixserverlib.Client,
 	cfg *config.Dendrite,
-	db *storage.Database,
+	db storage.Database,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) (errorResponse error) {
@@ -545,7 +545,7 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 	client *gomatrixserverlib.Client,
 	absBasePath config.Path,
 	maxFileSizeBytes config.FileSizeBytes,
-	db *storage.Database,
+	db storage.Database,
 	thumbnailSizes []config.ThumbnailSize,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,

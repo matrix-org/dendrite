@@ -33,7 +33,7 @@ import (
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
-	db                 *storage.Database
+	db                 storage.Database
 	queues             *queue.OutgoingQueues
 	query              api.RoomserverQueryAPI
 }
@@ -43,7 +43,7 @@ func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
-	store *storage.Database,
+	store storage.Database,
 	queryAPI api.RoomserverQueryAPI,
 ) *OutputRoomEventConsumer {
 	consumer := common.ContinualConsumer{
