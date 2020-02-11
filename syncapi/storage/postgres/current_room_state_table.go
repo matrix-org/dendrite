@@ -154,7 +154,7 @@ func (s *currentRoomStateStatements) selectJoinedUsers(
 		users = append(users, userID)
 		result[roomID] = users
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
@@ -179,7 +179,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 		}
 		result = append(result, roomID)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // CurrentState returns all the current state events for the given room.
@@ -267,7 +267,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 		}
 		result = append(result, ev)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *currentRoomStateStatements) selectStateEvent(

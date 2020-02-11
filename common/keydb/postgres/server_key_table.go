@@ -117,7 +117,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 			ExpiredTS:    gomatrixserverlib.Timestamp(expiredTS),
 		}
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 func (s *serverKeyStatements) upsertServerKeys(
