@@ -67,7 +67,7 @@ func SetupClientAPIComponent(
 	}
 
 	routing.Setup(
-		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
+		base.APIMux, base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
 		syncProducer, typingProducer, transactionsCache, fedSenderAPI,
 	)
