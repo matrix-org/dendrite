@@ -54,6 +54,7 @@ type Database interface {
 	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error)
 	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error)
 	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
+	GetRoomVersionForRoom(ctx context.Context, roomNID types.RoomNID) (int64, error)
 }
 
 // NewPublicRoomsServerDatabase opens a database connection.
