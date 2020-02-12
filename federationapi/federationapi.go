@@ -45,8 +45,8 @@ func SetupFederationAPIComponent(
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
 
 	routing.Setup(
-		base.APIMux, *base.Cfg, queryAPI, aliasAPI, asAPI,
-		roomserverProducer, federationSenderAPI, *keyRing, federation, accountsDB,
-		deviceDB,
+		base.APIMux, base.Cfg, queryAPI, aliasAPI, asAPI,
+		roomserverProducer, federationSenderAPI, *keyRing,
+		federation, accountsDB, deviceDB,
 	)
 }

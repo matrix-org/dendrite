@@ -90,6 +90,7 @@ func (s *accountDataStatements) selectAccountData(
 	if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 
 	global = []gomatrixserverlib.ClientEvent{}
 	rooms = make(map[string][]gomatrixserverlib.ClientEvent)
@@ -114,8 +115,7 @@ func (s *accountDataStatements) selectAccountData(
 			global = append(global, ac)
 		}
 	}
-
-	return
+	return global, rooms, rows.Err()
 }
 
 func (s *accountDataStatements) selectAccountDataByType(

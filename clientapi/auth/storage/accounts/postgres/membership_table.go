@@ -122,11 +122,10 @@ func (s *membershipStatements) selectMembershipsByLocalpart(
 	for rows.Next() {
 		var m authtypes.Membership
 		m.Localpart = localpart
-		if err := rows.Scan(&m.RoomID, &m.EventID); err != nil {
-			return nil, err
+		if err = rows.Scan(&m.RoomID, &m.EventID); err != nil {
+			return
 		}
 		memberships = append(memberships, m)
 	}
-
-	return
+	return memberships, rows.Err()
 }

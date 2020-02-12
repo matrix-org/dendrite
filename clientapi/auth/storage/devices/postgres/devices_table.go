@@ -19,10 +19,10 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/matrix-org/dendrite/common"
-
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -80,6 +80,9 @@ const deleteDeviceSQL = "" +
 const deleteDevicesByLocalpartSQL = "" +
 	"DELETE FROM device_devices WHERE localpart = $1"
 
+const deleteDevicesSQL = "" +
+	"DELETE FROM device_devices WHERE localpart = $1 AND device_id = ANY($2)"
+
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
@@ -88,6 +91,7 @@ type devicesStatements struct {
 	updateDeviceNameStmt         *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
+	deleteDevicesStmt            *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
 }
 
@@ -117,6 +121,9 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 	if s.deleteDevicesByLocalpartStmt, err = db.Prepare(deleteDevicesByLocalpartSQL); err != nil {
 		return
 	}
+	if s.deleteDevicesStmt, err = db.Prepare(deleteDevicesSQL); err != nil {
+		return
+	}
 	s.serverName = server
 	return
 }
@@ -142,6 +149,7 @@ func (s *devicesStatements) insertDevice(
 	}, nil
 }
 
+// deleteDevice removes a single device by id and user localpart.
 func (s *devicesStatements) deleteDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart string,
 ) error {
@@ -150,6 +158,18 @@ func (s *devicesStatements) deleteDevice(
 	return err
 }
 
+// deleteDevices removes a single or multiple devices by ids and user localpart.
+// Returns an error if the execution failed.
+func (s *devicesStatements) deleteDevices(
+	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
+) error {
+	stmt := common.TxStmt(txn, s.deleteDevicesStmt)
+	_, err := stmt.ExecContext(ctx, localpart, pq.Array(devices))
+	return err
+}
+
+// deleteDevicesByLocalpart removes all devices for the
+// given user localpart.
 func (s *devicesStatements) deleteDevicesByLocalpart(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) error {
@@ -206,6 +226,7 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	if err != nil {
 		return devices, err
 	}
+	defer rows.Close() // nolint: errcheck
 
 	for rows.Next() {
 		var dev authtypes.Device
@@ -217,5 +238,5 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 		devices = append(devices, dev)
 	}
 
-	return devices, nil
+	return devices, rows.Err()
 }

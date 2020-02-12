@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrix"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -153,7 +152,7 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB, streamID *streamIDState
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
 	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
-	stateFilterPart *gomatrix.FilterPart,
+	stateFilterPart *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 

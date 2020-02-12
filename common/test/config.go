@@ -111,6 +111,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	// Bind to the same address as the listen address
 	// All microservices are run on the same host in testing
 	cfg.Bind.ClientAPI = cfg.Listen.ClientAPI
+	cfg.Bind.AppServiceAPI = cfg.Listen.AppServiceAPI
 	cfg.Bind.FederationAPI = cfg.Listen.FederationAPI
 	cfg.Bind.MediaAPI = cfg.Listen.MediaAPI
 	cfg.Bind.RoomServer = cfg.Listen.RoomServer

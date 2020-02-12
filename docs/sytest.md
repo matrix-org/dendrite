@@ -44,6 +44,7 @@ args:
     user: dendrite
     database: dendrite
     host: 127.0.0.1
+    sslmode: disable
 type: pg
 EOF
 ```

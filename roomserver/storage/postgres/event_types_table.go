@@ -143,5 +143,5 @@ func (s *eventTypeStatements) bulkSelectEventTypeNID(
 		}
 		result[eventType] = types.EventTypeNID(eventTypeNID)
 	}
-	return result, nil
+	return result, rows.Err()
 }

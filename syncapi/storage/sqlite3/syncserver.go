@@ -28,7 +28,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrix"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -262,7 +261,7 @@ func (d *SyncServerDatasource) GetStateEvent(
 // Returns an empty slice if no state events could be found for this room.
 // Returns an error if there was an issue with the retrieval.
 func (d *SyncServerDatasource) GetStateEventsForRoom(
-	ctx context.Context, roomID string, stateFilterPart *gomatrix.FilterPart,
+	ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter,
 ) (stateEvents []gomatrixserverlib.Event, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
@@ -447,7 +446,7 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	var succeeded bool
 	defer common.EndTransaction(txn, &succeeded)
 
-	stateFilterPart := gomatrix.DefaultFilterPart() // TODO: use filter provided in request
+	stateFilterPart := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
 	// Work out which rooms to return in the response. This is done by getting not only the currently
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 PDU stream positions.
@@ -613,7 +612,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	}
 	fmt.Println("Joined rooms:", joinedRoomIDs)
 
-	stateFilterPart := gomatrix.DefaultFilterPart() // TODO: use filter provided in request
+	stateFilterPart := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
@@ -716,7 +715,7 @@ var txReadOnlySnapshot = sql.TxOptions{
 // If there was an issue with the retrieval, returns an error
 func (d *SyncServerDatasource) GetAccountDataInRange(
 	ctx context.Context, userID string, oldPos, newPos types.StreamPosition,
-	accountDataFilterPart *gomatrix.FilterPart,
+	accountDataFilterPart *gomatrixserverlib.EventFilter,
 ) (map[string][]string, error) {
 	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos, accountDataFilterPart)
 }
@@ -972,7 +971,7 @@ func (d *SyncServerDatasource) fetchMissingStateEvents(
 func (d *SyncServerDatasource) getStateDeltas(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
 	fromPos, toPos types.StreamPosition, userID string,
-	stateFilterPart *gomatrix.FilterPart,
+	stateFilterPart *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
@@ -1047,7 +1046,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
 	fromPos, toPos types.StreamPosition, userID string,
-	stateFilterPart *gomatrix.FilterPart,
+	stateFilterPart *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
 	joinedRoomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
 	if err != nil {
@@ -1102,7 +1101,7 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 
 func (d *SyncServerDatasource) currentStateStreamEventsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	stateFilterPart *gomatrix.FilterPart,
+	stateFilterPart *gomatrixserverlib.StateFilter,
 ) ([]types.StreamEvent, error) {
 	allState, err := d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
 	if err != nil {

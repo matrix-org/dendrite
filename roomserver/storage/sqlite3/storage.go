@@ -831,6 +831,14 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 	return d.Events(ctx, nids)
 }
 
+func (d *Database) GetRoomVersionForRoom(
+	ctx context.Context, roomNID types.RoomNID,
+) (int64, error) {
+	return d.statements.selectRoomVersionForRoomNID(
+		ctx, nil, roomNID,
+	)
+}
+
 type transaction struct {
 	ctx context.Context
 	txn *sql.Tx

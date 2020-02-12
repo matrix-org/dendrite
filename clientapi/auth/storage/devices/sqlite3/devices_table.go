@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -68,6 +69,9 @@ const deleteDeviceSQL = "" +
 const deleteDevicesByLocalpartSQL = "" +
 	"DELETE FROM device_devices WHERE localpart = $1"
 
+const deleteDevicesSQL = "" +
+	"DELETE FROM device_devices WHERE localpart = $1 AND device_id = ANY($2)"
+
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
 	selectDevicesCountStmt       *sql.Stmt
@@ -77,6 +81,7 @@ type devicesStatements struct {
 	updateDeviceNameStmt         *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
+	deleteDevicesStmt            *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
 }
 
@@ -107,6 +112,9 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 		return
 	}
 	if s.deleteDevicesByLocalpartStmt, err = db.Prepare(deleteDevicesByLocalpartSQL); err != nil {
+		return
+	}
+	if s.deleteDevicesStmt, err = db.Prepare(deleteDevicesSQL); err != nil {
 		return
 	}
 	s.serverName = server
@@ -144,6 +152,14 @@ func (s *devicesStatements) deleteDevice(
 ) error {
 	stmt := common.TxStmt(txn, s.deleteDeviceStmt)
 	_, err := stmt.ExecContext(ctx, id, localpart)
+	return err
+}
+
+func (s *devicesStatements) deleteDevices(
+	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
+) error {
+	stmt := common.TxStmt(txn, s.deleteDevicesStmt)
+	_, err := stmt.ExecContext(ctx, localpart, pq.Array(devices))
 	return err
 }
 

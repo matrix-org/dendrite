@@ -43,7 +43,7 @@ func SendEvent(
 	req *http.Request,
 	device *authtypes.Device,
 	roomID, eventType string, txnID, stateKey *string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	txnCache *transactions.Cache,
@@ -93,7 +93,7 @@ func generateSendEvent(
 	req *http.Request,
 	device *authtypes.Device,
 	roomID, eventType string, stateKey *string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request

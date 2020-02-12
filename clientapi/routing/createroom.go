@@ -134,7 +134,7 @@ type fledglingEvent struct {
 // CreateRoom implements /createRoom
 func CreateRoom(
 	req *http.Request, device *authtypes.Device,
-	cfg config.Dendrite, producer *producers.RoomserverProducer,
+	cfg *config.Dendrite, producer *producers.RoomserverProducer,
 	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -148,7 +148,7 @@ func CreateRoom(
 // nolint: gocyclo
 func createRoom(
 	req *http.Request, device *authtypes.Device,
-	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
+	cfg *config.Dendrite, roomID string, producer *producers.RoomserverProducer,
 	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -344,7 +344,7 @@ func createRoom(
 func buildEvent(
 	builder *gomatrixserverlib.EventBuilder,
 	provider gomatrixserverlib.AuthEventProvider,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	evTime time.Time,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)

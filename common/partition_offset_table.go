@@ -99,7 +99,7 @@ func (s *PartitionOffsetStatements) selectPartitionOffsets(
 		}
 		results = append(results, offset)
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 // UpsertPartitionOffset updates or inserts the partition offset for the given topic.

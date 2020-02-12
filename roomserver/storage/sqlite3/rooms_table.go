@@ -30,7 +30,8 @@ const roomsSchema = `
     room_id TEXT NOT NULL UNIQUE,
     latest_event_nids TEXT NOT NULL DEFAULT '{}',
     last_event_sent_nid INTEGER NOT NULL DEFAULT 0,
-    state_snapshot_nid INTEGER NOT NULL DEFAULT 0
+    state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
+    room_version INTEGER NOT NULL DEFAULT 1
   );
 `
 
@@ -52,12 +53,16 @@ const selectLatestEventNIDsForUpdateSQL = "" +
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE roomserver_rooms SET latest_event_nids = $1, last_event_sent_nid = $2, state_snapshot_nid = $3 WHERE room_nid = $4"
 
+const selectRoomVersionForRoomNIDSQL = "" +
+	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
+
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
+	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 }
 
 func (s *roomStatements) prepare(db *sql.DB) (err error) {
@@ -71,6 +76,7 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
+		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
 	}.prepare(db)
 }
 
@@ -147,4 +153,13 @@ func (s *roomStatements) updateLatestEventNIDs(
 		roomNID,
 	)
 	return err
+}
+
+func (s *roomStatements) selectRoomVersionForRoomNID(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+) (int64, error) {
+	var roomVersion int64
+	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
+	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
+	return roomVersion, err
 }

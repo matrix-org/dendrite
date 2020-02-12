@@ -133,7 +133,7 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 
 		result[roomID] = event
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *inviteEventsStatements) selectMaxInviteID(

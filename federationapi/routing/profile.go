@@ -31,7 +31,7 @@ import (
 func GetProfile(
 	httpReq *http.Request,
 	accountDB accounts.Database,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	userID, field := httpReq.FormValue("user_id"), httpReq.FormValue("field")

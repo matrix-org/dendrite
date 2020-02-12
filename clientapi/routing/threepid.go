@@ -39,7 +39,7 @@ type threePIDsResponse struct {
 // RequestEmailToken implements:
 //     POST /account/3pid/email/requestToken
 //     POST /register/email/requestToken
-func RequestEmailToken(req *http.Request, accountDB accounts.Database, cfg config.Dendrite) util.JSONResponse {
+func RequestEmailToken(req *http.Request, accountDB accounts.Database, cfg *config.Dendrite) util.JSONResponse {
 	var body threepid.EmailAssociationRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -83,7 +83,7 @@ func RequestEmailToken(req *http.Request, accountDB accounts.Database, cfg confi
 // CheckAndSave3PIDAssociation implements POST /account/3pid
 func CheckAndSave3PIDAssociation(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var body threepid.EmailAssociationCheckRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
