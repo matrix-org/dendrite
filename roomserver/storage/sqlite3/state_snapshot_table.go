@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -36,13 +35,7 @@ const stateSnapshotSchema = `
 
 const insertStateSQL = `
 	INSERT INTO roomserver_state_snapshots (room_nid, state_block_nids)
-	  VALUES ($1, $2);
-`
-
-const insertStateResultSQL = `
-	SELECT state_snapshot_nid FROM roomserver_state_snapshots
-		WHERE rowid = last_insert_rowid();
-`
+	  VALUES ($1, $2);`
 
 // Bulk state data NID lookup.
 // Sorting by state_snapshot_nid means we can use binary search over the result
@@ -67,7 +60,6 @@ func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
 
 	return statementList{
 		{&s.insertStateStmt, insertStateSQL},
-		{&s.insertStateResultStmt, insertStateResultSQL},
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
 	}.prepare(db)
 }
@@ -79,15 +71,17 @@ func (s *stateSnapshotStatements) insertState(
 	for i := range stateBlockNIDs {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
-	insertStmt := common.TxStmt(txn, s.insertStateStmt)
-	resultStmt := common.TxStmt(txn, s.insertStateResultStmt)
-	if _, err = insertStmt.ExecContext(ctx, int64(roomNID), pq.Int64Array(nids)); err == nil {
-		err = resultStmt.QueryRowContext(ctx).Scan(&stateNID)
-		if err != nil {
-			fmt.Println("insertState s.insertStateResultStmt.QueryRowContext:", err)
+	insertStmt := txn.Stmt(s.insertStateStmt)
+	//resultStmt := txn.Stmt(s.insertStateResultStmt)
+	fmt.Println(insertStateSQL, roomNID, nids)
+	if res, err2 := insertStmt.ExecContext(ctx, int64(roomNID), pq.Int64Array(nids)); err2 == nil {
+		lastRowID, err3 := res.LastInsertId()
+		if err3 != nil {
+			err = err3
 		}
+		stateNID = types.StateSnapshotNID(lastRowID)
 	} else {
-		fmt.Println("insertState s.insertStateStmt.ExecContext:", err)
+		fmt.Println("insertState s.insertStateStmt.ExecContext:", err2)
 	}
 	return
 }
@@ -101,7 +95,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 		nids[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", queryVariadic(len(nids)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
+	selectStmt, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +106,6 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 			nids[i] = int64(stateNIDs[i])
 		}
 	*/
-	selectStmt := common.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, nids...)
 	if err != nil {
 		fmt.Println("bulkSelectStateBlockNIDs s.bulkSelectStateBlockNIDsStmt.QueryContext:", err)

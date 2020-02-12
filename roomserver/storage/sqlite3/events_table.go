@@ -69,7 +69,7 @@ const bulkSelectStateAtEventByIDSQL = "" +
 	" WHERE event_id IN ($1)"
 
 const updateEventStateSQL = "" +
-	"UPDATE roomserver_events SET state_snapshot_nid = $2 WHERE event_nid = $1"
+	"UPDATE roomserver_events SET state_snapshot_nid = $1 WHERE event_nid = $2"
 
 const selectEventSentToOutputSQL = "" +
 	"SELECT sent_to_output FROM roomserver_events WHERE event_nid = $1"
@@ -153,21 +153,18 @@ func (s *eventStatements) insertEvent(
 	var eventNID int64
 	var stateNID int64
 	var err error
+	var res sql.Result
 	insertStmt := common.TxStmt(txn, s.insertEventStmt)
 	resultStmt := common.TxStmt(txn, s.insertEventResultStmt)
-	if _, err = insertStmt.ExecContext(
+	if res, err = insertStmt.ExecContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
 		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
 	); err == nil {
+		a, b := res.LastInsertId()
+		fmt.Println("LastInsertId", a, b)
 		err = resultStmt.QueryRowContext(ctx).Scan(&eventNID, &stateNID)
-		if err != nil {
-			fmt.Println("insertEvent HAS FAILED!", err)
-		}
-	} else {
-		fmt.Println("insertEvent HAS GONE WRONG!", err)
 	}
-	fmt.Println("Event NID:", eventNID)
-	fmt.Println("State snapshot NID:", stateNID)
+	fmt.Println("INSERT event ID", eventID, "state snapshot NID:", stateNID, "event NID:", eventNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
@@ -192,7 +189,7 @@ func (s *eventStatements) bulkSelectStateEventByID(
 		iEventIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateEventByIDSQL, "($1)", queryVariadic(len(iEventIDs)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
+	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +242,7 @@ func (s *eventStatements) bulkSelectStateAtEventByID(
 		iEventIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateAtEventByIDSQL, "($1)", queryVariadic(len(iEventIDs)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
+	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
@@ -287,10 +284,14 @@ func (s *eventStatements) updateEventState(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
 	updateStmt := common.TxStmt(txn, s.updateEventStateStmt)
-	_, err := updateStmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
+	fmt.Println("=====================================")
+	fmt.Println(updateEventStateSQL, stateNID, eventNID)
+	res, err := updateStmt.ExecContext(ctx, int64(stateNID), int64(eventNID))
 	if err != nil {
 		fmt.Println("updateEventState s.updateEventStateStmt.ExecContext:", err)
 	}
+	a, b := res.RowsAffected()
+	fmt.Println("Rows affected:", a, b)
 	return err
 }
 
@@ -336,14 +337,9 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateAtEventAndReferenceSQL, "($1)", queryVariadic(len(iEventNIDs)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
-	if err != nil {
-		return nil, err
-	}
-	///////////////
+	//////////////
 
-	selectStmt := common.TxStmt(txn, selectPrep)
-	rows, err := selectStmt.QueryContext(ctx, iEventNIDs...)
+	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
 	if err != nil {
 		fmt.Println("bulkSelectStateAtEventAndREference stmt.QueryContext:", err)
 		return nil, err
@@ -389,7 +385,7 @@ func (s *eventStatements) bulkSelectEventReference(
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventReferenceSQL, "($1)", queryVariadic(len(iEventNIDs)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
+	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +421,7 @@ func (s *eventStatements) bulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventIDSQL, "($1)", queryVariadic(len(iEventNIDs)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
+	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +460,7 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 		iEventIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventNIDSQL, "($1)", queryVariadic(len(iEventIDs)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
+	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}

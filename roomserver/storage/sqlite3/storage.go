@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -54,8 +55,8 @@ func Open(dataSourceName string) (*Database, error) {
 		return nil, err
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
-	//d.db.Exec("PRAGMA parser_trace = true;")
-	d.db.SetMaxOpenConns(1)
+	//d.db.Exec("PRAGMA read_uncommitted = true;")
+	d.db.SetMaxOpenConns(2)
 	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}
@@ -196,36 +197,56 @@ func (d *Database) assignStateKeyNID(
 // StateEntriesForEventIDs implements input.EventDatabase
 func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
-) ([]types.StateEntry, error) {
-	return d.statements.bulkSelectStateEventByID(ctx, nil, eventIDs)
+) (se []types.StateEntry, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		se, err = d.statements.bulkSelectStateEventByID(ctx, txn, eventIDs)
+		return err
+	})
+	return
 }
 
 // EventTypeNIDs implements state.RoomStateDatabase
 func (d *Database) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
-) (map[string]types.EventTypeNID, error) {
-	return d.statements.bulkSelectEventTypeNID(ctx, nil, eventTypes)
+) (etnids map[string]types.EventTypeNID, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		etnids, err = d.statements.bulkSelectEventTypeNID(ctx, txn, eventTypes)
+		return err
+	})
+	return
 }
 
 // EventStateKeyNIDs implements state.RoomStateDatabase
 func (d *Database) EventStateKeyNIDs(
 	ctx context.Context, eventStateKeys []string,
-) (map[string]types.EventStateKeyNID, error) {
-	return d.statements.bulkSelectEventStateKeyNID(ctx, nil, eventStateKeys)
+) (esknids map[string]types.EventStateKeyNID, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		esknids, err = d.statements.bulkSelectEventStateKeyNID(ctx, txn, eventStateKeys)
+		return err
+	})
+	return
 }
 
 // EventStateKeys implements query.RoomserverQueryAPIDatabase
 func (d *Database) EventStateKeys(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
-) (map[types.EventStateKeyNID]string, error) {
-	return d.statements.bulkSelectEventStateKey(ctx, nil, eventStateKeyNIDs)
+) (out map[types.EventStateKeyNID]string, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		out, err = d.statements.bulkSelectEventStateKey(ctx, txn, eventStateKeyNIDs)
+		return err
+	})
+	return
 }
 
 // EventNIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) EventNIDs(
 	ctx context.Context, eventIDs []string,
-) (map[string]types.EventNID, error) {
-	return d.statements.bulkSelectEventNID(ctx, nil, eventIDs)
+) (out map[string]types.EventNID, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		out, err = d.statements.bulkSelectEventNID(ctx, txn, eventIDs)
+		return err
+	})
+	return
 }
 
 // Events implements input.EventDatabase
@@ -235,12 +256,15 @@ func (d *Database) Events(
 	var eventJSONs []eventJSONPair
 	var err error
 	results := make([]types.Event, len(eventNIDs))
+	fmt.Println("pre txn")
 	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		fmt.Println("in txn", txn)
 		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
 		if err != nil || len(eventJSONs) == 0 {
 			fmt.Println("d.statements.bulkSelectEventJSON:", err)
 			return nil
 		}
+		fmt.Println("selected txn")
 		for i, eventJSON := range eventJSONs {
 			result := &results[i]
 			result.EventNID = eventJSON.EventNID
@@ -252,6 +276,7 @@ func (d *Database) Events(
 		}
 		return nil
 	})
+	fmt.Println("post txn")
 	if err != nil {
 		return []types.Event{}, err
 	}
@@ -265,7 +290,9 @@ func (d *Database) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
-	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	fmt.Println("AddState INSERT STATE START", stateBlockNIDs)
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		fmt.Println("insert state txn created")
 		if len(state) > 0 {
 			stateBlockNID, err := d.statements.selectNextStateBlockNID(ctx, txn)
 			if err != nil {
@@ -277,8 +304,10 @@ func (d *Database) AddState(
 			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
 		}
 		stateNID, err = d.statements.insertState(ctx, txn, roomNID, stateBlockNIDs)
-		return nil
+		fmt.Println("AddState: completing txn", time.Now(), "err=", err)
+		return err
 	})
+	fmt.Println("AddState INSERT STATE END pkey=", stateNID, time.Now(), "err=", err)
 	if err != nil {
 		return 0, err
 	}
@@ -289,49 +318,77 @@ func (d *Database) AddState(
 func (d *Database) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return d.statements.updateEventState(ctx, nil, eventNID, stateNID)
+	fmt.Println("SetState event NID:", eventNID, "state NID:", stateNID)
+	e := common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.statements.updateEventState(ctx, txn, eventNID, stateNID)
+	})
+	fmt.Println("SetState finish", e)
+	return e
 }
 
 // StateAtEventIDs implements input.EventDatabase
 func (d *Database) StateAtEventIDs(
 	ctx context.Context, eventIDs []string,
-) ([]types.StateAtEvent, error) {
-	return d.statements.bulkSelectStateAtEventByID(ctx, nil, eventIDs)
+) (se []types.StateAtEvent, err error) {
+	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		se, err = d.statements.bulkSelectStateAtEventByID(ctx, txn, eventIDs)
+		return err
+	})
+	return
 }
 
 // StateBlockNIDs implements state.RoomStateDatabase
 func (d *Database) StateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
-) ([]types.StateBlockNIDList, error) {
-	return d.statements.bulkSelectStateBlockNIDs(ctx, nil, stateNIDs)
+) (sl []types.StateBlockNIDList, err error) {
+	fmt.Println("StateBlockNIDs SELECT STATE START", stateNIDs)
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		fmt.Println("   in txn")
+		sl, err = d.statements.bulkSelectStateBlockNIDs(ctx, txn, stateNIDs)
+		return err
+	})
+	fmt.Println("StateBlockNIDs SELECT STATE END", sl)
+	return
 }
 
 // StateEntries implements state.RoomStateDatabase
 func (d *Database) StateEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
-) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectStateBlockEntries(ctx, nil, stateBlockNIDs)
+) (sel []types.StateEntryList, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		sel, err = d.statements.bulkSelectStateBlockEntries(ctx, txn, stateBlockNIDs)
+		return err
+	})
+	return
 }
 
 // SnapshotNIDFromEventID implements state.RoomStateDatabase
 func (d *Database) SnapshotNIDFromEventID(
 	ctx context.Context, eventID string,
 ) (stateNID types.StateSnapshotNID, err error) {
-	_, stateNID, err = d.statements.selectEvent(ctx, nil, eventID)
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		_, stateNID, err = d.statements.selectEvent(ctx, txn, eventID)
+		return err
+	})
 	return
 }
 
 // EventIDs implements input.RoomEventDatabase
 func (d *Database) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
-) (map[types.EventNID]string, error) {
-	return d.statements.bulkSelectEventID(ctx, nil, eventNIDs)
+) (out map[types.EventNID]string, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		out, err = d.statements.bulkSelectEventID(ctx, txn, eventNIDs)
+		return err
+	})
+	return
 }
 
 // GetLatestEventsForUpdate implements input.EventDatabase
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
 ) (types.RoomRecentEventsUpdater, error) {
+	fmt.Println("=============== GetLatestEventsForUpdate BEGIN TXN")
 	txn, err := d.db.Begin()
 	if err != nil {
 		return nil, err
@@ -355,8 +412,15 @@ func (d *Database) GetLatestEventsForUpdate(
 			return nil, err
 		}
 	}
+	fmt.Println("GetLatestEventsForUpdate returning updater")
+
+	// FIXME: we probably want to support long-lived txns in sqlite somehow, but we don't because we get
+	// 'database is locked' errors caused by multiple write txns (one being the long-lived txn created here)
+	// so for now let's not use a long-lived txn at all, and just commit it here and set the txn to nil so
+	// we fail fast if someone tries to use the underlying txn object.
+	txn.Commit()
 	return &roomRecentEventsUpdater{
-		transaction{ctx, txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
+		transaction{ctx, nil}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
 	}, nil
 }
 
@@ -398,24 +462,33 @@ func (u *roomRecentEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotN
 
 // StorePreviousEvents implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
-	for _, ref := range previousEventReferences {
-		if err := u.d.statements.insertPreviousEvent(u.ctx, u.txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
-			return err
+	err := common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		for _, ref := range previousEventReferences {
+			if err := u.d.statements.insertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
+	return err
 }
 
 // IsReferenced implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
-	err := u.d.statements.selectPreviousEventExists(u.ctx, u.txn, eventReference.EventID, eventReference.EventSHA256)
-	if err == nil {
-		return true, nil
-	}
-	if err == sql.ErrNoRows {
-		return false, nil
-	}
-	return false, err
+func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (res bool, err error) {
+	fmt.Println("[[TXN]] IsReferenced")
+	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		err := u.d.statements.selectPreviousEventExists(u.ctx, txn, eventReference.EventID, eventReference.EventSHA256)
+		if err == nil {
+			res = true
+			err = nil
+		}
+		if err == sql.ErrNoRows {
+			res = false
+			err = nil
+		}
+		return err
+	})
+	return
 }
 
 // SetLatestEvents implements types.RoomRecentEventsUpdater
@@ -423,38 +496,58 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(
 	roomNID types.RoomNID, latest []types.StateAtEventAndReference, lastEventNIDSent types.EventNID,
 	currentStateSnapshotNID types.StateSnapshotNID,
 ) error {
-	eventNIDs := make([]types.EventNID, len(latest))
-	for i := range latest {
-		eventNIDs[i] = latest[i].EventNID
-	}
-	// TODO: transaction was removed here - is this wise?
-	return u.d.statements.updateLatestEventNIDs(u.ctx, nil, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID)
+	err := common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		eventNIDs := make([]types.EventNID, len(latest))
+		for i := range latest {
+			eventNIDs[i] = latest[i].EventNID
+		}
+		return u.d.statements.updateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID)
+	})
+	return err
 }
 
 // HasEventBeenSent implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (bool, error) {
+func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (res bool, err error) {
 	// TODO: transaction was removed here - is this wise?
-	return u.d.statements.selectEventSentToOutput(u.ctx, nil, eventNID)
+	fmt.Println("[[TXN]] HasEventBeenSent")
+	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		res, err = u.d.statements.selectEventSentToOutput(u.ctx, txn, eventNID)
+		return err
+	})
+	return
 }
 
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
 	// TODO: transaction was removed here - is this wise?
-	return u.d.statements.updateEventSentToOutput(u.ctx, nil, eventNID)
+	fmt.Println("[[TXN]] updateEventSentToOutput")
+	err := common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		return u.d.statements.updateEventSentToOutput(u.ctx, txn, eventNID)
+	})
+	return err
 }
 
-func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID) (types.MembershipUpdater, error) {
+func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID) (mu types.MembershipUpdater, err error) {
 	// TODO: transaction was removed here - is this wise?
-	return u.d.membershipUpdaterTxn(u.ctx, nil, u.roomNID, targetUserNID)
+	fmt.Println("[[TXN]] membershipUpdaterTxn")
+	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		mu, err = u.d.membershipUpdaterTxn(u.ctx, txn, u.roomNID, targetUserNID)
+		return err
+	})
+	return
 }
 
 // RoomNID implements query.RoomserverQueryAPIDB
-func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, error) {
-	roomNID, err := d.statements.selectRoomNID(ctx, nil, roomID)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	return roomNID, err
+func (d *Database) RoomNID(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
+		if err == sql.ErrNoRows {
+			roomNID = 0
+			err = nil
+		}
+		return err
+	})
+	return
 }
 
 // LatestEventIDs implements query.RoomserverQueryAPIDatabase
@@ -532,12 +625,14 @@ func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 ) (types.MembershipUpdater, error) {
 	txn, err := d.db.Begin()
+	fmt.Println("=== UPDATER TXN START ====")
 	if err != nil {
 		return nil, err
 	}
 	succeeded := false
 	defer func() {
 		if !succeeded {
+			fmt.Println("=== UPDATER TXN ROLLBACK ====")
 			txn.Rollback() // nolint: errcheck
 		}
 	}()
@@ -606,92 +701,99 @@ func (u *membershipUpdater) IsLeave() bool {
 }
 
 // SetToInvite implements types.MembershipUpdater
-func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
-	senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, event.Sender())
-	if err != nil {
-		return false, err
-	}
-	inserted, err := u.d.statements.insertInviteEvent(
-		u.ctx, u.txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
-	)
-	if err != nil {
-		return false, err
-	}
-	if u.membership != membershipStateInvite {
-		if err = u.d.statements.updateMembership(
-			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite, 0,
-		); err != nil {
-			return false, err
+func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (inserted bool, err error) {
+	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, txn, event.Sender())
+		if err != nil {
+			return err
 		}
-	}
-	return inserted, nil
+		inserted, err = u.d.statements.insertInviteEvent(
+			u.ctx, txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
+		)
+		if err != nil {
+			return err
+		}
+		if u.membership != membershipStateInvite {
+			if err = u.d.statements.updateMembership(
+				u.ctx, txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite, 0,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
 }
 
 // SetToJoin implements types.MembershipUpdater
-func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpdate bool) ([]string, error) {
-	var inviteEventIDs []string
-
-	senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, senderUserID)
-	if err != nil {
-		return nil, err
-	}
-
-	// If this is a join event update, there is no invite to update
-	if !isUpdate {
-		inviteEventIDs, err = u.d.statements.updateInviteRetired(
-			u.ctx, u.txn, u.roomNID, u.targetUserNID,
-		)
+func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpdate bool) (inviteEventIDs []string, err error) {
+	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, txn, senderUserID)
 		if err != nil {
-			return nil, err
+			return err
 		}
-	}
 
-	// Look up the NID of the new join event
-	nIDs, err := u.d.EventNIDs(u.ctx, []string{eventID})
-	if err != nil {
-		return nil, err
-	}
-
-	if u.membership != membershipStateJoin || isUpdate {
-		if err = u.d.statements.updateMembership(
-			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID,
-			membershipStateJoin, nIDs[eventID],
-		); err != nil {
-			return nil, err
+		// If this is a join event update, there is no invite to update
+		if !isUpdate {
+			inviteEventIDs, err = u.d.statements.updateInviteRetired(
+				u.ctx, txn, u.roomNID, u.targetUserNID,
+			)
+			if err != nil {
+				return err
+			}
 		}
-	}
 
-	return inviteEventIDs, nil
+		// Look up the NID of the new join event
+		nIDs, err := u.d.EventNIDs(u.ctx, []string{eventID})
+		if err != nil {
+			return err
+		}
+
+		if u.membership != membershipStateJoin || isUpdate {
+			if err = u.d.statements.updateMembership(
+				u.ctx, txn, u.roomNID, u.targetUserNID, senderUserNID,
+				membershipStateJoin, nIDs[eventID],
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	return
 }
 
 // SetToLeave implements types.MembershipUpdater
-func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]string, error) {
-	senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, senderUserID)
-	if err != nil {
-		return nil, err
-	}
-	inviteEventIDs, err := u.d.statements.updateInviteRetired(
-		u.ctx, u.txn, u.roomNID, u.targetUserNID,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Look up the NID of the new leave event
-	nIDs, err := u.d.EventNIDs(u.ctx, []string{eventID})
-	if err != nil {
-		return nil, err
-	}
-
-	if u.membership != membershipStateLeaveOrBan {
-		if err = u.d.statements.updateMembership(
-			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID,
-			membershipStateLeaveOrBan, nIDs[eventID],
-		); err != nil {
-			return nil, err
+func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) (inviteEventIDs []string, err error) {
+	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, txn, senderUserID)
+		if err != nil {
+			return err
 		}
-	}
-	return inviteEventIDs, nil
+		inviteEventIDs, err = u.d.statements.updateInviteRetired(
+			u.ctx, txn, u.roomNID, u.targetUserNID,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Look up the NID of the new leave event
+		nIDs, err := u.d.EventNIDs(u.ctx, []string{eventID})
+		if err != nil {
+			return err
+		}
+
+		if u.membership != membershipStateLeaveOrBan {
+			if err = u.d.statements.updateMembership(
+				u.ctx, txn, u.roomNID, u.targetUserNID, senderUserNID,
+				membershipStateLeaveOrBan, nIDs[eventID],
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
 }
 
 // GetMembership implements query.RoomserverQueryAPIDB
@@ -762,10 +864,16 @@ type transaction struct {
 
 // Commit implements types.Transaction
 func (t *transaction) Commit() error {
+	if t.txn == nil {
+		return nil
+	}
 	return t.txn.Commit()
 }
 
 // Rollback implements types.Transaction
 func (t *transaction) Rollback() error {
+	if t.txn == nil {
+		return nil
+	}
 	return t.txn.Rollback()
 }

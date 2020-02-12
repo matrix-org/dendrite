@@ -30,11 +30,13 @@ type Transaction interface {
 
 // EndTransaction ends a transaction.
 // If the transaction succeeded then it is committed, otherwise it is rolledback.
-func EndTransaction(txn Transaction, succeeded *bool) {
+// You MUST check the error returned from this function to be sure that the transaction
+// was applied correctly. For example, 'database is locked' errors in sqlite will happen here.
+func EndTransaction(txn Transaction, succeeded *bool) error {
 	if *succeeded {
-		txn.Commit() // nolint: errcheck
+		return txn.Commit() // nolint: errcheck
 	} else {
-		txn.Rollback() // nolint: errcheck
+		return txn.Rollback() // nolint: errcheck
 	}
 }
 
@@ -47,7 +49,12 @@ func WithTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 		return
 	}
 	succeeded := false
-	defer EndTransaction(txn, &succeeded)
+	defer func() {
+		err2 := EndTransaction(txn, &succeeded)
+		if err == nil && err2 != nil { // failed to commit/rollback
+			err = err2
+		}
+	}()
 
 	err = fn(txn)
 	if err != nil {

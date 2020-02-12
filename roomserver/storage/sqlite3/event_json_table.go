@@ -18,7 +18,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/common"
@@ -79,21 +78,14 @@ type eventJSONPair struct {
 func (s *eventJSONStatements) bulkSelectEventJSON(
 	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]eventJSONPair, error) {
-	///////////////
 	iEventNIDs := make([]interface{}, len(eventNIDs))
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", queryVariadic(len(iEventNIDs)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
-	if err != nil {
-		return nil, err
-	}
-	///////////////
 
-	rows, err := common.TxStmt(txn, selectPrep).QueryContext(ctx, iEventNIDs...)
+	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
 	if err != nil {
-		fmt.Println("bulkSelectEventJSON s.bulkSelectEventJSONStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -108,7 +100,6 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 		result := &results[i]
 		var eventNID int64
 		if err := rows.Scan(&eventNID, &result.EventJSON); err != nil {
-			fmt.Println("bulkSelectEventJSON rows.Scan:", err)
 			return nil, err
 		}
 		result.EventNID = types.EventNID(eventNID)
