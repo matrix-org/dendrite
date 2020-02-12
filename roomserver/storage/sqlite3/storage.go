@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/common"
@@ -44,9 +43,9 @@ func Open(dataSourceName string) (*Database, error) {
 	}
 	var cs string
 	if uri.Opaque != "" { // file:filename.db
-		cs = fmt.Sprintf("%s", uri.Opaque)
+		cs = uri.Opaque
 	} else if uri.Path != "" { // file:///path/to/filename.db
-		cs = fmt.Sprintf("%s", uri.Path)
+		cs = uri.Path
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
@@ -286,7 +285,7 @@ func (d *Database) AddState(
 ) (stateNID types.StateSnapshotNID, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if len(state) > 0 {
-			stateBlockNID, err := d.statements.selectNextStateBlockNID(ctx, txn)
+			stateBlockNID, err = d.statements.selectNextStateBlockNID(ctx, txn)
 			if err != nil {
 				return err
 			}

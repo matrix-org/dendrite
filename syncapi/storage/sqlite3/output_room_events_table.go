@@ -368,7 +368,7 @@ func (s *outputRoomEventsStatements) selectEvents(
 		if streamEvents, err := rowsToStreamEvents(rows); err == nil {
 			returnEvents = append(returnEvents, streamEvents...)
 		}
-		rows.Close()
+		rows.Close() // nolint: errcheck
 	}
 	return returnEvents, nil
 }

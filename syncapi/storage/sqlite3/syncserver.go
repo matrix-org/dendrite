@@ -64,6 +64,7 @@ type SyncServerDatasource struct {
 }
 
 // NewSyncServerDatasource creates a new sync server database
+// nolint: gocyclo
 func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	uri, err := url.Parse(dataSourceName)
@@ -72,43 +73,48 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	}
 	var cs string
 	if uri.Opaque != "" { // file:filename.db
-		//	cs = fmt.Sprintf("%s?cache=shared&_busy_timeout=9999999", uri.Opaque)
-		cs = fmt.Sprintf("%s", uri.Opaque)
+		cs = uri.Opaque
 	} else if uri.Path != "" { // file:///path/to/filename.db
-		//	cs = fmt.Sprintf("%s?cache=shared&_busy_timeout=9999999", uri.Path)
-		cs = fmt.Sprintf("%s", uri.Path)
+		cs = uri.Path
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
 	if d.db, err = sql.Open("sqlite3", cs); err != nil {
 		return nil, err
 	}
-	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
-		return nil, err
-	}
-	if err = d.streamID.prepare(d.db); err != nil {
-		return nil, err
-	}
-	if err = d.accountData.prepare(d.db, &d.streamID); err != nil {
-		return nil, err
-	}
-	if err = d.events.prepare(d.db, &d.streamID); err != nil {
-		return nil, err
-	}
-	if err := d.roomstate.prepare(d.db, &d.streamID); err != nil {
-		return nil, err
-	}
-	if err := d.invites.prepare(d.db, &d.streamID); err != nil {
-		return nil, err
-	}
-	if err := d.topology.prepare(d.db); err != nil {
-		return nil, err
-	}
-	if err := d.backwardExtremities.prepare(d.db); err != nil {
+	if err = d.prepare(); err != nil {
 		return nil, err
 	}
 	d.typingCache = cache.NewTypingCache()
 	return &d, nil
+}
+
+func (d *SyncServerDataSource) prepare() error {
+	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
+		return err
+	}
+	if err = d.streamID.prepare(d.db); err != nil {
+		return err
+	}
+	if err = d.accountData.prepare(d.db, &d.streamID); err != nil {
+		return err
+	}
+	if err = d.events.prepare(d.db, &d.streamID); err != nil {
+		return err
+	}
+	if err := d.roomstate.prepare(d.db, &d.streamID); err != nil {
+		return err
+	}
+	if err := d.invites.prepare(d.db, &d.streamID); err != nil {
+		return err
+	}
+	if err := d.topology.prepare(d.db); err != nil {
+		return err
+	}
+	if err := d.backwardExtremities.prepare(d.db); err != nil {
+		return err
+	}
+	return nil
 }
 
 // AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
