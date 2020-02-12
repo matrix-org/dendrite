@@ -16,6 +16,7 @@ package common
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/lib/pq"
 )
@@ -80,4 +81,21 @@ func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 func IsUniqueConstraintViolationErr(err error) bool {
 	pqErr, ok := err.(*pq.Error)
 	return ok && pqErr.Code == "23505"
+}
+
+// Hack of the century
+func QueryVariadic(count int) string {
+	return QueryVariadicOffset(count, 0)
+}
+
+func QueryVariadicOffset(count, offset int) string {
+	str := "("
+	for i := 0; i < count; i++ {
+		str += fmt.Sprintf("$%d", i+offset+1)
+		if i < (count - 1) {
+			str += ", "
+		}
+	}
+	str += ")"
+	return str
 }

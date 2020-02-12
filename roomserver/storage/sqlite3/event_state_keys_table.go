@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"strings"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -109,7 +110,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	for k, v := range eventStateKeys {
 		iEventStateKeys[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", queryVariadic(len(eventStateKeys)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", common.QueryVariadic(len(eventStateKeys)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeys...)
 	if err != nil {
@@ -135,7 +136,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	for k, v := range eventStateKeyNIDs {
 		iEventStateKeyNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", queryVariadic(len(eventStateKeyNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", common.QueryVariadic(len(eventStateKeyNIDs)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeyNIDs...)
 	if err != nil {

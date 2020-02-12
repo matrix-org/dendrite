@@ -17,9 +17,9 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -70,9 +70,10 @@ const deleteDevicesByLocalpartSQL = "" +
 	"DELETE FROM device_devices WHERE localpart = $1"
 
 const deleteDevicesSQL = "" +
-	"DELETE FROM device_devices WHERE localpart = $1 AND device_id = ANY($2)"
+	"DELETE FROM device_devices WHERE localpart = $1 AND device_id IN ($2)"
 
 type devicesStatements struct {
+	db                           *sql.DB
 	insertDeviceStmt             *sql.Stmt
 	selectDevicesCountStmt       *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
@@ -81,11 +82,11 @@ type devicesStatements struct {
 	updateDeviceNameStmt         *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
-	deleteDevicesStmt            *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
 }
 
 func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
+	s.db = db
 	_, err = db.Exec(devicesSchema)
 	if err != nil {
 		return
@@ -112,9 +113,6 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 		return
 	}
 	if s.deleteDevicesByLocalpartStmt, err = db.Prepare(deleteDevicesByLocalpartSQL); err != nil {
-		return
-	}
-	if s.deleteDevicesStmt, err = db.Prepare(deleteDevicesSQL); err != nil {
 		return
 	}
 	s.serverName = server
@@ -158,8 +156,19 @@ func (s *devicesStatements) deleteDevice(
 func (s *devicesStatements) deleteDevices(
 	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
 ) error {
-	stmt := common.TxStmt(txn, s.deleteDevicesStmt)
-	_, err := stmt.ExecContext(ctx, localpart, pq.Array(devices))
+	orig := strings.Replace(deleteDevicesSQL, "($1)", common.QueryVariadic(len(devices)), 1)
+	prep, err := s.db.Prepare(orig)
+	if err != nil {
+		return err
+	}
+	stmt := common.TxStmt(txn, prep)
+	params := make([]interface{}, len(devices)+1)
+	params[0] = localpart
+	for i, v := range devices {
+		params[i+1] = v
+	}
+	params = append(params, params...)
+	_, err = stmt.ExecContext(ctx, params...)
 	return err
 }
 

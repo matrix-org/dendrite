@@ -82,7 +82,7 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", queryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
 	if err != nil {

@@ -184,7 +184,7 @@ func (s *eventStatements) bulkSelectStateEventByID(
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateEventByIDSQL, "($1)", queryVariadic(len(iEventIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectStateEventByIDSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
@@ -237,7 +237,7 @@ func (s *eventStatements) bulkSelectStateAtEventByID(
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateAtEventByIDSQL, "($1)", queryVariadic(len(iEventIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectStateAtEventByIDSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
@@ -318,7 +318,7 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateAtEventAndReferenceSQL, "($1)", queryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectStateAtEventAndReferenceSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
 	//////////////
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
@@ -364,7 +364,7 @@ func (s *eventStatements) bulkSelectEventReference(
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventReferenceSQL, "($1)", queryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventReferenceSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
@@ -398,7 +398,7 @@ func (s *eventStatements) bulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventIDSQL, "($1)", queryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventIDSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
@@ -435,7 +435,7 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventNIDSQL, "($1)", queryVariadic(len(iEventIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventNIDSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err

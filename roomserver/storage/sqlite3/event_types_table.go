@@ -126,7 +126,7 @@ func (s *eventTypeStatements) bulkSelectEventTypeNID(
 	for k, v := range eventTypes {
 		iEventTypes[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", queryVariadic(len(iEventTypes)), 1)
+	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", common.QueryVariadic(len(iEventTypes)), 1)
 	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err

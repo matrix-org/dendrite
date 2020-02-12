@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -89,7 +90,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	for k, v := range stateNIDs {
 		nids[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", queryVariadic(len(nids)), 1)
+	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", common.QueryVariadic(len(nids)), 1)
 	selectStmt, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
