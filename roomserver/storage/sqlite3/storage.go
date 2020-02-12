@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"time"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -256,15 +255,11 @@ func (d *Database) Events(
 	var eventJSONs []eventJSONPair
 	var err error
 	results := make([]types.Event, len(eventNIDs))
-	fmt.Println("pre txn")
 	common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		fmt.Println("in txn", txn)
 		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
 		if err != nil || len(eventJSONs) == 0 {
-			fmt.Println("d.statements.bulkSelectEventJSON:", err)
 			return nil
 		}
-		fmt.Println("selected txn")
 		for i, eventJSON := range eventJSONs {
 			result := &results[i]
 			result.EventNID = eventJSON.EventNID
@@ -276,7 +271,6 @@ func (d *Database) Events(
 		}
 		return nil
 	})
-	fmt.Println("post txn")
 	if err != nil {
 		return []types.Event{}, err
 	}
@@ -290,9 +284,7 @@ func (d *Database) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
-	fmt.Println("AddState INSERT STATE START", stateBlockNIDs)
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		fmt.Println("insert state txn created")
 		if len(state) > 0 {
 			stateBlockNID, err := d.statements.selectNextStateBlockNID(ctx, txn)
 			if err != nil {
@@ -304,10 +296,8 @@ func (d *Database) AddState(
 			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
 		}
 		stateNID, err = d.statements.insertState(ctx, txn, roomNID, stateBlockNIDs)
-		fmt.Println("AddState: completing txn", time.Now(), "err=", err)
 		return err
 	})
-	fmt.Println("AddState INSERT STATE END pkey=", stateNID, time.Now(), "err=", err)
 	if err != nil {
 		return 0, err
 	}
@@ -318,11 +308,9 @@ func (d *Database) AddState(
 func (d *Database) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	fmt.Println("SetState event NID:", eventNID, "state NID:", stateNID)
 	e := common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		return d.statements.updateEventState(ctx, txn, eventNID, stateNID)
 	})
-	fmt.Println("SetState finish", e)
 	return e
 }
 
@@ -341,13 +329,10 @@ func (d *Database) StateAtEventIDs(
 func (d *Database) StateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) (sl []types.StateBlockNIDList, err error) {
-	fmt.Println("StateBlockNIDs SELECT STATE START", stateNIDs)
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		fmt.Println("   in txn")
 		sl, err = d.statements.bulkSelectStateBlockNIDs(ctx, txn, stateNIDs)
 		return err
 	})
-	fmt.Println("StateBlockNIDs SELECT STATE END", sl)
 	return
 }
 
@@ -388,7 +373,6 @@ func (d *Database) EventIDs(
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
 ) (types.RoomRecentEventsUpdater, error) {
-	fmt.Println("=============== GetLatestEventsForUpdate BEGIN TXN")
 	txn, err := d.db.Begin()
 	if err != nil {
 		return nil, err
@@ -412,7 +396,6 @@ func (d *Database) GetLatestEventsForUpdate(
 			return nil, err
 		}
 	}
-	fmt.Println("GetLatestEventsForUpdate returning updater")
 
 	// FIXME: we probably want to support long-lived txns in sqlite somehow, but we don't because we get
 	// 'database is locked' errors caused by multiple write txns (one being the long-lived txn created here)
@@ -475,7 +458,6 @@ func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, p
 
 // IsReferenced implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (res bool, err error) {
-	fmt.Println("[[TXN]] IsReferenced")
 	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		err := u.d.statements.selectPreviousEventExists(u.ctx, txn, eventReference.EventID, eventReference.EventSHA256)
 		if err == nil {
@@ -508,8 +490,6 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(
 
 // HasEventBeenSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (res bool, err error) {
-	// TODO: transaction was removed here - is this wise?
-	fmt.Println("[[TXN]] HasEventBeenSent")
 	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		res, err = u.d.statements.selectEventSentToOutput(u.ctx, txn, eventNID)
 		return err
@@ -519,8 +499,6 @@ func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (res
 
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
-	// TODO: transaction was removed here - is this wise?
-	fmt.Println("[[TXN]] updateEventSentToOutput")
 	err := common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		return u.d.statements.updateEventSentToOutput(u.ctx, txn, eventNID)
 	})
@@ -528,8 +506,6 @@ func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error
 }
 
 func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID) (mu types.MembershipUpdater, err error) {
-	// TODO: transaction was removed here - is this wise?
-	fmt.Println("[[TXN]] membershipUpdaterTxn")
 	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		mu, err = u.d.membershipUpdaterTxn(u.ctx, txn, u.roomNID, targetUserNID)
 		return err
@@ -625,14 +601,12 @@ func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 ) (types.MembershipUpdater, error) {
 	txn, err := d.db.Begin()
-	fmt.Println("=== UPDATER TXN START ====")
 	if err != nil {
 		return nil, err
 	}
 	succeeded := false
 	defer func() {
 		if !succeeded {
-			fmt.Println("=== UPDATER TXN ROLLBACK ====")
 			txn.Rollback() // nolint: errcheck
 		}
 	}()

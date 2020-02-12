@@ -67,8 +67,8 @@ const selectMembershipForUpdateSQL = "" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 const updateMembershipSQL = "" +
-	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4, event_nid = $5" +
-	" WHERE room_nid = $1 AND target_nid = $2"
+	"UPDATE roomserver_membership SET sender_nid = $1, membership_nid = $2, event_nid = $3" +
+	" WHERE room_nid = $4 AND target_nid = $5"
 
 type membershipStatements struct {
 	insertMembershipStmt                       *sql.Stmt
@@ -186,7 +186,7 @@ func (s *membershipStatements) updateMembership(
 ) error {
 	stmt := common.TxStmt(txn, s.updateMembershipStmt)
 	_, err := stmt.ExecContext(
-		ctx, roomNID, targetUserNID, senderUserNID, membership, eventNID,
+		ctx, senderUserNID, membership, eventNID, roomNID, targetUserNID,
 	)
 	if err != nil {
 		fmt.Println("updateMembership common.TxStmt.ExecContent:", err)

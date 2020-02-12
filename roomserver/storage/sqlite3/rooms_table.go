@@ -51,7 +51,7 @@ const selectLatestEventNIDsForUpdateSQL = "" +
 	"SELECT latest_event_nids, last_event_sent_nid, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1"
 
 const updateLatestEventNIDsSQL = "" +
-	"UPDATE roomserver_rooms SET latest_event_nids = $2, last_event_sent_nid = $3, state_snapshot_nid = $4 WHERE room_nid = $1"
+	"UPDATE roomserver_rooms SET latest_event_nids = $1, last_event_sent_nid = $2, state_snapshot_nid = $3 WHERE room_nid = $4"
 
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
@@ -145,10 +145,10 @@ func (s *roomStatements) updateLatestEventNIDs(
 	stmt := common.TxStmt(txn, s.updateLatestEventNIDsStmt)
 	_, err := stmt.ExecContext(
 		ctx,
-		roomNID,
 		eventNIDsAsArray(eventNIDs),
 		int64(lastEventSentNID),
 		int64(stateSnapshotNID),
+		roomNID,
 	)
 	if err != nil {
 		fmt.Println("updateLatestEventNIDs stmt.ExecContext:", err)
