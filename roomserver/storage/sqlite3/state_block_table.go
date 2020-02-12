@@ -204,12 +204,25 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	sort.Sort(tuples)
 
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
-	selectStmt := common.TxStmt(txn, s.bulkSelectFilteredStateBlockEntriesStmt)
-	rows, err := selectStmt.QueryContext(
+	sqlStatement := strings.Replace(bulkSelectFilteredStateBlockEntriesSQL, "($1)", queryVariadic(len(stateBlockNIDs)), 1)
+	sqlStatement = strings.Replace(sqlStatement, "($2)", queryVariadicOffset(len(eventTypeNIDArray), len(stateBlockNIDs)), 1)
+	sqlStatement = strings.Replace(sqlStatement, "($3)", queryVariadicOffset(len(eventStateKeyNIDArray), len(stateBlockNIDs)+len(eventTypeNIDArray)), 1)
+
+	var params []interface{}
+	for _, val := range stateBlockNIDs {
+		params = append(params, int64(val))
+	}
+	for _, val := range eventTypeNIDArray {
+		params = append(params, val)
+	}
+	for _, val := range eventStateKeyNIDArray {
+		params = append(params, val)
+	}
+
+	rows, err := s.db.QueryContext(
 		ctx,
-		stateBlockNIDsAsArray(stateBlockNIDs),
-		eventTypeNIDArray,
-		sqliteIn(eventStateKeyNIDArray),
+		sqlStatement,
+		params...,
 	)
 	if err != nil {
 		fmt.Println("bulkSelectFilteredStateBlockEntries s.bulkSelectFilteredStateBlockEntriesStmt.QueryContext:", err)

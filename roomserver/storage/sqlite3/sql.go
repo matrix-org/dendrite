@@ -62,10 +62,14 @@ func (s *statements) prepare(db *sql.DB) error {
 
 // Hack of the century
 func queryVariadic(count int) string {
+	return queryVariadicOffset(count, 0)
+}
+
+func queryVariadicOffset(count, offset int) string {
 	str := "("
-	for i := 1; i <= count; i++ {
-		str += fmt.Sprintf("$%d", i)
-		if i < count {
+	for i := 0; i < count; i++ {
+		str += fmt.Sprintf("$%d", i+offset+1)
+		if i < (count - 1) {
 			str += ", "
 		}
 	}
