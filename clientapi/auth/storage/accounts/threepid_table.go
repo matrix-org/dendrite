@@ -97,6 +97,7 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 	if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 
 	threepids = []authtypes.ThreePID{}
 	for rows.Next() {
@@ -110,8 +111,7 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 			Medium:  medium,
 		})
 	}
-
-	return
+	return threepids, rows.Err()
 }
 
 func (s *threepidStatements) insertThreePID(

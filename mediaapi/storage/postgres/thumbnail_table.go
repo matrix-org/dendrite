@@ -144,6 +144,7 @@ func (s *thumbnailStatements) selectThumbnails(
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close() // nolint: errcheck
 
 	var thumbnails []*types.ThumbnailMetadata
 	for rows.Next() {
@@ -167,5 +168,5 @@ func (s *thumbnailStatements) selectThumbnails(
 		thumbnails = append(thumbnails, &thumbnailMetadata)
 	}
 
-	return thumbnails, err
+	return thumbnails, rows.Err()
 }

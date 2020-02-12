@@ -22,7 +22,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const accountDataSchema = `
@@ -99,7 +99,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	ctx context.Context,
 	userID string,
 	oldPos, newPos types.StreamPosition,
-	accountDataFilterPart *gomatrix.FilterPart,
+	accountDataEventFilter *gomatrixserverlib.EventFilter,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
@@ -111,13 +111,14 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	}
 
 	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos,
-		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataFilterPart.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataFilterPart.NotTypes)),
-		accountDataFilterPart.Limit,
+		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.NotTypes)),
+		accountDataEventFilter.Limit,
 	)
 	if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 
 	for rows.Next() {
 		var dataType string
@@ -133,8 +134,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 			data[roomID] = []string{dataType}
 		}
 	}
-
-	return
+	return data, rows.Err()
 }
 
 func (s *accountDataStatements) selectMaxAccountDataID(

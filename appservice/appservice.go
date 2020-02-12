@@ -100,7 +100,7 @@ func SetupAppServiceAPIComponent(
 
 	// Set up HTTP Endpoints
 	routing.Setup(
-		base.APIMux, *base.Cfg, roomserverQueryAPI, roomserverAliasAPI,
+		base.APIMux, base.Cfg, roomserverQueryAPI, roomserverAliasAPI,
 		accountsDB, federation, transactionsCache,
 	)
 
