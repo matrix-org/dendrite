@@ -18,7 +18,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 )
@@ -70,9 +69,6 @@ func (s *transactionStatements) insertTransaction(
 	_, err = stmt.ExecContext(
 		ctx, transactionID, sessionID, userID, eventID,
 	)
-	if err != nil {
-		fmt.Println("insertTransaction s.insertTransactionStmt.ExecContent:", err)
-	}
 	return
 }
 
@@ -86,8 +82,5 @@ func (s *transactionStatements) selectTransactionEventID(
 	err = stmt.QueryRowContext(
 		ctx, transactionID, sessionID, userID,
 	).Scan(&eventID)
-	if err != nil {
-		fmt.Println("selectTransactionEventID s.selectTransactionEventIDStmt.QueryRowContext:", err)
-	}
 	return
 }

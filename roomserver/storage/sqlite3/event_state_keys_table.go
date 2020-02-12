@@ -18,7 +18,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -90,8 +89,6 @@ func (s *eventStateKeyStatements) insertEventStateKeyNID(
 	insertStmt := txn.Stmt(s.insertEventStateKeyNIDStmt)
 	if res, err = insertStmt.ExecContext(ctx, eventStateKey); err == nil {
 		eventStateKeyNID, err = res.LastInsertId()
-	} else {
-		fmt.Println("insertEventStateKeyNID insertStmt.ExecContext:", err)
 	}
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }

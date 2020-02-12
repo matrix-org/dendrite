@@ -556,14 +556,10 @@ func CalculateAndStoreStateBeforeEvent(
 		prevEventIDs[i] = prevEventRefs[i].EventID
 	}
 
-	fmt.Println("Previous event IDs:", prevEventIDs)
-
 	prevStates, err := db.StateAtEventIDs(ctx, prevEventIDs)
 	if err != nil {
 		return 0, err
 	}
-
-	fmt.Println("Previous states:", prevStates)
 
 	// The state before this event will be the state after the events that came before it.
 	return CalculateAndStoreStateAfterEvents(ctx, db, roomNID, prevStates)
@@ -618,7 +614,6 @@ func CalculateAndStoreStateAfterEvents(
 		// So fall through to calculateAndStoreStateAfterManyEvents
 	}
 
-	fmt.Println("Falling through to calculateAndStoreStateAfterManyEvents")
 	return calculateAndStoreStateAfterManyEvents(ctx, db, roomNID, prevStates, metrics)
 }
 

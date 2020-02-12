@@ -18,7 +18,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -90,12 +89,10 @@ func (s *inviteStatements) insertInviteEvent(
 		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)
 	if err != nil {
-		fmt.Println("insertInviteEvent common.TxStmt.ExecContext:", err)
 		return false, err
 	}
 	count, err := result.RowsAffected()
 	if err != nil {
-		fmt.Println("insertInviteEvent result.RowsAffected:", err)
 		return false, err
 	}
 	return count != 0, nil
@@ -108,14 +105,12 @@ func (s *inviteStatements) updateInviteRetired(
 	stmt := common.TxStmt(txn, s.updateInviteRetiredStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
-		fmt.Println("updateInviteRetired stmt.QueryContext:", err)
 		return nil, err
 	}
 	defer (func() { err = rows.Close() })()
 	for rows.Next() {
 		var inviteEventID string
 		if err := rows.Scan(&inviteEventID); err != nil {
-			fmt.Println("updateInviteRetired rows.Scan:", err)
 			return nil, err
 		}
 		eventIDs = append(eventIDs, inviteEventID)
@@ -132,7 +127,6 @@ func (s *inviteStatements) selectInviteActiveForUserInRoom(
 		ctx, targetUserNID, roomNID,
 	)
 	if err != nil {
-		fmt.Println("selectInviteActiveForUserInRoom s.selectInviteActiveForUserInRoomStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -140,7 +134,6 @@ func (s *inviteStatements) selectInviteActiveForUserInRoom(
 	for rows.Next() {
 		var senderUserNID int64
 		if err := rows.Scan(&senderUserNID); err != nil {
-			fmt.Println("selectInviteActiveForUserInRoom rows.Scan:", err)
 			return nil, err
 		}
 		result = append(result, types.EventStateKeyNID(senderUserNID))

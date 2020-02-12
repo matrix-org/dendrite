@@ -18,7 +18,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -83,7 +82,6 @@ func (s *roomStatements) insertRoomNID(
 	if _, err = insertStmt.ExecContext(ctx, roomID); err == nil {
 		return s.selectRoomNID(ctx, txn, roomID)
 	} else {
-		fmt.Println("insertRoomNID insertStmt.ExecContext:", err)
 		return types.RoomNID(0), err
 	}
 }
@@ -105,7 +103,6 @@ func (s *roomStatements) selectLatestEventNIDs(
 	stmt := common.TxStmt(txn, s.selectLatestEventNIDsStmt)
 	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &stateSnapshotNID)
 	if err != nil {
-		fmt.Println("selectLatestEventNIDs stmt.QueryRowContext:", err)
 		return nil, 0, err
 	}
 	eventNIDs := make([]types.EventNID, len(nids))
@@ -124,7 +121,6 @@ func (s *roomStatements) selectLatestEventsNIDsForUpdate(
 	stmt := common.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
 	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
 	if err != nil {
-		fmt.Println("selectLatestEventsNIDsForUpdate stmt.QueryRowContext:", err)
 		return nil, 0, 0, err
 	}
 	eventNIDs := make([]types.EventNID, len(nids))
@@ -150,8 +146,5 @@ func (s *roomStatements) updateLatestEventNIDs(
 		int64(stateSnapshotNID),
 		roomNID,
 	)
-	if err != nil {
-		fmt.Println("updateLatestEventNIDs stmt.ExecContext:", err)
-	}
 	return err
 }

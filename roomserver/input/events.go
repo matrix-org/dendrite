@@ -124,10 +124,8 @@ func processRoomEvent(
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		fmt.Println("We don't have a state snapshot NID yet")
 		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event)
 		if err != nil {
-			fmt.Println("Failed to calculateAndSetState:", err)
 			return
 		}
 	}
@@ -153,7 +151,6 @@ func calculateAndSetState(
 ) error {
 	var err error
 	if input.HasState {
-		fmt.Println("We have state")
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
@@ -165,13 +162,11 @@ func calculateAndSetState(
 			return err
 		}
 	} else {
-		fmt.Println("We don't have state")
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
 		if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, db, event, roomNID); err != nil {
 			return err
 		}
 	}
-	fmt.Println("Then set state", stateAtEvent)
 	return db.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 }
 

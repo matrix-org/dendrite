@@ -72,16 +72,12 @@ func (s *stateSnapshotStatements) insertState(
 		nids[i] = int64(stateBlockNIDs[i])
 	}
 	insertStmt := txn.Stmt(s.insertStateStmt)
-	//resultStmt := txn.Stmt(s.insertStateResultStmt)
-	fmt.Println(insertStateSQL, roomNID, nids)
 	if res, err2 := insertStmt.ExecContext(ctx, int64(roomNID), pq.Int64Array(nids)); err2 == nil {
 		lastRowID, err3 := res.LastInsertId()
 		if err3 != nil {
 			err = err3
 		}
 		stateNID = types.StateSnapshotNID(lastRowID)
-	} else {
-		fmt.Println("insertState s.insertStateStmt.ExecContext:", err2)
 	}
 	return
 }
@@ -89,7 +85,6 @@ func (s *stateSnapshotStatements) insertState(
 func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
-	///////////////
 	nids := make([]interface{}, len(stateNIDs))
 	for k, v := range stateNIDs {
 		nids[k] = v
@@ -99,16 +94,9 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	if err != nil {
 		return nil, err
 	}
-	///////////////
-	/*
-		nids := make([]int64, len(stateNIDs))
-		for i := range stateNIDs {
-			nids[i] = int64(stateNIDs[i])
-		}
-	*/
+
 	rows, err := selectStmt.QueryContext(ctx, nids...)
 	if err != nil {
-		fmt.Println("bulkSelectStateBlockNIDs s.bulkSelectStateBlockNIDsStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -118,7 +106,6 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 		result := &results[i]
 		var stateBlockNIDs pq.Int64Array
 		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDs); err != nil {
-			fmt.Println("bulkSelectStateBlockNIDs rows.Scan:", err)
 			return nil, err
 		}
 		result.StateBlockNIDs = make([]types.StateBlockNID, len(stateBlockNIDs))

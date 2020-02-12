@@ -18,7 +18,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 )
@@ -80,9 +79,6 @@ func (s *roomAliasesStatements) insertRoomAlias(
 ) (err error) {
 	insertStmt := common.TxStmt(txn, s.insertRoomAliasStmt)
 	_, err = insertStmt.ExecContext(ctx, alias, roomID, creatorUserID)
-	if err != nil {
-		fmt.Println("insertRoomAlias s.insertRoomAliasStmt.ExecContent:", err)
-	}
 	return
 }
 
@@ -104,14 +100,12 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 	selectStmt := common.TxStmt(txn, s.selectAliasesFromRoomIDStmt)
 	rows, err := selectStmt.QueryContext(ctx, roomID)
 	if err != nil {
-		fmt.Println("selectAliasesFromRoomID s.selectAliasesFromRoomIDStmt.QueryContext:", err)
 		return
 	}
 
 	for rows.Next() {
 		var alias string
 		if err = rows.Scan(&alias); err != nil {
-			fmt.Println("selectAliasesFromRoomID rows.Scan:", err)
 			return
 		}
 

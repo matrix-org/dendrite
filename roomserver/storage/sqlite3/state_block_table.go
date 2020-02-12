@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -111,8 +110,6 @@ func (s *stateBlockStatements) bulkInsertStateData(
 			int64(entry.EventNID),
 		)
 		if err != nil {
-			fmt.Println("bulkInsertStateData s.insertStateDataStmt.ExecContext:", err)
-			debug.PrintStack()
 			return err
 		}
 	}
@@ -132,7 +129,6 @@ func (s *stateBlockStatements) selectNextStateBlockNID(
 func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	ctx context.Context, txn *sql.Tx, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
-	///////////////
 	nids := make([]interface{}, len(stateBlockNIDs))
 	for k, v := range stateBlockNIDs {
 		nids[k] = v
@@ -142,17 +138,9 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	///////////////
-	/*
-		nids := make([]int64, len(stateBlockNIDs))
-		for i := range stateBlockNIDs {
-			nids[i] = int64(stateBlockNIDs[i])
-		}
-	*/
 	selectStmt := common.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, nids...)
 	if err != nil {
-		fmt.Println("bulkSelectStateBlockEntries s.bulkSelectStateBlockEntriesStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -172,10 +160,8 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 		if err := rows.Scan(
 			&stateBlockNID, &eventTypeNID, &eventStateKeyNID, &eventNID,
 		); err != nil {
-			fmt.Println("bulkSelectStateBlockEntries rows.Scan:", err)
 			return nil, err
 		}
-		fmt.Println("state block NID", stateBlockNID, "event type NID", eventTypeNID, "event state key NID", eventStateKeyNID, "event NID", eventNID)
 		entry.EventTypeNID = types.EventTypeNID(eventTypeNID)
 		entry.EventStateKeyNID = types.EventStateKeyNID(eventStateKeyNID)
 		entry.EventNID = types.EventNID(eventNID)
@@ -225,7 +211,6 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 		params...,
 	)
 	if err != nil {
-		fmt.Println("bulkSelectFilteredStateBlockEntries s.bulkSelectFilteredStateBlockEntriesStmt.QueryContext:", err)
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
@@ -243,7 +228,6 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 		if err := rows.Scan(
 			&stateBlockNID, &eventTypeNID, &eventStateKeyNID, &eventNID,
 		); err != nil {
-			fmt.Println("bulkSelectFilteredStateBlockEntries rows.Scan:", err)
 			return nil, err
 		}
 		entry.EventTypeNID = types.EventTypeNID(eventTypeNID)
