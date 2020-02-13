@@ -48,7 +48,6 @@ const bulkSelectStateBlockNIDsSQL = "" +
 type stateSnapshotStatements struct {
 	db                           *sql.DB
 	insertStateStmt              *sql.Stmt
-	insertStateResultStmt        *sql.Stmt
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 

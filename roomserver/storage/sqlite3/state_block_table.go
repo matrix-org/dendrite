@@ -181,7 +181,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 }
 
 func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context, txn *sql.Tx, // nolint: unparam
 	stateBlockNIDs []types.StateBlockNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
@@ -257,14 +257,6 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 		results = append(results, current)
 	}
 	return results, nil
-}
-
-func stateBlockNIDsAsArray(stateBlockNIDs []types.StateBlockNID) pq.Int64Array {
-	nids := make([]int64, len(stateBlockNIDs))
-	for i := range stateBlockNIDs {
-		nids[i] = int64(stateBlockNIDs[i])
-	}
-	return pq.Int64Array(nids)
 }
 
 type stateKeyTupleSorter []types.StateKeyTuple

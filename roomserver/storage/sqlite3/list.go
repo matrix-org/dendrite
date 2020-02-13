@@ -16,7 +16,3 @@ func sqliteIn(a pq.Int64Array) string {
 	}
 	return strings.Join(b, ",")
 }
-
-func sqliteInStr(a pq.StringArray) string {
-	return "\"" + strings.Join(a, "\",\"") + "\""
-}

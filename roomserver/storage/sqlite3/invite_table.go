@@ -84,7 +84,7 @@ func (s *inviteStatements) insertInviteEvent(
 	inviteEventJSON []byte,
 ) (bool, error) {
 	stmt := common.TxStmt(txn, s.insertInviteEventStmt)
-	defer stmt.Close()
+	defer stmt.Close() // nolint: errcheck
 	result, err := stmt.ExecContext(
 		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)

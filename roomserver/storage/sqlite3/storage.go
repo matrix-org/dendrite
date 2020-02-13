@@ -401,7 +401,10 @@ func (d *Database) GetLatestEventsForUpdate(
 	// 'database is locked' errors caused by multiple write txns (one being the long-lived txn created here)
 	// so for now let's not use a long-lived txn at all, and just commit it here and set the txn to nil so
 	// we fail fast if someone tries to use the underlying txn object.
-	txn.Commit()
+	err = txn.Commit()
+	if err != nil {
+		return nil, err
+	}
 	return &roomRecentEventsUpdater{
 		transaction{ctx, nil}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
 	}, nil
