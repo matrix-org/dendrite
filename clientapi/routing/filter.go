@@ -27,7 +27,7 @@ import (
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
 func GetFilter(
-	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string, filterID string,
+	req *http.Request, device *authtypes.Device, accountDB accounts.Database, userID string, filterID string,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -63,7 +63,7 @@ type filterResponse struct {
 
 //PutFilter implements POST /_matrix/client/r0/user/{userId}/filter
 func PutFilter(
-	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string,
+	req *http.Request, device *authtypes.Device, accountDB accounts.Database, userID string,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{

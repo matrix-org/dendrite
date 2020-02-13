@@ -45,7 +45,7 @@ func JoinRoomByIDOrAlias(
 	queryAPI roomserverAPI.RoomserverQueryAPI,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	keyRing gomatrixserverlib.KeyRing,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 ) util.JSONResponse {
 	var content map[string]interface{} // must be a JSON object
 	if resErr := httputil.UnmarshalJSONRequest(req, &content); resErr != nil {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package accounts
+package sqlite3
 
 import (
 	"context"
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS account_data (
 
 const insertAccountDataSQL = `
 	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
-	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = EXCLUDED.content
+	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
 `
 
 const selectAccountDataSQL = "" +
@@ -90,7 +90,6 @@ func (s *accountDataStatements) selectAccountData(
 	if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
 
 	global = []gomatrixserverlib.ClientEvent{}
 	rooms = make(map[string][]gomatrixserverlib.ClientEvent)
@@ -115,7 +114,8 @@ func (s *accountDataStatements) selectAccountData(
 			global = append(global, ac)
 		}
 	}
-	return global, rooms, rows.Err()
+
+	return
 }
 
 func (s *accountDataStatements) selectAccountDataByType(

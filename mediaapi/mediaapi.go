@@ -27,7 +27,7 @@ import (
 // component.
 func SetupMediaAPIComponent(
 	base *basecomponent.BaseDendrite,
-	deviceDB *devices.Database,
+	deviceDB devices.Database,
 ) {
 	mediaDB, err := storage.Open(string(base.Cfg.Database.MediaAPI))
 	if err != nil {

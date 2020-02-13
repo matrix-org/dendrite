@@ -26,7 +26,7 @@ import (
 
 // Logout handles POST /logout
 func Logout(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
@@ -45,7 +45,7 @@ func Logout(
 
 // LogoutAll handles POST /logout/all
 func LogoutAll(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {

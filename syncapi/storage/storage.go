@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
+	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/typingserver/cache"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -63,6 +64,8 @@ func NewSyncServerDatasource(dataSourceName string) (Database, error) {
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewSyncServerDatasource(dataSourceName)
+	case "file":
+		return sqlite3.NewSyncServerDatasource(dataSourceName)
 	default:
 		return postgres.NewSyncServerDatasource(dataSourceName)
 	}

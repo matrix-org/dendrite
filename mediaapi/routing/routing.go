@@ -44,7 +44,7 @@ func Setup(
 	apiMux *mux.Router,
 	cfg *config.Dendrite,
 	db storage.Database,
-	deviceDB *devices.Database,
+	deviceDB devices.Database,
 	client *gomatrixserverlib.Client,
 ) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()

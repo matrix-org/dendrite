@@ -38,7 +38,7 @@ const pathPrefixApp = "/_matrix/app/v1"
 func Setup(
 	apiMux *mux.Router, cfg *config.Dendrite, // nolint: unparam
 	queryAPI api.RoomserverQueryAPI, aliasAPI api.RoomserverAliasAPI, // nolint: unparam
-	accountDB *accounts.Database, // nolint: unparam
+	accountDB accounts.Database, // nolint: unparam
 	federation *gomatrixserverlib.FederationClient, // nolint: unparam
 	transactionsCache *transactions.Cache, // nolint: unparam
 ) {

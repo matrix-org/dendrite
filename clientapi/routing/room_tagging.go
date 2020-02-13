@@ -40,7 +40,7 @@ func newTag() gomatrix.TagContent {
 // GetTags implements GET /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags
 func GetTags(
 	req *http.Request,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 	device *authtypes.Device,
 	userID string,
 	roomID string,
@@ -77,7 +77,7 @@ func GetTags(
 // the tag to the "map" and saving the new "map" to the DB
 func PutTag(
 	req *http.Request,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 	device *authtypes.Device,
 	userID string,
 	roomID string,
@@ -134,7 +134,7 @@ func PutTag(
 // the "map" and then saving the new "map" in the DB
 func DeleteTag(
 	req *http.Request,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 	device *authtypes.Device,
 	userID string,
 	roomID string,
@@ -203,7 +203,7 @@ func obtainSavedTags(
 	req *http.Request,
 	userID string,
 	roomID string,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 ) (string, *gomatrixserverlib.ClientEvent, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -222,7 +222,7 @@ func saveTagData(
 	req *http.Request,
 	localpart string,
 	roomID string,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 	Tag gomatrix.TagContent,
 ) error {
 	newTagData, err := json.Marshal(Tag)
