@@ -464,7 +464,6 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	// This works out what the 'state' key should be for each room as well as which membership block
 	// to put the room into.
 	var deltas []stateDelta
-	var joinedRoomIDs []string
 	if !wantFullState {
 		deltas, joinedRoomIDs, err = d.getStateDeltas(
 			ctx, &device, txn, fromPos, toPos, device.UserID, &stateFilterPart,

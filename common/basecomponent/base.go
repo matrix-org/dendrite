@@ -215,23 +215,23 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 	var naffkaDB *naffka.DatabaseImpl
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
-	if err != nil || uri.Scheme == "postgres" {
-		db, err = sql.Open("postgres", string(cfg.Database.Naffka))
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to open naffka database")
-		}
-
-		naffkaDB, err = naffka.NewPostgresqlDatabase(db)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to setup naffka database")
-		}
-	} else if uri.Scheme == "file" {
+	if err != nil || uri.Scheme == "file" {
 		db, err = sql.Open("sqlite3", string(cfg.Database.Naffka))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}
 
 		naffkaDB, err = naffka.NewSqliteDatabase(db)
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to setup naffka database")
+		}
+	} else {
+		db, err = sql.Open("postgres", string(cfg.Database.Naffka))
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to open naffka database")
+		}
+
+		naffkaDB, err = naffka.NewPostgresqlDatabase(db)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
