@@ -89,7 +89,7 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	return &d, nil
 }
 
-func (d *SyncServerDataSource) prepare() error {
+func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
 		return err
 	}
