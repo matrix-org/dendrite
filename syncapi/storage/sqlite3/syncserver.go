@@ -444,13 +444,18 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	numRecentEventsPerRoom int,
 	wantFullState bool,
 	res *types.Response,
-) ([]string, error) {
+) (joinedRoomIDs []string, err error) {
 	txn, err := d.db.BeginTx(ctx, &txReadOnlySnapshot)
 	if err != nil {
 		return nil, err
 	}
 	var succeeded bool
-	defer common.EndTransaction(txn, &succeeded)
+	defer func() {
+		txerr := common.EndTransaction(txn, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
 
 	stateFilterPart := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
@@ -601,7 +606,12 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		return
 	}
 	var succeeded bool
-	defer common.EndTransaction(txn, &succeeded)
+	defer func() {
+		txerr := common.EndTransaction(txn, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
 
 	// Get the current sync position which we will base the sync response on.
 	toPos, err = d.syncPositionTx(ctx, txn)
@@ -734,14 +744,20 @@ func (d *SyncServerDatasource) GetAccountDataInRange(
 // Returns an error if there was an issue with the upsert
 func (d *SyncServerDatasource) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
-) (types.StreamPosition, error) {
+) (sp types.StreamPosition, err error) {
 	txn, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return types.StreamPosition(0), err
 	}
 	var succeeded bool
-	defer common.EndTransaction(txn, &succeeded)
-	return d.accountData.insertAccountData(ctx, txn, userID, roomID, dataType)
+	defer func() {
+		txerr := common.EndTransaction(txn, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
+	sp, err = d.accountData.insertAccountData(ctx, txn, userID, roomID, dataType)
+	return
 }
 
 // AddInviteEvent stores a new invite event for a user.

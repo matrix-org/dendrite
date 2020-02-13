@@ -196,7 +196,12 @@ func processInviteEvent(
 		return err
 	}
 	succeeded := false
-	defer common.EndTransaction(updater, &succeeded)
+	defer func() {
+		txerr := common.EndTransaction(updater, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
 
 	if updater.IsJoin() {
 		// If the user is joined to the room then that takes precedence over this

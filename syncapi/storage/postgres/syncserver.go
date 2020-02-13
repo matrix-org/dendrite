@@ -413,13 +413,18 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 	numRecentEventsPerRoom int,
 	wantFullState bool,
 	res *types.Response,
-) ([]string, error) {
+) (joinedRoomIDs []string, err error) {
 	txn, err := d.db.BeginTx(ctx, &txReadOnlySnapshot)
 	if err != nil {
 		return nil, err
 	}
 	var succeeded bool
-	defer common.EndTransaction(txn, &succeeded)
+	defer func() {
+		txerr := common.EndTransaction(txn, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
 
 	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
@@ -570,7 +575,12 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		return
 	}
 	var succeeded bool
-	defer common.EndTransaction(txn, &succeeded)
+	defer func() {
+		txerr := common.EndTransaction(txn, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
 
 	// Get the current sync position which we will base the sync response on.
 	toPos, err = d.syncPositionTx(ctx, txn)

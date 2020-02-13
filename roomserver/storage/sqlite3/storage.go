@@ -254,7 +254,7 @@ func (d *Database) Events(
 	var eventJSONs []eventJSONPair
 	var err error
 	results := make([]types.Event, len(eventNIDs))
-	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
 		if err != nil || len(eventJSONs) == 0 {
 			return nil
@@ -318,7 +318,7 @@ func (d *Database) SetState(
 func (d *Database) StateAtEventIDs(
 	ctx context.Context, eventIDs []string,
 ) (se []types.StateAtEvent, err error) {
-	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		se, err = d.statements.bulkSelectStateAtEventByID(ctx, txn, eventIDs)
 		return err
 	})
@@ -805,7 +805,7 @@ func (d *Database) GetMembership(
 func (d *Database) GetMembershipEventNIDsForRoom(
 	ctx context.Context, roomNID types.RoomNID, joinOnly bool,
 ) (eventNIDs []types.EventNID, err error) {
-	common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if joinOnly {
 			eventNIDs, err = d.statements.selectMembershipsFromRoomAndMembership(
 				ctx, txn, roomNID, membershipStateJoin,
