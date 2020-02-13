@@ -76,14 +76,23 @@ while read -r test_name; do
 	fi
 done <<< "${passed_but_expected_fail}"
 
+# Wrap output in code blocks for buildkite annotation rendering purposes
+if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
+    echo "\`\`\`"
+fi
+
 if [ -n "${tests_to_add}" ]; then
-	echo "ERROR: The following passed tests are not present in $2. Please append them to the file:"
+	echo "ERROR: The following passed tests are not present in $2. Please append them to the file!:"
 	echo -e "${tests_to_add}"
 fi
 
 if [ -n "${already_in_whitelist}" ]; then
 	echo "WARN: Tests in the whitelist still marked as expected fail:"
 	echo -e "${already_in_whitelist}"
+fi
+
+if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
+    echo "\`\`\`"
 fi
 
 exit ${fail_build}
