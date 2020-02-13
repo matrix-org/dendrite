@@ -203,6 +203,7 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	if err != nil {
 		return []types.PublicRoom{}, nil
 	}
+	defer rows.Close() // nolint: errcheck
 
 	rooms := []types.PublicRoom{}
 	for rows.Next() {
@@ -222,7 +223,7 @@ func (s *publicRoomsStatements) selectPublicRooms(
 		rooms = append(rooms, r)
 	}
 
-	return rooms, nil
+	return rooms, rows.Err()
 }
 
 func (s *publicRoomsStatements) selectRoomVisibility(

@@ -59,9 +59,9 @@ var (
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, queryAPI roomserverAPI.RoomserverQueryAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI, cfg config.Dendrite,
+	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
 	producer *producers.RoomserverProducer, federation *gomatrixserverlib.FederationClient,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -98,7 +98,7 @@ func ExchangeThirdPartyInvite(
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
@@ -172,9 +172,9 @@ func ExchangeThirdPartyInvite(
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
 	ctx context.Context, queryAPI roomserverAPI.RoomserverQueryAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI, cfg config.Dendrite,
+	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
 	inv invite, federation *gomatrixserverlib.FederationClient,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 ) (*gomatrixserverlib.Event, error) {
 	_, server, err := gomatrixserverlib.SplitID('@', inv.MXID)
 	if err != nil {
@@ -230,7 +230,7 @@ func createInviteFrom3PIDInvite(
 func buildMembershipEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, queryAPI roomserverAPI.RoomserverQueryAPI,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -290,7 +290,7 @@ func buildMembershipEvent(
 // them responded with an error.
 func sendToRemoteServer(
 	ctx context.Context, inv invite,
-	federation *gomatrixserverlib.FederationClient, _ config.Dendrite,
+	federation *gomatrixserverlib.FederationClient, _ *config.Dendrite,
 	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
 	remoteServers := make([]gomatrixserverlib.ServerName, 2)

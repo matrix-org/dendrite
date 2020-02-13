@@ -39,7 +39,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // nolint: gocyclo
 func Setup(
 	apiMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
-	deviceDB *devices.Database, federation *gomatrixserverlib.FederationClient,
+	deviceDB devices.Database, federation *gomatrixserverlib.FederationClient,
 	queryAPI api.RoomserverQueryAPI,
 	cfg *config.Dendrite,
 ) {

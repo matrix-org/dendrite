@@ -31,7 +31,7 @@ import (
 func MakeLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	roomID, userID string,
 ) util.JSONResponse {
@@ -95,7 +95,7 @@ func MakeLeave(
 func SendLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,

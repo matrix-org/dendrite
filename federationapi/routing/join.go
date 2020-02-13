@@ -33,7 +33,7 @@ import (
 func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	roomID, userID string,
 ) util.JSONResponse {
@@ -97,7 +97,7 @@ func MakeJoin(
 func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,

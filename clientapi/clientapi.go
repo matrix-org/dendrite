@@ -34,8 +34,8 @@ import (
 // component.
 func SetupClientAPIComponent(
 	base *basecomponent.BaseDendrite,
-	deviceDB *devices.Database,
-	accountsDB *accounts.Database,
+	deviceDB devices.Database,
+	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
@@ -67,7 +67,7 @@ func SetupClientAPIComponent(
 	}
 
 	routing.Setup(
-		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
+		base.APIMux, base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
 		syncProducer, typingProducer, transactionsCache, fedSenderAPI,
 	)

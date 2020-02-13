@@ -32,7 +32,7 @@ func Invite(
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
 	eventID string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
