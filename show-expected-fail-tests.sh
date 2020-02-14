@@ -80,7 +80,7 @@ done <<< "${passed_but_expected_fail}"
 tests_to_add=$(echo $tests_to_add | xargs)
 already_in_whitelist=$(echo $already_in_whitelist | xargs)
 
-# Wrap output in code blocks for buildkite annotation rendering purposes
+# Format output with markdown for buildkite annotation rendering purposes
 if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
 	echo "### 📜 SyTest Whitelist Maintenance"
 fi
