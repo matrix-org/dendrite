@@ -183,7 +183,6 @@ GET /directory/room/:room_alias yields room ID
 PUT /directory/room/:room_alias creates alias
 Room aliases can contain Unicode
 Creators can delete alias
-Alias creators can delete canonical alias with no ops
 Regular users cannot create room aliases within the AS namespace
 Deleting a non-existent alias should return a 404
 Users can't delete other's aliases
