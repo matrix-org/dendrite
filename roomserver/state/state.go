@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/state/database"
 	v1 "github.com/matrix-org/dendrite/roomserver/state/v1"
+	v2 "github.com/matrix-org/dendrite/roomserver/state/v2"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -40,6 +41,8 @@ func GetStateResolutionAlgorithm(
 	switch version {
 	case StateResolutionAlgorithmV1:
 		return v1.Prepare(db), nil
+	case StateResolutionAlgorithmV2:
+		return v2.Prepare(db), nil
 	default:
 		return nil, errors.New("unsupported room version")
 	}
