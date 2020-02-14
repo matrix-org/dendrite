@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/postgres"
+	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -43,6 +44,8 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+	case "file":
+		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
 	default:
 		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
 	}

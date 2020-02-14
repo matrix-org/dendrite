@@ -39,26 +39,15 @@ var editableAttributes = []string{
 const publicRoomsSchema = `
 -- Stores all of the rooms with data needed to create the server's room directory
 CREATE TABLE IF NOT EXISTS publicroomsapi_public_rooms(
-	-- The room's ID
 	room_id TEXT NOT NULL PRIMARY KEY,
-	-- Number of joined members in the room
 	joined_members INTEGER NOT NULL DEFAULT 0,
-	-- Aliases of the room (empty array if none)
-	aliases TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
-	-- Canonical alias of the room (empty string if none)
+	aliases TEXT NOT NULL DEFAULT '',
 	canonical_alias TEXT NOT NULL DEFAULT '',
-	-- Name of the room (empty string if none)
 	name TEXT NOT NULL DEFAULT '',
-	-- Topic of the room (empty string if none)
 	topic TEXT NOT NULL DEFAULT '',
-	-- Is the room world readable?
 	world_readable BOOLEAN NOT NULL DEFAULT false,
-	-- Can guest join the room?
 	guest_can_join BOOLEAN NOT NULL DEFAULT false,
-	-- URL of the room avatar (empty string if none)
 	avatar_url TEXT NOT NULL DEFAULT '',
-	-- Visibility of the room: true means the room is publicly visible, false
-	-- means the room is private
 	visibility BOOLEAN NOT NULL DEFAULT false
 );
 `
@@ -71,33 +60,33 @@ const selectPublicRoomsSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
 	" FROM publicroomsapi_public_rooms WHERE visibility = true" +
 	" ORDER BY joined_members DESC" +
-	" OFFSET $1"
+	" LIMIT 30 OFFSET $1"
 
 const selectPublicRoomsWithLimitSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
 	" FROM publicroomsapi_public_rooms WHERE visibility = true" +
 	" ORDER BY joined_members DESC" +
-	" OFFSET $1 LIMIT $2"
+	" LIMIT $2 OFFSET $1"
 
 const selectPublicRoomsWithFilterSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
 	" FROM publicroomsapi_public_rooms" +
 	" WHERE visibility = true" +
 	" AND (LOWER(name) LIKE LOWER($1)" +
-	" OR LOWER(topic) LIKE LOWER($1)" +
-	" OR LOWER(ARRAY_TO_STRING(aliases, ',')) LIKE LOWER($1))" +
+	" OR LOWER(topic) LIKE LOWER($1))" +
+	//" OR LOWER(ARRAY_TO_STRING(aliases, ',')) LIKE LOWER($1))" +
 	" ORDER BY joined_members DESC" +
-	" OFFSET $2"
+	" LIMIT 30 OFFSET $2"
 
 const selectPublicRoomsWithLimitAndFilterSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
 	" FROM publicroomsapi_public_rooms" +
 	" WHERE visibility = true" +
 	" AND (LOWER(name) LIKE LOWER($1)" +
-	" OR LOWER(topic) LIKE LOWER($1)" +
-	" OR LOWER(ARRAY_TO_STRING(aliases, ',')) LIKE LOWER($1))" +
+	" OR LOWER(topic) LIKE LOWER($1))" +
+	// " OR LOWER(ARRAY_TO_STRING(aliases, ',')) LIKE LOWER($1))" +
 	" ORDER BY joined_members DESC" +
-	" OFFSET $2 LIMIT $3"
+	" LIMIT $3 OFFSET $2"
 
 const selectRoomVisibilitySQL = "" +
 	"SELECT visibility FROM publicroomsapi_public_rooms" +
@@ -187,7 +176,7 @@ func (s *publicRoomsStatements) selectPublicRooms(
 			)
 		} else {
 			rows, err = s.selectPublicRoomsWithLimitAndFilterStmt.QueryContext(
-				ctx, pattern, offset, limit,
+				ctx, pattern, limit, offset,
 			)
 		}
 	} else {
@@ -195,7 +184,7 @@ func (s *publicRoomsStatements) selectPublicRooms(
 			rows, err = s.selectPublicRoomsStmt.QueryContext(ctx, offset)
 		} else {
 			rows, err = s.selectPublicRoomsWithLimitStmt.QueryContext(
-				ctx, offset, limit,
+				ctx, limit, offset,
 			)
 		}
 	}
