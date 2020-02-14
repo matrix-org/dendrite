@@ -76,6 +76,8 @@ while read -r test_name; do
 	fi
 done <<< "${passed_but_expected_fail}"
 
+# TODO: Check that the same test doesn't exist in both the whitelist and blacklist
+
 # Trim test output strings
 tests_to_add=$(echo -e $tests_to_add | xargs)
 already_in_whitelist=$(echo -e $already_in_whitelist | xargs)
