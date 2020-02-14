@@ -102,5 +102,5 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 		}
 		result.EventNID = types.EventNID(eventNID)
 	}
-	return results[:i], nil
+	return results[:i], rows.Err()
 }

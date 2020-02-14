@@ -40,8 +40,8 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
 func SendMembership(
-	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
-	roomID string, membership string, cfg config.Dendrite,
+	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	roomID string, membership string, cfg *config.Dendrite,
 	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
@@ -116,10 +116,10 @@ func SendMembership(
 
 func buildMembershipEvent(
 	ctx context.Context,
-	body threepid.MembershipRequest, accountDB *accounts.Database,
+	body threepid.MembershipRequest, accountDB accounts.Database,
 	device *authtypes.Device,
 	membership, roomID string,
-	cfg config.Dendrite, evTime time.Time,
+	cfg *config.Dendrite, evTime time.Time,
 	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.Event, error) {
 	stateKey, reason, err := getMembershipStateKey(body, device, membership)
@@ -165,8 +165,8 @@ func buildMembershipEvent(
 func loadProfile(
 	ctx context.Context,
 	userID string,
-	cfg config.Dendrite,
-	accountDB *accounts.Database,
+	cfg *config.Dendrite,
+	accountDB accounts.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*authtypes.Profile, error) {
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
@@ -214,9 +214,9 @@ func checkAndProcessThreepid(
 	req *http.Request,
 	device *authtypes.Device,
 	body *threepid.MembershipRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 	producer *producers.RoomserverProducer,
 	membership, roomID string,
 	evTime time.Time,

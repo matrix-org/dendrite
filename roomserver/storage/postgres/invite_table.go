@@ -114,21 +114,23 @@ func (s *inviteStatements) insertInviteEvent(
 func (s *inviteStatements) updateInviteRetired(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
-) (eventIDs []string, err error) {
+) ([]string, error) {
 	stmt := common.TxStmt(txn, s.updateInviteRetiredStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
-	defer (func() { err = rows.Close() })()
+	defer rows.Close() // nolint: errcheck
+
+	var eventIDs []string
 	for rows.Next() {
 		var inviteEventID string
-		if err := rows.Scan(&inviteEventID); err != nil {
+		if err = rows.Scan(&inviteEventID); err != nil {
 			return nil, err
 		}
 		eventIDs = append(eventIDs, inviteEventID)
 	}
-	return
+	return eventIDs, rows.Err()
 }
 
 // selectInviteActiveForUserInRoom returns a list of sender state key NIDs
@@ -151,5 +153,5 @@ func (s *inviteStatements) selectInviteActiveForUserInRoom(
 		}
 		result = append(result, types.EventStateKeyNID(senderUserNID))
 	}
-	return result, nil
+	return result, rows.Err()
 }

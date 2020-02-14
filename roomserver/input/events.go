@@ -1,4 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
+// Copyright 2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,13 +23,14 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
 type RoomEventDatabase interface {
-	state.RoomStateDatabase
+	database.RoomStateDatabase
 	// Stores a matrix room event in the database
 	StoreEvent(
 		ctx context.Context,
@@ -149,7 +152,12 @@ func calculateAndSetState(
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
-	var err error
+	// TODO: get the correct room version
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
+	if err != nil {
+		return err
+	}
+
 	if input.HasState {
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
@@ -163,7 +171,7 @@ func calculateAndSetState(
 		}
 	} else {
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-		if stateAtEvent.BeforeStateSnapshotNID, err = state.CalculateAndStoreStateBeforeEvent(ctx, db, event, roomNID); err != nil {
+		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, roomNID); err != nil {
 			return err
 		}
 	}
@@ -188,7 +196,12 @@ func processInviteEvent(
 		return err
 	}
 	succeeded := false
-	defer common.EndTransaction(updater, &succeeded)
+	defer func() {
+		txerr := common.EndTransaction(updater, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
 
 	if updater.IsJoin() {
 		// If the user is joined to the room then that takes precedence over this

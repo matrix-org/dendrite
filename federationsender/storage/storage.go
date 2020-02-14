@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
+	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
 	"github.com/matrix-org/dendrite/federationsender/types"
 )
 
@@ -36,6 +37,8 @@ func NewDatabase(dataSourceName string) (Database, error) {
 		return postgres.NewDatabase(dataSourceName)
 	}
 	switch uri.Scheme {
+	case "file":
+		return sqlite3.NewDatabase(dataSourceName)
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName)
 	default:

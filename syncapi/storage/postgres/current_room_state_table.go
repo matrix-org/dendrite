@@ -23,7 +23,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -154,7 +153,7 @@ func (s *currentRoomStateStatements) selectJoinedUsers(
 		users = append(users, userID)
 		result[roomID] = users
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
@@ -179,22 +178,22 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 		}
 		result = append(result, roomID)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // CurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) selectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	stateFilterPart *gomatrix.FilterPart,
+	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]gomatrixserverlib.Event, error) {
 	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
-		pq.StringArray(stateFilterPart.Senders),
-		pq.StringArray(stateFilterPart.NotSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
-		stateFilterPart.ContainsURL,
-		stateFilterPart.Limit,
+		pq.StringArray(stateFilter.Senders),
+		pq.StringArray(stateFilter.NotSenders),
+		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
+		stateFilter.ContainsURL,
+		stateFilter.Limit,
 	)
 	if err != nil {
 		return nil, err
@@ -267,7 +266,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 		}
 		result = append(result, ev)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *currentRoomStateStatements) selectStateEvent(

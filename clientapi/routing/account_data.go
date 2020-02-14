@@ -30,7 +30,7 @@ import (
 
 // GetAccountData implements GET /user/{userId}/[rooms/{roomid}/]account_data/{type}
 func GetAccountData(
-	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	userID string, roomID string, dataType string,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -62,7 +62,7 @@ func GetAccountData(
 
 // SaveAccountData implements PUT /user/{userId}/[rooms/{roomId}/]account_data/{type}
 func SaveAccountData(
-	req *http.Request, accountDB *accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	userID string, roomID string, dataType string, syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	if userID != device.UserID {

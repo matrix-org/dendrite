@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -33,12 +32,12 @@ import (
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
 	db        storage.Database
-	accountDB *accounts.Database
+	accountDB accounts.Database
 	notifier  *Notifier
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db storage.Database, n *Notifier, adb *accounts.Database) *RequestPool {
+func NewRequestPool(db storage.Database, n *Notifier, adb accounts.Database) *RequestPool {
 	return &RequestPool{db, adb, n}
 }
 
@@ -142,14 +141,14 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Pagin
 		return
 	}
 
-	accountDataFilter := gomatrix.DefaultFilterPart() // TODO: use filter provided in req instead
-	res, err = rp.appendAccountData(res, req.device.UserID, req, int64(latestPos.PDUPosition), &accountDataFilter)
+	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
+	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
 	return
 }
 
 func (rp *RequestPool) appendAccountData(
-	data *types.Response, userID string, req syncRequest, currentPos int64,
-	accountDataFilter *gomatrix.FilterPart,
+	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
+	accountDataFilter *gomatrixserverlib.EventFilter,
 ) (*types.Response, error) {
 	// TODO: Account data doesn't have a sync position of its own, meaning that
 	// account data might be sent multiple time to the client if multiple account

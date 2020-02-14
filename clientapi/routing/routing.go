@@ -47,13 +47,13 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, cfg config.Dendrite,
+	apiMux *mux.Router, cfg *config.Dendrite,
 	producer *producers.RoomserverProducer,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.KeyRing,
 	userUpdateProducer *producers.UserUpdateProducer,
@@ -170,11 +170,11 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/register", common.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		return Register(req, accountDB, deviceDB, &cfg)
+		return Register(req, accountDB, deviceDB, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	v1mux.Handle("/register", common.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		return LegacyRegister(req, accountDB, deviceDB, &cfg)
+		return LegacyRegister(req, accountDB, deviceDB, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/register/available", common.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
@@ -187,7 +187,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DirectoryRoom(req, vars["roomAlias"], federation, &cfg, aliasAPI, federationSender)
+			return DirectoryRoom(req, vars["roomAlias"], federation, cfg, aliasAPI, federationSender)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -197,7 +197,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetLocalAlias(req, device, vars["roomAlias"], &cfg, aliasAPI)
+			return SetLocalAlias(req, device, vars["roomAlias"], cfg, aliasAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -301,7 +301,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetProfile(req, accountDB, &cfg, vars["userID"], asAPI, federation)
+			return GetProfile(req, accountDB, cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -311,7 +311,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetAvatarURL(req, accountDB, &cfg, vars["userID"], asAPI, federation)
+			return GetAvatarURL(req, accountDB, cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -321,7 +321,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetAvatarURL(req, accountDB, device, vars["userID"], userUpdateProducer, &cfg, producer, queryAPI)
+			return SetAvatarURL(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, queryAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -333,7 +333,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetDisplayName(req, accountDB, &cfg, vars["userID"], asAPI, federation)
+			return GetDisplayName(req, accountDB, cfg, vars["userID"], asAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -343,7 +343,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetDisplayName(req, accountDB, device, vars["userID"], userUpdateProducer, &cfg, producer, queryAPI)
+			return SetDisplayName(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, queryAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -503,6 +503,22 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
+	r0mux.Handle("/devices/{deviceID}",
+		common.MakeAuthAPI("delete_device", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return DeleteDeviceById(req, deviceDB, device, vars["deviceID"])
+		}),
+	).Methods(http.MethodDelete, http.MethodOptions)
+
+	r0mux.Handle("/delete_devices",
+		common.MakeAuthAPI("delete_devices", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return DeleteDevices(req, deviceDB, device)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	// Stub implementations for sytest
 	r0mux.Handle("/events",
 		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {
@@ -551,4 +567,10 @@ func Setup(
 			return DeleteTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
+
+	r0mux.Handle("/capabilities",
+		common.MakeAuthAPI("capabilities", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return GetCapabilities(req, queryAPI)
+		}),
+	).Methods(http.MethodGet)
 }
