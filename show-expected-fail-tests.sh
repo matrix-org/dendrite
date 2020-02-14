@@ -82,7 +82,7 @@ already_in_whitelist=$(echo $already_in_whitelist | xargs)
 
 # Wrap output in code blocks for buildkite annotation rendering purposes
 if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
-	echo "### SyTest Whitelist Maintenance"
+	echo "### 📜 SyTest Whitelist Maintenance"
 fi
 
 if [ -n "${tests_to_add}" ]; then
