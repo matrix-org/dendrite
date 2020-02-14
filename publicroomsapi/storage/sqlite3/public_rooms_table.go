@@ -73,8 +73,8 @@ const selectPublicRoomsWithFilterSQL = "" +
 	" FROM publicroomsapi_public_rooms" +
 	" WHERE visibility = true" +
 	" AND (LOWER(name) LIKE LOWER($1)" +
-	" OR LOWER(topic) LIKE LOWER($1))" +
-	//" OR LOWER(ARRAY_TO_STRING(aliases, ',')) LIKE LOWER($1))" +
+	" OR LOWER(topic) LIKE LOWER($1)" +
+	" OR LOWER(aliases) LIKE LOWER($1))" + // TODO: Is there a better way to search aliases?
 	" ORDER BY joined_members DESC" +
 	" LIMIT 30 OFFSET $2"
 
@@ -83,8 +83,8 @@ const selectPublicRoomsWithLimitAndFilterSQL = "" +
 	" FROM publicroomsapi_public_rooms" +
 	" WHERE visibility = true" +
 	" AND (LOWER(name) LIKE LOWER($1)" +
-	" OR LOWER(topic) LIKE LOWER($1))" +
-	// " OR LOWER(ARRAY_TO_STRING(aliases, ',')) LIKE LOWER($1))" +
+	" OR LOWER(topic) LIKE LOWER($1)" +
+	" OR LOWER(aliases) LIKE LOWER($1))" + // TODO: Is there a better way to search aliases?
 	" ORDER BY joined_members DESC" +
 	" LIMIT $3 OFFSET $2"
 
