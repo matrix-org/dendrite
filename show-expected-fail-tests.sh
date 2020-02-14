@@ -77,8 +77,8 @@ while read -r test_name; do
 done <<< "${passed_but_expected_fail}"
 
 # Trim test output strings
-tests_to_add=$(echo $tests_to_add | xargs)
-already_in_whitelist=$(echo $already_in_whitelist | xargs)
+tests_to_add=$(echo -e $tests_to_add | xargs)
+already_in_whitelist=$(echo -e $already_in_whitelist | xargs)
 
 # Format output with markdown for buildkite annotation rendering purposes
 if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
