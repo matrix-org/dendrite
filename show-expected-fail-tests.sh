@@ -76,22 +76,26 @@ while read -r test_name; do
 	fi
 done <<< "${passed_but_expected_fail}"
 
+# Trim test output strings
+tests_to_add=$(echo $tests_to_add | xargs)
+already_in_whitelist=$(echo $already_in_whitelist | xargs)
+
 # Wrap output in code blocks for buildkite annotation rendering purposes
 if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
-    echo "\`\`\`"
+	echo "### SyTest Whitelist Maintenance"
 fi
 
 if [ -n "${tests_to_add}" ]; then
-	echo "ERROR: The following passed tests are not present in $2. Please append them to the file!:"
+	echo "**ERROR**: The following tests passed but are not present in `$2`. Please append them to the file:"
+    echo "\`\`\`"
 	echo -e "${tests_to_add}"
+    echo "\`\`\`"
 fi
 
 if [ -n "${already_in_whitelist}" ]; then
-	echo "WARN: Tests in the whitelist still marked as expected fail:"
+	echo "**WARN**: Tests in the whitelist still marked as **expected fail**:"
+    echo "\`\`\`"
 	echo -e "${already_in_whitelist}"
-fi
-
-if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
     echo "\`\`\`"
 fi
 
