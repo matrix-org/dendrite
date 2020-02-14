@@ -1,4 +1,5 @@
 // Copyright 2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package sqlite3
 
 import (
 	"context"
@@ -28,13 +29,13 @@ const appserviceEventsSchema = `
 -- Stores events to be sent to application services
 CREATE TABLE IF NOT EXISTS appservice_events (
 	-- An auto-incrementing id unique to each event in the table
-	id BIGSERIAL NOT NULL PRIMARY KEY,
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	-- The ID of the application service the event will be sent to
 	as_id TEXT NOT NULL,
 	-- JSON representation of the event
 	event_json TEXT NOT NULL,
 	-- The ID of the transaction that this event is a part of
-	txn_id BIGINT NOT NULL
+	txn_id INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_events(as_id);

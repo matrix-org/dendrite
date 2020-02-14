@@ -19,6 +19,7 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/mediaapi/storage/postgres"
+	"github.com/matrix-org/dendrite/mediaapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -40,6 +41,8 @@ func Open(dataSourceName string) (Database, error) {
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.Open(dataSourceName)
+	case "file":
+		return sqlite3.Open(dataSourceName)
 	default:
 		return postgres.Open(dataSourceName)
 	}

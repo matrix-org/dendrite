@@ -43,7 +43,7 @@ var (
 // size), then send that off to the AS's /transactions/{txnID} endpoint. It also
 // handles exponentially backing off in case the AS isn't currently available.
 func SetupTransactionWorkers(
-	appserviceDB *storage.Database,
+	appserviceDB storage.Database,
 	workerStates []types.ApplicationServiceWorkerState,
 ) error {
 	// Create a worker that handles transmitting events to a single homeserver
@@ -58,7 +58,7 @@ func SetupTransactionWorkers(
 
 // worker is a goroutine that sends any queued events to the application service
 // it is given.
-func worker(db *storage.Database, ws types.ApplicationServiceWorkerState) {
+func worker(db storage.Database, ws types.ApplicationServiceWorkerState) {
 	log.WithFields(log.Fields{
 		"appservice": ws.AppService.ID,
 	}).Info("starting application service")
@@ -149,7 +149,7 @@ func backoff(ws *types.ApplicationServiceWorkerState, err error) {
 // transaction, and JSON-encodes the results.
 func createTransaction(
 	ctx context.Context,
-	db *storage.Database,
+	db storage.Database,
 	appserviceID string,
 ) (
 	transactionJSON []byte,
