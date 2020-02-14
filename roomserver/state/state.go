@@ -46,36 +46,12 @@ func GetStateResolutionAlgorithm(
 }
 
 type StateResolutionImpl interface {
-	LoadStateAtSnapshot(
-		ctx context.Context, stateNID types.StateSnapshotNID,
-	) ([]types.StateEntry, error)
-	LoadStateAtEvent(
-		ctx context.Context, eventID string,
-	) ([]types.StateEntry, error)
-	LoadCombinedStateAfterEvents(
-		ctx context.Context, prevStates []types.StateAtEvent,
-	) ([]types.StateEntry, error)
-	DifferenceBetweeenStateSnapshots(
-		ctx context.Context, oldStateNID, newStateNID types.StateSnapshotNID,
-	) (removed, added []types.StateEntry, err error)
-	LoadStateAtSnapshotForStringTuples(
-		ctx context.Context,
-		stateNID types.StateSnapshotNID,
-		stateKeyTuples []gomatrixserverlib.StateKeyTuple,
-	) ([]types.StateEntry, error)
-	LoadStateAfterEventsForStringTuples(
-		ctx context.Context,
-		prevStates []types.StateAtEvent,
-		stateKeyTuples []gomatrixserverlib.StateKeyTuple,
-	) ([]types.StateEntry, error)
-	CalculateAndStoreStateBeforeEvent(
-		ctx context.Context,
-		event gomatrixserverlib.Event,
-		roomNID types.RoomNID,
-	) (types.StateSnapshotNID, error)
-	CalculateAndStoreStateAfterEvents(
-		ctx context.Context,
-		roomNID types.RoomNID,
-		prevStates []types.StateAtEvent,
-	) (types.StateSnapshotNID, error)
+	LoadStateAtSnapshot(ctx context.Context, stateNID types.StateSnapshotNID) ([]types.StateEntry, error)
+	LoadStateAtEvent(ctx context.Context, eventID string) ([]types.StateEntry, error)
+	LoadCombinedStateAfterEvents(ctx context.Context, prevStates []types.StateAtEvent) ([]types.StateEntry, error)
+	DifferenceBetweeenStateSnapshots(ctx context.Context, oldStateNID, newStateNID types.StateSnapshotNID) (removed, added []types.StateEntry, err error)
+	LoadStateAtSnapshotForStringTuples(ctx context.Context, stateNID types.StateSnapshotNID, stateKeyTuples []gomatrixserverlib.StateKeyTuple) ([]types.StateEntry, error)
+	LoadStateAfterEventsForStringTuples(ctx context.Context, prevStates []types.StateAtEvent, stateKeyTuples []gomatrixserverlib.StateKeyTuple) ([]types.StateEntry, error)
+	CalculateAndStoreStateBeforeEvent(ctx context.Context, event gomatrixserverlib.Event, roomNID types.RoomNID) (types.StateSnapshotNID, error)
+	CalculateAndStoreStateAfterEvents(ctx context.Context, roomNID types.RoomNID, prevStates []types.StateAtEvent) (types.StateSnapshotNID, error)
 }
