@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package sqlite3
 
 import (
 	"context"
@@ -21,10 +21,17 @@ import (
 
 const txnIDSchema = `
 -- Keeps a count of the current transaction ID
-CREATE SEQUENCE IF NOT EXISTS txn_id_counter START 1;
+CREATE TABLE IF NOT EXISTS appservice_counters (
+  name TEXT PRIMARY KEY NOT NULL,
+  last_id INTEGER DEFAULT 1
+);
+INSERT OR IGNORE INTO appservice_counters (name, last_id) VALUES('txn_id', 1);
 `
 
-const selectTxnIDSQL = "SELECT nextval('txn_id_counter')"
+const selectTxnIDSQL = `
+  SELECT last_id FROM appservice_counters WHERE name='txn_id';
+  UPDATE appservice_counters SET last_id=last_id+1 WHERE name='txn_id';
+`
 
 type txnStatements struct {
 	selectTxnIDStmt *sql.Stmt
