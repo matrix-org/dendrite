@@ -86,7 +86,7 @@ if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
 fi
 
 if [ -n "${tests_to_add}" ]; then
-	echo "**ERROR**: The following tests passed but are not present in `$2`. Please append them to the file:"
+	echo "**ERROR**: The following tests passed but are not present in \`$2\`. Please append them to the file:"
     echo "\`\`\`"
 	echo -e "${tests_to_add}"
     echo "\`\`\`"
