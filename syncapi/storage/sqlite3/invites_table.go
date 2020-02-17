@@ -42,9 +42,6 @@ const insertInviteEventSQL = "" +
 	" (room_id, event_id, target_user_id, event_json)" +
 	" VALUES ($1, $2, $3, $4)"
 
-const selectLastInsertedInviteEventSQL = "" +
-	"SELECT id FROM syncapi_invite_events WHERE rowid = last_insert_rowid()"
-
 const deleteInviteEventSQL = "" +
 	"DELETE FROM syncapi_invite_events WHERE event_id = $1"
 
@@ -57,12 +54,11 @@ const selectMaxInviteIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_invite_events"
 
 type inviteEventsStatements struct {
-	streamIDStatements                *streamIDStatements
-	insertInviteEventStmt             *sql.Stmt
-	selectLastInsertedInviteEventStmt *sql.Stmt
-	selectInviteEventsInRangeStmt     *sql.Stmt
-	deleteInviteEventStmt             *sql.Stmt
-	selectMaxInviteIDStmt             *sql.Stmt
+	streamIDStatements            *streamIDStatements
+	insertInviteEventStmt         *sql.Stmt
+	selectInviteEventsInRangeStmt *sql.Stmt
+	deleteInviteEventStmt         *sql.Stmt
+	selectMaxInviteIDStmt         *sql.Stmt
 }
 
 func (s *inviteEventsStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
@@ -72,9 +68,6 @@ func (s *inviteEventsStatements) prepare(db *sql.DB, streamID *streamIDStatement
 		return
 	}
 	if s.insertInviteEventStmt, err = db.Prepare(insertInviteEventSQL); err != nil {
-		return
-	}
-	if s.selectLastInsertedInviteEventStmt, err = db.Prepare(selectLastInsertedInviteEventSQL); err != nil {
 		return
 	}
 	if s.selectInviteEventsInRangeStmt, err = db.Prepare(selectInviteEventsInRangeSQL); err != nil {
@@ -92,7 +85,8 @@ func (s *inviteEventsStatements) prepare(db *sql.DB, streamID *streamIDStatement
 func (s *inviteEventsStatements) insertInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.Event,
 ) (streamPos types.StreamPosition, err error) {
-	_, err = s.insertInviteEventStmt.ExecContext(
+	var res sql.Result
+	res, err = s.insertInviteEventStmt.ExecContext(
 		ctx,
 		inviteEvent.RoomID(),
 		inviteEvent.EventID(),
@@ -102,7 +96,12 @@ func (s *inviteEventsStatements) insertInviteEvent(
 	if err != nil {
 		return
 	}
-	err = s.selectLastInsertedInviteEventStmt.QueryRowContext(ctx).Scan(&streamPos)
+	var rowID int64
+	rowID, err = res.LastInsertId()
+	if err != nil {
+		return
+	}
+	streamPos = types.StreamPosition(rowID)
 	return
 }
 
