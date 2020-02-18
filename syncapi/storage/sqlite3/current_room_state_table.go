@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -88,7 +89,6 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithMembershipStmt *sql.Stmt
 	selectCurrentStateStmt          *sql.Stmt
 	selectJoinedUsersStmt           *sql.Stmt
-	selectEventsWithEventIDsStmt    *sql.Stmt
 	selectStateEventStmt            *sql.Stmt
 }
 
@@ -111,9 +111,6 @@ func (s *currentRoomStateStatements) prepare(db *sql.DB, streamID *streamIDState
 		return
 	}
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
-		return
-	}
-	if s.selectEventsWithEventIDsStmt, err = db.Prepare(selectEventsWithEventIDsSQL); err != nil {
 		return
 	}
 	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
@@ -233,8 +230,12 @@ func (s *currentRoomStateStatements) upsertRoomState(
 func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
-	stmt := common.TxStmt(txn, s.selectEventsWithEventIDsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	iEventIDs := make([]interface{}, len(eventIDs))
+	for k, v := range eventIDs {
+		iEventIDs[k] = v
+	}
+	query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
+	rows, err := txn.QueryContext(ctx, query, iEventIDs...)
 	if err != nil {
 		return nil, err
 	}
