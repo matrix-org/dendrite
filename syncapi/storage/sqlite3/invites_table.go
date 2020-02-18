@@ -26,7 +26,7 @@ import (
 
 const inviteEventsSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_invite_events (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	id INTEGER PRIMARY KEY,
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,
@@ -39,8 +39,8 @@ CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx ON syncapi_invite_events
 
 const insertInviteEventSQL = "" +
 	"INSERT INTO syncapi_invite_events" +
-	" (room_id, event_id, target_user_id, event_json)" +
-	" VALUES ($1, $2, $3, $4)"
+	" (id, room_id, event_id, target_user_id, event_json)" +
+	" VALUES ($1, $2, $3, $4, $5)"
 
 const deleteInviteEventSQL = "" +
 	"DELETE FROM syncapi_invite_events WHERE event_id = $1"
@@ -83,25 +83,16 @@ func (s *inviteEventsStatements) prepare(db *sql.DB, streamID *streamIDStatement
 }
 
 func (s *inviteEventsStatements) insertInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.Event,
-) (streamPos types.StreamPosition, err error) {
-	var res sql.Result
-	res, err = s.insertInviteEventStmt.ExecContext(
+	ctx context.Context, txn *sql.Tx, inviteEvent gomatrixserverlib.Event, streamPos types.StreamPosition,
+) (err error) {
+	_, err = txn.Stmt(s.insertInviteEventStmt).ExecContext(
 		ctx,
+		streamPos,
 		inviteEvent.RoomID(),
 		inviteEvent.EventID(),
 		*inviteEvent.StateKey(),
 		inviteEvent.JSON(),
 	)
-	if err != nil {
-		return
-	}
-	var rowID int64
-	rowID, err = res.LastInsertId()
-	if err != nil {
-		return
-	}
-	streamPos = types.StreamPosition(rowID)
 	return
 }
 
