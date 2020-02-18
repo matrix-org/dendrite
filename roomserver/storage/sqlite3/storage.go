@@ -285,7 +285,8 @@ func (d *Database) AddState(
 ) (stateNID types.StateSnapshotNID, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if len(state) > 0 {
-			stateBlockNID, err := d.statements.bulkInsertStateData(ctx, txn, state)
+			var stateBlockNID types.StateBlockNID
+			stateBlockNID, err = d.statements.bulkInsertStateData(ctx, txn, state)
 			if err != nil {
 				return err
 			}
