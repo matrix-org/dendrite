@@ -336,8 +336,12 @@ func (d *SyncServerDatasource) GetEventsInRange(
 }
 
 // SyncPosition returns the latest positions for syncing.
-func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (types.PaginationToken, error) {
-	return d.syncPositionTx(ctx, nil)
+func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (tok types.PaginationToken, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		tok, err = d.syncPositionTx(ctx, txn)
+		return err
+	})
+	return
 }
 
 // BackwardExtremitiesForRoom returns the event IDs of all of the backward
@@ -376,8 +380,12 @@ func (d *SyncServerDatasource) EventPositionInTopology(
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
-func (d *SyncServerDatasource) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
-	return d.syncStreamPositionTx(ctx, nil)
+func (d *SyncServerDatasource) SyncStreamPosition(ctx context.Context) (pos types.StreamPosition, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		pos, err = d.syncStreamPositionTx(ctx, txn)
+		return err
+	})
+	return
 }
 
 func (d *SyncServerDatasource) syncStreamPositionTx(
@@ -734,18 +742,10 @@ func (d *SyncServerDatasource) GetAccountDataInRange(
 func (d *SyncServerDatasource) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (sp types.StreamPosition, err error) {
-	txn, err := d.db.BeginTx(ctx, nil)
-	if err != nil {
-		return types.StreamPosition(0), err
-	}
-	var succeeded bool
-	defer func() {
-		txerr := common.EndTransaction(txn, &succeeded)
-		if err == nil && txerr != nil {
-			err = txerr
-		}
-	}()
-	sp, err = d.accountData.insertAccountData(ctx, txn, userID, roomID, dataType)
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		sp, err = d.accountData.insertAccountData(ctx, txn, userID, roomID, dataType)
+		return err
+	})
 	return
 }
 
