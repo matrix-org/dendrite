@@ -608,6 +608,15 @@ func (d *Database) MembershipUpdater(
 	defer func() {
 		if !succeeded {
 			txn.Rollback() // nolint: errcheck
+		} else {
+			// TODO: We should be holding open this transaction but we cannot have
+			// multiple write transactions on sqlite. The code will perform additional
+			// write transactions independent of this one which will consistently cause
+			// 'database is locked' errors. For now, we'll break up the transaction and
+			// hope we don't race too catastrophically. Long term, we should be able to
+			// thread in txn objects where appropriate (either at the interface level or
+			// bring matrix business logic into the storage layer).
+			txn.Commit()
 		}
 	}()
 
@@ -655,7 +664,8 @@ func (d *Database) membershipUpdaterTxn(
 	}
 
 	return &membershipUpdater{
-		transaction{ctx, txn}, d, roomNID, targetUserNID, membership,
+		// purposefully set the txn to nil so if we try to use it we panic and fail fast
+		transaction{ctx, nil}, d, roomNID, targetUserNID, membership,
 	}, nil
 }
 
