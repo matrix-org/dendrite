@@ -253,12 +253,13 @@ func (d *Database) Events(
 ) ([]types.Event, error) {
 	var eventJSONs []eventJSONPair
 	var err error
-	results := make([]types.Event, len(eventNIDs))
+	var results []types.Event
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
 		if err != nil || len(eventJSONs) == 0 {
 			return nil
 		}
+		results = make([]types.Event, len(eventJSONs))
 		for i, eventJSON := range eventJSONs {
 			result := &results[i]
 			result.EventNID = eventJSON.EventNID
