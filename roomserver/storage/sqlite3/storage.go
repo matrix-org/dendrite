@@ -54,7 +54,12 @@ func Open(dataSourceName string) (*Database, error) {
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
 	//d.db.Exec("PRAGMA read_uncommitted = true;")
-	d.db.SetMaxOpenConns(2)
+
+	// FIXME: We are leaking connections somewhere. Setting this to 2 will eventually
+	// cause the roomserver to be unresponsive to new events because something will
+	// acquire the global mutex and never unlock it because it is waiting for a connection
+	// which it will never obtain.
+	d.db.SetMaxOpenConns(20)
 	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}
