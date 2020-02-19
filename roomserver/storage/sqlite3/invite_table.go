@@ -114,7 +114,7 @@ func (s *inviteStatements) updateInviteRetired(
 	defer (func() { err = rows.Close() })()
 	for rows.Next() {
 		var inviteEventID string
-		if err := rows.Scan(&inviteEventID); err != nil {
+		if err = rows.Scan(&inviteEventID); err != nil {
 			return nil, err
 		}
 		eventIDs = append(eventIDs, inviteEventID)

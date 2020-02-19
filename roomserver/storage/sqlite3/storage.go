@@ -605,8 +605,9 @@ func (d *Database) StateEntriesForTuples(
 // MembershipUpdater implements input.RoomEventDatabase
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
-) (types.MembershipUpdater, error) {
-	txn, err := d.db.Begin()
+) (updater types.MembershipUpdater, err error) {
+	var txn *sql.Tx
+	txn, err = d.db.Begin()
 	if err != nil {
 		return nil, err
 	}
@@ -622,7 +623,10 @@ func (d *Database) MembershipUpdater(
 			// hope we don't race too catastrophically. Long term, we should be able to
 			// thread in txn objects where appropriate (either at the interface level or
 			// bring matrix business logic into the storage layer).
-			txn.Commit()
+			txerr := txn.Commit()
+			if err == nil && txerr != nil {
+				err = txerr
+			}
 		}
 	}()
 
@@ -636,7 +640,7 @@ func (d *Database) MembershipUpdater(
 		return nil, err
 	}
 
-	updater, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID)
+	updater, err = d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
