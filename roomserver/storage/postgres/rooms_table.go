@@ -21,6 +21,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -165,8 +166,8 @@ func (s *roomStatements) updateLatestEventNIDs(
 
 func (s *roomStatements) selectRoomVersionForRoomNID(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) (int64, error) {
-	var roomVersion int64
+) (state.StateResolutionVersion, error) {
+	var roomVersion state.StateResolutionVersion
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
 	return roomVersion, err

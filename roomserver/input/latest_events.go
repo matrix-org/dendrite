@@ -178,8 +178,11 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, u.db)
+	roomVersion, err := u.db.GetRoomVersionForRoom(u.ctx, u.roomNID)
+	if err != nil {
+		return err
+	}
+	roomState, err := state.GetStateResolutionAlgorithm(roomVersion, u.db)
 	if err != nil {
 		return err
 	}

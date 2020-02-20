@@ -19,6 +19,7 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	statedb "github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
@@ -48,7 +49,7 @@ type Database interface {
 	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error)
 	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error)
 	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
-	GetRoomVersionForRoom(ctx context.Context, roomNID types.RoomNID) (int64, error)
+	GetRoomVersionForRoom(ctx context.Context, roomNID types.RoomNID) (state.StateResolutionVersion, error)
 }
 
 // NewPublicRoomsServerDatabase opens a database connection.

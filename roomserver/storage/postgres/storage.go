@@ -22,6 +22,7 @@ import (
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -699,7 +700,7 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 
 func (d *Database) GetRoomVersionForRoom(
 	ctx context.Context, roomNID types.RoomNID,
-) (int64, error) {
+) (state.StateResolutionVersion, error) {
 	return d.statements.selectRoomVersionForRoomNID(
 		ctx, nil, roomNID,
 	)

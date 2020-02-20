@@ -72,6 +72,10 @@ type RoomEventDatabase interface {
 		ctx context.Context, transactionID string,
 		sessionID int64, userID string,
 	) (string, error)
+	// Look up the room version from the database.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomNID types.RoomNID,
+	) (state.StateResolutionVersion, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -152,8 +156,11 @@ func calculateAndSetState(
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
+	roomVersion, err := db.GetRoomVersionForRoom(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+	roomState, err := state.GetStateResolutionAlgorithm(roomVersion, db)
 	if err != nil {
 		return err
 	}

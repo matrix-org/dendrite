@@ -90,6 +90,10 @@ type RoomserverQueryAPIDatabase interface {
 	EventStateKeys(
 		context.Context, []types.EventStateKeyNID,
 	) (map[types.EventStateKeyNID]string, error)
+	// Look up the room version from the database.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomNID types.RoomNID,
+	) (state.StateResolutionVersion, error)
 }
 
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
@@ -103,11 +107,6 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
-	if err != nil {
-		return err
-	}
 	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -115,6 +114,14 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	}
 	if roomNID == 0 {
 		return nil
+	}
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+	roomState, err := state.GetStateResolutionAlgorithm(roomVersion, r.DB)
+	if err != nil {
+		return err
 	}
 	response.RoomExists = true
 	var currentStateSnapshotNID types.StateSnapshotNID
@@ -147,11 +154,6 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
-	if err != nil {
-		return err
-	}
 	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -161,7 +163,14 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return nil
 	}
 	response.RoomExists = true
-
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+	roomState, err := state.GetStateResolutionAlgorithm(roomVersion, r.DB)
+	if err != nil {
+		return err
+	}
 	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
 		switch err.(type) {

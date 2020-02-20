@@ -614,7 +614,7 @@ func (v StateResolutionV2) resolveConflicts(
 	}
 
 	// Resolve the conflicts.
-	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents)
+	resolvedEvents := gomatrixserverlib.ResolveStateConflictsV2(conflictedEvents, authEvents)
 
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
