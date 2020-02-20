@@ -38,6 +38,8 @@ type Database interface {
 	GetLatestEventsForUpdate(ctx context.Context, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error)
 	GetTransactionEventID(ctx context.Context, transactionID string, sessionID int64, userID string) (string, error)
 	RoomNID(ctx context.Context, roomID string) (types.RoomNID, error)
+	RoomNIDForEventID(ctx context.Context, eventID string) (types.RoomNID, error)
+	RoomNIDForEventNID(ctx context.Context, eventNID types.EventNID) (types.RoomNID, error)
 	LatestEventIDs(ctx context.Context, roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error)
 	GetInvitesForUser(ctx context.Context, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) (senderUserIDs []types.EventStateKeyNID, err error)
 	SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error

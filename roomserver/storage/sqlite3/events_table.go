@@ -80,6 +80,12 @@ const updateEventSentToOutputSQL = "" +
 const selectEventIDSQL = "" +
 	"SELECT event_id FROM roomserver_events WHERE event_nid = $1"
 
+const selectRoomNIDForEventIDSQL = "" +
+	"SELECT room_nid FROM roomserver_events WHERE event_id = $1"
+
+const selectRoomNIDForEventNIDSQL = "" +
+	"SELECT room_nid FROM roomserver_events WHERE event_nid = $1"
+
 const bulkSelectStateAtEventAndReferenceSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
 	" FROM roomserver_events WHERE event_nid IN ($1)"
@@ -107,6 +113,8 @@ type eventStatements struct {
 	selectEventSentToOutputStmt            *sql.Stmt
 	updateEventSentToOutputStmt            *sql.Stmt
 	selectEventIDStmt                      *sql.Stmt
+	selectRoomNIDForEventIDStmt            *sql.Stmt
+	selectRoomNIDForEventNIDStmt           *sql.Stmt
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
@@ -131,6 +139,8 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		{&s.updateEventSentToOutputStmt, updateEventSentToOutputSQL},
 		{&s.selectEventSentToOutputStmt, selectEventSentToOutputSQL},
 		{&s.selectEventIDStmt, selectEventIDSQL},
+		{&s.selectRoomNIDForEventIDStmt, selectRoomNIDForEventIDSQL},
+		{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
 		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
@@ -307,6 +317,22 @@ func (s *eventStatements) selectEventID(
 ) (eventID string, err error) {
 	selectStmt := common.TxStmt(txn, s.selectEventIDStmt)
 	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&eventID)
+	return
+}
+
+func (s *eventStatements) selectRoomNIDForEventID(
+	ctx context.Context, txn *sql.Tx, eventID string,
+) (roomNID types.RoomNID, err error) {
+	stmt := common.TxStmt(txn, s.selectRoomNIDForEventIDStmt)
+	err = stmt.QueryRowContext(ctx, eventID).Scan(&roomNID)
+	return
+}
+
+func (s *eventStatements) selectRoomNIDForEventNID(
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
+) (roomNID types.RoomNID, err error) {
+	stmt := common.TxStmt(txn, s.selectRoomNIDForEventNIDStmt)
+	err = stmt.QueryRowContext(ctx, eventNID).Scan(&roomNID)
 	return
 }
 

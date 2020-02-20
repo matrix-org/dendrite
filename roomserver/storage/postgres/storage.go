@@ -21,6 +21,7 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -412,6 +413,26 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 		return 0, nil
 	}
 	return roomNID, err
+}
+
+func (d *Database) RoomNIDForEventID(
+	ctx context.Context, eventID string,
+) (out types.RoomNID, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		out, err = d.statements.selectRoomNIDForEventID(ctx, txn, eventID)
+		return err
+	})
+	return
+}
+
+func (d *Database) RoomNIDForEventNID(
+	ctx context.Context, eventNID types.EventNID,
+) (out types.RoomNID, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		out, err = d.statements.selectRoomNIDForEventNID(ctx, txn, eventNID)
+		return err
+	})
+	return
 }
 
 // LatestEventIDs implements query.RoomserverQueryAPIDatabase

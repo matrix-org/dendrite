@@ -533,6 +533,26 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (roomNID types.Ro
 	return
 }
 
+func (d *Database) RoomNIDForEventID(
+	ctx context.Context, eventID string,
+) (out types.RoomNID, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		out, err = d.statements.selectRoomNIDForEventID(ctx, txn, eventID)
+		return err
+	})
+	return
+}
+
+func (d *Database) RoomNIDForEventNID(
+	ctx context.Context, eventNID types.EventNID,
+) (out types.RoomNID, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		out, err = d.statements.selectRoomNIDForEventNID(ctx, txn, eventNID)
+		return err
+	})
+	return
+}
+
 // LatestEventIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
