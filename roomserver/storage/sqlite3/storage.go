@@ -54,7 +54,12 @@ func Open(dataSourceName string) (*Database, error) {
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
 	//d.db.Exec("PRAGMA read_uncommitted = true;")
-	d.db.SetMaxOpenConns(2)
+
+	// FIXME: We are leaking connections somewhere. Setting this to 2 will eventually
+	// cause the roomserver to be unresponsive to new events because something will
+	// acquire the global mutex and never unlock it because it is waiting for a connection
+	// which it will never obtain.
+	d.db.SetMaxOpenConns(20)
 	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}
@@ -253,12 +258,13 @@ func (d *Database) Events(
 ) ([]types.Event, error) {
 	var eventJSONs []eventJSONPair
 	var err error
-	results := make([]types.Event, len(eventNIDs))
+	var results []types.Event
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
 		if err != nil || len(eventJSONs) == 0 {
 			return nil
 		}
+		results = make([]types.Event, len(eventJSONs))
 		for i, eventJSON := range eventJSONs {
 			result := &results[i]
 			result.EventNID = eventJSON.EventNID
@@ -286,11 +292,8 @@ func (d *Database) AddState(
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if len(state) > 0 {
 			var stateBlockNID types.StateBlockNID
-			stateBlockNID, err = d.statements.selectNextStateBlockNID(ctx, txn)
+			stateBlockNID, err = d.statements.bulkInsertStateData(ctx, txn, state)
 			if err != nil {
-				return err
-			}
-			if err = d.statements.bulkInsertStateData(ctx, txn, stateBlockNID, state); err != nil {
 				return err
 			}
 			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
@@ -602,8 +605,9 @@ func (d *Database) StateEntriesForTuples(
 // MembershipUpdater implements input.RoomEventDatabase
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
-) (types.MembershipUpdater, error) {
-	txn, err := d.db.Begin()
+) (updater types.MembershipUpdater, err error) {
+	var txn *sql.Tx
+	txn, err = d.db.Begin()
 	if err != nil {
 		return nil, err
 	}
@@ -611,6 +615,18 @@ func (d *Database) MembershipUpdater(
 	defer func() {
 		if !succeeded {
 			txn.Rollback() // nolint: errcheck
+		} else {
+			// TODO: We should be holding open this transaction but we cannot have
+			// multiple write transactions on sqlite. The code will perform additional
+			// write transactions independent of this one which will consistently cause
+			// 'database is locked' errors. For now, we'll break up the transaction and
+			// hope we don't race too catastrophically. Long term, we should be able to
+			// thread in txn objects where appropriate (either at the interface level or
+			// bring matrix business logic into the storage layer).
+			txerr := txn.Commit()
+			if err == nil && txerr != nil {
+				err = txerr
+			}
 		}
 	}()
 
@@ -624,7 +640,7 @@ func (d *Database) MembershipUpdater(
 		return nil, err
 	}
 
-	updater, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID)
+	updater, err = d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
@@ -658,7 +674,8 @@ func (d *Database) membershipUpdaterTxn(
 	}
 
 	return &membershipUpdater{
-		transaction{ctx, txn}, d, roomNID, targetUserNID, membership,
+		// purposefully set the txn to nil so if we try to use it we panic and fail fast
+		transaction{ctx, nil}, d, roomNID, targetUserNID, membership,
 	}, nil
 }
 

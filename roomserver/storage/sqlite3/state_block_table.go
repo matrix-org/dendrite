@@ -30,7 +30,7 @@ import (
 
 const stateDataSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_state_block (
-    state_block_nid INTEGER PRIMARY KEY AUTOINCREMENT,
+    state_block_nid INTEGER NOT NULL,
     event_type_nid INTEGER NOT NULL,
     event_state_key_nid INTEGER NOT NULL,
     event_nid INTEGER NOT NULL,
@@ -43,10 +43,7 @@ const insertStateDataSQL = "" +
 	" VALUES ($1, $2, $3, $4)"
 
 const selectNextStateBlockNIDSQL = `
-	SELECT COALESCE((
-		SELECT seq+1 AS state_block_nid FROM sqlite_sequence
-		WHERE name = 'roomserver_state_block'), 1
-	) AS state_block_nid
+SELECT IFNULL(MAX(state_block_nid), 0) + 1 FROM roomserver_state_block
 `
 
 // Bulk state lookup by numeric state block ID.
@@ -98,11 +95,19 @@ func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
 
 func (s *stateBlockStatements) bulkInsertStateData(
 	ctx context.Context, txn *sql.Tx,
-	stateBlockNID types.StateBlockNID,
 	entries []types.StateEntry,
-) error {
+) (types.StateBlockNID, error) {
+	if len(entries) == 0 {
+		return 0, nil
+	}
+	var stateBlockNID types.StateBlockNID
+	err := txn.Stmt(s.selectNextStateBlockNIDStmt).QueryRowContext(ctx).Scan(&stateBlockNID)
+	if err != nil {
+		return 0, err
+	}
+
 	for _, entry := range entries {
-		_, err := common.TxStmt(txn, s.insertStateDataStmt).ExecContext(
+		_, err := txn.Stmt(s.insertStateDataStmt).ExecContext(
 			ctx,
 			int64(stateBlockNID),
 			int64(entry.EventTypeNID),
@@ -110,20 +115,10 @@ func (s *stateBlockStatements) bulkInsertStateData(
 			int64(entry.EventNID),
 		)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
-	return nil
-}
-
-func (s *stateBlockStatements) selectNextStateBlockNID(
-	ctx context.Context,
-	txn *sql.Tx,
-) (types.StateBlockNID, error) {
-	var stateBlockNID int64
-	selectStmt := common.TxStmt(txn, s.selectNextStateBlockNIDStmt)
-	err := selectStmt.QueryRowContext(ctx).Scan(&stateBlockNID)
-	return types.StateBlockNID(stateBlockNID), err
+	return stateBlockNID, nil
 }
 
 func (s *stateBlockStatements) bulkSelectStateBlockEntries(

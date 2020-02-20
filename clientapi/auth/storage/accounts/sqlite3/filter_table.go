@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -47,14 +48,10 @@ const selectFilterIDByContentSQL = "" +
 const insertFilterSQL = "" +
 	"INSERT INTO account_filter (filter, localpart) VALUES ($1, $2)"
 
-const selectLastInsertedFilterIDSQL = "" +
-	"SELECT id FROM account_filter WHERE rowid = last_insert_rowid()"
-
 type filterStatements struct {
-	selectFilterStmt               *sql.Stmt
-	selectLastInsertedFilterIDStmt *sql.Stmt
-	selectFilterIDByContentStmt    *sql.Stmt
-	insertFilterStmt               *sql.Stmt
+	selectFilterStmt            *sql.Stmt
+	selectFilterIDByContentStmt *sql.Stmt
+	insertFilterStmt            *sql.Stmt
 }
 
 func (s *filterStatements) prepare(db *sql.DB) (err error) {
@@ -63,9 +60,6 @@ func (s *filterStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
-		return
-	}
-	if s.selectLastInsertedFilterIDStmt, err = db.Prepare(selectLastInsertedFilterIDSQL); err != nil {
 		return
 	}
 	if s.selectFilterIDByContentStmt, err = db.Prepare(selectFilterIDByContentSQL); err != nil {
@@ -128,12 +122,14 @@ func (s *filterStatements) insertFilter(
 	}
 
 	// Otherwise insert the filter and return the new ID
-	if _, err = s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart); err != nil {
+	res, err := s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart)
+	if err != nil {
 		return "", err
 	}
-	row := s.selectLastInsertedFilterIDStmt.QueryRowContext(ctx)
-	if err := row.Scan(&filterID); err != nil {
+	rowid, err := res.LastInsertId()
+	if err != nil {
 		return "", err
 	}
+	filterID = fmt.Sprintf("%d", rowid)
 	return
 }

@@ -103,6 +103,8 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 		return
 	}
 
+	defer rows.Close() // nolint: errcheck
+
 	for rows.Next() {
 		var alias string
 		if err = rows.Scan(&alias); err != nil {
