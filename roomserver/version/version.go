@@ -54,7 +54,7 @@ var roomVersions = map[RoomVersionID]RoomVersionDescription{
 		EnforceSigningKeyValidity: false,
 	},
 	RoomVersionV2: RoomVersionDescription{
-		Supported:                 false,
+		Supported:                 true,
 		Stable:                    true,
 		StateResolution:           state.StateResolutionAlgorithmV2,
 		EventFormat:               EventFormatV1,
@@ -84,7 +84,7 @@ var roomVersions = map[RoomVersionID]RoomVersionDescription{
 }
 
 func GetDefaultRoomVersion() RoomVersionID {
-	return RoomVersionV1
+	return RoomVersionV2
 }
 
 func GetRoomVersions() map[RoomVersionID]RoomVersionDescription {
