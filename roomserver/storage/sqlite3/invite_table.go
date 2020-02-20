@@ -52,16 +52,18 @@ const selectInviteActiveForUserInRoomSQL = "" +
 // However the matrix protocol doesn't give us a way to reliably identify the
 // invites that were retired, so we are forced to retire all of them.
 const updateInviteRetiredSQL = `
-	UPDATE roomserver_invites SET retired = TRUE
-	  WHERE room_nid = $1 AND target_nid = $2 AND NOT retired;
-	SELECT invite_event_id FROM roomserver_invites
-		WHERE rowid = last_insert_rowid();
+	UPDATE roomserver_invites SET retired = TRUE WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
+`
+
+const selectInvitesAboutToRetireSQL = `
+SELECT invite_event_id FROM roomserver_invites WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
 `
 
 type inviteStatements struct {
 	insertInviteEventStmt               *sql.Stmt
 	selectInviteActiveForUserInRoomStmt *sql.Stmt
 	updateInviteRetiredStmt             *sql.Stmt
+	selectInvitesAboutToRetireStmt      *sql.Stmt
 }
 
 func (s *inviteStatements) prepare(db *sql.DB) (err error) {
@@ -74,6 +76,7 @@ func (s *inviteStatements) prepare(db *sql.DB) (err error) {
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
 		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
+		{&s.selectInvitesAboutToRetireStmt, selectInvitesAboutToRetireSQL},
 	}.prepare(db)
 }
 
@@ -102,7 +105,8 @@ func (s *inviteStatements) updateInviteRetired(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventIDs []string, err error) {
-	stmt := common.TxStmt(txn, s.updateInviteRetiredStmt)
+	// gather all the event IDs we will retire
+	stmt := txn.Stmt(s.selectInvitesAboutToRetireStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
@@ -110,11 +114,15 @@ func (s *inviteStatements) updateInviteRetired(
 	defer (func() { err = rows.Close() })()
 	for rows.Next() {
 		var inviteEventID string
-		if err := rows.Scan(&inviteEventID); err != nil {
+		if err = rows.Scan(&inviteEventID); err != nil {
 			return nil, err
 		}
 		eventIDs = append(eventIDs, inviteEventID)
 	}
+
+	// now retire the invites
+	stmt = txn.Stmt(s.updateInviteRetiredStmt)
+	_, err = stmt.ExecContext(ctx, roomNID, targetUserNID)
 	return
 }
 
