@@ -11,7 +11,7 @@ var calculateStateDurations = prometheus.NewSummaryVec(
 	prometheus.SummaryOpts{
 		Namespace: "dendrite",
 		Subsystem: "roomserver",
-		Name:      "calculate_state_duration_microseconds",
+		Name:      "calculate_state_v2_duration_microseconds",
 		Help:      "How long it takes to calculate the state after a list of events",
 	},
 	// Takes two labels:
@@ -38,7 +38,7 @@ var calculateStatePrevEventLength = prometheus.NewSummaryVec(
 	prometheus.SummaryOpts{
 		Namespace: "dendrite",
 		Subsystem: "roomserver",
-		Name:      "calculate_state_prev_event_length",
+		Name:      "calculate_state_v2_prev_event_length",
 		Help:      "The length of the list of events to calculate the state after",
 	},
 	[]string{"algorithm", "outcome"},
@@ -48,7 +48,7 @@ var calculateStateFullStateLength = prometheus.NewSummaryVec(
 	prometheus.SummaryOpts{
 		Namespace: "dendrite",
 		Subsystem: "roomserver",
-		Name:      "calculate_state_full_state_length",
+		Name:      "calculate_state_v2_full_state_length",
 		Help:      "The length of the full room state.",
 	},
 	[]string{"algorithm", "outcome"},
@@ -58,7 +58,7 @@ var calculateStateConflictLength = prometheus.NewSummaryVec(
 	prometheus.SummaryOpts{
 		Namespace: "dendrite",
 		Subsystem: "roomserver",
-		Name:      "calculate_state_conflict_state_length",
+		Name:      "calculate_state_v2_conflict_state_length",
 		Help:      "The length of the conflicted room state.",
 	},
 	[]string{"algorithm", "outcome"},
