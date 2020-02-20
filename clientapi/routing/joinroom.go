@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -288,7 +289,11 @@ func (r joinRoomReq) joinRoomUsingServers(
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
 func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
-	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID)
+	var roomVersions []int
+	for i := range version.GetSupportedRoomVersions() {
+		roomVersions = append(roomVersions, int(i))
+	}
+	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, roomVersions)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
 		return nil, err
