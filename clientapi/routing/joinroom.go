@@ -293,6 +293,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	for i := range version.GetSupportedRoomVersions() {
 		roomVersions = append(roomVersions, int(i))
 	}
+	fmt.Println("Supported versions:", roomVersions)
 	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, roomVersions)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
