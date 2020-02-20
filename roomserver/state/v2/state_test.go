@@ -19,6 +19,7 @@ package v2
 import (
 	"testing"
 
+	"github.com/matrix-org/dendrite/roomserver/state/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -45,7 +46,7 @@ func TestFindDuplicateStateKeys(t *testing.T) {
 	}}
 
 	for _, test := range testCases {
-		got := findDuplicateStateKeys(test.Input)
+		got := shared.FindDuplicateStateKeys(test.Input)
 		if len(got) != len(test.Want) {
 			t.Fatalf("Wanted %v, got %v", test.Want, got)
 		}
