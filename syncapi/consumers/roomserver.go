@@ -158,6 +158,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event":      string(msg.Event.JSON()),
+			"pdupos":     pduPos,
 			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write invite failure")
 		return nil

@@ -193,24 +193,20 @@ func (d *SyncServerDatasource) WriteEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
 		)
 		if err != nil {
-			fmt.Println("d.events.insertEvent:", err)
 			return err
 		}
 		pduPosition = pos
 
 		if err = d.topology.insertEventInTopology(ctx, txn, ev); err != nil {
-			fmt.Println("d.topology.insertEventInTopology:", err)
 			return err
 		}
 
 		if err = d.handleBackwardExtremities(ctx, txn, ev); err != nil {
-			fmt.Println("d.handleBackwardExtremities:", err)
 			return err
 		}
 
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
 			// Nothing to do, the event may have just been a message event.
-			fmt.Println("nothing to do")
 			return nil
 		}
 
@@ -340,8 +336,12 @@ func (d *SyncServerDatasource) GetEventsInRange(
 }
 
 // SyncPosition returns the latest positions for syncing.
-func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (types.PaginationToken, error) {
-	return d.syncPositionTx(ctx, nil)
+func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (tok types.PaginationToken, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		tok, err = d.syncPositionTx(ctx, txn)
+		return err
+	})
+	return
 }
 
 // BackwardExtremitiesForRoom returns the event IDs of all of the backward
@@ -380,8 +380,12 @@ func (d *SyncServerDatasource) EventPositionInTopology(
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
-func (d *SyncServerDatasource) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
-	return d.syncStreamPositionTx(ctx, nil)
+func (d *SyncServerDatasource) SyncStreamPosition(ctx context.Context) (pos types.StreamPosition, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		pos, err = d.syncStreamPositionTx(ctx, txn)
+		return err
+	})
+	return
 }
 
 func (d *SyncServerDatasource) syncStreamPositionTx(
@@ -625,18 +629,15 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	if err != nil {
 		return
 	}
-	fmt.Println("Joined rooms:", joinedRoomIDs)
 
 	stateFilterPart := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
-		fmt.Println("WE'RE ON", roomID)
 
 		var stateEvents []gomatrixserverlib.Event
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, &stateFilterPart)
 		if err != nil {
-			fmt.Println("d.roomstate.selectCurrentState:", err)
 			return
 		}
 		//fmt.Println("State events:", stateEvents)
@@ -648,7 +649,6 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 			numRecentEventsPerRoom, true, true,
 		)
 		if err != nil {
-			fmt.Println("d.events.selectRecentEvents:", err)
 			return
 		}
 		//fmt.Println("Recent stream events:", recentStreamEvents)
@@ -658,10 +658,9 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		var backwardTopologyPos types.StreamPosition
 		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 		if err != nil {
-			fmt.Println("d.topology.selectPositionInTopology:", err)
 			return nil, types.PaginationToken{}, []string{}, err
 		}
-		fmt.Println("Backward topology position:", backwardTopologyPos)
+
 		if backwardTopologyPos-1 <= 0 {
 			backwardTopologyPos = types.StreamPosition(1)
 		} else {
@@ -683,7 +682,6 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	}
 
 	if err = d.addInvitesToResponse(ctx, txn, userID, 0, toPos.PDUPosition, res); err != nil {
-		fmt.Println("d.addInvitesToResponse:", err)
 		return
 	}
 
@@ -744,18 +742,10 @@ func (d *SyncServerDatasource) GetAccountDataInRange(
 func (d *SyncServerDatasource) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (sp types.StreamPosition, err error) {
-	txn, err := d.db.BeginTx(ctx, nil)
-	if err != nil {
-		return types.StreamPosition(0), err
-	}
-	var succeeded bool
-	defer func() {
-		txerr := common.EndTransaction(txn, &succeeded)
-		if err == nil && txerr != nil {
-			err = txerr
-		}
-	}()
-	sp, err = d.accountData.insertAccountData(ctx, txn, userID, roomID, dataType)
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		sp, err = d.accountData.insertAccountData(ctx, txn, userID, roomID, dataType)
+		return err
+	})
 	return
 }
 
@@ -764,8 +754,15 @@ func (d *SyncServerDatasource) UpsertAccountData(
 // Returns an error if there was a problem communicating with the database.
 func (d *SyncServerDatasource) AddInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.Event,
-) (types.StreamPosition, error) {
-	return d.invites.insertInviteEvent(ctx, inviteEvent)
+) (streamPos types.StreamPosition, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		streamPos, err = d.streamID.nextStreamID(ctx, txn)
+		if err != nil {
+			return err
+		}
+		return d.invites.insertInviteEvent(ctx, txn, inviteEvent, streamPos)
+	})
+	return
 }
 
 // RetireInviteEvent removes an old invite event from the database.

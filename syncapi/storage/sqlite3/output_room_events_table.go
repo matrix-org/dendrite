@@ -54,9 +54,6 @@ const insertEventSQL = "" +
 	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
 	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = $11"
 
-const selectLastInsertedEventSQL = "" +
-	"SELECT id FROM syncapi_output_room_events WHERE rowid = last_insert_rowid()"
-
 const selectEventsSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
 
@@ -105,7 +102,6 @@ const selectStateInRangeSQL = "" +
 type outputRoomEventsStatements struct {
 	streamIDStatements            *streamIDStatements
 	insertEventStmt               *sql.Stmt
-	selectLastInsertedEventStmt   *sql.Stmt
 	selectEventsStmt              *sql.Stmt
 	selectMaxEventIDStmt          *sql.Stmt
 	selectRecentEventsStmt        *sql.Stmt
@@ -121,9 +117,6 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB, streamID *streamIDState
 		return
 	}
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
-		return
-	}
-	if s.selectLastInsertedEventStmt, err = db.Prepare(selectLastInsertedEventSQL); err != nil {
 		return
 	}
 	if s.selectEventsStmt, err = db.Prepare(selectEventsSQL); err != nil {
@@ -270,7 +263,6 @@ func (s *outputRoomEventsStatements) insertEvent(
 	}
 
 	insertStmt := common.TxStmt(txn, s.insertEventStmt)
-	selectStmt := common.TxStmt(txn, s.selectLastInsertedEventStmt)
 	_, err = insertStmt.ExecContext(
 		ctx,
 		streamPos,
@@ -286,10 +278,6 @@ func (s *outputRoomEventsStatements) insertEvent(
 		txnID,
 		excludeFromSync,
 	)
-	if err != nil {
-		return
-	}
-	err = selectStmt.QueryRowContext(ctx).Scan(&streamPos)
 	return
 }
 
