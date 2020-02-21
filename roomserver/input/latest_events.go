@@ -60,7 +60,12 @@ func updateLatestEvents(
 		return
 	}
 	succeeded := false
-	defer common.EndTransaction(updater, &succeeded)
+	defer func() {
+		txerr := common.EndTransaction(updater, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
 
 	u := latestEventsUpdater{
 		ctx: ctx, db: db, updater: updater, ow: ow, roomNID: roomNID,

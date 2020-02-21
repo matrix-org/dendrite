@@ -91,6 +91,7 @@ func (s *backwardExtremitiesStatements) selectBackwardExtremitiesForRoom(
 	if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 
 	for rows.Next() {
 		var eID string
@@ -101,7 +102,7 @@ func (s *backwardExtremitiesStatements) selectBackwardExtremitiesForRoom(
 		eventIDs = append(eventIDs, eID)
 	}
 
-	return
+	return eventIDs, rows.Err()
 }
 
 func (s *backwardExtremitiesStatements) isBackwardExtremity(

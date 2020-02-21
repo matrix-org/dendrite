@@ -1,13 +1,21 @@
 version: "3.4"
 services:
+  riot:
+    image: vectorim/riot-web
+    networks:
+      - internal
+    ports:
+      - "8500:80"
+
   monolith:
     container_name: dendrite_monolith
     hostname: monolith
-    entrypoint: ["bash", "./docker/services/monolith.sh"]
+    entrypoint: ["bash", "./docker/services/monolith.sh", "--config", "/etc/dendrite/dendrite.yaml"]
     build: ./
     volumes:
       - ..:/build
       - ./build/bin:/build/bin
+      - ../cfg:/etc/dendrite
     networks:
       - internal
     depends_on:

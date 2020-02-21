@@ -76,14 +76,30 @@ while read -r test_name; do
 	fi
 done <<< "${passed_but_expected_fail}"
 
+# TODO: Check that the same test doesn't exist in both the whitelist and blacklist
+# TODO: Check that the same test doesn't appear twice in the whitelist|blacklist
+
+# Trim test output strings
+tests_to_add=$(echo -e $tests_to_add | xargs)
+already_in_whitelist=$(echo -e $already_in_whitelist | xargs)
+
+# Format output with markdown for buildkite annotation rendering purposes
+if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
+	echo "### 📜 SyTest Whitelist Maintenance"
+fi
+
 if [ -n "${tests_to_add}" ]; then
-	echo "ERROR: The following passed tests are not present in $2. Please append them to the file:"
+	echo "**ERROR**: The following tests passed but are not present in \`$2\`. Please append them to the file:"
+    echo "\`\`\`"
 	echo -e "${tests_to_add}"
+    echo "\`\`\`"
 fi
 
 if [ -n "${already_in_whitelist}" ]; then
-	echo "WARN: Tests in the whitelist still marked as expected fail:"
+	echo "**WARN**: Tests in the whitelist still marked as **expected fail**:"
+    echo "\`\`\`"
 	echo -e "${already_in_whitelist}"
+    echo "\`\`\`"
 fi
 
 exit ${fail_build}

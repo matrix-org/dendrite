@@ -36,8 +36,8 @@ import (
 // component.
 func SetupSyncAPIComponent(
 	base *basecomponent.BaseDendrite,
-	deviceDB *devices.Database,
-	accountsDB *accounts.Database,
+	deviceDB devices.Database,
+	accountsDB accounts.Database,
 	queryAPI api.RoomserverQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,

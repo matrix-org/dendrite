@@ -440,8 +440,8 @@ func validateApplicationService(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 
@@ -513,8 +513,8 @@ func handleGuestRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 
 	//Generate numeric local part for guest user
@@ -570,8 +570,8 @@ func handleRegistrationFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
@@ -668,8 +668,8 @@ func handleApplicationServiceRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
@@ -707,8 +707,8 @@ func checkAndCompleteFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
@@ -730,8 +730,8 @@ func checkAndCompleteFlow(
 // LegacyRegister process register requests from the legacy v1 API
 func LegacyRegister(
 	req *http.Request,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var r legacyRegisterRequest
@@ -814,8 +814,8 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 // not all
 func completeRegistration(
 	ctx context.Context,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	username, password, appserviceID string,
 	inhibitLogin common.WeakBoolean,
 	displayName, deviceID *string,
@@ -992,7 +992,7 @@ type availableResponse struct {
 func RegisterAvailable(
 	req *http.Request,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 

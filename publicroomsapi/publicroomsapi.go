@@ -28,7 +28,7 @@ import (
 // component.
 func SetupPublicRoomsAPIComponent(
 	base *basecomponent.BaseDendrite,
-	deviceDB *devices.Database,
+	deviceDB devices.Database,
 	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
 ) {
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))

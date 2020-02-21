@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrix"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -154,22 +153,23 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB) (err error) {
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) selectStateInRange(
 	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
-	stateFilterPart *gomatrix.FilterPart,
+	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(
 		ctx, oldPos, newPos,
-		pq.StringArray(stateFilterPart.Senders),
-		pq.StringArray(stateFilterPart.NotSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
-		stateFilterPart.ContainsURL,
-		stateFilterPart.Limit,
+		pq.StringArray(stateFilter.Senders),
+		pq.StringArray(stateFilter.NotSenders),
+		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
+		stateFilter.ContainsURL,
+		stateFilter.Limit,
 	)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer rows.Close() // nolint: errcheck
 	// Fetch all the state change events for all rooms between the two positions then loop each event and:
 	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
 	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
@@ -226,7 +226,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 		}
 	}
 
-	return stateNeeded, eventIDToEvent, nil
+	return stateNeeded, eventIDToEvent, rows.Err()
 }
 
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
@@ -392,5 +392,5 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			ExcludeFromSync: excludeFromSync,
 		})
 	}
-	return result, nil
+	return result, rows.Err()
 }

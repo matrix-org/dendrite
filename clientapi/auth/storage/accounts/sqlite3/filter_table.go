@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package accounts
+package sqlite3
 
 import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -28,11 +29,11 @@ CREATE TABLE IF NOT EXISTS account_filter (
 	-- The filter
 	filter TEXT NOT NULL,
 	-- The ID
-	id SERIAL UNIQUE,
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	-- The localpart of the Matrix user ID associated to this filter
 	localpart TEXT NOT NULL,
 
-	PRIMARY KEY(id, localpart)
+	UNIQUE (id, localpart)
 );
 
 CREATE INDEX IF NOT EXISTS account_filter_localpart ON account_filter(localpart);
@@ -45,7 +46,7 @@ const selectFilterIDByContentSQL = "" +
 	"SELECT id FROM account_filter WHERE localpart = $1 AND filter = $2"
 
 const insertFilterSQL = "" +
-	"INSERT INTO account_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id"
+	"INSERT INTO account_filter (filter, localpart) VALUES ($1, $2)"
 
 type filterStatements struct {
 	selectFilterStmt            *sql.Stmt
@@ -121,7 +122,14 @@ func (s *filterStatements) insertFilter(
 	}
 
 	// Otherwise insert the filter and return the new ID
-	err = s.insertFilterStmt.QueryRowContext(ctx, filterJSON, localpart).
-		Scan(&filterID)
+	res, err := s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart)
+	if err != nil {
+		return "", err
+	}
+	rowid, err := res.LastInsertId()
+	if err != nil {
+		return "", err
+	}
+	filterID = fmt.Sprintf("%d", rowid)
 	return
 }

@@ -30,7 +30,7 @@ type userDevicesResponse struct {
 // GetUserDevices for the given user id
 func GetUserDevices(
 	req *http.Request,
-	deviceDB *devices.Database,
+	deviceDB devices.Database,
 	userID string,
 ) util.JSONResponse {
 	localpart, err := userutil.ParseUsernameParam(userID, nil)

@@ -30,7 +30,7 @@ import (
 // GetProfile implements GET /_matrix/federation/v1/query/profile
 func GetProfile(
 	httpReq *http.Request,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 	cfg *config.Dendrite,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {

@@ -209,6 +209,9 @@ func (s *eventStatements) bulkSelectStateEventByID(
 			return nil, err
 		}
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if i != len(eventIDs) {
 		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
 		// We don't know which ones were missing because we don't return the string IDs in the query.
@@ -219,7 +222,7 @@ func (s *eventStatements) bulkSelectStateEventByID(
 			fmt.Sprintf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs)),
 		)
 	}
-	return results, err
+	return results, nil
 }
 
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
@@ -251,12 +254,15 @@ func (s *eventStatements) bulkSelectStateAtEventByID(
 			)
 		}
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if i != len(eventIDs) {
 		return nil, types.MissingEventError(
 			fmt.Sprintf("storage: event IDs missing from the database (%d != %d)", i, len(eventIDs)),
 		)
 	}
-	return results, err
+	return results, nil
 }
 
 func (s *eventStatements) updateEventState(
@@ -321,6 +327,9 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 		result.EventID = eventID
 		result.EventSHA256 = eventSHA256
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
 	}
@@ -342,6 +351,9 @@ func (s *eventStatements) bulkSelectEventReference(
 		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
 			return nil, err
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
@@ -366,6 +378,9 @@ func (s *eventStatements) bulkSelectEventID(ctx context.Context, eventNIDs []typ
 		}
 		results[types.EventNID(eventNID)] = eventID
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
 	}
@@ -389,7 +404,7 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, eventIDs []str
 		}
 		results[eventID] = types.EventNID(eventNID)
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 func (s *eventStatements) selectMaxEventDepth(ctx context.Context, eventNIDs []types.EventNID) (int64, error) {

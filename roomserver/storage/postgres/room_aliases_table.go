@@ -90,23 +90,23 @@ func (s *roomAliasesStatements) selectRoomIDFromAlias(
 
 func (s *roomAliasesStatements) selectAliasesFromRoomID(
 	ctx context.Context, roomID string,
-) (aliases []string, err error) {
-	aliases = []string{}
+) ([]string, error) {
 	rows, err := s.selectAliasesFromRoomIDStmt.QueryContext(ctx, roomID)
 	if err != nil {
-		return
+		return nil, err
 	}
+	defer rows.Close() // nolint: errcheck
 
+	var aliases []string
 	for rows.Next() {
 		var alias string
 		if err = rows.Scan(&alias); err != nil {
-			return
+			return nil, err
 		}
 
 		aliases = append(aliases, alias)
 	}
-
-	return
+	return aliases, rows.Err()
 }
 
 func (s *roomAliasesStatements) selectCreatorIDFromAlias(

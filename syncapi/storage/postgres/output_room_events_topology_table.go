@@ -134,6 +134,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 	} else if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 
 	// Return the IDs.
 	var eventID string
@@ -144,7 +145,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 		eventIDs = append(eventIDs, eventID)
 	}
 
-	return
+	return eventIDs, rows.Err()
 }
 
 // selectPositionInTopology returns the position of a given event in the
@@ -176,6 +177,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
 	} else if err != nil {
 		return
 	}
+	defer rows.Close() // nolint: errcheck
 	// Return the IDs.
 	var eventID string
 	for rows.Next() {
@@ -184,5 +186,5 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
 		}
 		eventIDs = append(eventIDs, eventID)
 	}
-	return
+	return eventIDs, rows.Err()
 }

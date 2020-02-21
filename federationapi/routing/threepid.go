@@ -61,7 +61,7 @@ func CreateInvitesFrom3PIDInvites(
 	req *http.Request, queryAPI roomserverAPI.RoomserverQueryAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
 	producer *producers.RoomserverProducer, federation *gomatrixserverlib.FederationClient,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -174,7 +174,7 @@ func createInviteFrom3PIDInvite(
 	ctx context.Context, queryAPI roomserverAPI.RoomserverQueryAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
 	inv invite, federation *gomatrixserverlib.FederationClient,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 ) (*gomatrixserverlib.Event, error) {
 	_, server, err := gomatrixserverlib.SplitID('@', inv.MXID)
 	if err != nil {
