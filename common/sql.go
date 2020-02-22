@@ -17,6 +17,7 @@ package common
 import (
 	"database/sql"
 	"fmt"
+	"runtime"
 
 	"github.com/lib/pq"
 )
@@ -98,4 +99,11 @@ func QueryVariadicOffset(count, offset int) string {
 	}
 	str += ")"
 	return str
+}
+
+func SQLiteDriverName() string {
+	if runtime.GOOS == "js" {
+		return "sqlite3_js"
+	}
+	return "sqlite3"
 }

@@ -41,7 +41,7 @@ type attributeValue interface{}
 func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerDatabase, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open("sqlite3", dataSourceName); err != nil {
+	if db, err = sql.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
 		return nil, err
 	}
 	storage := PublicRoomsServerDatabase{
