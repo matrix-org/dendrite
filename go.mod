@@ -1,5 +1,7 @@
 module github.com/matrix-org/dendrite
 
+replace github.com/lib/pq => github.com/matrix-org/pq v1.3.2
+
 require (
 	github.com/DataDog/zstd v1.4.4 // indirect
 	github.com/Shopify/toxiproxy v2.1.4+incompatible // indirect
