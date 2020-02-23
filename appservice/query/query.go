@@ -180,10 +180,10 @@ func makeHTTPClient() *http.Client {
 	}
 }
 
-// SetupHTTP adds the AppServiceQueryPAI handlers to the http.ServeMux. This
+// SetupHTTP adds the AppServiceQueryAPI handlers to the http.ServeMux. This
 // handles and muxes incoming api requests the to internal AppServiceQueryAPI.
-func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(
+func (a *AppServiceQueryAPI) SetupHTTP(serveMux *http.ServeMux) {
+	serveMux.Handle(
 		api.AppServiceRoomAliasExistsPath,
 		common.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
 			var request api.RoomAliasExistsRequest
@@ -197,7 +197,7 @@ func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	serveMux.Handle(
 		api.AppServiceUserIDExistsPath,
 		common.MakeInternalAPI("appserviceUserIDExists", func(req *http.Request) util.JSONResponse {
 			var request api.UserIDExistsRequest

@@ -19,6 +19,8 @@ require (
 	github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible
 	github.com/miekg/dns v1.1.12 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
 	github.com/opentracing/opentracing-go v1.0.2
 	github.com/pierrec/lz4 v2.4.1+incompatible // indirect
