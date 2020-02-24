@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/federationapi"
@@ -51,7 +52,23 @@ var (
 )
 
 func main() {
-	cfg := basecomponent.ParseMonolithFlags()
+	cfg := &config.Dendrite{}
+	cfg.Kafka.UseNaffka = true
+	cfg.Database.Account = "file:dendritejs_account.db"
+	cfg.Database.AppService = "file:dendritejs_appservice.db"
+	cfg.Database.Device = "file:dendritejs_device.db"
+	cfg.Database.FederationSender = "file:dendritejs_fedsender.db"
+	cfg.Database.MediaAPI = "file:dendritejs_mediaapi.db"
+	cfg.Database.Naffka = "file:dendritejs_naffka.db"
+	cfg.Database.PublicRoomsAPI = "file:dendritejs_publicrooms.db"
+	cfg.Database.RoomServer = "file:dendritejs_roomserver.db"
+	cfg.Database.ServerKey = "file:dendritejs_serverkey.db"
+	cfg.Database.SyncAPI = "file:dendritejs_syncapi.db"
+
+	cfg.Matrix.ServerName = "localhost"
+	cfg.Matrix.TrustedIDServers = []string{
+		"matrix.org", "vector.im",
+	}
 	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 

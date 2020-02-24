@@ -64,10 +64,11 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 	common.SetupStdLogging()
 	common.SetupHookLogging(cfg.Logging, componentName)
 
-	closer, err := cfg.SetupTracing("Dendrite" + componentName)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to start opentracing")
-	}
+	// TODO: Make this optional
+	//closer, err := cfg.SetupTracing("Dendrite" + componentName)
+	//if err != nil {
+	//	logrus.WithError(err).Panicf("failed to start opentracing")
+	//}
 
 	var kafkaConsumer sarama.Consumer
 	var kafkaProducer sarama.SyncProducer
@@ -79,7 +80,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 
 	return &BaseDendrite{
 		componentName: componentName,
-		tracerCloser:  closer,
+		//tracerCloser:  closer,
 		Cfg:           cfg,
 		APIMux:        mux.NewRouter().UseEncodedPath(),
 		KafkaConsumer: kafkaConsumer,
@@ -89,7 +90,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 
 // Close implements io.Closer
 func (b *BaseDendrite) Close() error {
-	return b.tracerCloser.Close()
+	return nil
+	// return b.tracerCloser.Close()
 }
 
 // CreateHTTPAppServiceAPIs returns the QueryAPI for hitting the appservice
