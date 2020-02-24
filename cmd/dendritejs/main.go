@@ -16,6 +16,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -33,11 +34,14 @@ import (
 	"github.com/matrix-org/dendrite/typingserver"
 	"github.com/matrix-org/dendrite/typingserver/cache"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
 	_ "github.com/matrix-org/go-sqlite3-js"
 )
+
+func init() {
+	fmt.Println("dendrite.js starting...")
+}
 
 var (
 	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
@@ -76,9 +80,6 @@ func main() {
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 
-	// Set up the API endpoints we handle. /metrics is for prometheus, and is
-	// not wrapped by CORS, while everything else is
-	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/", httpHandler)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
