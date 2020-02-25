@@ -75,6 +75,12 @@ github.com/matrix-org/go-sqlite3-js v0.0.0-20200225105839-089f29e7c4bd h1:pz266H
 github.com/matrix-org/go-sqlite3-js v0.0.0-20200225105839-089f29e7c4bd/go.mod h1:e+cg2q7C7yE5QnAXgzo512tgFh1RbQLC0+jozuegKgo=
 github.com/matrix-org/go-sqlite3-js v0.0.0-20200225115056-c0aef2609ba2 h1:ZgjpruDBBat81KC7Mv2dTc3nsLp5mNV/C6p637NQoqw=
 github.com/matrix-org/go-sqlite3-js v0.0.0-20200225115056-c0aef2609ba2/go.mod h1:e+cg2q7C7yE5QnAXgzo512tgFh1RbQLC0+jozuegKgo=
+github.com/matrix-org/go-sqlite3-js v0.0.0-20200225214814-ffc26cc11c6c h1:anhIgTzzlpxfyMRg6zDu2ySXi6Rgm7OwjImULcb7fmU=
+github.com/matrix-org/go-sqlite3-js v0.0.0-20200225214814-ffc26cc11c6c/go.mod h1:e+cg2q7C7yE5QnAXgzo512tgFh1RbQLC0+jozuegKgo=
+github.com/matrix-org/go-sqlite3-js v0.0.0-20200225220001-0b5561bfc12f h1:OOE9IBDB9DEp3cXs+bxnEagiuANedhOocpoWTv9BbKk=
+github.com/matrix-org/go-sqlite3-js v0.0.0-20200225220001-0b5561bfc12f/go.mod h1:e+cg2q7C7yE5QnAXgzo512tgFh1RbQLC0+jozuegKgo=
+github.com/matrix-org/go-sqlite3-js v0.0.0-20200225224420-1ca1c9f64f82 h1:gFdtxNrSzfqVdMR/xGdactHjQBqb/eSPrrXwe/C/goE=
+github.com/matrix-org/go-sqlite3-js v0.0.0-20200225224420-1ca1c9f64f82/go.mod h1:e+cg2q7C7yE5QnAXgzo512tgFh1RbQLC0+jozuegKgo=
 github.com/matrix-org/gomatrix v0.0.0-20190130130140-385f072fe9af h1:piaIBNQGIHnni27xRB7VKkEwoWCgAmeuYf8pxAyG0bI=
 github.com/matrix-org/gomatrix v0.0.0-20190130130140-385f072fe9af/go.mod h1:3fxX6gUjWyI/2Bt7J1OLhpCzOfO/bB3AiX0cJtEKud0=
 github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26 h1:Hr3zjRsq2bhrnp3Ky1qgx/fzCtCALOoGYylh2tpS9K4=

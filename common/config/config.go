@@ -365,7 +365,7 @@ func loadConfig(
 		return nil, err
 	}
 
-	config.setDefaults()
+	config.SetDefaults()
 
 	if err = config.check(monolithic); err != nil {
 		return nil, err
@@ -398,7 +398,7 @@ func loadConfig(
 	config.Media.AbsBasePath = Path(absPath(basePath, config.Media.BasePath))
 
 	// Generate data from config options
-	err = config.derive()
+	err = config.Derive()
 	if err != nil {
 		return nil, err
 	}
@@ -406,9 +406,9 @@ func loadConfig(
 	return &config, nil
 }
 
-// derive generates data that is derived from various values provided in
+// Derive generates data that is derived from various values provided in
 // the config file.
-func (config *Dendrite) derive() error {
+func (config *Dendrite) Derive() error {
 	// Determine registrations flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
@@ -433,8 +433,8 @@ func (config *Dendrite) derive() error {
 	return nil
 }
 
-// setDefaults sets default config values if they are not explicitly set.
-func (config *Dendrite) setDefaults() {
+// SetDefaults sets default config values if they are not explicitly set.
+func (config *Dendrite) SetDefaults() {
 	if config.Matrix.KeyValidityPeriod == 0 {
 		config.Matrix.KeyValidityPeriod = 24 * time.Hour
 	}

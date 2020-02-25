@@ -63,6 +63,7 @@ func generateKey() ed25519.PrivateKey {
 
 func main() {
 	cfg := &config.Dendrite{}
+	cfg.SetDefaults()
 	cfg.Kafka.UseNaffka = true
 	cfg.Database.Account = "file:dendritejs_account.db"
 	cfg.Database.AppService = "file:dendritejs_appservice.db"
@@ -80,6 +81,9 @@ func main() {
 		"matrix.org", "vector.im",
 	}
 	cfg.Matrix.PrivateKey = generateKey()
+	if err := cfg.Derive(); err != nil {
+		logrus.Fatalf("Failed to derive values from config: %s", err)
+	}
 	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
