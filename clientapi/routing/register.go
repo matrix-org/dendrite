@@ -444,7 +444,8 @@ func Register(
 	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-
+	logger := util.GetLogger(req.Context())
+	logger.Info("Incoming request info: " + fmt.Sprintf("%+v", req))
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
@@ -499,7 +500,6 @@ func Register(
 		}
 	}
 
-	logger := util.GetLogger(req.Context())
 	logger.WithFields(log.Fields{
 		"username":   r.Username,
 		"auth.type":  r.Auth.Type,

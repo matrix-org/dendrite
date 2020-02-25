@@ -35,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/dendrite/typingserver"
 	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
 
 	"github.com/sirupsen/logrus"
 
@@ -109,17 +110,12 @@ func main() {
 
 	http.Handle("/", httpHandler)
 
-	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		logrus.Info("Listening on ", *httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(*httpBindAddr, nil))
-	}()
-	// Handle HTTPS if certificate and key are provided
-	go func() {
-		if *certFile != "" && *keyFile != "" {
-			logrus.Info("Listening on ", *httpsBindAddr)
-			logrus.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, nil))
-		}
+		logrus.Info("Listening for service-worker fetch traffic")
+
+		listener := go_http_js_libp2p.NewFetchListener()
+		s := &http.Server{}
+		go s.Serve(listener)
 	}()
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
