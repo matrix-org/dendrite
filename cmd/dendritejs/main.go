@@ -15,6 +15,7 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"flag"
 	"fmt"
 	"net/http"
@@ -51,6 +52,14 @@ var (
 	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
 )
 
+func generateKey() ed25519.PrivateKey {
+	_, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		logrus.Fatalf("Failed to generate ed25519 key: %s", err)
+	}
+	return priv
+}
+
 func main() {
 	cfg := &config.Dendrite{}
 	cfg.Kafka.UseNaffka = true
@@ -69,6 +78,7 @@ func main() {
 	cfg.Matrix.TrustedIDServers = []string{
 		"matrix.org", "vector.im",
 	}
+	cfg.Matrix.PrivateKey = generateKey()
 	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
