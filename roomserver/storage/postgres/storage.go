@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -70,7 +71,17 @@ func (d *Database) StoreEvent(
 		}
 	}
 
-	if roomNID, err = d.assignRoomNID(ctx, nil, event.RoomID()); err != nil {
+	roomVersion := ""
+	if event.Type() == gomatrixserverlib.MRoomCreate {
+		var createContent gomatrixserverlib.CreateContent
+		if err := json.Unmarshal(event.Content(), createContent); err == nil {
+			if createContent.RoomVersion != nil {
+				roomVersion = *createContent.RoomVersion
+			}
+		}
+	}
+
+	if roomNID, err = d.assignRoomNID(ctx, nil, event.RoomID(), roomVersion); err != nil {
 		return 0, types.StateAtEvent{}, err
 	}
 
@@ -123,13 +134,13 @@ func (d *Database) StoreEvent(
 }
 
 func (d *Database) assignRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string, roomVersion string,
 ) (types.RoomNID, error) {
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.statements.selectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID)
+		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID, roomVersion)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
 			roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
@@ -516,7 +527,7 @@ func (d *Database) MembershipUpdater(
 		}
 	}()
 
-	roomNID, err := d.assignRoomNID(ctx, txn, roomID)
+	roomNID, err := d.assignRoomNID(ctx, txn, roomID, "")
 	if err != nil {
 		return nil, err
 	}

@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/url"
 
@@ -91,7 +92,17 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID()); err != nil {
+		roomVersion := ""
+		if event.Type() == gomatrixserverlib.MRoomCreate {
+			var createContent gomatrixserverlib.CreateContent
+			if err := json.Unmarshal(event.Content(), createContent); err == nil {
+				if createContent.RoomVersion != nil {
+					roomVersion = *createContent.RoomVersion
+				}
+			}
+		}
+
+		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
 			return err
 		}
 
@@ -151,13 +162,13 @@ func (d *Database) StoreEvent(
 }
 
 func (d *Database) assignRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string, roomVersion string,
 ) (roomNID types.RoomNID, err error) {
 	// Check if we already have a numeric ID in the database.
 	roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID)
+		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID, roomVersion)
 		if err == nil {
 			// Now get the numeric ID back out of the database
 			roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
@@ -651,7 +662,7 @@ func (d *Database) MembershipUpdater(
 		}
 	}()
 
-	roomNID, err := d.assignRoomNID(ctx, txn, roomID)
+	roomNID, err := d.assignRoomNID(ctx, txn, roomID, "")
 	if err != nil {
 		return nil, err
 	}

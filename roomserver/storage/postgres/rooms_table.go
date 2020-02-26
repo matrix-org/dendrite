@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS roomserver_rooms (
 
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = "" +
-	"INSERT INTO roomserver_rooms (room_id) VALUES ($1)" +
+	"INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_room_id_unique" +
 	" DO NOTHING RETURNING (room_nid)"
 
@@ -93,11 +93,11 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *roomStatements) insertRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string, roomVersion string,
 ) (types.RoomNID, error) {
 	var roomNID int64
 	stmt := common.TxStmt(txn, s.insertRoomNIDStmt)
-	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
+	err := stmt.QueryRowContext(ctx, roomID, roomVersion).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 

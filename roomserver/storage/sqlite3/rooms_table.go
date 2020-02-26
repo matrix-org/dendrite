@@ -38,7 +38,7 @@ const roomsSchema = `
 
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = `
-	INSERT INTO roomserver_rooms (room_id) VALUES ($1)
+	INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)
 	  ON CONFLICT DO NOTHING;
 `
 
@@ -82,11 +82,11 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *roomStatements) insertRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string, roomVersion string,
 ) (types.RoomNID, error) {
 	var err error
 	insertStmt := common.TxStmt(txn, s.insertRoomNIDStmt)
-	if _, err = insertStmt.ExecContext(ctx, roomID); err == nil {
+	if _, err = insertStmt.ExecContext(ctx, roomID, roomVersion); err == nil {
 		return s.selectRoomNID(ctx, txn, roomID)
 	} else {
 		return types.RoomNID(0), err
