@@ -16,6 +16,7 @@ package threepid
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
 )
@@ -74,6 +76,14 @@ func CreateSession(
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	client := http.Client{}
+	if cfg.Test.SkipSSLVerify == true {
+		customTransport := http.DefaultTransport.(*http.Transport).Clone()
+		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		client = http.Client{
+			Transport: customTransport,
+			Timeout:   time.Second * 30,
+		}
+	}
 	resp, err := client.Do(request.WithContext(ctx))
 	if err != nil {
 		return "", err
@@ -161,6 +171,14 @@ func PublishAssociation(creds Credentials, userID string, cfg *config.Dendrite) 
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	client := http.Client{}
+	if cfg.Test.SkipSSLVerify == true {
+		customTransport := http.DefaultTransport.(*http.Transport).Clone()
+		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		client = http.Client{
+			Transport: customTransport,
+			Timeout:   time.Second * 30,
+		}
+	}
 	resp, err := client.Do(request)
 	if err != nil {
 		return err

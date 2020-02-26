@@ -95,7 +95,7 @@ func (b *BaseDendrite) Close() error {
 // CreateHTTPAppServiceAPIs returns the QueryAPI for hitting the appservice
 // component over HTTP.
 func (b *BaseDendrite) CreateHTTPAppServiceAPIs() appserviceAPI.AppServiceQueryAPI {
-	return appserviceAPI.NewAppServiceQueryAPIHTTP(b.Cfg.AppServiceURL(), nil)
+	return appserviceAPI.NewAppServiceQueryAPIHTTP(b.Cfg, nil)
 }
 
 // CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI for hitting

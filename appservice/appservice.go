@@ -16,6 +16,7 @@ package appservice
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	"sync"
 	"time"
@@ -81,6 +82,14 @@ func SetupAppServiceAPIComponent(
 			Timeout: time.Second * 30,
 		},
 		Cfg: base.Cfg,
+	}
+	if base.Cfg.Test.SkipSSLVerify == true {
+		customTransport := http.DefaultTransport.(*http.Transport).Clone()
+		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		appserviceQueryAPI.HTTPClient = &http.Client{
+			Transport: customTransport,
+			Timeout:   time.Second * 30,
+		}
 	}
 
 	appserviceQueryAPI.SetupHTTP(http.DefaultServeMux)

@@ -18,6 +18,7 @@ package query
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -52,7 +53,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 
 	// Create an HTTP client if one does not already exist
 	if a.HTTPClient == nil {
-		a.HTTPClient = makeHTTPClient()
+		a.HTTPClient = makeHTTPClient(a.Cfg.Test.SkipSSLVerify)
 	}
 
 	// Determine which application service should handle this request
@@ -120,7 +121,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 
 	// Create an HTTP client if one does not already exist
 	if a.HTTPClient == nil {
-		a.HTTPClient = makeHTTPClient()
+		a.HTTPClient = makeHTTPClient(a.Cfg.Test.SkipSSLVerify)
 	}
 
 	// Determine which application service should handle this request
@@ -174,9 +175,14 @@ func (a *AppServiceQueryAPI) UserIDExists(
 }
 
 // makeHTTPClient creates an HTTP client with certain options that will be used for all query requests to application services
-func makeHTTPClient() *http.Client {
+func makeHTTPClient(skipSSLVerify bool) *http.Client {
+	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	if skipSSLVerify == true {
+		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 	return &http.Client{
-		Timeout: time.Second * 30,
+		Transport: customTransport,
+		Timeout:   time.Second * 30,
 	}
 }
 

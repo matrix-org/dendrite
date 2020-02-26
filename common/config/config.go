@@ -268,6 +268,10 @@ type Dendrite struct {
 		// Note: An Exclusive Regex for room ID isn't necessary as we aren't blocking
 		// servers from creating RoomIDs in exclusive application service namespaces
 	} `yaml:"-"`
+
+	Test struct {
+		SkipSSLVerify bool `yaml:"skip_verify_SSL_certificates"`
+	} `yaml:"test"`
 }
 
 // A Path on the filesystem.

@@ -16,6 +16,7 @@ package threepid
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -226,6 +227,14 @@ func queryIDServerStoreInvite(
 	}
 
 	client := http.Client{}
+	if cfg.Test.SkipSSLVerify == true {
+		customTransport := http.DefaultTransport.(*http.Transport).Clone()
+		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		client = http.Client{
+			Transport: customTransport,
+			Timeout: time.Second * 30,
+		}
+	}
 
 	data := url.Values{}
 	data.Add("medium", body.Medium)

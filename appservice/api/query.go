@@ -19,14 +19,17 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	opentracing "github.com/opentracing/opentracing-go"
 )
@@ -99,13 +102,20 @@ type httpAppServiceQueryAPI struct {
 // to a HTTP POST API.
 // If httpClient is nil then it uses http.DefaultClient
 func NewAppServiceQueryAPIHTTP(
-	appserviceURL string,
+	Cfg *config.Dendrite,
 	httpClient *http.Client,
 ) AppServiceQueryAPI {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		customTransport := http.DefaultTransport.(*http.Transport).Clone()
+		if Cfg.Test.SkipSSLVerify == true {
+			customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		}
+		httpClient = &http.Client{
+			Timeout:   time.Second * 30,
+			Transport: customTransport,
+		}
 	}
-	return &httpAppServiceQueryAPI{appserviceURL, httpClient}
+	return &httpAppServiceQueryAPI{Cfg.AppServiceURL(), httpClient}
 }
 
 // RoomAliasExists implements AppServiceQueryAPI
