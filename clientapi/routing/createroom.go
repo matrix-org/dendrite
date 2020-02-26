@@ -18,11 +18,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -180,7 +182,7 @@ func createRoom(
 	}
 
 	r.CreationContent["creator"] = userID
-	r.CreationContent["room_version"] = "1" // TODO: We set this to 1 before we support Room versioning
+	r.CreationContent["room_version"] = strconv.Itoa(roomserverVersion.GetDefaultRoomVersion())
 
 	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association
