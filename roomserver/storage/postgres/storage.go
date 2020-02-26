@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strconv"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -26,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -71,10 +73,13 @@ func (d *Database) StoreEvent(
 		}
 	}
 
-	roomVersion := ""
+	roomVersion := strconv.Itoa(int(version.GetDefaultRoomVersion()))
+	// The below works because the first event to be persisted to the database
+	// is always the m.room.create event. We can therefore set the room version
+	// correctly at the same time as assigning the room NID.
 	if event.Type() == gomatrixserverlib.MRoomCreate {
 		var createContent gomatrixserverlib.CreateContent
-		if err := json.Unmarshal(event.Content(), createContent); err == nil {
+		if err := json.Unmarshal(event.Content(), &createContent); err == nil {
 			if createContent.RoomVersion != nil {
 				roomVersion = *createContent.RoomVersion
 			}
