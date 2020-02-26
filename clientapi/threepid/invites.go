@@ -232,7 +232,7 @@ func queryIDServerStoreInvite(
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		client = http.Client{
 			Transport: customTransport,
-			Timeout: time.Second * 30,
+			Timeout:   time.Second * 30,
 		}
 	}
 
