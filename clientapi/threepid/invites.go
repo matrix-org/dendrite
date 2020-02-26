@@ -227,7 +227,7 @@ func queryIDServerStoreInvite(
 	}
 
 	client := http.Client{}
-	if cfg.Test.SkipSSLVerify == true {
+	if cfg.Test.SkipSSLVerify {
 		customTransport := http.DefaultTransport.(*http.Transport).Clone()
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		client = http.Client{

@@ -177,7 +177,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 // makeHTTPClient creates an HTTP client with certain options that will be used for all query requests to application services
 func makeHTTPClient(skipSSLVerify bool) *http.Client {
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	if skipSSLVerify == true {
+	if skipSSLVerify {
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	return &http.Client{

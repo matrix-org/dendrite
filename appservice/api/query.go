@@ -107,7 +107,7 @@ func NewAppServiceQueryAPIHTTP(
 ) AppServiceQueryAPI {
 	if httpClient == nil {
 		customTransport := http.DefaultTransport.(*http.Transport).Clone()
-		if Cfg.Test.SkipSSLVerify == true {
+		if Cfg.Test.SkipSSLVerify {
 			customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		}
 		httpClient = &http.Client{

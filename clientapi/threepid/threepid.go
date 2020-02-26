@@ -76,7 +76,7 @@ func CreateSession(
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	client := http.Client{}
-	if cfg.Test.SkipSSLVerify == true {
+	if cfg.Test.SkipSSLVerify {
 		customTransport := http.DefaultTransport.(*http.Transport).Clone()
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		client = http.Client{
@@ -171,7 +171,7 @@ func PublishAssociation(creds Credentials, userID string, cfg *config.Dendrite) 
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	client := http.Client{}
-	if cfg.Test.SkipSSLVerify == true {
+	if cfg.Test.SkipSSLVerify {
 		customTransport := http.DefaultTransport.(*http.Transport).Clone()
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		client = http.Client{

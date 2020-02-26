@@ -83,7 +83,7 @@ func SetupAppServiceAPIComponent(
 		},
 		Cfg: base.Cfg,
 	}
-	if base.Cfg.Test.SkipSSLVerify == true {
+	if base.Cfg.Test.SkipSSLVerify {
 		customTransport := http.DefaultTransport.(*http.Transport).Clone()
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		appserviceQueryAPI.HTTPClient = &http.Client{
