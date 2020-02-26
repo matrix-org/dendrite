@@ -182,7 +182,9 @@ func createRoom(
 	}
 
 	r.CreationContent["creator"] = userID
-	r.CreationContent["room_version"] = strconv.Itoa(roomserverVersion.GetDefaultRoomVersion())
+
+	defaultVersion := roomserverVersion.GetDefaultRoomVersion()
+	r.CreationContent["room_version"] = strconv.Itoa(int(defaultVersion))
 
 	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association
