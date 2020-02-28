@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -49,6 +48,7 @@ type createRoomRequest struct {
 	InitialState    []fledglingEvent       `json:"initial_state"`
 	RoomAliasName   string                 `json:"room_alias_name"`
 	GuestCanJoin    bool                   `json:"guest_can_join"`
+	RoomVersion     string                 `json:"room_version"`
 }
 
 const (
@@ -181,18 +181,25 @@ func createRoom(
 		r.CreationContent = make(map[string]interface{}, 2)
 	}
 
-	r.CreationContent["creator"] = userID
+	roomVersion := roomserverVersion.GetDefaultRoomVersion()
+	if r.RoomVersion != "" {
+		id, meta, verr := roomserverVersion.GetSupportedRoomVersionFromString(r.RoomVersion)
+		if verr == nil && meta.Supported {
+			roomVersion = id
+		}
+	}
 
-	defaultVersion := roomserverVersion.GetDefaultRoomVersion()
-	r.CreationContent["room_version"] = strconv.Itoa(int(defaultVersion))
+	r.CreationContent["room_version"] = roomVersion.String()
+	r.CreationContent["creator"] = userID
 
 	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!
 
 	logger.WithFields(log.Fields{
-		"userID": userID,
-		"roomID": roomID,
+		"userID":      userID,
+		"roomID":      roomID,
+		"roomVersion": r.CreationContent["room_version"],
 	}).Info("Creating new room")
 
 	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)

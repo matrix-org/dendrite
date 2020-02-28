@@ -16,6 +16,7 @@ package version
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/matrix-org/dendrite/roomserver/state"
 )
@@ -101,12 +102,35 @@ func GetSupportedRoomVersions() map[RoomVersionID]RoomVersionDescription {
 	return versions
 }
 
-func GetSupportedRoomVersion(version RoomVersionID) (desc RoomVersionDescription, err error) {
-	if version, ok := roomVersions[version]; ok {
+func GetSupportedRoomVersion(id RoomVersionID) (
+	ver RoomVersionID,
+	desc RoomVersionDescription,
+	err error,
+) {
+	if version, ok := roomVersions[id]; ok {
+		ver = id
 		desc = version
 	}
 	if !desc.Supported {
 		err = errors.New("unsupported room version")
 	}
 	return
+}
+
+func (v RoomVersionID) String() string {
+	return strconv.Itoa(int(v))
+}
+
+func GetSupportedRoomVersionFromString(version string) (
+	ver RoomVersionID,
+	desc RoomVersionDescription,
+	err error,
+) {
+	var v RoomVersionID
+	if version, err := strconv.Atoi(version); err == nil {
+		v = RoomVersionID(version)
+	} else {
+		v = GetDefaultRoomVersion()
+	}
+	return GetSupportedRoomVersion(v)
 }
