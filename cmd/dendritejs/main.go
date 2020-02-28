@@ -65,21 +65,22 @@ func main() {
 	cfg := &config.Dendrite{}
 	cfg.SetDefaults()
 	cfg.Kafka.UseNaffka = true
-	cfg.Database.Account = "file:dendritejs_account.db"
-	cfg.Database.AppService = "file:dendritejs_appservice.db"
-	cfg.Database.Device = "file:dendritejs_device.db"
-	cfg.Database.FederationSender = "file:dendritejs_fedsender.db"
-	cfg.Database.MediaAPI = "file:dendritejs_mediaapi.db"
-	cfg.Database.Naffka = "file:dendritejs_naffka.db"
-	cfg.Database.PublicRoomsAPI = "file:dendritejs_publicrooms.db"
-	cfg.Database.RoomServer = "file:dendritejs_roomserver.db"
-	cfg.Database.ServerKey = "file:dendritejs_serverkey.db"
-	cfg.Database.SyncAPI = "file:dendritejs_syncapi.db"
+	cfg.Database.Account = "file:dendritejs_account.db?txns=false"
+	cfg.Database.AppService = "file:dendritejs_appservice.db?txns=false"
+	cfg.Database.Device = "file:dendritejs_device.db?txns=false"
+	cfg.Database.FederationSender = "file:dendritejs_fedsender.db?txns=false"
+	cfg.Database.MediaAPI = "file:dendritejs_mediaapi.db?txns=false"
+	cfg.Database.Naffka = "file:dendritejs_naffka.db?txns=false"
+	cfg.Database.PublicRoomsAPI = "file:dendritejs_publicrooms.db?txns=false"
+	cfg.Database.RoomServer = "file:dendritejs_roomserver.db?txns=false"
+	cfg.Database.ServerKey = "file:dendritejs_serverkey.db?txns=false"
+	cfg.Database.SyncAPI = "file:dendritejs_syncapi.db?txns=false"
 
-	cfg.Matrix.ServerName = "localhost"
+	cfg.Matrix.ServerName = "p2p-js"
 	cfg.Matrix.TrustedIDServers = []string{
 		"matrix.org", "vector.im",
 	}
+	cfg.Matrix.KeyID = "ed25519:1337"
 	cfg.Matrix.PrivateKey = generateKey()
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
@@ -113,6 +114,18 @@ func main() {
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 
 	http.Handle("/", httpHandler)
+
+	// Expose the matrix APIs via libp2p-js
+	if base.P2pLocalNode != nil {
+		go func() {
+			logrus.Info("Listening on libp2p-js host ID ", base.P2pLocalNode.Id)
+
+			listener := go_http_js_libp2p.NewP2pListener(base.P2pLocalNode)
+			defer listener.Close()
+			s := &http.Server{}
+			s.Serve(listener)
+		}()
+	}
 
 	go func() {
 		logrus.Info("Listening for service-worker fetch traffic")
