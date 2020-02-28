@@ -16,6 +16,7 @@ package basecomponent
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -39,6 +40,8 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
 )
 
 // BaseDendrite is a base for creating new instances of dendrite. It parses
@@ -55,6 +58,8 @@ type BaseDendrite struct {
 	Cfg           *config.Dendrite
 	KafkaConsumer sarama.Consumer
 	KafkaProducer sarama.SyncProducer
+
+	P2pLocalNode *go_http_js_libp2p.P2pLocalNode
 }
 
 // NewBaseDendrite creates a new instance to be used by a component.
@@ -78,6 +83,14 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
+	var node *go_http_js_libp2p.P2pLocalNode
+	if cfg.Matrix.ServerName == "p2p-js" {
+		fmt.Println("NewP2pLocalNode")
+		node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", []string{"/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/"})
+		cfg.Matrix.ServerName = gomatrixserverlib.ServerName(node.Id)
+		fmt.Println("ServerName: ", node.Id)
+	}
+
 	return &BaseDendrite{
 		componentName: componentName,
 		//tracerCloser:  closer,
@@ -85,6 +98,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		APIMux:        mux.NewRouter().UseEncodedPath(),
 		KafkaConsumer: kafkaConsumer,
 		KafkaProducer: kafkaProducer,
+
+		P2pLocalNode: node,
 	}
 }
 
@@ -166,9 +181,23 @@ func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
-	return gomatrixserverlib.NewFederationClient(
-		b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
-	)
+	if b.P2pLocalNode != nil {
+		fmt.Println("Running in js-libp2p federation mode")
+		fmt.Println("Warning: Federation with non-libp2p homeservers will not work in this mode yet!")
+		tr := go_http_js_libp2p.NewP2pTransport(b.P2pLocalNode)
+
+		fed := gomatrixserverlib.NewFederationClient(
+			b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
+		)
+		fed.Client = *gomatrixserverlib.NewClientWithTransport(tr)
+
+		return fed
+	} else {
+		fmt.Println("Running in regular federation mode")
+		return gomatrixserverlib.NewFederationClient(
+			b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
+		)
+	}
 }
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
