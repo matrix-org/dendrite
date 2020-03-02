@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -35,7 +36,8 @@ func GetVisibility(
 ) util.JSONResponse {
 	isPublic, err := publicRoomsDatabase.GetRoomVisibility(req.Context(), roomID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("publicRoomsDatabase.GetRoomVisibility failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var v roomVisibility
@@ -64,7 +66,8 @@ func SetVisibility(
 
 	isPublic := v.Visibility == gomatrixserverlib.Public
 	if err := publicRoomsDatabase.SetRoomVisibility(req.Context(), isPublic, roomID); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("publicRoomsDatabase.SetRoomVisibility failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

@@ -56,7 +56,8 @@ func GetTags(
 
 	_, data, err := obtainSavedTags(req, userID, roomID, accountDB)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if data == nil {
@@ -99,20 +100,23 @@ func PutTag(
 
 	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var tagContent gomatrix.TagContent
 	if data != nil {
 		if err = json.Unmarshal(data.Content, &tagContent); err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
+			return jsonerror.InternalServerError()
 		}
 	} else {
 		tagContent = newTag()
 	}
 	tagContent.Tags[tag] = properties
 	if err = saveTagData(req, localpart, roomID, accountDB, tagContent); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Send data to syncProducer in order to inform clients of changes
@@ -151,7 +155,8 @@ func DeleteTag(
 
 	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// If there are no tags in the database, exit
@@ -166,7 +171,8 @@ func DeleteTag(
 	var tagContent gomatrix.TagContent
 	err = json.Unmarshal(data.Content, &tagContent)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Check whether the tag to be deleted exists
@@ -180,7 +186,8 @@ func DeleteTag(
 		}
 	}
 	if err = saveTagData(req, localpart, roomID, accountDB, tagContent); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Send data to syncProducer in order to inform clients of changes

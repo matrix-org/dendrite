@@ -74,7 +74,8 @@ func CreateInvitesFrom3PIDInvites(
 			req.Context(), queryAPI, asAPI, cfg, inv, federation, accountDB,
 		)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("createInviteFrom3PIDInvite failed")
+			return jsonerror.InternalServerError()
 		}
 		if event != nil {
 			evs = append(evs, *event)
@@ -83,7 +84,8 @@ func CreateInvitesFrom3PIDInvites(
 
 	// Send all the events
 	if _, err := producer.SendEvents(req.Context(), evs, cfg.Matrix.ServerName, nil); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -143,21 +145,24 @@ func ExchangeThirdPartyInvite(
 			JSON: jsonerror.NotFound("Unknown room " + roomID),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("buildMembershipEvent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Ask the requesting server to sign the newly created event so we know it
 	// acknowledged it
 	signedEvent, err := federation.SendInvite(httpReq.Context(), request.Origin(), *event)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Send the event to the roomserver
 	if _, err = producer.SendEvents(
 		httpReq.Context(), []gomatrixserverlib.Event{signedEvent.Event}, cfg.Matrix.ServerName, nil,
 	); err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

@@ -37,7 +37,8 @@ func GetFilter(
 	}
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	filter, err := accountDB.GetFilter(req.Context(), localpart, filterID)
@@ -74,7 +75,8 @@ func PutFilter(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var filter gomatrixserverlib.Filter
@@ -93,7 +95,8 @@ func PutFilter(
 
 	filterID, err := accountDB.PutFilter(req.Context(), localpart, &filter)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.PutFilter failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

@@ -90,13 +90,15 @@ func SendMembership(
 			JSON: jsonerror.NotFound(err.Error()),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if _, err := producer.SendEvents(
 		req.Context(), []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName, nil,
 	); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var returnData interface{} = struct{}{}
@@ -242,7 +244,8 @@ func checkAndProcessThreepid(
 			JSON: jsonerror.NotFound(err.Error()),
 		}
 	} else if err != nil {
-		er := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		er := jsonerror.InternalServerError()
 		return inviteStored, &er
 	}
 	return

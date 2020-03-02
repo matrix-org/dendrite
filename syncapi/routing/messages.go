@@ -20,7 +20,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -104,7 +103,8 @@ func OnIncomingMessagesRequest(
 		// going forward).
 		to, err = setToDefault(req.Context(), db, backwardOrdering, roomID)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("setToDefault failed")
+			return jsonerror.InternalServerError()
 		}
 		wasToProvided = false
 	}
@@ -147,7 +147,8 @@ func OnIncomingMessagesRequest(
 
 	clientEvents, start, end, err := mReq.retrieveEvents()
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Respond with the events.
