@@ -204,7 +204,8 @@ func createRoom(
 
 	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		return jsonerror.InternalServerError()
 	}
 
 	membershipContent := gomatrixserverlib.MemberContent{
@@ -287,7 +288,8 @@ func createRoom(
 		}
 		err = builder.SetContent(e.Content)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+			return jsonerror.InternalServerError()
 		}
 		if i > 0 {
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
@@ -295,25 +297,29 @@ func createRoom(
 		var ev *gomatrixserverlib.Event
 		ev, err = buildEvent(&builder, &authEvents, cfg, evTime)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("buildEvent failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if err = gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.Allowed failed")
+			return jsonerror.InternalServerError()
 		}
 
 		// Add the event to the list of auth events
 		builtEvents = append(builtEvents, *ev)
 		err = authEvents.AddEvent(ev)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("authEvents.AddEvent failed")
+			return jsonerror.InternalServerError()
 		}
 	}
 
 	// send events to the room server
 	_, err = producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName, nil)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// TODO(#269): Reserve room alias while we create the room. This stops us
@@ -332,7 +338,8 @@ func createRoom(
 		var aliasResp roomserverAPI.SetRoomAliasResponse
 		err = aliasAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if aliasResp.AliasExists {

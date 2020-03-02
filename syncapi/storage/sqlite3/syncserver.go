@@ -657,10 +657,6 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		// oldest event in the room's topology.
 		var backwardTopologyPos types.StreamPosition
 		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
-		if err != nil {
-			return nil, types.PaginationToken{}, []string{}, err
-		}
-
 		if backwardTopologyPos-1 <= 0 {
 			backwardTopologyPos = types.StreamPosition(1)
 		} else {

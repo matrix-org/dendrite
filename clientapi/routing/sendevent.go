@@ -74,7 +74,8 @@ func SendEvent(
 		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndSessionID,
 	)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	res := util.JSONResponse{
@@ -121,7 +122,8 @@ func generateSendEvent(
 	}
 	err = builder.SetContent(r)
 	if err != nil {
-		resErr := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
 
@@ -133,7 +135,8 @@ func generateSendEvent(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
-		resErr := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("common.BuildEvent failed")
+		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
 
