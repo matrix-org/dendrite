@@ -36,11 +36,3 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 	}
 	return nil
 }
-
-// LogThenError logs the given error then returns a matrix-compliant 500 internal server error response.
-// This should be used to log fatal errors which require investigation. It should not be used
-// to log client validation errors, etc.
-func LogThenError(req *http.Request, err error) util.JSONResponse {
-	util.GetLogger(req.Context()).WithError(err).Error("request failed")
-	return jsonerror.InternalServerError()
-}

@@ -51,7 +51,8 @@ func RequestEmailToken(req *http.Request, accountDB accounts.Database, cfg *conf
 	// Check if the 3PID is already in use locally
 	localpart, err := accountDB.GetLocalpartForThreePID(req.Context(), body.Email, "email")
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetLocalpartForThreePID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if len(localpart) > 0 {
@@ -71,7 +72,8 @@ func RequestEmailToken(req *http.Request, accountDB accounts.Database, cfg *conf
 			JSON: jsonerror.NotTrusted(body.IDServer),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CreateSession failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -98,7 +100,8 @@ func CheckAndSave3PIDAssociation(
 			JSON: jsonerror.NotTrusted(body.Creds.IDServer),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if !verified {
@@ -120,18 +123,21 @@ func CheckAndSave3PIDAssociation(
 				JSON: jsonerror.NotTrusted(body.Creds.IDServer),
 			}
 		} else if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("threepid.PublishAssociation failed")
+			return jsonerror.InternalServerError()
 		}
 	}
 
 	// Save the association in the database
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err = accountDB.SaveThreePIDAssociation(req.Context(), address, localpart, medium); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountsDB.SaveThreePIDAssociation failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -146,12 +152,14 @@ func GetAssociated3PIDs(
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	threepids, err := accountDB.GetThreePIDsForLocalpart(req.Context(), localpart)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetThreePIDsForLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -168,7 +176,8 @@ func Forget3PID(req *http.Request, accountDB accounts.Database) util.JSONRespons
 	}
 
 	if err := accountDB.RemoveThreePIDAssociation(req.Context(), body.Address, body.Medium); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.RemoveThreePIDAssociation failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

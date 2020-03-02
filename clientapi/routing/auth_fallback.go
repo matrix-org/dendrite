@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
@@ -151,7 +150,8 @@ func AuthFallback(
 			clientIP := req.RemoteAddr
 			err := req.ParseForm()
 			if err != nil {
-				res := httputil.LogThenError(req, err)
+				util.GetLogger(req.Context()).WithError(err).Error("req.ParseForm failed")
+				res := jsonerror.InternalServerError()
 				return &res
 			}
 
@@ -203,7 +203,8 @@ func writeHTTPMessage(
 	w.WriteHeader(header)
 	_, err := w.Write([]byte(message))
 	if err != nil {
-		res := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("w.Write failed")
+		res := jsonerror.InternalServerError()
 		return &res
 	}
 	return nil

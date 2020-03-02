@@ -18,7 +18,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -43,7 +42,8 @@ func GetMemberships(
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
 	if err := queryAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryMembershipsForRoom failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if !queryRes.HasBeenInRoom {

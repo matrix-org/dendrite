@@ -60,11 +60,13 @@ func GetPostPublicRooms(
 	// ParseInt returns 0 and an error when trying to parse an empty string
 	// In that case, we want to assign 0 so we ignore the error
 	if err != nil && len(request.Since) > 0 {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("strconv.ParseInt failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if response.Estimate, err = publicRoomDatabase.CountPublicRooms(req.Context()); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("publicRoomDatabase.CountPublicRooms failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if offset > 0 {
@@ -78,7 +80,8 @@ func GetPostPublicRooms(
 	if response.Chunk, err = publicRoomDatabase.GetPublicRooms(
 		req.Context(), offset, limit, request.Filter.SearchTerms,
 	); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("publicRoomDatabase.GetPublicRooms failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -96,7 +99,8 @@ func fillPublicRoomsReq(httpReq *http.Request, request *publicRoomReq) *util.JSO
 		// Atoi returns 0 and an error when trying to parse an empty string
 		// In that case, we want to assign 0 so we ignore the error
 		if err != nil && len(httpReq.FormValue("limit")) > 0 {
-			reqErr := httputil.LogThenError(httpReq, err)
+			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
+			reqErr := jsonerror.InternalServerError()
 			return &reqErr
 		}
 		request.Limit = int16(limit)
