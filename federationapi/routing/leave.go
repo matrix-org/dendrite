@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
@@ -58,7 +57,8 @@ func MakeLeave(
 	}
 	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Leave})
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
@@ -69,7 +69,8 @@ func MakeLeave(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("common.BuildEvent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Check that the leave is allowed or not
@@ -140,7 +141,8 @@ func SendLeave(
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+		return jsonerror.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
@@ -152,7 +154,8 @@ func SendLeave(
 	// check membership is set to leave
 	mem, err := event.Membership()
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("event.Membership failed")
+		return jsonerror.InternalServerError()
 	} else if mem != gomatrixserverlib.Leave {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -165,7 +168,8 @@ func SendLeave(
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	_, err = producer.SendEvents(httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

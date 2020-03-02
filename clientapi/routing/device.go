@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -51,7 +50,8 @@ func GetDeviceByID(
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	ctx := req.Context()
@@ -62,7 +62,8 @@ func GetDeviceByID(
 			JSON: jsonerror.NotFound("Unknown device"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDeviceByID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -80,14 +81,16 @@ func GetDevicesByLocalpart(
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	ctx := req.Context()
 	deviceList, err := deviceDB.GetDevicesByLocalpart(ctx, localpart)
 
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDevicesByLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	res := devicesJSON{}
@@ -112,7 +115,8 @@ func UpdateDeviceByID(
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	ctx := req.Context()
@@ -123,7 +127,8 @@ func UpdateDeviceByID(
 			JSON: jsonerror.NotFound("Unknown device"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDeviceByID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if dev.UserID != device.UserID {
@@ -138,11 +143,13 @@ func UpdateDeviceByID(
 	payload := deviceUpdateJSON{}
 
 	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("json.NewDecoder.Decode failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err := deviceDB.UpdateDevice(ctx, localpart, deviceID, payload.DisplayName); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.UpdateDevice failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -158,14 +165,16 @@ func DeleteDeviceById(
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 	ctx := req.Context()
 
 	defer req.Body.Close() // nolint: errcheck
 
 	if err := deviceDB.RemoveDevice(ctx, deviceID, localpart); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveDevice failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -180,20 +189,23 @@ func DeleteDevices(
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	ctx := req.Context()
 	payload := devicesDeleteJSON{}
 
 	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("json.NewDecoder.Decode failed")
+		return jsonerror.InternalServerError()
 	}
 
 	defer req.Body.Close() // nolint: errcheck
 
 	if err := deviceDB.RemoveDevices(ctx, localpart, payload.Devices); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveDevices failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

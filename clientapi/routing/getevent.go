@@ -18,7 +18,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -55,7 +54,8 @@ func GetEvent(
 	var eventsResp api.QueryEventsByIDResponse
 	err := queryAPI.QueryEventsByID(req.Context(), &eventsReq, &eventsResp)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryEventsByID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if len(eventsResp.Events) == 0 {
@@ -89,7 +89,8 @@ func GetEvent(
 	}
 	var stateResp api.QueryStateAfterEventsResponse
 	if err := queryAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryStateAfterEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if !stateResp.RoomExists {
@@ -109,7 +110,8 @@ func GetEvent(
 		if stateEvent.StateKeyEquals(r.device.UserID) {
 			membership, err := stateEvent.Membership()
 			if err != nil {
-				return httputil.LogThenError(req, err)
+				util.GetLogger(req.Context()).WithError(err).Error("stateEvent.Membership failed")
+				return jsonerror.InternalServerError()
 			}
 			if membership == gomatrixserverlib.Join {
 				return util.JSONResponse{

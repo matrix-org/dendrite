@@ -122,7 +122,8 @@ func Login(
 
 		token, err := auth.GenerateAccessToken()
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("auth.GenerateAccessToken failed")
+			return jsonerror.InternalServerError()
 		}
 
 		dev, err := getDevice(req.Context(), r, deviceDB, acc, token)

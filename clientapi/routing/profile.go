@@ -50,7 +50,8 @@ func GetProfile(
 			}
 		}
 
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -77,7 +78,8 @@ func GetAvatarURL(
 			}
 		}
 
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -116,7 +118,8 @@ func SetAvatarURL(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
@@ -129,16 +132,19 @@ func SetAvatarURL(
 
 	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err = accountDB.SetAvatarURL(req.Context(), localpart, r.AvatarURL); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.SetAvatarURL failed")
+		return jsonerror.InternalServerError()
 	}
 
 	memberships, err := accountDB.GetMembershipsByLocalpart(req.Context(), localpart)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetMembershipsByLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	newProfile := authtypes.Profile{
@@ -151,15 +157,18 @@ func SetAvatarURL(
 		req.Context(), memberships, newProfile, userID, cfg, evTime, queryAPI,
 	)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("rsProducer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err := producer.SendUpdate(userID, changedKey, oldProfile.AvatarURL, r.AvatarURL); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendUpdate failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -183,7 +192,8 @@ func GetDisplayName(
 			}
 		}
 
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -222,7 +232,8 @@ func SetDisplayName(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
@@ -235,16 +246,19 @@ func SetDisplayName(
 
 	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err = accountDB.SetDisplayName(req.Context(), localpart, r.DisplayName); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.SetDisplayName failed")
+		return jsonerror.InternalServerError()
 	}
 
 	memberships, err := accountDB.GetMembershipsByLocalpart(req.Context(), localpart)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetMembershipsByLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	newProfile := authtypes.Profile{
@@ -257,15 +271,18 @@ func SetDisplayName(
 		req.Context(), memberships, newProfile, userID, cfg, evTime, queryAPI,
 	)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("rsProducer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err := producer.SendUpdate(userID, changedKey, oldProfile.DisplayName, r.DisplayName); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendUpdate failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

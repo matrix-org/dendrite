@@ -472,7 +472,8 @@ func Register(
 	if r.Username == "" {
 		id, err := accountDB.GetNewNumericLocalpart(req.Context())
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetNewNumericLocalpart failed")
+			return jsonerror.InternalServerError()
 		}
 
 		r.Username = strconv.FormatInt(id, 10)
@@ -520,7 +521,8 @@ func handleGuestRegistration(
 	//Generate numeric local part for guest user
 	id, err := accountDB.GetNewNumericLocalpart(req.Context())
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetNewNumericLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	localpart := strconv.FormatInt(id, 10)
@@ -602,7 +604,8 @@ func handleRegistrationFlow(
 		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Auth.Mac)
 
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
+			return jsonerror.InternalServerError()
 		} else if !valid {
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
@@ -758,7 +761,8 @@ func LegacyRegister(
 
 		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Mac)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if !valid {
