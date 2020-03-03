@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   remove_state_ids TEXT[],
   session_id BIGINT,
   transaction_id TEXT,
-  exclude_from_sync BOOL DEFAULT FALSE
+  exclude_from_sync BOOL NOT NULL DEFAULT FALSE
 );
 `
 
@@ -52,7 +52,7 @@ const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
 	"id, room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
 	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
-	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = $11"
+	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = $13"
 
 const selectEventsSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
@@ -277,6 +277,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 		sessionID,
 		txnID,
 		excludeFromSync,
+		excludeFromSync,
 	)
 	return
 }
@@ -372,9 +373,11 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			txnID           *string
 			transactionID   *api.TransactionID
 		)
+
 		if err := rows.Scan(&streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID); err != nil {
 			return nil, err
 		}
+
 		// TODO: Handle redacted events
 		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
 		if err != nil {
