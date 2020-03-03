@@ -18,8 +18,9 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 
-	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -60,11 +61,13 @@ const upsertServerKeysSQL = "" +
 	" DO UPDATE SET valid_until_ts = $4, expired_ts = $5, server_key = $6"
 
 type serverKeyStatements struct {
+	db                       *sql.DB
 	bulkSelectServerKeysStmt *sql.Stmt
 	upsertServerKeysStmt     *sql.Stmt
 }
 
 func (s *serverKeyStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
 	_, err = db.Exec(serverKeysSchema)
 	if err != nil {
 		return
@@ -86,8 +89,14 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	for request := range requests {
 		nameAndKeyIDs = append(nameAndKeyIDs, nameAndKeyID(request))
 	}
-	stmt := s.bulkSelectServerKeysStmt
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(nameAndKeyIDs))
+	query := strings.Replace(bulkSelectServerKeysSQL, "($1)", common.QueryVariadic(len(nameAndKeyIDs)), 1)
+
+	iKeyIDs := make([]interface{}, len(nameAndKeyIDs))
+	for i, v := range nameAndKeyIDs {
+		iKeyIDs[i] = v
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, iKeyIDs...)
 	if err != nil {
 		return nil, err
 	}
