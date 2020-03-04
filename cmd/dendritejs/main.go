@@ -16,7 +16,6 @@ package main
 
 import (
 	"crypto/ed25519"
-	"flag"
 	"fmt"
 	"net/http"
 
@@ -36,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/typingserver"
 	"github.com/matrix-org/dendrite/typingserver/cache"
 	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
 
@@ -46,13 +46,6 @@ func init() {
 	fmt.Println("dendrite.js starting...")
 }
 
-var (
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
-)
-
 func generateKey() ed25519.PrivateKey {
 	_, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -61,27 +54,49 @@ func generateKey() ed25519.PrivateKey {
 	return priv
 }
 
+func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLocalNode) *gomatrixserverlib.FederationClient {
+	fmt.Println("Running in js-libp2p federation mode")
+	fmt.Println("Warning: Federation with non-libp2p homeservers will not work in this mode yet!")
+	tr := go_http_js_libp2p.NewP2pTransport(node)
+
+	fed := gomatrixserverlib.NewFederationClient(
+		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+	)
+	fed.Client = *gomatrixserverlib.NewClientWithTransport(tr)
+
+	return fed
+}
+
+func createP2PNode() (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
+	node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", []string{"/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/"})
+	serverName = node.Id
+	fmt.Println("p2p assigned ServerName: ", serverName)
+	return
+}
+
 func main() {
 	cfg := &config.Dendrite{}
 	cfg.SetDefaults()
 	cfg.Kafka.UseNaffka = true
-	cfg.Database.Account = "file:dendritejs_account.db?txns=false"
-	cfg.Database.AppService = "file:dendritejs_appservice.db?txns=false"
-	cfg.Database.Device = "file:dendritejs_device.db?txns=false"
-	cfg.Database.FederationSender = "file:dendritejs_fedsender.db?txns=false"
-	cfg.Database.MediaAPI = "file:dendritejs_mediaapi.db?txns=false"
-	cfg.Database.Naffka = "file:dendritejs_naffka.db?txns=false"
-	cfg.Database.PublicRoomsAPI = "file:dendritejs_publicrooms.db?txns=false"
-	cfg.Database.RoomServer = "file:dendritejs_roomserver.db?txns=false"
-	cfg.Database.ServerKey = "file:dendritejs_serverkey.db?txns=false"
-	cfg.Database.SyncAPI = "file:dendritejs_syncapi.db?txns=false"
-
-	cfg.Matrix.ServerName = "p2p-js"
+	cfg.Database.Account = "file:dendritejs_account.db"
+	cfg.Database.AppService = "file:dendritejs_appservice.db"
+	cfg.Database.Device = "file:dendritejs_device.db"
+	cfg.Database.FederationSender = "file:dendritejs_fedsender.db"
+	cfg.Database.MediaAPI = "file:dendritejs_mediaapi.db"
+	cfg.Database.Naffka = "file:dendritejs_naffka.db"
+	cfg.Database.PublicRoomsAPI = "file:dendritejs_publicrooms.db"
+	cfg.Database.RoomServer = "file:dendritejs_roomserver.db"
+	cfg.Database.ServerKey = "file:dendritejs_serverkey.db"
+	cfg.Database.SyncAPI = "file:dendritejs_syncapi.db"
 	cfg.Matrix.TrustedIDServers = []string{
 		"matrix.org", "vector.im",
 	}
 	cfg.Matrix.KeyID = "ed25519:1337"
 	cfg.Matrix.PrivateKey = generateKey()
+
+	serverName, node := createP2PNode()
+	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(serverName)
+
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
@@ -91,7 +106,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	keyDB := base.CreateKeyDB()
-	federation := base.CreateFederationClient()
+	federation := createFederationClient(cfg, node)
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
@@ -115,18 +130,19 @@ func main() {
 
 	http.Handle("/", httpHandler)
 
-	// Expose the matrix APIs via libp2p-js
-	if base.P2pLocalNode != nil {
+	// Expose the matrix APIs via libp2p-js - for federation traffic
+	if node != nil {
 		go func() {
-			logrus.Info("Listening on libp2p-js host ID ", base.P2pLocalNode.Id)
+			logrus.Info("Listening on libp2p-js host ID ", node.Id)
 
-			listener := go_http_js_libp2p.NewP2pListener(base.P2pLocalNode)
+			listener := go_http_js_libp2p.NewP2pListener(node)
 			defer listener.Close()
 			s := &http.Server{}
 			s.Serve(listener)
 		}()
 	}
 
+	// Expose the matrix APIs via fetch - for local traffic
 	go func() {
 		logrus.Info("Listening for service-worker fetch traffic")
 
@@ -135,6 +151,6 @@ func main() {
 		go s.Serve(listener)
 	}()
 
-	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
+	// We want to block forever to let the fetch and libp2p handler serve the APIs
 	select {}
 }
