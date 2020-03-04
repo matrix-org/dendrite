@@ -20,8 +20,10 @@ import (
 	"database/sql"
 	"strings"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 const serverKeysSchema = `
@@ -64,10 +66,16 @@ type serverKeyStatements struct {
 	db                       *sql.DB
 	bulkSelectServerKeysStmt *sql.Stmt
 	upsertServerKeysStmt     *sql.Stmt
+
+	cache *lru.Cache // nameAndKeyID => gomatrixserverlib.PublicKeyLookupResult
 }
 
 func (s *serverKeyStatements) prepare(db *sql.DB) (err error) {
 	s.db = db
+	s.cache, err = lru.New(64)
+	if err != nil {
+		return
+	}
 	_, err = db.Exec(serverKeysSchema)
 	if err != nil {
 		return
@@ -89,6 +97,22 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	for request := range requests {
 		nameAndKeyIDs = append(nameAndKeyIDs, nameAndKeyID(request))
 	}
+
+	// If we can satisfy all of the requests from the cache, do so. TODO: Allow partial matches with merges.
+	cacheResults := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
+	for request := range requests {
+		r, ok := s.cache.Get(nameAndKeyID(request))
+		if !ok {
+			break
+		}
+		cacheResult := r.(gomatrixserverlib.PublicKeyLookupResult)
+		cacheResults[request] = cacheResult
+	}
+	if len(cacheResults) == len(requests) {
+		util.GetLogger(ctx).Infof("KeyDB cache hit for %d keys", len(cacheResults))
+		return cacheResults, nil
+	}
+
 	query := strings.Replace(bulkSelectServerKeysSQL, "($1)", common.QueryVariadic(len(nameAndKeyIDs)), 1)
 
 	iKeyIDs := make([]interface{}, len(nameAndKeyIDs))
@@ -134,6 +158,7 @@ func (s *serverKeyStatements) upsertServerKeys(
 	request gomatrixserverlib.PublicKeyLookupRequest,
 	key gomatrixserverlib.PublicKeyLookupResult,
 ) error {
+	s.cache.Add(nameAndKeyID(request), key)
 	_, err := s.upsertServerKeysStmt.ExecContext(
 		ctx,
 		string(request.ServerName),
