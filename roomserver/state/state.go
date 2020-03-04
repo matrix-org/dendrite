@@ -557,7 +557,6 @@ func (v StateResolution) calculateAndStoreStateAfterManyEvents(
 
 func (v StateResolution) calculateStateAfterManyEvents(
 	ctx context.Context,
-
 	prevStates []types.StateAtEvent,
 ) (state []types.StateEntry, algorithm string, conflictLength int, err error) {
 	var combined []types.StateEntry
@@ -608,6 +607,19 @@ func (v StateResolution) calculateStateAfterManyEvents(
 	return
 }
 
+func (v StateResolution) resolveConflicts(
+	ctx context.Context,
+	notConflicted, conflicted []types.StateEntry,
+) ([]types.StateEntry, error) {
+	switch v.version {
+	case StateResolutionAlgorithmV1:
+		return v.resolveConflictsV1(ctx, notConflicted, conflicted)
+	case StateResolutionAlgorithmV2:
+		return v.resolveConflictsV2(ctx, notConflicted, conflicted)
+	}
+	return nil, errors.New("unsupported state resolution algorithm")
+}
+
 // resolveConflicts resolves a list of conflicted state entries. It takes two lists.
 // The first is a list of all state entries that are not conflicted.
 // The second is a list of all state entries that are conflicted
@@ -615,7 +627,7 @@ func (v StateResolution) calculateStateAfterManyEvents(
 // Returns a list that combines the entries without conflicts with the result of state resolution for the entries with conflicts.
 // The returned list is sorted by state key tuple.
 // Returns an error if there was a problem talking to the database.
-func (v StateResolution) resolveConflicts(
+func (v StateResolution) resolveConflictsV1(
 	ctx context.Context,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
@@ -655,17 +667,123 @@ func (v StateResolution) resolveConflicts(
 	}
 
 	// Resolve the conflicts.
-	var resolvedEvents []gomatrixserverlib.Event
-	switch v.version {
-	case StateResolutionAlgorithmV1:
-		fmt.Println("using room version 1")
-		resolvedEvents = gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents)
-	case StateResolutionAlgorithmV2:
-		fmt.Println("using room version 2")
-		resolvedEvents = gomatrixserverlib.ResolveStateConflictsV2(conflictedEvents, nil, authEvents)
-	default:
-		return nil, errors.New("unsupported room version")
+	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents)
+
+	// Map from the full events back to numeric state entries.
+	for _, resolvedEvent := range resolvedEvents {
+		entry, ok := eventIDMap[resolvedEvent.EventID()]
+		if !ok {
+			panic(fmt.Errorf("Missing state entry for event ID %q", resolvedEvent.EventID()))
+		}
+		notConflicted = append(notConflicted, entry)
 	}
+
+	// Sort the result so it can be searched.
+	sort.Sort(shared.StateEntrySorter(notConflicted))
+	return notConflicted, nil
+}
+
+// resolveConflicts resolves a list of conflicted state entries. It takes two lists.
+// The first is a list of all state entries that are not conflicted.
+// The second is a list of all state entries that are conflicted
+// A state entry is conflicted when there is more than one numeric event ID for the same state key tuple.
+// Returns a list that combines the entries without conflicts with the result of state resolution for the entries with conflicts.
+// The returned list is sorted by state key tuple.
+// Returns an error if there was a problem talking to the database.
+func (v StateResolution) resolveConflictsV2(
+	ctx context.Context,
+	notConflicted, conflicted []types.StateEntry,
+) ([]types.StateEntry, error) {
+
+	// Load the non-conflicted events
+	nonConflictedEvents, _, err := v.loadStateEvents(ctx, notConflicted)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load the conflicted events
+	conflictedEvents, eventIDMap, err := v.loadStateEvents(ctx, conflicted)
+	if err != nil {
+		return nil, err
+	}
+
+	// For each conflicted event, we will add a new set of auth events. Auth
+	// events may be duplicated across these sets but that's OK.
+	authSets := make(map[string][]gomatrixserverlib.Event)
+	var authEvents []gomatrixserverlib.Event
+	var authDifference []gomatrixserverlib.Event
+
+	// For each conflicted event, let's try and get the needed auth events.
+	for _, conflictedEvent := range conflictedEvents {
+		// Work out which auth events we need to load.
+		key := conflictedEvent.EventID()
+		needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{conflictedEvent})
+
+		// Find the numeric IDs for the necessary state keys.
+		var neededStateKeys []string
+		neededStateKeys = append(neededStateKeys, needed.Member...)
+		neededStateKeys = append(neededStateKeys, needed.ThirdPartyInvite...)
+		stateKeyNIDMap, err := v.db.EventStateKeyNIDs(ctx, neededStateKeys)
+		if err != nil {
+			return nil, err
+		}
+
+		// Load the necessary auth events.
+		tuplesNeeded := v.stateKeyTuplesNeeded(stateKeyNIDMap, needed)
+		var authEntries []types.StateEntry
+		for _, tuple := range tuplesNeeded {
+			if eventNID, ok := shared.StateEntryMap(notConflicted).Lookup(tuple); ok {
+				authEntries = append(authEntries, types.StateEntry{
+					StateKeyTuple: tuple,
+					EventNID:      eventNID,
+				})
+			}
+		}
+
+		// Store the newly found auth events in the auth set for this event.
+		authSets[key], _, err = v.loadStateEvents(ctx, authEntries)
+		if err != nil {
+			return nil, err
+		}
+		authEvents = append(authEvents, authSets[key]...)
+	}
+
+	// This function helps us to work out whether an event exists in one of the
+	// auth sets.
+	isInAuthList := func(k string, event gomatrixserverlib.Event) bool {
+		for _, e := range authSets[k] {
+			if e.EventID() == event.EventID() {
+				return true
+			}
+		}
+		return false
+	}
+
+	// This function works out if an event exists in all of the auth sets.
+	isInAllAuthLists := func(event gomatrixserverlib.Event) bool {
+		found := true
+		for k := range authSets {
+			found = found && isInAuthList(k, event)
+		}
+		return found
+	}
+
+	// Look through all of the auth events that we've been given and work out if
+	// there are any events which don't appear in all of the auth sets. If they
+	// don't then we add them to the auth difference.
+	for _, event := range authEvents {
+		if !isInAllAuthLists(event) {
+			authDifference = append(authDifference, event)
+		}
+	}
+
+	// Resolve the conflicts.
+	resolvedEvents := gomatrixserverlib.ResolveStateConflictsV2(
+		conflictedEvents,
+		nonConflictedEvents,
+		authEvents,
+		authDifference,
+	)
 
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
