@@ -17,17 +17,14 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/publicroomsapi/types"
+	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
-	common.PartitionStorer
-	GetRoomVisibility(ctx context.Context, roomID string) (bool, error)
-	SetRoomVisibility(ctx context.Context, visible bool, roomID string) error
-	CountPublicRooms(ctx context.Context) (int64, error)
-	GetPublicRooms(ctx context.Context, offset int64, limit int16, filter string) ([]types.PublicRoom, error)
-	UpdateRoomFromEvents(ctx context.Context, eventsToAdd []gomatrixserverlib.Event, eventsToRemove []gomatrixserverlib.Event) error
-	UpdateRoomFromEvent(ctx context.Context, event gomatrixserverlib.Event) error
+	StoreMediaMetadata(ctx context.Context, mediaMetadata *types.MediaMetadata) error
+	GetMediaMetadata(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) (*types.MediaMetadata, error)
+	StoreThumbnail(ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata) error
+	GetThumbnail(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName, width, height int, resizeMethod string) (*types.ThumbnailMetadata, error)
+	GetThumbnails(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) ([]*types.ThumbnailMetadata, error)
 }

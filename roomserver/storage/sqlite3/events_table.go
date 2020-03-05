@@ -18,10 +18,10 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -463,17 +463,14 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 func (s *eventStatements) selectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error) {
 	var result int64
 	selectStmt := common.TxStmt(txn, s.selectMaxEventDepthStmt)
-	err := selectStmt.QueryRowContext(ctx, sqliteIn(eventNIDsAsArray(eventNIDs))).Scan(&result)
+	err := selectStmt.QueryRowContext(ctx, eventNIDsAsArray(eventNIDs)).Scan(&result)
 	if err != nil {
 		return 0, err
 	}
 	return result, nil
 }
 
-func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
-	nids := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		nids[i] = int64(eventNIDs[i])
-	}
-	return nids
+func eventNIDsAsArray(eventNIDs []types.EventNID) string {
+	b, _ := json.Marshal(eventNIDs)
+	return string(b)
 }

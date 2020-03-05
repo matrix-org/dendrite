@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
@@ -268,9 +267,9 @@ func (s stateKeyTupleSorter) contains(value types.StateKeyTuple) bool {
 
 // List the unique eventTypeNIDs and eventStateKeyNIDs.
 // Assumes that the list is sorted.
-func (s stateKeyTupleSorter) typesAndStateKeysAsArrays() (eventTypeNIDs pq.Int64Array, eventStateKeyNIDs pq.Int64Array) {
-	eventTypeNIDs = make(pq.Int64Array, len(s))
-	eventStateKeyNIDs = make(pq.Int64Array, len(s))
+func (s stateKeyTupleSorter) typesAndStateKeysAsArrays() (eventTypeNIDs []int64, eventStateKeyNIDs []int64) {
+	eventTypeNIDs = make([]int64, len(s))
+	eventStateKeyNIDs = make([]int64, len(s))
 	for i := range s {
 		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
 		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)
