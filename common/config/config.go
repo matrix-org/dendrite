@@ -224,6 +224,8 @@ type Dendrite struct {
 
 	// The config for tracing the dendrite servers.
 	Tracing struct {
+		// Set to true to enable tracer hooks. If false, no tracing is set up.
+		Enabled bool `yaml:"enabled"`
 		// The config for the jaeger opentracing reporter.
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	} `yaml:"tracing"`
@@ -703,6 +705,9 @@ func (config *Dendrite) FederationSenderURL() string {
 
 // SetupTracing configures the opentracing using the supplied configuration.
 func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err error) {
+	if !config.Tracing.Enabled {
+		return ioutil.NopCloser(bytes.NewReader([]byte{})), nil
+	}
 	return config.Tracing.Jaeger.InitGlobalTracer(
 		serviceName,
 		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
