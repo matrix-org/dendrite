@@ -1,19 +1,11 @@
-## Peer-to-peer
+## Peer-to-peer Matrix
 
-These are the instructions for setting up P2P Dendrite, current as of March 2020. You need a dendrite and a riot-web checked out.
-In addition:
-
-```
-$ git clone git@github.com:matrix-org/go-http-js-libp2p.git
-$ git clone git@github.com:matrix-org/go-sqlite3-js.git
-```
-
-Make sure to `yarn install` in both of these repos.
+These are the instructions for setting up P2P Dendrite, current as of March 2020. There's both Go stuff and JS stuff to do to set this up.
 
 
 ### Dendrite
 
-- `kegan/wasm` branch will do.
+- The `master` branch has a WASM-only binary for dendrite: `./cmd/dendritejs`.
 - Build it and copy assets to riot-web.
 ```
 $ GOOS=js GOARCH=wasm go build -o main.wasm ./cmd/dendritejs
@@ -22,13 +14,28 @@ $ cp main.wasm ../riot-web/src/vector/dendrite.wasm
 
 ### Rendezvous
 
-- This is how the peers discover each other.
+This is how peers discover each other and communicate.
+
+By default, Dendrite uses the IPFS-hosted websocket star **Development** relay server at `/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star`.
+This is currently hard-coded in `./cmd/dendritejs/main.go` - you can also use a local one if you run your own relay:
+
 ```
 $ npm install --global libp2p-websocket-star-rendezvous
 $ rendezvous --port=9090 --host=127.0.0.1
 ```
 
+Then use `/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/`. We'll probably run our own relay server at some point.
+
 ### Riot-web
+
+You need to check out these repos:
+
+``
+$ git clone git@github.com:matrix-org/go-http-js-libp2p.git
+$ git clone git@github.com:matrix-org/go-sqlite3-js.git
+```
+
+Make sure to `yarn install` in both of these repos. Then:
 
 - `$ cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" ./src/vector/`
 - Comment out the lines in `wasm_exec.js` which contains:
@@ -47,6 +54,8 @@ $ ln -s ../../go-http-js-libp2p
 
 NB: If you don't run the server with `yarn start` you need to make sure your server is sending the header `Service-Worker-Allowed: /`.
 
+TODO: Make a Docker image with all of this in it and a volume mount for `dendrite.wasm`.
+
 ## Running
 
 You need a Chrome and a Firefox running to test locally as service workers don't work in incognito tabs.
@@ -56,6 +65,8 @@ You need a Chrome and a Firefox running to test locally as service workers don't
 Assuming you've `yarn start`ed Riot-Web, go to `http://localhost:8080` and wait a bit. Then refresh the page (this is required
 because the fetch interceptor races with setting up dendrite. If you don't refresh, you won't be able to contact your HS). After
 the refresh, click Register and use `http://localhost:8080` as your HS URL.
+
+TODO: Fix the race so we don't need multiple refreshes.
 
 You can join rooms by room alias e.g `/join #foo:bar`.
 
