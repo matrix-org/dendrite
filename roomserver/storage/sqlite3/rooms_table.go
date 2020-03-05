@@ -28,7 +28,7 @@ const roomsSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_rooms (
     room_nid INTEGER PRIMARY KEY AUTOINCREMENT,
     room_id TEXT NOT NULL UNIQUE,
-    latest_event_nids TEXT NOT NULL DEFAULT '{}',
+    latest_event_nids TEXT NOT NULL DEFAULT '[]',
     last_event_sent_nid INTEGER NOT NULL DEFAULT 0,
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
     room_version INTEGER NOT NULL DEFAULT 1

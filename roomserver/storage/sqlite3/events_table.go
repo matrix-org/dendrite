@@ -38,7 +38,7 @@ const eventsSchema = `
     depth INTEGER NOT NULL,
     event_id TEXT NOT NULL UNIQUE,
     reference_sha256 BLOB NOT NULL,
-    auth_event_nids TEXT NOT NULL DEFAULT '{}'
+    auth_event_nids TEXT NOT NULL DEFAULT '[]'
   );
 `
 

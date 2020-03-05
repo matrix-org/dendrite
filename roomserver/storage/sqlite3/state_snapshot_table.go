@@ -30,7 +30,7 @@ const stateSnapshotSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
     state_snapshot_nid INTEGER PRIMARY KEY AUTOINCREMENT,
     room_nid INTEGER NOT NULL,
-    state_block_nids TEXT NOT NULL DEFAULT '{}'
+    state_block_nids TEXT NOT NULL DEFAULT '[]'
   );
 `
 

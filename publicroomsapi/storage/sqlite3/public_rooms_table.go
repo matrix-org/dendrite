@@ -206,8 +206,10 @@ func (s *publicRoomsStatements) selectPublicRooms(
 			return rooms, err
 		}
 
-		if err := json.Unmarshal([]byte(aliasesJSON), &r.Aliases); err != nil {
-			return rooms, err
+		if len(aliasesJSON) > 0 {
+			if err := json.Unmarshal([]byte(aliasesJSON), &r.Aliases); err != nil {
+				return rooms, err
+			}
 		}
 
 		rooms = append(rooms, r)
