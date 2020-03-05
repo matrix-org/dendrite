@@ -12,29 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !wasm
-
-package storage
+package keydb
 
 import (
+	"fmt"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/publicroomsapi/storage/postgres"
-	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
+	"golang.org/x/crypto/ed25519"
+
+	"github.com/matrix-org/dendrite/common/keydb/sqlite3"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// NewPublicRoomsServerDatabase opens a database connection.
-func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
+// NewDatabase opens a database connection.
+func NewDatabase(
+	dataSourceName string,
+	serverName gomatrixserverlib.ServerName,
+	serverKey ed25519.PublicKey,
+	serverKeyID gomatrixserverlib.KeyID,
+) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return nil, err
 	}
 	switch uri.Scheme {
 	case "postgres":
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
-		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
+		return sqlite3.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
 	default:
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
 }

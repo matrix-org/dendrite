@@ -1,7 +1,5 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/lib/pq => github.com/matrix-org/pq v1.3.2
-
 replace github.com/prometheus/client_golang => ./prometheus
 
 require (

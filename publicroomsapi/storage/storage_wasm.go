@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !wasm
-
 package storage
 
 import (
+	"fmt"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/publicroomsapi/storage/postgres"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
 )
 
@@ -27,14 +25,14 @@ import (
 func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return nil, err
 	}
 	switch uri.Scheme {
 	case "postgres":
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
 		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
 	default:
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
 }
