@@ -29,8 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
-	// Import the postgres database driver.
-	_ "github.com/lib/pq"
+	// Import the sqlite3 package
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/common"

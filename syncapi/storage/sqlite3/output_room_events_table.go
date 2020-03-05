@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -40,8 +39,8 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   type TEXT NOT NULL,
   sender TEXT NOT NULL,
   contains_url BOOL NOT NULL,
-  add_state_ids TEXT[],
-  remove_state_ids TEXT[],
+  add_state_ids TEXT, -- JSON encoded string array
+  remove_state_ids TEXT, -- JSON encoded string array
   session_id BIGINT,
   transaction_id TEXT,
   exclude_from_sync BOOL NOT NULL DEFAULT FALSE
@@ -176,11 +175,25 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 			streamPos       types.StreamPosition
 			eventBytes      []byte
 			excludeFromSync bool
-			addIDs          pq.StringArray
-			delIDs          pq.StringArray
+			addIDsJSON      string
+			delIDsJSON      string
 		)
-		if err := rows.Scan(&streamPos, &eventBytes, &excludeFromSync, &addIDs, &delIDs); err != nil {
+		if err := rows.Scan(&streamPos, &eventBytes, &excludeFromSync, &addIDsJSON, &delIDsJSON); err != nil {
 			return nil, nil, err
+		}
+
+		var addIDs []string
+		var delIDs []string
+
+		if len(addIDsJSON) > 0 {
+			if err := json.Unmarshal([]byte(addIDsJSON), &addIDs); err != nil {
+				return nil, nil, err
+			}
+		}
+		if len(delIDsJSON) > 0 {
+			if err := json.Unmarshal([]byte(delIDsJSON), &delIDs); err != nil {
+				return nil, nil, err
+			}
 		}
 		// Sanity check for deleted state and whine if we see it. We don't need to do anything
 		// since it'll just mark the event as not being needed.
@@ -188,8 +201,8 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 			log.WithFields(log.Fields{
 				"since":   oldPos,
 				"current": newPos,
-				"adds":    addIDs,
-				"dels":    delIDs,
+				"adds":    addIDsJSON,
+				"dels":    delIDsJSON,
 			}).Warn("StateBetween: ignoring deleted state")
 		}
 
@@ -262,6 +275,15 @@ func (s *outputRoomEventsStatements) insertEvent(
 		return
 	}
 
+	addStateJSON, err := json.Marshal(addState)
+	if err != nil {
+		return
+	}
+	removeStateJSON, err := json.Marshal(removeState)
+	if err != nil {
+		return
+	}
+
 	insertStmt := common.TxStmt(txn, s.insertEventStmt)
 	_, err = insertStmt.ExecContext(
 		ctx,
@@ -272,8 +294,8 @@ func (s *outputRoomEventsStatements) insertEvent(
 		event.Type(),
 		event.Sender(),
 		containsURL,
-		pq.StringArray(addState),
-		pq.StringArray(removeState),
+		string(addStateJSON),
+		string(removeStateJSON),
 		sessionID,
 		txnID,
 		excludeFromSync,
