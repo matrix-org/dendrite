@@ -1,7 +1,5 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/prometheus/client_golang => ./prometheus
-
 require (
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
