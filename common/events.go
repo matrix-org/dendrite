@@ -47,6 +47,17 @@ func BuildEvent(
 		return nil, err
 	}
 
+	fmt.Println("BUILDING EVENT FOR ROOM", builder.RoomID)
+	roomVersion := 2
+
+	vQueryReq := api.QueryRoomVersionForRoomIDRequest{RoomID: builder.RoomID}
+	vQueryRes := api.QueryRoomVersionForRoomIDResponse{}
+	if e := queryAPI.QueryRoomVersionForRoomID(ctx, &vQueryReq, &vQueryRes); e != nil {
+		fmt.Println("Eaux neaux, an error occured:", e)
+	}
+
+	fmt.Println("ROOM VERSION IS", roomVersion)
+
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {

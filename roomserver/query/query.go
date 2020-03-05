@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -765,16 +764,38 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
 ) error {
-	response.DefaultRoomVersion = strconv.Itoa(int(version.GetDefaultRoomVersion()))
-	response.AvailableRoomVersions = make(map[string]string)
+	response.DefaultRoomVersion = int(version.GetDefaultRoomVersion())
+	response.AvailableRoomVersions = make(map[int]string)
 	for v, desc := range version.GetSupportedRoomVersions() {
-		sv := strconv.Itoa(int(v))
 		if desc.Stable {
-			response.AvailableRoomVersions[sv] = "stable"
+			response.AvailableRoomVersions[int(v)] = "stable"
 		} else {
-			response.AvailableRoomVersions[sv] = "unstable"
+			response.AvailableRoomVersions[int(v)] = "unstable"
 		}
 	}
+	return nil
+}
+
+// QueryRoomVersionCapabilities implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryRoomVersionForRoomID(
+	ctx context.Context,
+	request *api.QueryRoomVersionForRoomIDRequest,
+	response *api.QueryRoomVersionForRoomIDResponse,
+) error {
+	// Get the room NID for the given room ID
+	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+
+	// Then look up the room version for that room NID
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+
+	// Populate the response
+	response.RoomVersion = int(roomVersion)
 	return nil
 }
 
