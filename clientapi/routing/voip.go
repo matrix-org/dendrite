@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/util"
@@ -56,7 +56,8 @@ func RequestTurnServer(req *http.Request, device *authtypes.Device, cfg *config.
 		_, err := mac.Write([]byte(resp.Username))
 
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("mac.Write failed")
+			return jsonerror.InternalServerError()
 		}
 
 		resp.Username = fmt.Sprintf("%d:%s", expiry, device.UserID)

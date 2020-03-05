@@ -26,7 +26,6 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common/config"
@@ -166,7 +165,8 @@ func verifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *auth
 				JSON: jsonerror.UnknownToken("Unknown token"),
 			}
 		} else {
-			jsonErr := httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDeviceByAccessToken failed")
+			jsonErr := jsonerror.InternalServerError()
 			resErr = &jsonErr
 		}
 	}

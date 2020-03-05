@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
@@ -60,7 +59,8 @@ func MakeJoin(
 	}
 	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Join})
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
@@ -71,7 +71,8 @@ func MakeJoin(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("common.BuildEvent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Check that the join is allowed or not
@@ -143,7 +144,8 @@ func SendJoin(
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+		return jsonerror.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
@@ -161,7 +163,8 @@ func SendJoin(
 		RoomID:       roomID,
 	}, &stateAndAuthChainResponse)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryStateAndAuthChain failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if !stateAndAuthChainResponse.RoomExists {
@@ -178,7 +181,8 @@ func SendJoin(
 		httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil,
 	)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

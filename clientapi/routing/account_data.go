@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -42,7 +41,8 @@ func GetAccountData(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if data, err := accountDB.GetAccountDataByType(
@@ -74,24 +74,28 @@ func SaveAccountData(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	defer req.Body.Close() // nolint: errcheck
 
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("ioutil.ReadAll failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err := accountDB.SaveAccountData(
 		req.Context(), localpart, roomID, dataType, string(body),
 	); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.SaveAccountData failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err := syncProducer.SendData(userID, roomID, dataType); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

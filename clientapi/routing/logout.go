@@ -19,7 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -30,11 +30,13 @@ func Logout(
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err := deviceDB.RemoveDevice(req.Context(), device.ID, localpart); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveDevice failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -49,11 +51,13 @@ func LogoutAll(
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err := deviceDB.RemoveAllDevices(req.Context(), localpart); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveAllDevices failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

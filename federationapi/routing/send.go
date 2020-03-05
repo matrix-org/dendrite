@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
@@ -61,7 +60,8 @@ func Send(
 
 	resp, err := t.processTransaction()
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

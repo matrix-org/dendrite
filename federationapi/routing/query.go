@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -57,14 +56,16 @@ func RoomAliasToID(
 		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
 		var queryRes roomserverAPI.GetRoomIDForAliasResponse
 		if err = aliasAPI.GetRoomIDForAlias(httpReq.Context(), &queryReq, &queryRes); err != nil {
-			return httputil.LogThenError(httpReq, err)
+			util.GetLogger(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if queryRes.RoomID != "" {
 			serverQueryReq := federationSenderAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: queryRes.RoomID}
 			var serverQueryRes federationSenderAPI.QueryJoinedHostServerNamesInRoomResponse
 			if err = senderAPI.QueryJoinedHostServerNamesInRoom(httpReq.Context(), &serverQueryReq, &serverQueryRes); err != nil {
-				return httputil.LogThenError(httpReq, err)
+				util.GetLogger(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
+				return jsonerror.InternalServerError()
 			}
 
 			resp = gomatrixserverlib.RespDirectory{
@@ -92,7 +93,8 @@ func RoomAliasToID(
 			}
 			// TODO: Return 502 if the remote server errored.
 			// TODO: Return 504 if the remote server timed out.
-			return httputil.LogThenError(httpReq, err)
+			util.GetLogger(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
+			return jsonerror.InternalServerError()
 		}
 	}
 
