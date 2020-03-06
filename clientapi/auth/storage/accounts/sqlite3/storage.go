@@ -166,7 +166,7 @@ func (d *Database) createAccount(
 		return nil, err
 	}
 
-	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push.rules", `{
+	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", `{
 		"global": {
 			"content": [],
 			"override": [],
