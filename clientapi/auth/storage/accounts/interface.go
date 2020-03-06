@@ -30,6 +30,7 @@ type Database interface {
 	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
 	SetDisplayName(ctx context.Context, localpart string, displayName string) error
 	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*authtypes.Account, error)
+	CreateGuestAccount(ctx context.Context) (*authtypes.Account, error)
 	UpdateMemberships(ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error
 	GetMembershipInRoomByLocalpart(ctx context.Context, localpart, roomID string) (authtypes.Membership, error)
 	GetMembershipsByLocalpart(ctx context.Context, localpart string) (memberships []authtypes.Membership, err error)

@@ -89,16 +89,16 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
 func (s *accountsStatements) insertAccount(
-	ctx context.Context, localpart, hash, appserviceID string,
+	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string,
 ) (*authtypes.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := s.insertAccountStmt
 
 	var err error
 	if appserviceID == "" {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil)
+		_, err = txn.Stmt(stmt).ExecContext(ctx, localpart, createdTimeMS, hash, nil)
 	} else {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID)
+		_, err = txn.Stmt(stmt).ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID)
 	}
 	if err != nil {
 		return nil, err
@@ -144,8 +144,12 @@ func (s *accountsStatements) selectAccountByLocalpart(
 }
 
 func (s *accountsStatements) selectNewNumericLocalpart(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
-	err = s.selectNewNumericLocalpartStmt.QueryRowContext(ctx).Scan(&id)
+	stmt := s.selectNewNumericLocalpartStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
+	err = stmt.QueryRowContext(ctx).Scan(&id)
 	return
 }
