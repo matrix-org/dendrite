@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -158,7 +159,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	}
 
 	if !stateResp.PrevEventsExist {
-		return t.processEventWithMissingState(e)
+		return t.processEventWithMissingState(e, 0)
 	}
 
 	// Check that the event is allowed by the state at the event.
@@ -185,7 +186,11 @@ func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserver
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
-func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
+func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, depth int) error {
+	if depth > 15 {
+		return errors.New("recursion limit hit trying to process event with missing state")
+	}
+
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
@@ -211,8 +216,27 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 		return err
 	}
 	// Check that the event is allowed by the state.
+retryAllowedState:
 	if err := checkAllowedByState(e, state.StateEvents); err != nil {
-		return err
+		switch missing := err.(type) {
+		case gomatrixserverlib.MissingAuthEventError:
+			// An auth event was missing so let's look up that event over federation
+			for _, s := range state.StateEvents {
+				if s.EventID() == missing.AuthEventID {
+					if serr := t.processEventWithMissingState(s, depth+1); serr == nil {
+						// If there was no error retrieving the event from federation then
+						// we assume that it succeeded, so retry the original state check
+						goto retryAllowedState
+					} else {
+						// An error occurred so let's not do anything further
+						return err
+					}
+				}
+			}
+		default:
+			// Some other error condition happened that wasn't a missing auth event
+			return err
+		}
 	}
 	// pass the event along with the state to the roomserver
 	return t.producer.SendEventWithState(t.context, state, e)
