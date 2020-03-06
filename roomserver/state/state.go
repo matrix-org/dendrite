@@ -695,7 +695,7 @@ func (v StateResolution) resolveConflictsV2(
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
 
-	var eventIDMap map[string]StateEntry
+	var eventIDMap map[string]types.StateEntry
 
 	// Load the conflicted events
 	conflictedEvents, conflictedEventMap, err := v.loadStateEvents(ctx, conflicted)
