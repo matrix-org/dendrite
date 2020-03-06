@@ -695,16 +695,24 @@ func (v StateResolution) resolveConflictsV2(
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
 
-	// Load the non-conflicted events
-	nonConflictedEvents, _, err := v.loadStateEvents(ctx, notConflicted)
+	var eventIDMap map[string]StateEntry
+
+	// Load the conflicted events
+	conflictedEvents, conflictedEventMap, err := v.loadStateEvents(ctx, conflicted)
 	if err != nil {
 		return nil, err
 	}
+	for k, v := range conflictedEventMap {
+		eventIDMap[k] = v
+	}
 
-	// Load the conflicted events
-	conflictedEvents, eventIDMap, err := v.loadStateEvents(ctx, conflicted)
+	// Load the non-conflicted events
+	nonConflictedEvents, nonConflictedEventMap, err := v.loadStateEvents(ctx, notConflicted)
 	if err != nil {
 		return nil, err
+	}
+	for k, v := range nonConflictedEventMap {
+		eventIDMap[k] = v
 	}
 
 	// For each conflicted event, we will add a new set of auth events. Auth
