@@ -91,10 +91,10 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
 func (s *accountsStatements) insertAccount(
-	ctx context.Context, localpart, hash, appserviceID string,
+	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string,
 ) (*authtypes.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
-	stmt := s.insertAccountStmt
+	stmt := txn.Stmt(s.insertAccountStmt)
 
 	var err error
 	if appserviceID == "" {

@@ -123,7 +123,8 @@ func (d *Database) SetDisplayName(
 // for this account.
 func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		numLocalpart, err := d.accounts.selectNewNumericLocalpart(ctx, txn)
+		var numLocalpart int64
+		numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
 		if err != nil {
 			return err
 		}
@@ -160,13 +161,14 @@ func (d *Database) createAccount(
 			return nil, err
 		}
 	}
-	if err := d.profiles.insertProfile(ctx, localpart); err != nil {
+	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		if common.IsUniqueConstraintViolationErr(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	if err := d.SaveAccountData(ctx, localpart, "", "m.push_rules", `{
+
+	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", `{
 		"global": {
 			"content": [],
 			"override": [],
@@ -177,7 +179,7 @@ func (d *Database) createAccount(
 	}`); err != nil {
 		return nil, err
 	}
-	return d.accounts.insertAccount(ctx, localpart, hash, appserviceID)
+	return d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID)
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
@@ -284,7 +286,9 @@ func (d *Database) newMembership(
 func (d *Database) SaveAccountData(
 	ctx context.Context, localpart, roomID, dataType, content string,
 ) error {
-	return d.accountDatas.insertAccountData(ctx, localpart, roomID, dataType, content)
+	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.accountDatas.insertAccountData(ctx, txn, localpart, roomID, dataType, content)
+	})
 }
 
 // GetAccountData returns account data related to a given localpart

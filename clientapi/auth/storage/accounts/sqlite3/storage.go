@@ -123,7 +123,8 @@ func (d *Database) SetDisplayName(
 // for this account.
 func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		numLocalpart, err := d.accounts.selectNewNumericLocalpart(ctx, txn)
+		var numLocalpart int64
+		numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
 		if err != nil {
 			return err
 		}
