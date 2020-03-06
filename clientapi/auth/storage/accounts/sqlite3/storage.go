@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common"
@@ -118,14 +119,36 @@ func (d *Database) SetDisplayName(
 	return d.profiles.setDisplayName(ctx, localpart, displayName)
 }
 
+func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		numLocalpart, err := d.accounts.selectNewNumericLocalpart(ctx, txn)
+		if err != nil {
+			return err
+		}
+		localpart := strconv.FormatInt(numLocalpart, 10)
+		acc, err = d.createAccount(ctx, txn, localpart, "", "")
+		return err
+	})
+	return acc, err
+}
+
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, nil.
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
+) (acc *authtypes.Account, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
+		return err
+	})
+	return
+}
+
+func (d *Database) createAccount(
+	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
 ) (*authtypes.Account, error) {
 	var err error
-
 	// Generate a password hash if this is not a password-less user
 	hash := ""
 	if plaintextPassword != "" {
@@ -134,13 +157,14 @@ func (d *Database) CreateAccount(
 			return nil, err
 		}
 	}
-	if err := d.profiles.insertProfile(ctx, localpart); err != nil {
+	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		if common.IsUniqueConstraintViolationErr(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	if err := d.SaveAccountData(ctx, localpart, "", "m.push_rules", `{
+
+	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push.rules", `{
 		"global": {
 			"content": [],
 			"override": [],
@@ -151,7 +175,7 @@ func (d *Database) CreateAccount(
 	}`); err != nil {
 		return nil, err
 	}
-	return d.accounts.insertAccount(ctx, localpart, hash, appserviceID)
+	return d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID)
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
@@ -258,7 +282,9 @@ func (d *Database) newMembership(
 func (d *Database) SaveAccountData(
 	ctx context.Context, localpart, roomID, dataType, content string,
 ) error {
-	return d.accountDatas.insertAccountData(ctx, localpart, roomID, dataType, content)
+	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.accountDatas.insertAccountData(ctx, txn, localpart, roomID, dataType, content)
+	})
 }
 
 // GetAccountData returns account data related to a given localpart
@@ -288,7 +314,7 @@ func (d *Database) GetAccountDataByType(
 func (d *Database) GetNewNumericLocalpart(
 	ctx context.Context,
 ) (int64, error) {
-	return d.accounts.selectNewNumericLocalpart(ctx)
+	return d.accounts.selectNewNumericLocalpart(ctx, nil)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {

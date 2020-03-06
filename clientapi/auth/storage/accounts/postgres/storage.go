@@ -118,6 +118,10 @@ func (d *Database) SetDisplayName(
 	return d.profiles.setDisplayName(ctx, localpart, displayName)
 }
 
+func (d *Database) CreateGuestAccount(ctx context.Context) (*authtypes.Account, error) {
+	return nil, nil
+}
+
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, nil.

@@ -516,16 +516,7 @@ func handleGuestRegistration(
 	accountDB accounts.Database,
 	deviceDB devices.Database,
 ) util.JSONResponse {
-
-	//Generate numeric local part for guest user
-	id, err := accountDB.GetNewNumericLocalpart(req.Context())
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetNewNumericLocalpart failed")
-		return jsonerror.InternalServerError()
-	}
-
-	localpart := strconv.FormatInt(id, 10)
-	acc, err := accountDB.CreateAccount(req.Context(), localpart, "", "")
+	acc, err := accountDB.CreateGuestAccount(req.Context())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
