@@ -14,27 +14,10 @@
 
 // +build !wasm
 
-package storage
+package main
 
-import (
-	"net/url"
+import "fmt"
 
-	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
-	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
-)
-
-// NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (Database, error) {
-	uri, err := url.Parse(dataSourceName)
-	if err != nil {
-		return postgres.NewDatabase(dataSourceName)
-	}
-	switch uri.Scheme {
-	case "file":
-		return sqlite3.NewDatabase(dataSourceName)
-	case "postgres":
-		return postgres.NewDatabase(dataSourceName)
-	default:
-		return postgres.NewDatabase(dataSourceName)
-	}
+func main() {
+	fmt.Println("dendritejs: no-op when not compiling for WebAssembly")
 }
