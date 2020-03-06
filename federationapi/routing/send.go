@@ -220,19 +220,16 @@ retryAllowedState:
 				if s.EventID() != missing.AuthEventID {
 					continue
 				}
-				if serr := t.processEventWithMissingState(s); serr == nil {
-					// If there was no error retrieving the event from federation then
-					// we assume that it succeeded, so retry the original state check
+				err = t.processEventWithMissingState(s)
+				// If there was no error retrieving the event from federation then
+				// we assume that it succeeded, so retry the original state check
+				if err == nil {
 					goto retryAllowedState
-				} else {
-					// An error occurred so let's not do anything further
-					return err
 				}
 			}
 		default:
-			// Some other error condition happened that wasn't a missing auth event
-			return err
 		}
+		return err
 	}
 	// pass the event along with the state to the roomserver
 	return t.producer.SendEventWithState(t.context, state, e)
