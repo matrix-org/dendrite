@@ -119,7 +119,6 @@ type eventStatements struct {
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
 	bulkSelectEventNIDStmt                 *sql.Stmt
-	selectMaxEventDepthStmt                *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -145,7 +144,6 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
-		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 	}.prepare(db)
 }
 
@@ -488,8 +486,12 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 
 func (s *eventStatements) selectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error) {
 	var result int64
-	selectStmt := common.TxStmt(txn, s.selectMaxEventDepthStmt)
-	err := selectStmt.QueryRowContext(ctx, eventNIDsAsArray(eventNIDs)).Scan(&result)
+	iEventIDs := make([]interface{}, len(eventNIDs))
+	for i, v := range eventNIDs {
+		iEventIDs[i] = v
+	}
+	sqlStr := strings.Replace(selectMaxEventDepthSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
+	err := txn.QueryRowContext(ctx, sqlStr, iEventIDs...).Scan(&result)
 	if err != nil {
 		return 0, err
 	}
