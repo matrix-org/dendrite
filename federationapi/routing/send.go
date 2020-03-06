@@ -211,7 +211,24 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 		return err
 	}
 	// Check that the event is allowed by the state.
+retryAllowedState:
 	if err := checkAllowedByState(e, state.StateEvents); err != nil {
+		switch missing := err.(type) {
+		case gomatrixserverlib.MissingAuthEventError:
+			// An auth event was missing so let's look up that event over federation
+			for _, s := range state.StateEvents {
+				if s.EventID() != missing.AuthEventID {
+					continue
+				}
+				err = t.processEventWithMissingState(s)
+				// If there was no error retrieving the event from federation then
+				// we assume that it succeeded, so retry the original state check
+				if err == nil {
+					goto retryAllowedState
+				}
+			}
+		default:
+		}
 		return err
 	}
 	// pass the event along with the state to the roomserver
