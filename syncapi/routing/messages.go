@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -176,6 +177,7 @@ func (r *messagesReq) retrieveEvents() (
 		r.ctx, r.from, r.to, r.roomID, r.limit, r.backwardOrdering,
 	)
 	if err != nil {
+		err = fmt.Errorf("GetEventsInRange: %s", err)
 		return
 	}
 
@@ -226,12 +228,14 @@ func (r *messagesReq) retrieveEvents() (
 		r.ctx, events[0].EventID(),
 	)
 	if err != nil {
+		err = fmt.Errorf("EventPositionInTopology: for start event %s: %s", events[0].EventID(), err)
 		return
 	}
 	endPos, err := r.db.EventPositionInTopology(
 		r.ctx, events[len(events)-1].EventID(),
 	)
 	if err != nil {
+		err = fmt.Errorf("EventPositionInTopology: for end event %s: %s", events[len(events)-1].EventID(), err)
 		return
 	}
 	// Generate pagination tokens to send to the client using the positions
