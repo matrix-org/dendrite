@@ -88,9 +88,22 @@ func MakeJoin(
 		}
 	}
 
+	// Get the room version of the room being joined
+	vQueryReq := api.QueryRoomVersionForRoomIDRequest{RoomID: roomID}
+	vQueryRes := api.QueryRoomVersionForRoomIDResponse{}
+	if e := query.QueryRoomVersionForRoomID(httpReq.Context(), &vQueryReq, &vQueryRes); e != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown(err.Error()),
+		}
+	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: map[string]interface{}{"event": builder},
+		JSON: map[string]interface{}{
+			"event":        builder,
+			"room_version": vQueryRes.RoomVersion,
+		},
 	}
 }
 

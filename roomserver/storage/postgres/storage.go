@@ -25,7 +25,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -737,7 +736,7 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 
 func (d *Database) GetRoomVersionForRoom(
 	ctx context.Context, roomNID types.RoomNID,
-) (state.StateResolutionVersion, error) {
+) (int64, error) {
 	return d.statements.selectRoomVersionForRoomNID(
 		ctx, nil, roomNID,
 	)

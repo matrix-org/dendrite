@@ -38,13 +38,13 @@ const (
 )
 
 func GetStateResolutionAlgorithm(
-	version StateResolutionVersion, db database.RoomStateDatabase,
+	version int64, db database.RoomStateDatabase,
 ) (StateResolutionImpl, error) {
 	switch version {
-	case StateResolutionAlgorithmV1:
-		fallthrough
-	case StateResolutionAlgorithmV2:
-		return Prepare(db, version), nil
+	case 1:
+		return Prepare(db, StateResolutionAlgorithmV1), nil
+	case 2, 3, 4, 5:
+		return Prepare(db, StateResolutionAlgorithmV2), nil
 	default:
 		return nil, errors.New("unsupported room version")
 	}

@@ -92,7 +92,7 @@ type RoomserverQueryAPIDatabase interface {
 	// Look up the room version from the database.
 	GetRoomVersionForRoom(
 		ctx context.Context, roomNID types.RoomNID,
-	) (state.StateResolutionVersion, error)
+	) (int64, error)
 	// Get the room NID for a given event ID.
 	RoomNIDForEventID(
 		ctx context.Context, eventID string,
@@ -627,17 +627,21 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	request *api.QueryStateAndAuthChainRequest,
 	response *api.QueryStateAndAuthChainResponse,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+	roomState, err := state.GetStateResolutionAlgorithm(roomVersion, r.DB)
 	if err != nil {
 		return err
 	}
 
 	response.QueryStateAndAuthChainRequest = *request
-	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
-	if err != nil {
-		return err
-	}
+
 	if roomNID == 0 {
 		return nil
 	}

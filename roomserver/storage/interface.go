@@ -46,4 +46,6 @@ type Database interface {
 	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error)
 	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
 	GetRoomVersionForRoom(ctx context.Context, roomNID types.RoomNID) (int64, error)
+	RoomNIDForEventID(ctx context.Context, eventID string) (types.RoomNID, error)
+	RoomNIDForEventNID(ctx context.Context, eventNID types.EventNID) (types.RoomNID, error)
 }

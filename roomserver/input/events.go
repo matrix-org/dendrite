@@ -75,7 +75,7 @@ type RoomEventDatabase interface {
 	// Look up the room version from the database.
 	GetRoomVersionForRoom(
 		ctx context.Context, roomNID types.RoomNID,
-	) (state.StateResolutionVersion, error)
+	) (int64, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
