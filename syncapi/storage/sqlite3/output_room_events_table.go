@@ -182,19 +182,11 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 			return nil, nil, err
 		}
 
-		var addIDs []string
-		var delIDs []string
+		addIDs, delIDs, err := unmarshalStateIDs(addIDsJSON, delIDsJSON)
+		if err != nil {
+			return nil, nil, err
+		}
 
-		if len(addIDsJSON) > 0 {
-			if err := json.Unmarshal([]byte(addIDsJSON), &addIDs); err != nil {
-				return nil, nil, err
-			}
-		}
-		if len(delIDsJSON) > 0 {
-			if err := json.Unmarshal([]byte(delIDsJSON), &delIDs); err != nil {
-				return nil, nil, err
-			}
-		}
 		// Sanity check for deleted state and whine if we see it. We don't need to do anything
 		// since it'll just mark the event as not being needed.
 		if len(addIDs) < len(delIDs) {
@@ -419,4 +411,18 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		})
 	}
 	return result, nil
+}
+
+func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs []string, err error) {
+	if len(addIDsJSON) > 0 {
+		if err = json.Unmarshal([]byte(addIDsJSON), &addIDs); err != nil {
+			return
+		}
+	}
+	if len(delIDsJSON) > 0 {
+		if err = json.Unmarshal([]byte(delIDsJSON), &delIDs); err != nil {
+			return
+		}
+	}
+	return
 }
