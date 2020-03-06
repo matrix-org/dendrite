@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -175,10 +174,10 @@ func (s *currentRoomStateStatements) selectCurrentState(
 ) ([]gomatrixserverlib.Event, error) {
 	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
-		pq.StringArray(stateFilterPart.Senders),
-		pq.StringArray(stateFilterPart.NotSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
+		nil, // FIXME: pq.StringArray(stateFilterPart.Senders),
+		nil, // FIXME: pq.StringArray(stateFilterPart.NotSenders),
+		nil, // FIXME: pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
+		nil, // FIXME: pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
 		stateFilterPart.ContainsURL,
 		stateFilterPart.Limit,
 	)

@@ -444,7 +444,6 @@ func Register(
 	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {

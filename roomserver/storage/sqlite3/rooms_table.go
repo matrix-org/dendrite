@@ -18,8 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -28,7 +28,7 @@ const roomsSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_rooms (
     room_nid INTEGER PRIMARY KEY AUTOINCREMENT,
     room_id TEXT NOT NULL UNIQUE,
-    latest_event_nids TEXT NOT NULL DEFAULT '{}',
+    latest_event_nids TEXT NOT NULL DEFAULT '[]',
     last_event_sent_nid INTEGER NOT NULL DEFAULT 0,
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
     room_version INTEGER NOT NULL DEFAULT 1
@@ -104,16 +104,16 @@ func (s *roomStatements) selectRoomNID(
 func (s *roomStatements) selectLatestEventNIDs(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.EventNID, types.StateSnapshotNID, error) {
-	var nids pq.Int64Array
+	var eventNIDs []types.EventNID
+	var nidsJSON string
 	var stateSnapshotNID int64
 	stmt := common.TxStmt(txn, s.selectLatestEventNIDsStmt)
-	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &stateSnapshotNID)
+	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nidsJSON, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, err
 	}
-	eventNIDs := make([]types.EventNID, len(nids))
-	for i := range nids {
-		eventNIDs[i] = types.EventNID(nids[i])
+	if err := json.Unmarshal([]byte(nidsJSON), &eventNIDs); err != nil {
+		return nil, 0, err
 	}
 	return eventNIDs, types.StateSnapshotNID(stateSnapshotNID), nil
 }
@@ -121,17 +121,17 @@ func (s *roomStatements) selectLatestEventNIDs(
 func (s *roomStatements) selectLatestEventsNIDsForUpdate(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.EventNID, types.EventNID, types.StateSnapshotNID, error) {
-	var nids pq.Int64Array
+	var eventNIDs []types.EventNID
+	var nidsJSON string
 	var lastEventSentNID int64
 	var stateSnapshotNID int64
 	stmt := common.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
-	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
+	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nidsJSON, &lastEventSentNID, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	eventNIDs := make([]types.EventNID, len(nids))
-	for i := range nids {
-		eventNIDs[i] = types.EventNID(nids[i])
+	if err := json.Unmarshal([]byte(nidsJSON), &eventNIDs); err != nil {
+		return nil, 0, 0, err
 	}
 	return eventNIDs, types.EventNID(lastEventSentNID), types.StateSnapshotNID(stateSnapshotNID), nil
 }

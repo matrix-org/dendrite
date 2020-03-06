@@ -29,8 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
-	// Import the postgres database driver.
-	_ "github.com/lib/pq"
+	// Import the sqlite3 package
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/common"
@@ -79,7 +78,7 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sql.Open("sqlite3", cs); err != nil {
+	if d.db, err = sql.Open(common.SQLiteDriverName(), cs); err != nil {
 		return nil, err
 	}
 	if err = d.prepare(); err != nil {

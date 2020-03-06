@@ -216,7 +216,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
 	if err != nil || uri.Scheme == "file" {
-		db, err = sql.Open("sqlite3", string(cfg.Database.Naffka))
+		db, err = sql.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}

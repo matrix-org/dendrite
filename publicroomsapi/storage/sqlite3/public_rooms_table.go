@@ -18,10 +18,10 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
 )
 
@@ -196,17 +196,21 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	rooms := []types.PublicRoom{}
 	for rows.Next() {
 		var r types.PublicRoom
-		var aliases pq.StringArray
+		var aliasesJSON string
 
 		err = rows.Scan(
-			&r.RoomID, &r.NumJoinedMembers, &aliases, &r.CanonicalAlias,
+			&r.RoomID, &r.NumJoinedMembers, &aliasesJSON, &r.CanonicalAlias,
 			&r.Name, &r.Topic, &r.WorldReadable, &r.GuestCanJoin, &r.AvatarURL,
 		)
 		if err != nil {
 			return rooms, err
 		}
 
-		r.Aliases = aliases
+		if len(aliasesJSON) > 0 {
+			if err := json.Unmarshal([]byte(aliasesJSON), &r.Aliases); err != nil {
+				return rooms, err
+			}
+		}
 
 		rooms = append(rooms, r)
 	}
@@ -254,7 +258,8 @@ func (s *publicRoomsStatements) updateRoomAttribute(
 	var value interface{}
 	switch v := attrValue.(type) {
 	case []string:
-		value = pq.StringArray(v)
+		b, _ := json.Marshal(v)
+		value = string(b)
 	case bool, string:
 		value = attrValue
 	default:

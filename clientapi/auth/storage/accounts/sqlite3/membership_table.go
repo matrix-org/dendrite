@@ -17,9 +17,10 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/common"
 )
 
 const membershipSchema = `
@@ -54,7 +55,6 @@ const deleteMembershipsByEventIDsSQL = "" +
 	"DELETE FROM account_memberships WHERE event_id IN ($1)"
 
 type membershipStatements struct {
-	deleteMembershipsByEventIDsStmt       *sql.Stmt
 	insertMembershipStmt                  *sql.Stmt
 	selectMembershipInRoomByLocalpartStmt *sql.Stmt
 	selectMembershipsByLocalpartStmt      *sql.Stmt
@@ -63,9 +63,6 @@ type membershipStatements struct {
 func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(membershipSchema)
 	if err != nil {
-		return
-	}
-	if s.deleteMembershipsByEventIDsStmt, err = db.Prepare(deleteMembershipsByEventIDsSQL); err != nil {
 		return
 	}
 	if s.insertMembershipStmt, err = db.Prepare(insertMembershipSQL); err != nil {
@@ -91,8 +88,12 @@ func (s *membershipStatements) insertMembership(
 func (s *membershipStatements) deleteMembershipsByEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) (err error) {
-	stmt := txn.Stmt(s.deleteMembershipsByEventIDsStmt)
-	_, err = stmt.ExecContext(ctx, pq.StringArray(eventIDs))
+	sqlStr := strings.Replace(deleteMembershipsByEventIDsSQL, "($1)", common.QueryVariadic(len(eventIDs)), 1)
+	iEventIDs := make([]interface{}, len(eventIDs))
+	for i, e := range eventIDs {
+		iEventIDs[i] = e
+	}
+	_, err = txn.ExecContext(ctx, sqlStr, iEventIDs...)
 	return
 }
 

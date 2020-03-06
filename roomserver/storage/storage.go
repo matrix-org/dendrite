@@ -12,44 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +build !wasm
+
 package storage
 
 import (
-	"context"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	statedb "github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
-
-type Database interface {
-	statedb.RoomStateDatabase
-	StoreEvent(ctx context.Context, event gomatrixserverlib.Event, txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
-	StateEntriesForEventIDs(ctx context.Context, eventIDs []string) ([]types.StateEntry, error)
-	EventStateKeys(ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error)
-	EventNIDs(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error)
-	SetState(ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID) error
-	EventIDs(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error)
-	GetLatestEventsForUpdate(ctx context.Context, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error)
-	GetTransactionEventID(ctx context.Context, transactionID string, sessionID int64, userID string) (string, error)
-	RoomNID(ctx context.Context, roomID string) (types.RoomNID, error)
-	LatestEventIDs(ctx context.Context, roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error)
-	GetInvitesForUser(ctx context.Context, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) (senderUserIDs []types.EventStateKeyNID, err error)
-	SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error
-	GetRoomIDForAlias(ctx context.Context, alias string) (string, error)
-	GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error)
-	GetCreatorIDForAlias(ctx context.Context, alias string) (string, error)
-	RemoveRoomAlias(ctx context.Context, alias string) error
-	MembershipUpdater(ctx context.Context, roomID, targetUserID string) (types.MembershipUpdater, error)
-	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error)
-	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error)
-	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
-	GetRoomVersionForRoom(ctx context.Context, roomNID types.RoomNID) (int64, error)
-}
 
 // NewPublicRoomsServerDatabase opens a database connection.
 func Open(dataSourceName string) (Database, error) {

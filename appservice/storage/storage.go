@@ -12,25 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +build !wasm
+
 package storage
 
 import (
-	"context"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/appservice/storage/postgres"
 	"github.com/matrix-org/dendrite/appservice/storage/sqlite3"
-	"github.com/matrix-org/gomatrixserverlib"
 )
-
-type Database interface {
-	StoreEvent(ctx context.Context, appServiceID string, event *gomatrixserverlib.Event) error
-	GetEventsWithAppServiceID(ctx context.Context, appServiceID string, limit int) (int, int, []gomatrixserverlib.Event, bool, error)
-	CountEventsWithAppServiceID(ctx context.Context, appServiceID string) (int, error)
-	UpdateTxnIDForEvents(ctx context.Context, appserviceID string, maxID, txnID int) error
-	RemoveEventsBeforeAndIncludingID(ctx context.Context, appserviceID string, eventTableID int) error
-	GetLatestTxnID(ctx context.Context) (int, error)
-}
 
 func NewDatabase(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)

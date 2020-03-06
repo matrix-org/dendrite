@@ -12,29 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !wasm
-
 package storage
 
 import (
+	"fmt"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
-	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
+	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
 )
 
-// NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (Database, error) {
+// NewPublicRoomsServerDatabase opens a database connection.
+func Open(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewDatabase(dataSourceName)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
 	switch uri.Scheme {
-	case "file":
-		return sqlite3.NewDatabase(dataSourceName)
 	case "postgres":
-		return postgres.NewDatabase(dataSourceName)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
+	case "file":
+		return sqlite3.Open(dataSourceName)
 	default:
-		return postgres.NewDatabase(dataSourceName)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
 }

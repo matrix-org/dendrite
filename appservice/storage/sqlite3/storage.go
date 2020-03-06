@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	// Import SQLite database driver
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -35,7 +36,7 @@ type Database struct {
 func NewDatabase(dataSourceName string) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sql.Open("sqlite3", dataSourceName); err != nil {
+	if result.db, err = sql.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {

@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -40,11 +39,11 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   type TEXT NOT NULL,
   sender TEXT NOT NULL,
   contains_url BOOL NOT NULL,
-  add_state_ids TEXT[],
-  remove_state_ids TEXT[],
+  add_state_ids TEXT, -- JSON encoded string array
+  remove_state_ids TEXT, -- JSON encoded string array
   session_id BIGINT,
   transaction_id TEXT,
-  exclude_from_sync BOOL DEFAULT FALSE
+  exclude_from_sync BOOL NOT NULL DEFAULT FALSE
 );
 `
 
@@ -52,7 +51,7 @@ const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
 	"id, room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
 	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
-	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = $11"
+	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = $13"
 
 const selectEventsSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
@@ -176,20 +175,26 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 			streamPos       types.StreamPosition
 			eventBytes      []byte
 			excludeFromSync bool
-			addIDs          pq.StringArray
-			delIDs          pq.StringArray
+			addIDsJSON      string
+			delIDsJSON      string
 		)
-		if err := rows.Scan(&streamPos, &eventBytes, &excludeFromSync, &addIDs, &delIDs); err != nil {
+		if err := rows.Scan(&streamPos, &eventBytes, &excludeFromSync, &addIDsJSON, &delIDsJSON); err != nil {
 			return nil, nil, err
 		}
+
+		addIDs, delIDs, err := unmarshalStateIDs(addIDsJSON, delIDsJSON)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		// Sanity check for deleted state and whine if we see it. We don't need to do anything
 		// since it'll just mark the event as not being needed.
 		if len(addIDs) < len(delIDs) {
 			log.WithFields(log.Fields{
 				"since":   oldPos,
 				"current": newPos,
-				"adds":    addIDs,
-				"dels":    delIDs,
+				"adds":    addIDsJSON,
+				"dels":    delIDsJSON,
 			}).Warn("StateBetween: ignoring deleted state")
 		}
 
@@ -262,6 +267,15 @@ func (s *outputRoomEventsStatements) insertEvent(
 		return
 	}
 
+	addStateJSON, err := json.Marshal(addState)
+	if err != nil {
+		return
+	}
+	removeStateJSON, err := json.Marshal(removeState)
+	if err != nil {
+		return
+	}
+
 	insertStmt := common.TxStmt(txn, s.insertEventStmt)
 	_, err = insertStmt.ExecContext(
 		ctx,
@@ -272,10 +286,11 @@ func (s *outputRoomEventsStatements) insertEvent(
 		event.Type(),
 		event.Sender(),
 		containsURL,
-		pq.StringArray(addState),
-		pq.StringArray(removeState),
+		string(addStateJSON),
+		string(removeStateJSON),
 		sessionID,
 		txnID,
+		excludeFromSync,
 		excludeFromSync,
 	)
 	return
@@ -396,4 +411,18 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		})
 	}
 	return result, nil
+}
+
+func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs []string, err error) {
+	if len(addIDsJSON) > 0 {
+		if err = json.Unmarshal([]byte(addIDsJSON), &addIDs); err != nil {
+			return
+		}
+	}
+	if len(delIDsJSON) > 0 {
+		if err = json.Unmarshal([]byte(delIDsJSON), &delIDs); err != nil {
+			return
+		}
+	}
+	return
 }
