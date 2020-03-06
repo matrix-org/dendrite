@@ -17,7 +17,6 @@ package routing
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -159,7 +158,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	}
 
 	if !stateResp.PrevEventsExist {
-		return t.processEventWithMissingState(e, 0)
+		return t.processEventWithMissingState(e)
 	}
 
 	// Check that the event is allowed by the state at the event.
@@ -186,11 +185,7 @@ func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserver
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
-func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, depth int) error {
-	if depth > 15 {
-		return errors.New("recursion limit hit trying to process event with missing state")
-	}
-
+func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
@@ -222,15 +217,16 @@ retryAllowedState:
 		case gomatrixserverlib.MissingAuthEventError:
 			// An auth event was missing so let's look up that event over federation
 			for _, s := range state.StateEvents {
-				if s.EventID() == missing.AuthEventID {
-					if serr := t.processEventWithMissingState(s, depth+1); serr == nil {
-						// If there was no error retrieving the event from federation then
-						// we assume that it succeeded, so retry the original state check
-						goto retryAllowedState
-					} else {
-						// An error occurred so let's not do anything further
-						return err
-					}
+				if s.EventID() != missing.AuthEventID {
+					continue
+				}
+				if serr := t.processEventWithMissingState(s); serr == nil {
+					// If there was no error retrieving the event from federation then
+					// we assume that it succeeded, so retry the original state check
+					goto retryAllowedState
+				} else {
+					// An error occurred so let's not do anything further
+					return err
 				}
 			}
 		default:
