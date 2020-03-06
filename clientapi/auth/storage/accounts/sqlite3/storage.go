@@ -119,6 +119,8 @@ func (d *Database) SetDisplayName(
 	return d.profiles.setDisplayName(ctx, localpart, displayName)
 }
 
+// CreateGuestAccount makes a new guest account and creates an empty profile
+// for this account.
 func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		numLocalpart, err := d.accounts.selectNewNumericLocalpart(ctx, txn)

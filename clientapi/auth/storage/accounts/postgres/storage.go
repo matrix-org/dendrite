@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common"
@@ -118,8 +119,19 @@ func (d *Database) SetDisplayName(
 	return d.profiles.setDisplayName(ctx, localpart, displayName)
 }
 
-func (d *Database) CreateGuestAccount(ctx context.Context) (*authtypes.Account, error) {
-	return nil, nil
+// CreateGuestAccount makes a new guest account and creates an empty profile
+// for this account.
+func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		numLocalpart, err := d.accounts.selectNewNumericLocalpart(ctx, txn)
+		if err != nil {
+			return err
+		}
+		localpart := strconv.FormatInt(numLocalpart, 10)
+		acc, err = d.createAccount(ctx, txn, localpart, "", "")
+		return err
+	})
+	return acc, err
 }
 
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
@@ -127,6 +139,16 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (*authtypes.Account, 
 // account already exists, it will return nil, nil.
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
+) (acc *authtypes.Account, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
+		return err
+	})
+	return
+}
+
+func (d *Database) createAccount(
+	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
 ) (*authtypes.Account, error) {
 	var err error
 
@@ -292,7 +314,7 @@ func (d *Database) GetAccountDataByType(
 func (d *Database) GetNewNumericLocalpart(
 	ctx context.Context,
 ) (int64, error) {
-	return d.accounts.selectNewNumericLocalpart(ctx)
+	return d.accounts.selectNewNumericLocalpart(ctx, nil)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {

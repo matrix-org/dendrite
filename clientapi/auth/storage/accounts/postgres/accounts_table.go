@@ -146,8 +146,12 @@ func (s *accountsStatements) selectAccountByLocalpart(
 }
 
 func (s *accountsStatements) selectNewNumericLocalpart(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
-	err = s.selectNewNumericLocalpartStmt.QueryRowContext(ctx).Scan(&id)
+	stmt := s.selectNewNumericLocalpartStmt
+	if txn != nil {
+		stmt = txn.Stmt(stmt)
+	}
+	err = stmt.QueryRowContext(ctx).Scan(&id)
 	return
 }
