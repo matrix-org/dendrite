@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -255,21 +254,19 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/pushrules/",
-		common.MakeExternalAPI("push_rules", func(req *http.Request) util.JSONResponse {
-			// TODO: Implement push rules API
-			res := json.RawMessage(`{
-					"global": {
-						"content": [],
-						"override": [],
-						"room": [],
-						"sender": [],
-						"underride": []
-					}
-				}`)
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: &res,
+		common.MakeAuthAPI("push_rules", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+
+			return GetPushRuleSet(req, device, accountDB)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/pushrules/global/{kind}/{ruleId}",
+		common.MakeAuthAPI("push_rules", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
 			}
+			return GetPushRule(req, device, accountDB, vars["kind"], vars["ruleId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
