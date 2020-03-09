@@ -2,12 +2,13 @@ package routing
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"net/http"
 )
 
 type PushCondition struct {
