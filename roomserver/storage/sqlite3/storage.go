@@ -93,7 +93,9 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		roomVersion := strconv.Itoa(int(version.GetDefaultRoomVersion()))
+		// The only room version where the "room_version" key isn't specified is
+		// room version 1
+		roomVersion := 1
 		// The below works because the first event to be persisted to the database
 		// is always the m.room.create event. We can therefore set the room version
 		// correctly at the same time as assigning the room NID.
