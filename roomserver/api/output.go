@@ -53,8 +53,10 @@ type OutputEvent struct {
 // event IDs in the room. The state before an event is the state after its
 // prev_events.
 type OutputNewRoomEvent struct {
-	// The Event.
-	Event gomatrixserverlib.Event `json:"event"`
+	// The event.
+	Event []byte `json:"event"`
+	// The event version.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The latest events in the room after this event.
 	// This can be used to set the prev events for new events in the room.
 	// This also can be used to get the full current state after this event.

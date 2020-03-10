@@ -67,10 +67,15 @@ func updateLatestEvents(
 		}
 	}()
 
+	roomVersion, err := db.GetRoomVersionForRoom(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+
 	u := latestEventsUpdater{
 		ctx: ctx, db: db, updater: updater, ow: ow, roomNID: roomNID,
-		stateAtEvent: stateAtEvent, event: event, sendAsServer: sendAsServer,
-		transactionID: transactionID,
+		roomVersion: roomVersion, stateAtEvent: stateAtEvent, event: event,
+		sendAsServer: sendAsServer, transactionID: transactionID,
 	}
 	if err = u.doUpdateLatestEvents(); err != nil {
 		return err
@@ -90,6 +95,7 @@ type latestEventsUpdater struct {
 	updater       types.RoomRecentEventsUpdater
 	ow            OutputRoomEventWriter
 	roomNID       types.RoomNID
+	roomVersion   gomatrixserverlib.RoomVersion
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event
 	transactionID *api.TransactionID
@@ -256,8 +262,13 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
+	eventJSON, err := u.event.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
 	ore := api.OutputNewRoomEvent{
-		Event:           u.event,
+		Event:           eventJSON,
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,
