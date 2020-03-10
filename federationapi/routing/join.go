@@ -17,7 +17,6 @@ package routing
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -103,7 +102,7 @@ func MakeJoin(
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
 			"event":        builder,
-			"room_version": strconv.Itoa(vQueryRes.RoomVersion),
+			"room_version": vQueryRes.RoomVersion,
 		},
 	}
 }

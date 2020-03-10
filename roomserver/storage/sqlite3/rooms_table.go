@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const roomsSchema = `
@@ -31,7 +32,7 @@ const roomsSchema = `
     latest_event_nids TEXT NOT NULL DEFAULT '[]',
     last_event_sent_nid INTEGER NOT NULL DEFAULT 0,
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
-    room_version INTEGER NOT NULL DEFAULT 1
+    room_version TEXT NOT NULL DEFAULT '1'
   );
 `
 
@@ -81,7 +82,8 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *roomStatements) insertRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string, roomVersion string,
+	ctx context.Context, txn *sql.Tx, roomID string,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var err error
 	insertStmt := common.TxStmt(txn, s.insertRoomNIDStmt)
@@ -157,8 +159,8 @@ func (s *roomStatements) updateLatestEventNIDs(
 
 func (s *roomStatements) selectRoomVersionForRoomNID(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) (int64, error) {
-	var roomVersion int64
+) (gomatrixserverlib.RoomVersion, error) {
+	var roomVersion gomatrixserverlib.RoomVersion
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
 	return roomVersion, err

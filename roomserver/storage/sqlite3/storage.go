@@ -21,12 +21,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
-	"strconv"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -95,7 +93,7 @@ func (d *Database) StoreEvent(
 
 		// The only room version where the "room_version" key isn't specified is
 		// room version 1
-		roomVersion := 1
+		roomVersion := gomatrixserverlib.RoomVersionV1
 		// The below works because the first event to be persisted to the database
 		// is always the m.room.create event. We can therefore set the room version
 		// correctly at the same time as assigning the room NID.
@@ -103,7 +101,7 @@ func (d *Database) StoreEvent(
 			var createContent gomatrixserverlib.CreateContent
 			if err := json.Unmarshal(event.Content(), &createContent); err == nil {
 				if createContent.RoomVersion != nil {
-					roomVersion = *createContent.RoomVersion
+					roomVersion = gomatrixserverlib.RoomVersion(*createContent.RoomVersion)
 				}
 			}
 		}
@@ -168,7 +166,8 @@ func (d *Database) StoreEvent(
 }
 
 func (d *Database) assignRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string, roomVersion string,
+	ctx context.Context, txn *sql.Tx, roomID string,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) (roomNID types.RoomNID, err error) {
 	// Check if we already have a numeric ID in the database.
 	roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
@@ -286,10 +285,18 @@ func (d *Database) Events(
 		for i, eventJSON := range eventJSONs {
 			result := &results[i]
 			result.EventNID = eventJSON.EventNID
-			// TODO: Use NewEventFromTrustedJSON for efficiency
-			result.Event, err = gomatrixserverlib.NewEventFromUntrustedJSON(eventJSON.EventJSON)
+			roomNID, err := d.RoomNIDForEventNID(ctx, result.EventNID)
 			if err != nil {
-				return nil
+				return err
+			}
+			roomVersion, err := d.GetRoomVersionForRoom(ctx, roomNID)
+			if err != nil {
+				return err
+			}
+			// TODO: Use NewEventFromTrustedJSON for efficiency
+			result.Event, err = gomatrixserverlib.NewEventFromUntrustedJSON(eventJSON.EventJSON, roomVersion)
+			if err != nil {
+				return err
 			}
 		}
 		return nil
@@ -891,7 +898,7 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 
 func (d *Database) GetRoomVersionForRoom(
 	ctx context.Context, roomNID types.RoomNID,
-) (int64, error) {
+) (gomatrixserverlib.RoomVersion, error) {
 	return d.statements.selectRoomVersionForRoomNID(
 		ctx, nil, roomNID,
 	)

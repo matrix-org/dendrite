@@ -92,7 +92,7 @@ type RoomserverQueryAPIDatabase interface {
 	// Look up the room version from the database.
 	GetRoomVersionForRoom(
 		ctx context.Context, roomNID types.RoomNID,
-	) (int64, error)
+	) (gomatrixserverlib.RoomVersion, error)
 	// Get the room NID for a given event ID.
 	RoomNIDForEventID(
 		ctx context.Context, eventID string,
@@ -768,13 +768,13 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
 ) error {
-	response.DefaultRoomVersion = int(version.GetDefaultRoomVersion())
-	response.AvailableRoomVersions = make(map[int]string)
+	response.DefaultRoomVersion = version.GetDefaultRoomVersion()
+	response.AvailableRoomVersions = make(map[gomatrixserverlib.RoomVersion]string)
 	for v, desc := range version.GetSupportedRoomVersions() {
 		if desc.Stable {
-			response.AvailableRoomVersions[int(v)] = "stable"
+			response.AvailableRoomVersions[v] = "stable"
 		} else {
-			response.AvailableRoomVersions[int(v)] = "unstable"
+			response.AvailableRoomVersions[v] = "unstable"
 		}
 	}
 	return nil
@@ -799,7 +799,7 @@ func (r *RoomserverQueryAPI) QueryRoomVersionForRoomID(
 	}
 
 	// Populate the response
-	response.RoomVersion = int(roomVersion)
+	response.RoomVersion = roomVersion
 	return nil
 }
 

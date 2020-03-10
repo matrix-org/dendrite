@@ -16,84 +16,56 @@ package version
 
 import (
 	"errors"
-	"strconv"
 
-	"github.com/matrix-org/dendrite/roomserver/state"
-)
-
-type RoomVersionID int
-type EventFormatID int
-
-const (
-	RoomVersionV1 RoomVersionID = iota + 1
-	RoomVersionV2
-	RoomVersionV3
-	RoomVersionV4
-	RoomVersionV5
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const (
-	EventFormatV1 EventFormatID = iota + 1 // original event ID formatting
-	EventFormatV2                          // event ID is event hash
-	EventFormatV3                          // event ID is URL-safe base64 event hash
+	RoomVersionV1 gomatrixserverlib.RoomVersion = "1"
+	RoomVersionV2 gomatrixserverlib.RoomVersion = "2"
+	RoomVersionV3 gomatrixserverlib.RoomVersion = "3"
+	RoomVersionV4 gomatrixserverlib.RoomVersion = "4"
+	RoomVersionV5 gomatrixserverlib.RoomVersion = "5"
 )
 
 type RoomVersionDescription struct {
-	Supported                 bool
-	Stable                    bool
-	StateResolution           state.StateResolutionVersion
-	EventFormat               EventFormatID
-	EnforceSigningKeyValidity bool
+	Supported bool
+	Stable    bool
 }
 
-var roomVersions = map[RoomVersionID]RoomVersionDescription{
+var roomVersions = map[gomatrixserverlib.RoomVersion]RoomVersionDescription{
 	RoomVersionV1: RoomVersionDescription{
-		Supported:                 true,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV1,
-		EventFormat:               EventFormatV1,
-		EnforceSigningKeyValidity: false,
+		Supported: true,
+		Stable:    true,
 	},
 	RoomVersionV2: RoomVersionDescription{
-		Supported:                 true,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV2,
-		EventFormat:               EventFormatV1,
-		EnforceSigningKeyValidity: false,
+		Supported: true,
+		Stable:    true,
 	},
 	RoomVersionV3: RoomVersionDescription{
-		Supported:                 false,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV2,
-		EventFormat:               EventFormatV2,
-		EnforceSigningKeyValidity: false,
+		Supported: true,
+		Stable:    false,
 	},
 	RoomVersionV4: RoomVersionDescription{
-		Supported:                 false,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV2,
-		EventFormat:               EventFormatV3,
-		EnforceSigningKeyValidity: false,
+		Supported: true,
+		Stable:    false,
 	},
 	RoomVersionV5: RoomVersionDescription{
-		Supported:                 false,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV2,
-		EventFormat:               EventFormatV3,
-		EnforceSigningKeyValidity: true,
+		Supported: false,
+		Stable:    false,
 	},
 }
 
-func GetDefaultRoomVersion() RoomVersionID {
+func GetDefaultRoomVersion() gomatrixserverlib.RoomVersion {
 	return RoomVersionV2
 }
 
-func GetRoomVersions() map[RoomVersionID]RoomVersionDescription {
+func GetRoomVersions() map[gomatrixserverlib.RoomVersion]RoomVersionDescription {
 	return roomVersions
 }
 
-func GetSupportedRoomVersions() map[RoomVersionID]RoomVersionDescription {
-	versions := make(map[RoomVersionID]RoomVersionDescription)
+func GetSupportedRoomVersions() map[gomatrixserverlib.RoomVersion]RoomVersionDescription {
+	versions := make(map[gomatrixserverlib.RoomVersion]RoomVersionDescription)
 	for id, version := range GetRoomVersions() {
 		if version.Supported {
 			versions[id] = version
@@ -102,8 +74,8 @@ func GetSupportedRoomVersions() map[RoomVersionID]RoomVersionDescription {
 	return versions
 }
 
-func GetSupportedRoomVersion(id RoomVersionID) (
-	ver RoomVersionID,
+func GetSupportedRoomVersion(id gomatrixserverlib.RoomVersion) (
+	ver gomatrixserverlib.RoomVersion,
 	desc RoomVersionDescription,
 	err error,
 ) {
@@ -117,20 +89,10 @@ func GetSupportedRoomVersion(id RoomVersionID) (
 	return
 }
 
-func (v RoomVersionID) String() string {
-	return strconv.Itoa(int(v))
-}
-
 func GetSupportedRoomVersionFromString(version string) (
-	ver RoomVersionID,
+	ver gomatrixserverlib.RoomVersion,
 	desc RoomVersionDescription,
 	err error,
 ) {
-	var v RoomVersionID
-	if version, err := strconv.Atoi(version); err == nil {
-		v = RoomVersionID(version)
-	} else {
-		v = GetDefaultRoomVersion()
-	}
-	return GetSupportedRoomVersion(v)
+	return GetSupportedRoomVersion(gomatrixserverlib.RoomVersion(version))
 }

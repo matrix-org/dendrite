@@ -300,11 +300,10 @@ func (r joinRoomReq) joinRoomUsingServers(
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
 func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
-	var roomVersions []int
+	var roomVersions []gomatrixserverlib.RoomVersion
 	for i := range version.GetSupportedRoomVersions() {
-		roomVersions = append(roomVersions, int(i))
+		roomVersions = append(roomVersions, i)
 	}
-	fmt.Println("Supported versions:", roomVersions)
 	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, roomVersions)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
@@ -321,6 +320,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
 	event, err := respMakeJoin.JoinEvent.Build(
 		eventID, r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
+		respMakeJoin.RoomVersion,
 	)
 	if err != nil {
 		util.GetLogger(r.req.Context()).WithError(err).Error("respMakeJoin.JoinEvent.Build failed")

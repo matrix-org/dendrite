@@ -47,7 +47,7 @@ func BuildEvent(
 		return nil, err
 	}
 
-	roomVersion := 2
+	roomVersion := gomatrixserverlib.RoomVersionV2
 	vQueryReq := api.QueryRoomVersionForRoomIDRequest{RoomID: builder.RoomID}
 	vQueryRes := api.QueryRoomVersionForRoomIDResponse{}
 	if e := queryAPI.QueryRoomVersionForRoomID(ctx, &vQueryReq, &vQueryRes); e == nil {
@@ -60,7 +60,10 @@ func BuildEvent(
 	// TODO: Room versions affect the below
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(
+		eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey, roomVersion,
+	)
 	if err != nil {
 		return nil, err
 	}

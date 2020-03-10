@@ -39,16 +39,16 @@ import (
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomRequest struct {
-	Invite          []string               `json:"invite"`
-	Name            string                 `json:"name"`
-	Visibility      string                 `json:"visibility"`
-	Topic           string                 `json:"topic"`
-	Preset          string                 `json:"preset"`
-	CreationContent map[string]interface{} `json:"creation_content"`
-	InitialState    []fledglingEvent       `json:"initial_state"`
-	RoomAliasName   string                 `json:"room_alias_name"`
-	GuestCanJoin    bool                   `json:"guest_can_join"`
-	RoomVersion     string                 `json:"room_version"`
+	Invite          []string                      `json:"invite"`
+	Name            string                        `json:"name"`
+	Visibility      string                        `json:"visibility"`
+	Topic           string                        `json:"topic"`
+	Preset          string                        `json:"preset"`
+	CreationContent map[string]interface{}        `json:"creation_content"`
+	InitialState    []fledglingEvent              `json:"initial_state"`
+	RoomAliasName   string                        `json:"room_alias_name"`
+	GuestCanJoin    bool                          `json:"guest_can_join"`
+	RoomVersion     gomatrixserverlib.RoomVersion `json:"room_version"`
 }
 
 const (
@@ -183,13 +183,13 @@ func createRoom(
 
 	roomVersion := roomserverVersion.GetDefaultRoomVersion()
 	if r.RoomVersion != "" {
-		id, meta, verr := roomserverVersion.GetSupportedRoomVersionFromString(r.RoomVersion)
+		id, meta, verr := roomserverVersion.GetSupportedRoomVersion(r.RoomVersion)
 		if verr == nil && meta.Supported {
 			roomVersion = id
 		}
 	}
 
-	r.CreationContent["room_version"] = roomVersion.String()
+	r.CreationContent["room_version"] = roomVersion
 	r.CreationContent["creator"] = userID
 
 	// TODO: visibility/presets/raw initial state
@@ -295,7 +295,7 @@ func createRoom(
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(&builder, &authEvents, cfg, evTime)
+		ev, err = buildEvent(&builder, &authEvents, cfg, evTime, roomVersion)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("buildEvent failed")
 			return jsonerror.InternalServerError()
@@ -364,6 +364,7 @@ func buildEvent(
 	provider gomatrixserverlib.AuthEventProvider,
 	cfg *config.Dendrite,
 	evTime time.Time,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -375,7 +376,10 @@ func buildEvent(
 	}
 	builder.AuthEvents = refs
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(
+		eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey, roomVersion,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
 	}

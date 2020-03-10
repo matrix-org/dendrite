@@ -251,8 +251,8 @@ type QueryRoomVersionCapabilitiesRequest struct{}
 
 // QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
 type QueryRoomVersionCapabilitiesResponse struct {
-	DefaultRoomVersion    int            `json:"default"`
-	AvailableRoomVersions map[int]string `json:"available"`
+	DefaultRoomVersion    gomatrixserverlib.RoomVersion            `json:"default"`
+	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
 }
 
 // QueryRoomVersionCapabilities asks for the default room version
@@ -262,7 +262,7 @@ type QueryRoomVersionForRoomIDRequest struct {
 
 // QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
 type QueryRoomVersionForRoomIDResponse struct {
-	RoomVersion int `json:"version"`
+	RoomVersion gomatrixserverlib.RoomVersion `json:"version"`
 }
 
 // RoomserverQueryAPI is used to query information from the room server.

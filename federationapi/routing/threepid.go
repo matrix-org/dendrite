@@ -257,6 +257,13 @@ func buildMembershipEvent(
 		return nil, errNotInRoom
 	}
 
+	// Get the room version of the room being joined
+	vQueryReq := roomserverAPI.QueryRoomVersionForRoomIDRequest{RoomID: builder.RoomID}
+	vQueryRes := roomserverAPI.QueryRoomVersionForRoomIDResponse{}
+	if e := queryAPI.QueryRoomVersionForRoomID(ctx, &vQueryReq, &vQueryRes); e != nil {
+		return nil, err
+	}
+
 	// Auth the event locally
 	builder.Depth = queryRes.Depth
 	builder.PrevEvents = queryRes.LatestEvents
@@ -283,6 +290,7 @@ func buildMembershipEvent(
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	event, err := builder.Build(
 		eventID, time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+		vQueryRes.RoomVersion,
 	)
 
 	return &event, err

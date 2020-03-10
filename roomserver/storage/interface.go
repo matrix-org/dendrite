@@ -45,7 +45,7 @@ type Database interface {
 	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error)
 	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error)
 	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
-	GetRoomVersionForRoom(ctx context.Context, roomNID types.RoomNID) (int64, error)
+	GetRoomVersionForRoom(ctx context.Context, roomNID types.RoomNID) (gomatrixserverlib.RoomVersion, error)
 	RoomNIDForEventID(ctx context.Context, eventID string) (types.RoomNID, error)
 	RoomNIDForEventNID(ctx context.Context, eventNID types.EventNID) (types.RoomNID, error)
 }

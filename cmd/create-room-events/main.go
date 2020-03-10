@@ -108,7 +108,7 @@ func buildAndOutput() gomatrixserverlib.EventReference {
 	name := gomatrixserverlib.ServerName(*serverName)
 	key := gomatrixserverlib.KeyID(*keyID)
 
-	event, err := b.Build(id, now, name, key, privateKey)
+	event, err := b.Build(id, now, name, key, privateKey, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		panic(err)
 	}

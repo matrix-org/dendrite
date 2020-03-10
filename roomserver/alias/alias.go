@@ -240,11 +240,18 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	}
 	builder.AuthEvents = refs
 
+	vReq := roomserverAPI.QueryRoomVersionForRoomIDRequest{RoomID: roomID}
+	var vRes roomserverAPI.QueryRoomVersionForRoomIDResponse
+	if err = r.QueryAPI.QueryRoomVersionForRoomID(ctx, &vReq, &vRes); err != nil {
+		return err
+	}
+
 	// Build the event
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
 	now := time.Now()
 	event, err := builder.Build(
 		eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey,
+		vRes.RoomVersion,
 	)
 	if err != nil {
 		return err

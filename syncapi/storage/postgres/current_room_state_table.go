@@ -252,7 +252,7 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	return rowsToStreamEvents(rows)
 }
 
-func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
+func rowsToEvents(rows *sql.Rows, roomVersion gomatrixserverlib.RoomVersion) ([]gomatrixserverlib.Event, error) {
 	result := []gomatrixserverlib.Event{}
 	for rows.Next() {
 		var eventBytes []byte
@@ -260,7 +260,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false, roomVersion)
 		if err != nil {
 			return nil, err
 		}

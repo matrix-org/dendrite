@@ -38,15 +38,13 @@ const (
 )
 
 func GetStateResolutionAlgorithm(
-	version int64, db database.RoomStateDatabase,
+	version gomatrixserverlib.RoomVersion, db database.RoomStateDatabase,
 ) (StateResolutionImpl, error) {
 	switch version {
-	case 1:
+	case gomatrixserverlib.RoomVersionV1:
 		return Prepare(db, StateResolutionAlgorithmV1), nil
-	case 2, 3, 4, 5:
-		return Prepare(db, StateResolutionAlgorithmV2), nil
 	default:
-		return nil, errors.New("unsupported room version")
+		return Prepare(db, StateResolutionAlgorithmV2), nil
 	}
 }
 
