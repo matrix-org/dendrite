@@ -77,6 +77,7 @@ func SendEvent(
 		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
+	util.GetLogger(req.Context()).WithField("event_id", eventID).Info("Sent event")
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,
