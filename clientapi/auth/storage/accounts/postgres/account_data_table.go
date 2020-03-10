@@ -72,9 +72,9 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *accountDataStatements) insertAccountData(
-	ctx context.Context, localpart, roomID, dataType, content string,
+	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType, content string,
 ) (err error) {
-	stmt := s.insertAccountDataStmt
+	stmt := txn.Stmt(s.insertAccountDataStmt)
 	_, err = stmt.ExecContext(ctx, localpart, roomID, dataType, content)
 	return
 }
