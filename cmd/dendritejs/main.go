@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -95,7 +94,7 @@ func main() {
 	cfg.Matrix.TrustedIDServers = []string{
 		"matrix.org", "vector.im",
 	}
-	cfg.Matrix.KeyID = "ed25519:1337"
+	cfg.Matrix.KeyID = libp2pMatrixKeyID
 	cfg.Matrix.PrivateKey = generateKey()
 
 	serverName, node := createP2PNode(cfg.Matrix.PrivateKey)
@@ -111,7 +110,12 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	keyDB := base.CreateKeyDB()
 	federation := createFederationClient(cfg, node)
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
+	keyRing := gomatrixserverlib.KeyRing{
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{
+			&libp2pKeyFetcher{},
+		},
+		KeyDatabase: keyDB,
+	}
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
 	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())

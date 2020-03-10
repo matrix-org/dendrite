@@ -1,9 +1,11 @@
 module github.com/matrix-org/dendrite
 
 require (
+	github.com/btcsuite/btcutil v1.0.1
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/lib/pq v1.2.0
+	github.com/libp2p/go-libp2p-core v0.5.0
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200306192008-b9e71eeaa437
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200304164012-aa524245b658
