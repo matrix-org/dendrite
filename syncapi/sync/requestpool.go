@@ -15,6 +15,7 @@
 package sync
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -135,8 +136,14 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Pagin
 	// TODO: handle ignored users
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
+		if err != nil {
+			util.GetLogger(context.Background()).WithError(err).Error("rp.db.CompleteSync failed")
+		}
 	} else {
 		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit, req.wantFullState)
+		if err != nil {
+			util.GetLogger(context.Background()).WithError(err).Error("rp.db.IncrementalSync failed")
+		}
 	}
 
 	if err != nil {
@@ -145,6 +152,10 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Pagin
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
 	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
+	if err != nil {
+		util.GetLogger(context.Background()).WithError(err).Error("rp.appendAccountData failed")
+	}
+
 	return
 }
 
