@@ -196,15 +196,18 @@ func (d *SyncServerDatasource) WriteEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
 		)
 		if err != nil {
+			fmt.Println("d.events.insertEvent:", err)
 			return err
 		}
 		pduPosition = pos
 
 		if err = d.topology.insertEventInTopology(ctx, txn, ev); err != nil {
+			fmt.Println("d.topology.insertEventInTopology:", err)
 			return err
 		}
 
 		if err = d.handleBackwardExtremities(ctx, txn, ev); err != nil {
+			fmt.Println("d.handleBackwardExtremities:", err)
 			return err
 		}
 
@@ -213,6 +216,7 @@ func (d *SyncServerDatasource) WriteEvent(
 			return nil
 		}
 
+		fmt.Println("d.updateRoomState...")
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition)
 	})
 

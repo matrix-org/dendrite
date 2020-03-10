@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     -- part of the current state of the room.
 	added_at BIGINT,
 	-- The version of the room
-	room_version TEXT NOT NULL,
+	room_version TEXT,
 	-- Clobber based on 3-uple of room_id, type and state_key
     CONSTRAINT syncapi_room_state_unique UNIQUE (room_id, type, state_key)
 );
@@ -61,8 +61,8 @@ CREATE INDEX IF NOT EXISTS syncapi_membership_idx ON syncapi_current_room_state(
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, event_json, membership, added_at)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
+	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, event_json, membership, added_at, room_version)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_room_state_unique" +
 	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, event_json = $7, membership = $8, added_at = $9"
 
@@ -229,12 +229,20 @@ func (s *currentRoomStateStatements) upsertRoomState(
 	ctx context.Context, txn *sql.Tx,
 	event gomatrixserverlib.Event, membership *string, addedAt types.StreamPosition,
 ) error {
+	roomVersionString := ""
+
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
 	var content map[string]interface{}
 	if json.Unmarshal(event.Content(), &content) != nil {
 		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
+	}
+
+	if event.Type() == gomatrixserverlib.MRoomCreate {
+		if rv, hasRv := content["room_version"]; hasRv {
+			roomVersionString = rv.(string)
+		}
 	}
 
 	// upsert state event
@@ -250,6 +258,7 @@ func (s *currentRoomStateStatements) upsertRoomState(
 		event.JSON(),
 		membership,
 		addedAt,
+		roomVersionString,
 	)
 	return err
 }

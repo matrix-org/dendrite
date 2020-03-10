@@ -170,23 +170,28 @@ func (d *SyncServerDatasource) WriteEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
 		)
 		if err != nil {
+			fmt.Println("d.events.insertEvent:", err)
 			return err
 		}
 		pduPosition = pos
 
 		if err = d.topology.insertEventInTopology(ctx, ev); err != nil {
+			fmt.Println("d.topology.insertEventInTopology:", err)
 			return err
 		}
 
 		if err = d.handleBackwardExtremities(ctx, ev); err != nil {
+			fmt.Println("d.handleBackwardExtremities:", err)
 			return err
 		}
 
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
 			// Nothing to do, the event may have just been a message event.
+			fmt.Println("not a state event")
 			return nil
 		}
 
+		fmt.Println("d.updateRoomState")
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition)
 	})
 

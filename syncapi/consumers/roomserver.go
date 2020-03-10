@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -98,8 +99,13 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
+	roomVersion := gomatrixserverlib.RoomVersionV1
+	if rv := gjson.Get(string(msg.Event), "content.room_version"); rv.Exists() {
+		roomVersion = gomatrixserverlib.RoomVersion(rv.String())
+	}
+
 	// TODO: Is this trusted here?
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(msg.Event, false, msg.RoomVersion)
+	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(msg.Event, false, roomVersion)
 	if err != nil {
 		log.WithError(err).WithField("roomversion", msg.RoomVersion).Errorf(
 			"roomserver output log: couldn't create event from trusted JSON (%d bytes)",
