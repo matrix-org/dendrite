@@ -77,7 +77,7 @@ func init() {
 		"room_id": "`+roomID+`",
 		"origin_server_ts": 12345,
 		"event_id": "$randomMessageEvent:localhost"
-	}`), false)
+	}`), false, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +91,7 @@ func init() {
 		"room_id": "`+roomID+`",
 		"origin_server_ts": 12345,
 		"event_id": "$aliceInviteBobEvent:localhost"
-	}`), false)
+	}`), false, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		panic(err)
 	}
@@ -105,7 +105,7 @@ func init() {
 		"room_id": "`+roomID+`",
 		"origin_server_ts": 12345,
 		"event_id": "$bobLeaveEvent:localhost"
-	}`), false)
+	}`), false, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		panic(err)
 	}

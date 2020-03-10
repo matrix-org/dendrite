@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     state_key TEXT NOT NULL,
     event_json TEXT NOT NULL,
     membership TEXT,
-    added_at BIGINT,
+	added_at BIGINT,
+	room_version TEXT NOT NULL,
     UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
@@ -82,6 +83,7 @@ const selectEventsWithEventIDsSQL = "" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 type currentRoomStateStatements struct {
+	roomVersions                    *roomVersionStatements
 	streamIDStatements              *streamIDStatements
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
@@ -91,7 +93,8 @@ type currentRoomStateStatements struct {
 	selectStateEventStmt            *sql.Stmt
 }
 
-func (s *currentRoomStateStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
+func (s *currentRoomStateStatements) prepare(db *sql.DB, rvs *roomVersionStatements, streamID *streamIDStatements) (err error) {
+	s.roomVersions = rvs
 	s.streamIDStatements = streamID
 	_, err = db.Exec(currentRoomStateSchema)
 	if err != nil {
@@ -186,7 +189,11 @@ func (s *currentRoomStateStatements) selectCurrentState(
 	}
 	defer rows.Close() // nolint: errcheck
 
-	return rowsToEvents(rows)
+	if roomVersion, e := s.roomVersions.selectRoomVersion(ctx, txn, roomID); e == nil {
+		return rowsToEvents(rows, roomVersion)
+	} else {
+		return nil, e
+	}
 }
 
 func (s *currentRoomStateStatements) deleteRoomStateByEventID(
@@ -239,10 +246,10 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
-	return rowsToStreamEvents(rows)
+	return rowsToStreamEvents(ctx, txn, s.roomVersions, rows)
 }
 
-func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
+func rowsToEvents(rows *sql.Rows, roomVersion gomatrixserverlib.RoomVersion) ([]gomatrixserverlib.Event, error) {
 	result := []gomatrixserverlib.Event{}
 	for rows.Next() {
 		var eventBytes []byte
@@ -250,7 +257,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false, roomVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -260,7 +267,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 }
 
 func (s *currentRoomStateStatements) selectStateEvent(
-	ctx context.Context, roomID, evType, stateKey string,
+	ctx context.Context, txn *sql.Tx, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.Event, error) {
 	stmt := s.selectStateEventStmt
 	var res []byte
@@ -271,6 +278,10 @@ func (s *currentRoomStateStatements) selectStateEvent(
 	if err != nil {
 		return nil, err
 	}
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(res, false)
-	return &ev, err
+	if roomVersion, e := s.roomVersions.selectRoomVersion(ctx, txn, roomID); e == nil {
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(res, false, roomVersion)
+		return &ev, err
+	} else {
+		return nil, e
+	}
 }

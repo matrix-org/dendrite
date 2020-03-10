@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -59,13 +60,15 @@ const selectMaxInviteIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_invite_events"
 
 type inviteEventsStatements struct {
+	roomVersions                  *roomVersionStatements
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt
 	deleteInviteEventStmt         *sql.Stmt
 	selectMaxInviteIDStmt         *sql.Stmt
 }
 
-func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
+func (s *inviteEventsStatements) prepare(db *sql.DB, rvs *roomVersionStatements) (err error) {
+	s.roomVersions = rvs
 	_, err = db.Exec(inviteEventsSchema)
 	if err != nil {
 		return
@@ -126,7 +129,13 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 			return nil, err
 		}
 
-		event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false)
+		roomVersion, err := s.roomVersions.selectRoomVersion(ctx, txn, roomID)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println("In invite events range, room version for", roomID, "is", roomVersion)
+
+		event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false, roomVersion)
 		if err != nil {
 			return nil, err
 		}

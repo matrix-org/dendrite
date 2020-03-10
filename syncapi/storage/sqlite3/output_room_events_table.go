@@ -19,10 +19,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"sort"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -99,6 +101,7 @@ const selectStateInRangeSQL = "" +
 	" LIMIT $8" // limit
 
 type outputRoomEventsStatements struct {
+	roomVersions                  *roomVersionStatements
 	streamIDStatements            *streamIDStatements
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -109,7 +112,7 @@ type outputRoomEventsStatements struct {
 	selectStateInRangeStmt        *sql.Stmt
 }
 
-func (s *outputRoomEventsStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
+func (s *outputRoomEventsStatements) prepare(db *sql.DB, rvs *roomVersionStatements, streamID *streamIDStatements) (err error) {
 	s.streamIDStatements = streamID
 	_, err = db.Exec(outputRoomEventsSchema)
 	if err != nil {
@@ -197,9 +200,16 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 				"dels":    delIDsJSON,
 			}).Warn("StateBetween: ignoring deleted state")
 		}
-
+		roomIDFromJSON := gjson.Get(string(eventBytes), "room_id")
+		if !roomIDFromJSON.Exists() {
+			return nil, nil, errors.New("room ID not in event")
+		}
+		roomVersion, err := s.roomVersions.selectRoomVersion(ctx, txn, roomIDFromJSON.String())
+		if err != nil {
+			return nil, nil, err
+		}
 		// TODO: Handle redacted events
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false, roomVersion)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -316,7 +326,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
-	events, err := rowsToStreamEvents(rows)
+	events, err := rowsToStreamEvents(ctx, txn, s.roomVersions, rows)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +353,7 @@ func (s *outputRoomEventsStatements) selectEarlyEvents(
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
-	events, err := rowsToStreamEvents(rows)
+	events, err := rowsToStreamEvents(ctx, txn, s.roomVersions, rows)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +378,7 @@ func (s *outputRoomEventsStatements) selectEvents(
 		if err != nil {
 			return nil, err
 		}
-		if streamEvents, err := rowsToStreamEvents(rows); err == nil {
+		if streamEvents, err := rowsToStreamEvents(ctx, txn, s.roomVersions, rows); err == nil {
 			returnEvents = append(returnEvents, streamEvents...)
 		}
 		rows.Close() // nolint: errcheck
@@ -376,7 +386,10 @@ func (s *outputRoomEventsStatements) selectEvents(
 	return returnEvents, nil
 }
 
-func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
+func rowsToStreamEvents(
+	ctx context.Context, txn *sql.Tx, roomVersions *roomVersionStatements,
+	rows *sql.Rows,
+) ([]types.StreamEvent, error) {
 	var result []types.StreamEvent
 	for rows.Next() {
 		var (
@@ -390,8 +403,16 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		if err := rows.Scan(&streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID); err != nil {
 			return nil, err
 		}
+		roomIDFromJSON := gjson.Get(string(eventBytes), "room_id")
+		if !roomIDFromJSON.Exists() {
+			return nil, errors.New("room ID not found in event")
+		}
+		roomVersion, err := roomVersions.selectRoomVersion(ctx, txn, roomIDFromJSON.String())
+		if err != nil {
+			return nil, err
+		}
 		// TODO: Handle redacted events
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false, roomVersion)
 		if err != nil {
 			return nil, err
 		}

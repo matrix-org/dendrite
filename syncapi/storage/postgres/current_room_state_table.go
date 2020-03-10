@@ -48,8 +48,10 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     membership TEXT,
     -- The serial ID of the output_room_events table when this event became
     -- part of the current state of the room.
-    added_at BIGINT,
-    -- Clobber based on 3-uple of room_id, type and state_key
+	added_at BIGINT,
+	-- The version of the room
+	room_version TEXT NOT NULL,
+	-- Clobber based on 3-uple of room_id, type and state_key
     CONSTRAINT syncapi_room_state_unique UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
@@ -94,6 +96,7 @@ const selectEventsWithEventIDsSQL = "" +
 	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
 type currentRoomStateStatements struct {
+	roomVersions                    *roomVersionStatements
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
@@ -103,7 +106,8 @@ type currentRoomStateStatements struct {
 	selectStateEventStmt            *sql.Stmt
 }
 
-func (s *currentRoomStateStatements) prepare(db *sql.DB) (err error) {
+func (s *currentRoomStateStatements) prepare(db *sql.DB, rvs *roomVersionStatements) (err error) {
+	s.roomVersions = rvs
 	_, err = db.Exec(currentRoomStateSchema)
 	if err != nil {
 		return
@@ -165,6 +169,9 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 ) ([]string, error) {
 	stmt := common.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
 	rows, err := stmt.QueryContext(ctx, userID, membership)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -195,12 +202,19 @@ func (s *currentRoomStateStatements) selectCurrentState(
 		stateFilter.ContainsURL,
 		stateFilter.Limit,
 	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
 
-	return rowsToEvents(rows)
+	if roomVersion, e := s.roomVersions.selectRoomVersion(ctx, txn, roomID); e == nil {
+		return rowsToEvents(rows, roomVersion)
+	} else {
+		return nil, e
+	}
 }
 
 func (s *currentRoomStateStatements) deleteRoomStateByEventID(
@@ -249,7 +263,7 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 		return nil, err
 	}
 	defer rows.Close() // nolint: errcheck
-	return rowsToStreamEvents(rows)
+	return rowsToStreamEvents(ctx, txn, s.roomVersions, rows)
 }
 
 func rowsToEvents(rows *sql.Rows, roomVersion gomatrixserverlib.RoomVersion) ([]gomatrixserverlib.Event, error) {
@@ -270,9 +284,9 @@ func rowsToEvents(rows *sql.Rows, roomVersion gomatrixserverlib.RoomVersion) ([]
 }
 
 func (s *currentRoomStateStatements) selectStateEvent(
-	ctx context.Context, roomID, evType, stateKey string,
+	ctx context.Context, txn *sql.Tx, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.Event, error) {
-	stmt := s.selectStateEventStmt
+	stmt := common.TxStmt(txn, s.selectStateEventStmt)
 	var res []byte
 	err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
 	if err == sql.ErrNoRows {
@@ -281,6 +295,10 @@ func (s *currentRoomStateStatements) selectStateEvent(
 	if err != nil {
 		return nil, err
 	}
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(res, false)
-	return &ev, err
+	if roomVersion, e := s.roomVersions.selectRoomVersion(ctx, txn, roomID); e == nil {
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(res, false, roomVersion)
+		return &ev, err
+	} else {
+		return nil, e
+	}
 }

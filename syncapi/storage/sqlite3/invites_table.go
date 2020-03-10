@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -54,6 +55,7 @@ const selectMaxInviteIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_invite_events"
 
 type inviteEventsStatements struct {
+	roomVersions                  *roomVersionStatements
 	streamIDStatements            *streamIDStatements
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt
@@ -61,7 +63,8 @@ type inviteEventsStatements struct {
 	selectMaxInviteIDStmt         *sql.Stmt
 }
 
-func (s *inviteEventsStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
+func (s *inviteEventsStatements) prepare(db *sql.DB, rvs *roomVersionStatements, streamID *streamIDStatements) (err error) {
+	s.roomVersions = rvs
 	s.streamIDStatements = streamID
 	_, err = db.Exec(inviteEventsSchema)
 	if err != nil {
@@ -124,7 +127,13 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 			return nil, err
 		}
 
-		event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false)
+		roomVersion, err := s.roomVersions.selectRoomVersion(ctx, txn, roomID)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println("In invite events range, room version for", roomID, "is", roomVersion)
+
+		event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false, roomVersion)
 		if err != nil {
 			return nil, err
 		}

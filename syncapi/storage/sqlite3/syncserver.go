@@ -52,6 +52,7 @@ type stateDelta struct {
 type SyncServerDatasource struct {
 	db *sql.DB
 	common.PartitionOffsetStatements
+	roomVersions        roomVersionStatements
 	streamID            streamIDStatements
 	accountData         accountDataStatements
 	events              outputRoomEventsStatements
@@ -92,19 +93,22 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
 		return err
 	}
+	if err = d.roomVersions.prepare(d.db); err != nil {
+		return err
+	}
 	if err = d.streamID.prepare(d.db); err != nil {
 		return err
 	}
 	if err = d.accountData.prepare(d.db, &d.streamID); err != nil {
 		return err
 	}
-	if err = d.events.prepare(d.db, &d.streamID); err != nil {
+	if err = d.events.prepare(d.db, &d.roomVersions, &d.streamID); err != nil {
 		return err
 	}
-	if err := d.roomstate.prepare(d.db, &d.streamID); err != nil {
+	if err := d.roomstate.prepare(d.db, &d.roomVersions, &d.streamID); err != nil {
 		return err
 	}
-	if err := d.invites.prepare(d.db, &d.streamID); err != nil {
+	if err := d.invites.prepare(d.db, &d.roomVersions, &d.streamID); err != nil {
 		return err
 	}
 	if err := d.topology.prepare(d.db); err != nil {
@@ -255,7 +259,7 @@ func (d *SyncServerDatasource) updateRoomState(
 func (d *SyncServerDatasource) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.Event, error) {
-	return d.roomstate.selectStateEvent(ctx, roomID, evType, stateKey)
+	return d.roomstate.selectStateEvent(ctx, nil, roomID, evType, stateKey)
 }
 
 // GetStateEventsForRoom fetches the state events for a given room.
