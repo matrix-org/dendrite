@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -69,10 +68,9 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 	return fed
 }
 
-func createP2PNode() (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
-	hosted := "/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star"
-	_ = "/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/"
-	node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", []string{hosted})
+func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
+	hosted := "/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/"
+	node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", privKey.Seed(), []string{hosted})
 	serverName = node.Id
 	fmt.Println("p2p assigned ServerName: ", serverName)
 	return
@@ -95,10 +93,10 @@ func main() {
 	cfg.Matrix.TrustedIDServers = []string{
 		"matrix.org", "vector.im",
 	}
-	cfg.Matrix.KeyID = "ed25519:1337"
+	cfg.Matrix.KeyID = libp2pMatrixKeyID
 	cfg.Matrix.PrivateKey = generateKey()
 
-	serverName, node := createP2PNode()
+	serverName, node := createP2PNode(cfg.Matrix.PrivateKey)
 	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(serverName)
 
 	if err := cfg.Derive(); err != nil {
@@ -111,7 +109,12 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	keyDB := base.CreateKeyDB()
 	federation := createFederationClient(cfg, node)
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
+	keyRing := gomatrixserverlib.KeyRing{
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{
+			&libp2pKeyFetcher{},
+		},
+		KeyDatabase: keyDB,
+	}
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
 	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
