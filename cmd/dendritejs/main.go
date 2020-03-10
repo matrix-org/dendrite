@@ -69,7 +69,6 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 }
 
 func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
-	_ = "/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star"
 	hosted := "/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/"
 	node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", privKey.Seed(), []string{hosted})
 	serverName = node.Id
