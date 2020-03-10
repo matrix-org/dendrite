@@ -113,6 +113,7 @@ type outputRoomEventsStatements struct {
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB, rvs *roomVersionStatements, streamID *streamIDStatements) (err error) {
+	s.roomVersions = rvs
 	s.streamIDStatements = streamID
 	_, err = db.Exec(outputRoomEventsSchema)
 	if err != nil {

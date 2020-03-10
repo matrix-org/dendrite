@@ -3,7 +3,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -40,6 +39,5 @@ func (s *roomVersionStatements) selectRoomVersion(
 		return
 	}
 	roomVersion = gomatrixserverlib.RoomVersion(rv.String())
-	fmt.Println("room version for", roomID, "is", rv.String())
 	return
 }
