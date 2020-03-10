@@ -127,7 +127,7 @@ func writeEvent(event gomatrixserverlib.Event) {
 		ire.Kind = api.KindNew
 		ire.Event = event
 		authEventIDs := []string{}
-		for _, ref := range b.AuthEvents {
+		for _, ref := range b.AuthEvents.([]gomatrixserverlib.EventReference) {
 			authEventIDs = append(authEventIDs, ref.EventID)
 		}
 		ire.AuthEventIDs = authEventIDs
