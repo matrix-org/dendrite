@@ -105,7 +105,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			log.ErrorKey: err,
 			"add":        output.NewRoomEvent.AddsStateEventIDs,
 			"del":        output.NewRoomEvent.RemovesStateEventIDs,
-		}).Errorf("roomserver output log: write event failure")
+		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
 
