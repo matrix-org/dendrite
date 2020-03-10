@@ -101,6 +101,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	// TODO: Is this trusted here?
 	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(msg.Event, false, msg.RoomVersion)
 	if err != nil {
+		log.WithError(err).WithField("roomversion", msg.RoomVersion).Errorf(
+			"roomserver output log: couldn't create event from trusted JSON (%d bytes)",
+			len(msg.Event),
+		)
 		return err
 	}
 

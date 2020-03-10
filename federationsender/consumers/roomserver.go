@@ -186,6 +186,10 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	// TODO: Is this trusted here?
 	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(ore.Event, false, ore.RoomVersion)
 	if err != nil {
+		log.WithError(err).WithField("roomversion", ore.RoomVersion).Errorf(
+			"roomserver output log: couldn't create event from trusted JSON (%d bytes)",
+			len(ore.Event),
+		)
 		return nil, err
 	}
 
