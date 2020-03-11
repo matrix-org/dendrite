@@ -67,7 +67,7 @@ func updateLatestEvents(
 		}
 	}()
 
-	roomVersion, err := db.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := db.GetRoomVersionForRoomNID(ctx, roomNID)
 	if err != nil {
 		return err
 	}
@@ -163,6 +163,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	}
 	updates = append(updates, *update)
 
+	roomVersion := gomatrixserverlib.RoomVersionV1
+
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
 	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
@@ -171,7 +173,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.ow.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
+	if err = u.ow.WriteOutputEvents(u.event.RoomID(), roomVersion, updates); err != nil {
 		return err
 	}
 
@@ -184,7 +186,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
-	roomVersion, err := u.db.GetRoomVersionForRoom(u.ctx, u.roomNID)
+	roomVersion, err := u.db.GetRoomVersionForRoomNID(u.ctx, u.roomNID)
 	if err != nil {
 		return err
 	}
@@ -262,7 +264,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
-	roomVersion, err := u.db.GetRoomVersionForRoom(context.Background(), u.roomNID)
+	roomVersion, err := u.db.GetRoomVersionForRoomNID(context.Background(), u.roomNID)
 	if err != nil {
 		return nil, err
 	}

@@ -15,8 +15,10 @@
 package consumers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
@@ -81,6 +83,30 @@ func (s *OutputRoomEventConsumer) Start() error {
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
+
+	// See if the room version is present in the headers. If it isn't
+	// then we can't process the event as we don't know what the format
+	// will be
+	var roomVersion gomatrixserverlib.RoomVersion
+	for _, header := range msg.Headers {
+		if bytes.Equal(header.Key, []byte("room_version")) {
+			roomVersion = gomatrixserverlib.RoomVersion(header.Value)
+			break
+		}
+	}
+	if roomVersion == "" {
+		return errors.New("room version was not in sarama headers")
+	}
+
+	// Prepare the room event so that it has the correct field types
+	// for the room version
+	if err := output.NewRoomEvent.Event.PrepareAs(roomVersion); err != nil {
+		log.WithFields(log.Fields{
+			"room_version": roomVersion,
+		}).WithError(err).Errorf("can't prepare event to version")
+		return err
+	}
+
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
@@ -91,31 +117,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
-		return nil
-	}
-
-	// Get the room version of the room
-	vQueryReq := api.QueryRoomVersionForRoomIDRequest{RoomID: string(msg.Key)}
-	vQueryRes := api.QueryRoomVersionForRoomIDResponse{}
-	if err := s.query.QueryRoomVersionForRoomID(context.Background(), &vQueryReq, &vQueryRes); err != nil {
-		log.WithFields(log.Fields{
-			"room_id": string(msg.Key),
-		}).WithError(err).Errorf("can't query room version")
-		return err
-	}
-
-	// Prepare the room event so that it has the correct field types
-	// for the room version
-	if err := output.NewRoomEvent.Event.PrepareAs(vQueryRes.RoomVersion); err != nil {
-		log.WithFields(log.Fields{
-			"room_version": vQueryRes.RoomVersion,
-		}).WithError(err).Errorf("can't prepare event to version")
-		return err
-	}
-
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
 		return nil
 	}
 

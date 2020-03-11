@@ -73,7 +73,10 @@ type RoomEventDatabase interface {
 		sessionID int64, userID string,
 	) (string, error)
 	// Look up the room version from the database.
-	GetRoomVersionForRoom(
+	GetRoomVersionForRoomID(
+		ctx context.Context, roomID string,
+	) (gomatrixserverlib.RoomVersion, error)
+	GetRoomVersionForRoomNID(
 		ctx context.Context, roomNID types.RoomNID,
 	) (gomatrixserverlib.RoomVersion, error)
 }
@@ -81,7 +84,7 @@ type RoomEventDatabase interface {
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
 type OutputRoomEventWriter interface {
 	// Write a list of events for a room
-	WriteOutputEvents(roomID string, updates []api.OutputEvent) error
+	WriteOutputEvents(roomID string, roomVersion gomatrixserverlib.RoomVersion, updates []api.OutputEvent) error
 }
 
 // processRoomEvent can only be called once at a time
@@ -156,7 +159,7 @@ func calculateAndSetState(
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
-	roomVersion, err := db.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := db.GetRoomVersionForRoomNID(ctx, roomNID)
 	if err != nil {
 		return err
 	}
@@ -196,6 +199,7 @@ func processInviteEvent(
 	}
 
 	roomID := input.Event.RoomID()
+	roomVersion := gomatrixserverlib.RoomVersionV1 // TODO: Feeeeeeex
 	targetUserID := *input.Event.StateKey()
 
 	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID)
@@ -246,7 +250,7 @@ func processInviteEvent(
 		return err
 	}
 
-	if err = ow.WriteOutputEvents(roomID, outputUpdates); err != nil {
+	if err = ow.WriteOutputEvents(roomID, roomVersion, outputUpdates); err != nil {
 		return err
 	}
 

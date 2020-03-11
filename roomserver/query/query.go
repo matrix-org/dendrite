@@ -90,7 +90,10 @@ type RoomserverQueryAPIDatabase interface {
 		context.Context, []types.EventStateKeyNID,
 	) (map[types.EventStateKeyNID]string, error)
 	// Look up the room version from the database.
-	GetRoomVersionForRoom(
+	GetRoomVersionForRoomID(
+		ctx context.Context, roomID string,
+	) (gomatrixserverlib.RoomVersion, error)
+	GetRoomVersionForRoomNID(
 		ctx context.Context, roomNID types.RoomNID,
 	) (gomatrixserverlib.RoomVersion, error)
 	// Get the room NID for a given event ID.
@@ -123,7 +126,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return nil
 	}
 	response.RoomExists = true
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoomID(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
@@ -170,7 +173,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return nil
 	}
 	response.RoomExists = true
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoomID(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
@@ -350,7 +353,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	if err != nil {
 		return nil, err
 	}
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoomNID(ctx, roomNID)
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +467,7 @@ func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 	if err != nil {
 		return false, err
 	}
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoomNID(ctx, roomNID)
 	if err != nil {
 		return false, err
 	}
@@ -631,7 +634,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	if err != nil {
 		return err
 	}
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoomID(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
@@ -786,14 +789,8 @@ func (r *RoomserverQueryAPI) QueryRoomVersionForRoomID(
 	request *api.QueryRoomVersionForRoomIDRequest,
 	response *api.QueryRoomVersionForRoomIDResponse,
 ) error {
-	// Get the room NID for the given room ID
-	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
-	if err != nil {
-		return err
-	}
-
 	// Then look up the room version for that room NID
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoomID(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}

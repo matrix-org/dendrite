@@ -289,7 +289,7 @@ func (d *Database) Events(
 			if err != nil {
 				return err
 			}
-			roomVersion, err := d.GetRoomVersionForRoom(ctx, roomNID)
+			roomVersion, err := d.GetRoomVersionForRoomNID(ctx, roomNID)
 			if err != nil {
 				return err
 			}
@@ -896,7 +896,15 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 	return d.Events(ctx, nids)
 }
 
-func (d *Database) GetRoomVersionForRoom(
+func (d *Database) GetRoomVersionForRoomID(
+	ctx context.Context, roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
+	return d.statements.selectRoomVersionForRoomID(
+		ctx, nil, roomID,
+	)
+}
+
+func (d *Database) GetRoomVersionForRoomNID(
 	ctx context.Context, roomNID types.RoomNID,
 ) (gomatrixserverlib.RoomVersion, error) {
 	return d.statements.selectRoomVersionForRoomNID(

@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
@@ -39,7 +40,9 @@ type RoomserverInputAPI struct {
 }
 
 // WriteOutputEvents implements OutputRoomEventWriter
-func (r *RoomserverInputAPI) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
+func (r *RoomserverInputAPI) WriteOutputEvents(
+	roomID string, roomVersion gomatrixserverlib.RoomVersion, updates []api.OutputEvent,
+) error {
 	messages := make([]*sarama.ProducerMessage, len(updates))
 	for i := range updates {
 		value, err := json.Marshal(updates[i])
@@ -50,6 +53,12 @@ func (r *RoomserverInputAPI) WriteOutputEvents(roomID string, updates []api.Outp
 			Topic: r.OutputRoomEventTopic,
 			Key:   sarama.StringEncoder(roomID),
 			Value: sarama.ByteEncoder(value),
+			Headers: []sarama.RecordHeader{
+				sarama.RecordHeader{
+					Key:   []byte("room_version"),
+					Value: []byte(roomVersion),
+				},
+			},
 		}
 	}
 	return r.Producer.SendMessages(messages)

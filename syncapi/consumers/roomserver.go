@@ -15,8 +15,10 @@
 package consumers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
@@ -74,18 +76,54 @@ func (s *OutputRoomEventConsumer) Start() error {
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return nil
+
+	// See if the room version is present in the headers. If it isn't
+	// then we can't process the event as we don't know what the format
+	// will be
+	var roomVersion gomatrixserverlib.RoomVersion
+	for _, header := range msg.Headers {
+		if bytes.Equal(header.Key, []byte("room_version")) {
+			roomVersion = gomatrixserverlib.RoomVersion(header.Value)
+			break
+		}
+	}
+	if roomVersion == "" {
+		return errors.New("room version was not in sarama headers")
 	}
 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
+		if err := output.NewRoomEvent.Event.PrepareAs(roomVersion); err != nil {
+			log.WithFields(log.Fields{
+				"room_version": roomVersion,
+			}).WithError(err).Errorf("can't prepare event to version")
+			return err
+		}
+		if err := json.Unmarshal(msg.Value, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("roomserver output log: message parse failure")
+			return nil
+		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:
+		if err := output.NewInviteEvent.Event.PrepareAs(roomVersion); err != nil {
+			log.WithFields(log.Fields{
+				"room_version": roomVersion,
+			}).WithError(err).Errorf("can't prepare event to version")
+			return err
+		}
+		if err := json.Unmarshal(msg.Value, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("roomserver output log: message parse failure")
+			return nil
+		}
 		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
+		if err := json.Unmarshal(msg.Value, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("roomserver output log: message parse failure")
+			return nil
+		}
 		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
 	default:
 		log.WithField("type", output.Type).Debug(
@@ -99,13 +137,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-
-	if err := msg.Event.PrepareAs(msg.RoomVersion); err != nil {
-		log.WithFields(log.Fields{
-			"room_version": msg.RoomVersion,
-		}).WithError(err).Errorf("can't prepare event to version")
-		return err
-	}
 
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
