@@ -28,7 +28,7 @@ func (s *roomVersionStatements) prepare(db *sql.DB) (err error) {
 func (s *roomVersionStatements) selectRoomVersion(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (roomVersion gomatrixserverlib.RoomVersion, err error) {
-	stmt := common.TxStmt(txn, s.selectStateEventStmt)
+	stmt := common.TxStmt(nil, s.selectStateEventStmt)
 	var res []byte
 	err = stmt.QueryRowContext(ctx, roomID, "m.room.create", "").Scan(&res)
 	if err != nil {

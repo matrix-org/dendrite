@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
@@ -78,16 +77,20 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	// TODO: Is this trusted here?
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(output.NewRoomEvent.Event, false, output.NewRoomEvent.RoomVersion)
-	if err != nil {
-		log.WithError(err).WithField("roomversion", output.NewRoomEvent.RoomVersion).Errorf(
-			"roomserver output log: couldn't create event from trusted JSON (%d bytes)",
-			len(output.NewRoomEvent.Event),
-		)
+	// Get the room version of the room
+	vQueryReq := api.QueryRoomVersionForRoomIDRequest{RoomID: output.NewRoomEvent.Event.RoomID()}
+	vQueryRes := api.QueryRoomVersionForRoomIDResponse{}
+	if err := s.query.QueryRoomVersionForRoomID(context.Background(), &vQueryReq, &vQueryRes); err != nil {
 		return err
 	}
 
+	if err := output.NewRoomEvent.Event.PrepareAs(vQueryRes.RoomVersion); err != nil {
+		log.WithFields(log.Fields{
+			"room_version": vQueryRes.RoomVersion,
+		}).WithError(err).Errorf("can't prepare event to version")
+	}
+
+	ev := output.NewRoomEvent.Event
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),

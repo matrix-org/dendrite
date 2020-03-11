@@ -99,19 +99,16 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
+	ev := msg.Event
 	roomVersion := gomatrixserverlib.RoomVersionV1
-	if rv := gjson.Get(string(msg.Event), "content.room_version"); rv.Exists() {
+	if rv := gjson.Get(string(ev.Content()), "room_version"); rv.Exists() {
 		roomVersion = gomatrixserverlib.RoomVersion(rv.String())
 	}
 
-	// TODO: Is this trusted here?
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(msg.Event, false, roomVersion)
-	if err != nil {
-		log.WithError(err).WithField("roomversion", msg.RoomVersion).Errorf(
-			"roomserver output log: couldn't create event from trusted JSON (%d bytes)",
-			len(msg.Event),
-		)
-		return err
+	if err := msg.Event.PrepareAs(roomVersion); err != nil {
+		log.WithFields(log.Fields{
+			"room_version": roomVersion,
+		}).WithError(err).Errorf("can't prepare event to version")
 	}
 
 	log.WithFields(log.Fields{

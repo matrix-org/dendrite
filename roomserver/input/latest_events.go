@@ -262,18 +262,13 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
-	eventJSON, err := u.event.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
 	roomVersion, err := u.db.GetRoomVersionForRoom(context.Background(), u.roomNID)
 	if err != nil {
 		return nil, err
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:           eventJSON,
+		Event:           u.event,
 		RoomVersion:     roomVersion,
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,

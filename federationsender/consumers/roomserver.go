@@ -86,12 +86,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	// TODO: Is this trusted here?
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(output.NewRoomEvent.Event, false, output.NewRoomEvent.RoomVersion)
-	if err != nil {
-		return err
-	}
-
+	ev := output.NewRoomEvent.Event
 	log.WithFields(log.Fields{
 		"event_id":       ev.EventID(),
 		"room_id":        ev.RoomID(),
@@ -115,12 +110,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
 func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
-	// TODO: Is this trusted here?
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(ore.Event, false, ore.RoomVersion)
-	if err != nil {
-		return err
-	}
-
+	ev := ore.Event
 	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ev)
 	if err != nil {
 		return err
@@ -183,15 +173,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	ore api.OutputNewRoomEvent, oldJoinedHosts []types.JoinedHost,
 ) ([]gomatrixserverlib.ServerName, error) {
-	// TODO: Is this trusted here?
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(ore.Event, false, ore.RoomVersion)
-	if err != nil {
-		log.WithError(err).WithField("roomversion", ore.RoomVersion).Errorf(
-			"roomserver output log: couldn't create event from trusted JSON (%d bytes)",
-			len(ore.Event),
-		)
-		return nil, err
-	}
+	ev := ore.Event
 
 	// Combine the delta into a single delta so that the adds and removes can
 	// cancel each other out. This should reduce the number of times we need

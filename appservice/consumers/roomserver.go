@@ -94,16 +94,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	// TODO: Is this trusted here?
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(output.NewRoomEvent.Event, false, output.NewRoomEvent.RoomVersion)
-	if err != nil {
-		log.WithError(err).WithField("roomversion", output.NewRoomEvent.RoomVersion).Errorf(
-			"roomserver output log: couldn't create event from trusted JSON (%d bytes)",
-			len(output.NewRoomEvent.Event),
-		)
-		return err
-	}
-
+	ev := output.NewRoomEvent.Event
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),

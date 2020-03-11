@@ -54,7 +54,7 @@ type OutputEvent struct {
 // prev_events.
 type OutputNewRoomEvent struct {
 	// The event.
-	Event []byte `json:"event"`
+	Event gomatrixserverlib.Event `json:"event"`
 	// The event version.
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The latest events in the room after this event.
