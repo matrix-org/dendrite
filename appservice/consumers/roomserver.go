@@ -82,6 +82,13 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
 
+	if output.Type != api.OutputTypeNewRoomEvent {
+		log.WithField("type", output.Type).Debug(
+			"roomserver output log: ignoring unknown output type",
+		)
+		return nil
+	}
+
 	// Get the room version of the room
 	vQueryReq := api.QueryRoomVersionForRoomIDRequest{RoomID: string(msg.Key)}
 	vQueryRes := api.QueryRoomVersionForRoomIDResponse{}
@@ -104,13 +111,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return nil
-	}
-
-	if output.Type != api.OutputTypeNewRoomEvent {
-		log.WithField("type", output.Type).Debug(
-			"roomserver output log: ignoring unknown output type",
-		)
 		return nil
 	}
 
