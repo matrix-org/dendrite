@@ -63,6 +63,11 @@ func (s *OutputRoomEventConsumer) Start() error {
 // onMessage is called when the sync server receives a new event from the room server output log.
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	var output api.OutputEvent
+	if err := json.Unmarshal(msg.Value, &output); err != nil {
+		// If the message was invalid, log it and move on to the next message in the stream
+		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		return nil
+	}
 
 	// Filter out any messages that aren't new room events
 	if output.Type != api.OutputTypeNewRoomEvent {
