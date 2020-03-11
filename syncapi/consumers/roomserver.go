@@ -104,6 +104,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		log.WithFields(log.Fields{
 			"room_version": msg.RoomVersion,
 		}).WithError(err).Errorf("can't prepare event to version")
+		return err
 	}
 
 	log.WithFields(log.Fields{

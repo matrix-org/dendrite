@@ -76,6 +76,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	vQueryReq := api.QueryRoomVersionForRoomIDRequest{RoomID: string(msg.Key)}
 	vQueryRes := api.QueryRoomVersionForRoomIDResponse{}
 	if err := s.query.QueryRoomVersionForRoomID(context.Background(), &vQueryReq, &vQueryRes); err != nil {
+		log.WithFields(log.Fields{
+			"room_id": string(msg.Key),
+		}).WithError(err).Errorf("can't query room version")
 		return err
 	}
 
@@ -85,6 +88,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		log.WithFields(log.Fields{
 			"room_version": vQueryRes.RoomVersion,
 		}).WithError(err).Errorf("can't prepare event to version")
+		return err
 	}
 
 	// Parse out the event JSON
