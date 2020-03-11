@@ -43,5 +43,5 @@ func SetupPublicRoomsAPIComponent(
 		logrus.WithError(err).Panic("failed to start public rooms server consumer")
 	}
 
-	routing.Setup(base.APIMux, deviceDB, publicRoomsDB)
+	routing.Setup(base.APIMux, deviceDB, publicRoomsDB, rsQueryAPI)
 }

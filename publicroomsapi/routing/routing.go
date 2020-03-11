@@ -17,6 +17,8 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -34,7 +36,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // Due to Setup being used to call many other functions, a gocyclo nolint is
 // applied:
 // nolint: gocyclo
-func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database) {
+func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, queryAPI api.RoomserverQueryAPI) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
@@ -59,7 +61,7 @@ func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return directory.SetVisibility(req, publicRoomsDB, vars["roomID"])
+			return directory.SetVisibility(req, publicRoomsDB, queryAPI, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
