@@ -156,10 +156,10 @@ func main() {
 	// Expose the matrix APIs via fetch - for local traffic
 	go func() {
 		logrus.Info("Listening for service-worker fetch traffic")
-
-		listener := go_http_js_libp2p.NewFetchListener()
-		s := &http.Server{}
-		go s.Serve(listener)
+		s := JSServer{
+			Mux: http.DefaultServeMux,
+		}
+		s.ListenAndServe("fetch")
 	}()
 
 	// We want to block forever to let the fetch and libp2p handler serve the APIs

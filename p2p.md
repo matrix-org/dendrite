@@ -16,7 +16,7 @@ $ cp main.wasm ../riot-web/src/vector/dendrite.wasm
 
 This is how peers discover each other and communicate.
 
-By default, Dendrite uses the IPFS-hosted websocket star **Development** relay server at `/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star`.
+By default, Dendrite uses the Matrix-hosted websocket star relay server at TODO `/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star`.
 This is currently hard-coded in `./cmd/dendritejs/main.go` - you can also use a local one if you run your own relay:
 
 ```
@@ -24,13 +24,13 @@ $ npm install --global libp2p-websocket-star-rendezvous
 $ rendezvous --port=9090 --host=127.0.0.1
 ```
 
-Then use `/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/`. We'll probably run our own relay server at some point.
+Then use `/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/`.
 
 ### Riot-web
 
 You need to check out these repos:
 
-``
+```
 $ git clone git@github.com:matrix-org/go-http-js-libp2p.git
 $ git clone git@github.com:matrix-org/go-sqlite3-js.git
 ```
@@ -39,6 +39,7 @@ Make sure to `yarn install` in both of these repos. Then:
 
 - `$ cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" ./src/vector/`
 - Comment out the lines in `wasm_exec.js` which contains:
+
 ```
 if (!global.fs && global.require) {
     global.fs = require("fs");
@@ -56,17 +57,13 @@ NB: If you don't run the server with `yarn start` you need to make sure your ser
 
 TODO: Make a Docker image with all of this in it and a volume mount for `dendrite.wasm`.
 
-## Running
+### Running
 
 You need a Chrome and a Firefox running to test locally as service workers don't work in incognito tabs.
 - For Chrome, use `chrome://serviceworker-internals/` to unregister/see logs.
 - For Firefox, use `about:debugging#/runtime/this-firefox` to unregister. Use the console window to see logs.
 
-Assuming you've `yarn start`ed Riot-Web, go to `http://localhost:8080` and wait a bit. Then refresh the page (this is required
-because the fetch interceptor races with setting up dendrite. If you don't refresh, you won't be able to contact your HS). After
-the refresh, click Register and use `http://localhost:8080` as your HS URL.
-
-TODO: Fix the race so we don't need multiple refreshes.
+Assuming you've `yarn start`ed Riot-Web, go to `http://localhost:8080` and register with `http://localhost:8080` as your HS URL.
 
 You can join rooms by room alias e.g `/join #foo:bar`.
 
@@ -74,7 +71,7 @@ You can join rooms by room alias e.g `/join #foo:bar`.
 
 - When registering you may be unable to find the server, it'll seem flakey. This happens because the SW, particularly in Firefox,
   gets killed after 30s of inactivity. When you are not registered, you aren't doing `/sync` calls to keep the SW alive, so if you
-  don't register for a while and idle on the page, the HS will disappear. To fix, unregister the SW, and then refresh the page *twice*.
+  don't register for a while and idle on the page, the HS will disappear. To fix, unregister the SW, and then refresh the page.
 
 - The libp2p layer has rate limits, so frequent Federation traffic may cause the connection to drop and messages to not be transferred.
   I guess in other words, don't send too much traffic?
