@@ -27,7 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -100,14 +99,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-	roomVersion := gomatrixserverlib.RoomVersionV1
-	if rv := gjson.Get(string(ev.Content()), "room_version"); rv.Exists() {
-		roomVersion = gomatrixserverlib.RoomVersion(rv.String())
-	}
 
-	if err := msg.Event.PrepareAs(roomVersion); err != nil {
+	if err := msg.Event.PrepareAs(msg.RoomVersion); err != nil {
 		log.WithFields(log.Fields{
-			"room_version": roomVersion,
+			"room_version": msg.RoomVersion,
 		}).WithError(err).Errorf("can't prepare event to version")
 	}
 
