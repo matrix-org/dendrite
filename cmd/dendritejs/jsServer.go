@@ -96,7 +96,7 @@ func (h *JSServer) ListenAndServe(namespace string) {
 		js.Global().Set(globalName, server)
 	}
 
-	server.Set(namespace, js.FuncOf(h.onRequestFromJS))
+	server.Set(namespace, js.FuncOf(h.OnRequestFromJS))
 
 	fmt.Printf("Listening for requests from JS on function %s.%s\n", globalName, namespace)
 	// Block forever to mimic http.ListenAndServe
