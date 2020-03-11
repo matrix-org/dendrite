@@ -93,6 +93,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
+		output.NewRoomEvent.Event = gomatrixserverlib.Event{}
 		if err := output.NewRoomEvent.Event.PrepareAs(roomVersion); err != nil {
 			log.WithFields(log.Fields{
 				"room_version": roomVersion,
@@ -106,6 +107,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:
+		output.NewInviteEvent.Event = gomatrixserverlib.Event{}
 		if err := output.NewInviteEvent.Event.PrepareAs(roomVersion); err != nil {
 			log.WithFields(log.Fields{
 				"room_version": roomVersion,

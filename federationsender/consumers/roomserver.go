@@ -93,6 +93,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 	// Prepare the room event so that it has the correct field types
 	// for the room version
+	output.NewRoomEvent.Event = gomatrixserverlib.Event{}
 	if err := output.NewRoomEvent.Event.PrepareAs(roomVersion); err != nil {
 		log.WithFields(log.Fields{
 			"room_version": roomVersion,
