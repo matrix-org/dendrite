@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
@@ -102,46 +103,30 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return errors.New("room version was not in sarama headers")
 	}
 
+	if err := json.Unmarshal(msg.Value, &output); err != nil {
+		// If the message was invalid, log it and move on to the next message in the stream
+		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		return nil
+	}
+
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
-		output.NewRoomEvent = &api.OutputNewRoomEvent{
-			Event: gomatrixserverlib.Event{},
-		}
-		if err := output.NewRoomEvent.Event.PrepareAs(roomVersion); err != nil {
-			log.WithFields(log.Fields{
-				"room_version": roomVersion,
-			}).WithError(err).Errorf("can't prepare event to version")
-			return err
-		}
-		if err := json.Unmarshal(msg.Value, &output); err != nil {
-			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithError(err).Errorf("roomserver output log: message parse failure")
-			return nil
+		evJSON := gjson.Get(string(msg.Value), "new_room_event.event")
+		if ev, err := gomatrixserverlib.NewEventFromUntrustedJSON([]byte(evJSON.String()), roomVersion); err == nil {
+			output.NewRoomEvent.Event = ev
+		} else {
+			return errors.New("unable to get new_room_event.event")
 		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:
-		output.NewInviteEvent = &api.OutputNewInviteEvent{
-			Event: gomatrixserverlib.Event{},
-		}
-		if err := output.NewInviteEvent.Event.PrepareAs(roomVersion); err != nil {
-			log.WithFields(log.Fields{
-				"room_version": roomVersion,
-			}).WithError(err).Errorf("can't prepare event to version")
-			return err
-		}
-		if err := json.Unmarshal(msg.Value, &output); err != nil {
-			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithError(err).Errorf("roomserver output log: message parse failure")
-			return nil
+		evJSON := gjson.Get(string(msg.Value), "new_invite_event.event")
+		if ev, err := gomatrixserverlib.NewEventFromUntrustedJSON([]byte(evJSON.String()), roomVersion); err == nil {
+			output.NewInviteEvent.Event = ev
+		} else {
+			return errors.New("unable to get new_invite_event.event")
 		}
 		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
-		output.RetireInviteEvent = &api.OutputRetireInviteEvent{}
-		if err := json.Unmarshal(msg.Value, &output); err != nil {
-			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithError(err).Errorf("roomserver output log: message parse failure")
-			return nil
-		}
 		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
 	default:
 		log.WithField("type", output.Type).Debug(

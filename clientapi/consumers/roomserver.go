@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
@@ -99,22 +100,17 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return errors.New("room version was not in sarama headers")
 	}
 
-	// Prepare the room event so that it has the correct field types
-	// for the room version
-	output.NewRoomEvent = &api.OutputNewRoomEvent{
-		Event: gomatrixserverlib.Event{},
-	}
-	if err := output.NewRoomEvent.Event.PrepareAs(roomVersion); err != nil {
-		log.WithFields(log.Fields{
-			"room_version": roomVersion,
-		}).WithError(err).Errorf("can't prepare event to version")
-		return err
-	}
-
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
 		return nil
+	}
+
+	evJSON := gjson.Get(string(msg.Value), "new_room_event.event")
+	if ev, err := gomatrixserverlib.NewEventFromUntrustedJSON([]byte(evJSON.String()), roomVersion); err == nil {
+		output.NewRoomEvent.Event = ev
+	} else {
+		return errors.New("unable to get new_room_event.event")
 	}
 
 	log.WithFields(log.Fields{
