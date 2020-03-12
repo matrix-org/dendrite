@@ -121,7 +121,8 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	if ev, err := gomatrixserverlib.NewEventFromUntrustedJSON([]byte(evJSON.String()), roomVersion); err == nil {
 		output.NewRoomEvent.Event = ev
 	} else {
-		return errors.New("unable to get new_room_event.event")
+		log.WithError(err).Errorf("roomserver output log: unable to find event from kafka message")
+		return nil
 	}
 
 	ev := output.NewRoomEvent.Event
