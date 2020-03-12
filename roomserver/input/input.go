@@ -44,16 +44,21 @@ func (r *RoomserverInputAPI) WriteOutputEvents(
 	roomID string, roomVersion gomatrixserverlib.RoomVersion, updates []api.OutputEvent,
 ) error {
 	messages := make([]*sarama.ProducerMessage, len(updates))
-	for i := range updates {
-		value, err := json.Marshal(updates[i])
+	for i, update := range updates {
+		value, err := json.Marshal(update)
 		if err != nil {
 			return err
 		}
+
 		messages[i] = &sarama.ProducerMessage{
 			Topic: r.OutputRoomEventTopic,
 			Key:   sarama.StringEncoder(roomID),
 			Value: sarama.ByteEncoder(value),
 			Headers: []sarama.RecordHeader{
+				sarama.RecordHeader{
+					Key:   []byte("type"),
+					Value: []byte(update.Type),
+				},
 				sarama.RecordHeader{
 					Key:   []byte("room_version"),
 					Value: []byte(roomVersion),

@@ -15,7 +15,6 @@
 package consumers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -66,30 +65,23 @@ func (s *OutputRoomEventConsumer) Start() error {
 // onMessage is called when the sync server receives a new event from the room server output log.
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	var output api.OutputEvent
+	headers := common.SaramaHeaders(msg.Headers)
 
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return nil
-	}
-
-	// Filter out any messages that aren't new room events
-	if output.Type != api.OutputTypeNewRoomEvent {
-		log.WithField("type", output.Type).Debug(
-			"roomserver output log: ignoring unknown output type",
-		)
-		return nil
+	if msgtype, ok := headers["type"]; ok {
+		if api.OutputType(msgtype) != api.OutputTypeNewRoomEvent {
+			log.WithField("type", msgtype).Debug(
+				"roomserver output log: ignoring unknown output type",
+			)
+			return nil
+		}
 	}
 
 	// See if the room version is present in the headers. If it isn't
 	// then we can't process the event as we don't know what the format
 	// will be
 	var roomVersion gomatrixserverlib.RoomVersion
-	for _, header := range msg.Headers {
-		if bytes.Equal(header.Key, []byte("room_version")) {
-			roomVersion = gomatrixserverlib.RoomVersion(header.Value)
-			break
-		}
+	if rv, ok := headers["room_version"]; ok {
+		roomVersion = gomatrixserverlib.RoomVersion(rv)
 	}
 	if roomVersion == "" {
 		return errors.New("room version was not in sarama headers")
