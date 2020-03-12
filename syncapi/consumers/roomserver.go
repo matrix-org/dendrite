@@ -84,6 +84,11 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			)
 			return nil
 		}
+	} else {
+		log.WithField("type", msgtype).Debug(
+			"roomserver output log: no message type included",
+		)
+		return nil
 	}
 
 	// See if the room version is present in the headers. If it isn't
