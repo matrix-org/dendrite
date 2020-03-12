@@ -116,7 +116,16 @@ func SendJoin(
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
-	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content())
+	vReq := api.QueryRoomVersionForRoomIDRequest{RoomID: roomID}
+	vRes := api.QueryRoomVersionForRoomIDResponse{}
+	if query.QueryRoomVersionForRoomID(httpReq.Context(), &vReq, &vRes) != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("Couldn't determine the room version for this room."),
+		}
+	}
+
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), vRes.RoomVersion)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
