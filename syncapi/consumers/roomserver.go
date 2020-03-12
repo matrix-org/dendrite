@@ -104,7 +104,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
-		output.NewRoomEvent.Event = gomatrixserverlib.Event{}
+		output.NewRoomEvent = &api.OutputNewRoomEvent{
+			Event: gomatrixserverlib.Event{},
+		}
 		if err := output.NewRoomEvent.Event.PrepareAs(roomVersion); err != nil {
 			log.WithFields(log.Fields{
 				"room_version": roomVersion,
@@ -118,7 +120,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:
-		output.NewInviteEvent.Event = gomatrixserverlib.Event{}
+		output.NewInviteEvent = &api.OutputNewInviteEvent{
+			Event: gomatrixserverlib.Event{},
+		}
 		if err := output.NewInviteEvent.Event.PrepareAs(roomVersion); err != nil {
 			log.WithFields(log.Fields{
 				"room_version": roomVersion,
@@ -132,6 +136,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		}
 		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
+		output.RetireInviteEvent = &api.OutputRetireInviteEvent{}
 		if err := json.Unmarshal(msg.Value, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
 			log.WithError(err).Errorf("roomserver output log: message parse failure")

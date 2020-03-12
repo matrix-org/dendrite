@@ -19,7 +19,6 @@ package input
 import (
 	"bytes"
 	"context"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -265,18 +264,8 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
-	roomVersion, err := u.db.GetRoomVersionForRoomNID(context.Background(), u.roomNID)
-	if err != nil {
-		fmt.Println("FAILED TO GET ROOM VERSION:", err)
-		return nil, err
-	}
-
-	fmt.Println("GOT ROOM VERSION", roomVersion)
-	fmt.Println("EVENT IS", u.event)
-
 	ore := api.OutputNewRoomEvent{
 		Event:           u.event,
-		RoomVersion:     roomVersion,
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,
@@ -316,6 +305,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 
 	return &api.OutputEvent{
 		Type:         api.OutputTypeNewRoomEvent,
+		RoomVersion:  u.roomVersion,
 		NewRoomEvent: &ore,
 	}, nil
 }

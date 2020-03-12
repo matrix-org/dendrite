@@ -73,18 +73,26 @@ func (s *OutputRoomEventConsumer) Start() error {
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+	fmt.Println("federation sender received room server message")
+
 	// Parse out the event JSON
 	var output api.OutputEvent
 	headers := common.SaramaHeaders(msg.Headers)
+
+	fmt.Println("headers are:", headers)
 
 	if msgtype, ok := headers["type"]; ok {
 		if api.OutputType(msgtype) != api.OutputTypeNewRoomEvent {
 			log.WithField("type", msgtype).Debug(
 				"roomserver output log: ignoring unknown output type",
 			)
+			fmt.Println("unknown type")
 			return nil
+		} else {
+			fmt.Println("federation sender received output type new room event")
 		}
 	} else {
+		fmt.Println("no message type included")
 		log.WithField("type", msgtype).Debug(
 			"roomserver output log: no message type included",
 		)
@@ -102,9 +110,13 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return errors.New("room version was not in sarama headers")
 	}
 
+	fmt.Println("room version is", roomVersion)
+
 	// Prepare the room event so that it has the correct field types
 	// for the room version
-	output.NewRoomEvent.Event = gomatrixserverlib.Event{}
+	output.NewRoomEvent = &api.OutputNewRoomEvent{
+		Event: gomatrixserverlib.Event{},
+	}
 	if err := output.NewRoomEvent.Event.PrepareAs(roomVersion); err != nil {
 		log.WithFields(log.Fields{
 			"room_version": roomVersion,

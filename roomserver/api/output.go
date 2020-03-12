@@ -34,7 +34,8 @@ const (
 // Consumers should check the type field when consuming this event.
 type OutputEvent struct {
 	// What sort of event this is.
-	Type OutputType `json:"type"`
+	Type        OutputType                    `json:"-"`
+	RoomVersion gomatrixserverlib.RoomVersion `json:"-"`
 	// The content of event with type OutputTypeNewRoomEvent
 	NewRoomEvent *OutputNewRoomEvent `json:"new_room_event,omitempty"`
 	// The content of event with type OutputTypeNewInviteEvent
@@ -55,8 +56,6 @@ type OutputEvent struct {
 type OutputNewRoomEvent struct {
 	// The event.
 	Event gomatrixserverlib.Event `json:"event"`
-	// The event version.
-	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The latest events in the room after this event.
 	// This can be used to set the prev events for new events in the room.
 	// This also can be used to get the full current state after this event.
