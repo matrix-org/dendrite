@@ -158,9 +158,10 @@ func SendJoin(
 	}
 
 	// Check that the event is signed by the server sending the request.
+	redacted := event.Redact()
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
 		ServerName: event.Origin(),
-		Message:    event.Redact().JSON(),
+		Message:    redacted.JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)

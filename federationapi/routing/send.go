@@ -26,6 +26,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // Send implements /_matrix/federation/v1/send/{txnID}
@@ -39,6 +41,7 @@ func Send(
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
+	fmt.Println("TRANSACTION CONTENT IS", string(request.Content()))
 
 	t := txnReq{
 		context:    httpReq.Context(),
@@ -47,12 +50,68 @@ func Send(
 		keys:       keys,
 		federation: federation,
 	}
-	if err := json.Unmarshal(request.Content(), &t); err != nil {
+
+	// we need to work out what the room version is for each of these events
+	// or otherwise we will not be able to unmarshal them from the tx
+	pdus := gjson.GetBytes(request.Content(), "pdus")
+	if rest, err := sjson.DeleteBytes(request.Content(), "pdus"); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("Extracting PDUs from JSON failed. " + err.Error()),
+		}
+	} else if err := json.Unmarshal(rest, &t); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
+
+	fmt.Println("Number of PDUs:", len(t.PDUs))
+	fmt.Println("Number of EDUs:", len(t.EDUs))
+
+	roomVersions := make(map[string]gomatrixserverlib.RoomVersion)
+	if pdus.Exists() {
+		for _, pdu := range pdus.Array() {
+			if rid := pdu.Get("room_id"); rid.Exists() {
+				// Look up the room version for this room if we don't already
+				// know it.
+				if _, ok := roomVersions[rid.String()]; !ok {
+					// Look up the room version for this room.
+					vReq := api.QueryRoomVersionForRoomIDRequest{RoomID: rid.String()}
+					vRes := api.QueryRoomVersionForRoomIDResponse{}
+					if query.QueryRoomVersionForRoomID(httpReq.Context(), &vReq, &vRes) == nil {
+						roomVersions[rid.String()] = vRes.RoomVersion
+						fmt.Println("Room version for", rid.String(), "is", vRes.RoomVersion)
+					}
+				}
+
+				// Check if we know the room ID again. It's possible the previous
+				// step failed.
+				if roomVersion, ok := roomVersions[rid.String()]; ok {
+					fmt.Println("We know the room version for", rid.String())
+					// Now unmarshal the event.
+					event, err := gomatrixserverlib.NewEventFromUntrustedJSON([]byte(pdu.Raw), roomVersion)
+					if err != nil {
+						fmt.Println("Couldn't create event:", err)
+						continue
+					}
+
+					fmt.Println("Event", event.EventID(), "was created successfully")
+					fmt.Println("Auth events:", event.AuthEventIDs())
+					fmt.Println("Prev events:", event.PrevEventIDs())
+
+					// Assuming nothing has gone wrong at this point, we can now
+					// append our newly formatted event into the transaction object.
+					t.PDUs = append(t.PDUs, event)
+				} else {
+					fmt.Println("We don't know the room version for", rid.String())
+				}
+			}
+		}
+	}
+
+	fmt.Println("Number of PDUs:", len(t.PDUs))
+	fmt.Println("Number of EDUs:", len(t.EDUs))
 
 	t.Origin = request.Origin()
 	t.TransactionID = txnID
