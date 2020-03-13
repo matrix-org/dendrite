@@ -69,7 +69,7 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 }
 
 func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
-	hosted := "/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/"
+	hosted := "/dns4/rendezvous.matrix.org/tcp/8443/wss/p2p-websocket-star/"
 	node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", privKey.Seed(), []string{hosted})
 	serverName = node.Id
 	fmt.Println("p2p assigned ServerName: ", serverName)
@@ -145,11 +145,10 @@ func main() {
 	if node != nil {
 		go func() {
 			logrus.Info("Listening on libp2p-js host ID ", node.Id)
-
-			listener := go_http_js_libp2p.NewP2pListener(node)
-			defer listener.Close()
-			s := &http.Server{}
-			s.Serve(listener)
+			s := JSServer{
+				Mux: http.DefaultServeMux,
+			}
+			s.ListenAndServe("p2p")
 		}()
 	}
 
