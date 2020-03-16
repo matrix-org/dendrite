@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
@@ -98,5 +99,13 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
-	return s.db.UpdateRoomFromEvents(context.TODO(), addQueryRes.Events, remQueryRes.Events)
+	var addQueryEvents, remQueryEvents []gomatrixserverlib.Event
+	for _, headeredEvent := range addQueryRes.Events {
+		addQueryEvents = append(addQueryEvents, headeredEvent.Event)
+	}
+	for _, headeredEvent := range remQueryRes.Events {
+		remQueryEvents = append(remQueryEvents, headeredEvent.Event)
+	}
+
+	return s.db.UpdateRoomFromEvents(context.TODO(), addQueryEvents, remQueryEvents)
 }

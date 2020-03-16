@@ -162,7 +162,11 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	}
 
 	// Check that the event is allowed by the state at the event.
-	if err := checkAllowedByState(e, stateResp.StateEvents); err != nil {
+	var events []gomatrixserverlib.Event
+	for _, headeredEvent := range stateResp.StateEvents {
+		events = append(events, headeredEvent.Event)
+	}
+	if err := checkAllowedByState(e, events); err != nil {
 		return err
 	}
 
