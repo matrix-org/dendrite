@@ -699,7 +699,7 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 
 func (d *Database) GetRoomVersionForRoom(
 	ctx context.Context, roomNID types.RoomNID,
-) (int64, error) {
+) (gomatrixserverlib.RoomVersion, error) {
 	return d.statements.selectRoomVersionForRoomNID(
 		ctx, nil, roomNID,
 	)
