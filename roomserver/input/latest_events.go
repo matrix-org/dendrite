@@ -253,8 +253,11 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
+	// TODO: Room version here
+	roomVersion := gomatrixserverlib.RoomVersionV1
+
 	ore := api.OutputNewRoomEvent{
-		Event:           u.event,
+		Event:           u.event.Headered(roomVersion),
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,
