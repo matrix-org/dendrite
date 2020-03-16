@@ -51,7 +51,7 @@ type InputRoomEvent struct {
 	// This controls how the event is processed.
 	Kind int `json:"kind"`
 	// The event JSON for the event to add.
-	Event gomatrixserverlib.Event `json:"event"`
+	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 	// List of state event IDs that authenticate this event.
 	// These are likely derived from the "auth_events" JSON key of the event.
 	// But can be different because the "auth_events" key can be incomplete or wrong.
@@ -85,7 +85,7 @@ type TransactionID struct {
 // the usual context a matrix room event would have. We usually do not have
 // access to the events needed to check the event auth rules for the invite.
 type InputInviteEvent struct {
-	Event gomatrixserverlib.Event `json:"event"`
+	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 // InputRoomEventsRequest is a request to InputRoomEvents

@@ -180,7 +180,8 @@ func createRoom(
 	}
 
 	r.CreationContent["creator"] = userID
-	r.CreationContent["room_version"] = "1" // TODO: We set this to 1 before we support Room versioning
+	// TODO: Room version here
+	r.CreationContent["room_version"] = gomatrixserverlib.RoomVersionV1
 
 	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association

@@ -250,10 +250,13 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 		return err
 	}
 
+	// TODO: Room version here
+	roomVersion := gomatrixserverlib.RoomVersionV1
+
 	// Create the request
 	ire := roomserverAPI.InputRoomEvent{
 		Kind:         roomserverAPI.KindNew,
-		Event:        event,
+		Event:        event.Headered(roomVersion),
 		AuthEventIDs: event.AuthEventIDs(),
 		SendAsServer: serverName,
 	}
