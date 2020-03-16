@@ -99,78 +99,47 @@ func GetPushRule(
 		util.GetLogger(req.Context()).WithError(err).Error("Could not unmarshal pushrules data")
 		return jsonerror.InternalServerError()
 	}
-
+	pushRule := PushRule{}
 	switch kind {
 	case "override":
-		for _, pushRule := range pushRuleSet.Global.Override {
-			if pushRule.RuleId == ruleID {
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: pushRule,
-				}
-			}
-		}
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Not found"),
-		}
+		pushRule = getPushRulebyId(pushRuleSet.Global.Override, ruleID)
+
 	case "underride":
-		for _, pushRule := range pushRuleSet.Global.Underride {
-			if pushRule.RuleId == ruleID {
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: pushRule,
-				}
-			}
-		}
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Not found"),
-		}
+		pushRule = getPushRulebyId(pushRuleSet.Global.Underride, ruleID)
+
 	case "sender":
-		for _, pushRule := range pushRuleSet.Global.Sender {
-			if pushRule.RuleId == ruleID {
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: pushRule,
-				}
-			}
-		}
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Not found"),
-		}
+		pushRule = getPushRulebyId(pushRuleSet.Global.Sender, ruleID)
+
 	case "room":
-		for _, pushRule := range pushRuleSet.Global.Room {
-			if pushRule.RuleId == ruleID {
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: pushRule,
-				}
-			}
-		}
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Not found"),
-		}
+		pushRule = getPushRulebyId(pushRuleSet.Global.Room, ruleID)
+
 	case "content":
-		for _, pushRule := range pushRuleSet.Global.Content {
-			if pushRule.RuleId == ruleID {
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: pushRule,
-				}
-			}
-		}
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Not found"),
-		}
+		pushRule = getPushRulebyId(pushRuleSet.Global.Content, ruleID)
+
 	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotFound("Unrecognised request"),
 		}
-
 	}
+	if pushRule.RuleId == ruleID {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: pushRule,
+		}
+	}
+	return util.JSONResponse{
+		Code: http.StatusNotFound,
+		JSON: jsonerror.NotFound("Not found"),
+	}
+}
+
+//Returns a single push rule which matches given ruleID
+func getPushRulebyId(pushRules []PushRule, ruleID string) PushRule {
+	for _, pushRule := range pushRules {
+		if pushRule.RuleId == ruleID {
+			return pushRule
+		}
+	}
+	return PushRule{}
 }
