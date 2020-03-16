@@ -68,8 +68,8 @@ func GetMissingEvents(
 
 // filterEvents returns only those events with matching roomID and having depth greater than minDepth
 func filterEvents(
-	events []gomatrixserverlib.Event, minDepth int64, roomID string,
-) []gomatrixserverlib.Event {
+	events []gomatrixserverlib.HeaderedEvent, minDepth int64, roomID string,
+) []gomatrixserverlib.HeaderedEvent {
 	ref := events[:0]
 	for _, ev := range events {
 		if ev.Depth() >= minDepth && ev.RoomID() == roomID {

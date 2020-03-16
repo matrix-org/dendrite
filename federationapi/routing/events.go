@@ -80,5 +80,5 @@ func getEvent(
 		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	return &eventsResponse.Events[0], nil
+	return &eventsResponse.Events[0].Event, nil
 }
