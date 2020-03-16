@@ -93,11 +93,12 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *roomStatements) insertRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx,
+	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var roomNID int64
 	stmt := common.TxStmt(txn, s.insertRoomNIDStmt)
-	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
+	err := stmt.QueryRowContext(ctx, roomID, roomVersion).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 

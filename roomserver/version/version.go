@@ -23,6 +23,11 @@ import (
 // RoomVersionDescription contains information about a room version,
 // namely whether it is marked as supported or stable in this server
 // version.
+// A version is supported if the server has some support for rooms
+// that are this version. A version is marked as stable or unstable
+// in order to hint whether the version should be used to clients
+// calling the /capabilities endpoint.
+// https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-capabilities
 type RoomVersionDescription struct {
 	Supported bool
 	Stable    bool

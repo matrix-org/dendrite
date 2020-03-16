@@ -82,11 +82,12 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *roomStatements) insertRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx,
+	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var err error
 	insertStmt := common.TxStmt(txn, s.insertRoomNIDStmt)
-	if _, err = insertStmt.ExecContext(ctx, roomID); err == nil {
+	if _, err = insertStmt.ExecContext(ctx, roomID, roomVersion); err == nil {
 		return s.selectRoomNID(ctx, txn, roomID)
 	} else {
 		return types.RoomNID(0), err

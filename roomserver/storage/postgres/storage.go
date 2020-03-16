@@ -68,7 +68,8 @@ func (d *Database) StoreEvent(
 		}
 	}
 
-	if roomNID, err = d.assignRoomNID(ctx, nil, event.RoomID()); err != nil {
+	// TODO: Room version here
+	if roomNID, err = d.assignRoomNID(ctx, nil, event.RoomID(), "1"); err != nil {
 		return 0, types.StateAtEvent{}, err
 	}
 
@@ -121,13 +122,14 @@ func (d *Database) StoreEvent(
 }
 
 func (d *Database) assignRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx,
+	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.statements.selectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID)
+		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID, roomVersion)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
 			roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
@@ -494,7 +496,8 @@ func (d *Database) MembershipUpdater(
 		}
 	}()
 
-	roomNID, err := d.assignRoomNID(ctx, txn, roomID)
+	// TODO: Room version here
+	roomNID, err := d.assignRoomNID(ctx, txn, roomID, "1")
 	if err != nil {
 		return nil, err
 	}
