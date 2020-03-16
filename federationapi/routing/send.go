@@ -116,6 +116,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
 			}
+			util.GetLogger(t.context).Error("Failed to process incoming federation event, skipping. Event ID:", e.EventID(), " Err:", err)
 		} else {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
 		}

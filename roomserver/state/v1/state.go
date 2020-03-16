@@ -366,10 +366,15 @@ func (v StateResolutionV1) loadStateAfterEventsForNumericTuples(
 			// update that key in the result.
 			// If the requested event wasn't a state event then the state after
 			// it is the same as the state before it.
+			set := false
 			for i := range result {
 				if result[i].StateKeyTuple == prevState.StateKeyTuple {
 					result[i] = prevState.StateEntry
+					set = true
 				}
+			}
+			if !set { // no previous state exists for this event: add new state
+				result = append(result, prevState.StateEntry)
 			}
 		}
 		return result, nil
