@@ -31,13 +31,13 @@ const roomsSchema = `
     latest_event_nids TEXT NOT NULL DEFAULT '[]',
     last_event_sent_nid INTEGER NOT NULL DEFAULT 0,
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
-    room_version INTEGER NOT NULL DEFAULT 1
+    room_version TEXT NOT NULL DEFAULT '1'
   );
 `
 
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = `
-	INSERT INTO roomserver_rooms (room_id) VALUES ($1)
+	INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)
 	  ON CONFLICT DO NOTHING;
 `
 

@@ -42,13 +42,13 @@ CREATE TABLE IF NOT EXISTS roomserver_rooms (
     state_snapshot_nid BIGINT NOT NULL DEFAULT 0,
     -- The version of the room, which will assist in determining the state resolution
     -- algorithm, event ID format, etc.
-    room_version BIGINT NOT NULL DEFAULT 1
+    room_version TEXT NOT NULL DEFAULT '1'
 );
 `
 
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = "" +
-	"INSERT INTO roomserver_rooms (room_id) VALUES ($1)" +
+	"INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_room_id_unique" +
 	" DO NOTHING RETURNING (room_nid)"
 
