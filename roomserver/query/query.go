@@ -732,9 +732,9 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
 ) error {
-	response.DefaultRoomVersion = string(version.GetDefaultRoomVersion())
+	response.DefaultRoomVersion = string(version.DefaultRoomVersion())
 	response.AvailableRoomVersions = make(map[string]string)
-	for v, desc := range version.GetSupportedRoomVersions() {
+	for v, desc := range version.SupportedRoomVersions() {
 		sv := string(v)
 		if desc.Stable {
 			response.AvailableRoomVersions[sv] = "stable"
