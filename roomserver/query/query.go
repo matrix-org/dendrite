@@ -147,12 +147,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, gomatrixserverlib.HeaderedEvent{
-			EventHeader: gomatrixserverlib.EventHeader{
-				RoomVersion: roomVersion,
-			},
-			Event: event,
-		})
+		response.StateEvents = append(response.StateEvents, event.Headered(roomVersion))
 	}
 
 	return nil
@@ -209,12 +204,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, gomatrixserverlib.HeaderedEvent{
-			EventHeader: gomatrixserverlib.EventHeader{
-				RoomVersion: roomVersion,
-			},
-			Event: event,
-		})
+		response.StateEvents = append(response.StateEvents, event.Headered(roomVersion))
 	}
 
 	return nil
@@ -247,12 +237,7 @@ func (r *RoomserverQueryAPI) QueryEventsByID(
 		// TODO: Room version here
 		roomVersion := gomatrixserverlib.RoomVersionV1
 
-		response.Events = append(response.Events, gomatrixserverlib.HeaderedEvent{
-			EventHeader: gomatrixserverlib.EventHeader{
-				RoomVersion: roomVersion,
-			},
-			Event: event,
-		})
+		response.Events = append(response.Events, event.Headered(roomVersion))
 	}
 
 	return nil
@@ -534,12 +519,7 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 			// TODO: Room version here
 			roomVersion := gomatrixserverlib.RoomVersionV1
 
-			response.Events = append(response.Events, gomatrixserverlib.HeaderedEvent{
-				EventHeader: gomatrixserverlib.EventHeader{
-					RoomVersion: roomVersion,
-				},
-				Event: event,
-			})
+			response.Events = append(response.Events, event.Headered(roomVersion))
 		}
 	}
 
@@ -585,12 +565,7 @@ func (r *RoomserverQueryAPI) QueryBackfill(
 		// TODO: Room version here
 		roomVersion := gomatrixserverlib.RoomVersionV1
 
-		response.Events = append(response.Events, gomatrixserverlib.HeaderedEvent{
-			EventHeader: gomatrixserverlib.EventHeader{
-				RoomVersion: roomVersion,
-			},
-			Event: event,
-		})
+		response.Events = append(response.Events, event.Headered(roomVersion))
 	}
 
 	return err
@@ -711,24 +686,14 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 		// TODO: Room version here
 		roomVersion := gomatrixserverlib.RoomVersionV1
 
-		response.StateEvents = append(response.StateEvents, gomatrixserverlib.HeaderedEvent{
-			EventHeader: gomatrixserverlib.EventHeader{
-				RoomVersion: roomVersion,
-			},
-			Event: event,
-		})
+		response.StateEvents = append(response.StateEvents, event.Headered(roomVersion))
 	}
 
 	for _, event := range authEvents {
 		// TODO: Room version here
 		roomVersion := gomatrixserverlib.RoomVersionV1
 
-		response.AuthChainEvents = append(response.AuthChainEvents, gomatrixserverlib.HeaderedEvent{
-			EventHeader: gomatrixserverlib.EventHeader{
-				RoomVersion: roomVersion,
-			},
-			Event: event,
-		})
+		response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(roomVersion))
 	}
 
 	return err
