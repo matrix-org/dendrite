@@ -51,6 +51,9 @@ const selectMembershipsByLocalpartSQL = "" +
 const selectMembershipInRoomByLocalpartSQL = "" +
 	"SELECT event_id FROM account_memberships WHERE localpart = $1 AND room_id = $2"
 
+const selectRoomIDsByLocalPartSQL = "" +
+	"SELECT room_id FROM account_memberships WHERE localpart = $1"
+
 const deleteMembershipsByEventIDsSQL = "" +
 	"DELETE FROM account_memberships WHERE event_id = ANY($1)"
 
@@ -59,6 +62,7 @@ type membershipStatements struct {
 	insertMembershipStmt                  *sql.Stmt
 	selectMembershipInRoomByLocalpartStmt *sql.Stmt
 	selectMembershipsByLocalpartStmt      *sql.Stmt
+	selectRoomIDsByLocalPartStmt          *sql.Stmt
 }
 
 func (s *membershipStatements) prepare(db *sql.DB) (err error) {
@@ -76,6 +80,9 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectMembershipsByLocalpartStmt, err = db.Prepare(selectMembershipsByLocalpartSQL); err != nil {
+		return
+	}
+	if s.selectRoomIDsByLocalPartStmt, err = db.Prepare(selectRoomIDsByLocalPartSQL); err != nil {
 		return
 	}
 	return
@@ -128,4 +135,24 @@ func (s *membershipStatements) selectMembershipsByLocalpart(
 		memberships = append(memberships, m)
 	}
 	return memberships, rows.Err()
+}
+
+func (s *membershipStatements) selectRoomIDsByLocalPart(
+	ctx context.Context, localPart string,
+) ([]string, error) {
+	stmt := s.selectRoomIDsByLocalPartStmt
+	rows, err := stmt.QueryContext(ctx, localPart)
+	if err != nil {
+		return nil, err
+	}
+	roomIDs := []string{}
+	defer rows.Close() // nolint: errcheck
+	for rows.Next() {
+		var roomID string
+		if err = rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return roomIDs, rows.Err()
 }

@@ -105,6 +105,12 @@ func Setup(
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/joined_rooms",
+		common.MakeAuthAPI("joined_rooms", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return GetJoinedRooms(req, device, accountDB)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
 		common.MakeAuthAPI("membership", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(req))
@@ -354,6 +360,12 @@ func Setup(
 			return GetAssociated3PIDs(req, accountDB, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/account/deactivate",
+		common.MakeAuthAPI("account_deactivate", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return GetAssociated3PIDs(req, accountDB, device)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/account/3pid",
 		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {

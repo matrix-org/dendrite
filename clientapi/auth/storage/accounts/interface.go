@@ -33,6 +33,7 @@ type Database interface {
 	CreateGuestAccount(ctx context.Context) (*authtypes.Account, error)
 	UpdateMemberships(ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error
 	GetMembershipInRoomByLocalpart(ctx context.Context, localpart, roomID string) (authtypes.Membership, error)
+	GetRoomIDsByLocalPart(ctx context.Context, localpart string) ([]string, error)
 	GetMembershipsByLocalpart(ctx context.Context, localpart string) (memberships []authtypes.Membership, err error)
 	SaveAccountData(ctx context.Context, localpart, roomID, dataType, content string) error
 	GetAccountData(ctx context.Context, localpart string) (global []gomatrixserverlib.ClientEvent, rooms map[string][]gomatrixserverlib.ClientEvent, err error)
