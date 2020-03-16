@@ -143,7 +143,9 @@ func (s *OutputRoomEventConsumer) lookupMissingStateEvents(
 		return nil, err
 	}
 
-	result = append(result, eventResp.Events...)
+	for _, headeredEvent := range eventResp.Events {
+		result = append(result, headeredEvent.Event)
+	}
 
 	return result, nil
 }
