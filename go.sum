@@ -152,6 +152,8 @@ github.com/matrix-org/gomatrixserverlib v0.0.0-20200316200447-0820dfcdff10 h1:O6
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200316200447-0820dfcdff10/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200316202926-7ce8b3298af6 h1:ZeRF0DpsnaxwYL7b6U1J3XMyUBpB8GWiNCqz3bWdivs=
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200316202926-7ce8b3298af6/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200316203446-64795a12215c h1:s7XUmnqbJTJmMHuZ9Ooad6vKlBsSpIe/C3aJc6G6cy8=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200316203446-64795a12215c/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
 github.com/matrix-org/naffka v0.0.0-20200127221512-0716baaabaf1 h1:osLoFdOy+ChQqVUn2PeTDETFftVkl4w9t/OW18g3lnk=
 github.com/matrix-org/naffka v0.0.0-20200127221512-0716baaabaf1/go.mod h1:cXoYQIENbdWIQHt1SyCo6Bl3C3raHwJ0wgVrXHSqf+A=
 github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5 h1:W7l5CP4V7wPyPb4tYE11dbmeAOwtFQBTW0rf4OonOS8=
