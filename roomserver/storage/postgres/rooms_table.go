@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS roomserver_rooms (
     state_snapshot_nid BIGINT NOT NULL DEFAULT 0,
     -- The version of the room, which will assist in determining the state resolution
     -- algorithm, event ID format, etc.
-    room_version TEXT NOT NULL DEFAULT '1'
+    room_version TEXT NOT NULL
 );
 `
 
