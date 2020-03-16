@@ -15,85 +15,64 @@
 package version
 
 import (
-	"errors"
+	"fmt"
 
-	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type RoomVersionID int
-type EventFormatID int
-
-const (
-	RoomVersionV1 RoomVersionID = iota + 1
-	RoomVersionV2
-	RoomVersionV3
-	RoomVersionV4
-	RoomVersionV5
-)
-
-const (
-	EventFormatV1 EventFormatID = iota + 1 // original event ID formatting
-	EventFormatV2                          // event ID is event hash
-	EventFormatV3                          // event ID is URL-safe base64 event hash
-)
-
+// RoomVersionDescription contains information about a room version,
+// namely whether it is marked as supported or stable in this server
+// version.
+// A version is supported if the server has some support for rooms
+// that are this version. A version is marked as stable or unstable
+// in order to hint whether the version should be used to clients
+// calling the /capabilities endpoint.
+// https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-capabilities
 type RoomVersionDescription struct {
-	Supported                 bool
-	Stable                    bool
-	StateResolution           state.StateResolutionVersion
-	EventFormat               EventFormatID
-	EnforceSigningKeyValidity bool
+	Supported bool
+	Stable    bool
 }
 
-var roomVersions = map[RoomVersionID]RoomVersionDescription{
-	RoomVersionV1: RoomVersionDescription{
-		Supported:                 true,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV1,
-		EventFormat:               EventFormatV1,
-		EnforceSigningKeyValidity: false,
+var roomVersions = map[gomatrixserverlib.RoomVersion]RoomVersionDescription{
+	gomatrixserverlib.RoomVersionV1: RoomVersionDescription{
+		Supported: true,
+		Stable:    true,
 	},
-	RoomVersionV2: RoomVersionDescription{
-		Supported:                 false,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV2,
-		EventFormat:               EventFormatV1,
-		EnforceSigningKeyValidity: false,
+	gomatrixserverlib.RoomVersionV2: RoomVersionDescription{
+		Supported: false,
+		Stable:    false,
 	},
-	RoomVersionV3: RoomVersionDescription{
-		Supported:                 false,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV2,
-		EventFormat:               EventFormatV2,
-		EnforceSigningKeyValidity: false,
+	gomatrixserverlib.RoomVersionV3: RoomVersionDescription{
+		Supported: false,
+		Stable:    false,
 	},
-	RoomVersionV4: RoomVersionDescription{
-		Supported:                 false,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV2,
-		EventFormat:               EventFormatV3,
-		EnforceSigningKeyValidity: false,
+	gomatrixserverlib.RoomVersionV4: RoomVersionDescription{
+		Supported: false,
+		Stable:    false,
 	},
-	RoomVersionV5: RoomVersionDescription{
-		Supported:                 false,
-		Stable:                    true,
-		StateResolution:           state.StateResolutionAlgorithmV2,
-		EventFormat:               EventFormatV3,
-		EnforceSigningKeyValidity: true,
+	gomatrixserverlib.RoomVersionV5: RoomVersionDescription{
+		Supported: false,
+		Stable:    false,
 	},
 }
 
-func GetDefaultRoomVersion() RoomVersionID {
-	return RoomVersionV1
+// DefaultRoomVersion contains the room version that will, by
+// default, be used to create new rooms on this server.
+func DefaultRoomVersion() gomatrixserverlib.RoomVersion {
+	return gomatrixserverlib.RoomVersionV1
 }
 
-func GetRoomVersions() map[RoomVersionID]RoomVersionDescription {
+// RoomVersions returns a map of all known room versions to this
+// server.
+func RoomVersions() map[gomatrixserverlib.RoomVersion]RoomVersionDescription {
 	return roomVersions
 }
 
-func GetSupportedRoomVersions() map[RoomVersionID]RoomVersionDescription {
-	versions := make(map[RoomVersionID]RoomVersionDescription)
-	for id, version := range GetRoomVersions() {
+// SupportedRoomVersions returns a map of descriptions for room
+// versions that are supported by this homeserver.
+func SupportedRoomVersions() map[gomatrixserverlib.RoomVersion]RoomVersionDescription {
+	versions := make(map[gomatrixserverlib.RoomVersion]RoomVersionDescription)
+	for id, version := range RoomVersions() {
 		if version.Supported {
 			versions[id] = version
 		}
@@ -101,12 +80,46 @@ func GetSupportedRoomVersions() map[RoomVersionID]RoomVersionDescription {
 	return versions
 }
 
-func GetSupportedRoomVersion(version RoomVersionID) (desc RoomVersionDescription, err error) {
+// RoomVersion returns information about a specific room version.
+// An UnknownVersionError is returned if the version is not known
+// to the server.
+func RoomVersion(version gomatrixserverlib.RoomVersion) (RoomVersionDescription, error) {
 	if version, ok := roomVersions[version]; ok {
-		desc = version
+		return version, nil
 	}
-	if !desc.Supported {
-		err = errors.New("unsupported room version")
+	return RoomVersionDescription{}, UnknownVersionError{version}
+}
+
+// SupportedRoomVersion returns information about a specific room
+// version. An UnknownVersionError is returned if the version is not
+// known to the server, or an UnsupportedVersionError is returned if
+// the version is known but specifically marked as unsupported.
+func SupportedRoomVersion(version gomatrixserverlib.RoomVersion) (RoomVersionDescription, error) {
+	result, err := RoomVersion(version)
+	if err != nil {
+		return RoomVersionDescription{}, err
 	}
-	return
+	if !result.Supported {
+		return RoomVersionDescription{}, UnsupportedVersionError{version}
+	}
+	return result, nil
+}
+
+// UnknownVersionError is caused when the room version is not known.
+type UnknownVersionError struct {
+	Version gomatrixserverlib.RoomVersion
+}
+
+func (e UnknownVersionError) Error() string {
+	return fmt.Sprintf("room version '%s' is not known", e.Version)
+}
+
+// UnsupportedVersionError is caused when the room version is specifically
+// marked as unsupported.
+type UnsupportedVersionError struct {
+	Version gomatrixserverlib.RoomVersion
+}
+
+func (e UnsupportedVersionError) Error() string {
+	return fmt.Sprintf("room version '%s' is marked as unsupported", e.Version)
 }
