@@ -19,10 +19,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"sort"
 	"strings"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/types"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
