@@ -70,6 +70,7 @@ func Open(dataSourceName string) (*Database, error) {
 }
 
 // StoreEvent implements input.EventDatabase
+// nolint:gocyclo
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
@@ -92,6 +93,9 @@ func (d *Database) StoreEvent(
 				return err
 			}
 		}
+
+		// TODO: Here we should aim to have two different code paths for new rooms
+		// vs existing ones.
 
 		// Get the default room version. If the client doesn't supply a room_version
 		// then we will use our configured default to create the room.
@@ -164,24 +168,26 @@ func (d *Database) StoreEvent(
 }
 
 func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
-	roomVersion gomatrixserverlib.RoomVersion, err error,
+	gomatrixserverlib.RoomVersion, error,
 ) {
+	var err error
+	var roomVersion gomatrixserverlib.RoomVersion
 	// Look for m.room.create events.
 	if event.Type() != gomatrixserverlib.MRoomCreate {
-		return
+		return gomatrixserverlib.RoomVersion(""), nil
 	}
 	roomVersion = roomserverVersion.DefaultRoomVersion()
 	var createContent gomatrixserverlib.CreateContent
 	// The m.room.create event contains an optional "room_version" key in
 	// the event content, so we need to unmarshal that first.
 	if err = json.Unmarshal(event.Content(), &createContent); err != nil {
-		return
+		return gomatrixserverlib.RoomVersion(""), err
 	}
 	// A room version was specified in the event content?
 	if createContent.RoomVersion != nil {
 		roomVersion = *createContent.RoomVersion
 	}
-	return
+	return roomVersion, err
 }
 
 func (d *Database) assignRoomNID(

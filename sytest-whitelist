@@ -104,12 +104,6 @@ Newly banned rooms appear in the leave section of incremental sync
 Newly banned rooms appear in the leave section of incremental sync
 local user can join room with version 1
 User can invite local user to room with version 1
-local user can join room with version 2
-User can invite local user to room with version 2
-local user can join room with version 3
-User can invite local user to room with version 3
-local user can join room with version 4
-User can invite local user to room with version 4
 Should reject keys claiming to belong to a different user
 Can add account data
 Can add account data to room
@@ -198,10 +192,6 @@ Local non-members don't see posted message events
 Remote room members also see posted message events
 Lazy loading parameters in the filter are strictly boolean
 remote user can join room with version 1
-remote user can join room with version 2
-remote user can join room with version 3
-remote user can join room with version 4
-remote user can join room with version 5
 Inbound federation can query room alias directory
 Outbound federation can query v2 /send_join
 Inbound federation can receive v2 /send_join
