@@ -253,7 +253,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.Event
 	}
 
 	prevEvent, err := s.db.GetStateEvent(
-		context.TODO(), event.Type(), event.RoomID(), stateKey,
+		context.TODO(), event.RoomID(), event.Type(), stateKey,
 	)
 	if err != nil {
 		return event, err
