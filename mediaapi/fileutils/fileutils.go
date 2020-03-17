@@ -168,11 +168,11 @@ func createTempFileWriter(absBasePath config.Path) (*bufio.Writer, *os.File, typ
 func createTempDir(baseDirectory config.Path) (types.Path, error) {
 	baseTmpDir := filepath.Join(string(baseDirectory), "tmp")
 	if err := os.MkdirAll(baseTmpDir, 0770); err != nil {
-		return "", fmt.Errorf("Failed to create base temp dir: %v", err)
+		return "", fmt.Errorf("Failed to create base temp dir: %w", err)
 	}
 	tmpDir, err := ioutil.TempDir(baseTmpDir, "")
 	if err != nil {
-		return "", fmt.Errorf("Failed to create temp dir: %v", err)
+		return "", fmt.Errorf("Failed to create temp dir: %w", err)
 	}
 	return types.Path(tmpDir), nil
 }
@@ -184,7 +184,7 @@ func createFileWriter(directory types.Path) (*bufio.Writer, *os.File, error) {
 	filePath := filepath.Join(string(directory), "content")
 	file, err := os.Create(filePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create file: %v", err)
+		return nil, nil, fmt.Errorf("Failed to create file: %w", err)
 	}
 
 	return bufio.NewWriter(file), file, nil
