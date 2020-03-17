@@ -46,6 +46,10 @@ type RoomserverAliasAPIDatabase interface {
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(ctx context.Context, alias string) error
+	// Look up the room version for a given room.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomID string,
+	) (gomatrixserverlib.RoomVersion, error)
 }
 
 // RoomserverAliasAPI is an implementation of alias.RoomserverAliasAPI
@@ -240,6 +244,11 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	}
 	builder.AuthEvents = refs
 
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomID)
+	if err != nil {
+		return err
+	}
+
 	// Build the event
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
 	now := time.Now()
@@ -249,9 +258,6 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	if err != nil {
 		return err
 	}
-
-	// TODO: Room version here
-	roomVersion := gomatrixserverlib.RoomVersionV1
 
 	// Create the request
 	ire := roomserverAPI.InputRoomEvent{
