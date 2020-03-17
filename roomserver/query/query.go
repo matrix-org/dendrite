@@ -677,7 +677,15 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 		return err
 	}
 
-	authEvents, err := getAuthChain(ctx, r.DB, request.AuthEventIDs)
+	// add the auth event IDs for the current state events too
+	var authEventIDs []string
+	authEventIDs = append(authEventIDs, request.AuthEventIDs...)
+	for _, se := range stateEvents {
+		authEventIDs = append(authEventIDs, se.AuthEventIDs()...)
+	}
+	authEventIDs = util.UniqueStrings(authEventIDs) // de-dupe
+
+	authEvents, err := getAuthChain(ctx, r.DB, authEventIDs)
 	if err != nil {
 		return err
 	}
