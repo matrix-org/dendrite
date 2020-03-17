@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -46,6 +47,12 @@ type RoomserverAliasAPIDatabase interface {
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(ctx context.Context, alias string) error
+	// Return the room NID for a room ID.
+	RoomNID(ctx context.Context, roomID string) (types.RoomNID, error)
+	// Look up the room version for a given room.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomNID types.RoomNID,
+	) (gomatrixserverlib.RoomVersion, error)
 }
 
 // RoomserverAliasAPI is an implementation of alias.RoomserverAliasAPI
@@ -240,6 +247,16 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	}
 	builder.AuthEvents = refs
 
+	roomNID, err := r.DB.RoomNID(ctx, roomID)
+	if err != nil {
+		return err
+	}
+
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+
 	// Build the event
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
 	now := time.Now()
@@ -249,9 +266,6 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	if err != nil {
 		return err
 	}
-
-	// TODO: Room version here
-	roomVersion := gomatrixserverlib.RoomVersionV1
 
 	// Create the request
 	ire := roomserverAPI.InputRoomEvent{

@@ -22,6 +22,8 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type MockRoomserverAliasAPIDatabase struct {
@@ -47,6 +49,18 @@ func (db *MockRoomserverAliasAPIDatabase) GetCreatorIDForAlias(
 	ctx context.Context, alias string,
 ) (string, error) {
 	return "", nil
+}
+
+func (db *MockRoomserverAliasAPIDatabase) RoomNID(
+	ctx context.Context, roomID string,
+) (types.RoomNID, error) {
+	return 1, nil
+}
+
+func (db *MockRoomserverAliasAPIDatabase) GetRoomVersionForRoom(
+	ctx context.Context, roomNID types.RoomNID,
+) (gomatrixserverlib.RoomVersion, error) {
+	return gomatrixserverlib.RoomVersionV1, nil
 }
 
 // This method needs to change depending on test case
