@@ -100,7 +100,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "bulkSelectStateBlockNIDs: rows.close() failed")
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
 	for ; rows.Next(); i++ {

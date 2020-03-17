@@ -118,7 +118,7 @@ func joinedHostsFromStmt(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "joinedHostsFromStmt: rows.close() failed")
 
 	var result []types.JoinedHost
 	for rows.Next() {

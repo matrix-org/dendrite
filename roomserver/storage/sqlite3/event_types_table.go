@@ -138,7 +138,7 @@ func (s *eventTypeStatements) bulkSelectEventTypeNID(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "bulkSelectEventTypeNID: rows.close() failed")
 
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
 	for rows.Next() {

@@ -136,7 +136,7 @@ func (s *thumbnailStatements) selectThumbnails(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectThumbnails: rows.close() failed")
 
 	var thumbnails []*types.ThumbnailMetadata
 	for rows.Next() {

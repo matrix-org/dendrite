@@ -136,7 +136,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 	} else if err != nil {
 		return
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectEventIDsInRange: rows.close() failed")
 
 	// Return the IDs.
 	var eventID string
@@ -179,7 +179,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
 	} else if err != nil {
 		return
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectEventIDsFromPosition: rows.close() failed")
 	// Return the IDs.
 	var eventID string
 	for rows.Next() {

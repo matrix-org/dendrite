@@ -92,7 +92,7 @@ func (s *accountDataStatements) selectAccountData(
 	if err != nil {
 		return
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectAccountData: rows.close() failed")
 
 	global = []gomatrixserverlib.ClientEvent{}
 	rooms = make(map[string][]gomatrixserverlib.ClientEvent)

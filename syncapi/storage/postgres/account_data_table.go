@@ -118,7 +118,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	if err != nil {
 		return
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectAccountDataInRange: rows.close() failed")
 
 	for rows.Next() {
 		var dataType string

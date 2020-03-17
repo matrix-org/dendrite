@@ -115,7 +115,7 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectInviteEventsInRange: rows.close() failed")
 	result := map[string]gomatrixserverlib.Event{}
 	for rows.Next() {
 		var (

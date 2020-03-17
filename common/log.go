@@ -161,6 +161,9 @@ func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName str
 }
 
 func LogIfError(ctx context.Context, err error, message string) {
+	if ctx == nil {
+		ctx = context.TODO()
+	}
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error(message)
 	}

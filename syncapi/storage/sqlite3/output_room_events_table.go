@@ -316,7 +316,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectRecentEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -343,7 +343,7 @@ func (s *outputRoomEventsStatements) selectEarlyEvents(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectEarlyEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -372,7 +372,7 @@ func (s *outputRoomEventsStatements) selectEvents(
 		if streamEvents, err := rowsToStreamEvents(rows); err == nil {
 			returnEvents = append(returnEvents, streamEvents...)
 		}
-		common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+		common.LogIfError(ctx, rows.Close(), "selectEvents: rows.close() failed")
 	}
 	return returnEvents, nil
 }

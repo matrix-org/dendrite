@@ -97,7 +97,7 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 	if err != nil {
 		return
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer common.LogIfError(ctx, rows.Close(), "selectThreePIDsForLocalpart: rows.close() failed")
 
 	threepids = []authtypes.ThreePID{}
 	for rows.Next() {
