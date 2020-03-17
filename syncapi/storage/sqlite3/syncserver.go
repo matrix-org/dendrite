@@ -318,7 +318,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 	if backwardOrdering {
 		// When using backward ordering, we want the most recent events first.
 		if events, err = d.events.selectRecentEvents(
-			ctx, nil, roomID, to.PDUPosition, from.PDUPosition, limit, false, false,
+			ctx, nil, roomID, to.PDUPosition, from.PDUPosition, limit, false, false, nil,
 		); err != nil {
 			return
 		}
@@ -595,6 +595,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	ctx context.Context,
 	userID string,
 	numRecentEventsPerRoom int,
+	ignoredUsers []string,
 ) (
 	res *types.Response,
 	toPos types.PaginationToken,
@@ -647,7 +648,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		var recentStreamEvents []types.StreamEvent
 		recentStreamEvents, err = d.events.selectRecentEvents(
 			ctx, txn, roomID, types.StreamPosition(0), toPos.PDUPosition,
-			numRecentEventsPerRoom, true, true,
+			numRecentEventsPerRoom, true, true, ignoredUsers,
 		)
 		if err != nil {
 			return
@@ -691,7 +692,7 @@ func (d *SyncServerDatasource) CompleteSync(
 	ctx context.Context, userID string, numRecentEventsPerRoom int, ignoredUsers []string,
 ) (*types.Response, error) {
 	res, toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
-		ctx, userID, numRecentEventsPerRoom,
+		ctx, userID, numRecentEventsPerRoom, ignoredUsers,
 	)
 	if err != nil {
 		return nil, err
@@ -856,7 +857,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	}
 	recentStreamEvents, err := d.events.selectRecentEvents(
 		ctx, txn, delta.roomID, types.StreamPosition(fromPos), types.StreamPosition(endPos),
-		numRecentEventsPerRoom, true, true,
+		numRecentEventsPerRoom, true, true, ignoredUsers,
 	)
 	if err != nil {
 		return err

@@ -19,10 +19,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"sort"
-
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"sort"
+	"strings"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -58,12 +58,12 @@ const selectEventsSQL = "" +
 
 const selectRecentEventsSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
+	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND sender NOT IN $5" +
 	" ORDER BY id DESC LIMIT $4"
 
 const selectRecentEventsForSyncSQL = "" +
 	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
+	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND sender NOT IN $5 AND exclude_from_sync = FALSE" +
 	" ORDER BY id DESC LIMIT $4"
 
 const selectEarlyEventsSQL = "" +
@@ -302,16 +302,19 @@ func (s *outputRoomEventsStatements) insertEvent(
 func (s *outputRoomEventsStatements) selectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, fromPos, toPos types.StreamPosition, limit int,
-	chronologicalOrder bool, onlySyncEvents bool,
+	chronologicalOrder bool, onlySyncEvents bool, ignoredUsers []string,
 ) ([]types.StreamEvent, error) {
-	var stmt *sql.Stmt
-	if onlySyncEvents {
-		stmt = common.TxStmt(txn, s.selectRecentEventsForSyncStmt)
-	} else {
-		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
+	iIgnoredUsers := make([]interface{}, len(ignoredUsers))
+	for k, v := range ignoredUsers {
+		iIgnoredUsers[k] = v
 	}
-
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	var query string
+	if onlySyncEvents {
+		query = strings.Replace(selectRecentEventsForSyncSQL, "($5)", common.QueryVariadic(len(iIgnoredUsers)), 1)
+	} else {
+		query = strings.Replace(selectRecentEventsSQL, "($5)", common.QueryVariadic(len(iIgnoredUsers)), 1)
+	}
+	rows, err := txn.QueryContext(ctx, query, roomID, fromPos, toPos, limit, iIgnoredUsers)
 	if err != nil {
 		return nil, err
 	}
