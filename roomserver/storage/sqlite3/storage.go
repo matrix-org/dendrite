@@ -70,7 +70,6 @@ func Open(dataSourceName string) (*Database, error) {
 }
 
 // StoreEvent implements input.EventDatabase
-// nolint:gocyclo
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
