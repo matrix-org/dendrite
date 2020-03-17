@@ -253,7 +253,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
-	roomVersion, err := u.db.GetRoomVersionForRoom(u.ctx, u.roomNID)
+	roomVersion, err := u.db.GetRoomVersionForRoom(u.ctx, u.event.RoomID())
 	if err != nil {
 		return nil, err
 	}

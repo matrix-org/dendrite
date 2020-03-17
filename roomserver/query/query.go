@@ -91,12 +91,8 @@ type RoomserverQueryAPIDatabase interface {
 	) (map[types.EventStateKeyNID]string, error)
 	// Look up the room version for a given room.
 	GetRoomVersionForRoom(
-		ctx context.Context, roomNID types.RoomNID,
+		ctx context.Context, roomID string,
 	) (gomatrixserverlib.RoomVersion, error)
-	// Look up the room NID that an event ID appears in.
-	GetRoomNIDForEventID(
-		ctx context.Context, eventID string,
-	) (types.RoomNID, error)
 }
 
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
@@ -125,7 +121,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	}
 	response.RoomExists = true
 
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
@@ -178,7 +174,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	}
 	response.RoomExists = true
 
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
@@ -238,12 +234,7 @@ func (r *RoomserverQueryAPI) QueryEventsByID(
 	}
 
 	for _, event := range events {
-		roomNID, nerr := r.DB.GetRoomNIDForEventID(ctx, event.EventID())
-		if nerr != nil {
-			return nerr
-		}
-
-		roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+		roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
 		if verr != nil {
 			return verr
 		}
@@ -527,12 +518,7 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 	response.Events = make([]gomatrixserverlib.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
 	for _, event := range loadedEvents {
 		if !eventsToFilter[event.EventID()] {
-			roomNID, nerr := r.DB.GetRoomNIDForEventID(ctx, event.EventID())
-			if nerr != nil {
-				return nerr
-			}
-
-			roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+			roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
 			if verr != nil {
 				return verr
 			}
@@ -580,12 +566,7 @@ func (r *RoomserverQueryAPI) QueryBackfill(
 	}
 
 	for _, event := range loadedEvents {
-		roomNID, nerr := r.DB.GetRoomNIDForEventID(ctx, event.EventID())
-		if nerr != nil {
-			return nerr
-		}
-
-		roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+		roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
 		if verr != nil {
 			return verr
 		}
@@ -678,7 +659,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	}
 	response.RoomExists = true
 
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomNID)
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}

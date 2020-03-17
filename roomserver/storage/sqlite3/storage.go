@@ -894,18 +894,10 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 }
 
 func (d *Database) GetRoomVersionForRoom(
-	ctx context.Context, roomNID types.RoomNID,
+	ctx context.Context, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
-	return d.statements.selectRoomVersionForRoomNID(
-		ctx, nil, roomNID,
-	)
-}
-
-func (d *Database) GetRoomNIDForEventID(
-	ctx context.Context, eventID string,
-) (types.RoomNID, error) {
-	return d.statements.selectRoomNIDForEventID(
-		ctx, nil, eventID,
+	return d.statements.selectRoomVersionForRoomID(
+		ctx, nil, roomID,
 	)
 }
 

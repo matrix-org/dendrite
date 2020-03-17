@@ -74,7 +74,7 @@ type RoomEventDatabase interface {
 	) (string, error)
 	// Look up the room version for a given room.
 	GetRoomVersionForRoom(
-		ctx context.Context, roomNID types.RoomNID,
+		ctx context.Context, roomID string,
 	) (gomatrixserverlib.RoomVersion, error)
 }
 

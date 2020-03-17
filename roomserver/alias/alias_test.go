@@ -22,7 +22,6 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -51,14 +50,8 @@ func (db *MockRoomserverAliasAPIDatabase) GetCreatorIDForAlias(
 	return "", nil
 }
 
-func (db *MockRoomserverAliasAPIDatabase) RoomNID(
-	ctx context.Context, roomID string,
-) (types.RoomNID, error) {
-	return 1, nil
-}
-
 func (db *MockRoomserverAliasAPIDatabase) GetRoomVersionForRoom(
-	ctx context.Context, roomNID types.RoomNID,
+	ctx context.Context, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
 	return gomatrixserverlib.RoomVersionV1, nil
 }

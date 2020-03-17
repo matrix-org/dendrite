@@ -54,8 +54,8 @@ const selectLatestEventNIDsForUpdateSQL = "" +
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE roomserver_rooms SET latest_event_nids = $1, last_event_sent_nid = $2, state_snapshot_nid = $3 WHERE room_nid = $4"
 
-const selectRoomVersionForRoomNIDSQL = "" +
-	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
+const selectRoomVersionForRoomIDSQL = "" +
+	"SELECT room_version FROM roomserver_rooms WHERE room_id = $1"
 
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
@@ -63,7 +63,7 @@ type roomStatements struct {
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
-	selectRoomVersionForRoomNIDStmt    *sql.Stmt
+	selectRoomVersionForRoomIDStmt     *sql.Stmt
 }
 
 func (s *roomStatements) prepare(db *sql.DB) (err error) {
@@ -77,7 +77,7 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
-		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
+		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 	}.prepare(db)
 }
 
@@ -157,11 +157,11 @@ func (s *roomStatements) updateLatestEventNIDs(
 	return err
 }
 
-func (s *roomStatements) selectRoomVersionForRoomNID(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+func (s *roomStatements) selectRoomVersionForRoomID(
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
 	var roomVersion gomatrixserverlib.RoomVersion
-	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
-	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
+	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
 	return roomVersion, err
 }
