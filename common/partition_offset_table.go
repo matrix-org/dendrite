@@ -90,7 +90,7 @@ func (s *PartitionOffsetStatements) selectPartitionOffsets(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
+	defer LogIfError(ctx, rows.Close(), "rows.close() failed")
 	var results []PartitionOffset
 	for rows.Next() {
 		var offset PartitionOffset

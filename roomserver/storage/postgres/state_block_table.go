@@ -19,8 +19,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/matrix-org/dendrite/common"
 	"sort"
+
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"

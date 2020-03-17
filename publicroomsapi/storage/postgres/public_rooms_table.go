@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"github.com/matrix-org/dendrite/common"
 
 	"github.com/lib/pq"

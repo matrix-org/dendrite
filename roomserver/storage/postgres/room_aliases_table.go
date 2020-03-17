@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+
 	"github.com/matrix-org/dendrite/common"
 )
 

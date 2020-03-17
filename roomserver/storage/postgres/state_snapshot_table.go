@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"github.com/matrix-org/dendrite/common"
 
 	"github.com/lib/pq"

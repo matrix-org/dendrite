@@ -18,8 +18,9 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"github.com/matrix-org/dendrite/common"
 	"time"
+
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"

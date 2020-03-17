@@ -17,12 +17,13 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/matrix-org/util"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dugong"

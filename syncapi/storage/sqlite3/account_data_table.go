@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+
 	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
