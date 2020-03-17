@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -118,7 +119,7 @@ func (s *membershipStatements) selectMembershipsByLocalpart(
 
 	memberships = []authtypes.Membership{}
 
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 	for rows.Next() {
 		var m authtypes.Membership
 		m.Localpart = localpart

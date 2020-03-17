@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -91,7 +92,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	for rows.Next() {
 		var serverName string

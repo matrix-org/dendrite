@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -86,7 +87,7 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 
 	// We know that we will only get as many results as event NIDs
 	// because of the unique constraint on event NIDs.

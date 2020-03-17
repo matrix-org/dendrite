@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -90,7 +91,7 @@ func (s *accountDataStatements) selectAccountData(
 	if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 
 	global = []gomatrixserverlib.ClientEvent{}
 	rooms = make(map[string][]gomatrixserverlib.ClientEvent)

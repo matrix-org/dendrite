@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"github.com/matrix-org/dendrite/common"
 	"time"
 
 	"github.com/matrix-org/dendrite/mediaapi/types"
@@ -134,7 +135,7 @@ func (s *thumbnailStatements) selectThumbnails(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 
 	var thumbnails []*types.ThumbnailMetadata
 	for rows.Next() {

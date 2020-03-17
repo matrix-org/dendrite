@@ -15,7 +15,9 @@
 package common
 
 import (
+	"context"
 	"fmt"
+	"github.com/matrix-org/util"
 	"os"
 	"path"
 	"path/filepath"
@@ -155,4 +157,10 @@ func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName str
 			&dugong.DailyRotationSchedule{GZip: true},
 		),
 	})
+}
+
+func LogIfError(ctx context.Context, err error, message string) {
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error(message)
+	}
 }

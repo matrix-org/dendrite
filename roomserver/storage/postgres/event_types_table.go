@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -132,7 +133,7 @@ func (s *eventTypeStatements) bulkSelectEventTypeNID(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
 	for rows.Next() {

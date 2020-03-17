@@ -226,7 +226,7 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	if err != nil {
 		return devices, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 
 	for rows.Next() {
 		var dev authtypes.Device

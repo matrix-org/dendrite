@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/matrix-org/dendrite/common"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -134,7 +135,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 	} else if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 
 	// Return the IDs.
 	var eventID string
@@ -177,7 +178,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
 	} else if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.LogIfError(ctx, rows.Close(), "rows.close() failed")
 	// Return the IDs.
 	var eventID string
 	for rows.Next() {
