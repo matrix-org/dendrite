@@ -160,6 +160,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer rows.Close() // nolint: errcheck
 	// Fetch all the state change events for all rooms between the two positions then loop each event and:
 	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
 	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes

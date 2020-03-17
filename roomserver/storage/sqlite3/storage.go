@@ -18,8 +18,11 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/url"
+
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -67,6 +70,7 @@ func Open(dataSourceName string) (*Database, error) {
 }
 
 // StoreEvent implements input.EventDatabase
+// nolint:gocyclo
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
@@ -90,8 +94,21 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		// TODO: Room version here
-		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), "1"); err != nil {
+		// TODO: Here we should aim to have two different code paths for new rooms
+		// vs existing ones.
+
+		// Get the default room version. If the client doesn't supply a room_version
+		// then we will use our configured default to create the room.
+		// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
+		// Note that the below logic depends on the m.room.create event being the
+		// first event that is persisted to the database when creating or joining a
+		// room.
+		var roomVersion gomatrixserverlib.RoomVersion
+		if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
+			return err
+		}
+
+		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
 			return err
 		}
 
@@ -148,6 +165,29 @@ func (d *Database) StoreEvent(
 			EventNID: eventNID,
 		},
 	}, nil
+}
+
+func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
+	gomatrixserverlib.RoomVersion, error,
+) {
+	var err error
+	var roomVersion gomatrixserverlib.RoomVersion
+	// Look for m.room.create events.
+	if event.Type() != gomatrixserverlib.MRoomCreate {
+		return gomatrixserverlib.RoomVersion(""), nil
+	}
+	roomVersion = roomserverVersion.DefaultRoomVersion()
+	var createContent gomatrixserverlib.CreateContent
+	// The m.room.create event contains an optional "room_version" key in
+	// the event content, so we need to unmarshal that first.
+	if err = json.Unmarshal(event.Content(), &createContent); err != nil {
+		return gomatrixserverlib.RoomVersion(""), err
+	}
+	// A room version was specified in the event content?
+	if createContent.RoomVersion != nil {
+		roomVersion = *createContent.RoomVersion
+	}
+	return roomVersion, err
 }
 
 func (d *Database) assignRoomNID(
