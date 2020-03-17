@@ -99,18 +99,9 @@ func (d *Database) StoreEvent(
 		// Note that the below logic depends on the m.room.create event being the
 		// first event that is persisted to the database when creating or joining a
 		// room.
-		roomVersion := roomserverVersion.DefaultRoomVersion()
-		// Look for m.room.create events.
-		if event.Type() == gomatrixserverlib.MRoomCreate {
-			var createContent gomatrixserverlib.CreateContent
-			// The m.room.create event contains an optional "room_version" key in
-			// the event content, so we need to unmarshal that first.
-			if err = json.Unmarshal(event.Content(), &createContent); err == nil {
-				if createContent.RoomVersion != nil {
-					// A room version was specified in the event content.
-					roomVersion = *createContent.RoomVersion
-				}
-			}
+		var roomVersion gomatrixserverlib.RoomVersion
+		if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
+			return err
 		}
 
 		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
@@ -170,6 +161,27 @@ func (d *Database) StoreEvent(
 			EventNID: eventNID,
 		},
 	}, nil
+}
+
+func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
+	roomVersion gomatrixserverlib.RoomVersion, err error,
+) {
+	// Look for m.room.create events.
+	if event.Type() != gomatrixserverlib.MRoomCreate {
+		return
+	}
+	roomVersion = roomserverVersion.DefaultRoomVersion()
+	var createContent gomatrixserverlib.CreateContent
+	// The m.room.create event contains an optional "room_version" key in
+	// the event content, so we need to unmarshal that first.
+	if err = json.Unmarshal(event.Content(), &createContent); err != nil {
+		return
+	}
+	// A room version was specified in the event content?
+	if createContent.RoomVersion != nil {
+		roomVersion = *createContent.RoomVersion
+	}
+	return
 }
 
 func (d *Database) assignRoomNID(
