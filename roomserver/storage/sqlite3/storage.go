@@ -18,8 +18,11 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/url"
+
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -90,8 +93,27 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		// TODO: Room version here
-		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), "1"); err != nil {
+		// Get the default room version. If the client doesn't supply a room_version
+		// then we will use our configured default to create the room.
+		// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
+		// Note that the below logic depends on the m.room.create event being the
+		// first event that is persisted to the database when creating or joining a
+		// room.
+		roomVersion := roomserverVersion.DefaultRoomVersion()
+		// Look for m.room.create events.
+		if event.Type() == gomatrixserverlib.MRoomCreate {
+			var createContent gomatrixserverlib.CreateContent
+			// The m.room.create event contains an optional "room_version" key in
+			// the event content, so we need to unmarshal that first.
+			if err = json.Unmarshal(event.Content(), &createContent); err == nil {
+				if createContent.RoomVersion != nil {
+					// A room version was specified in the event content.
+					roomVersion = *createContent.RoomVersion
+				}
+			}
+		}
+
+		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
 			return err
 		}
 
