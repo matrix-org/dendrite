@@ -253,8 +253,10 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
-	// TODO: Room version here
-	roomVersion := gomatrixserverlib.RoomVersionV1
+	roomVersion, err := u.db.GetRoomVersionForRoom(u.ctx, u.roomNID)
+	if err != nil {
+		return nil, err
+	}
 
 	ore := api.OutputNewRoomEvent{
 		Event:           u.event.Headered(roomVersion),

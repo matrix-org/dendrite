@@ -747,6 +747,14 @@ func (d *Database) GetRoomVersionForRoom(
 	)
 }
 
+func (d *Database) GetRoomNIDForEventID(
+	ctx context.Context, eventID string,
+) (types.RoomNID, error) {
+	return d.statements.selectRoomNIDForEventID(
+		ctx, nil, eventID,
+	)
+}
+
 type transaction struct {
 	ctx context.Context
 	txn *sql.Tx

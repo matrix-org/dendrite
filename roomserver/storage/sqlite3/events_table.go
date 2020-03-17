@@ -96,6 +96,9 @@ const bulkSelectEventNIDSQL = "" +
 const selectMaxEventDepthSQL = "" +
 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
 
+const selectRoomNIDForEventIDSQL = "" +
+	"SELECT room_nid FROM roomserver_events WHERE event_id = $1"
+
 type eventStatements struct {
 	db                                     *sql.DB
 	insertEventStmt                        *sql.Stmt
@@ -111,6 +114,7 @@ type eventStatements struct {
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
 	bulkSelectEventNIDStmt                 *sql.Stmt
+	selectRoomNIDForEventIDStmt            *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -134,6 +138,7 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
+		{&s.selectRoomNIDForEventIDStmt, selectRoomNIDForEventIDSQL},
 	}.prepare(db)
 }
 
@@ -475,4 +480,12 @@ func (s *eventStatements) selectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 func eventNIDsAsArray(eventNIDs []types.EventNID) string {
 	b, _ := json.Marshal(eventNIDs)
 	return string(b)
+}
+
+func (s *eventStatements) selectRoomNIDForEventID(
+	ctx context.Context, txn *sql.Tx, eventID string,
+) (roomNID types.RoomNID, err error) {
+	selectStmt := common.TxStmt(txn, s.selectRoomNIDForEventIDStmt)
+	err = selectStmt.QueryRowContext(ctx, eventID).Scan(&roomNID)
+	return
 }

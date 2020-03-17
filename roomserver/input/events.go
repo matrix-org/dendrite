@@ -72,6 +72,10 @@ type RoomEventDatabase interface {
 		ctx context.Context, transactionID string,
 		sessionID int64, userID string,
 	) (string, error)
+	// Look up the room version for a given room.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomNID types.RoomNID,
+	) (gomatrixserverlib.RoomVersion, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
