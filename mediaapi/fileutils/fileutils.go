@@ -49,7 +49,7 @@ func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath config.Path)
 		"file",
 	))
 	if err != nil {
-		return "", fmt.Errorf("Unable to construct filePath: %q", err)
+		return "", fmt.Errorf("Unable to construct filePath: %w", err)
 	}
 
 	// check if the absolute absBasePath is a prefix of the absolute filePath
@@ -73,7 +73,7 @@ func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata
 	duplicate := false
 	finalPath, err := GetPathFromBase64Hash(mediaMetadata.Base64Hash, absBasePath)
 	if err != nil {
-		return "", duplicate, fmt.Errorf("failed to get file path from metadata: %q", err)
+		return "", duplicate, fmt.Errorf("failed to get file path from metadata: %w", err)
 	}
 
 	var stat os.FileInfo
@@ -91,7 +91,7 @@ func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata
 		types.Path(finalPath),
 	)
 	if err != nil {
-		return "", duplicate, fmt.Errorf("failed to move file to final destination (%v): %q", finalPath, err)
+		return "", duplicate, fmt.Errorf("failed to move file to final destination (%v): %w", finalPath, err)
 	}
 	return types.Path(finalPath), duplicate, nil
 }
@@ -143,11 +143,11 @@ func moveFile(src types.Path, dst types.Path) error {
 
 	err := os.MkdirAll(dstDir, 0770)
 	if err != nil {
-		return fmt.Errorf("Failed to make directory: %q", err)
+		return fmt.Errorf("Failed to make directory: %w", err)
 	}
 	err = os.Rename(string(src), string(dst))
 	if err != nil {
-		return fmt.Errorf("Failed to move directory: %q", err)
+		return fmt.Errorf("Failed to move directory: %w", err)
 	}
 	return nil
 }
@@ -155,11 +155,11 @@ func moveFile(src types.Path, dst types.Path) error {
 func createTempFileWriter(absBasePath config.Path) (*bufio.Writer, *os.File, types.Path, error) {
 	tmpDir, err := createTempDir(absBasePath)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("Failed to create temp dir: %q", err)
+		return nil, nil, "", fmt.Errorf("Failed to create temp dir: %w", err)
 	}
 	writer, tmpFile, err := createFileWriter(tmpDir)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("Failed to create file writer: %q", err)
+		return nil, nil, "", fmt.Errorf("Failed to create file writer: %w", err)
 	}
 	return writer, tmpFile, tmpDir, nil
 }
