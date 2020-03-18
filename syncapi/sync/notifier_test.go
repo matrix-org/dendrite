@@ -77,6 +77,7 @@ func init() {
 		},
 		"sender": "@noone:localhost",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$randomMessageEvent:localhost"
 	}`), &randomMessageEvent)
@@ -84,6 +85,7 @@ func init() {
 		panic(err)
 	}
 	err = json.Unmarshal([]byte(`{
+		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",
 		"content": {
@@ -91,6 +93,7 @@ func init() {
 		},
 		"sender": "`+alice+`",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$aliceInviteBobEvent:localhost"
 	}`), &aliceInviteBobEvent)
@@ -98,6 +101,7 @@ func init() {
 		panic(err)
 	}
 	err = json.Unmarshal([]byte(`{
+		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",
 		"content": {
@@ -105,6 +109,7 @@ func init() {
 		},
 		"sender": "`+bob+`",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$bobLeaveEvent:localhost"
 	}`), &bobLeaveEvent)
