@@ -811,11 +811,10 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	response.DefaultRoomVersion = version.DefaultRoomVersion()
 	response.AvailableRoomVersions = make(map[gomatrixserverlib.RoomVersion]string)
 	for v, desc := range version.SupportedRoomVersions() {
-		sv := v
 		if desc.Stable {
-			response.AvailableRoomVersions[sv] = "stable"
+			response.AvailableRoomVersions[v] = "stable"
 		} else {
-			response.AvailableRoomVersions[sv] = "unstable"
+			response.AvailableRoomVersions[v] = "unstable"
 		}
 	}
 	return nil
