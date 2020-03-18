@@ -101,7 +101,7 @@ func (s *outputRoomEventsTopologyStatements) prepare(db *sql.DB) (err error) {
 // insertEventInTopology inserts the given event in the room's topology, based
 // on the event's depth.
 func (s *outputRoomEventsTopologyStatements) insertEventInTopology(
-	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent,
 ) (err error) {
 	stmt := common.TxStmt(txn, s.insertEventInTopologyStmt)
 	_, err = stmt.ExecContext(

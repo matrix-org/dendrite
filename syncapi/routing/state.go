@@ -56,7 +56,9 @@ func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID strin
 	// Fill the prev_content and replaces_state keys if necessary
 	for _, event := range stateEvents {
 		stateEvent := stateEventInStateResp{
-			ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll),
+			ClientEvent: gomatrixserverlib.HeaderedToClientEvents(
+				[]gomatrixserverlib.HeaderedEvent{event}, gomatrixserverlib.FormatAll,
+			)[0],
 		}
 		var prevEventRef types.PrevEventRef
 		if len(event.Unsigned()) > 0 {
@@ -113,7 +115,7 @@ func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID s
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.ToClientEvent(*event, gomatrixserverlib.FormatAll),
+		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(*event, gomatrixserverlib.FormatAll),
 	}
 
 	return util.JSONResponse{

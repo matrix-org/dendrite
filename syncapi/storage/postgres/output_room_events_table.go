@@ -203,8 +203,8 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 		}
 
 		// TODO: Handle redacted events
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
-		if err != nil {
+		var ev gomatrixserverlib.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, nil, err
 		}
 		needSet := stateNeeded[ev.RoomID()]
@@ -220,7 +220,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 		stateNeeded[ev.RoomID()] = needSet
 
 		eventIDToEvent[ev.EventID()] = types.StreamEvent{
-			Event:           ev,
+			HeaderedEvent:   ev,
 			StreamPosition:  streamPos,
 			ExcludeFromSync: excludeFromSync,
 		}
@@ -248,7 +248,7 @@ func (s *outputRoomEventsStatements) selectMaxEventID(
 // of the inserted event.
 func (s *outputRoomEventsStatements) insertEvent(
 	ctx context.Context, txn *sql.Tx,
-	event *gomatrixserverlib.Event, addState, removeState []string,
+	event *gomatrixserverlib.HeaderedEvent, addState, removeState []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
 ) (streamPos types.StreamPosition, err error) {
 	var txnID *string
@@ -373,8 +373,8 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
-		if err != nil {
+		var ev gomatrixserverlib.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 
@@ -386,7 +386,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		}
 
 		result = append(result, types.StreamEvent{
-			Event:           ev,
+			HeaderedEvent:   ev,
 			StreamPosition:  streamPos,
 			TransactionID:   transactionID,
 			ExcludeFromSync: excludeFromSync,

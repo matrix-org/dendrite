@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -86,7 +87,7 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *inviteEventsStatements) insertInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.Event,
+	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
 	err = s.insertInviteEventStmt.QueryRowContext(
 		ctx,
@@ -109,14 +110,14 @@ func (s *inviteEventsStatements) deleteInviteEvent(
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) selectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, startPos, endPos types.StreamPosition,
-) (map[string]gomatrixserverlib.Event, error) {
+) (map[string]gomatrixserverlib.HeaderedEvent, error) {
 	stmt := common.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, startPos, endPos)
 	if err != nil {
 		return nil, err
 	}
 	defer common.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
-	result := map[string]gomatrixserverlib.Event{}
+	result := map[string]gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var (
 			roomID    string
@@ -126,8 +127,8 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 			return nil, err
 		}
 
-		event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false)
-		if err != nil {
+		var event gomatrixserverlib.HeaderedEvent
+		if err := json.Unmarshal(eventJSON, &event); err != nil {
 			return nil, err
 		}
 

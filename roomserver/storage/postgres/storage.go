@@ -155,7 +155,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 	}
 	// A room version was specified in the event content?
 	if createContent.RoomVersion != nil {
-		roomVersion = *createContent.RoomVersion
+		roomVersion = gomatrixserverlib.RoomVersion(*createContent.RoomVersion)
 	}
 	return roomVersion, err
 }

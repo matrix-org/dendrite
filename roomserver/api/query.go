@@ -43,6 +43,8 @@ type QueryLatestEventsAndStateResponse struct {
 	// Does the room exist?
 	// If the room doesn't exist this will be false and LatestEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The latest events in the room.
 	// These are used to set the prev_events when sending an event.
 	LatestEvents []gomatrixserverlib.EventReference `json:"latest_events"`
@@ -74,6 +76,8 @@ type QueryStateAfterEventsResponse struct {
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
@@ -207,6 +211,8 @@ type QueryStateAndAuthChainResponse struct {
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
@@ -251,8 +257,18 @@ type QueryRoomVersionCapabilitiesRequest struct{}
 
 // QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
 type QueryRoomVersionCapabilitiesResponse struct {
-	DefaultRoomVersion    string            `json:"default"`
-	AvailableRoomVersions map[string]string `json:"available"`
+	DefaultRoomVersion    gomatrixserverlib.RoomVersion            `json:"default"`
+	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
+}
+
+// QueryRoomVersionForRoom asks for the room version for a given room.
+type QueryRoomVersionForRoomRequest struct {
+	RoomID string `json:"room_id"`
+}
+
+// QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
+type QueryRoomVersionForRoomResponse struct {
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 }
 
 // RoomserverQueryAPI is used to query information from the room server.
@@ -341,6 +357,15 @@ type RoomserverQueryAPI interface {
 		request *QueryRoomVersionCapabilitiesRequest,
 		response *QueryRoomVersionCapabilitiesResponse,
 	) error
+
+	// Asks for the room version for a given room.
+	/*
+		QueryRoomVersionForRoom(
+			ctx context.Context,
+			request *QueryRoomVersionForRoomRequest,
+			response *QueryRoomVersionForRoomResponse,
+		) error
+	*/
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
@@ -378,6 +403,9 @@ const RoomserverQueryServersInRoomAtEventPath = "/api/roomserver/queryServersInR
 
 // RoomserverQueryRoomVersionCapabilitiesPath is the HTTP path for the QueryRoomVersionCapabilities API
 const RoomserverQueryRoomVersionCapabilitiesPath = "/api/roomserver/queryRoomVersionCapabilities"
+
+// RoomserverQueryRoomVersionCapabilitiesPath is the HTTP path for the QueryRoomVersionCapabilities API
+const RoomserverQueryRoomVersionForRoomPath = "/api/roomserver/queryRoomVersionForRoom"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil then it uses the http.DefaultClient
@@ -536,7 +564,7 @@ func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// QueryServersInRoomAtEvent implements RoomServerQueryAPI
+// QueryRoomVersionCapabilities implements RoomServerQueryAPI
 func (h *httpRoomserverQueryAPI) QueryRoomVersionCapabilities(
 	ctx context.Context,
 	request *QueryRoomVersionCapabilitiesRequest,
@@ -546,5 +574,18 @@ func (h *httpRoomserverQueryAPI) QueryRoomVersionCapabilities(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryRoomVersionCapabilitiesPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryRoomVersionForRoom implements RoomServerQueryAPI
+func (h *httpRoomserverQueryAPI) QueryRoomVersionForRoom(
+	ctx context.Context,
+	request *QueryRoomVersionForRoomRequest,
+	response *QueryRoomVersionForRoomResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomVersionForRoom")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryRoomVersionForRoomPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
