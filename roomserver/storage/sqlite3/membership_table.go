@@ -134,7 +134,7 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoom: rows.close() failed")
 
 	for rows.Next() {
 		var eNID types.EventNID
@@ -154,7 +154,7 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 	if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoomAndMembership: rows.close() failed")
 
 	for rows.Next() {
 		var eNID types.EventNID

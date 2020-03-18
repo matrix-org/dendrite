@@ -17,6 +17,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
+
+	"github.com/matrix-org/dendrite/common"
 )
 
 const backwardExtremitiesSchema = `
@@ -91,7 +93,7 @@ func (s *backwardExtremitiesStatements) selectBackwardExtremitiesForRoom(
 	if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectBackwardExtremitiesForRoom: rows.close() failed")
 
 	for rows.Next() {
 		var eID string

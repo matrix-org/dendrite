@@ -126,7 +126,7 @@ func (s *currentRoomStateStatements) selectJoinedUsers(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
 
 	result := make(map[string][]string)
 	for rows.Next() {
@@ -154,7 +154,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectRoomIDsWithMembership: rows.close() failed")
 
 	var result []string
 	for rows.Next() {
@@ -184,7 +184,7 @@ func (s *currentRoomStateStatements) selectCurrentState(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectCurrentState: rows.close() failed")
 
 	return rowsToEvents(rows)
 }
@@ -238,7 +238,7 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
 	return rowsToStreamEvents(rows)
 }
 
