@@ -223,9 +223,14 @@ func (s *currentRoomStateStatements) upsertRoomState(
 		_, containsURL = content["url"]
 	}
 
+	headeredJSON, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
 	// upsert state event
 	stmt := common.TxStmt(txn, s.upsertRoomStateStmt)
-	_, err := stmt.ExecContext(
+	_, err = stmt.ExecContext(
 		ctx,
 		event.RoomID(),
 		event.EventID(),
@@ -233,7 +238,7 @@ func (s *currentRoomStateStatements) upsertRoomState(
 		event.Sender(),
 		containsURL,
 		*event.StateKey(),
-		event.JSON(),
+		headeredJSON,
 		membership,
 		addedAt,
 	)

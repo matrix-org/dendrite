@@ -266,12 +266,18 @@ func (s *outputRoomEventsStatements) insertEvent(
 		_, containsURL = content["url"]
 	}
 
+	var headeredJSON []byte
+	headeredJSON, err = json.Marshal(event)
+	if err != nil {
+		return
+	}
+
 	stmt := common.TxStmt(txn, s.insertEventStmt)
 	err = stmt.QueryRowContext(
 		ctx,
 		event.RoomID(),
 		event.EventID(),
-		event.JSON(),
+		headeredJSON,
 		event.Type(),
 		event.Sender(),
 		containsURL,

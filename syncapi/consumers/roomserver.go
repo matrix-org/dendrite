@@ -100,8 +100,9 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 ) error {
 	ev := msg.Event
 	log.WithFields(log.Fields{
-		"event_id": ev.EventID(),
-		"room_id":  ev.RoomID(),
+		"event_id":     ev.EventID(),
+		"room_id":      ev.RoomID(),
+		"room_version": ev.RoomVersion,
 	}).Info("received event from roomserver")
 
 	addsStateEvents, err := s.lookupStateEvents(msg.AddsStateEventIDs, ev)
