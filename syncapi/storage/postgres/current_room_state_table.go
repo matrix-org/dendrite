@@ -287,7 +287,7 @@ func (s *currentRoomStateStatements) selectStateEvent(
 		return nil, err
 	}
 	var ev gomatrixserverlib.HeaderedEvent
-	if err := json.Unmarshal(res, &ev); err != nil {
+	if err = json.Unmarshal(res, &ev); err != nil {
 		return nil, err
 	}
 	return &ev, err
