@@ -14,14 +14,11 @@
 
 package types
 
-import "time"
-
 // ExternalPublicRoomsProvider provides a list of homeservers who should be queried
 // periodically for a list of public rooms on their server.
 type ExternalPublicRoomsProvider interface {
-	// The interval at which to check servers
-	PollInterval() time.Duration
 	// The list of homeserver domains to query. These servers will receive a request
 	// via this API: https://matrix.org/docs/spec/server_server/latest#public-room-directory
+	// This will be called -on demand- by clients, so cache appropriately!
 	Homeservers() []string
 }

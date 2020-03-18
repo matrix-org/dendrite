@@ -15,9 +15,7 @@
 package routing
 
 import (
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -27,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/directory"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -37,7 +36,10 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // Due to Setup being used to call many other functions, a gocyclo nolint is
 // applied:
 // nolint: gocyclo
-func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, extRoomsProvider types.ExternalPublicRoomsProvider) {
+func Setup(
+	apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database,
+	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider types.ExternalPublicRoomsProvider,
+) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
@@ -68,6 +70,7 @@ func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.
 	r0mux.Handle("/publicRooms",
 		common.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
 			if extRoomsProvider != nil {
+				return directory.GetPostPublicRoomsWithExternal(req, publicRoomsDB, fedClient, extRoomsProvider)
 			}
 			return directory.GetPostPublicRooms(req, publicRoomsDB)
 		}),
@@ -79,18 +82,4 @@ func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.
 			return directory.GetPostPublicRooms(req, publicRoomsDB)
 		}),
 	).Methods(http.MethodGet)
-
-	if extRoomsProvider != nil {
-		pollExternalPublicRooms(extRoomsProvider)
-	}
-}
-
-func pollExternalPublicRooms(extRoomsProvider types.ExternalPublicRoomsProvider) {
-	go func() {
-		for {
-			hses := extRoomsProvider.Homeservers()
-			fmt.Println(hses)
-			time.Sleep(extRoomsProvider.PollInterval())
-		}
-	}()
 }

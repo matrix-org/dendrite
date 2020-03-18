@@ -18,10 +18,13 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
+	"github.com/matrix-org/dendrite/publicroomsapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -44,7 +47,7 @@ func GetPostPublicRooms(
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
 		return *fillErr
 	}
-	response, err := PublicRooms(req.Context(), request, publicRoomDatabase)
+	response, err := publicRooms(req.Context(), request, publicRoomDatabase)
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
@@ -54,7 +57,123 @@ func GetPostPublicRooms(
 	}
 }
 
-func PublicRooms(ctx context.Context, request PublicRoomReq, publicRoomDatabase storage.Database) (*gomatrixserverlib.RespPublicRooms, error) {
+// GetPostPublicRoomsWithExternal is the same as GetPostPublicRooms but also mixes in public rooms from the provider supplied.
+func GetPostPublicRoomsWithExternal(
+	req *http.Request, publicRoomDatabase storage.Database, fedClient *gomatrixserverlib.FederationClient,
+	extRoomsProvider types.ExternalPublicRoomsProvider,
+) util.JSONResponse {
+	var request PublicRoomReq
+	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
+		return *fillErr
+	}
+	response, err := publicRooms(req.Context(), request, publicRoomDatabase)
+	if err != nil {
+		return jsonerror.InternalServerError()
+	}
+
+	if request.Since != "" {
+		// TODO: handle pagination tokens sensibly rather than ignoring them.
+		// ignore paginated requests since we don't handle them yet over federation.
+		// Only the initial request will contain federated rooms.
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: response,
+		}
+	}
+
+	// If we have already hit the limit on the number of rooms, bail.
+	var limit int
+	if request.Limit > 0 {
+		limit = int(request.Limit) - len(response.Chunk)
+		if limit <= 0 {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: response,
+			}
+		}
+	}
+
+	// downcasting `limit` is safe as we know it isn't bigger than request.Limit which is int16
+	fedRooms := bulkFetchPublicRoomsFromServers(req.Context(), fedClient, extRoomsProvider.Homeservers(), int16(limit))
+	response.Chunk = append(response.Chunk, fedRooms...)
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: response,
+	}
+}
+
+// bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
+// Returns a list of public rooms up to the limit specified.
+func bulkFetchPublicRoomsFromServers(
+	ctx context.Context, fedClient *gomatrixserverlib.FederationClient, homeservers []string, limit int16,
+) (publicRooms []gomatrixserverlib.PublicRoom) {
+	// follow pipeline semantics, see https://blog.golang.org/pipelines for more info.
+	// goroutines send rooms to this channel
+	roomCh := make(chan gomatrixserverlib.PublicRoom, int(limit))
+	// signalling channel to tell goroutines to stop sending rooms and quit
+	done := make(chan bool)
+	// signalling to say when we can close the room channel
+	var wg sync.WaitGroup
+	wg.Add(len(homeservers))
+	// concurrently query for public rooms
+	for _, hs := range homeservers {
+		go func(homeserverDomain string) {
+			defer wg.Done()
+			util.GetLogger(ctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")
+			fres, err := fedClient.GetPublicRooms(ctx, gomatrixserverlib.ServerName(homeserverDomain), int(limit), "", false, "")
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).WithField("hs", homeserverDomain).Warn(
+					"bulkFetchPublicRoomsFromServers: failed to query hs",
+				)
+				return
+			}
+			for _, room := range fres.Chunk {
+				// atomically send a room or stop
+				select {
+				case roomCh <- room:
+				case <-done:
+					util.GetLogger(ctx).WithError(err).WithField("hs", homeserverDomain).Info("Interruped whilst sending rooms")
+					return
+				}
+			}
+		}(hs)
+	}
+
+	// Close the room channel when the goroutines have quit so we don't leak, but don't let it stop the in-flight request.
+	// This also allows the request to fail fast if all HSes experience errors as it will cause the room channel to be
+	// closed.
+	go func() {
+		wg.Wait()
+		util.GetLogger(ctx).Info("Cleaning up resources")
+		close(roomCh)
+	}()
+
+	// fan-in results with timeout. We stop when we reach the limit.
+FanIn:
+	for len(publicRooms) < int(limit) || limit == 0 {
+		// add a room or timeout
+		select {
+		case room, ok := <-roomCh:
+			if !ok {
+				util.GetLogger(ctx).Info("All homeservers have been queried, returning results.")
+				break FanIn
+			}
+			publicRooms = append(publicRooms, room)
+		case <-time.After(15 * time.Second): // we've waited long enough, let's tell the client what we got.
+			util.GetLogger(ctx).Info("Waited 15s for federated public rooms, returning early")
+			break FanIn
+		case <-ctx.Done(): // the client hung up on us, let's stop.
+			util.GetLogger(ctx).Info("Client hung up, returning early")
+			break FanIn
+		}
+	}
+	// tell goroutines to stop
+	close(done)
+
+	return publicRooms
+}
+
+func publicRooms(ctx context.Context, request PublicRoomReq, publicRoomDatabase storage.Database) (*gomatrixserverlib.RespPublicRooms, error) {
 	var response gomatrixserverlib.RespPublicRooms
 	var limit int16
 	var offset int64

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -66,7 +67,7 @@ const selectPublicRoomsWithLimitSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
 	" FROM publicroomsapi_public_rooms WHERE visibility = true" +
 	" ORDER BY joined_members DESC" +
-	" LIMIT $2 OFFSET $1"
+	" LIMIT $1 OFFSET $2"
 
 const selectPublicRoomsWithFilterSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
@@ -192,6 +193,7 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	if err != nil {
 		return []gomatrixserverlib.PublicRoom{}, nil
 	}
+	defer common.CloseAndLogIfError(ctx, rows, "selectPublicRooms failed to close rows")
 
 	rooms := []gomatrixserverlib.PublicRoom{}
 	for rows.Next() {

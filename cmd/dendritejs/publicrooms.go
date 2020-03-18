@@ -17,8 +17,6 @@
 package main
 
 import (
-	"time"
-
 	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
 )
 
@@ -37,10 +35,6 @@ func NewLibP2PPublicRoomsProvider(node *go_http_js_libp2p.P2pLocalNode) *libp2pP
 
 func (p *libp2pPublicRoomsProvider) foundProviders(peerInfos []go_http_js_libp2p.PeerInfo) {
 	p.providers = peerInfos
-}
-
-func (p *libp2pPublicRoomsProvider) PollInterval() time.Duration {
-	return 10 * time.Second
 }
 
 func (p *libp2pPublicRoomsProvider) Homeservers() []string {
