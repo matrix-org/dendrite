@@ -137,7 +137,7 @@ func (s *inviteStatements) selectInviteActiveForUserInRoom(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "selectInviteActiveForUserInRoom: rows.close() failed")
+	defer common.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
 	var result []types.EventStateKeyNID
 	for rows.Next() {
 		var senderUserNID int64

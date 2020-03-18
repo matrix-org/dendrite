@@ -17,6 +17,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -160,7 +161,12 @@ func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName str
 	})
 }
 
-func LogIfError(ctx context.Context, err error, message string) {
+//CloseAndLogIfError Closes io.Closer and logs the error if any
+func CloseAndLogIfError(ctx context.Context, closer io.Closer, message string) {
+	if closer == nil {
+		return
+	}
+	err := closer.Close()
 	if ctx == nil {
 		ctx = context.TODO()
 	}

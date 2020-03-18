@@ -20,8 +20,6 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/common"
-
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -100,7 +98,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "bulkSelectStateBlockNIDs: rows.close() failed")
+	defer rows.Close() // nolint: errcheck
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
 	for ; rows.Next(); i++ {

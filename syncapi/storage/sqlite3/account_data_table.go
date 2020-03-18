@@ -104,7 +104,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	if err != nil {
 		return
 	}
-	defer common.LogIfError(ctx, rows.Close(), "selectAccountDataInRange: rows.close() failed")
+	defer common.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
 
 	var entries int
 

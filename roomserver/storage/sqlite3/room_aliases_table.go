@@ -103,7 +103,7 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 		return
 	}
 
-	defer common.LogIfError(ctx, rows.Close(), "selectAliasesFromRoomID: rows.close() failed")
+	defer common.CloseAndLogIfError(ctx, rows, "selectAliasesFromRoomID: rows.close() failed")
 
 	for rows.Next() {
 		var alias string

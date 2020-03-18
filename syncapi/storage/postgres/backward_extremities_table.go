@@ -93,7 +93,7 @@ func (s *backwardExtremitiesStatements) selectBackwardExtremitiesForRoom(
 	if err != nil {
 		return
 	}
-	defer common.LogIfError(ctx, rows.Close(), "selectBackwardExtremitiesForRoom: rows.close() failed")
+	defer common.CloseAndLogIfError(ctx, rows, "selectBackwardExtremitiesForRoom: rows.close() failed")
 
 	for rows.Next() {
 		var eID string

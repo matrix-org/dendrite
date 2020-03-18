@@ -205,7 +205,7 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	if err != nil {
 		return []types.PublicRoom{}, nil
 	}
-	defer common.LogIfError(ctx, rows.Close(), "selectPublicRooms: rows.close() failed")
+	defer common.CloseAndLogIfError(ctx, rows, "selectPublicRooms: rows.close() failed")
 
 	rooms := []types.PublicRoom{}
 	for rows.Next() {

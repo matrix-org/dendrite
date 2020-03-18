@@ -88,7 +88,7 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "bulkSelectEventJSON: rows.close() failed")
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
 
 	// We know that we will only get as many results as event NIDs
 	// because of the unique constraint on event NIDs.

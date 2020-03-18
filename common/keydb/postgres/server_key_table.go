@@ -93,7 +93,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	if err != nil {
 		return nil, err
 	}
-	defer common.LogIfError(ctx, rows.Close(), "bulkSelectServerKeys: rows.close() failed")
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectServerKeys: rows.close() failed")
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	for rows.Next() {
 		var serverName string
