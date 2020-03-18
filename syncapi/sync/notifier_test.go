@@ -135,7 +135,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewEventAndJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndJoinedToRoom error: %w", err)
 		}
 		if pos != syncPositionAfter {
 			t.Errorf("TestNewEventAndJoinedToRoom want %v, got %v", syncPositionAfter, pos)
@@ -163,7 +163,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewInviteEventForUser error: %s", err)
+			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
 		if pos != syncPositionAfter {
 			t.Errorf("TestNewInviteEventForUser want %v, got %v", syncPositionAfter, pos)
@@ -191,7 +191,7 @@ func TestEDUWakeup(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionAfter))
 		if err != nil {
-			t.Errorf("TestNewInviteEventForUser error: %s", err)
+			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
 		if pos != syncPositionNewEDU {
 			t.Errorf("TestNewInviteEventForUser want %v, got %v", syncPositionNewEDU, pos)
@@ -219,7 +219,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	poll := func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestMultipleRequestWakeup error: %s", err)
+			t.Errorf("TestMultipleRequestWakeup error: %w", err)
 		}
 		if pos != syncPositionAfter {
 			t.Errorf("TestMultipleRequestWakeup want %v, got %v", syncPositionAfter, pos)
@@ -259,7 +259,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
 		if pos != syncPositionAfter {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom want %v, got %v", syncPositionAfter, pos)
@@ -278,7 +278,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(alice, syncPositionAfter))
 		if err != nil {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
 		if pos != syncPositionAfter2 {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom want %v, got %v", syncPositionAfter2, pos)
