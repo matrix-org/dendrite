@@ -808,16 +808,30 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
 ) error {
-	response.DefaultRoomVersion = string(version.DefaultRoomVersion())
-	response.AvailableRoomVersions = make(map[string]string)
+	response.DefaultRoomVersion = version.DefaultRoomVersion()
+	response.AvailableRoomVersions = make(map[gomatrixserverlib.RoomVersion]string)
 	for v, desc := range version.SupportedRoomVersions() {
-		sv := string(v)
+		sv := v
 		if desc.Stable {
 			response.AvailableRoomVersions[sv] = "stable"
 		} else {
 			response.AvailableRoomVersions[sv] = "unstable"
 		}
 	}
+	return nil
+}
+
+// QueryRoomVersionCapabilities implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
+	ctx context.Context,
+	request *api.QueryRoomVersionForRoomRequest,
+	response *api.QueryRoomVersionForRoomResponse,
+) error {
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	response.RoomVersion = roomVersion
 	return nil
 }
 
@@ -987,6 +1001,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryRoomVersionCapabilities(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryRoomVersionForRoomPath,
+		common.MakeInternalAPI("QueryRoomVersionForRoom", func(req *http.Request) util.JSONResponse {
+			var request api.QueryRoomVersionForRoomRequest
+			var response api.QueryRoomVersionForRoomResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryRoomVersionForRoom(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
