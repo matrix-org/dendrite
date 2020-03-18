@@ -22,7 +22,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/publicroomsapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var editableAttributes = []string{
@@ -164,7 +164,7 @@ func (s *publicRoomsStatements) countPublicRooms(ctx context.Context) (nb int64,
 
 func (s *publicRoomsStatements) selectPublicRooms(
 	ctx context.Context, offset int64, limit int16, filter string,
-) ([]types.PublicRoom, error) {
+) ([]gomatrixserverlib.PublicRoom, error) {
 	var rows *sql.Rows
 	var err error
 
@@ -190,16 +190,16 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	}
 
 	if err != nil {
-		return []types.PublicRoom{}, nil
+		return []gomatrixserverlib.PublicRoom{}, nil
 	}
 
-	rooms := []types.PublicRoom{}
+	rooms := []gomatrixserverlib.PublicRoom{}
 	for rows.Next() {
-		var r types.PublicRoom
+		var r gomatrixserverlib.PublicRoom
 		var aliasesJSON string
 
 		err = rows.Scan(
-			&r.RoomID, &r.NumJoinedMembers, &aliasesJSON, &r.CanonicalAlias,
+			&r.RoomID, &r.JoinedMembersCount, &aliasesJSON, &r.CanonicalAlias,
 			&r.Name, &r.Topic, &r.WorldReadable, &r.GuestCanJoin, &r.AvatarURL,
 		)
 		if err != nil {

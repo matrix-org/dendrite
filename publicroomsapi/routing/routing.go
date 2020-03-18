@@ -67,11 +67,13 @@ func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
 		common.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+			if extRoomsProvider != nil {
+			}
 			return directory.GetPostPublicRooms(req, publicRoomsDB)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
-	// Federation
+	// Federation - TODO: should this live here or in federation API? It's sure easier if it's here so here it is.
 	apiMux.Handle("/_matrix/federation/v1/publicRooms",
 		common.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
 			return directory.GetPostPublicRooms(req, publicRoomsDB)

@@ -23,7 +23,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/publicroomsapi/types"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -87,7 +86,7 @@ func (d *PublicRoomsServerDatabase) CountPublicRooms(ctx context.Context) (int64
 // Returns an error if the retrieval failed.
 func (d *PublicRoomsServerDatabase) GetPublicRooms(
 	ctx context.Context, offset int64, limit int16, filter string,
-) ([]types.PublicRoom, error) {
+) ([]gomatrixserverlib.PublicRoom, error) {
 	return d.statements.selectPublicRooms(ctx, offset, limit, filter)
 }
 
