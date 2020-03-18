@@ -18,6 +18,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
+
+	"github.com/matrix-org/dendrite/common"
 )
 
 const roomAliasesSchema = `
@@ -95,7 +97,7 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectAliasesFromRoomID: rows.close() failed")
 
 	var aliases []string
 	for rows.Next() {

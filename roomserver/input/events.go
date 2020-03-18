@@ -72,6 +72,10 @@ type RoomEventDatabase interface {
 		ctx context.Context, transactionID string,
 		sessionID int64, userID string,
 	) (string, error)
+	// Look up the room version for a given room.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomID string,
+	) (gomatrixserverlib.RoomVersion, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -95,7 +99,7 @@ func processRoomEvent(
 	event := input.Event
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
-	authEventNIDs, err := checkAuthEvents(ctx, db, event, input.AuthEventIDs)
+	authEventNIDs, err := checkAuthEvents(ctx, db, event.Event, input.AuthEventIDs)
 	if err != nil {
 		return
 	}
@@ -112,7 +116,7 @@ func processRoomEvent(
 	}
 
 	// Store the event
-	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
+	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event.Event, input.TransactionID, authEventNIDs)
 	if err != nil {
 		return
 	}
@@ -127,7 +131,7 @@ func processRoomEvent(
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event)
+		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event.Event)
 		if err != nil {
 			return
 		}
@@ -140,7 +144,7 @@ func processRoomEvent(
 
 	// Update the extremities of the event graph for the room
 	return event.EventID(), updateLatestEvents(
-		ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID,
+		ctx, db, ow, roomNID, stateAtEvent, event.Event, input.SendAsServer, input.TransactionID,
 	)
 }
 
@@ -234,7 +238,7 @@ func processInviteEvent(
 		return nil
 	}
 
-	outputUpdates, err := updateToInviteMembership(updater, &input.Event, nil)
+	outputUpdates, err := updateToInviteMembership(updater, &input.Event.Event, nil)
 	if err != nil {
 		return err
 	}

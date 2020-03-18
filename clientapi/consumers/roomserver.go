@@ -91,7 +91,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		"type":     ev.Type(),
 	}).Info("received event from roomserver")
 
-	events, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
+	events, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev.Event)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,9 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 		return nil, err
 	}
 
-	result = append(result, eventResp.Events...)
+	for _, headeredEvent := range eventResp.Events {
+		result = append(result, headeredEvent.Event)
+	}
 
 	return result, nil
 }

@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -90,7 +92,7 @@ func (s *accountDataStatements) selectAccountData(
 	if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectAccountData: rows.close() failed")
 
 	global = []gomatrixserverlib.ClientEvent{}
 	rooms = make(map[string][]gomatrixserverlib.ClientEvent)

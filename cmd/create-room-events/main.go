@@ -125,7 +125,7 @@ func writeEvent(event gomatrixserverlib.Event) {
 	if *format == "InputRoomEvent" {
 		var ire api.InputRoomEvent
 		ire.Kind = api.KindNew
-		ire.Event = event
+		ire.Event = event.Headered(gomatrixserverlib.RoomVersionV1)
 		authEventIDs := []string{}
 		for _, ref := range b.AuthEvents {
 			authEventIDs = append(authEventIDs, ref.EventID)

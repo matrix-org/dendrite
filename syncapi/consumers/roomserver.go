@@ -98,7 +98,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
-	ev := msg.Event
+	ev := msg.Event.Event
 	log.WithFields(log.Fields{
 		"event_id": ev.EventID(),
 		"room_id":  ev.RoomID(),
@@ -153,7 +153,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) error {
-	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
+	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event.Event)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -163,7 +163,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&msg.Event, "", nil, types.PaginationToken{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(&msg.Event.Event, "", nil, types.PaginationToken{PDUPosition: pduPos})
 	return nil
 }
 
@@ -229,7 +229,10 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 		return nil, err
 	}
 
-	result = append(result, eventResp.Events...)
+	for _, headeredEvent := range eventResp.Events {
+		result = append(result, headeredEvent.Event)
+	}
+
 	missing = missingEventsFrom(result, addsStateEventIDs)
 
 	if len(missing) != 0 {
@@ -250,7 +253,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.Event
 	}
 
 	prevEvent, err := s.db.GetStateEvent(
-		context.TODO(), event.Type(), event.RoomID(), stateKey,
+		context.TODO(), event.RoomID(), event.Type(), stateKey,
 	)
 	if err != nil {
 		return event, err

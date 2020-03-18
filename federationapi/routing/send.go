@@ -116,6 +116,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
 			}
+			util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).Warn("Failed to process incoming federation event, skipping it.")
 		} else {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
 		}
@@ -162,7 +163,11 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	}
 
 	// Check that the event is allowed by the state at the event.
-	if err := checkAllowedByState(e, stateResp.StateEvents); err != nil {
+	var events []gomatrixserverlib.Event
+	for _, headeredEvent := range stateResp.StateEvents {
+		events = append(events, headeredEvent.Event)
+	}
+	if err := checkAllowedByState(e, events); err != nil {
 		return err
 	}
 

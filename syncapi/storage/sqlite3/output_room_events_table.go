@@ -160,6 +160,7 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer rows.Close() // nolint: errcheck
 	// Fetch all the state change events for all rooms between the two positions then loop each event and:
 	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
 	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
@@ -315,7 +316,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -342,7 +343,7 @@ func (s *outputRoomEventsStatements) selectEarlyEvents(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectEarlyEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -371,7 +372,7 @@ func (s *outputRoomEventsStatements) selectEvents(
 		if streamEvents, err := rowsToStreamEvents(rows); err == nil {
 			returnEvents = append(returnEvents, streamEvents...)
 		}
-		rows.Close() // nolint: errcheck
+		common.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
 	}
 	return returnEvents, nil
 }
