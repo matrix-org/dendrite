@@ -14,6 +14,8 @@
 
 package types
 
+import "time"
+
 // PublicRoom represents a local public room
 type PublicRoom struct {
 	RoomID           string   `json:"room_id"`
@@ -25,4 +27,14 @@ type PublicRoom struct {
 	NumJoinedMembers int64    `json:"num_joined_members"`
 	WorldReadable    bool     `json:"world_readable"`
 	GuestCanJoin     bool     `json:"guest_can_join"`
+}
+
+// ExternalPublicRoomsProvider provides a list of homeservers who should be queried
+// periodically for a list of public rooms on their server.
+type ExternalPublicRoomsProvider interface {
+	// The interval at which to check servers
+	PollInterval() time.Duration
+	// The list of homeserver domains to query. These servers will receive a request
+	// via this API: https://matrix.org/docs/spec/server_server/latest#public-room-directory
+	Homeservers() []string
 }
