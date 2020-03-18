@@ -381,7 +381,7 @@ func buildEvent(
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
+		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
 	}
 	return &event, nil
 }

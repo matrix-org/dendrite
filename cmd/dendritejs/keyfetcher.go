@@ -53,15 +53,15 @@ func (f *libp2pKeyFetcher) FetchKeys(
 		peerIDStr := string(req.ServerName)
 		peerID, err := peer.Decode(peerIDStr)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to decode peer ID from server name '%s': %s", peerIDStr, err)
+			return nil, fmt.Errorf("Failed to decode peer ID from server name '%s': %w", peerIDStr, err)
 		}
 		pubKey, err := peerID.ExtractPublicKey()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to extract public key from peer ID: %s", err)
+			return nil, fmt.Errorf("Failed to extract public key from peer ID: %w", err)
 		}
 		pubKeyBytes, err := pubKey.Raw()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to extract raw bytes from public key: %s", err)
+			return nil, fmt.Errorf("Failed to extract raw bytes from public key: %w", err)
 		}
 		util.GetLogger(ctx).Info("libp2pKeyFetcher.FetchKeys: Using public key %v for server name %s", pubKeyBytes, req.ServerName)
 
