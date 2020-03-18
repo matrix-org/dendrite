@@ -132,7 +132,7 @@ func bulkFetchPublicRoomsFromServers(
 				select {
 				case roomCh <- room:
 				case <-done:
-					util.GetLogger(ctx).WithError(err).WithField("hs", homeserverDomain).Info("Interruped whilst sending rooms")
+					util.GetLogger(ctx).WithError(err).WithField("hs", homeserverDomain).Info("Interrupted whilst sending rooms")
 					return
 				}
 			}
