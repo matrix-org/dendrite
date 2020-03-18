@@ -361,12 +361,6 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/account/deactivate",
-		common.MakeAuthAPI("account_deactivate", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return GetAssociated3PIDs(req, accountDB, device)
-		}),
-	).Methods(http.MethodPost, http.MethodOptions)
-
 	r0mux.Handle("/account/3pid",
 		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return CheckAndSave3PIDAssociation(req, accountDB, device, cfg)
