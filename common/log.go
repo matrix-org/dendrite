@@ -15,12 +15,16 @@
 package common
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dugong"
@@ -155,4 +159,18 @@ func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName str
 			&dugong.DailyRotationSchedule{GZip: true},
 		),
 	})
+}
+
+//CloseAndLogIfError Closes io.Closer and logs the error if any
+func CloseAndLogIfError(ctx context.Context, closer io.Closer, message string) {
+	if closer == nil {
+		return
+	}
+	err := closer.Close()
+	if ctx == nil {
+		ctx = context.TODO()
+	}
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error(message)
+	}
 }

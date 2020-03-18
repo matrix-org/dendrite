@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
 )
@@ -203,7 +205,7 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	if err != nil {
 		return []types.PublicRoom{}, nil
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectPublicRooms: rows.close() failed")
 
 	rooms := []types.PublicRoom{}
 	for rows.Next() {

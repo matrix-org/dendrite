@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -134,7 +136,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 	} else if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectEventIDsInRange: rows.close() failed")
 
 	// Return the IDs.
 	var eventID string
@@ -177,7 +179,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
 	} else if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectEventIDsFromPosition: rows.close() failed")
 	// Return the IDs.
 	var eventID string
 	for rows.Next() {
