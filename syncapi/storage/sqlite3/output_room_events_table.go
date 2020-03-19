@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id TEXT NOT NULL UNIQUE,
   room_id TEXT NOT NULL,
-  event_json TEXT NOT NULL,
+  headered_event_json TEXT NOT NULL,
   type TEXT NOT NULL,
   sender TEXT NOT NULL,
   contains_url BOOL NOT NULL,
@@ -49,25 +49,25 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
-	"id, room_id, event_id, event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
+	"id, room_id, event_id, headered_event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
 	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
 	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = $13"
 
 const selectEventsSQL = "" +
-	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
+	"SELECT id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
 
 const selectRecentEventsSQL = "" +
-	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
 const selectRecentEventsForSyncSQL = "" +
-	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
 	" ORDER BY id DESC LIMIT $4"
 
 const selectEarlyEventsSQL = "" +
-	"SELECT id, event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id ASC LIMIT $4"
 
@@ -86,7 +86,7 @@ const selectMaxEventIDSQL = "" +
 	$8 = stateFilterPart.Limit,
 */
 const selectStateInRangeSQL = "" +
-	"SELECT id, event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
+	"SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2)" + // old/new pos
 	" AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +

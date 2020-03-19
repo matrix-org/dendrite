@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     sender TEXT NOT NULL,
     contains_url BOOL NOT NULL DEFAULT false,
     state_key TEXT NOT NULL,
-    event_json TEXT NOT NULL,
+    headered_event_json TEXT NOT NULL,
     membership TEXT,
     added_at BIGINT,
     UNIQUE (room_id, type, state_key)
@@ -47,10 +47,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_s
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, event_json, membership, added_at)" +
+	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
 	" ON CONFLICT (event_id, room_id, type, sender, contains_url)" +
-	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, event_json = $7, membership = $8, added_at = $9"
+	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
 
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
@@ -59,7 +59,7 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectCurrentStateSQL = "" +
-	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1" +
+	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
 	" AND ( $2 IS NULL OR     sender IN ($2)  )" +
 	" AND ( $3 IS NULL OR NOT(sender IN ($3)) )" +
 	" AND ( $4 IS NULL OR     type   IN ($4)  )" +
@@ -71,14 +71,14 @@ const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
 const selectStateEventSQL = "" +
-	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
+	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
 	// TODO: The session_id and transaction_id blanks are here because otherwise
 	// the rowsToStreamEvents expects there to be exactly five columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT added_at, event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 type currentRoomStateStatements struct {

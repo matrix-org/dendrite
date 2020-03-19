@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS syncapi_invite_events (
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,
-	event_json TEXT NOT NULL
+	headered_event_json TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS syncapi_invites_target_user_id_idx ON syncapi_invite_events (target_user_id, id);
@@ -40,14 +40,14 @@ CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx ON syncapi_invite_events
 
 const insertInviteEventSQL = "" +
 	"INSERT INTO syncapi_invite_events" +
-	" (id, room_id, event_id, target_user_id, event_json)" +
+	" (id, room_id, event_id, target_user_id, headered_event_json)" +
 	" VALUES ($1, $2, $3, $4, $5)"
 
 const deleteInviteEventSQL = "" +
 	"DELETE FROM syncapi_invite_events WHERE event_id = $1"
 
 const selectInviteEventsInRangeSQL = "" +
-	"SELECT room_id, event_json FROM syncapi_invite_events" +
+	"SELECT room_id, headered_event_json FROM syncapi_invite_events" +
 	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC"
 

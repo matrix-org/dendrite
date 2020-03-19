@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS syncapi_invite_events (
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,
-	event_json TEXT NOT NULL
+	headered_event_json TEXT NOT NULL
 );
 
 -- For looking up the invites for a given user.
