@@ -255,7 +255,7 @@ type QueryServersInRoomAtEventResponse struct {
 // QueryRoomVersionCapabilities asks for the default room version
 type QueryRoomVersionCapabilitiesRequest struct{}
 
-// QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
+// QueryRoomVersionCapabilitiesResponse is a response to QueryRoomVersionCapabilitiesRequest
 type QueryRoomVersionCapabilitiesResponse struct {
 	DefaultRoomVersion    gomatrixserverlib.RoomVersion            `json:"default"`
 	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
