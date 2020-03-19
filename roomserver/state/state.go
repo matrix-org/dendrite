@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/state/database"
-	"github.com/matrix-org/dendrite/roomserver/state/shared"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -735,7 +734,7 @@ func (v StateResolution) resolveConflictsV1(
 	tuplesNeeded := v.stateKeyTuplesNeeded(stateKeyNIDMap, needed)
 	var authEntries []types.StateEntry
 	for _, tuple := range tuplesNeeded {
-		if eventNID, ok := shared.StateEntryMap(notConflicted).Lookup(tuple); ok {
+		if eventNID, ok := stateEntryMap(notConflicted).lookup(tuple); ok {
 			authEntries = append(authEntries, types.StateEntry{
 				StateKeyTuple: tuple,
 				EventNID:      eventNID,
@@ -760,7 +759,7 @@ func (v StateResolution) resolveConflictsV1(
 	}
 
 	// Sort the result so it can be searched.
-	sort.Sort(shared.StateEntrySorter(notConflicted))
+	sort.Sort(stateEntrySorter(notConflicted))
 	return notConflicted, nil
 }
 
@@ -820,7 +819,7 @@ func (v StateResolution) resolveConflictsV2(
 		tuplesNeeded := v.stateKeyTuplesNeeded(stateKeyNIDMap, needed)
 		var authEntries []types.StateEntry
 		for _, tuple := range tuplesNeeded {
-			if eventNID, ok := shared.StateEntryMap(notConflicted).Lookup(tuple); ok {
+			if eventNID, ok := stateEntryMap(notConflicted).lookup(tuple); ok {
 				authEntries = append(authEntries, types.StateEntry{
 					StateKeyTuple: tuple,
 					EventNID:      eventNID,
@@ -883,7 +882,7 @@ func (v StateResolution) resolveConflictsV2(
 	}
 
 	// Sort the result so it can be searched.
-	sort.Sort(shared.StateEntrySorter(notConflicted))
+	sort.Sort(stateEntrySorter(notConflicted))
 	return notConflicted, nil
 }
 
