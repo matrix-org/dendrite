@@ -360,7 +360,8 @@ func (v StateResolution) loadStateAfterEventsForNumericTuples(
 	if len(prevStates) == 1 {
 		// Fast path for a single event.
 		prevState := prevStates[0]
-		result, err := v.loadStateAtSnapshotForNumericTuples(
+		var result []types.StateEntry
+		result, err = v.loadStateAtSnapshotForNumericTuples(
 			ctx, prevState.BeforeStateSnapshotNID, stateKeyTuples,
 		)
 		if err != nil {
@@ -766,11 +767,12 @@ func (v StateResolution) resolveConflictsV1(
 // Returns a list that combines the entries without conflicts with the result of state resolution for the entries with conflicts.
 // The returned list is sorted by state key tuple.
 // Returns an error if there was a problem talking to the database.
+// nolint:gocyclo
 func (v StateResolution) resolveConflictsV2(
 	ctx context.Context,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	var eventIDMap map[string]types.StateEntry
+	eventIDMap := make(map[string]types.StateEntry)
 
 	// Load the conflicted events
 	conflictedEvents, conflictedEventMap, err := v.loadStateEvents(ctx, conflicted)
