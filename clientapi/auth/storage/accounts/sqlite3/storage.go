@@ -253,6 +253,16 @@ func (d *Database) GetMembershipsByLocalpart(
 	return d.memberships.selectMembershipsByLocalpart(ctx, localpart)
 }
 
+// GetRoomIDsByLocalPart returns an array containing the room ids of all
+// the rooms a user matching a given localpart is a member of
+// If no membership match the given localpart, returns an empty array
+// If there was an issue during the retrieval, returns the SQL error
+func (d *Database) GetRoomIDsByLocalPart(
+	ctx context.Context, localpart string,
+) ([]string, error) {
+	return d.memberships.selectRoomIDsByLocalPart(ctx, localpart)
+}
+
 // newMembership saves a new membership in the database.
 // If the event isn't a valid m.room.member event with type `join`, does nothing.
 // If an error occurred, returns the SQL error
