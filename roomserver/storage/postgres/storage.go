@@ -747,6 +747,14 @@ func (d *Database) GetRoomVersionForRoom(
 	)
 }
 
+func (d *Database) GetRoomVersionForRoomNID(
+	ctx context.Context, roomNID types.RoomNID,
+) (gomatrixserverlib.RoomVersion, error) {
+	return d.statements.selectRoomVersionForRoomNID(
+		ctx, nil, roomNID,
+	)
+}
+
 type transaction struct {
 	ctx context.Context
 	txn *sql.Tx
