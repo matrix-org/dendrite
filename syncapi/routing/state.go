@@ -16,6 +16,8 @@ package routing
 
 import (
 	"encoding/json"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -39,17 +41,35 @@ type stateEventInStateResp struct {
 // TODO: Check if the user is in the room. If not, check if the room's history
 // is publicly visible. Current behaviour is returning an empty array if the
 // user cannot see the room's history.
-func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID string) util.JSONResponse {
-	// TODO(#287): Auth request and handle the case where the user has left (where
-	// we should return the state at the poin they left)
-
+func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID string, queryAPI api.RoomserverQueryAPI, device *authtypes.Device) util.JSONResponse {
 	stateFilter := gomatrixserverlib.DefaultStateFilter()
 	// TODO: stateFilter should not limit the number of state events (or only limits abusive number of events)
 
-	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID, &stateFilter)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("db.GetStateEventsForRoom failed")
-		return jsonerror.InternalServerError()
+	var stateEvents []gomatrixserverlib.Event
+	//Get membership event for user
+	event, err := db.GetStateEvent(req.Context(), roomID, gomatrixserverlib.MRoomMember, device.UserID)
+	if event == nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user is neither a member nor previously been member of the user"),
+		}
+	}
+	membership, _ := event.Membership()
+	if membership == gomatrixserverlib.Ban || membership == gomatrixserverlib.Leave {
+		queryReq := api.QueryFullStateAtEventRequest{EventID: event.EventID()}
+		var queryRes api.QueryFullStateAtEventResponse
+		err := queryAPI.QueryFullStateAtEvent(req.Context(), &queryReq, &queryRes)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryFullStateAtEvent failed")
+			return jsonerror.InternalServerError()
+		}
+		stateEvents = queryRes.StateEvents
+	} else {
+		stateEvents, err = db.GetStateEventsForRoom(req.Context(), roomID, &stateFilter)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("db.GetStateEventsForRoom failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	resp := []stateEventInStateResp{}
@@ -88,9 +108,7 @@ func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID strin
 // /rooms/{roomID}/state/{type}/{statekey} request. It will look in current
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
-func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID string, evType, stateKey string) util.JSONResponse {
-	// TODO(#287): Auth request and handle the case where the user has left (where
-	// we should return the state at the poin they left)
+func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID string, evType, stateKey string, device *authtypes.Device, queryAPI api.RoomserverQueryAPI) util.JSONResponse {
 
 	logger := util.GetLogger(req.Context())
 	logger.WithFields(log.Fields{
@@ -99,10 +117,55 @@ func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID s
 		"stateKey": stateKey,
 	}).Info("Fetching state")
 
-	event, err := db.GetStateEvent(req.Context(), roomID, evType, stateKey)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("db.GetStateEvent failed")
-		return jsonerror.InternalServerError()
+	//Get membership event for user
+	event, err := db.GetStateEvent(req.Context(), roomID, gomatrixserverlib.MRoomMember, device.UserID)
+	if event == nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user is neither a member nor previously been member of the user"),
+		}
+	}
+	membership, _ := event.Membership()
+	//we return state at the time user leaves the room
+	if membership == gomatrixserverlib.Ban || membership == gomatrixserverlib.Leave {
+		queryReq := api.QueryStateAfterEventsRequest{
+			RoomID:       roomID,
+			PrevEventIDs: []string{event.EventID()},
+			StateToFetch: []gomatrixserverlib.StateKeyTuple{{
+				EventType: evType,
+				StateKey:  stateKey,
+			}},
+		}
+		var queryRes api.QueryStateAfterEventsResponse
+		err := queryAPI.QueryStateAfterEvents(req.Context(), &queryReq, &queryRes)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryFullStateAtEvent failed")
+			return jsonerror.InternalServerError()
+		}
+		if queryRes.StateEvents == nil {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound("cannot find state"),
+			}
+		}
+
+		stateEvent := stateEventInStateResp{
+			ClientEvent: gomatrixserverlib.ToClientEvent(queryRes.StateEvents[0].Event, gomatrixserverlib.FormatAll),
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: stateEvent.Content,
+		}
+
+	}
+
+	//We don't need to query state again if event type is m.room.member and state key is same as user id of current user
+	if stateKey != device.UserID || evType != gomatrixserverlib.MRoomMember {
+		event, err = db.GetStateEvent(req.Context(), roomID, evType, stateKey)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("db.GetStateEvent failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	if event == nil {

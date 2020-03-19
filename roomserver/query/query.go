@@ -485,6 +485,27 @@ func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 	return auth.IsServerAllowed(serverName, stateAtEvent), nil
 }
 
+// QueryServerAllowedToSeeEvent implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryFullStateAtEvent(
+	ctx context.Context,
+	request *api.QueryFullStateAtEventRequest,
+	response *api.QueryFullStateAtEventResponse,
+) (err error) {
+	// TODO: get the correct room version
+	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	if err != nil {
+		return err
+	}
+
+	stateEntries, err := roomState.LoadStateAtEvent(ctx, request.EventID)
+	if err != nil {
+		return
+	}
+
+	response.StateEvents, err = r.loadStateEvents(ctx, stateEntries)
+	return
+}
+
 // QueryMissingEvents implements api.RoomserverQueryAPI
 func (r *RoomserverQueryAPI) QueryMissingEvents(
 	ctx context.Context,
