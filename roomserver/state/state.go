@@ -81,7 +81,7 @@ func (v StateResolution) LoadStateAtSnapshot(
 	return fullState, nil
 }
 
-// LoadStateAtEvent loads the full state of a room at a particular event.
+// LoadStateAtEvent loads the full state of a room before a particular event.
 func (v StateResolution) LoadStateAtEvent(
 	ctx context.Context, eventID string,
 ) ([]types.StateEntry, error) {
@@ -99,7 +99,8 @@ func (v StateResolution) LoadStateAtEvent(
 }
 
 // LoadCombinedStateAfterEvents loads a snapshot of the state after each of the events
-// and combines those snapshots together into a single list.
+// and combines those snapshots together into a single list. At this point it is
+// possible to run into duplicate (type, state key) tuples.
 func (v StateResolution) LoadCombinedStateAfterEvents(
 	ctx context.Context, prevStates []types.StateAtEvent,
 ) ([]types.StateEntry, error) {
