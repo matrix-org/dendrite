@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	log "github.com/sirupsen/logrus"
 )
 
 type messagesReq struct {
@@ -424,7 +423,7 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 			srvToBackfillFrom = serversResponse.Servers[1]
 		} else {
 			srvToBackfillFrom = gomatrixserverlib.ServerName("")
-			log.Warn("Not enough servers to backfill from")
+			util.GetLogger(r.ctx).Info("Not enough servers to backfill from")
 		}
 	}
 
