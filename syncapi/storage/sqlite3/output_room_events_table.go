@@ -263,6 +263,12 @@ func (s *outputRoomEventsStatements) insertEvent(
 		_, containsURL = content["url"]
 	}
 
+	var headeredJSON []byte
+	headeredJSON, err = json.Marshal(event)
+	if err != nil {
+		return
+	}
+
 	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
 	if err != nil {
 		return
@@ -283,7 +289,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 		streamPos,
 		event.RoomID(),
 		event.EventID(),
-		event.JSON(),
+		headeredJSON,
 		event.Type(),
 		event.Sender(),
 		containsURL,
