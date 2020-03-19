@@ -45,14 +45,14 @@ CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx
 
 const insertInviteEventSQL = "" +
 	"INSERT INTO syncapi_invite_events (" +
-	" room_id, event_id, target_user_id, event_json" +
+	" room_id, event_id, target_user_id, headered_event_json" +
 	") VALUES ($1, $2, $3, $4) RETURNING id"
 
 const deleteInviteEventSQL = "" +
 	"DELETE FROM syncapi_invite_events WHERE event_id = $1"
 
 const selectInviteEventsInRangeSQL = "" +
-	"SELECT room_id, event_json FROM syncapi_invite_events" +
+	"SELECT room_id, headered_event_json FROM syncapi_invite_events" +
 	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC"
 
