@@ -808,14 +808,13 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
 ) error {
-	response.DefaultRoomVersion = string(version.DefaultRoomVersion())
-	response.AvailableRoomVersions = make(map[string]string)
+	response.DefaultRoomVersion = version.DefaultRoomVersion()
+	response.AvailableRoomVersions = make(map[gomatrixserverlib.RoomVersion]string)
 	for v, desc := range version.SupportedRoomVersions() {
-		sv := string(v)
 		if desc.Stable {
-			response.AvailableRoomVersions[sv] = "stable"
+			response.AvailableRoomVersions[v] = "stable"
 		} else {
-			response.AvailableRoomVersions[sv] = "unstable"
+			response.AvailableRoomVersions[v] = "unstable"
 		}
 	}
 	return nil

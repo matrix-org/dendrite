@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     sender TEXT NOT NULL,
     contains_url BOOL NOT NULL DEFAULT false,
     state_key TEXT NOT NULL,
-    event_json TEXT NOT NULL,
+    headered_event_json TEXT NOT NULL,
     membership TEXT,
     added_at BIGINT,
     UNIQUE (room_id, type, state_key)
@@ -47,10 +47,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_s
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, event_json, membership, added_at)" +
+	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
 	" ON CONFLICT (event_id, room_id, type, sender, contains_url)" +
-	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, event_json = $7, membership = $8, added_at = $9"
+	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
 
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
@@ -59,7 +59,7 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectCurrentStateSQL = "" +
-	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1" +
+	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
 	" AND ( $2 IS NULL OR     sender IN ($2)  )" +
 	" AND ( $3 IS NULL OR NOT(sender IN ($3)) )" +
 	" AND ( $4 IS NULL OR     type   IN ($4)  )" +
@@ -71,14 +71,14 @@ const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
 const selectStateEventSQL = "" +
-	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
+	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
 	// TODO: The session_id and transaction_id blanks are here because otherwise
 	// the rowsToStreamEvents expects there to be exactly five columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT added_at, event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 type currentRoomStateStatements struct {
@@ -171,7 +171,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 func (s *currentRoomStateStatements) selectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilterPart *gomatrixserverlib.StateFilter,
-) ([]gomatrixserverlib.Event, error) {
+) ([]gomatrixserverlib.HeaderedEvent, error) {
 	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
 		nil, // FIXME: pq.StringArray(stateFilterPart.Senders),
@@ -199,7 +199,7 @@ func (s *currentRoomStateStatements) deleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) upsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.Event, membership *string, addedAt types.StreamPosition,
+	event gomatrixserverlib.HeaderedEvent, membership *string, addedAt types.StreamPosition,
 ) error {
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
@@ -209,9 +209,14 @@ func (s *currentRoomStateStatements) upsertRoomState(
 		_, containsURL = content["url"]
 	}
 
+	headeredJSON, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
 	// upsert state event
 	stmt := common.TxStmt(txn, s.upsertRoomStateStmt)
-	_, err := stmt.ExecContext(
+	_, err = stmt.ExecContext(
 		ctx,
 		event.RoomID(),
 		event.EventID(),
@@ -219,7 +224,7 @@ func (s *currentRoomStateStatements) upsertRoomState(
 		event.Sender(),
 		containsURL,
 		*event.StateKey(),
-		event.JSON(),
+		headeredJSON,
 		membership,
 		addedAt,
 	)
@@ -242,16 +247,16 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	return rowsToStreamEvents(rows)
 }
 
-func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
-	result := []gomatrixserverlib.Event{}
+func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.HeaderedEvent, error) {
+	result := []gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var eventBytes []byte
 		if err := rows.Scan(&eventBytes); err != nil {
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
-		if err != nil {
+		var ev gomatrixserverlib.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 		result = append(result, ev)
@@ -261,7 +266,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 
 func (s *currentRoomStateStatements) selectStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
-) (*gomatrixserverlib.Event, error) {
+) (*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := s.selectStateEventStmt
 	var res []byte
 	err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
@@ -271,6 +276,9 @@ func (s *currentRoomStateStatements) selectStateEvent(
 	if err != nil {
 		return nil, err
 	}
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(res, false)
+	var ev gomatrixserverlib.HeaderedEvent
+	if err = json.Unmarshal(res, &ev); err != nil {
+		return nil, err
+	}
 	return &ev, err
 }

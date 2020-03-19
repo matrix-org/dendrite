@@ -16,6 +16,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -29,9 +30,9 @@ import (
 )
 
 var (
-	randomMessageEvent  gomatrixserverlib.Event
-	aliceInviteBobEvent gomatrixserverlib.Event
-	bobLeaveEvent       gomatrixserverlib.Event
+	randomMessageEvent  gomatrixserverlib.HeaderedEvent
+	aliceInviteBobEvent gomatrixserverlib.HeaderedEvent
+	bobLeaveEvent       gomatrixserverlib.HeaderedEvent
 	syncPositionVeryOld types.PaginationToken
 	syncPositionBefore  types.PaginationToken
 	syncPositionAfter   types.PaginationToken
@@ -67,7 +68,8 @@ func init() {
 	syncPositionAfter2.PDUPosition = 13
 
 	var err error
-	randomMessageEvent, err = gomatrixserverlib.NewEventFromTrustedJSON([]byte(`{
+	err = json.Unmarshal([]byte(`{
+		"_room_version": "1",
 		"type": "m.room.message",
 		"content": {
 			"body": "Hello World",
@@ -75,13 +77,15 @@ func init() {
 		},
 		"sender": "@noone:localhost",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$randomMessageEvent:localhost"
-	}`), false)
+	}`), &randomMessageEvent)
 	if err != nil {
 		panic(err)
 	}
-	aliceInviteBobEvent, err = gomatrixserverlib.NewEventFromTrustedJSON([]byte(`{
+	err = json.Unmarshal([]byte(`{
+		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",
 		"content": {
@@ -89,13 +93,15 @@ func init() {
 		},
 		"sender": "`+alice+`",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$aliceInviteBobEvent:localhost"
-	}`), false)
+	}`), &aliceInviteBobEvent)
 	if err != nil {
 		panic(err)
 	}
-	bobLeaveEvent, err = gomatrixserverlib.NewEventFromTrustedJSON([]byte(`{
+	err = json.Unmarshal([]byte(`{
+		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",
 		"content": {
@@ -103,9 +109,10 @@ func init() {
 		},
 		"sender": "`+bob+`",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$bobLeaveEvent:localhost"
-	}`), false)
+	}`), &bobLeaveEvent)
 	if err != nil {
 		panic(err)
 	}

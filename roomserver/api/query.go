@@ -43,6 +43,8 @@ type QueryLatestEventsAndStateResponse struct {
 	// Does the room exist?
 	// If the room doesn't exist this will be false and LatestEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The latest events in the room.
 	// These are used to set the prev_events when sending an event.
 	LatestEvents []gomatrixserverlib.EventReference `json:"latest_events"`
@@ -74,6 +76,8 @@ type QueryStateAfterEventsResponse struct {
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
@@ -207,6 +211,8 @@ type QueryStateAndAuthChainResponse struct {
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
@@ -249,10 +255,10 @@ type QueryServersInRoomAtEventResponse struct {
 // QueryRoomVersionCapabilities asks for the default room version
 type QueryRoomVersionCapabilitiesRequest struct{}
 
-// QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
+// QueryRoomVersionCapabilitiesResponse is a response to QueryRoomVersionCapabilitiesRequest
 type QueryRoomVersionCapabilitiesResponse struct {
-	DefaultRoomVersion    string            `json:"default"`
-	AvailableRoomVersions map[string]string `json:"available"`
+	DefaultRoomVersion    gomatrixserverlib.RoomVersion            `json:"default"`
+	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
 }
 
 // RoomserverQueryAPI is used to query information from the room server.
@@ -536,7 +542,7 @@ func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// QueryServersInRoomAtEvent implements RoomServerQueryAPI
+// QueryRoomVersionCapabilities implements RoomServerQueryAPI
 func (h *httpRoomserverQueryAPI) QueryRoomVersionCapabilities(
 	ctx context.Context,
 	request *QueryRoomVersionCapabilitiesRequest,
