@@ -89,12 +89,18 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 func (s *inviteEventsStatements) insertInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
+	var headeredJSON []byte
+	headeredJSON, err = json.Marshal(inviteEvent)
+	if err != nil {
+		return
+	}
+
 	err = s.insertInviteEventStmt.QueryRowContext(
 		ctx,
 		inviteEvent.RoomID(),
 		inviteEvent.EventID(),
 		*inviteEvent.StateKey(),
-		inviteEvent.JSON(),
+		headeredJSON,
 	).Scan(&streamPos)
 	return
 }

@@ -86,13 +86,19 @@ func (s *inviteEventsStatements) prepare(db *sql.DB, streamID *streamIDStatement
 func (s *inviteEventsStatements) insertInviteEvent(
 	ctx context.Context, txn *sql.Tx, inviteEvent gomatrixserverlib.HeaderedEvent, streamPos types.StreamPosition,
 ) (err error) {
+	var headeredJSON []byte
+	headeredJSON, err = json.Marshal(inviteEvent)
+	if err != nil {
+		return
+	}
+
 	_, err = txn.Stmt(s.insertInviteEventStmt).ExecContext(
 		ctx,
 		streamPos,
 		inviteEvent.RoomID(),
 		inviteEvent.EventID(),
 		*inviteEvent.StateKey(),
-		inviteEvent.JSON(),
+		headeredJSON,
 	)
 	return
 }
