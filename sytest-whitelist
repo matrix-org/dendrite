@@ -218,3 +218,5 @@ Push rules come down in an initial /sync
 Regular users can add and delete aliases in the default room configuration
 Regular users can add and delete aliases when m.room.aliases is restricted
 GET /r0/capabilities is not public
+GET /joined_rooms lists newly-created room
+/joined_rooms returns only joined rooms

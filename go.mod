@@ -25,6 +25,7 @@ require (
 	github.com/tidwall/pretty v1.0.1 // indirect
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible
+	go.uber.org/atomic v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20200115085410-6d4e4cb37c7d
 	gopkg.in/Shopify/sarama.v1 v1.20.1
 	gopkg.in/h2non/bimg.v1 v1.0.18
