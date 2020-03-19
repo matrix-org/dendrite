@@ -179,7 +179,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 func (u *latestEventsUpdater) latestState() error {
 	var err error
 	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, u.db)
+	roomState, err := state.Prepare(u.db, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		return err
 	}

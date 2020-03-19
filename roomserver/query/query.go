@@ -106,11 +106,16 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
+
+	roomState, err := state.Prepare(r.DB, roomVersion)
+	if err != nil {
+		return err
+	}
+
 	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -120,11 +125,6 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return nil
 	}
 	response.RoomExists = true
-
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
-	if err != nil {
-		return err
-	}
 
 	var currentStateSnapshotNID types.StateSnapshotNID
 	response.LatestEvents, currentStateSnapshotNID, response.Depth, err =
@@ -159,11 +159,16 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
+
+	roomState, err := state.Prepare(r.DB, roomVersion)
+	if err != nil {
+		return err
+	}
+
 	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -173,11 +178,6 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return nil
 	}
 	response.RoomExists = true
-
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
-	if err != nil {
-		return err
-	}
 
 	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
@@ -359,7 +359,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	ctx context.Context, eventNID types.EventNID, joinedOnly bool,
 ) ([]types.Event, error) {
 	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomState, err := state.Prepare(r.DB, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		return []types.Event{}, err
 	}
@@ -465,7 +465,7 @@ func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName,
 ) (bool, error) {
 	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomState, err := state.Prepare(r.DB, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		return false, err
 	}
@@ -690,7 +690,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 
 func (r *RoomserverQueryAPI) loadStateAtEventIDs(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
 	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, r.DB)
+	roomState, err := state.Prepare(r.DB, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		return nil, err
 	}

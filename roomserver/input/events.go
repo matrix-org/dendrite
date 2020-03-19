@@ -157,7 +157,7 @@ func calculateAndSetState(
 	event gomatrixserverlib.Event,
 ) error {
 	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
+	roomState, err := state.Prepare(db, gomatrixserverlib.RoomVersionV1)
 	if err != nil {
 		return err
 	}
