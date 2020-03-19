@@ -35,7 +35,7 @@ type StateResolution struct {
 	db database.RoomStateDatabase
 }
 
-func Prepare(db database.RoomStateDatabase) StateResolution {
+func NewStateResolution(db database.RoomStateDatabase) StateResolution {
 	return StateResolution{
 		db: db,
 	}

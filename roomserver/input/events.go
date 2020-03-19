@@ -157,7 +157,7 @@ func calculateAndSetState(
 	event gomatrixserverlib.Event,
 ) error {
 	var err error
-	roomState := state.Prepare(db)
+	roomState := state.NewStateResolution(db)
 
 	if input.HasState {
 		// We've been told what the state at the event is so we don't need to calculate it.

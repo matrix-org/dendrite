@@ -112,7 +112,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return nil
 	}
 
-	roomState := state.Prepare(r.DB)
+	roomState := state.NewStateResolution(r.DB)
 
 	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
@@ -163,7 +163,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return nil
 	}
 
-	roomState := state.Prepare(r.DB)
+	roomState := state.NewStateResolution(r.DB)
 
 	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
@@ -354,7 +354,7 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	ctx context.Context, eventNID types.EventNID, joinedOnly bool,
 ) ([]types.Event, error) {
-	roomState := state.Prepare(r.DB)
+	roomState := state.NewStateResolution(r.DB)
 	events := []types.Event{}
 	// Lookup the event NID
 	eIDs, err := r.DB.EventIDs(ctx, []types.EventNID{eventNID})
@@ -456,7 +456,7 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName,
 ) (bool, error) {
-	roomState := state.Prepare(r.DB)
+	roomState := state.NewStateResolution(r.DB)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		return false, err
@@ -676,7 +676,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 }
 
 func (r *RoomserverQueryAPI) loadStateAtEventIDs(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
-	roomState := state.Prepare(r.DB)
+	roomState := state.NewStateResolution(r.DB)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
 		switch err.(type) {
