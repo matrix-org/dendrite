@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/util"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -288,6 +289,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 		txnID,
 		excludeFromSync,
 	).Scan(&streamPos)
+	util.GetLogger(ctx).Info("INSERT EVENT: ", event.RoomID(), " Type:", event.Type(), " pos:", streamPos)
 	return
 }
 
@@ -305,7 +307,7 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	} else {
 		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
 	}
-
+	util.GetLogger(ctx).Info("SELECT ", roomID, " from=", fromPos, " to=", toPos, " limit=", limit)
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
 	if err != nil {
 		return nil, err
@@ -314,6 +316,9 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
+	}
+	for _, e := range events {
+		util.GetLogger(ctx).Info("SELECTED ", e.RoomID(), " Type:", e.Type(), " pos:", e.StreamPosition)
 	}
 	if chronologicalOrder {
 		// The events need to be returned from oldest to latest, which isn't

@@ -47,7 +47,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	var syncData *types.Response
 
 	// Extract values from request
-	logger := util.GetLogger(req.Context())
 	userID := device.UserID
 	syncReq, err := newSyncRequest(req, *device)
 	if err != nil {
@@ -56,20 +55,21 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			JSON: jsonerror.Unknown(err.Error()),
 		}
 	}
-	logger.WithFields(log.Fields{
+	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
 		"userID":  userID,
 		"since":   syncReq.since,
 		"timeout": syncReq.timeout,
-	}).Info("Incoming /sync request")
+	})
 
 	currPos := rp.notifier.CurrentPosition()
 
 	if shouldReturnImmediately(syncReq) {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("rp.currentSyncForUser failed")
+			logger.WithError(err).Error("rp.currentSyncForUser failed")
 			return jsonerror.InternalServerError()
 		}
+		logger.WithField("next", syncData.NextBatch).Info("Responding immediately")
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: syncData,
@@ -107,7 +107,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			hasTimedOut = true
 		// Or for the request to be cancelled
 		case <-req.Context().Done():
-			util.GetLogger(req.Context()).WithError(err).Error("request cancelled")
+			logger.WithError(err).Error("request cancelled")
 			return jsonerror.InternalServerError()
 		}
 
@@ -118,11 +118,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("rp.currentSyncForUser failed")
+			logger.WithError(err).Error("rp.currentSyncForUser failed")
 			return jsonerror.InternalServerError()
 		}
 
 		if !syncData.IsEmpty() || hasTimedOut {
+			logger.WithField("next", syncData.NextBatch).WithField("timed_out", hasTimedOut).Info("Responding")
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: syncData,

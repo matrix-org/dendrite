@@ -26,6 +26,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/util"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -296,6 +297,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		); err != nil {
 			return
 		}
+		util.GetLogger(ctx).Info("selectRecentEvents from token: ", from.PDUPosition)
 	} else {
 		// When using forward ordering, we want the least recent events first.
 		if events, err = d.events.selectEarlyEvents(

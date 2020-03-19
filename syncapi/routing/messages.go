@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 type messagesReq struct {
@@ -150,6 +151,14 @@ func OnIncomingMessagesRequest(
 		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
 		return jsonerror.InternalServerError()
 	}
+	util.GetLogger(req.Context()).WithFields(logrus.Fields{
+		"from":         from.String(),
+		"to":           to.String(),
+		"limit":        limit,
+		"backwards":    backwardOrdering,
+		"return_start": start.String(),
+		"return_end":   end.String(),
+	}).Info("Responding")
 
 	// Respond with the events.
 	return util.JSONResponse{
@@ -179,6 +188,11 @@ func (r *messagesReq) retrieveEvents() (
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return
 	}
+	for i := range streamEvents {
+		s := streamEvents[i]
+		util.GetLogger(r.ctx).Info("spos=", s.StreamPosition, " content=", string(s.Content()))
+	}
+	util.GetLogger(r.ctx).Info("Found ", len(streamEvents), " in the database")
 
 	var events []gomatrixserverlib.HeaderedEvent
 
@@ -301,8 +315,9 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	events []gomatrixserverlib.HeaderedEvent, err error,
 ) {
 	// Check if we have enough events.
-	isSetLargeEnough := true
-	if len(streamEvents) < r.limit {
+	isSetLargeEnough := len(streamEvents) >= r.limit
+	if !isSetLargeEnough {
+		// it might be fine we don't have up to 'limit' events, let's find out
 		if r.backwardOrdering {
 			if r.wasToProvided {
 				// The condition in the SQL query is a strict "greater than" so
@@ -422,8 +437,8 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 		if len(serversResponse.Servers) > 1 {
 			srvToBackfillFrom = serversResponse.Servers[1]
 		} else {
-			srvToBackfillFrom = gomatrixserverlib.ServerName("")
 			util.GetLogger(r.ctx).Info("Not enough servers to backfill from")
+			return nil, nil
 		}
 	}
 
@@ -431,32 +446,32 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 
 	// If the roomserver responded with at least one server that isn't us,
 	// send it a request for backfill.
-	if len(srvToBackfillFrom) > 0 {
-		txn, err := r.federation.Backfill(
-			r.ctx, srvToBackfillFrom, r.roomID, limit, fromEventIDs,
-		)
-		if err != nil {
+	util.GetLogger(r.ctx).WithField("server", srvToBackfillFrom).WithField("limit", limit).Info("Backfilling from server")
+	txn, err := r.federation.Backfill(
+		r.ctx, srvToBackfillFrom, r.roomID, limit, fromEventIDs,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, p := range txn.PDUs {
+		pdus = append(pdus, p.Headered(gomatrixserverlib.RoomVersionV1))
+	}
+	util.GetLogger(r.ctx).WithField("server", srvToBackfillFrom).WithField("new_events", len(pdus)).Info("Storing new events from backfill")
+
+	// Store the events in the database, while marking them as unfit to show
+	// up in responses to sync requests.
+	for _, pdu := range pdus {
+		headered := pdu.Headered(gomatrixserverlib.RoomVersionV1)
+		if _, err = r.db.WriteEvent(
+			r.ctx,
+			&headered,
+			[]gomatrixserverlib.HeaderedEvent{},
+			[]string{},
+			[]string{},
+			nil, true,
+		); err != nil {
 			return nil, err
-		}
-
-		for _, p := range txn.PDUs {
-			pdus = append(pdus, p.Headered(gomatrixserverlib.RoomVersionV1))
-		}
-
-		// Store the events in the database, while marking them as unfit to show
-		// up in responses to sync requests.
-		for _, pdu := range pdus {
-			headered := pdu.Headered(gomatrixserverlib.RoomVersionV1)
-			if _, err = r.db.WriteEvent(
-				r.ctx,
-				&headered,
-				[]gomatrixserverlib.HeaderedEvent{},
-				[]string{},
-				[]string{},
-				nil, true,
-			); err != nil {
-				return nil, err
-			}
 		}
 	}
 
@@ -474,7 +489,8 @@ func setToDefault(
 	roomID string,
 ) (to *types.PaginationToken, err error) {
 	if backwardOrdering {
-		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 1, 0)
+		// go 1 earlier than the first event so we correctly fetch the earliest event
+		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
 	} else {
 		var pos types.StreamPosition
 		pos, err = db.MaxTopologicalPosition(ctx, roomID)
