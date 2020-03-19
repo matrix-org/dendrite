@@ -108,7 +108,8 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 ) error {
 	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
-		return err
+		response.RoomExists = false
+		return nil
 	}
 
 	roomState := state.Prepare(r.DB)
@@ -158,7 +159,8 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 ) error {
 	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
-		return err
+		response.RoomExists = false
+		return nil
 	}
 
 	roomState := state.Prepare(r.DB)
