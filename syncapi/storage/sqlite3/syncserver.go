@@ -664,6 +664,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		// We don't include a device here as we don't need to send down
 		// transaction IDs for complete syncs
 		recentEvents := d.StreamEventsToEvents(nil, recentStreamEvents)
+		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
 			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
@@ -803,8 +804,8 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 	}
 	for roomID, inviteEvent := range invites {
 		ir := types.NewInviteResponse()
-		ir.InviteState.Events = gomatrixserverlib.ToClientEvents(
-			[]gomatrixserverlib.Event{inviteEvent.Event}, gomatrixserverlib.FormatSync,
+		ir.InviteState.Events = gomatrixserverlib.HeaderedToClientEvents(
+			[]gomatrixserverlib.HeaderedEvent{inviteEvent}, gomatrixserverlib.FormatSync,
 		)
 		// TODO: add the invite state from the invite event.
 		res.Rooms.Invite[roomID] = *ir
@@ -856,12 +857,8 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	if err != nil {
 		return err
 	}
-	headeredRecentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
-	var recentEvents []gomatrixserverlib.Event
-	for _, event := range d.StreamEventsToEvents(nil, recentStreamEvents) {
-		recentEvents = append(recentEvents, event.Event)
-	}
-	delta.stateEvents = removeDuplicates(delta.stateEvents, headeredRecentEvents)
+	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
+	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents)
 	backwardTopologyPos := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
 
 	switch delta.membership {
@@ -871,7 +868,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
 			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
 		).String()
-		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.roomID] = *jr
@@ -884,7 +881,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		lr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
 			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
 		).String()
-		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+		lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Leave[delta.roomID] = *lr
