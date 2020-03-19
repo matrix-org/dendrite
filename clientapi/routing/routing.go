@@ -396,7 +396,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	unstableMux.Handle("/thirdparty/protocols",
+	r0mux.Handle("/thirdparty/protocols",
 		common.MakeExternalAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
 			// TODO: Return the third party protcols
 			return util.JSONResponse{
