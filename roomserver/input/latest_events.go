@@ -178,11 +178,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
-	// TODO: get the correct room version
-	roomState, err := state.Prepare(u.db, gomatrixserverlib.RoomVersionV1)
-	if err != nil {
-		return err
-	}
+	roomState := state.Prepare(u.db)
 
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
 	for i := range u.latest {

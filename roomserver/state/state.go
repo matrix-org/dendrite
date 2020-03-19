@@ -32,26 +32,12 @@ import (
 )
 
 type StateResolution struct {
-	db      database.RoomStateDatabase
-	version gomatrixserverlib.RoomVersion
+	db database.RoomStateDatabase
 }
 
-func Prepare(db database.RoomStateDatabase, version gomatrixserverlib.RoomVersion) (StateResolution, error) {
-	stateResAlgo, err := version.StateResAlgorithm()
-	if err != nil {
-		return StateResolution{}, err
-	}
-
-	switch stateResAlgo {
-	case gomatrixserverlib.StateResV1:
-		fallthrough
-	case gomatrixserverlib.StateResV2:
-		return StateResolution{
-			db:      db,
-			version: version,
-		}, nil
-	default:
-		return StateResolution{}, errors.New("unsupported state resolution algorithm")
+func Prepare(db database.RoomStateDatabase) StateResolution {
+	return StateResolution{
+		db: db,
 	}
 }
 
@@ -350,7 +336,7 @@ func (v StateResolution) loadStateAtSnapshotForNumericTuples(
 // This is typically the state before an event.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.
 func (v StateResolution) LoadStateAfterEventsForStringTuples(
-	ctx context.Context,
+	ctx context.Context, roomNID types.RoomNID,
 	prevStates []types.StateAtEvent,
 	stateKeyTuples []gomatrixserverlib.StateKeyTuple,
 ) ([]types.StateEntry, error) {
@@ -358,14 +344,19 @@ func (v StateResolution) LoadStateAfterEventsForStringTuples(
 	if err != nil {
 		return nil, err
 	}
-	return v.loadStateAfterEventsForNumericTuples(ctx, prevStates, numericTuples)
+	return v.loadStateAfterEventsForNumericTuples(ctx, roomNID, prevStates, numericTuples)
 }
 
 func (v StateResolution) loadStateAfterEventsForNumericTuples(
-	ctx context.Context,
+	ctx context.Context, roomNID types.RoomNID,
 	prevStates []types.StateAtEvent,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
+	roomVersion, err := v.db.GetRoomVersionForRoomNID(ctx, roomNID)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(prevStates) == 1 {
 		// Fast path for a single event.
 		prevState := prevStates[0]
@@ -408,7 +399,7 @@ func (v StateResolution) loadStateAfterEventsForNumericTuples(
 
 	// TODO: Add metrics for this as it could take a long time for big rooms
 	// with large conflicts.
-	fullState, _, _, err := v.calculateStateAfterManyEvents(ctx, prevStates)
+	fullState, _, _, err := v.calculateStateAfterManyEvents(ctx, roomVersion, prevStates)
 	if err != nil {
 		return nil, err
 	}
@@ -617,9 +608,13 @@ func (v StateResolution) calculateAndStoreStateAfterManyEvents(
 	prevStates []types.StateAtEvent,
 	metrics calculateStateMetrics,
 ) (types.StateSnapshotNID, error) {
+	roomVersion, err := v.db.GetRoomVersionForRoomNID(ctx, roomNID)
+	if err != nil {
+		return metrics.stop(0, err)
+	}
 
 	state, algorithm, conflictLength, err :=
-		v.calculateStateAfterManyEvents(ctx, prevStates)
+		v.calculateStateAfterManyEvents(ctx, roomVersion, prevStates)
 	metrics.algorithm = algorithm
 	if err != nil {
 		return metrics.stop(0, err)
@@ -633,7 +628,8 @@ func (v StateResolution) calculateAndStoreStateAfterManyEvents(
 }
 
 func (v StateResolution) calculateStateAfterManyEvents(
-	ctx context.Context, prevStates []types.StateAtEvent,
+	ctx context.Context, roomVersion gomatrixserverlib.RoomVersion,
+	prevStates []types.StateAtEvent,
 ) (state []types.StateEntry, algorithm string, conflictLength int, err error) {
 	var combined []types.StateEntry
 	// Conflict resolution.
@@ -668,7 +664,7 @@ func (v StateResolution) calculateStateAfterManyEvents(
 		}
 
 		var resolved []types.StateEntry
-		resolved, err = v.resolveConflicts(ctx, notConflicted, conflicts)
+		resolved, err = v.resolveConflicts(ctx, roomVersion, notConflicted, conflicts)
 		if err != nil {
 			algorithm = "_resolve_conflicts"
 			return
@@ -684,10 +680,10 @@ func (v StateResolution) calculateStateAfterManyEvents(
 }
 
 func (v StateResolution) resolveConflicts(
-	ctx context.Context,
+	ctx context.Context, version gomatrixserverlib.RoomVersion,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	stateResAlgo, err := v.version.StateResAlgorithm()
+	stateResAlgo, err := version.StateResAlgorithm()
 	if err != nil {
 		return nil, err
 	}

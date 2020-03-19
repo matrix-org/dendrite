@@ -111,10 +111,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return err
 	}
 
-	roomState, err := state.Prepare(r.DB, roomVersion)
-	if err != nil {
-		return err
-	}
+	roomState := state.Prepare(r.DB)
 
 	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
@@ -164,10 +161,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return err
 	}
 
-	roomState, err := state.Prepare(r.DB, roomVersion)
-	if err != nil {
-		return err
-	}
+	roomState := state.Prepare(r.DB)
 
 	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
@@ -192,7 +186,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 
 	// Look up the currrent state for the requested tuples.
 	stateEntries, err := roomState.LoadStateAfterEventsForStringTuples(
-		ctx, prevStates, request.StateToFetch,
+		ctx, roomNID, prevStates, request.StateToFetch,
 	)
 	if err != nil {
 		return err
@@ -358,11 +352,7 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	ctx context.Context, eventNID types.EventNID, joinedOnly bool,
 ) ([]types.Event, error) {
-	// TODO: get the correct room version
-	roomState, err := state.Prepare(r.DB, gomatrixserverlib.RoomVersionV1)
-	if err != nil {
-		return []types.Event{}, err
-	}
+	roomState := state.Prepare(r.DB)
 	events := []types.Event{}
 	// Lookup the event NID
 	eIDs, err := r.DB.EventIDs(ctx, []types.EventNID{eventNID})
@@ -464,12 +454,7 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName,
 ) (bool, error) {
-	// TODO: get the correct room version
-	roomState, err := state.Prepare(r.DB, gomatrixserverlib.RoomVersionV1)
-	if err != nil {
-		return false, err
-	}
-
+	roomState := state.Prepare(r.DB)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		return false, err
@@ -689,12 +674,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 }
 
 func (r *RoomserverQueryAPI) loadStateAtEventIDs(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
-	// TODO: get the correct room version
-	roomState, err := state.Prepare(r.DB, gomatrixserverlib.RoomVersionV1)
-	if err != nil {
-		return nil, err
-	}
-
+	roomState := state.Prepare(r.DB)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
 		switch err.(type) {
