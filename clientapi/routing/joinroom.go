@@ -307,10 +307,8 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, err
 	}
 	var supportedVersions []gomatrixserverlib.RoomVersion
-	for version, descriptor := range response.AvailableRoomVersions {
-		if descriptor == "stable" {
-			supportedVersions = append(supportedVersions, version)
-		}
+	for version := range response.AvailableRoomVersions {
+		supportedVersions = append(supportedVersions, version)
 	}
 	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, supportedVersions)
 	if err != nil {
