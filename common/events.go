@@ -42,12 +42,25 @@ func BuildEvent(
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Dendrite, evTime time.Time,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
+	if queryRes == nil {
+		queryRes = &api.QueryLatestEventsAndStateResponse{}
+	}
+
 	err := AddPrevEventsToEvent(ctx, builder, queryAPI, queryRes)
 	if err != nil {
 		return nil, err
 	}
 
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	var eventID string
+	var format gomatrixserverlib.EventIDFormat
+	format, err = queryRes.RoomVersion.EventIDFormat()
+	if err != nil {
+		return nil, err
+	}
+	if format == gomatrixserverlib.EventIDFormatV1 {
+		eventID = fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	}
+
 	event, err := builder.Build(
 		eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
 		cfg.Matrix.PrivateKey, queryRes.RoomVersion,
@@ -74,9 +87,6 @@ func AddPrevEventsToEvent(
 	queryReq := api.QueryLatestEventsAndStateRequest{
 		RoomID:       builder.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),
-	}
-	if queryRes == nil {
-		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
 	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
 		return err
