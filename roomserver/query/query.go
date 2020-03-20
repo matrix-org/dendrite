@@ -607,6 +607,15 @@ func (r *RoomserverQueryAPI) scanEventTree(
 	var next []string
 	var pre string
 
+	// TODO: add tests for this function to ensure it meets the contract that callers expect (and doc what that is supposed to be)
+	// Currently, callers like QueryBackfill will call scanEventTree with a pre-populated `visited` map, assuming that by doing
+	// so means that the events in that map will NOT be returned from this function. That is not currently true, resulting in
+	// duplicate events being sent in response to /backfill requests.
+	initialIgnoreList := make(map[string]bool, len(visited))
+	for k, v := range visited {
+		initialIgnoreList[k] = v
+	}
+
 	resultNIDs = make([]types.EventNID, 0, limit)
 
 	var checkedServerInRoom bool
@@ -643,8 +652,11 @@ BFSLoop:
 			if len(resultNIDs) == limit {
 				break BFSLoop
 			}
-			// Update the list of events to retrieve.
-			resultNIDs = append(resultNIDs, ev.EventNID)
+
+			if !initialIgnoreList[ev.EventID()] {
+				// Update the list of events to retrieve.
+				resultNIDs = append(resultNIDs, ev.EventNID)
+			}
 			// Loop through the event's parents.
 			for _, pre = range ev.PrevEventIDs() {
 				// Only add an event to the list of next events to process if it
