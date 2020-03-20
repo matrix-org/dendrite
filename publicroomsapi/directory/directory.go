@@ -57,6 +57,7 @@ func GetVisibility(
 }
 
 // SetVisibility implements PUT /directory/list/room/{roomID}
+// TODO: Allow admin users to edit the room visibility
 func SetVisibility(
 	req *http.Request, publicRoomsDatabase storage.Database, queryAPI api.RoomserverQueryAPI, dev *authtypes.Device,
 	roomID string,
@@ -93,7 +94,7 @@ func SetVisibility(
 	}
 	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
 
-	//Check if the user's power is greater than power required to change m.room.aliases event
+	// Check if the user's power is greater than power required to change m.room.aliases event
 	if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomAliases, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
