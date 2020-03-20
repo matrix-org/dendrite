@@ -193,7 +193,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		return true
 	}
 
-	if event.Type() == "m.room.member" {
+	if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
 		if appservice.IsInterestedInUserID(*event.StateKey()) {
 			return true
 		}
