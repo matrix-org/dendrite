@@ -68,6 +68,9 @@ const updateLatestEventNIDsSQL = "" +
 const selectRoomVersionForRoomIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_id = $1"
 
+const selectRoomVersionForRoomNIDSQL = "" +
+	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
+
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
@@ -75,6 +78,7 @@ type roomStatements struct {
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
 	selectRoomVersionForRoomIDStmt     *sql.Stmt
+	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 }
 
 func (s *roomStatements) prepare(db *sql.DB) (err error) {
@@ -89,6 +93,7 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
+		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
 	}.prepare(db)
 }
 
@@ -171,5 +176,14 @@ func (s *roomStatements) selectRoomVersionForRoomID(
 	var roomVersion gomatrixserverlib.RoomVersion
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
+	return roomVersion, err
+}
+
+func (s *roomStatements) selectRoomVersionForRoomNID(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+) (gomatrixserverlib.RoomVersion, error) {
+	var roomVersion gomatrixserverlib.RoomVersion
+	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
+	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
 	return roomVersion, err
 }

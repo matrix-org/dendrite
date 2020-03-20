@@ -156,11 +156,8 @@ func calculateAndSetState(
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
-	if err != nil {
-		return err
-	}
+	var err error
+	roomState := state.NewStateResolution(db)
 
 	if input.HasState {
 		// We've been told what the state at the event is so we don't need to calculate it.
