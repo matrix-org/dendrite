@@ -48,7 +48,10 @@ func BuildEvent(
 	}
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(
+		eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey, queryRes.RoomVersion,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +76,7 @@ func AddPrevEventsToEvent(
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	if queryRes == nil {
-		queryRes = &api.QueryLatestEventsAndStateResponse{}
+		*queryRes = api.QueryLatestEventsAndStateResponse{}
 	}
 	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
 		return err

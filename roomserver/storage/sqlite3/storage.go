@@ -310,7 +310,10 @@ func (d *Database) Events(
 			result := &results[i]
 			result.EventNID = eventJSON.EventNID
 			// TODO: Use NewEventFromTrustedJSON for efficiency
-			result.Event, err = gomatrixserverlib.NewEventFromUntrustedJSON(eventJSON.EventJSON)
+			// TODO: Room version here
+			result.Event, err = gomatrixserverlib.NewEventFromUntrustedJSON(
+				eventJSON.EventJSON, gomatrixserverlib.RoomVersionV1,
+			)
 			if err != nil {
 				return nil
 			}

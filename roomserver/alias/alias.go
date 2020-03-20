@@ -253,7 +253,8 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
 	now := time.Now()
 	event, err := builder.Build(
-		eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey,
+		eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID,
+		r.Cfg.Matrix.PrivateKey, roomVersion,
 	)
 	if err != nil {
 		return err

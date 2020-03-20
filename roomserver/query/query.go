@@ -123,6 +123,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return nil
 	}
 	response.RoomExists = true
+	response.RoomVersion = roomVersion
 
 	var currentStateSnapshotNID types.StateSnapshotNID
 	response.LatestEvents, currentStateSnapshotNID, response.Depth, err =
@@ -174,6 +175,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return nil
 	}
 	response.RoomExists = true
+	response.RoomVersion = roomVersion
 
 	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {

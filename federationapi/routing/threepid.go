@@ -282,7 +282,8 @@ func buildMembershipEvent(
 
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	event, err := builder.Build(
-		eventID, time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+		eventID, time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey, queryRes.RoomVersion,
 	)
 
 	return &event, err
