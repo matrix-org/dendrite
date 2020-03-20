@@ -76,7 +76,7 @@ func AddPrevEventsToEvent(
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	if queryRes == nil {
-		*queryRes = api.QueryLatestEventsAndStateResponse{}
+		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
 	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
 		return err
