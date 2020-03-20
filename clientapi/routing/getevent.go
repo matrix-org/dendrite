@@ -66,7 +66,7 @@ func GetEvent(
 		}
 	}
 
-	requestedEvent := eventsResp.Events[0]
+	requestedEvent := eventsResp.Events[0].Event
 
 	r := getEventRequest{
 		req:            req,

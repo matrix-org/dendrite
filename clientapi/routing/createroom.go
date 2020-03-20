@@ -23,6 +23,7 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -38,15 +39,16 @@ import (
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomRequest struct {
-	Invite          []string               `json:"invite"`
-	Name            string                 `json:"name"`
-	Visibility      string                 `json:"visibility"`
-	Topic           string                 `json:"topic"`
-	Preset          string                 `json:"preset"`
-	CreationContent map[string]interface{} `json:"creation_content"`
-	InitialState    []fledglingEvent       `json:"initial_state"`
-	RoomAliasName   string                 `json:"room_alias_name"`
-	GuestCanJoin    bool                   `json:"guest_can_join"`
+	Invite          []string                      `json:"invite"`
+	Name            string                        `json:"name"`
+	Visibility      string                        `json:"visibility"`
+	Topic           string                        `json:"topic"`
+	Preset          string                        `json:"preset"`
+	CreationContent map[string]interface{}        `json:"creation_content"`
+	InitialState    []fledglingEvent              `json:"initial_state"`
+	RoomAliasName   string                        `json:"room_alias_name"`
+	GuestCanJoin    bool                          `json:"guest_can_join"`
+	RoomVersion     gomatrixserverlib.RoomVersion `json:"room_version"`
 }
 
 const (
@@ -180,15 +182,28 @@ func createRoom(
 	}
 
 	r.CreationContent["creator"] = userID
-	r.CreationContent["room_version"] = "1" // TODO: We set this to 1 before we support Room versioning
+	roomVersion := roomserverVersion.DefaultRoomVersion()
+	if r.RoomVersion != "" {
+		candidateVersion := gomatrixserverlib.RoomVersion(r.RoomVersion)
+		_, roomVersionError := roomserverVersion.SupportedRoomVersion(candidateVersion)
+		if roomVersionError != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.UnsupportedRoomVersion(roomVersionError.Error()),
+			}
+		}
+		roomVersion = candidateVersion
+	}
+	r.CreationContent["room_version"] = roomVersion
 
 	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!
 
 	logger.WithFields(log.Fields{
-		"userID": userID,
-		"roomID": roomID,
+		"userID":      userID,
+		"roomID":      roomID,
+		"roomVersion": r.CreationContent["room_version"],
 	}).Info("Creating new room")
 
 	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
@@ -366,7 +381,7 @@ func buildEvent(
 	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
+		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
 	}
 	return &event, nil
 }

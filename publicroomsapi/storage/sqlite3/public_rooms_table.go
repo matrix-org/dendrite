@@ -22,7 +22,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/publicroomsapi/types"
+	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var editableAttributes = []string{
@@ -66,7 +67,7 @@ const selectPublicRoomsWithLimitSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
 	" FROM publicroomsapi_public_rooms WHERE visibility = true" +
 	" ORDER BY joined_members DESC" +
-	" LIMIT $2 OFFSET $1"
+	" LIMIT $1 OFFSET $2"
 
 const selectPublicRoomsWithFilterSQL = "" +
 	"SELECT room_id, joined_members, aliases, canonical_alias, name, topic, world_readable, guest_can_join, avatar_url" +
@@ -164,7 +165,7 @@ func (s *publicRoomsStatements) countPublicRooms(ctx context.Context) (nb int64,
 
 func (s *publicRoomsStatements) selectPublicRooms(
 	ctx context.Context, offset int64, limit int16, filter string,
-) ([]types.PublicRoom, error) {
+) ([]gomatrixserverlib.PublicRoom, error) {
 	var rows *sql.Rows
 	var err error
 
@@ -190,16 +191,17 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	}
 
 	if err != nil {
-		return []types.PublicRoom{}, nil
+		return []gomatrixserverlib.PublicRoom{}, nil
 	}
+	defer common.CloseAndLogIfError(ctx, rows, "selectPublicRooms failed to close rows")
 
-	rooms := []types.PublicRoom{}
+	rooms := []gomatrixserverlib.PublicRoom{}
 	for rows.Next() {
-		var r types.PublicRoom
+		var r gomatrixserverlib.PublicRoom
 		var aliasesJSON string
 
 		err = rows.Scan(
-			&r.RoomID, &r.NumJoinedMembers, &aliasesJSON, &r.CanonicalAlias,
+			&r.RoomID, &r.JoinedMembersCount, &aliasesJSON, &r.CanonicalAlias,
 			&r.Name, &r.Topic, &r.WorldReadable, &r.GuestCanJoin, &r.AvatarURL,
 		)
 		if err != nil {

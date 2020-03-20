@@ -124,6 +124,12 @@ func GuestAccessForbidden(msg string) *MatrixError {
 	return &MatrixError{"M_GUEST_ACCESS_FORBIDDEN", msg}
 }
 
+// UnsupportedRoomVersion is an error which is returned when the client
+// requests a room with a version that is unsupported.
+func UnsupportedRoomVersion(msg string) *MatrixError {
+	return &MatrixError{"M_UNSUPPORTED_ROOM_VERSION", msg}
+}
+
 // LimitExceededError is a rate-limiting error.
 type LimitExceededError struct {
 	MatrixError

@@ -43,6 +43,8 @@ type QueryLatestEventsAndStateResponse struct {
 	// Does the room exist?
 	// If the room doesn't exist this will be false and LatestEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The latest events in the room.
 	// These are used to set the prev_events when sending an event.
 	LatestEvents []gomatrixserverlib.EventReference `json:"latest_events"`
@@ -50,7 +52,7 @@ type QueryLatestEventsAndStateResponse struct {
 	// This list will be in an arbitrary order.
 	// These are used to set the auth_events when sending an event.
 	// These are used to check whether the event is allowed.
-	StateEvents []gomatrixserverlib.Event `json:"state_events"`
+	StateEvents []gomatrixserverlib.HeaderedEvent `json:"state_events"`
 	// The depth of the latest events.
 	// This is one greater than the maximum depth of the latest events.
 	// This is used to set the depth when sending an event.
@@ -74,12 +76,14 @@ type QueryStateAfterEventsResponse struct {
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
 	// The state events requested.
 	// This list will be in an arbitrary order.
-	StateEvents []gomatrixserverlib.Event `json:"state_events"`
+	StateEvents []gomatrixserverlib.HeaderedEvent `json:"state_events"`
 }
 
 // QueryEventsByIDRequest is a request to QueryEventsByID
@@ -99,7 +103,7 @@ type QueryEventsByIDResponse struct {
 	// fails to read it from the database then it will fail
 	// the entire request.
 	// This list will be in an arbitrary order.
-	Events []gomatrixserverlib.Event `json:"events"`
+	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
 // QueryMembershipForUserRequest is a request to QueryMembership
@@ -186,7 +190,7 @@ type QueryMissingEventsRequest struct {
 // QueryMissingEventsResponse is a response to QueryMissingEvents
 type QueryMissingEventsResponse struct {
 	// Missing events, arbritrary order.
-	Events []gomatrixserverlib.Event `json:"events"`
+	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
 // QueryStateAndAuthChainRequest is a request to QueryStateAndAuthChain
@@ -207,13 +211,15 @@ type QueryStateAndAuthChainResponse struct {
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
 	// The state and auth chain events that were requested.
 	// The lists will be in an arbitrary order.
-	StateEvents     []gomatrixserverlib.Event `json:"state_events"`
-	AuthChainEvents []gomatrixserverlib.Event `json:"auth_chain_events"`
+	StateEvents     []gomatrixserverlib.HeaderedEvent `json:"state_events"`
+	AuthChainEvents []gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
 }
 
 // QueryBackfillRequest is a request to QueryBackfill.
@@ -229,7 +235,7 @@ type QueryBackfillRequest struct {
 // QueryBackfillResponse is a response to QueryBackfill.
 type QueryBackfillResponse struct {
 	// Missing events, arbritrary order.
-	Events []gomatrixserverlib.Event `json:"events"`
+	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
 // QueryServersInRoomAtEventRequest is a request to QueryServersInRoomAtEvent
@@ -249,10 +255,10 @@ type QueryServersInRoomAtEventResponse struct {
 // QueryRoomVersionCapabilities asks for the default room version
 type QueryRoomVersionCapabilitiesRequest struct{}
 
-// QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
+// QueryRoomVersionCapabilitiesResponse is a response to QueryRoomVersionCapabilitiesRequest
 type QueryRoomVersionCapabilitiesResponse struct {
-	DefaultRoomVersion    string            `json:"default"`
-	AvailableRoomVersions map[string]string `json:"available"`
+	DefaultRoomVersion    gomatrixserverlib.RoomVersion            `json:"default"`
+	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
 }
 
 // RoomserverQueryAPI is used to query information from the room server.
@@ -536,7 +542,7 @@ func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// QueryServersInRoomAtEvent implements RoomServerQueryAPI
+// QueryRoomVersionCapabilities implements RoomServerQueryAPI
 func (h *httpRoomserverQueryAPI) QueryRoomVersionCapabilities(
 	ctx context.Context,
 	request *QueryRoomVersionCapabilitiesRequest,

@@ -105,6 +105,12 @@ func Setup(
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/joined_rooms",
+		common.MakeAuthAPI("joined_rooms", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			return GetJoinedRooms(req, device, accountDB)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
 		common.MakeAuthAPI("membership", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(req))
@@ -390,7 +396,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	unstableMux.Handle("/thirdparty/protocols",
+	r0mux.Handle("/thirdparty/protocols",
 		common.MakeExternalAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
 			// TODO: Return the third party protcols
 			return util.JSONResponse{

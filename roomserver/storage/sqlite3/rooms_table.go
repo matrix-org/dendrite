@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const roomsSchema = `
@@ -31,13 +32,13 @@ const roomsSchema = `
     latest_event_nids TEXT NOT NULL DEFAULT '[]',
     last_event_sent_nid INTEGER NOT NULL DEFAULT 0,
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
-    room_version INTEGER NOT NULL DEFAULT 1
+    room_version TEXT NOT NULL
   );
 `
 
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = `
-	INSERT INTO roomserver_rooms (room_id) VALUES ($1)
+	INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)
 	  ON CONFLICT DO NOTHING;
 `
 
@@ -53,6 +54,9 @@ const selectLatestEventNIDsForUpdateSQL = "" +
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE roomserver_rooms SET latest_event_nids = $1, last_event_sent_nid = $2, state_snapshot_nid = $3 WHERE room_nid = $4"
 
+const selectRoomVersionForRoomIDSQL = "" +
+	"SELECT room_version FROM roomserver_rooms WHERE room_id = $1"
+
 const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
 
@@ -62,6 +66,7 @@ type roomStatements struct {
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
+	selectRoomVersionForRoomIDStmt     *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 }
 
@@ -76,16 +81,18 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
+		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
 	}.prepare(db)
 }
 
 func (s *roomStatements) insertRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx,
+	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var err error
 	insertStmt := common.TxStmt(txn, s.insertRoomNIDStmt)
-	if _, err = insertStmt.ExecContext(ctx, roomID); err == nil {
+	if _, err = insertStmt.ExecContext(ctx, roomID, roomVersion); err == nil {
 		return s.selectRoomNID(ctx, txn, roomID)
 	} else {
 		return types.RoomNID(0), err
@@ -155,10 +162,19 @@ func (s *roomStatements) updateLatestEventNIDs(
 	return err
 }
 
+func (s *roomStatements) selectRoomVersionForRoomID(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
+	var roomVersion gomatrixserverlib.RoomVersion
+	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
+	return roomVersion, err
+}
+
 func (s *roomStatements) selectRoomVersionForRoomNID(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) (int64, error) {
-	var roomVersion int64
+) (gomatrixserverlib.RoomVersion, error) {
+	var roomVersion gomatrixserverlib.RoomVersion
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
 	return roomVersion, err

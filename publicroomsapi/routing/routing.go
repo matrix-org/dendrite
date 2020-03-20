@@ -26,6 +26,8 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/publicroomsapi/directory"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
+	"github.com/matrix-org/dendrite/publicroomsapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -36,7 +38,10 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // Due to Setup being used to call many other functions, a gocyclo nolint is
 // applied:
 // nolint: gocyclo
-func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, queryAPI api.RoomserverQueryAPI) {
+func Setup(
+	apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, queryAPI api.RoomserverQueryAPI,
+	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider types.ExternalPublicRoomsProvider,
+) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
@@ -66,7 +71,17 @@ func Setup(apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
 		common.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+			if extRoomsProvider != nil {
+				return directory.GetPostPublicRoomsWithExternal(req, publicRoomsDB, fedClient, extRoomsProvider)
+			}
 			return directory.GetPostPublicRooms(req, publicRoomsDB)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
+
+	// Federation - TODO: should this live here or in federation API? It's sure easier if it's here so here it is.
+	apiMux.Handle("/_matrix/federation/v1/publicRooms",
+		common.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
+			return directory.GetPostPublicRooms(req, publicRoomsDB)
+		}),
+	).Methods(http.MethodGet)
 }

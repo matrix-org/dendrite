@@ -136,13 +136,14 @@ func updateToInviteMembership(
 		return nil, err
 	}
 	if needsSending {
+		roomVersion := gomatrixserverlib.RoomVersionV1
 		// We notify the consumers using a special event even though we will
 		// notify them about the change in current state as part of the normal
 		// room event stream. This ensures that the consumers only have to
 		// consider a single stream of events when determining whether a user
 		// is invited, rather than having to combine multiple streams themselves.
 		onie := api.OutputNewInviteEvent{
-			Event: *add,
+			Event: (*add).Headered(roomVersion),
 		}
 		updates = append(updates, api.OutputEvent{
 			Type:           api.OutputTypeNewInviteEvent,

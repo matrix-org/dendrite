@@ -112,7 +112,7 @@ func (c *ContinualConsumer) consumePartition(pc sarama.PartitionConsumer) {
 		msgErr := c.ProcessMessage(message)
 		// Advance our position in the stream so that we will start at the right position after a restart.
 		if err := c.PartitionStore.SetPartitionOffset(context.TODO(), c.Topic, message.Partition, message.Offset); err != nil {
-			panic(fmt.Errorf("the ContinualConsumer failed to SetPartitionOffset: %s", err))
+			panic(fmt.Errorf("the ContinualConsumer failed to SetPartitionOffset: %w", err))
 		}
 		// Shutdown if we were told to do so.
 		if msgErr == ErrShutdown {

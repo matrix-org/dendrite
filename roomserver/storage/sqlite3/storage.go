@@ -18,8 +18,11 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/url"
+
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -90,7 +93,21 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID()); err != nil {
+		// TODO: Here we should aim to have two different code paths for new rooms
+		// vs existing ones.
+
+		// Get the default room version. If the client doesn't supply a room_version
+		// then we will use our configured default to create the room.
+		// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
+		// Note that the below logic depends on the m.room.create event being the
+		// first event that is persisted to the database when creating or joining a
+		// room.
+		var roomVersion gomatrixserverlib.RoomVersion
+		if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
+			return err
+		}
+
+		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
 			return err
 		}
 
@@ -149,14 +166,38 @@ func (d *Database) StoreEvent(
 	}, nil
 }
 
+func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
+	gomatrixserverlib.RoomVersion, error,
+) {
+	var err error
+	var roomVersion gomatrixserverlib.RoomVersion
+	// Look for m.room.create events.
+	if event.Type() != gomatrixserverlib.MRoomCreate {
+		return gomatrixserverlib.RoomVersion(""), nil
+	}
+	roomVersion = roomserverVersion.DefaultRoomVersion()
+	var createContent gomatrixserverlib.CreateContent
+	// The m.room.create event contains an optional "room_version" key in
+	// the event content, so we need to unmarshal that first.
+	if err = json.Unmarshal(event.Content(), &createContent); err != nil {
+		return gomatrixserverlib.RoomVersion(""), err
+	}
+	// A room version was specified in the event content?
+	if createContent.RoomVersion != nil {
+		roomVersion = gomatrixserverlib.RoomVersion(*createContent.RoomVersion)
+	}
+	return roomVersion, err
+}
+
 func (d *Database) assignRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx,
+	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (roomNID types.RoomNID, err error) {
 	// Check if we already have a numeric ID in the database.
 	roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID)
+		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID, roomVersion)
 		if err == nil {
 			// Now get the numeric ID back out of the database
 			roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
@@ -630,7 +671,8 @@ func (d *Database) MembershipUpdater(
 		}
 	}()
 
-	roomNID, err := d.assignRoomNID(ctx, txn, roomID)
+	// TODO: Room version here
+	roomNID, err := d.assignRoomNID(ctx, txn, roomID, "1")
 	if err != nil {
 		return nil, err
 	}
@@ -852,8 +894,16 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 }
 
 func (d *Database) GetRoomVersionForRoom(
+	ctx context.Context, roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
+	return d.statements.selectRoomVersionForRoomID(
+		ctx, nil, roomID,
+	)
+}
+
+func (d *Database) GetRoomVersionForRoomNID(
 	ctx context.Context, roomNID types.RoomNID,
-) (int64, error) {
+) (gomatrixserverlib.RoomVersion, error) {
 	return d.statements.selectRoomVersionForRoomNID(
 		ctx, nil, roomNID,
 	)
