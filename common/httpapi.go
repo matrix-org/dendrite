@@ -25,6 +25,10 @@ func MakeAuthAPI(
 		if err != nil {
 			return *err
 		}
+		// add the user ID to the logger
+		logger := util.GetLogger((req.Context()))
+		logger = logger.WithField("user_id", device.UserID)
+		req = req.WithContext(util.ContextWithLogger(req.Context(), logger))
 
 		return f(req, device)
 	}

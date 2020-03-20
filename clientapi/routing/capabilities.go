@@ -17,7 +17,7 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/util"
@@ -35,7 +35,8 @@ func GetCapabilities(
 		&roomVersionsQueryReq,
 		&roomVersionsQueryRes,
 	); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryRoomVersionCapabilities failed")
+		return jsonerror.InternalServerError()
 	}
 
 	response := map[string]interface{}{

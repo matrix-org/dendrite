@@ -26,4 +26,5 @@ type Device struct {
 	// associated with access tokens.
 	SessionID int64
 	// TODO: display name, last used timestamp, keys, etc
+	DisplayName string
 }

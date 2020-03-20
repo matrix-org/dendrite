@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
+	"sync"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/common"
@@ -39,13 +41,15 @@ type Database struct {
 	threepids    threepidStatements
 	filter       filterStatements
 	serverName   gomatrixserverlib.ServerName
+
+	createGuestAccountMu sync.Mutex
 }
 
 // NewDatabase creates a new accounts and profiles database
 func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open("sqlite3", dataSourceName); err != nil {
+	if db, err = sql.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
 		return nil, err
 	}
 	partitions := common.PartitionOffsetStatements{}
@@ -76,7 +80,7 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = f.prepare(db); err != nil {
 		return nil, err
 	}
-	return &Database{db, partitions, a, p, m, ac, t, f, serverName}, nil
+	return &Database{db, partitions, a, p, m, ac, t, f, serverName, sync.Mutex{}}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -118,14 +122,46 @@ func (d *Database) SetDisplayName(
 	return d.profiles.setDisplayName(ctx, localpart, displayName)
 }
 
+// CreateGuestAccount makes a new guest account and creates an empty profile
+// for this account.
+func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		// We need to lock so we sequentially create numeric localparts. If we don't, two calls to
+		// this function will cause the same number to be selected and one will fail with 'database is locked'
+		// when the first txn upgrades to a write txn.
+		// We know we'll be the only process since this is sqlite ;) so a lock here will be all that is needed.
+		d.createGuestAccountMu.Lock()
+		defer d.createGuestAccountMu.Unlock()
+
+		var numLocalpart int64
+		numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
+		if err != nil {
+			return err
+		}
+		localpart := strconv.FormatInt(numLocalpart, 10)
+		acc, err = d.createAccount(ctx, txn, localpart, "", "")
+		return err
+	})
+	return acc, err
+}
+
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, nil.
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
+) (acc *authtypes.Account, err error) {
+	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
+		return err
+	})
+	return
+}
+
+func (d *Database) createAccount(
+	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
 ) (*authtypes.Account, error) {
 	var err error
-
 	// Generate a password hash if this is not a password-less user
 	hash := ""
 	if plaintextPassword != "" {
@@ -134,13 +170,14 @@ func (d *Database) CreateAccount(
 			return nil, err
 		}
 	}
-	if err := d.profiles.insertProfile(ctx, localpart); err != nil {
+	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		if common.IsUniqueConstraintViolationErr(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	if err := d.SaveAccountData(ctx, localpart, "", "m.push_rules", `{
+
+	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", `{
 		"global": {
 			"content": [],
 			"override": [],
@@ -151,7 +188,7 @@ func (d *Database) CreateAccount(
 	}`); err != nil {
 		return nil, err
 	}
-	return d.accounts.insertAccount(ctx, localpart, hash, appserviceID)
+	return d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID)
 }
 
 // SaveMembership saves the user matching a given localpart as a member of a given
@@ -216,6 +253,16 @@ func (d *Database) GetMembershipsByLocalpart(
 	return d.memberships.selectMembershipsByLocalpart(ctx, localpart)
 }
 
+// GetRoomIDsByLocalPart returns an array containing the room ids of all
+// the rooms a user matching a given localpart is a member of
+// If no membership match the given localpart, returns an empty array
+// If there was an issue during the retrieval, returns the SQL error
+func (d *Database) GetRoomIDsByLocalPart(
+	ctx context.Context, localpart string,
+) ([]string, error) {
+	return d.memberships.selectRoomIDsByLocalPart(ctx, localpart)
+}
+
 // newMembership saves a new membership in the database.
 // If the event isn't a valid m.room.member event with type `join`, does nothing.
 // If an error occurred, returns the SQL error
@@ -258,7 +305,9 @@ func (d *Database) newMembership(
 func (d *Database) SaveAccountData(
 	ctx context.Context, localpart, roomID, dataType, content string,
 ) error {
-	return d.accountDatas.insertAccountData(ctx, localpart, roomID, dataType, content)
+	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.accountDatas.insertAccountData(ctx, txn, localpart, roomID, dataType, content)
+	})
 }
 
 // GetAccountData returns account data related to a given localpart
@@ -288,7 +337,7 @@ func (d *Database) GetAccountDataByType(
 func (d *Database) GetNewNumericLocalpart(
 	ctx context.Context,
 ) (int64, error) {
-	return d.accounts.selectNewNumericLocalpart(ctx)
+	return d.accounts.selectNewNumericLocalpart(ctx, nil)
 }
 
 func hashPassword(plaintext string) (hash string, err error) {

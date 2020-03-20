@@ -101,11 +101,11 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		"type":     ev.Type(),
 	}).Info("appservice received an event from roomserver")
 
-	missingEvents, err := s.lookupMissingStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
+	missingEvents, err := s.lookupMissingStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev.Event)
 	if err != nil {
 		return err
 	}
-	events := append(missingEvents, ev)
+	events := append(missingEvents, ev.Event)
 
 	// Send event to any relevant application services
 	return s.filterRoomserverEvents(context.TODO(), events)
@@ -143,7 +143,9 @@ func (s *OutputRoomEventConsumer) lookupMissingStateEvents(
 		return nil, err
 	}
 
-	result = append(result, eventResp.Events...)
+	for _, headeredEvent := range eventResp.Events {
+		result = append(result, headeredEvent.Event)
+	}
 
 	return result, nil
 }

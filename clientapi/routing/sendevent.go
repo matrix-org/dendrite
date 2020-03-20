@@ -74,8 +74,10 @@ func SendEvent(
 		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndSessionID,
 	)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
+	util.GetLogger(req.Context()).WithField("event_id", eventID).Info("Sent event")
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,
@@ -121,7 +123,8 @@ func generateSendEvent(
 	}
 	err = builder.SetContent(r)
 	if err != nil {
-		resErr := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
 
@@ -133,14 +136,15 @@ func generateSendEvent(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
-		resErr := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("common.BuildEvent failed")
+		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
 
 	// check to see if this user can perform this operation
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i]
+		stateEvents[i] = &queryRes.StateEvents[i].Event
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(*e, &provider); err != nil {

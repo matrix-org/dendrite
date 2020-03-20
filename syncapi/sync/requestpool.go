@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -68,7 +67,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	if shouldReturnImmediately(syncReq) {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("rp.currentSyncForUser failed")
+			return jsonerror.InternalServerError()
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -107,7 +107,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			hasTimedOut = true
 		// Or for the request to be cancelled
 		case <-req.Context().Done():
-			return httputil.LogThenError(req, req.Context().Err())
+			util.GetLogger(req.Context()).WithError(err).Error("request cancelled")
+			return jsonerror.InternalServerError()
 		}
 
 		// Note that we don't time out during calculation of sync
@@ -117,7 +118,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("rp.currentSyncForUser failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if !syncData.IsEmpty() || hasTimedOut {

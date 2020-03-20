@@ -231,7 +231,7 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 
 	for rows.Next() {
 		var dev authtypes.Device
-		err = rows.Scan(&dev.ID)
+		err = rows.Scan(&dev.ID, &dev.DisplayName)
 		if err != nil {
 			return devices, err
 		}

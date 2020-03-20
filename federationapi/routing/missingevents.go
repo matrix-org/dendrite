@@ -16,7 +16,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -56,7 +55,8 @@ func GetMissingEvents(
 		},
 		&eventsResponse,
 	); err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryMissingEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	eventsResponse.Events = filterEvents(eventsResponse.Events, gme.MinDepth, roomID)
@@ -68,8 +68,8 @@ func GetMissingEvents(
 
 // filterEvents returns only those events with matching roomID and having depth greater than minDepth
 func filterEvents(
-	events []gomatrixserverlib.Event, minDepth int64, roomID string,
-) []gomatrixserverlib.Event {
+	events []gomatrixserverlib.HeaderedEvent, minDepth int64, roomID string,
+) []gomatrixserverlib.HeaderedEvent {
 	ref := events[:0]
 	for _, ev := range events {
 		if ev.Depth() >= minDepth && ev.RoomID() == roomID {

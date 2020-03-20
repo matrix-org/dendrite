@@ -102,7 +102,10 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 		return nil
 	}
 
-	var t gomatrixserverlib.Transaction
+	t := gomatrixserverlib.Transaction{
+		PDUs: []gomatrixserverlib.Event{},
+		EDUs: []gomatrixserverlib.EDU{},
+	}
 	now := gomatrixserverlib.AsTimestamp(time.Now())
 	t.TransactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.sentCounter))
 	t.Origin = oq.origin

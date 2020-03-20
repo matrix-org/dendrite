@@ -18,26 +18,27 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const roomsSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_rooms (
     room_nid INTEGER PRIMARY KEY AUTOINCREMENT,
     room_id TEXT NOT NULL UNIQUE,
-    latest_event_nids TEXT NOT NULL DEFAULT '{}',
+    latest_event_nids TEXT NOT NULL DEFAULT '[]',
     last_event_sent_nid INTEGER NOT NULL DEFAULT 0,
     state_snapshot_nid INTEGER NOT NULL DEFAULT 0,
-    room_version INTEGER NOT NULL DEFAULT 1
+    room_version TEXT NOT NULL
   );
 `
 
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = `
-	INSERT INTO roomserver_rooms (room_id) VALUES ($1)
+	INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)
 	  ON CONFLICT DO NOTHING;
 `
 
@@ -53,6 +54,9 @@ const selectLatestEventNIDsForUpdateSQL = "" +
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE roomserver_rooms SET latest_event_nids = $1, last_event_sent_nid = $2, state_snapshot_nid = $3 WHERE room_nid = $4"
 
+const selectRoomVersionForRoomIDSQL = "" +
+	"SELECT room_version FROM roomserver_rooms WHERE room_id = $1"
+
 const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
 
@@ -62,6 +66,7 @@ type roomStatements struct {
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
+	selectRoomVersionForRoomIDStmt     *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 }
 
@@ -76,16 +81,18 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
+		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
 	}.prepare(db)
 }
 
 func (s *roomStatements) insertRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, txn *sql.Tx,
+	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var err error
 	insertStmt := common.TxStmt(txn, s.insertRoomNIDStmt)
-	if _, err = insertStmt.ExecContext(ctx, roomID); err == nil {
+	if _, err = insertStmt.ExecContext(ctx, roomID, roomVersion); err == nil {
 		return s.selectRoomNID(ctx, txn, roomID)
 	} else {
 		return types.RoomNID(0), err
@@ -104,16 +111,16 @@ func (s *roomStatements) selectRoomNID(
 func (s *roomStatements) selectLatestEventNIDs(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.EventNID, types.StateSnapshotNID, error) {
-	var nids pq.Int64Array
+	var eventNIDs []types.EventNID
+	var nidsJSON string
 	var stateSnapshotNID int64
 	stmt := common.TxStmt(txn, s.selectLatestEventNIDsStmt)
-	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &stateSnapshotNID)
+	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nidsJSON, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, err
 	}
-	eventNIDs := make([]types.EventNID, len(nids))
-	for i := range nids {
-		eventNIDs[i] = types.EventNID(nids[i])
+	if err := json.Unmarshal([]byte(nidsJSON), &eventNIDs); err != nil {
+		return nil, 0, err
 	}
 	return eventNIDs, types.StateSnapshotNID(stateSnapshotNID), nil
 }
@@ -121,17 +128,17 @@ func (s *roomStatements) selectLatestEventNIDs(
 func (s *roomStatements) selectLatestEventsNIDsForUpdate(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.EventNID, types.EventNID, types.StateSnapshotNID, error) {
-	var nids pq.Int64Array
+	var eventNIDs []types.EventNID
+	var nidsJSON string
 	var lastEventSentNID int64
 	var stateSnapshotNID int64
 	stmt := common.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
-	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
+	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nidsJSON, &lastEventSentNID, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	eventNIDs := make([]types.EventNID, len(nids))
-	for i := range nids {
-		eventNIDs[i] = types.EventNID(nids[i])
+	if err := json.Unmarshal([]byte(nidsJSON), &eventNIDs); err != nil {
+		return nil, 0, 0, err
 	}
 	return eventNIDs, types.EventNID(lastEventSentNID), types.StateSnapshotNID(stateSnapshotNID), nil
 }
@@ -155,10 +162,19 @@ func (s *roomStatements) updateLatestEventNIDs(
 	return err
 }
 
+func (s *roomStatements) selectRoomVersionForRoomID(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (gomatrixserverlib.RoomVersion, error) {
+	var roomVersion gomatrixserverlib.RoomVersion
+	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
+	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
+	return roomVersion, err
+}
+
 func (s *roomStatements) selectRoomVersionForRoomNID(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) (int64, error) {
-	var roomVersion int64
+) (gomatrixserverlib.RoomVersion, error) {
+	var roomVersion gomatrixserverlib.RoomVersion
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
 	return roomVersion, err

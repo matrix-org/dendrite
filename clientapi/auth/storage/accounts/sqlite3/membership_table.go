@@ -17,9 +17,10 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/common"
 )
 
 const membershipSchema = `
@@ -50,22 +51,22 @@ const selectMembershipsByLocalpartSQL = "" +
 const selectMembershipInRoomByLocalpartSQL = "" +
 	"SELECT event_id FROM account_memberships WHERE localpart = $1 AND room_id = $2"
 
+const selectRoomIDsByLocalPartSQL = "" +
+	"SELECT room_id FROM account_memberships WHERE localpart = $1"
+
 const deleteMembershipsByEventIDsSQL = "" +
 	"DELETE FROM account_memberships WHERE event_id IN ($1)"
 
 type membershipStatements struct {
-	deleteMembershipsByEventIDsStmt       *sql.Stmt
 	insertMembershipStmt                  *sql.Stmt
 	selectMembershipInRoomByLocalpartStmt *sql.Stmt
 	selectMembershipsByLocalpartStmt      *sql.Stmt
+	selectRoomIDsByLocalPartStmt          *sql.Stmt
 }
 
 func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(membershipSchema)
 	if err != nil {
-		return
-	}
-	if s.deleteMembershipsByEventIDsStmt, err = db.Prepare(deleteMembershipsByEventIDsSQL); err != nil {
 		return
 	}
 	if s.insertMembershipStmt, err = db.Prepare(insertMembershipSQL); err != nil {
@@ -75,6 +76,9 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectMembershipsByLocalpartStmt, err = db.Prepare(selectMembershipsByLocalpartSQL); err != nil {
+		return
+	}
+	if s.selectRoomIDsByLocalPartStmt, err = db.Prepare(selectRoomIDsByLocalPartSQL); err != nil {
 		return
 	}
 	return
@@ -91,8 +95,12 @@ func (s *membershipStatements) insertMembership(
 func (s *membershipStatements) deleteMembershipsByEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) (err error) {
-	stmt := txn.Stmt(s.deleteMembershipsByEventIDsStmt)
-	_, err = stmt.ExecContext(ctx, pq.StringArray(eventIDs))
+	sqlStr := strings.Replace(deleteMembershipsByEventIDsSQL, "($1)", common.QueryVariadic(len(eventIDs)), 1)
+	iEventIDs := make([]interface{}, len(eventIDs))
+	for i, e := range eventIDs {
+		iEventIDs[i] = e
+	}
+	_, err = txn.ExecContext(ctx, sqlStr, iEventIDs...)
 	return
 }
 
@@ -117,7 +125,7 @@ func (s *membershipStatements) selectMembershipsByLocalpart(
 
 	memberships = []authtypes.Membership{}
 
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectMembershipsByLocalpart: rows.close() failed")
 	for rows.Next() {
 		var m authtypes.Membership
 		m.Localpart = localpart
@@ -128,4 +136,23 @@ func (s *membershipStatements) selectMembershipsByLocalpart(
 	}
 
 	return
+}
+func (s *membershipStatements) selectRoomIDsByLocalPart(
+	ctx context.Context, localPart string,
+) ([]string, error) {
+	stmt := s.selectRoomIDsByLocalPartStmt
+	rows, err := stmt.QueryContext(ctx, localPart)
+	if err != nil {
+		return nil, err
+	}
+	roomIDs := []string{}
+	defer rows.Close() // nolint: errcheck
+	for rows.Next() {
+		var roomID string
+		if err = rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return roomIDs, rows.Err()
 }

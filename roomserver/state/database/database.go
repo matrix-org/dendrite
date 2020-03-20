@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A RoomStateDatabase has the storage APIs needed to load state from the database
@@ -61,4 +62,6 @@ type RoomStateDatabase interface {
 	Events(ctx context.Context, eventNIDs []types.EventNID) ([]types.Event, error)
 	// Look up snapshot NID for an event ID string
 	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
+	// Look up a room version from the room NID.
+	GetRoomVersionForRoomNID(ctx context.Context, roomNID types.RoomNID) (gomatrixserverlib.RoomVersion, error)
 }

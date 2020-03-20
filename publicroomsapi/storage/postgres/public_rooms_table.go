@@ -21,8 +21,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/publicroomsapi/types"
 )
 
 var editableAttributes = []string{
@@ -175,7 +177,7 @@ func (s *publicRoomsStatements) countPublicRooms(ctx context.Context) (nb int64,
 
 func (s *publicRoomsStatements) selectPublicRooms(
 	ctx context.Context, offset int64, limit int16, filter string,
-) ([]types.PublicRoom, error) {
+) ([]gomatrixserverlib.PublicRoom, error) {
 	var rows *sql.Rows
 	var err error
 
@@ -201,17 +203,17 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	}
 
 	if err != nil {
-		return []types.PublicRoom{}, nil
+		return []gomatrixserverlib.PublicRoom{}, nil
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectPublicRooms: rows.close() failed")
 
-	rooms := []types.PublicRoom{}
+	rooms := []gomatrixserverlib.PublicRoom{}
 	for rows.Next() {
-		var r types.PublicRoom
+		var r gomatrixserverlib.PublicRoom
 		var aliases pq.StringArray
 
 		err = rows.Scan(
-			&r.RoomID, &r.NumJoinedMembers, &aliases, &r.CanonicalAlias,
+			&r.RoomID, &r.JoinedMembersCount, &aliases, &r.CanonicalAlias,
 			&r.Name, &r.Topic, &r.WorldReadable, &r.GuestCanJoin, &r.AvatarURL,
 		)
 		if err != nil {

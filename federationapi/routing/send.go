@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
@@ -61,7 +60,8 @@ func Send(
 
 	resp, err := t.processTransaction()
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -116,6 +116,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
 			}
+			util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).Warn("Failed to process incoming federation event, skipping it.")
 		} else {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
 		}
@@ -162,7 +163,11 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	}
 
 	// Check that the event is allowed by the state at the event.
-	if err := checkAllowedByState(e, stateResp.StateEvents); err != nil {
+	var events []gomatrixserverlib.Event
+	for _, headeredEvent := range stateResp.StateEvents {
+		events = append(events, headeredEvent.Event)
+	}
+	if err := checkAllowedByState(e, events); err != nil {
 		return err
 	}
 
@@ -211,7 +216,24 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 		return err
 	}
 	// Check that the event is allowed by the state.
+retryAllowedState:
 	if err := checkAllowedByState(e, state.StateEvents); err != nil {
+		switch missing := err.(type) {
+		case gomatrixserverlib.MissingAuthEventError:
+			// An auth event was missing so let's look up that event over federation
+			for _, s := range state.StateEvents {
+				if s.EventID() != missing.AuthEventID {
+					continue
+				}
+				err = t.processEventWithMissingState(s)
+				// If there was no error retrieving the event from federation then
+				// we assume that it succeeded, so retry the original state check
+				if err == nil {
+					goto retryAllowedState
+				}
+			}
+		default:
+		}
 		return err
 	}
 	// pass the event along with the state to the roomserver

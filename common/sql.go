@@ -17,8 +17,7 @@ package common
 import (
 	"database/sql"
 	"fmt"
-
-	"github.com/lib/pq"
+	"runtime"
 )
 
 // A Transaction is something that can be committed or rolledback.
@@ -77,12 +76,6 @@ func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 	return statement
 }
 
-// IsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation error
-func IsUniqueConstraintViolationErr(err error) bool {
-	pqErr, ok := err.(*pq.Error)
-	return ok && pqErr.Code == "23505"
-}
-
 // Hack of the century
 func QueryVariadic(count int) string {
 	return QueryVariadicOffset(count, 0)
@@ -98,4 +91,11 @@ func QueryVariadicOffset(count, offset int) string {
 	}
 	str += ")"
 	return str
+}
+
+func SQLiteDriverName() string {
+	if runtime.GOOS == "js" {
+		return "sqlite3_js"
+	}
+	return "sqlite3"
 }

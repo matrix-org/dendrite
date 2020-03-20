@@ -89,7 +89,7 @@ func AddPrevEventsToEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(&queryRes.StateEvents[i])
+		err = authEvents.AddEvent(&queryRes.StateEvents[i].Event)
 		if err != nil {
 			return err
 		}

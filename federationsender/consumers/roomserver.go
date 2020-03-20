@@ -109,7 +109,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
 func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
-	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ore.Event)
+	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ore.Event.Event)
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 
 	// Send the event.
 	return s.queues.SendEvent(
-		&ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
+		&ore.Event.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	)
 }
 
@@ -178,7 +178,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		ore.AddsStateEventIDs, ore.RemovesStateEventIDs,
 		ore.StateBeforeAddsEventIDs, ore.StateBeforeRemovesEventIDs,
 	)
-	combinedAddsEvents, err := s.lookupStateEvents(combinedAdds, ore.Event)
+	combinedAddsEvents, err := s.lookupStateEvents(combinedAdds, ore.Event.Event)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,10 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 		return nil, err
 	}
 
-	result = append(result, eventResp.Events...)
+	for _, headeredEvent := range eventResp.Events {
+		result = append(result, headeredEvent.Event)
+	}
+
 	missing = missingEventsFrom(result, addsStateEventIDs)
 
 	if len(missing) != 0 {

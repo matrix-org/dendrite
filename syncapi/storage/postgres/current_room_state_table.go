@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     -- The state_key value for this state event e.g ''
     state_key TEXT NOT NULL,
     -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
-    event_json TEXT NOT NULL,
+    headered_event_json TEXT NOT NULL,
     -- The 'content.membership' value if this event is an m.room.member event. For other
     -- events, this will be NULL.
     membership TEXT,
@@ -59,10 +59,10 @@ CREATE INDEX IF NOT EXISTS syncapi_membership_idx ON syncapi_current_room_state(
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, event_json, membership, added_at)" +
+	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_room_state_unique" +
-	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, event_json = $7, membership = $8, added_at = $9"
+	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
 
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
@@ -71,7 +71,7 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectCurrentStateSQL = "" +
-	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1" +
+	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
 	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
 	" AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) )" +
 	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
@@ -83,14 +83,14 @@ const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
 const selectStateEventSQL = "" +
-	"SELECT event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
+	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
 	// TODO: The session_id and transaction_id blanks are here because otherwise
 	// the rowsToStreamEvents expects there to be exactly five columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT added_at, event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
 	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
 type currentRoomStateStatements struct {
@@ -140,7 +140,7 @@ func (s *currentRoomStateStatements) selectJoinedUsers(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
 
 	result := make(map[string][]string)
 	for rows.Next() {
@@ -168,7 +168,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectRoomIDsWithMembership: rows.close() failed")
 
 	var result []string
 	for rows.Next() {
@@ -185,7 +185,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 func (s *currentRoomStateStatements) selectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
-) ([]gomatrixserverlib.Event, error) {
+) ([]gomatrixserverlib.HeaderedEvent, error) {
 	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
 		pq.StringArray(stateFilter.Senders),
@@ -198,7 +198,7 @@ func (s *currentRoomStateStatements) selectCurrentState(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectCurrentState: rows.close() failed")
 
 	return rowsToEvents(rows)
 }
@@ -213,7 +213,7 @@ func (s *currentRoomStateStatements) deleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) upsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.Event, membership *string, addedAt types.StreamPosition,
+	event gomatrixserverlib.HeaderedEvent, membership *string, addedAt types.StreamPosition,
 ) error {
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
@@ -223,9 +223,14 @@ func (s *currentRoomStateStatements) upsertRoomState(
 		_, containsURL = content["url"]
 	}
 
+	headeredJSON, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
 	// upsert state event
 	stmt := common.TxStmt(txn, s.upsertRoomStateStmt)
-	_, err := stmt.ExecContext(
+	_, err = stmt.ExecContext(
 		ctx,
 		event.RoomID(),
 		event.EventID(),
@@ -233,7 +238,7 @@ func (s *currentRoomStateStatements) upsertRoomState(
 		event.Sender(),
 		containsURL,
 		*event.StateKey(),
-		event.JSON(),
+		headeredJSON,
 		membership,
 		addedAt,
 	)
@@ -248,20 +253,20 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
 	return rowsToStreamEvents(rows)
 }
 
-func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
-	result := []gomatrixserverlib.Event{}
+func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.HeaderedEvent, error) {
+	result := []gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var eventBytes []byte
 		if err := rows.Scan(&eventBytes); err != nil {
 			return nil, err
 		}
 		// TODO: Handle redacted events
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(eventBytes, false)
-		if err != nil {
+		var ev gomatrixserverlib.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 		result = append(result, ev)
@@ -271,7 +276,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.Event, error) {
 
 func (s *currentRoomStateStatements) selectStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
-) (*gomatrixserverlib.Event, error) {
+) (*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := s.selectStateEventStmt
 	var res []byte
 	err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
@@ -281,6 +286,9 @@ func (s *currentRoomStateStatements) selectStateEvent(
 	if err != nil {
 		return nil, err
 	}
-	ev, err := gomatrixserverlib.NewEventFromTrustedJSON(res, false)
+	var ev gomatrixserverlib.HeaderedEvent
+	if err = json.Unmarshal(res, &ev); err != nil {
+		return nil, err
+	}
 	return &ev, err
 }
