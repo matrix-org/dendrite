@@ -51,13 +51,12 @@ func BuildEvent(
 		return nil, err
 	}
 
-	var eventID string
-	var format gomatrixserverlib.EventIDFormat
-	format, err = queryRes.RoomVersion.EventIDFormat()
+	eventID := ""
+	eventIDFormat, err := queryRes.RoomVersion.EventIDFormat()
 	if err != nil {
 		return nil, err
 	}
-	if format == gomatrixserverlib.EventIDFormatV1 {
+	if eventIDFormat == gomatrixserverlib.EventIDFormatV1 {
 		eventID = fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	}
 

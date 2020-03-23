@@ -335,7 +335,14 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		}, nil
 	}
 
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
+	eventID := ""
+	eventIDFormat, err := respMakeJoin.RoomVersion.EventIDFormat()
+	if err != nil {
+		return nil, err
+	}
+	if eventIDFormat == gomatrixserverlib.EventIDFormatV1 {
+		eventID = fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
+	}
 	event, err := respMakeJoin.JoinEvent.Build(
 		eventID, r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID,
 		r.cfg.Matrix.PrivateKey, respMakeJoin.RoomVersion,

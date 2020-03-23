@@ -379,7 +379,14 @@ func buildEvent(
 		return nil, err
 	}
 	builder.AuthEvents = refs
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	eventID := ""
+	eventIDFormat, err := roomVersion.EventIDFormat()
+	if err != nil {
+		return nil, err
+	}
+	if eventIDFormat == gomatrixserverlib.EventIDFormatV1 {
+		eventID = fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	}
 	event, err := builder.Build(
 		eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
 		cfg.Matrix.PrivateKey, roomVersion,
