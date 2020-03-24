@@ -357,54 +357,6 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	return
 }
 
-// containsBackwardExtremity checks if a slice of StreamEvent contains a
-// backward extremity. It does so by selecting the earliest event in the slice
-// and by checking the presence in the database of all of its parent events, and
-// considers the event itself a backward extremity if at least one of the parent
-// events doesn't exist in the database.
-// Returns an error if there was an issue with talking to the database.
-//
-// This function is unused but currently set to nolint for now until we are
-// absolutely sure that the changes in matrix-org/dendrite#847 are behaving
-// properly.
-// nolint:unused
-func (r *messagesReq) containsBackwardExtremity(events []types.StreamEvent) (bool, error) {
-	// Select the earliest retrieved event.
-	var ev *types.StreamEvent
-	if r.backwardOrdering {
-		ev = &(events[len(events)-1])
-	} else {
-		ev = &(events[0])
-	}
-	// Get the earliest retrieved event's parents.
-	prevIDs := ev.PrevEventIDs()
-	prevs, err := r.db.Events(r.ctx, prevIDs)
-	if err != nil {
-		return false, nil
-	}
-	// Check if we have all of the events we requested. If not, it means we've
-	// reached a backward extremity.
-	var eventInDB bool
-	var id string
-	// Iterate over the IDs we used in the request.
-	for _, id = range prevIDs {
-		eventInDB = false
-		// Iterate over the events we got in response.
-		for _, ev := range prevs {
-			if ev.EventID() == id {
-				eventInDB = true
-			}
-		}
-		// One occurrence of one the event's parents not being present in the
-		// database is enough to say that the event is a backward extremity.
-		if !eventInDB {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
 // backfill performs a backfill request over the federation on another
 // homeserver in the room.
 // See: https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid
@@ -415,31 +367,9 @@ func (r *messagesReq) containsBackwardExtremity(events []types.StreamEvent) (boo
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
 func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
-	// Query the list of servers in the room when one of the backward extremities
-	// was sent.
-	var serversResponse api.QueryServersInRoomAtEventResponse
-	serversRequest := api.QueryServersInRoomAtEventRequest{
-		RoomID:  r.roomID,
-		EventID: fromEventIDs[0],
-	}
-	if err := r.queryAPI.QueryServersInRoomAtEvent(r.ctx, &serversRequest, &serversResponse); err != nil {
-		return nil, err
-	}
-
-	// Use the first server from the response, except if that server is us.
-	// In that case, use the second one if the roomserver responded with
-	// enough servers. If not, use an empty string to prevent the backfill
-	// from happening as there's no server to direct the request towards.
-	// TODO: Be smarter at selecting the server to direct the request
-	// towards.
-	srvToBackfillFrom := serversResponse.Servers[0]
-	if srvToBackfillFrom == r.cfg.Matrix.ServerName {
-		if len(serversResponse.Servers) > 1 {
-			srvToBackfillFrom = serversResponse.Servers[1]
-		} else {
-			util.GetLogger(r.ctx).Info("Not enough servers to backfill from")
-			return nil, nil
-		}
+	srvToBackfillFrom, err := r.serverToBackfillFrom(fromEventIDs)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot find server to backfill from: %w", err)
 	}
 
 	pdus := make([]gomatrixserverlib.HeaderedEvent, 0)
@@ -476,6 +406,62 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 	}
 
 	return pdus, nil
+}
+
+func (r *messagesReq) serverToBackfillFrom(fromEventIDs []string) (gomatrixserverlib.ServerName, error) {
+	// Query the list of servers in the room when one of the backward extremities
+	// was sent.
+	var serversResponse api.QueryServersInRoomAtEventResponse
+	serversRequest := api.QueryServersInRoomAtEventRequest{
+		RoomID:  r.roomID,
+		EventID: fromEventIDs[0],
+	}
+	if err := r.queryAPI.QueryServersInRoomAtEvent(r.ctx, &serversRequest, &serversResponse); err != nil {
+		util.GetLogger(r.ctx).WithError(err).Warn("Failed to query servers in room at event, falling back to event sender")
+		// FIXME: We shouldn't be doing this but in situations where we have already backfilled once
+		// the query API doesn't work as backfilled events do not make it to the room server.
+		// This means QueryServersInRoomAtEvent returns an error as it doesn't have the event ID in question.
+		// We need to inject backfilled events into the room server and store them appropriately.
+		events, err := r.db.Events(r.ctx, fromEventIDs)
+		if err != nil {
+			return "", err
+		}
+		if len(events) == 0 {
+			// should be impossible as these event IDs are backwards extremities
+			return "", fmt.Errorf("backfill: missing backwards extremities, event IDs: %s", fromEventIDs)
+		}
+		// The rationale here is that the last event was unlikely to be sent by us, so poke the server who sent it.
+		// We shouldn't be doing this really, but as a heuristic it should work pretty well for now.
+		for _, e := range events {
+			_, srv, err := gomatrixserverlib.SplitID('@', e.Sender())
+			if err != nil {
+				util.GetLogger(r.ctx).WithError(err).Warn("Failed to extract domain from event sender")
+				continue
+			}
+			if srv != r.cfg.Matrix.ServerName {
+				return srv, nil
+			}
+		}
+		// no valid events which have a remote server, fail.
+		return "", err
+	}
+
+	// Use the first server from the response, except if that server is us.
+	// In that case, use the second one if the roomserver responded with
+	// enough servers. If not, use an empty string to prevent the backfill
+	// from happening as there's no server to direct the request towards.
+	// TODO: Be smarter at selecting the server to direct the request
+	// towards.
+	srvToBackfillFrom := serversResponse.Servers[0]
+	if srvToBackfillFrom == r.cfg.Matrix.ServerName {
+		if len(serversResponse.Servers) > 1 {
+			srvToBackfillFrom = serversResponse.Servers[1]
+		} else {
+			util.GetLogger(r.ctx).Info("Not enough servers to backfill from")
+			return "", nil
+		}
+	}
+	return srvToBackfillFrom, nil
 }
 
 // setToDefault returns the default value for the "to" query parameter of a
