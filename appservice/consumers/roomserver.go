@@ -193,6 +193,12 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		return true
 	}
 
+	if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
+		if appservice.IsInterestedInUserID(*event.StateKey()) {
+			return true
+		}
+	}
+
 	// Check all known room aliases of the room the event came from
 	queryReq := api.GetAliasesForRoomIDRequest{RoomID: event.RoomID()}
 	var queryRes api.GetAliasesForRoomIDResponse
