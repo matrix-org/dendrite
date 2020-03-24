@@ -95,8 +95,23 @@ func AddPrevEventsToEvent(
 		return ErrRoomNoExists
 	}
 
+	eventFormat, err := queryRes.RoomVersion.EventFormat()
+	if err != nil {
+		return err
+	}
+
 	builder.Depth = queryRes.Depth
-	builder.PrevEvents = queryRes.LatestEvents
+
+	switch eventFormat {
+	case gomatrixserverlib.EventFormatV1:
+		builder.PrevEvents = queryRes.LatestEvents
+	case gomatrixserverlib.EventFormatV2:
+		v2Refs := []string{}
+		for _, ref := range queryRes.LatestEvents {
+			v2Refs = append(v2Refs, ref.EventID)
+		}
+		builder.PrevEvents = v2Refs
+	}
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
@@ -111,7 +126,16 @@ func AddPrevEventsToEvent(
 	if err != nil {
 		return err
 	}
-	builder.AuthEvents = refs
+	switch eventFormat {
+	case gomatrixserverlib.EventFormatV1:
+		builder.AuthEvents = refs
+	case gomatrixserverlib.EventFormatV2:
+		v2Refs := []string{}
+		for _, ref := range refs {
+			v2Refs = append(v2Refs, ref.EventID)
+		}
+		builder.AuthEvents = v2Refs
+	}
 
 	return nil
 }

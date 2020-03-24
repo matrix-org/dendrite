@@ -15,6 +15,8 @@
 package routing
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -35,6 +37,15 @@ func MakeJoin(
 	query api.RoomserverQueryAPI,
 	roomID, userID string,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return util.JSONResponse{
@@ -62,7 +73,9 @@ func MakeJoin(
 		return jsonerror.InternalServerError()
 	}
 
-	var queryRes api.QueryLatestEventsAndStateResponse
+	queryRes := api.QueryLatestEventsAndStateResponse{
+		RoomVersion: verRes.RoomVersion,
+	}
 	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), query, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
@@ -88,7 +101,13 @@ func MakeJoin(
 		}
 	}
 
-	resultMap := map[string]interface{}{"event": builder}
+	resultMap := map[string]interface{}{
+		"event":        builder,
+		"room_version": verRes.RoomVersion,
+	}
+
+	j, _ := json.MarshalIndent(resultMap, "", "  ")
+	fmt.Println("Response to make join:", string(j))
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
