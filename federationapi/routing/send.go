@@ -39,7 +39,6 @@ func Send(
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-
 	t := txnReq{
 		context:    httpReq.Context(),
 		query:      query,
@@ -47,7 +46,12 @@ func Send(
 		keys:       keys,
 		federation: federation,
 	}
-	if err := json.Unmarshal(request.Content(), &t); err != nil {
+
+	var txnEvents struct {
+		events []json.RawMessage `json:"events"`
+	}
+
+	if err := json.Unmarshal(request.Content(), &txnEvents); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),

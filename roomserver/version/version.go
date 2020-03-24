@@ -43,11 +43,11 @@ var roomVersions = map[gomatrixserverlib.RoomVersion]RoomVersionDescription{
 		Stable:    true,
 	},
 	gomatrixserverlib.RoomVersionV3: RoomVersionDescription{
-		Supported: false,
+		Supported: true,
 		Stable:    false,
 	},
 	gomatrixserverlib.RoomVersionV4: RoomVersionDescription{
-		Supported: false,
+		Supported: true,
 		Stable:    false,
 	},
 	gomatrixserverlib.RoomVersionV5: RoomVersionDescription{
@@ -59,7 +59,7 @@ var roomVersions = map[gomatrixserverlib.RoomVersion]RoomVersionDescription{
 // DefaultRoomVersion contains the room version that will, by
 // default, be used to create new rooms on this server.
 func DefaultRoomVersion() gomatrixserverlib.RoomVersion {
-	return gomatrixserverlib.RoomVersionV2
+	return gomatrixserverlib.RoomVersionV4
 }
 
 // RoomVersions returns a map of all known room versions to this

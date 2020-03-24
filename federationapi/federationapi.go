@@ -42,7 +42,7 @@ func SetupFederationAPIComponent(
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federationSenderAPI federationSenderAPI.FederationSenderQueryAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
+	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
 
 	routing.Setup(
 		base.APIMux, base.Cfg, queryAPI, aliasAPI, asAPI,

@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -80,6 +79,7 @@ func MakeJoin(
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = &queryRes.StateEvents[i].Event
 	}
+
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(*event, &provider); err != nil {
 		return util.JSONResponse{
@@ -88,9 +88,11 @@ func MakeJoin(
 		}
 	}
 
+	resultMap := map[string]interface{}{"event": builder}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: map[string]interface{}{"event": builder},
+		JSON: resultMap,
 	}
 }
 
@@ -104,8 +106,17 @@ func SendJoin(
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
-	var event gomatrixserverlib.Event
-	if err := json.Unmarshal(request.Content(), &event); err != nil {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
