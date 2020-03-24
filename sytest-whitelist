@@ -220,3 +220,6 @@ Regular users can add and delete aliases when m.room.aliases is restricted
 GET /r0/capabilities is not public
 GET /joined_rooms lists newly-created room
 /joined_rooms returns only joined rooms
+Message history can be paginated over federation
+GET /rooms/:room_id/messages returns a message
+Remote user can backfill in a room with version 1

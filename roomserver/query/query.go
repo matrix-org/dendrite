@@ -449,14 +449,26 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	request *api.QueryServerAllowedToSeeEventRequest,
 	response *api.QueryServerAllowedToSeeEventResponse,
 ) (err error) {
+	events, err := r.DB.EventsFromIDs(ctx, []string{request.EventID})
+	if err != nil {
+		return
+	}
+	if len(events) == 0 {
+		response.AllowedToSeeEvent = false // event doesn't exist so not allowed to see
+		return
+	}
+	isServerInRoom, err := r.isServerCurrentlyInRoom(ctx, request.ServerName, events[0].RoomID())
+	if err != nil {
+		return
+	}
 	response.AllowedToSeeEvent, err = r.checkServerAllowedToSeeEvent(
-		ctx, request.EventID, request.ServerName,
+		ctx, request.EventID, request.ServerName, isServerInRoom,
 	)
 	return
 }
 
 func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
-	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
 ) (bool, error) {
 	roomState := state.NewStateResolution(r.DB)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
@@ -471,7 +483,7 @@ func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 		return false, err
 	}
 
-	return auth.IsServerAllowed(serverName, stateAtEvent), nil
+	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
 }
 
 // QueryMissingEvents implements api.RoomserverQueryAPI
@@ -566,16 +578,54 @@ func (r *RoomserverQueryAPI) QueryBackfill(
 	return err
 }
 
+func (r *RoomserverQueryAPI) isServerCurrentlyInRoom(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
+	roomNID, err := r.DB.RoomNID(ctx, roomID)
+	if err != nil {
+		return false, err
+	}
+
+	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true)
+	if err != nil {
+		return false, err
+	}
+
+	events, err := r.DB.Events(ctx, eventNIDs)
+	if err != nil {
+		return false, err
+	}
+	gmslEvents := make([]gomatrixserverlib.Event, len(events))
+	for i := range events {
+		gmslEvents[i] = events[i].Event
+	}
+	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, gomatrixserverlib.Join), nil
+}
+
+// TODO: Remove this when we have tests to assert correctness of this function
+// nolint:gocyclo
 func (r *RoomserverQueryAPI) scanEventTree(
 	ctx context.Context, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,
-) (resultNIDs []types.EventNID, err error) {
+) ([]types.EventNID, error) {
+	var resultNIDs []types.EventNID
+	var err error
 	var allowed bool
 	var events []types.Event
 	var next []string
 	var pre string
 
+	// TODO: add tests for this function to ensure it meets the contract that callers expect (and doc what that is supposed to be)
+	// Currently, callers like QueryBackfill will call scanEventTree with a pre-populated `visited` map, assuming that by doing
+	// so means that the events in that map will NOT be returned from this function. That is not currently true, resulting in
+	// duplicate events being sent in response to /backfill requests.
+	initialIgnoreList := make(map[string]bool, len(visited))
+	for k, v := range visited {
+		initialIgnoreList[k] = v
+	}
+
 	resultNIDs = make([]types.EventNID, 0, limit)
+
+	var checkedServerInRoom bool
+	var isServerInRoom bool
 
 	// Loop through the event IDs to retrieve the requested events and go
 	// through the whole tree (up to the provided limit) using the events'
@@ -589,7 +639,18 @@ BFSLoop:
 		// Retrieve the events to process from the database.
 		events, err = r.DB.EventsFromIDs(ctx, front)
 		if err != nil {
-			return
+			return resultNIDs, err
+		}
+
+		if !checkedServerInRoom && len(events) > 0 {
+			// It's nasty that we have to extract the room ID from an event, but many federation requests
+			// only talk in event IDs, no room IDs at all (!!!)
+			ev := events[0]
+			isServerInRoom, err = r.isServerCurrentlyInRoom(ctx, serverName, ev.RoomID())
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to check if server is currently in room, assuming not.")
+			}
+			checkedServerInRoom = true
 		}
 
 		for _, ev := range events {
@@ -597,17 +658,23 @@ BFSLoop:
 			if len(resultNIDs) == limit {
 				break BFSLoop
 			}
-			// Update the list of events to retrieve.
-			resultNIDs = append(resultNIDs, ev.EventNID)
+
+			if !initialIgnoreList[ev.EventID()] {
+				// Update the list of events to retrieve.
+				resultNIDs = append(resultNIDs, ev.EventNID)
+			}
 			// Loop through the event's parents.
 			for _, pre = range ev.PrevEventIDs() {
 				// Only add an event to the list of next events to process if it
 				// hasn't been seen before.
 				if !visited[pre] {
 					visited[pre] = true
-					allowed, err = r.checkServerAllowedToSeeEvent(ctx, pre, serverName)
+					allowed, err = r.checkServerAllowedToSeeEvent(ctx, pre, serverName, isServerInRoom)
 					if err != nil {
-						return
+						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
+							"Error checking if allowed to see event",
+						)
+						return resultNIDs, err
 					}
 
 					// If the event hasn't been seen before and the HS
@@ -615,6 +682,8 @@ BFSLoop:
 					// the list of events to retrieve.
 					if allowed {
 						next = append(next, pre)
+					} else {
+						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).Info("Not allowed to see event")
 					}
 				}
 			}
@@ -623,7 +692,7 @@ BFSLoop:
 		front = next
 	}
 
-	return
+	return resultNIDs, err
 }
 
 // QueryStateAndAuthChain implements api.RoomserverQueryAPI

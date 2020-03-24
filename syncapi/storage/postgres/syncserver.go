@@ -111,22 +111,17 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 	return d.StreamEventsToEvents(nil, streamEvents), nil
 }
 
-func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
-	// If the event is already known as a backward extremity, don't consider
-	// it as such anymore now that we have it.
-	isBackwardExtremity, err := d.backwardExtremities.isBackwardExtremity(ctx, ev.RoomID(), ev.EventID())
-	if err != nil {
+// handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of
+// the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
+// to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
+func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.HeaderedEvent) error {
+	if err := d.backwardExtremities.deleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 		return err
-	}
-	if isBackwardExtremity {
-		if err = d.backwardExtremities.deleteBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
-			return err
-		}
 	}
 
 	// Check if we have all of the event's previous events. If an event is
 	// missing, add it to the room's backward extremities.
-	prevEvents, err := d.events.selectEvents(ctx, nil, ev.PrevEventIDs())
+	prevEvents, err := d.events.selectEvents(ctx, txn, ev.PrevEventIDs())
 	if err != nil {
 		return err
 	}
@@ -141,7 +136,7 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
 				return err
 			}
 		}
@@ -174,7 +169,7 @@ func (d *SyncServerDatasource) WriteEvent(
 			return err
 		}
 
-		if err = d.handleBackwardExtremities(ctx, ev); err != nil {
+		if err = d.handleBackwardExtremities(ctx, txn, ev); err != nil {
 			return err
 		}
 
