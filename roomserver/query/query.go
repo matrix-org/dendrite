@@ -598,10 +598,14 @@ func (r *RoomserverQueryAPI) isServerCurrentlyInRoom(ctx context.Context, server
 	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, gomatrixserverlib.Join), nil
 }
 
+// TODO: Remove this when we have tests to assert correctness of this function
+// nolint:gocyclo
 func (r *RoomserverQueryAPI) scanEventTree(
 	ctx context.Context, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,
-) (resultNIDs []types.EventNID, err error) {
+) ([]types.EventNID, error) {
+	var resultNIDs []types.EventNID
+	var err error
 	var allowed bool
 	var events []types.Event
 	var next []string
@@ -633,7 +637,7 @@ BFSLoop:
 		// Retrieve the events to process from the database.
 		events, err = r.DB.EventsFromIDs(ctx, front)
 		if err != nil {
-			return
+			return resultNIDs, err
 		}
 
 		if !checkedServerInRoom && len(events) > 0 {
@@ -668,7 +672,7 @@ BFSLoop:
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
 							"Error checking if allowed to see event",
 						)
-						return
+						return resultNIDs, err
 					}
 
 					// If the event hasn't been seen before and the HS
@@ -686,7 +690,7 @@ BFSLoop:
 		front = next
 	}
 
-	return
+	return resultNIDs, err
 }
 
 // QueryStateAndAuthChain implements api.RoomserverQueryAPI

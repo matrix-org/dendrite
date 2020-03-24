@@ -428,9 +428,9 @@ func (r *messagesReq) serverToBackfillFrom(fromEventIDs []string) (gomatrixserve
 		// The rationale here is that the last event was unlikely to be sent by us, so poke the server who sent it.
 		// We shouldn't be doing this really, but as a heuristic it should work pretty well for now.
 		for _, e := range events {
-			_, srv, err := gomatrixserverlib.SplitID('@', e.Sender())
-			if err != nil {
-				util.GetLogger(r.ctx).WithError(err).Warn("Failed to extract domain from event sender")
+			_, srv, srverr := gomatrixserverlib.SplitID('@', e.Sender())
+			if srverr != nil {
+				util.GetLogger(r.ctx).WithError(srverr).Warn("Failed to extract domain from event sender")
 				continue
 			}
 			if srv != r.cfg.Matrix.ServerName {
