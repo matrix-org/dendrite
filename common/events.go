@@ -102,17 +102,6 @@ func AddPrevEventsToEvent(
 
 	builder.Depth = queryRes.Depth
 
-	switch eventFormat {
-	case gomatrixserverlib.EventFormatV1:
-		builder.PrevEvents = queryRes.LatestEvents
-	case gomatrixserverlib.EventFormatV2:
-		v2Refs := []string{}
-		for _, ref := range queryRes.LatestEvents {
-			v2Refs = append(v2Refs, ref.EventID)
-		}
-		builder.PrevEvents = v2Refs
-	}
-
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
@@ -126,15 +115,22 @@ func AddPrevEventsToEvent(
 	if err != nil {
 		return err
 	}
+
 	switch eventFormat {
 	case gomatrixserverlib.EventFormatV1:
 		builder.AuthEvents = refs
+		builder.PrevEvents = queryRes.LatestEvents
 	case gomatrixserverlib.EventFormatV2:
-		v2Refs := []string{}
+		v2AuthRefs := []string{}
+		v2PrevRefs := []string{}
 		for _, ref := range refs {
-			v2Refs = append(v2Refs, ref.EventID)
+			v2AuthRefs = append(v2AuthRefs, ref.EventID)
 		}
-		builder.AuthEvents = v2Refs
+		for _, ref := range queryRes.LatestEvents {
+			v2PrevRefs = append(v2PrevRefs, ref.EventID)
+		}
+		builder.AuthEvents = v2AuthRefs
+		builder.PrevEvents = v2PrevRefs
 	}
 
 	return nil

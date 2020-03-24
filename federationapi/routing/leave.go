@@ -13,7 +13,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -110,8 +109,9 @@ func SendLeave(
 		}
 	}
 
-	var event gomatrixserverlib.Event
-	if err := json.Unmarshal(request.Content(), &event); err != nil {
+	// Decode the event JSON from the request.
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),

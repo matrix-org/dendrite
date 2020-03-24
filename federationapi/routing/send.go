@@ -48,7 +48,7 @@ func Send(
 	}
 
 	var txnEvents struct {
-		events []json.RawMessage `json:"events"`
+		Events []json.RawMessage `json:"events"`
 	}
 
 	if err := json.Unmarshal(request.Content(), &txnEvents); err != nil {

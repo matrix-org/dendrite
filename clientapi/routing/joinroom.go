@@ -331,7 +331,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	if respMakeJoin.RoomVersion == "" {
 		respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
 	}
-	if _, err := respMakeJoin.RoomVersion.EventFormat(); err != nil {
+	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(
