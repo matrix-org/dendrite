@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/util"
 )
 
 // UserStream represents a communication mechanism between the /sync request goroutine
@@ -76,7 +75,6 @@ func (s *UserStream) GetListener(ctx context.Context) UserStreamListener {
 	// Lets be a bit paranoid here and check that Close() is being called
 	runtime.SetFinalizer(&listener, func(l *UserStreamListener) {
 		if !l.hasClosed {
-			util.GetLogger(ctx).Warn("Didn't call Close on UserStreamListener")
 			l.Close()
 		}
 	})
