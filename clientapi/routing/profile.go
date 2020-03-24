@@ -338,10 +338,16 @@ func buildMembershipEvents(
 	memberships []authtypes.Membership,
 	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
 	evTime time.Time, queryAPI api.RoomserverQueryAPI,
-) ([]gomatrixserverlib.Event, error) {
-	evs := []gomatrixserverlib.Event{}
+) ([]gomatrixserverlib.HeaderedEvent, error) {
+	evs := []gomatrixserverlib.HeaderedEvent{}
 
 	for _, membership := range memberships {
+		verReq := api.QueryRoomVersionForRoomRequest{RoomID: membership.EventID}
+		verRes := api.QueryRoomVersionForRoomResponse{}
+		if err := queryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+			return []gomatrixserverlib.HeaderedEvent{}, err
+		}
+
 		builder := gomatrixserverlib.EventBuilder{
 			Sender:   userID,
 			RoomID:   membership.RoomID,
@@ -365,7 +371,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		evs = append(evs, *event)
+		evs = append(evs, (*event).Headered(verRes.RoomVersion))
 	}
 
 	return evs, nil

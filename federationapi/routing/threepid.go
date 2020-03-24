@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -68,8 +69,17 @@ func CreateInvitesFrom3PIDInvites(
 		return *reqErr
 	}
 
-	evs := []gomatrixserverlib.Event{}
+	evs := []gomatrixserverlib.HeaderedEvent{}
 	for _, inv := range body.Invites {
+		verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
+		verRes := api.QueryRoomVersionForRoomResponse{}
+		if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+			}
+		}
+
 		event, err := createInviteFrom3PIDInvite(
 			req.Context(), queryAPI, asAPI, cfg, inv, federation, accountDB,
 		)
@@ -78,7 +88,7 @@ func CreateInvitesFrom3PIDInvites(
 			return jsonerror.InternalServerError()
 		}
 		if event != nil {
-			evs = append(evs, *event)
+			evs = append(evs, (*event).Headered(verRes.RoomVersion))
 		}
 	}
 
@@ -137,6 +147,15 @@ func ExchangeThirdPartyInvite(
 		}
 	}
 
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := queryAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
 	// Auth and build the event from what the remote server sent us
 	event, err := buildMembershipEvent(httpReq.Context(), &builder, queryAPI, cfg)
 	if err == errNotInRoom {
@@ -159,7 +178,12 @@ func ExchangeThirdPartyInvite(
 
 	// Send the event to the roomserver
 	if _, err = producer.SendEvents(
-		httpReq.Context(), []gomatrixserverlib.Event{signedEvent.Event}, cfg.Matrix.ServerName, nil,
+		httpReq.Context(),
+		[]gomatrixserverlib.HeaderedEvent{
+			signedEvent.Event.Headered(verRes.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		nil,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()
@@ -181,6 +205,12 @@ func createInviteFrom3PIDInvite(
 	inv invite, federation *gomatrixserverlib.FederationClient,
 	accountDB accounts.Database,
 ) (*gomatrixserverlib.Event, error) {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := queryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+		return nil, err
+	}
+
 	_, server, err := gomatrixserverlib.SplitID('@', inv.MXID)
 	if err != nil {
 		return nil, err

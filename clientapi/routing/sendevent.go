@@ -48,6 +48,15 @@ func SendEvent(
 	producer *producers.RoomserverProducer,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
 	if txnID != nil {
 		// Try to fetch response from transactionsCache
 		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
@@ -71,7 +80,12 @@ func SendEvent(
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	eventID, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndSessionID,
+		req.Context(),
+		[]gomatrixserverlib.HeaderedEvent{
+			(*e).Headered(verRes.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		txnAndSessionID,
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")

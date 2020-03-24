@@ -209,7 +209,12 @@ func SendJoin(
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	_, err = producer.SendEvents(
-		httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil,
+		httpReq.Context(),
+		[]gomatrixserverlib.HeaderedEvent{
+			event.Headered(stateAndAuthChainResponse.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		nil,
 	)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")

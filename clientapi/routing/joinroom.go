@@ -242,7 +242,12 @@ func (r joinRoomReq) joinRoomUsingServers(
 	queryRes := roomserverAPI.QueryLatestEventsAndStateResponse{}
 	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.queryAPI, &queryRes)
 	if err == nil {
-		if _, err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName, nil); err != nil {
+		if _, err = r.producer.SendEvents(
+			r.req.Context(),
+			[]gomatrixserverlib.HeaderedEvent{(*event).Headered(queryRes.RoomVersion)},
+			r.cfg.Matrix.ServerName,
+			nil,
+		); err != nil {
 			util.GetLogger(r.req.Context()).WithError(err).Error("r.producer.SendEvents failed")
 			return jsonerror.InternalServerError()
 		}
@@ -363,7 +368,9 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	}
 
 	if err = r.producer.SendEventWithState(
-		r.req.Context(), gomatrixserverlib.RespState(respSendJoin.RespState), event,
+		r.req.Context(),
+		gomatrixserverlib.RespState(respSendJoin.RespState),
+		event.Headered(respMakeJoin.RoomVersion),
 	); err != nil {
 		util.GetLogger(r.req.Context()).WithError(err).Error("gomatrixserverlib.RespState failed")
 		res := jsonerror.InternalServerError()

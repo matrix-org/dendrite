@@ -37,31 +37,14 @@ func NewRoomserverProducer(inputAPI api.RoomserverInputAPI, queryAPI api.Roomser
 
 // SendEvents writes the given events to the roomserver input log. The events are written with KindNew.
 func (c *RoomserverProducer) SendEvents(
-	ctx context.Context, events []gomatrixserverlib.Event, sendAsServer gomatrixserverlib.ServerName,
+	ctx context.Context, events []gomatrixserverlib.HeaderedEvent, sendAsServer gomatrixserverlib.ServerName,
 	txnID *api.TransactionID,
 ) (string, error) {
-	roomVersions := make(map[string]gomatrixserverlib.RoomVersion)
-
 	ires := make([]api.InputRoomEvent, len(events))
 	for i, event := range events {
-		var roomVersion gomatrixserverlib.RoomVersion
-		roomID := event.RoomID()
-		if v, ok := roomVersions[roomID]; ok {
-			roomVersion = v
-		} else {
-			verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-			verRes := api.QueryRoomVersionForRoomResponse{}
-			err := c.QueryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes)
-			if err != nil {
-				return "", err
-			}
-			roomVersion = verRes.RoomVersion
-			roomVersions[roomID] = roomVersion
-		}
-
 		ires[i] = api.InputRoomEvent{
 			Kind:          api.KindNew,
-			Event:         event.Headered(roomVersion),
+			Event:         event,
 			AuthEventIDs:  event.AuthEventIDs(),
 			SendAsServer:  string(sendAsServer),
 			TransactionID: txnID,
@@ -73,16 +56,9 @@ func (c *RoomserverProducer) SendEvents(
 // SendEventWithState writes an event with KindNew to the roomserver input log
 // with the state at the event as KindOutlier before it.
 func (c *RoomserverProducer) SendEventWithState(
-	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.Event,
+	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.HeaderedEvent,
 ) error {
 	outliers, err := state.Events()
-	if err != nil {
-		return err
-	}
-
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: event.RoomID()}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	err = c.QueryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes)
 	if err != nil {
 		return err
 	}
@@ -91,7 +67,7 @@ func (c *RoomserverProducer) SendEventWithState(
 	for i, outlier := range outliers {
 		ires[i] = api.InputRoomEvent{
 			Kind:         api.KindOutlier,
-			Event:        outlier.Headered(verRes.RoomVersion),
+			Event:        outlier.Headered(event.RoomVersion),
 			AuthEventIDs: outlier.AuthEventIDs(),
 		}
 	}
@@ -103,7 +79,7 @@ func (c *RoomserverProducer) SendEventWithState(
 
 	ires[len(outliers)] = api.InputRoomEvent{
 		Kind:          api.KindNew,
-		Event:         event.Headered(verRes.RoomVersion),
+		Event:         event,
 		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateEventIDs,

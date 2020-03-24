@@ -101,6 +101,15 @@ func SendLeave(
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := producer.QueryAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
 	var event gomatrixserverlib.Event
 	if err := json.Unmarshal(request.Content(), &event); err != nil {
 		return util.JSONResponse{
@@ -167,7 +176,14 @@ func SendLeave(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
+	_, err = producer.SendEvents(
+		httpReq.Context(),
+		[]gomatrixserverlib.HeaderedEvent{
+			event.Headered(verRes.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		nil,
+	)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()

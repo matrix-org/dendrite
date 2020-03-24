@@ -237,7 +237,7 @@ func createRoom(
 		historyVisibility = historyVisibilityShared
 	}
 
-	var builtEvents []gomatrixserverlib.Event
+	var builtEvents []gomatrixserverlib.HeaderedEvent
 
 	// send events into the room in order of:
 	//  1- m.room.create
@@ -311,7 +311,7 @@ func createRoom(
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, *ev)
+		builtEvents = append(builtEvents, (*ev).Headered(roomVersion))
 		err = authEvents.AddEvent(ev)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("authEvents.AddEvent failed")

@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -45,6 +46,15 @@ func SendMembership(
 	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
 	var body threepid.MembershipRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -95,7 +105,10 @@ func SendMembership(
 	}
 
 	if _, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName, nil,
+		req.Context(),
+		[]gomatrixserverlib.HeaderedEvent{(*event).Headered(verRes.RoomVersion)},
+		cfg.Matrix.ServerName,
+		nil,
 	); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()

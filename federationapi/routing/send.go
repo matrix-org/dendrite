@@ -179,7 +179,12 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	// TODO: Check that the event is allowed by its auth_events.
 
 	// pass the event to the roomserver
-	_, err := t.producer.SendEvents(t.context, []gomatrixserverlib.Event{e}, api.DoNotSendToOtherServers, nil)
+	_, err := t.producer.SendEvents(
+		t.context,
+		stateResp.StateEvents,
+		api.DoNotSendToOtherServers,
+		nil,
+	)
 	return err
 }
 
@@ -240,6 +245,13 @@ retryAllowedState:
 		}
 		return err
 	}
+
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: e.RoomID()}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := t.query.QueryRoomVersionForRoom(context.Background(), &verReq, &verRes); err != nil {
+		return err
+	}
+
 	// pass the event along with the state to the roomserver
-	return t.producer.SendEventWithState(t.context, state, e)
+	return t.producer.SendEventWithState(t.context, state, e.Headered(verRes.RoomVersion))
 }

@@ -359,6 +359,13 @@ func emit3PIDInviteEvent(
 		return err
 	}
 
-	_, err = producer.SendEvents(ctx, []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName, nil)
+	_, err = producer.SendEvents(
+		ctx,
+		[]gomatrixserverlib.HeaderedEvent{
+			(*event).Headered(queryRes.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		nil,
+	)
 	return err
 }
