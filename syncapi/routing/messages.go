@@ -188,11 +188,6 @@ func (r *messagesReq) retrieveEvents() (
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return
 	}
-	for i := range streamEvents {
-		s := streamEvents[i]
-		util.GetLogger(r.ctx).Info("spos=", s.StreamPosition, " content=", string(s.Content()))
-	}
-	util.GetLogger(r.ctx).Info("Found ", len(streamEvents), " in the database")
 
 	var events []gomatrixserverlib.HeaderedEvent
 

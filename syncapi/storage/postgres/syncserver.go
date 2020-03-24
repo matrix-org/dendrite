@@ -26,7 +26,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/util"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -115,41 +114,35 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of
 // the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
-func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
-	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if err := d.backwardExtremities.deleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
-			util.GetLogger(ctx).Error("DELETE FAILED: ", err)
-			return err
-		}
+func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.HeaderedEvent) error {
+	if err := d.backwardExtremities.deleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
+		return err
+	}
 
-		// Check if we have all of the event's previous events. If an event is
-		// missing, add it to the room's backward extremities.
-		prevEvents, err := d.events.selectEvents(ctx, txn, ev.PrevEventIDs())
-		if err != nil {
-			return err
-		}
-		var found bool
-		for _, eID := range ev.PrevEventIDs() {
-			found = false
-			for _, prevEv := range prevEvents {
-				if eID == prevEv.EventID() {
-					found = true
-				}
-			}
-
-			// If the event is missing, consider it a backward extremity.
-			if !found {
-				util.GetLogger(ctx).Info(eID, " is a backwards extremity for event ", ev.EventID())
-				if err = d.backwardExtremities.insertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
-					return err
-				}
-			} else {
-				util.GetLogger(ctx).Info(eID, " is NOT a backwards extremity ", ev.EventID())
+	// Check if we have all of the event's previous events. If an event is
+	// missing, add it to the room's backward extremities.
+	prevEvents, err := d.events.selectEvents(ctx, txn, ev.PrevEventIDs())
+	if err != nil {
+		return err
+	}
+	var found bool
+	for _, eID := range ev.PrevEventIDs() {
+		found = false
+		for _, prevEv := range prevEvents {
+			if eID == prevEv.EventID() {
+				found = true
 			}
 		}
 
-		return nil
-	})
+		// If the event is missing, consider it a backward extremity.
+		if !found {
+			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
@@ -176,7 +169,7 @@ func (d *SyncServerDatasource) WriteEvent(
 			return err
 		}
 
-		if err = d.handleBackwardExtremities(ctx, ev); err != nil {
+		if err = d.handleBackwardExtremities(ctx, txn, ev); err != nil {
 			return err
 		}
 
@@ -273,7 +266,6 @@ func (d *SyncServerDatasource) GetEventsInRange(
 			forwardLimit = to.PDUPosition
 		}
 
-		util.GetLogger(ctx).Info("TOPOLOGY SELECT from >", backwardLimit, "  to <=", forwardLimit)
 		// Select the event IDs from the defined range.
 		var eIDs []string
 		eIDs, err = d.topology.selectEventIDsInRange(
@@ -282,7 +274,6 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		if err != nil {
 			return
 		}
-		util.GetLogger(ctx).Info("TOPOLOGY SELECTED ", eIDs)
 
 		// Retrieve the events' contents using their IDs.
 		events, err = d.events.selectEvents(ctx, nil, eIDs)
@@ -300,7 +291,6 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		); err != nil {
 			return
 		}
-		util.GetLogger(ctx).Info("selectRecentEvents from token: ", from.PDUPosition)
 	} else {
 		// When using forward ordering, we want the least recent events first.
 		if events, err = d.events.selectEarlyEvents(
