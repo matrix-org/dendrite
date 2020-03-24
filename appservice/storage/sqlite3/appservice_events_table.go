@@ -42,14 +42,14 @@ CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_events(as_id);
 `
 
 const selectEventsByApplicationServiceIDSQL = "" +
-	"SELECT id, event_json, txn_id " +
+	"SELECT id, headered_event_json, txn_id " +
 	"FROM appservice_events WHERE as_id = $1 ORDER BY txn_id DESC, id ASC"
 
 const countEventsByApplicationServiceIDSQL = "" +
 	"SELECT COUNT(id) FROM appservice_events WHERE as_id = $1"
 
 const insertEventSQL = "" +
-	"INSERT INTO appservice_events(as_id, event_json, txn_id) " +
+	"INSERT INTO appservice_events(as_id, headered_event_json, txn_id) " +
 	"VALUES ($1, $2, $3)"
 
 const updateTxnIDForEventsSQL = "" +
