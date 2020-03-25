@@ -15,8 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -106,9 +104,6 @@ func MakeJoin(
 		"room_version": verRes.RoomVersion,
 	}
 
-	j, _ := json.MarshalIndent(resultMap, "", "  ")
-	fmt.Println("Response to make join:", string(j))
-
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: resultMap,
@@ -181,7 +176,7 @@ func SendJoin(
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The join must be signed by the server it originated on"),
+			JSON: jsonerror.Forbidden("Signature check failed: " + verifyResults[0].Error.Error()),
 		}
 	}
 

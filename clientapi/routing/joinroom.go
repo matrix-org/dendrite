@@ -244,7 +244,9 @@ func (r joinRoomReq) joinRoomUsingServers(
 	if err == nil {
 		if _, err = r.producer.SendEvents(
 			r.req.Context(),
-			[]gomatrixserverlib.HeaderedEvent{(*event).Headered(queryRes.RoomVersion)},
+			[]gomatrixserverlib.HeaderedEvent{
+				(*event).Headered(queryRes.RoomVersion),
+			},
 			r.cfg.Matrix.ServerName,
 			nil,
 		); err != nil {
@@ -340,11 +342,11 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		}, nil
 	}
 
-	eventID := ""
 	eventIDFormat, err := respMakeJoin.RoomVersion.EventIDFormat()
 	if err != nil {
 		return nil, err
 	}
+	eventID := ""
 	if eventIDFormat == gomatrixserverlib.EventIDFormatV1 {
 		eventID = fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
 	}
@@ -358,7 +360,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return &res, nil
 	}
 
-	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event)
+	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event, respMakeJoin.RoomVersion)
 	if err != nil {
 		return nil, err
 	}
