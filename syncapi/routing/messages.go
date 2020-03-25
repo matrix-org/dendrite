@@ -362,6 +362,12 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
 func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: r.roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := r.queryAPI.QueryRoomVersionForRoom(r.ctx, &verReq, &verRes); err != nil {
+		return nil, err
+	}
+
 	srvToBackfillFrom, err := r.serverToBackfillFrom(fromEventIDs)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot find server to backfill from: %w", err)
@@ -380,17 +386,16 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 	}
 
 	for _, p := range txn.PDUs {
-		pdus = append(pdus, p.Headered(gomatrixserverlib.RoomVersionV1))
+		pdus = append(pdus, p.Headered(verRes.RoomVersion))
 	}
 	util.GetLogger(r.ctx).WithField("server", srvToBackfillFrom).WithField("new_events", len(pdus)).Info("Storing new events from backfill")
 
 	// Store the events in the database, while marking them as unfit to show
 	// up in responses to sync requests.
 	for _, pdu := range pdus {
-		headered := pdu.Headered(gomatrixserverlib.RoomVersionV1)
 		if _, err = r.db.WriteEvent(
 			r.ctx,
-			&headered,
+			&pdu,
 			[]gomatrixserverlib.HeaderedEvent{},
 			[]string{},
 			[]string{},
