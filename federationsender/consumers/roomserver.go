@@ -155,7 +155,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 
 	// Send the event.
 	return s.queues.SendEvent(
-		&ore.Event.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
+		&ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	)
 }
 

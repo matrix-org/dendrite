@@ -39,14 +39,14 @@ type destinationQueue struct {
 	running            bool
 	sentCounter        int
 	lastTransactionIDs []gomatrixserverlib.TransactionID
-	pendingEvents      []*gomatrixserverlib.Event
+	pendingEvents      []*gomatrixserverlib.HeaderedEvent
 	pendingEDUs        []*gomatrixserverlib.EDU
 }
 
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.Event) {
+func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.HeaderedEvent) {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
 	oq.pendingEvents = append(oq.pendingEvents, ev)
