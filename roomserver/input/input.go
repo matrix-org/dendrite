@@ -18,7 +18,6 @@ package input
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"sync"
 
@@ -62,19 +61,16 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) (err error) {
-	fmt.Println("Starting InputRoomEvents")
 	// We lock as processRoomEvent can only be called once at a time
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	for i := range request.InputRoomEvents {
 		if response.EventID, err = processRoomEvent(ctx, r.DB, r, request.InputRoomEvents[i]); err != nil {
-			fmt.Println("processRoomEvent:", err)
 			return err
 		}
 	}
 	for i := range request.InputInviteEvents {
 		if err = processInviteEvent(ctx, r.DB, r, request.InputInviteEvents[i]); err != nil {
-			fmt.Println("processInviteEvent:", err)
 			return err
 		}
 	}

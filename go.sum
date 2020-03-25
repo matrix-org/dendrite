@@ -134,6 +134,16 @@ github.com/matrix-org/gomatrixserverlib v0.0.0-20200325145347-4c5d0cbc87b4 h1:fA
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200325145347-4c5d0cbc87b4/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200325163624-c51df36ecb1e h1:yfBGdUqr9uRcClTrIwl1/XIFvM5V1t3y+AIR29F1U3w=
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200325163624-c51df36ecb1e/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325170457-bfd5fdb4127e h1:FUzhkQ+t/zrZkjrNRtusuUNQqkIf9I1P4ttKwwd77i4=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325170457-bfd5fdb4127e/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325171332-c1f8f5d11057 h1:J3rlEdUMEFeda5l41g9u1wql21GwQkNxH42SXqLkaQo=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325171332-c1f8f5d11057/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325173720-c273a574f124 h1:wgldXHFa28uTQqz3avtP5aQg80UXtXRXcysZw/m5ozU=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325173720-c273a574f124/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325174455-fc9d25db2565 h1:DU2Zn0QloACuSR53h57Pw1l1c0mzXWhwXoZY3GNDgeo=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325174455-fc9d25db2565/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325175108-22fa4c36a0c7 h1:4lzSBzW2xPlSvVIv0NFW2oy+dS2MPT0PK+Thl/WLo84=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200325175108-22fa4c36a0c7/go.mod h1:FsKa2pWE/bpQql9H7U4boOPXFoJX/QcqaZZ6ijLkaZI=
 github.com/matrix-org/naffka v0.0.0-20200127221512-0716baaabaf1 h1:osLoFdOy+ChQqVUn2PeTDETFftVkl4w9t/OW18g3lnk=
 github.com/matrix-org/naffka v0.0.0-20200127221512-0716baaabaf1/go.mod h1:cXoYQIENbdWIQHt1SyCo6Bl3C3raHwJ0wgVrXHSqf+A=
 github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5 h1:W7l5CP4V7wPyPb4tYE11dbmeAOwtFQBTW0rf4OonOS8=
