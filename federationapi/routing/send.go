@@ -84,14 +84,38 @@ type txnReq struct {
 }
 
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
+	var pdus []gomatrixserverlib.Event
+
+	for _, pdu := range t.PDUs {
+		var header struct {
+			roomID string `json:"room_id"`
+		}
+		if err := json.Unmarshal(pdu, &header); err != nil {
+			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to extract room ID from event, skipping it.")
+			continue
+		}
+		verReq := api.QueryRoomVersionForRoomRequest{RoomID: header.roomID}
+		verRes := api.QueryRoomVersionForRoomResponse{}
+		if err := t.query.QueryRoomVersionForRoom(t.context, &verReq, &verRes); err != nil {
+			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to query room version for event, skipping it.")
+			continue
+		}
+		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, verRes.RoomVersion)
+		if err != nil {
+			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to parse event JSON, skipping it.")
+			continue
+		}
+		pdus = append(pdus, event)
+	}
+
 	// Check the event signatures
-	if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, t.PDUs, t.keys); err != nil {
+	if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, pdus, t.keys); err != nil {
 		return nil, err
 	}
 
 	// Process the events.
 	results := map[string]gomatrixserverlib.PDUResult{}
-	for _, e := range t.PDUs {
+	for _, e := range pdus {
 		err := t.processEvent(e)
 		if err != nil {
 			// If the error is due to the event itself being bad then we skip

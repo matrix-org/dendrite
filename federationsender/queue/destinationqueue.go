@@ -16,6 +16,7 @@ package queue
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -103,7 +104,7 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	}
 
 	t := gomatrixserverlib.Transaction{
-		PDUs: []gomatrixserverlib.Event{},
+		PDUs: []json.RawMessage{},
 		EDUs: []gomatrixserverlib.EDU{},
 	}
 	now := gomatrixserverlib.AsTimestamp(time.Now())
@@ -119,7 +120,7 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	oq.lastTransactionIDs = []gomatrixserverlib.TransactionID{t.TransactionID}
 
 	for _, pdu := range oq.pendingEvents {
-		t.PDUs = append(t.PDUs, *pdu)
+		t.PDUs = append(t.PDUs, (*pdu).JSON())
 	}
 	oq.pendingEvents = nil
 	oq.sentCounter += len(t.PDUs)

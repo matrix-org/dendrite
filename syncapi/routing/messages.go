@@ -386,16 +386,20 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 	}
 
 	for _, p := range txn.PDUs {
-		pdus = append(pdus, p.Headered(verRes.RoomVersion))
+		event, e := gomatrixserverlib.NewEventFromUntrustedJSON(p, verRes.RoomVersion)
+		if e != nil {
+			continue
+		}
+		pdus = append(pdus, event.Headered(verRes.RoomVersion))
 	}
 	util.GetLogger(r.ctx).WithField("server", srvToBackfillFrom).WithField("new_events", len(pdus)).Info("Storing new events from backfill")
 
 	// Store the events in the database, while marking them as unfit to show
 	// up in responses to sync requests.
-	for _, pdu := range pdus {
+	for i := range pdus {
 		if _, err = r.db.WriteEvent(
 			r.ctx,
-			&pdu,
+			&pdus[i],
 			[]gomatrixserverlib.HeaderedEvent{},
 			[]string{},
 			[]string{},
