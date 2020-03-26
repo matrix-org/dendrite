@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -80,6 +81,8 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// TODO: handle retries.
 		// TODO: blacklist uncooperative servers.
+
+		util.GetLogger(context.TODO()).Infof("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
 
 		_, err := oq.client.SendTransaction(context.TODO(), *t)
 		if err != nil {

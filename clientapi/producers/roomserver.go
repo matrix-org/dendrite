@@ -63,13 +63,13 @@ func (c *RoomserverProducer) SendEventWithState(
 		return err
 	}
 
-	ires := make([]api.InputRoomEvent, len(outliers)+1)
-	for i, outlier := range outliers {
-		ires[i] = api.InputRoomEvent{
+	var ires []api.InputRoomEvent
+	for _, outlier := range outliers {
+		ires = append(ires, api.InputRoomEvent{
 			Kind:         api.KindOutlier,
 			Event:        outlier.Headered(event.RoomVersion),
 			AuthEventIDs: outlier.AuthEventIDs(),
-		}
+		})
 	}
 
 	stateEventIDs := make([]string, len(state.StateEvents))
@@ -77,13 +77,13 @@ func (c *RoomserverProducer) SendEventWithState(
 		stateEventIDs[i] = state.StateEvents[i].EventID()
 	}
 
-	ires[len(outliers)] = api.InputRoomEvent{
+	ires = append(ires, api.InputRoomEvent{
 		Kind:          api.KindNew,
 		Event:         event,
 		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateEventIDs,
-	}
+	})
 
 	_, err = c.SendInputRoomEvents(ctx, ires)
 	return err

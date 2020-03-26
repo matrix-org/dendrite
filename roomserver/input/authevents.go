@@ -27,7 +27,7 @@ import (
 func checkAuthEvents(
 	ctx context.Context,
 	db RoomEventDatabase,
-	event gomatrixserverlib.Event,
+	event gomatrixserverlib.HeaderedEvent,
 	authEventIDs []string,
 ) ([]types.EventNID, error) {
 	// Grab the numeric IDs for the supplied auth state events from the database.
@@ -38,7 +38,7 @@ func checkAuthEvents(
 	// TODO: check for duplicate state keys here.
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
@@ -47,7 +47,7 @@ func checkAuthEvents(
 	}
 
 	// Check if the event is allowed.
-	if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
+	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
 		return nil, err
 	}
 

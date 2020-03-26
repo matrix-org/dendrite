@@ -63,6 +63,8 @@ func Send(
 	t.TransactionID = txnID
 	t.Destination = cfg.Matrix.ServerName
 
+	util.GetLogger(httpReq.Context()).Infof("Received transaction %q containing %d PDUs, %d EDUs", txnID, len(t.PDUs), len(t.EDUs))
+
 	resp, err := t.processTransaction()
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
@@ -91,22 +93,22 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			RoomID string `json:"room_id"`
 		}
 		if err := json.Unmarshal(pdu, &header); err != nil {
-			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to extract room ID from event, skipping it.")
-			continue
+			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to extract room ID from event")
+			return nil, err
 		}
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: header.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
 		if err := t.query.QueryRoomVersionForRoom(t.context, &verReq, &verRes); err != nil {
-			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to query room version for event, skipping it.")
-			continue
+			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to query room version for room", verReq.RoomID)
+			return nil, err
 		}
 		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, verRes.RoomVersion)
 		if err != nil {
-			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to parse event JSON, skipping it.")
-			continue
+			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to parse event JSON of event %q", event.EventID())
+			return nil, err
 		}
 		if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
-			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q, skipping it.", event.EventID())
+			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
 			return nil, err
 		}
 		pdus = append(pdus, event.Headered(verRes.RoomVersion))
@@ -115,7 +117,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	// Process the events.
 	results := map[string]gomatrixserverlib.PDUResult{}
 	for _, e := range pdus {
-		err := t.processEvent(e.Event)
+		err := t.processEvent(e.Unwrap())
 		if err != nil {
 			// If the error is due to the event itself being bad then we skip
 			// it and move onto the next event. We report an error so that the
@@ -150,7 +152,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	}
 
 	// TODO: Process the EDUs.
-
+	util.GetLogger(t.context).Infof("Processed %d PDUs from transaction %q", len(results), t.TransactionID)
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
@@ -192,7 +194,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	// Check that the event is allowed by the state at the event.
 	var events []gomatrixserverlib.Event
 	for _, headeredEvent := range stateResp.StateEvents {
-		events = append(events, headeredEvent.Event)
+		events = append(events, headeredEvent.Unwrap())
 	}
 	if err := checkAllowedByState(e, events); err != nil {
 		return err
@@ -204,7 +206,9 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	// pass the event to the roomserver
 	_, err := t.producer.SendEvents(
 		t.context,
-		stateResp.StateEvents,
+		[]gomatrixserverlib.HeaderedEvent{
+			e.Headered(stateResp.RoomVersion),
+		},
 		api.DoNotSendToOtherServers,
 		nil,
 	)

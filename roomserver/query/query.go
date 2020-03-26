@@ -715,6 +715,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	if err != nil {
 		return err
 	}
+	response.RoomVersion = roomVersion
 
 	stateEvents, err := r.loadStateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {

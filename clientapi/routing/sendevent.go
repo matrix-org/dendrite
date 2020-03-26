@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid
@@ -82,7 +83,7 @@ func SendEvent(
 	eventID, err := producer.SendEvents(
 		req.Context(),
 		[]gomatrixserverlib.HeaderedEvent{
-			(*e).Headered(verRes.RoomVersion),
+			e.Headered(verRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,
 		txnAndSessionID,
@@ -91,7 +92,11 @@ func SendEvent(
 		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
-	util.GetLogger(req.Context()).WithField("event_id", eventID).Info("Sent event")
+	util.GetLogger(req.Context()).WithFields(logrus.Fields{
+		"event_id":     eventID,
+		"room_id":      roomID,
+		"room_version": verRes.RoomVersion,
+	}).Info("Sent event to roomserver")
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,
