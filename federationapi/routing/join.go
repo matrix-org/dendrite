@@ -219,8 +219,8 @@ func SendJoin(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"state":      stateAndAuthChainResponse.StateEvents,
-			"auth_chain": stateAndAuthChainResponse.AuthChainEvents,
+			"state":      common.RemoveEventHeaders(stateAndAuthChainResponse.StateEvents),
+			"auth_chain": common.RemoveEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
 		},
 	}
 }

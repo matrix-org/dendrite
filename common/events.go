@@ -135,3 +135,12 @@ func AddPrevEventsToEvent(
 
 	return nil
 }
+
+// RemoveEventHeaders unwraps an array of headered events.
+func RemoveEventHeaders(in []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.Event {
+	result := make([]gomatrixserverlib.Event, len(in))
+	for i := range in {
+		result[i] = in[i].Event
+	}
+	return result
+}

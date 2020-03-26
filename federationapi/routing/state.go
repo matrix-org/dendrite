@@ -18,6 +18,7 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -129,17 +130,9 @@ func getState(
 		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	var stateEvents, authEvents []gomatrixserverlib.Event
-	for _, headeredEvent := range response.StateEvents {
-		stateEvents = append(stateEvents, headeredEvent.Event)
-	}
-	for _, headeredEvent := range response.AuthChainEvents {
-		authEvents = append(authEvents, headeredEvent.Event)
-	}
-
 	return &gomatrixserverlib.RespState{
-		StateEvents: stateEvents,
-		AuthEvents:  authEvents,
+		StateEvents: common.RemoveEventHeaders(response.StateEvents),
+		AuthEvents:  common.RemoveEventHeaders(response.AuthChainEvents),
 	}, nil
 }
 
