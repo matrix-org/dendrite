@@ -75,14 +75,14 @@ func Setup(
 				return directory.GetPostPublicRoomsWithExternal(req, publicRoomsDB, fedClient, extRoomsProvider)
 			}
 			server := gomatrixserverlib.ServerName(req.URL.Query().Get("server"))
-			return directory.GetPostPublicRooms(req, cfg, server, publicRoomsDB, fedClient)
+			return directory.GetPostPublicRooms(req, cfg, server, publicRoomsDB, fedClient, authData)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	// Federation - TODO: should this live here or in federation API? It's sure easier if it's here so here it is.
 	apiMux.Handle("/_matrix/federation/v1/publicRooms",
 		common.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
-			return directory.GetPostPublicRooms(req, cfg, cfg.Matrix.ServerName, publicRoomsDB, fedClient)
+			return directory.GetPostPublicRooms(req, cfg, cfg.Matrix.ServerName, publicRoomsDB, fedClient, authData)
 		}),
 	).Methods(http.MethodGet)
 }

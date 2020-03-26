@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth"
+
 	"github.com/matrix-org/dendrite/common/config"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -44,14 +46,19 @@ type filter struct {
 // GetPostPublicRooms implements GET and POST /publicRooms
 func GetPostPublicRooms(
 	req *http.Request, cfg *config.Dendrite, server gomatrixserverlib.ServerName,
-	publicRoomDatabase storage.Database, fedClient *gomatrixserverlib.FederationClient,
+	publicRoomDatabase storage.Database, fedClient *gomatrixserverlib.FederationClient, data auth.Data,
 ) util.JSONResponse {
 	var request PublicRoomReq
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
 		return *fillErr
 	}
 	if server != "" && server != cfg.Matrix.ServerName {
-		//TODO Authenticate user before serving rooms from other server
+		// We require requests to be authenticated in order
+		// to serve public rooms from other server
+		_, jsonerr := auth.VerifyUserFromRequest(req, data)
+		if jsonerr != nil {
+			return *jsonerr
+		}
 		fres, err := fedClient.GetPublicRooms(req.Context(), server, int(request.Limit),
 			request.Since, false, "")
 		if err != nil {
