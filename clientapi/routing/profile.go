@@ -342,7 +342,7 @@ func buildMembershipEvents(
 	evs := []gomatrixserverlib.HeaderedEvent{}
 
 	for _, membership := range memberships {
-		verReq := api.QueryRoomVersionForRoomRequest{RoomID: membership.EventID}
+		verReq := api.QueryRoomVersionForRoomRequest{RoomID: membership.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
 		if err := queryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
 			return []gomatrixserverlib.HeaderedEvent{}, err
