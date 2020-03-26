@@ -97,12 +97,10 @@ func processRoomEvent(
 ) (eventID string, err error) {
 	// Parse and validate the event JSON
 	event := input.Event
-	fmt.Println("Starting processRoomEvent")
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(ctx, db, event.Event, input.AuthEventIDs)
 	if err != nil {
-		fmt.Println("checkAuthEvents:", err)
 		return
 	}
 
@@ -113,7 +111,6 @@ func processRoomEvent(
 		)
 		// On error OR event with the transaction already processed/processesing
 		if err != nil || eventID != "" {
-			fmt.Println("db.GetTransactionEventID:", err)
 			return
 		}
 	}
@@ -121,7 +118,6 @@ func processRoomEvent(
 	// Store the event
 	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event.Event, input.TransactionID, authEventNIDs)
 	if err != nil {
-		fmt.Println("db.StoreEvent:", err)
 		return
 	}
 
@@ -137,7 +133,6 @@ func processRoomEvent(
 		// Lets calculate one.
 		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event.Event)
 		if err != nil {
-			fmt.Println("calculateAndSetState:", err)
 			return
 		}
 	}
