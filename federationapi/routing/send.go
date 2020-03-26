@@ -104,7 +104,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 		}
 		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, verRes.RoomVersion)
 		if err != nil {
-			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to parse event JSON of event %q", event.EventID())
+			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
 			return nil, err
 		}
 		if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
