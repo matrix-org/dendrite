@@ -17,6 +17,8 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/common/config"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -37,7 +39,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database,
+	apiMux *mux.Router, cfg *config.Dendrite, deviceDB devices.Database, publicRoomsDB storage.Database,
 	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
@@ -72,14 +74,15 @@ func Setup(
 			if extRoomsProvider != nil {
 				return directory.GetPostPublicRoomsWithExternal(req, publicRoomsDB, fedClient, extRoomsProvider)
 			}
-			return directory.GetPostPublicRooms(req, publicRoomsDB)
+			server := gomatrixserverlib.ServerName(req.URL.Query().Get("server"))
+			return directory.GetPostPublicRooms(req, cfg, server, publicRoomsDB, fedClient)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	// Federation - TODO: should this live here or in federation API? It's sure easier if it's here so here it is.
 	apiMux.Handle("/_matrix/federation/v1/publicRooms",
 		common.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
-			return directory.GetPostPublicRooms(req, publicRoomsDB)
+			return directory.GetPostPublicRooms(req, cfg, cfg.Matrix.ServerName, publicRoomsDB, fedClient)
 		}),
 	).Methods(http.MethodGet)
 }
