@@ -123,6 +123,8 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	oq.lastTransactionIDs = []gomatrixserverlib.TransactionID{t.TransactionID}
 
 	for _, pdu := range oq.pendingEvents {
+		// Append the JSON of the event, since this is a json.RawMessage type in the
+		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, (*pdu).JSON())
 	}
 	oq.pendingEvents = nil
