@@ -46,7 +46,7 @@ func SetupClientAPIComponent(
 	transactionsCache *transactions.Cache,
 	fedSenderAPI federationSenderAPI.FederationSenderQueryAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
+	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
 	typingProducer := producers.NewTypingServerProducer(typingInputAPI)
 
 	userUpdateProducer := &producers.UserUpdateProducer{

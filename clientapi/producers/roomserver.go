@@ -24,27 +24,27 @@ import (
 // RoomserverProducer produces events for the roomserver to consume.
 type RoomserverProducer struct {
 	InputAPI api.RoomserverInputAPI
+	QueryAPI api.RoomserverQueryAPI
 }
 
 // NewRoomserverProducer creates a new RoomserverProducer
-func NewRoomserverProducer(inputAPI api.RoomserverInputAPI) *RoomserverProducer {
+func NewRoomserverProducer(inputAPI api.RoomserverInputAPI, queryAPI api.RoomserverQueryAPI) *RoomserverProducer {
 	return &RoomserverProducer{
 		InputAPI: inputAPI,
+		QueryAPI: queryAPI,
 	}
 }
 
 // SendEvents writes the given events to the roomserver input log. The events are written with KindNew.
 func (c *RoomserverProducer) SendEvents(
-	ctx context.Context, events []gomatrixserverlib.Event, sendAsServer gomatrixserverlib.ServerName,
+	ctx context.Context, events []gomatrixserverlib.HeaderedEvent, sendAsServer gomatrixserverlib.ServerName,
 	txnID *api.TransactionID,
 ) (string, error) {
 	ires := make([]api.InputRoomEvent, len(events))
 	for i, event := range events {
-		roomVersion := gomatrixserverlib.RoomVersionV1
-
 		ires[i] = api.InputRoomEvent{
 			Kind:          api.KindNew,
-			Event:         event.Headered(roomVersion),
+			Event:         event,
 			AuthEventIDs:  event.AuthEventIDs(),
 			SendAsServer:  string(sendAsServer),
 			TransactionID: txnID,
@@ -56,23 +56,20 @@ func (c *RoomserverProducer) SendEvents(
 // SendEventWithState writes an event with KindNew to the roomserver input log
 // with the state at the event as KindOutlier before it.
 func (c *RoomserverProducer) SendEventWithState(
-	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.Event,
+	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.HeaderedEvent,
 ) error {
 	outliers, err := state.Events()
 	if err != nil {
 		return err
 	}
 
-	// TODO: Room version here
-	roomVersion := gomatrixserverlib.RoomVersionV1
-
-	ires := make([]api.InputRoomEvent, len(outliers)+1)
-	for i, outlier := range outliers {
-		ires[i] = api.InputRoomEvent{
+	var ires []api.InputRoomEvent
+	for _, outlier := range outliers {
+		ires = append(ires, api.InputRoomEvent{
 			Kind:         api.KindOutlier,
-			Event:        outlier.Headered(roomVersion),
+			Event:        outlier.Headered(event.RoomVersion),
 			AuthEventIDs: outlier.AuthEventIDs(),
-		}
+		})
 	}
 
 	stateEventIDs := make([]string, len(state.StateEvents))
@@ -80,13 +77,13 @@ func (c *RoomserverProducer) SendEventWithState(
 		stateEventIDs[i] = state.StateEvents[i].EventID()
 	}
 
-	ires[len(outliers)] = api.InputRoomEvent{
+	ires = append(ires, api.InputRoomEvent{
 		Kind:          api.KindNew,
-		Event:         event.Headered(roomVersion),
+		Event:         event,
 		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateEventIDs,
-	}
+	})
 
 	_, err = c.SendInputRoomEvents(ctx, ires)
 	return err
@@ -109,12 +106,16 @@ func (c *RoomserverProducer) SendInputRoomEvents(
 func (c *RoomserverProducer) SendInvite(
 	ctx context.Context, inviteEvent gomatrixserverlib.Event,
 ) error {
-	// TODO: Room version here
-	roomVersion := gomatrixserverlib.RoomVersionV1
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: inviteEvent.RoomID()}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	err := c.QueryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes)
+	if err != nil {
+		return err
+	}
 
 	request := api.InputRoomEventsRequest{
 		InputInviteEvents: []api.InputInviteEvent{{
-			Event: inviteEvent.Headered(roomVersion),
+			Event: inviteEvent.Headered(verRes.RoomVersion),
 		}},
 	}
 	var response api.InputRoomEventsResponse

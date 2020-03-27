@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid
@@ -48,6 +49,15 @@ func SendEvent(
 	producer *producers.RoomserverProducer,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
 	if txnID != nil {
 		// Try to fetch response from transactionsCache
 		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
@@ -71,13 +81,22 @@ func SendEvent(
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	eventID, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndSessionID,
+		req.Context(),
+		[]gomatrixserverlib.HeaderedEvent{
+			e.Headered(verRes.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		txnAndSessionID,
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
-	util.GetLogger(req.Context()).WithField("event_id", eventID).Info("Sent event")
+	util.GetLogger(req.Context()).WithFields(logrus.Fields{
+		"event_id":     eventID,
+		"room_id":      roomID,
+		"room_version": verRes.RoomVersion,
+	}).Info("Sent event to roomserver")
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,

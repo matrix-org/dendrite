@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -91,9 +92,14 @@ func Backfill(
 		}
 	}
 
+	var eventJSONs []json.RawMessage
+	for _, e := range evs {
+		eventJSONs = append(eventJSONs, e.JSON())
+	}
+
 	txn := gomatrixserverlib.Transaction{
 		Origin:         cfg.Matrix.ServerName,
-		PDUs:           evs,
+		PDUs:           eventJSONs,
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
 

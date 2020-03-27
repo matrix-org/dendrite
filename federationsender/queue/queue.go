@@ -43,7 +43,7 @@ func NewOutgoingQueues(origin gomatrixserverlib.ServerName, client *gomatrixserv
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
-	ev *gomatrixserverlib.Event, origin gomatrixserverlib.ServerName,
+	ev *gomatrixserverlib.HeaderedEvent, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if origin != oqs.origin {
