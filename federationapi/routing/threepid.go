@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -310,16 +309,8 @@ func buildMembershipEvent(
 	}
 	builder.AuthEvents = refs
 
-	eventID := ""
-	eventIDFormat, err := queryRes.RoomVersion.EventIDFormat()
-	if err != nil {
-		return nil, err
-	}
-	if eventIDFormat == gomatrixserverlib.EventIDFormatV1 {
-		eventID = fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	}
 	event, err := builder.Build(
-		eventID, time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID,
 		cfg.Matrix.PrivateKey, queryRes.RoomVersion,
 	)
 

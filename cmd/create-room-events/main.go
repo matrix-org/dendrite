@@ -103,13 +103,12 @@ func main() {
 // Build an event and write the event to the output.
 func buildAndOutput() gomatrixserverlib.EventReference {
 	eventID++
-	id := fmt.Sprintf("$%d:%s", eventID, *serverName)
 	now = time.Unix(0, 0)
 	name := gomatrixserverlib.ServerName(*serverName)
 	key := gomatrixserverlib.KeyID(*keyID)
 
 	event, err := b.Build(
-		id, now, name, key, privateKey,
+		now, name, key, privateKey,
 		gomatrixserverlib.RoomVersionV1,
 	)
 	if err != nil {

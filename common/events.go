@@ -17,14 +17,12 @@ package common
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
@@ -51,17 +49,8 @@ func BuildEvent(
 		return nil, err
 	}
 
-	eventID := ""
-	eventIDFormat, err := queryRes.RoomVersion.EventIDFormat()
-	if err != nil {
-		return nil, err
-	}
-	if eventIDFormat == gomatrixserverlib.EventIDFormatV1 {
-		eventID = fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	}
-
 	event, err := builder.Build(
-		eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
 		cfg.Matrix.PrivateKey, queryRes.RoomVersion,
 	)
 	if err != nil {
