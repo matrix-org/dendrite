@@ -48,7 +48,8 @@ func Send(
 	}
 
 	var txnEvents struct {
-		Events []json.RawMessage `json:"pdus"`
+		PDUs []json.RawMessage `json:"pdus"`
+		EDUs []json.RawMessage `json:"edus"`
 	}
 
 	if err := json.Unmarshal(request.Content(), &txnEvents); err != nil {
@@ -58,7 +59,7 @@ func Send(
 		}
 	}
 
-	t.PDUs = txnEvents.Events
+	t.PDUs = txnEvents.PDUs
 	t.Origin = request.Origin()
 	t.TransactionID = txnID
 	t.Destination = cfg.Matrix.ServerName
