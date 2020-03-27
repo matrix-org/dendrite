@@ -218,8 +218,8 @@ func SendJoin(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"state":      common.RemoveEventHeaders(stateAndAuthChainResponse.StateEvents),
-			"auth_chain": common.RemoveEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
+			"state":      gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.StateEvents),
+			"auth_chain": gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
 		},
 	}
 }

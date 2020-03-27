@@ -18,7 +18,6 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -131,8 +130,8 @@ func getState(
 	}
 
 	return &gomatrixserverlib.RespState{
-		StateEvents: common.RemoveEventHeaders(response.StateEvents),
-		AuthEvents:  common.RemoveEventHeaders(response.AuthChainEvents),
+		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
+		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
 	}, nil
 }
 
