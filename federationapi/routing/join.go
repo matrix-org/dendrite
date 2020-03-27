@@ -99,14 +99,12 @@ func MakeJoin(
 		}
 	}
 
-	resultMap := map[string]interface{}{
-		"event":        builder,
-		"room_version": verRes.RoomVersion,
-	}
-
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: resultMap,
+		JSON: map[string]interface{}{
+			"event":        builder,
+			"room_version": verRes.RoomVersion,
+		},
 	}
 }
 
@@ -123,6 +121,7 @@ func SendJoin(
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
 	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryRoomVersionForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),

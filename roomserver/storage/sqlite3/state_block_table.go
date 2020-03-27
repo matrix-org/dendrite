@@ -39,8 +39,7 @@ const stateDataSchema = `
 
 const insertStateDataSQL = "" +
 	"INSERT INTO roomserver_state_block (state_block_nid, event_type_nid, event_state_key_nid, event_nid)" +
-	" VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT DO NOTHING"
+	" VALUES ($1, $2, $3, $4)"
 
 const selectNextStateBlockNIDSQL = `
 SELECT IFNULL(MAX(state_block_nid), 0) + 1 FROM roomserver_state_block

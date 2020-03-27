@@ -51,8 +51,7 @@ CREATE TABLE IF NOT EXISTS roomserver_state_block (
 
 const insertStateDataSQL = "" +
 	"INSERT INTO roomserver_state_block (state_block_nid, event_type_nid, event_state_key_nid, event_nid)" +
-	" VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT DO NOTHING"
+	" VALUES ($1, $2, $3, $4)"
 
 const selectNextStateBlockNIDSQL = "" +
 	"SELECT nextval('roomserver_state_block_nid_seq')"

@@ -373,7 +373,7 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 		return nil, fmt.Errorf("Cannot find server to backfill from: %w", err)
 	}
 
-	pdus := make([]gomatrixserverlib.HeaderedEvent, 0)
+	headered := make([]gomatrixserverlib.HeaderedEvent, 0)
 
 	// If the roomserver responded with at least one server that isn't us,
 	// send it a request for backfill.
@@ -390,16 +390,16 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 		if e != nil {
 			continue
 		}
-		pdus = append(pdus, event.Headered(verRes.RoomVersion))
+		headered = append(headered, event.Headered(verRes.RoomVersion))
 	}
-	util.GetLogger(r.ctx).WithField("server", srvToBackfillFrom).WithField("new_events", len(pdus)).Info("Storing new events from backfill")
+	util.GetLogger(r.ctx).WithField("server", srvToBackfillFrom).WithField("new_events", len(headered)).Info("Storing new events from backfill")
 
 	// Store the events in the database, while marking them as unfit to show
 	// up in responses to sync requests.
-	for i := range pdus {
+	for i := range headered {
 		if _, err = r.db.WriteEvent(
 			r.ctx,
-			&pdus[i],
+			&headered[i],
 			[]gomatrixserverlib.HeaderedEvent{},
 			[]string{},
 			[]string{},
@@ -409,7 +409,7 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 		}
 	}
 
-	return pdus, nil
+	return headered, nil
 }
 
 func (r *messagesReq) serverToBackfillFrom(fromEventIDs []string) (gomatrixserverlib.ServerName, error) {
