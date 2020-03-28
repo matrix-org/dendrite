@@ -223,3 +223,4 @@ GET /joined_rooms lists newly-created room
 Message history can be paginated over federation
 GET /rooms/:room_id/messages returns a message
 Remote user can backfill in a room with version 1
+Can get remote public room list
