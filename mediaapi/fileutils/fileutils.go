@@ -105,7 +105,9 @@ func RemoveDir(dir types.Path, logger *log.Entry) {
 }
 
 // WriteTempFile writes to a new temporary file
-func WriteTempFile(reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, absBasePath config.Path) (hash types.Base64Hash, size types.FileSizeBytes, path types.Path, err error) {
+// and deletes the file if an error is occurred while writing.
+// A log entry is needed to log the log the errors on deleting.
+func WriteTempFile(reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, absBasePath config.Path, logger *log.Entry) (hash types.Base64Hash, size types.FileSizeBytes, path types.Path, err error) {
 	size = -1
 
 	tmpFileWriter, tmpFile, tmpDir, err := createTempFileWriter(absBasePath)
@@ -123,11 +125,13 @@ func WriteTempFile(reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, a
 	teeReader := io.TeeReader(limitedReader, hasher)
 	bytesWritten, err := io.Copy(tmpFileWriter, teeReader)
 	if err != nil && err != io.EOF {
+		RemoveDir(tmpDir, logger)
 		return
 	}
 
 	err = tmpFileWriter.Flush()
 	if err != nil {
+		RemoveDir(tmpDir, logger)
 		return
 	}
 

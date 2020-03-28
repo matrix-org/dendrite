@@ -109,12 +109,11 @@ func (r *uploadRequest) doUpload(
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	// Data is truncated to maxFileSizeBytes. Content-Length was reported as 0 < Content-Length <= maxFileSizeBytes so this is OK.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(reqReader, *cfg.Media.MaxFileSizeBytes, cfg.Media.AbsBasePath)
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(reqReader, *cfg.Media.MaxFileSizeBytes, cfg.Media.AbsBasePath, r.Logger)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": *cfg.Media.MaxFileSizeBytes,
 		}).Warn("Error while transferring file")
-		fileutils.RemoveDir(tmpDir, r.Logger)
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("Failed to upload"),
@@ -139,6 +138,7 @@ func (r *uploadRequest) doUpload(
 		ctx, r.MediaMetadata.MediaID, r.MediaMetadata.Origin,
 	)
 	if err != nil {
+		fileutils.RemoveDir(tmpDir, r.Logger)
 		r.Logger.WithError(err).Error("Error querying the database.")
 		resErr := jsonerror.InternalServerError()
 		return &resErr
