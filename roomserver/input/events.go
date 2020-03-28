@@ -72,6 +72,10 @@ type RoomEventDatabase interface {
 		ctx context.Context, transactionID string,
 		sessionID int64, userID string,
 	) (string, error)
+	// Look up the room version for a given room.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomID string,
+	) (gomatrixserverlib.RoomVersion, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -92,10 +96,11 @@ func processRoomEvent(
 	input api.InputRoomEvent,
 ) (eventID string, err error) {
 	// Parse and validate the event JSON
-	event := input.Event
+	headered := input.Event
+	event := headered.Unwrap()
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
-	authEventNIDs, err := checkAuthEvents(ctx, db, event, input.AuthEventIDs)
+	authEventNIDs, err := checkAuthEvents(ctx, db, headered, input.AuthEventIDs)
 	if err != nil {
 		return
 	}
@@ -103,7 +108,7 @@ func processRoomEvent(
 	if input.TransactionID != nil {
 		tdID := input.TransactionID
 		eventID, err = db.GetTransactionEventID(
-			ctx, tdID.TransactionID, tdID.SessionID, input.Event.Sender(),
+			ctx, tdID.TransactionID, tdID.SessionID, event.Sender(),
 		)
 		// On error OR event with the transaction already processed/processesing
 		if err != nil || eventID != "" {
@@ -152,11 +157,8 @@ func calculateAndSetState(
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
-	if err != nil {
-		return err
-	}
+	var err error
+	roomState := state.NewStateResolution(db)
 
 	if input.HasState {
 		// We've been told what the state at the event is so we don't need to calculate it.
@@ -234,7 +236,8 @@ func processInviteEvent(
 		return nil
 	}
 
-	outputUpdates, err := updateToInviteMembership(updater, &input.Event, nil)
+	event := input.Event.Unwrap()
+	outputUpdates, err := updateToInviteMembership(updater, &event, nil)
 	if err != nil {
 		return err
 	}

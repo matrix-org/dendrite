@@ -17,8 +17,9 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -26,8 +27,12 @@ import (
 	"github.com/matrix-org/util"
 )
 
-type response struct {
+type getMembershipResponse struct {
 	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+}
+
+type getJoinedRoomsResponse struct {
+	JoinedRooms []string `json:"joined_rooms"`
 }
 
 // GetMemberships implements GET /rooms/{roomId}/members
@@ -43,7 +48,8 @@ func GetMemberships(
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
 	if err := queryAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryMembershipsForRoom failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if !queryRes.HasBeenInRoom {
@@ -55,6 +61,27 @@ func GetMemberships(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: response{queryRes.JoinEvents},
+		JSON: getMembershipResponse{queryRes.JoinEvents},
+	}
+}
+
+func GetJoinedRooms(
+	req *http.Request,
+	device *authtypes.Device,
+	accountsDB accounts.Database,
+) util.JSONResponse {
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
+	}
+	joinedRooms, err := accountsDB.GetRoomIDsByLocalPart(req.Context(), localpart)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("accountsDB.GetRoomIDsByLocalPart failed")
+		return jsonerror.InternalServerError()
+	}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: getJoinedRoomsResponse{joinedRooms},
 	}
 }

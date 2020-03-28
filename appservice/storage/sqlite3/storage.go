@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	// Import SQLite database driver
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -35,7 +36,7 @@ type Database struct {
 func NewDatabase(dataSourceName string) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sql.Open("sqlite3", dataSourceName); err != nil {
+	if result.db, err = sql.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {
@@ -52,12 +53,12 @@ func (d *Database) prepare() error {
 	return d.txnID.prepare(d.db)
 }
 
-// StoreEvent takes in a gomatrixserverlib.Event and stores it in the database
+// StoreEvent takes in a gomatrixserverlib.HeaderedEvent and stores it in the database
 // for a transaction worker to pull and later send to an application service.
 func (d *Database) StoreEvent(
 	ctx context.Context,
 	appServiceID string,
-	event *gomatrixserverlib.Event,
+	event *gomatrixserverlib.HeaderedEvent,
 ) error {
 	return d.events.insertEvent(ctx, appServiceID, event)
 }
@@ -68,7 +69,7 @@ func (d *Database) GetEventsWithAppServiceID(
 	ctx context.Context,
 	appServiceID string,
 	limit int,
-) (int, int, []gomatrixserverlib.Event, bool, error) {
+) (int, int, []gomatrixserverlib.HeaderedEvent, bool, error) {
 	return d.events.selectEventsByApplicationServiceID(ctx, appServiceID, limit)
 }
 

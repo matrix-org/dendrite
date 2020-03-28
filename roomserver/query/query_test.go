@@ -54,7 +54,9 @@ func (db *getEventDB) addFakeEvent(eventID string, authIDs []string) error {
 		return err
 	}
 
-	event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false)
+	event, err := gomatrixserverlib.NewEventFromTrustedJSON(
+		eventJSON, false, gomatrixserverlib.RoomVersionV1,
+	)
 	if err != nil {
 		return err
 	}

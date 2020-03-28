@@ -46,7 +46,8 @@ func SendTyping(
 
 	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("userutil.ParseUsernameParam failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Verify that the user is a member of this room
@@ -57,7 +58,8 @@ func SendTyping(
 			JSON: jsonerror.Forbidden("User not in this room"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetMembershipInRoomByLocalPart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// parse the incoming http request
@@ -70,7 +72,8 @@ func SendTyping(
 	if err = typingProducer.Send(
 		req.Context(), userID, roomID, r.Typing, r.Timeout,
 	); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("typingProducer.Send failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

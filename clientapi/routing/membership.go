@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -45,6 +46,15 @@ func SendMembership(
 	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
 	var body threepid.MembershipRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -90,13 +100,18 @@ func SendMembership(
 			JSON: jsonerror.NotFound(err.Error()),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if _, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*event}, cfg.Matrix.ServerName, nil,
+		req.Context(),
+		[]gomatrixserverlib.HeaderedEvent{(*event).Headered(verRes.RoomVersion)},
+		cfg.Matrix.ServerName,
+		nil,
 	); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var returnData interface{} = struct{}{}
@@ -242,7 +257,8 @@ func checkAndProcessThreepid(
 			JSON: jsonerror.NotFound(err.Error()),
 		}
 	} else if err != nil {
-		er := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		er := jsonerror.InternalServerError()
 		return inviteStored, &er
 	}
 	return

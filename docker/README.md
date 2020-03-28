@@ -11,10 +11,10 @@ and start working on dendrite.
 
 ### Configuration
 
-Copy the `dendrite-docker.yaml` file to the root of the project and rename it to
-`dendrite.yaml`. It already contains the defaults used in `docker-compose` for 
-networking so you will only have to change things like the `server_name` or to 
-toggle `naffka`.
+Create a directory named `cfg` in the root of the project. Copy the
+`dendrite-docker.yaml` file into that directory and rename it to `dendrite.yaml`.
+It already contains the defaults used in `docker-compose` for networking so you will
+only have to change things like the `server_name` or to toggle `naffka`.
 
 You can run the following `docker-compose` commands either from the top directory
 specifying the `docker-compose` file

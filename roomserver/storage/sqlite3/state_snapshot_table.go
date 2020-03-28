@@ -18,10 +18,10 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -30,7 +30,7 @@ const stateSnapshotSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
     state_snapshot_nid INTEGER PRIMARY KEY AUTOINCREMENT,
     room_nid INTEGER NOT NULL,
-    state_block_nids TEXT NOT NULL DEFAULT '{}'
+    state_block_nids TEXT NOT NULL DEFAULT '[]'
   );
 `
 
@@ -67,12 +67,12 @@ func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
 func (s *stateSnapshotStatements) insertState(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
 ) (stateNID types.StateSnapshotNID, err error) {
-	nids := make([]int64, len(stateBlockNIDs))
-	for i := range stateBlockNIDs {
-		nids[i] = int64(stateBlockNIDs[i])
+	stateBlockNIDsJSON, err := json.Marshal(stateBlockNIDs)
+	if err != nil {
+		return
 	}
 	insertStmt := txn.Stmt(s.insertStateStmt)
-	if res, err2 := insertStmt.ExecContext(ctx, int64(roomNID), pq.Int64Array(nids)); err2 == nil {
+	if res, err2 := insertStmt.ExecContext(ctx, int64(roomNID), string(stateBlockNIDsJSON)); err2 == nil {
 		lastRowID, err3 := res.LastInsertId()
 		if err3 != nil {
 			err = err3
@@ -99,18 +99,17 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockNIDs: rows.close() failed")
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		var stateBlockNIDs pq.Int64Array
-		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDs); err != nil {
+		var stateBlockNIDsJSON string
+		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDsJSON); err != nil {
 			return nil, err
 		}
-		result.StateBlockNIDs = make([]types.StateBlockNID, len(stateBlockNIDs))
-		for k := range stateBlockNIDs {
-			result.StateBlockNIDs[k] = types.StateBlockNID(stateBlockNIDs[k])
+		if err := json.Unmarshal([]byte(stateBlockNIDsJSON), &result.StateBlockNIDs); err != nil {
+			return nil, err
 		}
 	}
 	if i != len(stateNIDs) {

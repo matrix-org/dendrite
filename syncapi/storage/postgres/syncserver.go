@@ -37,7 +37,7 @@ import (
 
 type stateDelta struct {
 	roomID      string
-	stateEvents []gomatrixserverlib.Event
+	stateEvents []gomatrixserverlib.HeaderedEvent
 	membership  string
 	// The PDU stream position of the latest membership event for this user, if applicable.
 	// Can be 0 if there is no membership event in this delta.
@@ -100,7 +100,7 @@ func (d *SyncServerDatasource) AllJoinedUsersInRooms(ctx context.Context) (map[s
 // If an event is not found in the database then it will be omitted from the list.
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
-func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.HeaderedEvent, error) {
 	streamEvents, err := d.events.selectEvents(ctx, nil, eventIDs)
 	if err != nil {
 		return nil, err
@@ -111,22 +111,17 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 	return d.StreamEventsToEvents(nil, streamEvents), nil
 }
 
-func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev *gomatrixserverlib.Event) error {
-	// If the event is already known as a backward extremity, don't consider
-	// it as such anymore now that we have it.
-	isBackwardExtremity, err := d.backwardExtremities.isBackwardExtremity(ctx, ev.RoomID(), ev.EventID())
-	if err != nil {
+// handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of
+// the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
+// to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
+func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.HeaderedEvent) error {
+	if err := d.backwardExtremities.deleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 		return err
-	}
-	if isBackwardExtremity {
-		if err = d.backwardExtremities.deleteBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
-			return err
-		}
 	}
 
 	// Check if we have all of the event's previous events. If an event is
 	// missing, add it to the room's backward extremities.
-	prevEvents, err := d.events.selectEvents(ctx, nil, ev.PrevEventIDs())
+	prevEvents, err := d.events.selectEvents(ctx, txn, ev.PrevEventIDs())
 	if err != nil {
 		return err
 	}
@@ -141,7 +136,7 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, ev.RoomID(), ev.EventID()); err != nil {
+			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
 				return err
 			}
 		}
@@ -155,8 +150,8 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, ev
 // Returns an error if there was a problem inserting this event.
 func (d *SyncServerDatasource) WriteEvent(
 	ctx context.Context,
-	ev *gomatrixserverlib.Event,
-	addStateEvents []gomatrixserverlib.Event,
+	ev *gomatrixserverlib.HeaderedEvent,
+	addStateEvents []gomatrixserverlib.HeaderedEvent,
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
 ) (pduPosition types.StreamPosition, returnErr error) {
@@ -174,7 +169,7 @@ func (d *SyncServerDatasource) WriteEvent(
 			return err
 		}
 
-		if err = d.handleBackwardExtremities(ctx, ev); err != nil {
+		if err = d.handleBackwardExtremities(ctx, txn, ev); err != nil {
 			return err
 		}
 
@@ -192,7 +187,7 @@ func (d *SyncServerDatasource) WriteEvent(
 func (d *SyncServerDatasource) updateRoomState(
 	ctx context.Context, txn *sql.Tx,
 	removedEventIDs []string,
-	addedEvents []gomatrixserverlib.Event,
+	addedEvents []gomatrixserverlib.HeaderedEvent,
 	pduPosition types.StreamPosition,
 ) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
@@ -228,7 +223,7 @@ func (d *SyncServerDatasource) updateRoomState(
 // If there was an issue during the retrieval, returns an error
 func (d *SyncServerDatasource) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
-) (*gomatrixserverlib.Event, error) {
+) (*gomatrixserverlib.HeaderedEvent, error) {
 	return d.roomstate.selectStateEvent(ctx, roomID, evType, stateKey)
 }
 
@@ -237,7 +232,7 @@ func (d *SyncServerDatasource) GetStateEvent(
 // Returns an error if there was an issue with the retrieval.
 func (d *SyncServerDatasource) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *gomatrixserverlib.StateFilter,
-) (stateEvents []gomatrixserverlib.Event, err error) {
+) (stateEvents []gomatrixserverlib.HeaderedEvent, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilter)
 		return err
@@ -599,7 +594,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
-		var stateEvents []gomatrixserverlib.Event
+		var stateEvents []gomatrixserverlib.HeaderedEvent
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, &stateFilter)
 		if err != nil {
 			return
@@ -619,9 +614,6 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		// oldest event in the room's topology.
 		var backwardTopologyPos types.StreamPosition
 		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
-		if err != nil {
-			return nil, types.PaginationToken{}, []string{}, err
-		}
 		if backwardTopologyPos-1 <= 0 {
 			backwardTopologyPos = types.StreamPosition(1)
 		} else {
@@ -636,9 +628,9 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
 			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
 		).String()
-		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
-		jr.State.Events = gomatrixserverlib.ToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
+		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[roomID] = *jr
 	}
 
@@ -710,7 +702,7 @@ func (d *SyncServerDatasource) UpsertAccountData(
 // If the invite was successfully stored this returns the stream ID it was stored at.
 // Returns an error if there was a problem communicating with the database.
 func (d *SyncServerDatasource) AddInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.Event,
+	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (types.StreamPosition, error) {
 	return d.invites.insertInviteEvent(ctx, inviteEvent)
 }
@@ -761,7 +753,7 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 	for roomID, inviteEvent := range invites {
 		ir := types.NewInviteResponse()
 		ir.InviteState.Events = gomatrixserverlib.ToClientEvents(
-			[]gomatrixserverlib.Event{inviteEvent}, gomatrixserverlib.FormatSync,
+			[]gomatrixserverlib.Event{inviteEvent.Event}, gomatrixserverlib.FormatSync,
 		)
 		// TODO: add the invite state from the invite event.
 		res.Rooms.Invite[roomID] = *ir
@@ -824,9 +816,9 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
 			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
 		).String()
-		jr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
-		jr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
+		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.roomID] = *jr
 	case gomatrixserverlib.Leave:
 		fallthrough // transitions to leave are the same as ban
@@ -837,9 +829,9 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		lr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
 			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
 		).String()
-		lr.Timeline.Events = gomatrixserverlib.ToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+		lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
-		lr.State.Events = gomatrixserverlib.ToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
+		lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Leave[delta.roomID] = *lr
 	}
 
@@ -1077,7 +1069,7 @@ func (d *SyncServerDatasource) currentStateStreamEventsForRoom(
 	}
 	s := make([]types.StreamEvent, len(allState))
 	for i := 0; i < len(s); i++ {
-		s[i] = types.StreamEvent{Event: allState[i], StreamPosition: 0}
+		s[i] = types.StreamEvent{HeaderedEvent: allState[i], StreamPosition: 0}
 	}
 	return s, nil
 }
@@ -1085,10 +1077,10 @@ func (d *SyncServerDatasource) currentStateStreamEventsForRoom(
 // StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 // matches the streamevent.transactionID device then the transaction ID gets
 // added to the unsigned section of the output event.
-func (d *SyncServerDatasource) StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.Event {
-	out := make([]gomatrixserverlib.Event, len(in))
+func (d *SyncServerDatasource) StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent {
+	out := make([]gomatrixserverlib.HeaderedEvent, len(in))
 	for i := 0; i < len(in); i++ {
-		out[i] = in[i].Event
+		out[i] = in[i].HeaderedEvent
 		if device != nil && in[i].TransactionID != nil {
 			if device.UserID == in[i].Sender() && device.SessionID == in[i].TransactionID.SessionID {
 				err := out[i].SetUnsignedField(
@@ -1108,7 +1100,7 @@ func (d *SyncServerDatasource) StreamEventsToEvents(device *authtypes.Device, in
 // There may be some overlap where events in stateEvents are already in recentEvents, so filter
 // them out so we don't include them twice in the /sync response. They should be in recentEvents
 // only, so clients get to the correct state once they have rolled forward.
-func removeDuplicates(stateEvents, recentEvents []gomatrixserverlib.Event) []gomatrixserverlib.Event {
+func removeDuplicates(stateEvents, recentEvents []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
 	for _, recentEv := range recentEvents {
 		if recentEv.StateKey() == nil {
 			continue // not a state event

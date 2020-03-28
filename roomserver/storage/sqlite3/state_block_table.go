@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
@@ -138,7 +137,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
 
 	results := make([]types.StateEntryList, len(stateBlockNIDs))
 	// current is a pointer to the StateEntryList to append the state entries to.
@@ -208,7 +207,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectFilteredStateBlockEntries: rows.close() failed")
 
 	var results []types.StateEntryList
 	var current types.StateEntryList
@@ -268,9 +267,9 @@ func (s stateKeyTupleSorter) contains(value types.StateKeyTuple) bool {
 
 // List the unique eventTypeNIDs and eventStateKeyNIDs.
 // Assumes that the list is sorted.
-func (s stateKeyTupleSorter) typesAndStateKeysAsArrays() (eventTypeNIDs pq.Int64Array, eventStateKeyNIDs pq.Int64Array) {
-	eventTypeNIDs = make(pq.Int64Array, len(s))
-	eventStateKeyNIDs = make(pq.Int64Array, len(s))
+func (s stateKeyTupleSorter) typesAndStateKeysAsArrays() (eventTypeNIDs []int64, eventStateKeyNIDs []int64) {
+	eventTypeNIDs = make([]int64, len(s))
+	eventStateKeyNIDs = make([]int64, len(s))
 	for i := range s {
 		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
 		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)

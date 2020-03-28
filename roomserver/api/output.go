@@ -54,7 +54,7 @@ type OutputEvent struct {
 // prev_events.
 type OutputNewRoomEvent struct {
 	// The Event.
-	Event gomatrixserverlib.Event `json:"event"`
+	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 	// The latest events in the room after this event.
 	// This can be used to set the prev events for new events in the room.
 	// This also can be used to get the full current state after this event.
@@ -117,7 +117,7 @@ type OutputNewRoomEvent struct {
 // tracked separately from the room events themselves.
 type OutputNewInviteEvent struct {
 	// The "m.room.member" invite event.
-	Event gomatrixserverlib.Event `json:"event"`
+	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 // An OutputRetireInviteEvent is written whenever an existing invite is no longer

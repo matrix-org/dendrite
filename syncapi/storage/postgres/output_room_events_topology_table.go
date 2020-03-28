@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -102,7 +104,7 @@ func (s *outputRoomEventsTopologyStatements) prepare(db *sql.DB) (err error) {
 // insertEventInTopology inserts the given event in the room's topology, based
 // on the event's depth.
 func (s *outputRoomEventsTopologyStatements) insertEventInTopology(
-	ctx context.Context, event *gomatrixserverlib.Event,
+	ctx context.Context, event *gomatrixserverlib.HeaderedEvent,
 ) (err error) {
 	_, err = s.insertEventInTopologyStmt.ExecContext(
 		ctx, event.EventID(), event.Depth(), event.RoomID(),
@@ -134,7 +136,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 	} else if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectEventIDsInRange: rows.close() failed")
 
 	// Return the IDs.
 	var eventID string
@@ -177,7 +179,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
 	} else if err != nil {
 		return
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "selectEventIDsFromPosition: rows.close() failed")
 	// Return the IDs.
 	var eventID string
 	for rows.Next() {

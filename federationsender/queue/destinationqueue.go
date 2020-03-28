@@ -16,11 +16,13 @@ package queue
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,14 +40,14 @@ type destinationQueue struct {
 	running            bool
 	sentCounter        int
 	lastTransactionIDs []gomatrixserverlib.TransactionID
-	pendingEvents      []*gomatrixserverlib.Event
+	pendingEvents      []*gomatrixserverlib.HeaderedEvent
 	pendingEDUs        []*gomatrixserverlib.EDU
 }
 
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.Event) {
+func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.HeaderedEvent) {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
 	oq.pendingEvents = append(oq.pendingEvents, ev)
@@ -80,6 +82,8 @@ func (oq *destinationQueue) backgroundSend() {
 		// TODO: handle retries.
 		// TODO: blacklist uncooperative servers.
 
+		util.GetLogger(context.TODO()).Infof("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
+
 		_, err := oq.client.SendTransaction(context.TODO(), *t)
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -102,7 +106,10 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 		return nil
 	}
 
-	var t gomatrixserverlib.Transaction
+	t := gomatrixserverlib.Transaction{
+		PDUs: []json.RawMessage{},
+		EDUs: []gomatrixserverlib.EDU{},
+	}
 	now := gomatrixserverlib.AsTimestamp(time.Now())
 	t.TransactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.sentCounter))
 	t.Origin = oq.origin
@@ -116,7 +123,9 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	oq.lastTransactionIDs = []gomatrixserverlib.TransactionID{t.TransactionID}
 
 	for _, pdu := range oq.pendingEvents {
-		t.PDUs = append(t.PDUs, *pdu)
+		// Append the JSON of the event, since this is a json.RawMessage type in the
+		// gomatrixserverlib.Transaction struct
+		t.PDUs = append(t.PDUs, (*pdu).JSON())
 	}
 	oq.pendingEvents = nil
 	oq.sentCounter += len(t.PDUs)

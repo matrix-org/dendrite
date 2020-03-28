@@ -15,13 +15,13 @@
 package routing
 
 import (
-	"encoding/json"
+	"context"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -36,10 +36,19 @@ func Invite(
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
+	// Look up the room version for the room.
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := producer.QueryAPI.QueryRoomVersionForRoom(context.Background(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
 
 	// Decode the event JSON from the request.
-	var event gomatrixserverlib.Event
-	if err := json.Unmarshal(request.Content(), &event); err != nil {
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
@@ -71,14 +80,16 @@ func Invite(
 	}
 
 	// Check that the event is signed by the server sending the request.
+	redacted := event.Redact()
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
 		ServerName: event.Origin(),
-		Message:    event.Redact().JSON(),
+		Message:    redacted.JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+		return jsonerror.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
@@ -94,7 +105,8 @@ func Invite(
 
 	// Add the invite event to the roomserver.
 	if err = producer.SendInvite(httpReq.Context(), signedEvent); err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Return the signed event to the originating server, it should then tell

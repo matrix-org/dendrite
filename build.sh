@@ -1,3 +1,6 @@
-#!/bin/sh
+#!/bin/bash -eu
 
-GOBIN=$PWD/`dirname $0`/bin go install -v $PWD/`dirname $0`/cmd/...
+# Put installed packages into ./bin
+export GOBIN=$PWD/`dirname $0`/bin
+
+go install -v $PWD/`dirname $0`/cmd/...

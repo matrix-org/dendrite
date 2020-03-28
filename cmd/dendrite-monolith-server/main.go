@@ -69,7 +69,7 @@ func main() {
 	)
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, query)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, query, federation, nil)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)

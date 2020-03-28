@@ -130,8 +130,8 @@ func getState(
 	}
 
 	return &gomatrixserverlib.RespState{
-		StateEvents: response.StateEvents,
-		AuthEvents:  response.AuthChainEvents,
+		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
+		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
 	}, nil
 }
 

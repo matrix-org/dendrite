@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -62,12 +63,14 @@ func JoinRoomByIDOrAlias(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	content["membership"] = gomatrixserverlib.Join
@@ -119,7 +122,8 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 	}
 	var queryRes roomserverAPI.QueryInvitesForUserResponse
 	if err := r.queryAPI.QueryInvitesForUser(r.req.Context(), &queryReq, &queryRes); err != nil {
-		return httputil.LogThenError(r.req, err)
+		util.GetLogger(r.req.Context()).WithError(err).Error("r.queryAPI.QueryInvitesForUser failed")
+		return jsonerror.InternalServerError()
 	}
 
 	servers := []gomatrixserverlib.ServerName{}
@@ -127,7 +131,8 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 	for _, userID := range queryRes.InviteSenderUserIDs {
 		_, domain, err := gomatrixserverlib.SplitID('@', userID)
 		if err != nil {
-			return httputil.LogThenError(r.req, err)
+			util.GetLogger(r.req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+			return jsonerror.InternalServerError()
 		}
 		if !seenInInviterIDs[domain] {
 			servers = append(servers, domain)
@@ -141,7 +146,8 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 	// Note: It's no guarantee we'll succeed because a room isn't bound to the domain in its ID
 	_, domain, err := gomatrixserverlib.SplitID('!', roomID)
 	if err != nil {
-		return httputil.LogThenError(r.req, err)
+		util.GetLogger(r.req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 	if domain != r.cfg.Matrix.ServerName && !seenInInviterIDs[domain] {
 		servers = append(servers, domain)
@@ -164,7 +170,8 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
 		var queryRes roomserverAPI.GetRoomIDForAliasResponse
 		if err = r.aliasAPI.GetRoomIDForAlias(r.req.Context(), &queryReq, &queryRes); err != nil {
-			return httputil.LogThenError(r.req, err)
+			util.GetLogger(r.req.Context()).WithError(err).Error("r.aliasAPI.GetRoomIDForAlias failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if len(queryRes.RoomID) > 0 {
@@ -194,7 +201,8 @@ func (r joinRoomReq) joinRoomByRemoteAlias(
 				}
 			}
 		}
-		return httputil.LogThenError(r.req, err)
+		util.GetLogger(r.req.Context()).WithError(err).Error("r.federation.LookupRoomAlias failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return r.joinRoomUsingServers(resp.RoomID, resp.Servers)
@@ -227,14 +235,23 @@ func (r joinRoomReq) joinRoomUsingServers(
 	var eb gomatrixserverlib.EventBuilder
 	err := r.writeToBuilder(&eb, roomID)
 	if err != nil {
-		return httputil.LogThenError(r.req, err)
+		util.GetLogger(r.req.Context()).WithError(err).Error("r.writeToBuilder failed")
+		return jsonerror.InternalServerError()
 	}
 
-	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
+	queryRes := roomserverAPI.QueryLatestEventsAndStateResponse{}
 	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.queryAPI, &queryRes)
 	if err == nil {
-		if _, err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName, nil); err != nil {
-			return httputil.LogThenError(r.req, err)
+		if _, err = r.producer.SendEvents(
+			r.req.Context(),
+			[]gomatrixserverlib.HeaderedEvent{
+				(*event).Headered(queryRes.RoomVersion),
+			},
+			r.cfg.Matrix.ServerName,
+			nil,
+		); err != nil {
+			util.GetLogger(r.req.Context()).WithError(err).Error("r.producer.SendEvents failed")
+			return jsonerror.InternalServerError()
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -244,7 +261,8 @@ func (r joinRoomReq) joinRoomUsingServers(
 		}
 	}
 	if err != common.ErrRoomNoExists {
-		return httputil.LogThenError(r.req, err)
+		util.GetLogger(r.req.Context()).WithError(err).Error("common.BuildEvent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if len(servers) == 0 {
@@ -280,7 +298,8 @@ func (r joinRoomReq) joinRoomUsingServers(
 	//   4) We couldn't fetch the public keys needed to verify the
 	//      signatures on the state events.
 	//   5) ...
-	return httputil.LogThenError(r.req, lastErr)
+	util.GetLogger(r.req.Context()).WithError(lastErr).Error("failed to join through any server")
+	return jsonerror.InternalServerError()
 }
 
 // joinRoomUsingServer tries to join a remote room using a given matrix server.
@@ -288,7 +307,17 @@ func (r joinRoomReq) joinRoomUsingServers(
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
 func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
-	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID)
+	// Ask the room server for information about room versions.
+	var request api.QueryRoomVersionCapabilitiesRequest
+	var response api.QueryRoomVersionCapabilitiesResponse
+	if err := r.queryAPI.QueryRoomVersionCapabilities(r.req.Context(), &request, &response); err != nil {
+		return nil, err
+	}
+	var supportedVersions []gomatrixserverlib.RoomVersion
+	for version := range response.AvailableRoomVersions {
+		supportedVersions = append(supportedVersions, version)
+	}
+	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, supportedVersions)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
 		return nil, err
@@ -301,16 +330,29 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, err
 	}
 
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
+	if respMakeJoin.RoomVersion == "" {
+		respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
+	}
+	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(
+				fmt.Sprintf("Room version '%s' is not supported", respMakeJoin.RoomVersion),
+			),
+		}, nil
+	}
+
 	event, err := respMakeJoin.JoinEvent.Build(
-		eventID, r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
+		r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID,
+		r.cfg.Matrix.PrivateKey, respMakeJoin.RoomVersion,
 	)
 	if err != nil {
-		res := httputil.LogThenError(r.req, err)
+		util.GetLogger(r.req.Context()).WithError(err).Error("respMakeJoin.JoinEvent.Build failed")
+		res := jsonerror.InternalServerError()
 		return &res, nil
 	}
 
-	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event)
+	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event, respMakeJoin.RoomVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -320,9 +362,12 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	}
 
 	if err = r.producer.SendEventWithState(
-		r.req.Context(), gomatrixserverlib.RespState(respSendJoin.RespState), event,
+		r.req.Context(),
+		gomatrixserverlib.RespState(respSendJoin.RespState),
+		event.Headered(respMakeJoin.RoomVersion),
 	); err != nil {
-		res := httputil.LogThenError(r.req, err)
+		util.GetLogger(r.req.Context()).WithError(err).Error("gomatrixserverlib.RespState failed")
+		res := jsonerror.InternalServerError()
 		return &res, nil
 	}
 

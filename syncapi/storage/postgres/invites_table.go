@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -30,7 +31,7 @@ CREATE TABLE IF NOT EXISTS syncapi_invite_events (
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,
-	event_json TEXT NOT NULL
+	headered_event_json TEXT NOT NULL
 );
 
 -- For looking up the invites for a given user.
@@ -44,14 +45,14 @@ CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx
 
 const insertInviteEventSQL = "" +
 	"INSERT INTO syncapi_invite_events (" +
-	" room_id, event_id, target_user_id, event_json" +
+	" room_id, event_id, target_user_id, headered_event_json" +
 	") VALUES ($1, $2, $3, $4) RETURNING id"
 
 const deleteInviteEventSQL = "" +
 	"DELETE FROM syncapi_invite_events WHERE event_id = $1"
 
 const selectInviteEventsInRangeSQL = "" +
-	"SELECT room_id, event_json FROM syncapi_invite_events" +
+	"SELECT room_id, headered_event_json FROM syncapi_invite_events" +
 	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC"
 
@@ -86,14 +87,20 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *inviteEventsStatements) insertInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.Event,
+	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
+	var headeredJSON []byte
+	headeredJSON, err = json.Marshal(inviteEvent)
+	if err != nil {
+		return
+	}
+
 	err = s.insertInviteEventStmt.QueryRowContext(
 		ctx,
 		inviteEvent.RoomID(),
 		inviteEvent.EventID(),
 		*inviteEvent.StateKey(),
-		inviteEvent.JSON(),
+		headeredJSON,
 	).Scan(&streamPos)
 	return
 }
@@ -109,14 +116,14 @@ func (s *inviteEventsStatements) deleteInviteEvent(
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) selectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, startPos, endPos types.StreamPosition,
-) (map[string]gomatrixserverlib.Event, error) {
+) (map[string]gomatrixserverlib.HeaderedEvent, error) {
 	stmt := common.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, startPos, endPos)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
-	result := map[string]gomatrixserverlib.Event{}
+	defer common.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
+	result := map[string]gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var (
 			roomID    string
@@ -126,8 +133,8 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 			return nil, err
 		}
 
-		event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false)
-		if err != nil {
+		var event gomatrixserverlib.HeaderedEvent
+		if err := json.Unmarshal(eventJSON, &event); err != nil {
 			return nil, err
 		}
 

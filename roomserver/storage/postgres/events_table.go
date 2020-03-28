@@ -116,6 +116,9 @@ const bulkSelectEventNIDSQL = "" +
 const selectMaxEventDepthSQL = "" +
 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid = ANY($1)"
 
+const selectRoomNIDForEventNIDSQL = "" +
+	"SELECT room_nid FROM roomserver_events WHERE event_nid = $1"
+
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
@@ -130,6 +133,7 @@ type eventStatements struct {
 	bulkSelectEventIDStmt                  *sql.Stmt
 	bulkSelectEventNIDStmt                 *sql.Stmt
 	selectMaxEventDepthStmt                *sql.Stmt
+	selectRoomNIDForEventNIDStmt           *sql.Stmt
 }
 
 func (s *eventStatements) prepare(db *sql.DB) (err error) {
@@ -152,6 +156,7 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
+		{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
 	}.prepare(db)
 }
 
@@ -192,7 +197,7 @@ func (s *eventStatements) bulkSelectStateEventByID(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
 	// We know that we will only get as many results as event IDs
 	// because of the unique constraint on event IDs.
 	// So we can allocate an array of the correct size now.
@@ -235,7 +240,7 @@ func (s *eventStatements) bulkSelectStateAtEventByID(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventByID: rows.close() failed")
 	results := make([]types.StateAtEvent, len(eventIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -302,7 +307,7 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventAndReference: rows.close() failed")
 	results := make([]types.StateAtEventAndReference, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -343,7 +348,7 @@ func (s *eventStatements) bulkSelectEventReference(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventReference: rows.close() failed")
 	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -367,7 +372,7 @@ func (s *eventStatements) bulkSelectEventID(ctx context.Context, eventNIDs []typ
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventID: rows.close() failed")
 	results := make(map[types.EventNID]string, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -394,7 +399,7 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, eventIDs []str
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventNID: rows.close() failed")
 	results := make(map[string]types.EventNID, len(eventIDs))
 	for rows.Next() {
 		var eventID string
@@ -415,6 +420,14 @@ func (s *eventStatements) selectMaxEventDepth(ctx context.Context, eventNIDs []t
 		return 0, err
 	}
 	return result, nil
+}
+
+func (s *eventStatements) selectRoomNIDForEventNID(
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
+) (roomNID types.RoomNID, err error) {
+	selectStmt := common.TxStmt(txn, s.selectRoomNIDForEventNIDStmt)
+	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&roomNID)
+	return
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {

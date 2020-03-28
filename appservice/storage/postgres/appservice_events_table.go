@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS appservice_events (
 	-- The ID of the application service the event will be sent to
 	as_id TEXT NOT NULL,
 	-- JSON representation of the event
-	event_json TEXT NOT NULL,
+	headered_event_json TEXT NOT NULL,
 	-- The ID of the transaction that this event is a part of
 	txn_id BIGINT NOT NULL
 );
@@ -42,14 +42,14 @@ CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_events(as_id);
 `
 
 const selectEventsByApplicationServiceIDSQL = "" +
-	"SELECT id, event_json, txn_id " +
+	"SELECT id, headered_event_json, txn_id " +
 	"FROM appservice_events WHERE as_id = $1 ORDER BY txn_id DESC, id ASC"
 
 const countEventsByApplicationServiceIDSQL = "" +
 	"SELECT COUNT(id) FROM appservice_events WHERE as_id = $1"
 
 const insertEventSQL = "" +
-	"INSERT INTO appservice_events(as_id, event_json, txn_id) " +
+	"INSERT INTO appservice_events(as_id, headered_event_json, txn_id) " +
 	"VALUES ($1, $2, $3)"
 
 const updateTxnIDForEventsSQL = "" +
@@ -107,7 +107,7 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 	limit int,
 ) (
 	txnID, maxID int,
-	events []gomatrixserverlib.Event,
+	events []gomatrixserverlib.HeaderedEvent,
 	eventsRemaining bool,
 	err error,
 ) {
@@ -132,7 +132,7 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 	return
 }
 
-func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.Event, maxID, txnID int, eventsRemaining bool, err error) {
+func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.HeaderedEvent, maxID, txnID int, eventsRemaining bool, err error) {
 	// Get current time for use in calculating event age
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 
@@ -141,7 +141,7 @@ func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.
 	// new ones. Send back those events first.
 	lastTxnID := invalidTxnID
 	for eventsProcessed := 0; eventRows.Next(); {
-		var event gomatrixserverlib.Event
+		var event gomatrixserverlib.HeaderedEvent
 		var eventJSON []byte
 		var id int
 		err = eventRows.Scan(
@@ -209,7 +209,7 @@ func (s *eventsStatements) countEventsByApplicationServiceID(
 func (s *eventsStatements) insertEvent(
 	ctx context.Context,
 	appServiceID string,
-	event *gomatrixserverlib.Event,
+	event *gomatrixserverlib.HeaderedEvent,
 ) (err error) {
 	// Convert event to JSON before inserting
 	eventJSON, err := json.Marshal(event)

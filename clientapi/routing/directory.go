@@ -63,7 +63,8 @@ func DirectoryRoom(
 	queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
 	var queryRes roomserverAPI.GetRoomIDForAliasResponse
 	if err = rsAPI.GetRoomIDForAlias(req.Context(), &queryReq, &queryRes); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.GetRoomIDForAlias failed")
+		return jsonerror.InternalServerError()
 	}
 
 	res.RoomID = queryRes.RoomID
@@ -76,7 +77,8 @@ func DirectoryRoom(
 			if fedErr != nil {
 				// TODO: Return 502 if the remote server errored.
 				// TODO: Return 504 if the remote server timed out.
-				return httputil.LogThenError(req, fedErr)
+				util.GetLogger(req.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
+				return jsonerror.InternalServerError()
 			}
 			res.RoomID = fedRes.RoomID
 			res.fillServers(fedRes.Servers)
@@ -94,7 +96,8 @@ func DirectoryRoom(
 		joinedHostsReq := federationSenderAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: res.RoomID}
 		var joinedHostsRes federationSenderAPI.QueryJoinedHostServerNamesInRoomResponse
 		if err = fedSenderAPI.QueryJoinedHostServerNamesInRoom(req.Context(), &joinedHostsReq, &joinedHostsRes); err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("fedSenderAPI.QueryJoinedHostServerNamesInRoom failed")
+			return jsonerror.InternalServerError()
 		}
 		res.fillServers(joinedHostsRes.ServerNames)
 	}
@@ -165,7 +168,8 @@ func SetLocalAlias(
 	}
 	var queryRes roomserverAPI.SetRoomAliasResponse
 	if err := aliasAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if queryRes.AliasExists {
@@ -194,7 +198,8 @@ func RemoveLocalAlias(
 	}
 	var creatorQueryRes roomserverAPI.GetCreatorIDForAliasResponse
 	if err := aliasAPI.GetCreatorIDForAlias(req.Context(), &creatorQueryReq, &creatorQueryRes); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.GetCreatorIDForAlias failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if creatorQueryRes.UserID == "" {
@@ -218,7 +223,8 @@ func RemoveLocalAlias(
 	}
 	var queryRes roomserverAPI.RemoveRoomAliasResponse
 	if err := aliasAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
