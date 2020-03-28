@@ -92,8 +92,7 @@ func SaveAccountData(
 		return httputil.LogThenError(req, err)
 	}
 
-	var rawJson json.RawMessage
-	if err = json.Unmarshal(body, &rawJson); err != nil {
+	if !json.Valid(body) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Bad JSON content"),
