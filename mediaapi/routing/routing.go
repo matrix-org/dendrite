@@ -61,8 +61,8 @@ func Setup(
 	// TODO: Add AS support
 	r0mux.Handle("/upload", common.MakeAuthAPI(
 		"upload", authData,
-		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
-			return Upload(req, cfg, db, activeThumbnailGeneration)
+		func(req *http.Request, dev *authtypes.Device) util.JSONResponse {
+			return Upload(req, cfg, dev, db, activeThumbnailGeneration, )
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
