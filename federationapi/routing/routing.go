@@ -300,4 +300,15 @@ func Setup(
 		},
 	)).Methods(http.MethodPost)
 
+	v1fedmux.Handle("/keys/query", common.MakeFedAPI(
+		"federation_query_e2ee_keys", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			// vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			// if err != nil {
+			// 	return util.ErrorResponse(err)
+			// }
+			return QueryKeys(httpReq, request, encryptionDB)
+		},
+	)).Methods(http.MethodPost)
+
 }

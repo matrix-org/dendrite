@@ -58,13 +58,13 @@ func Setup(
 
 	unstablemux.Handle("/keys/claim",
 		common.MakeAuthAPI("claim keys", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return ClaimOneTimeKeys(req, encryptionDB)
+			return ClaimOneTimeKeys(req, encryptionDB, device.UserID)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstablemux.Handle("/keys/changes",
 		common.MakeAuthAPI("get changes", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return ChangesInKeys(req, encryptionDB, device.ID, deviceDB)
+			return ChangesInKeys(req, encryptionDB)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

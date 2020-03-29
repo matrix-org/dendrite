@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/encryptoapi/storage"
 	"github.com/matrix-org/dendrite/encryptoapi/types"
+	"github.com/SUMUKHA-PK/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -28,8 +29,10 @@ import (
 func ClaimOneTimeKeys(
 	req *http.Request,
 	encryptionDB *storage.Database,
+	userID string,
 ) util.JSONResponse {
 	var claimRq types.ClaimRequest
+	
 	claimRes := types.ClaimResponse{}
 	claimRes.Failures = make(map[string]interface{})
 	claimRes.OneTimeKeys = make(map[string]map[string]map[string]interface{})
@@ -37,11 +40,18 @@ func ClaimOneTimeKeys(
 		return *reqErr
 	}
 
-	var obtainedFromFed types.QueryResponse
-	obtainedKeysFromFed := obtainedFromFed.DeviceKeys
-	claimRes.OneTimeKeys = obtainedKeysFromFed
+	var federationClient *gomatrixserverlib.FederationClient
+	resKeys, err := federationClient.KeyForwarding(r.req.Context(), server, userID)
+	if err != nil {
+		// TODO: Check if the user was not allowed to join the room.
+		return err
+	}
 
-	// not sure what FED should return here
+	/*
+		what I think must happen here is, I must request to the HS that I need to
+		talk to and, it must send the one time keys required for further communication.
+
+	*/
 	/*
 		federation consideration: when user id is in federation, a query is needed to ask fed for keys
 		domain --------+ fed (keys)
@@ -49,10 +59,10 @@ func ClaimOneTimeKeys(
 	*/
 	// todo: Add federation processing at specific userID.
 	if false /*federation judgement*/ {
-		tout := claimRq.Timeout
+		timeOut := claimRq.Timeout
 		stimuCh := make(chan int)
 		go func() {
-			time.Sleep(time.Duration(tout) * 1000 * 1000)
+			time.Sleep(time.Duration(timeOut) * 1000 * 1000)
 			close(stimuCh)
 		}()
 		select {
@@ -61,6 +71,12 @@ func ClaimOneTimeKeys(
 			// todo: key in this map is restricted to username at the end, yet a mocked one.
 			claimRes.Failures["@alice:localhost"] = "ran out of offered time"
 		case <-make(chan interface{}):
+			var obtainedFromFed types.QueryResponse
+			obtainedKeysFromFed := obtainedFromFed.DeviceKeys
+			// here is where the response from FED is being received.
+			// we need to process the response and add it to claimRes
+			claimRes.OneTimeKeys = obtainedKeysFromFed
+
 			// todo : here goes federation chan , still a mocked one
 		}
 		// probably some other better error to tell it timed out in FED

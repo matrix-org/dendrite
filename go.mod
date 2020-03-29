@@ -28,8 +28,6 @@ require (
 	github.com/matrix-org/naffka v0.0.0-20171115094957-662bfd0841d0
 	github.com/matrix-org/util v0.0.0-20171127121716-2e2df66af2f5
 	github.com/matttproud/golang_protobuf_extensions v1.0.1
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
 	github.com/nicksnyder/go-i18n v1.8.1
 	github.com/opentracing/opentracing-go v0.0.0-20170806192116-8ebe5d4e236e

@@ -23,8 +23,8 @@ type QueryRequest struct {
 
 // QueryResponse structure
 type QueryResponse struct {
-	Failure    map[string]interface{}                `json:"failures"`
-	DeviceKeys map[string]map[string]DeviceKeysQuery `json:"device_keys"`
+	Failure    map[string]interface{}                       `json:"failures"`
+	DeviceKeys map[string]map[string]map[string]interface{} `json:"device_keys"`
 }
 
 // DeviceKeysQuery structure

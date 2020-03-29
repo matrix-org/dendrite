@@ -36,7 +36,6 @@ func QueryPKeys(
 	deviceID string,
 	deviceDB *devices.Database,
 ) util.JSONResponse {
-	var err error
 	var queryRq types.QueryRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &queryRq); reqErr != nil {
 		return *reqErr
