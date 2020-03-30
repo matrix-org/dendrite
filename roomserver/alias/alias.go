@@ -17,7 +17,6 @@ package alias
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -250,10 +249,10 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	}
 
 	// Build the event
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
 	now := time.Now()
 	event, err := builder.Build(
-		eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey,
+		now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID,
+		r.Cfg.Matrix.PrivateKey, roomVersion,
 	)
 	if err != nil {
 		return err

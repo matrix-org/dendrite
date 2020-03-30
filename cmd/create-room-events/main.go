@@ -103,12 +103,14 @@ func main() {
 // Build an event and write the event to the output.
 func buildAndOutput() gomatrixserverlib.EventReference {
 	eventID++
-	id := fmt.Sprintf("$%d:%s", eventID, *serverName)
 	now = time.Unix(0, 0)
 	name := gomatrixserverlib.ServerName(*serverName)
 	key := gomatrixserverlib.KeyID(*keyID)
 
-	event, err := b.Build(id, now, name, key, privateKey)
+	event, err := b.Build(
+		now, name, key, privateKey,
+		gomatrixserverlib.RoomVersionV1,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -127,7 +129,7 @@ func writeEvent(event gomatrixserverlib.Event) {
 		ire.Kind = api.KindNew
 		ire.Event = event.Headered(gomatrixserverlib.RoomVersionV1)
 		authEventIDs := []string{}
-		for _, ref := range b.AuthEvents {
+		for _, ref := range b.AuthEvents.([]gomatrixserverlib.EventReference) {
 			authEventIDs = append(authEventIDs, ref.EventID)
 		}
 		ire.AuthEventIDs = authEventIDs

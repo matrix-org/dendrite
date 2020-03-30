@@ -183,7 +183,6 @@ After deactivating account, can't log in with an email
 Remote room alias queries can handle Unicode
 Newly joined room is included in an incremental sync after invite
 Inbound /v1/make_join rejects remote attempts to join local users to rooms
-Inbound federation rejects invites which are not signed by the sender
 Local room members see posted message events
 Fetching eventstream a second time doesn't yield the message again
 Local non-members don't see posted message events
@@ -220,3 +219,15 @@ Regular users can add and delete aliases when m.room.aliases is restricted
 GET /r0/capabilities is not public
 GET /joined_rooms lists newly-created room
 /joined_rooms returns only joined rooms
+Message history can be paginated over federation
+GET /rooms/:room_id/messages returns a message
+Remote user can backfill in a room with version 1
+POST /createRoom creates a room with the given version
+POST /createRoom rejects attempts to create rooms with numeric versions
+POST /createRoom rejects attempts to create rooms with unknown versions
+User can create and send/receive messages in a room with version 2
+local user can join room with version 2
+remote user can join room with version 2
+User can invite local user to room with version 2
+Remote user can backfill in a room with version 2
+Inbound federation accepts attempts to join v2 rooms from servers with support
