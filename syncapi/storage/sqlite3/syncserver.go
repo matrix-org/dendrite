@@ -57,7 +57,7 @@ type SyncServerDatasource struct {
 	events              outputRoomEventsStatements
 	roomstate           currentRoomStateStatements
 	invites             inviteEventsStatements
-	eduCache            *cache.TypingCache
+	eduCache            *cache.EDUCache
 	topology            outputRoomEventsTopologyStatements
 	backwardExtremities backwardExtremitiesStatements
 }

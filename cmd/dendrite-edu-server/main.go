@@ -30,8 +30,8 @@ func main() {
 		}
 	}()
 
-	eduserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	eduserver.SetupEDUServerComponent(base, cache.New())
 
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.TypingServer), string(base.Cfg.Listen.TypingServer))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.EDUServer), string(base.Cfg.Listen.EDUServer))
 
 }

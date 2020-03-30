@@ -111,10 +111,10 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	return alias, input, query
 }
 
-// CreateHTTPEDUServerAPIs returns typingInputAPI for hitting the typing
+// CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
 // server over HTTP
-func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.TypingServerInputAPI {
-	return eduServerAPI.NewTypingServerInputAPIHTTP(b.Cfg.EDUServerURL(), nil)
+func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI {
+	return eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), nil)
 }
 
 // CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting

@@ -27,9 +27,9 @@ import (
 // APIs directly instead of having to use HTTP.
 func SetupEDUServerComponent(
 	base *basecomponent.BaseDendrite,
-	eduCache *cache.TypingCache,
-) api.TypingServerInputAPI {
-	inputAPI := &input.TypingServerInputAPI{
+	eduCache *cache.EDUCache,
+) api.EDUServerInputAPI {
+	inputAPI := &input.EDUServerInputAPI{
 		Cache:                  eduCache,
 		Producer:               base.KafkaProducer,
 		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),

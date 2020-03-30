@@ -58,7 +58,7 @@ func Setup(
 	keyRing gomatrixserverlib.KeyRing,
 	userUpdateProducer *producers.UserUpdateProducer,
 	syncProducer *producers.SyncAPIProducer,
-	typingProducer *producers.TypingServerProducer,
+	eduProducer *producers.EDUServerProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationSenderAPI.FederationSenderQueryAPI,
 ) {
@@ -235,7 +235,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, typingProducer)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 

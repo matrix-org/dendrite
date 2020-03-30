@@ -26,18 +26,18 @@ import (
 	"gopkg.in/Shopify/sarama.v1"
 )
 
-// TypingServerInputAPI implements api.TypingServerInputAPI
-type TypingServerInputAPI struct {
+// EDUServerInputAPI implements api.EDUServerInputAPI
+type EDUServerInputAPI struct {
 	// Cache to store the current typing members in each room.
-	Cache *cache.TypingCache
+	Cache *cache.EDUCache
 	// The kafka topic to output new typing events to.
 	OutputTypingEventTopic string
 	// kafka producer
 	Producer sarama.SyncProducer
 }
 
-// InputTypingEvent implements api.TypingServerInputAPI
-func (t *TypingServerInputAPI) InputTypingEvent(
+// InputTypingEvent implements api.EDUServerInputAPI
+func (t *EDUServerInputAPI) InputTypingEvent(
 	ctx context.Context,
 	request *api.InputTypingEventRequest,
 	response *api.InputTypingEventResponse,
@@ -56,7 +56,7 @@ func (t *TypingServerInputAPI) InputTypingEvent(
 	return t.sendEvent(ite)
 }
 
-func (t *TypingServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
+func (t *EDUServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
 	ev := &api.TypingEvent{
 		Type:   gomatrixserverlib.MTyping,
 		RoomID: ite.RoomID,
@@ -89,9 +89,9 @@ func (t *TypingServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
 	return err
 }
 
-// SetupHTTP adds the TypingServerInputAPI handlers to the http.ServeMux.
-func (t *TypingServerInputAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(api.TypingServerInputTypingEventPath,
+// SetupHTTP adds the EDUServerInputAPI handlers to the http.ServeMux.
+func (t *EDUServerInputAPI) SetupHTTP(servMux *http.ServeMux) {
+	servMux.Handle(api.EDUServerInputTypingEventPath,
 		common.MakeInternalAPI("inputTypingEvents", func(req *http.Request) util.JSONResponse {
 			var request api.InputTypingEventRequest
 			var response api.InputTypingEventResponse
