@@ -73,6 +73,17 @@ func (t *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		return nil
 	}
 
+	// only send typing events which originated from us
+	_, typingServerName, err := gomatrixserverlib.SplitID('@', ote.Event.UserID)
+	if err != nil {
+		log.WithError(err).WithField("user_id", ote.Event.UserID).Error("Failed to extract domain from typing sender")
+		return nil
+	}
+	if typingServerName != t.ServerName {
+		log.WithField("other_server", typingServerName).Info("Suppressing typing notif: originated elsewhere")
+		return nil
+	}
+
 	joined, err := t.db.GetJoinedHosts(context.TODO(), ote.Event.RoomID)
 	if err != nil {
 		return err

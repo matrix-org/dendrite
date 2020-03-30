@@ -30,8 +30,8 @@ type InputTypingEvent struct {
 	RoomID string `json:"room_id"`
 	// Typing is true if the user is typing, false if they have stopped.
 	Typing bool `json:"typing"`
-	// Timeout is the interval for which the user should be marked as typing.
-	Timeout int64 `json:"timeout"`
+	// Timeout is the interval in milliseconds for which the user should be marked as typing.
+	TimeoutMS int64 `json:"timeout"`
 	// OriginServerTS when the server received the update.
 	OriginServerTS gomatrixserverlib.Timestamp `json:"origin_server_ts"`
 }

@@ -48,6 +48,7 @@ func Setup(
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
+	eduProducer *producers.EDUServerProducer,
 	federationSenderAPI federationSenderAPI.FederationSenderQueryAPI,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
@@ -79,7 +80,7 @@ func Setup(
 			}
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, query, producer, keys, federation,
+				cfg, query, producer, eduProducer, keys, federation,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
