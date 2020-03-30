@@ -114,7 +114,7 @@ listen:
     media_api: "media_api:7774"
     public_rooms_api: "public_rooms_api:7775"
     federation_sender: "federation_sender:7776"
-    typing_server: "typing_server:7777"
+    edu_server: "typing_server:7777"
 
 # The configuration for tracing the dendrite components.
 tracing:
