@@ -85,7 +85,7 @@ kafka:
     topics:
         output_room_event: roomserverOutput
         output_client_data: clientapiOutput
-        output_typing_event: typingServerOutput
+        output_typing_event: eduServerOutput
         user_updates: userUpdates
 
 

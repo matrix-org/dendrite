@@ -23,7 +23,7 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "TypingServerAPI")
+	base := basecomponent.NewBaseDendrite(cfg, "EDUServerAPI")
 	defer func() {
 		if err := base.Close(); err != nil {
 			logrus.WithError(err).Warn("BaseDendrite close failed")
