@@ -32,8 +32,8 @@ type roomData struct {
 	userSet      userSet
 }
 
-// TypingCache maintains a list of users typing in each room.
-type TypingCache struct {
+// EDUCache maintains a list of users typing in each room.
+type EDUCache struct {
 	sync.RWMutex
 	latestSyncPosition int64
 	data               map[string]*roomData
@@ -42,26 +42,26 @@ type TypingCache struct {
 
 // Create a roomData with its sync position set to the latest sync position.
 // Must only be called after locking the cache.
-func (t *TypingCache) newRoomData() *roomData {
+func (t *EDUCache) newRoomData() *roomData {
 	return &roomData{
 		syncPosition: t.latestSyncPosition,
 		userSet:      make(userSet),
 	}
 }
 
-// NewTypingCache returns a new TypingCache initialised for use.
-func NewTypingCache() *TypingCache {
-	return &TypingCache{data: make(map[string]*roomData)}
+// New returns a new EDUCache initialised for use.
+func New() *EDUCache {
+	return &EDUCache{data: make(map[string]*roomData)}
 }
 
 // SetTimeoutCallback sets a callback function that is called right after
 // a user is removed from the typing user list due to timeout.
-func (t *TypingCache) SetTimeoutCallback(fn TimeoutCallbackFn) {
+func (t *EDUCache) SetTimeoutCallback(fn TimeoutCallbackFn) {
 	t.timeoutCallback = fn
 }
 
 // GetTypingUsers returns the list of users typing in a room.
-func (t *TypingCache) GetTypingUsers(roomID string) []string {
+func (t *EDUCache) GetTypingUsers(roomID string) []string {
 	users, _ := t.GetTypingUsersIfUpdatedAfter(roomID, 0)
 	// 0 should work above because the first position used will be 1.
 	return users
@@ -70,7 +70,7 @@ func (t *TypingCache) GetTypingUsers(roomID string) []string {
 // GetTypingUsersIfUpdatedAfter returns all users typing in this room with
 // updated == true if the typing sync position of the room is after the given
 // position. Otherwise, returns an empty slice with updated == false.
-func (t *TypingCache) GetTypingUsersIfUpdatedAfter(
+func (t *EDUCache) GetTypingUsersIfUpdatedAfter(
 	roomID string, position int64,
 ) (users []string, updated bool) {
 	t.RLock()
@@ -93,7 +93,7 @@ func (t *TypingCache) GetTypingUsersIfUpdatedAfter(
 // expire is the time when the user typing should time out.
 // if expire is nil, defaultTypingTimeout is assumed.
 // Returns the latest sync position for typing after update.
-func (t *TypingCache) AddTypingUser(
+func (t *EDUCache) AddTypingUser(
 	userID, roomID string, expire *time.Time,
 ) int64 {
 	expireTime := getExpireTime(expire)
@@ -111,7 +111,7 @@ func (t *TypingCache) AddTypingUser(
 
 // addUser with mutex lock & replace the previous timer.
 // Returns the latest typing sync position after update.
-func (t *TypingCache) addUser(
+func (t *EDUCache) addUser(
 	userID, roomID string, expiryTimer *time.Timer,
 ) int64 {
 	t.Lock()
@@ -143,7 +143,7 @@ func (t *TypingCache) addUser(
 
 // RemoveUser with mutex lock & stop the timer.
 // Returns the latest sync position for typing after update.
-func (t *TypingCache) RemoveUser(userID, roomID string) int64 {
+func (t *EDUCache) RemoveUser(userID, roomID string) int64 {
 	t.Lock()
 	defer t.Unlock()
 
@@ -166,7 +166,7 @@ func (t *TypingCache) RemoveUser(userID, roomID string) int64 {
 	return t.latestSyncPosition
 }
 
-func (t *TypingCache) GetLatestSyncPosition() int64 {
+func (t *EDUCache) GetLatestSyncPosition() int64 {
 	t.Lock()
 	defer t.Unlock()
 	return t.latestSyncPosition
