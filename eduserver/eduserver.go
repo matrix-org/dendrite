@@ -10,15 +10,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package typingserver
+package eduserver
 
 import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/typingserver/api"
-	"github.com/matrix-org/dendrite/typingserver/cache"
-	"github.com/matrix-org/dendrite/typingserver/input"
+	"github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/eduserver/input"
 )
 
 // SetupTypingServerComponent sets up and registers HTTP handlers for the

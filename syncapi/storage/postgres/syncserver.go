@@ -31,7 +31,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

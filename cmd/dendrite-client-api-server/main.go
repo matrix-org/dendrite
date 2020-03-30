@@ -19,8 +19,8 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
-	"github.com/matrix-org/dendrite/typingserver"
-	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/dendrite/eduserver"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 )
 
 func main() {
@@ -38,7 +38,7 @@ func main() {
 	asQuery := base.CreateHTTPAppServiceAPIs()
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
 	fedSenderAPI := base.CreateHTTPFederationSenderAPIs()
-	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	typingInputAPI := eduserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, &keyRing,

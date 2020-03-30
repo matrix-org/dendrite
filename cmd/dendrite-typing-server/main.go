@@ -16,8 +16,8 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/typingserver"
-	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/dendrite/eduserver"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/sirupsen/logrus"
 )
 
@@ -30,7 +30,7 @@ func main() {
 		}
 	}()
 
-	typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	eduserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.TypingServer), string(base.Cfg.Listen.TypingServer))
 

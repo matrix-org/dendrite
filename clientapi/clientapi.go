@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/common/transactions"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
+	typingServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )

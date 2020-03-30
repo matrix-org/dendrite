@@ -37,7 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
+	typingServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/sirupsen/logrus"
 )
 

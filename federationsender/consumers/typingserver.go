@@ -20,7 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/typingserver/api"
+	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/Shopify/sarama.v1"
@@ -69,7 +69,7 @@ func (t *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 	var ote api.OutputTypingEvent
 	if err := json.Unmarshal(msg.Value, &ote); err != nil {
 		// Skip this msg but continue processing messages.
-		log.WithError(err).Errorf("typingserver output log: message parse failed")
+		log.WithError(err).Errorf("eduserver output log: message parse failed")
 		return nil
 	}
 

@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/typingserver/api"
+	"github.com/matrix-org/dendrite/eduserver/api"
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )

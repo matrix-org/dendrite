@@ -134,7 +134,7 @@ type Dendrite struct {
 			OutputRoomEvent Topic `yaml:"output_room_event"`
 			// Topic for sending account data from client API to sync API
 			OutputClientData Topic `yaml:"output_client_data"`
-			// Topic for typingserver/api.OutputTypingEvent events.
+			// Topic for eduserver/api.OutputTypingEvent events.
 			OutputTypingEvent Topic `yaml:"output_typing_event"`
 			// Topic for user updates (profile, presence)
 			UserUpdates Topic `yaml:"user_updates"`

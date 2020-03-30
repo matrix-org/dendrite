@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

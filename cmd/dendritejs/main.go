@@ -33,8 +33,8 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/matrix-org/dendrite/typingserver"
-	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/dendrite/eduserver"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -122,7 +122,7 @@ func main() {
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
-	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	typingInputAPI := eduserver.SetupTypingServerComponent(base, cache.NewTypingCache())
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
 	)

@@ -16,7 +16,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/matrix-org/dendrite/typingserver/api"
+	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

@@ -54,7 +54,7 @@ type TypingServerInputAPI interface {
 }
 
 // TypingServerInputTypingEventPath is the HTTP path for the InputTypingEvent API.
-const TypingServerInputTypingEventPath = "/api/typingserver/input"
+const TypingServerInputTypingEventPath = "/api/eduserver/input"
 
 // NewTypingServerInputAPIHTTP creates a TypingServerInputAPI implemented by talking to a HTTP POST API.
 func NewTypingServerInputAPIHTTP(typingServerURL string, httpClient *http.Client) TypingServerInputAPI {
