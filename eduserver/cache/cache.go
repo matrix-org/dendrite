@@ -49,8 +49,8 @@ func (t *TypingCache) newRoomData() *roomData {
 	}
 }
 
-// NewTypingCache returns a new TypingCache initialised for use.
-func NewTypingCache() *TypingCache {
+// New returns a new TypingCache initialised for use.
+func New() *TypingCache {
 	return &TypingCache{data: make(map[string]*roomData)}
 }
 

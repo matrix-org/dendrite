@@ -56,7 +56,7 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
-	typingInputAPI := eduserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
 	)
@@ -65,7 +65,7 @@ func main() {
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
 		federation, &keyRing, alias, input, query,
-		typingInputAPI, asQuery, transactions.New(), fedSenderAPI,
+		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
