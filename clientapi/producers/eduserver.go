@@ -20,7 +20,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// EDUServerProducer produces events for the typing server to consume
+// EDUServerProducer produces events for the EDU server to consume
 type EDUServerProducer struct {
 	InputAPI api.EDUServerInputAPI
 }
@@ -35,13 +35,13 @@ func NewEDUServerProducer(inputAPI api.EDUServerInputAPI) *EDUServerProducer {
 // SendTyping sends a typing event to EDU server
 func (p *EDUServerProducer) SendTyping(
 	ctx context.Context, userID, roomID string,
-	typing bool, timeout int64,
+	typing bool, timeoutMS int64,
 ) error {
 	requestData := api.InputTypingEvent{
 		UserID:         userID,
 		RoomID:         roomID,
 		Typing:         typing,
-		Timeout:        timeout,
+		TimeoutMS:      timeoutMS,
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
 

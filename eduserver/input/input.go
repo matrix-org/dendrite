@@ -46,7 +46,7 @@ func (t *EDUServerInputAPI) InputTypingEvent(
 	if ite.Typing {
 		// user is typing, update our current state of users typing.
 		expireTime := ite.OriginServerTS.Time().Add(
-			time.Duration(ite.Timeout) * time.Millisecond,
+			time.Duration(ite.TimeoutMS) * time.Millisecond,
 		)
 		t.Cache.AddTypingUser(ite.UserID, ite.RoomID, &expireTime)
 	} else {
@@ -69,7 +69,7 @@ func (t *EDUServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
 
 	if ev.Typing {
 		expireTime := ite.OriginServerTS.Time().Add(
-			time.Duration(ite.Timeout) * time.Millisecond,
+			time.Duration(ite.TimeoutMS) * time.Millisecond,
 		)
 		ote.ExpireTime = &expireTime
 	}

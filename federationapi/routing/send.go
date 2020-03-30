@@ -36,20 +36,22 @@ func Send(
 	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
+	eduProducer *producers.EDUServerProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	t := txnReq{
-		context:    httpReq.Context(),
-		query:      query,
-		producer:   producer,
-		keys:       keys,
-		federation: federation,
+		context:     httpReq.Context(),
+		query:       query,
+		producer:    producer,
+		eduProducer: eduProducer,
+		keys:        keys,
+		federation:  federation,
 	}
 
 	var txnEvents struct {
-		PDUs []json.RawMessage `json:"pdus"`
-		EDUs []json.RawMessage `json:"edus"`
+		PDUs []json.RawMessage       `json:"pdus"`
+		EDUs []gomatrixserverlib.EDU `json:"edus"`
 	}
 
 	if err := json.Unmarshal(request.Content(), &txnEvents); err != nil {
@@ -59,7 +61,9 @@ func Send(
 		}
 	}
 
+	// TODO: Really we should have a function to convert FederationRequest to txnReq
 	t.PDUs = txnEvents.PDUs
+	t.EDUs = txnEvents.EDUs
 	t.Origin = request.Origin()
 	t.TransactionID = txnID
 	t.Destination = cfg.Matrix.ServerName
@@ -80,11 +84,12 @@ func Send(
 
 type txnReq struct {
 	gomatrixserverlib.Transaction
-	context    context.Context
-	query      api.RoomserverQueryAPI
-	producer   *producers.RoomserverProducer
-	keys       gomatrixserverlib.KeyRing
-	federation *gomatrixserverlib.FederationClient
+	context     context.Context
+	query       api.RoomserverQueryAPI
+	producer    *producers.RoomserverProducer
+	eduProducer *producers.EDUServerProducer
+	keys        gomatrixserverlib.KeyRing
+	federation  *gomatrixserverlib.FederationClient
 }
 
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
@@ -152,7 +157,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 		}
 	}
 
-	// TODO: Process the EDUs.
+	t.processEDUs(t.EDUs)
 	util.GetLogger(t.context).Infof("Processed %d PDUs from transaction %q", len(results), t.TransactionID)
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
@@ -162,6 +167,29 @@ type unknownRoomError struct {
 }
 
 func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e.roomID) }
+
+func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
+	for _, e := range edus {
+		switch e.Type {
+		case gomatrixserverlib.MTyping:
+			// https://matrix.org/docs/spec/server_server/latest#typing-notifications
+			var typingPayload struct {
+				RoomID string `json:"room_id"`
+				UserID string `json:"user_id"`
+				Typing bool   `json:"typing"`
+			}
+			if err := json.Unmarshal(e.Content, &typingPayload); err != nil {
+				util.GetLogger(t.context).WithError(err).Error("Failed to unmarshal typing event")
+				continue
+			}
+			if err := t.eduProducer.SendTyping(t.context, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
+				util.GetLogger(t.context).WithError(err).Error("Failed to send typing event to edu server")
+			}
+		default:
+			util.GetLogger(t.context).WithField("type", e.Type).Warn("unhandled edu")
+		}
+	}
+}
 
 func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	prevEventIDs := e.PrevEventIDs()
