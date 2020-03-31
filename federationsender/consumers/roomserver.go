@@ -72,11 +72,6 @@ func (s *OutputRoomEventConsumer) Start() error {
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	fmt.Println("--------")
-	fmt.Println("RECEIVED:")
-	fmt.Println(string(msg.Value))
-	fmt.Println("--------")
-
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
