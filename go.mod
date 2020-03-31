@@ -7,7 +7,7 @@ require (
 	github.com/libp2p/go-libp2p-core v0.5.0
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200318135427-31631a9ef51f
-	github.com/matrix-org/go-sqlite3-js v0.0.0-20200304164012-aa524245b658
+	github.com/matrix-org/go-sqlite3-js v0.0.0-20200325174927-327088cdef10
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20200331114308-cce9803cf1c0
 	github.com/matrix-org/naffka v0.0.0-20200127221512-0716baaabaf1
