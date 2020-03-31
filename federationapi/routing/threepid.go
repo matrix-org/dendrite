@@ -169,7 +169,7 @@ func ExchangeThirdPartyInvite(
 
 	// Ask the requesting server to sign the newly created event so we know it
 	// acknowledged it
-	signedEvent, err := federation.SendInvite(httpReq.Context(), request.Origin(), *event)
+	signedEvent, err := federation.SendInvite(httpReq.Context(), request.Origin(), event)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return jsonerror.InternalServerError()
@@ -293,7 +293,7 @@ func buildMembershipEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(&queryRes.StateEvents[i].Event)
+		err = authEvents.AddEvent(queryRes.StateEvents[i].Event)
 		if err != nil {
 			return nil, err
 		}
@@ -314,7 +314,7 @@ func buildMembershipEvent(
 		cfg.Matrix.PrivateKey, queryRes.RoomVersion,
 	)
 
-	return &event, err
+	return event, err
 }
 
 // sendToRemoteServer uses federation to send an invite provided by an identity

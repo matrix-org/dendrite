@@ -311,6 +311,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	var request api.QueryRoomVersionCapabilitiesRequest
 	var response api.QueryRoomVersionCapabilitiesResponse
 	if err := r.queryAPI.QueryRoomVersionCapabilities(r.req.Context(), &request, &response); err != nil {
+		fmt.Println("r.queryAPI.QueryRoomVersionCapabilities:", err)
 		return nil, err
 	}
 	var supportedVersions []gomatrixserverlib.RoomVersion
@@ -320,6 +321,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, supportedVersions)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
+		fmt.Println("r.federation.MakeJoin:", err)
 		return nil, err
 	}
 
@@ -327,6 +329,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	// but it's possible that the remote server returned us something "odd"
 	err = r.writeToBuilder(&respMakeJoin.JoinEvent, roomID)
 	if err != nil {
+		fmt.Println("r.writeToBuilder:", err)
 		return nil, err
 	}
 
@@ -352,18 +355,22 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return &res, nil
 	}
 
+	fmt.Println("Sending", string(event.JSON()))
+
 	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event, respMakeJoin.RoomVersion)
 	if err != nil {
+		fmt.Println("r.federation.SendJoin:", err)
 		return nil, err
 	}
 
 	if err = respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
+		fmt.Println("respSendJoin.Check:", err)
 		return nil, err
 	}
 
 	if err = r.producer.SendEventWithState(
 		r.req.Context(),
-		gomatrixserverlib.RespState(respSendJoin.RespState),
+		respSendJoin.ToRespState(),
 		event.Headered(respMakeJoin.RoomVersion),
 	); err != nil {
 		util.GetLogger(r.req.Context()).WithError(err).Error("gomatrixserverlib.RespState failed")

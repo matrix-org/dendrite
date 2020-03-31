@@ -185,7 +185,7 @@ func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 func (s *currentRoomStateStatements) selectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
-) ([]gomatrixserverlib.HeaderedEvent, error) {
+) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
 		pq.StringArray(stateFilter.Senders),
@@ -213,7 +213,7 @@ func (s *currentRoomStateStatements) deleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) upsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.HeaderedEvent, membership *string, addedAt types.StreamPosition,
+	event *gomatrixserverlib.HeaderedEvent, membership *string, addedAt types.StreamPosition,
 ) error {
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
@@ -257,8 +257,8 @@ func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	return rowsToStreamEvents(rows)
 }
 
-func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.HeaderedEvent, error) {
-	result := []gomatrixserverlib.HeaderedEvent{}
+func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	result := []*gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var eventBytes []byte
 		if err := rows.Scan(&eventBytes); err != nil {
@@ -269,7 +269,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.HeaderedEvent, error) {
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
-		result = append(result, ev)
+		result = append(result, &ev)
 	}
 	return result, rows.Err()
 }

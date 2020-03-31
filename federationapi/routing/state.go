@@ -144,7 +144,7 @@ func getIDsFromEventRef(events []gomatrixserverlib.EventReference) []string {
 	return IDs
 }
 
-func getIDsFromEvent(events []gomatrixserverlib.Event) []string {
+func getIDsFromEvent(events []*gomatrixserverlib.Event) []string {
 	IDs := make([]string, len(events))
 	for i := range events {
 		IDs[i] = events[i].EventID()

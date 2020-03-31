@@ -232,7 +232,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	// Add auth events
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range res.StateEvents {
-		err = authEvents.AddEvent(&res.StateEvents[i].Event)
+		err = authEvents.AddEvent(res.StateEvents[i].Event)
 		if err != nil {
 			return err
 		}

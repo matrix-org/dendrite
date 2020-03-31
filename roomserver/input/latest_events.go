@@ -51,7 +51,7 @@ func updateLatestEvents(
 	ow OutputRoomEventWriter,
 	roomNID types.RoomNID,
 	stateAtEvent types.StateAtEvent,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 	sendAsServer string,
 	transactionID *api.TransactionID,
 ) (err error) {
@@ -91,7 +91,7 @@ type latestEventsUpdater struct {
 	ow            OutputRoomEventWriter
 	roomNID       types.RoomNID
 	stateAtEvent  types.StateAtEvent
-	event         gomatrixserverlib.Event
+	event         *gomatrixserverlib.Event
 	transactionID *api.TransactionID
 	// Which server to send this event as.
 	sendAsServer string

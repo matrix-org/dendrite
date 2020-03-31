@@ -98,7 +98,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
-	ev := msg.Event
+	ev := &msg.Event
 	log.WithFields(log.Fields{
 		"event_id":     ev.EventID(),
 		"room_id":      ev.RoomID(),
@@ -129,7 +129,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	pduPos, err := s.db.WriteEvent(
 		ctx,
-		&ev,
+		ev,
 		addsStateEvents,
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
@@ -146,7 +146,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&ev, "", nil, types.PaginationToken{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(ev, "", nil, types.PaginationToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -154,7 +154,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) error {
-	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
+	pduPos, err := s.db.AddInviteEvent(ctx, &msg.Event)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -187,8 +187,8 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 
 // lookupStateEvents looks up the state events that are added by a new event.
 func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.HeaderedEvent,
-) ([]gomatrixserverlib.HeaderedEvent, error) {
+	addsStateEventIDs []string, event *gomatrixserverlib.HeaderedEvent,
+) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
 		return nil, nil
@@ -196,7 +196,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 
 	// Fast path if the only state event added is the event itself.
 	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.HeaderedEvent{event}, nil
+		return []*gomatrixserverlib.HeaderedEvent{event}, nil
 	}
 
 	// Check if this is re-adding a state events that we previously processed
@@ -230,7 +230,9 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 		return nil, err
 	}
 
-	result = append(result, eventResp.Events...)
+	for i := range eventResp.Events {
+		result = append(result, &eventResp.Events[i])
+	}
 	missing = missingEventsFrom(result, addsStateEventIDs)
 
 	if len(missing) != 0 {
@@ -242,7 +244,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	return result, nil
 }
 
-func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.HeaderedEvent) (gomatrixserverlib.HeaderedEvent, error) {
+func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {
 	var stateKey string
 	if event.StateKey() == nil {
 		stateKey = ""
@@ -271,7 +273,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.Heade
 	return event, err
 }
 
-func missingEventsFrom(events []gomatrixserverlib.HeaderedEvent, required []string) []string {
+func missingEventsFrom(events []*gomatrixserverlib.HeaderedEvent, required []string) []string {
 	have := map[string]bool{}
 	for _, event := range events {
 		have[event.EventID()] = true

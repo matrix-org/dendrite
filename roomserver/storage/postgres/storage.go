@@ -50,7 +50,7 @@ func Open(dataSourceName string) (*Database, error) {
 
 // StoreEvent implements input.EventDatabase
 func (d *Database) StoreEvent(
-	ctx context.Context, event gomatrixserverlib.Event,
+	ctx context.Context, event *gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
 ) (types.RoomNID, types.StateAtEvent, error) {
 	var (
@@ -137,7 +137,7 @@ func (d *Database) StoreEvent(
 	}, nil
 }
 
-func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
+func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 	gomatrixserverlib.RoomVersion, error,
 ) {
 	var err error

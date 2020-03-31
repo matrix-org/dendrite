@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -88,11 +89,11 @@ func MakeJoin(
 	// Check that the join is allowed or not
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i].Event
+		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
 
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(*event, &provider); err != nil {
+	if err = gomatrixserverlib.Allowed(event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()),
@@ -128,8 +129,13 @@ func SendJoin(
 		}
 	}
 
+	fmt.Println("Content:", string(request.Content()))
+	fmt.Println("Room version:", verRes.RoomVersion)
+
 	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
 	if err != nil {
+		fmt.Println("gomatrixserverlib.NewEventFromUntrustedJSON:", err)
+
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),

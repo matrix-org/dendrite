@@ -27,6 +27,6 @@ type Database interface {
 	SetRoomVisibility(ctx context.Context, visible bool, roomID string) error
 	CountPublicRooms(ctx context.Context) (int64, error)
 	GetPublicRooms(ctx context.Context, offset int64, limit int16, filter string) ([]gomatrixserverlib.PublicRoom, error)
-	UpdateRoomFromEvents(ctx context.Context, eventsToAdd []gomatrixserverlib.Event, eventsToRemove []gomatrixserverlib.Event) error
-	UpdateRoomFromEvent(ctx context.Context, event gomatrixserverlib.Event) error
+	UpdateRoomFromEvents(ctx context.Context, eventsToAdd []*gomatrixserverlib.Event, eventsToRemove []*gomatrixserverlib.Event) error
+	UpdateRoomFromEvent(ctx context.Context, event *gomatrixserverlib.Event) error
 }

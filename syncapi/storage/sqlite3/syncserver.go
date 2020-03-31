@@ -40,7 +40,7 @@ import (
 
 type stateDelta struct {
 	roomID      string
-	stateEvents []gomatrixserverlib.HeaderedEvent
+	stateEvents []*gomatrixserverlib.HeaderedEvent
 	membership  string
 	// The PDU stream position of the latest membership event for this user, if applicable.
 	// Can be 0 if there is no membership event in this delta.
@@ -126,7 +126,7 @@ func (d *SyncServerDatasource) AllJoinedUsersInRooms(ctx context.Context) (map[s
 // If an event is not found in the database then it will be omitted from the list.
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
-func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.HeaderedEvent, error) {
+func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	streamEvents, err := d.events.selectEvents(ctx, nil, eventIDs)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, tx
 func (d *SyncServerDatasource) WriteEvent(
 	ctx context.Context,
 	ev *gomatrixserverlib.HeaderedEvent,
-	addStateEvents []gomatrixserverlib.HeaderedEvent,
+	addStateEvents []*gomatrixserverlib.HeaderedEvent,
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
 ) (pduPosition types.StreamPosition, returnErr error) {
@@ -213,7 +213,7 @@ func (d *SyncServerDatasource) WriteEvent(
 func (d *SyncServerDatasource) updateRoomState(
 	ctx context.Context, txn *sql.Tx,
 	removedEventIDs []string,
-	addedEvents []gomatrixserverlib.HeaderedEvent,
+	addedEvents []*gomatrixserverlib.HeaderedEvent,
 	pduPosition types.StreamPosition,
 ) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
@@ -258,7 +258,7 @@ func (d *SyncServerDatasource) GetStateEvent(
 // Returns an error if there was an issue with the retrieval.
 func (d *SyncServerDatasource) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter,
-) (stateEvents []gomatrixserverlib.HeaderedEvent, err error) {
+) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
 		return err
@@ -628,7 +628,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
-		var stateEvents []gomatrixserverlib.HeaderedEvent
+		var stateEvents []*gomatrixserverlib.HeaderedEvent
 		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, &stateFilterPart)
 		if err != nil {
 			return
@@ -742,7 +742,7 @@ func (d *SyncServerDatasource) UpsertAccountData(
 // If the invite was successfully stored this returns the stream ID it was stored at.
 // Returns an error if there was a problem communicating with the database.
 func (d *SyncServerDatasource) AddInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, inviteEvent *gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
 	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		streamPos, err = d.streamID.nextStreamID(ctx, txn)
@@ -800,7 +800,7 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 	for roomID, inviteEvent := range invites {
 		ir := types.NewInviteResponse()
 		ir.InviteState.Events = gomatrixserverlib.HeaderedToClientEvents(
-			[]gomatrixserverlib.HeaderedEvent{inviteEvent}, gomatrixserverlib.FormatSync,
+			[]*gomatrixserverlib.HeaderedEvent{inviteEvent}, gomatrixserverlib.FormatSync,
 		)
 		// TODO: add the invite state from the invite event.
 		res.Rooms.Invite[roomID] = *ir
@@ -1007,7 +1007,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 			//       dupe join events will result in the entire room state coming down to the client again. This is added in
 			//       the 'state' part of the response though, so is transparent modulo bandwidth concerns as it is not added to
 			//       the timeline.
-			if membership := getMembershipFromEvent(&ev.HeaderedEvent, userID); membership != "" {
+			if membership := getMembershipFromEvent(ev.HeaderedEvent, userID); membership != "" {
 				if membership == gomatrixserverlib.Join {
 					// send full room state down instead of a delta
 					var s []types.StreamEvent
@@ -1088,7 +1088,7 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			if membership := getMembershipFromEvent(&ev.HeaderedEvent, userID); membership != "" {
+			if membership := getMembershipFromEvent(ev.HeaderedEvent, userID); membership != "" {
 				if membership != gomatrixserverlib.Join { // We've already added full state for all joined rooms above.
 					deltas = append(deltas, stateDelta{
 						membership:    membership,
@@ -1124,8 +1124,8 @@ func (d *SyncServerDatasource) currentStateStreamEventsForRoom(
 // StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 // matches the streamevent.transactionID device then the transaction ID gets
 // added to the unsigned section of the output event.
-func (d *SyncServerDatasource) StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent {
-	out := make([]gomatrixserverlib.HeaderedEvent, len(in))
+func (d *SyncServerDatasource) StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []*gomatrixserverlib.HeaderedEvent {
+	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].HeaderedEvent
 		if device != nil && in[i].TransactionID != nil {
@@ -1147,7 +1147,7 @@ func (d *SyncServerDatasource) StreamEventsToEvents(device *authtypes.Device, in
 // There may be some overlap where events in stateEvents are already in recentEvents, so filter
 // them out so we don't include them twice in the /sync response. They should be in recentEvents
 // only, so clients get to the correct state once they have rolled forward.
-func removeDuplicates(stateEvents, recentEvents []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
+func removeDuplicates(stateEvents, recentEvents []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 	for _, recentEv := range recentEvents {
 		if recentEv.StateKey() == nil {
 			continue // not a state event

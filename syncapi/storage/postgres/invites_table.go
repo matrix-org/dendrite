@@ -87,7 +87,7 @@ func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *inviteEventsStatements) insertInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, inviteEvent *gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
 	var headeredJSON []byte
 	headeredJSON, err = json.Marshal(inviteEvent)

@@ -113,6 +113,6 @@ func Invite(
 	// the other servers in the room that we have been invited.
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespInvite{Event: signedEvent},
+		JSON: gomatrixserverlib.RespInvite{Event: &signedEvent},
 	}
 }

@@ -34,7 +34,7 @@ type RoomEventDatabase interface {
 	// Stores a matrix room event in the database
 	StoreEvent(
 		ctx context.Context,
-		event gomatrixserverlib.Event,
+		event *gomatrixserverlib.Event,
 		txnAndSessionID *api.TransactionID,
 		authEventNIDs []types.EventNID,
 	) (types.RoomNID, types.StateAtEvent, error)
@@ -155,7 +155,7 @@ func calculateAndSetState(
 	input api.InputRoomEvent,
 	roomNID types.RoomNID,
 	stateAtEvent *types.StateAtEvent,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 ) error {
 	var err error
 	roomState := state.NewStateResolution(db)
@@ -237,7 +237,7 @@ func processInviteEvent(
 	}
 
 	event := input.Event.Unwrap()
-	outputUpdates, err := updateToInviteMembership(updater, &event, nil)
+	outputUpdates, err := updateToInviteMembership(updater, event, nil)
 	if err != nil {
 		return err
 	}

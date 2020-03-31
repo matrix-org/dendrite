@@ -31,7 +31,7 @@ type Database interface {
 	SetDisplayName(ctx context.Context, localpart string, displayName string) error
 	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*authtypes.Account, error)
 	CreateGuestAccount(ctx context.Context) (*authtypes.Account, error)
-	UpdateMemberships(ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error
+	UpdateMemberships(ctx context.Context, eventsToAdd []*gomatrixserverlib.Event, idsToRemove []string) error
 	GetMembershipInRoomByLocalpart(ctx context.Context, localpart, roomID string) (authtypes.Membership, error)
 	GetRoomIDsByLocalPart(ctx context.Context, localpart string) ([]string, error)
 	GetMembershipsByLocalpart(ctx context.Context, localpart string) (memberships []authtypes.Membership, err error)

@@ -305,7 +305,7 @@ func createRoom(
 			return jsonerror.InternalServerError()
 		}
 
-		if err = gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
+		if err = gomatrixserverlib.Allowed(ev, &authEvents); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.Allowed failed")
 			return jsonerror.InternalServerError()
 		}
@@ -386,5 +386,5 @@ func buildEvent(
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
 	}
-	return &event, nil
+	return event, nil
 }

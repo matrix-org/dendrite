@@ -97,8 +97,8 @@ func (d *PublicRoomsServerDatabase) GetPublicRooms(
 // returns an error.
 func (d *PublicRoomsServerDatabase) UpdateRoomFromEvents(
 	ctx context.Context,
-	eventsToAdd []gomatrixserverlib.Event,
-	eventsToRemove []gomatrixserverlib.Event,
+	eventsToAdd []*gomatrixserverlib.Event,
+	eventsToRemove []*gomatrixserverlib.Event,
 ) error {
 	for _, event := range eventsToAdd {
 		if err := d.UpdateRoomFromEvent(ctx, event); err != nil {
@@ -124,7 +124,7 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvents(
 // does nothing.
 // If something went wrong during the process, returns an error.
 func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(
-	ctx context.Context, event gomatrixserverlib.Event,
+	ctx context.Context, event *gomatrixserverlib.Event,
 ) error {
 	// Process the event according to its type
 	switch event.Type() {
@@ -179,7 +179,7 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(
 // database, if set to truem decrements it.
 // Returns an error if the update failed.
 func (d *PublicRoomsServerDatabase) updateNumJoinedUsers(
-	ctx context.Context, membershipEvent gomatrixserverlib.Event, remove bool,
+	ctx context.Context, membershipEvent *gomatrixserverlib.Event, remove bool,
 ) error {
 	membership, err := membershipEvent.Membership()
 	if err != nil {
@@ -202,7 +202,7 @@ func (d *PublicRoomsServerDatabase) updateNumJoinedUsers(
 // Returns an error if decoding the Matrix event's content or updating the attribute
 // failed.
 func (d *PublicRoomsServerDatabase) updateStringAttribute(
-	ctx context.Context, attrName string, event gomatrixserverlib.Event,
+	ctx context.Context, attrName string, event *gomatrixserverlib.Event,
 	content interface{}, field *string,
 ) error {
 	if err := json.Unmarshal(event.Content(), content); err != nil {
@@ -219,7 +219,7 @@ func (d *PublicRoomsServerDatabase) updateStringAttribute(
 // Returns an error if decoding the Matrix event's content or updating the attribute
 // failed.
 func (d *PublicRoomsServerDatabase) updateBooleanAttribute(
-	ctx context.Context, attrName string, event gomatrixserverlib.Event,
+	ctx context.Context, attrName string, event *gomatrixserverlib.Event,
 	content interface{}, field *string, strForTrue string,
 ) error {
 	if err := json.Unmarshal(event.Content(), content); err != nil {
@@ -240,7 +240,7 @@ func (d *PublicRoomsServerDatabase) updateBooleanAttribute(
 // a given room with it.
 // Returns an error if decoding the Matrix event or updating the list failed.
 func (d *PublicRoomsServerDatabase) updateRoomAliases(
-	ctx context.Context, aliasesEvent gomatrixserverlib.Event,
+	ctx context.Context, aliasesEvent *gomatrixserverlib.Event,
 ) error {
 	var content common.AliasesContent
 	if err := json.Unmarshal(aliasesEvent.Content(), &content); err != nil {

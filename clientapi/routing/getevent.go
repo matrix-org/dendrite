@@ -76,7 +76,7 @@ func GetEvent(
 		cfg:            cfg,
 		federation:     federation,
 		keyRing:        keyRing,
-		requestedEvent: requestedEvent,
+		requestedEvent: *requestedEvent,
 	}
 
 	stateReq := api.QueryStateAfterEventsRequest{
@@ -116,7 +116,7 @@ func GetEvent(
 			if membership == gomatrixserverlib.Join {
 				return util.JSONResponse{
 					Code: http.StatusOK,
-					JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
+					JSON: gomatrixserverlib.ToClientEvent(&r.requestedEvent, gomatrixserverlib.FormatAll),
 				}
 			}
 		}

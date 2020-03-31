@@ -108,7 +108,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
 			return nil, err
 		}
-		if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
+		if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, []*gomatrixserverlib.Event{event}, t.keys); err != nil {
 			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
 			return nil, err
 		}
@@ -163,11 +163,11 @@ type unknownRoomError struct {
 
 func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e.roomID) }
 
-func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
+func (t *txnReq) processEvent(e *gomatrixserverlib.Event) error {
 	prevEventIDs := e.PrevEventIDs()
 
 	// Fetch the state needed to authenticate the event.
-	needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{e})
+	needed := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{e})
 	stateReq := api.QueryStateAfterEventsRequest{
 		RoomID:       e.RoomID(),
 		PrevEventIDs: prevEventIDs,
@@ -193,7 +193,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	}
 
 	// Check that the event is allowed by the state at the event.
-	var events []gomatrixserverlib.Event
+	var events []*gomatrixserverlib.Event
 	for _, headeredEvent := range stateResp.StateEvents {
 		events = append(events, headeredEvent.Unwrap())
 	}
@@ -216,10 +216,10 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	return err
 }
 
-func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserverlib.Event) error {
+func checkAllowedByState(e *gomatrixserverlib.Event, stateEvents []*gomatrixserverlib.Event) error {
 	authUsingState := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range stateEvents {
-		err := authUsingState.AddEvent(&stateEvents[i])
+		err := authUsingState.AddEvent(stateEvents[i])
 		if err != nil {
 			return err
 		}
@@ -227,7 +227,7 @@ func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserver
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
-func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) error {
+func (t *txnReq) processEventWithMissingState(e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) error {
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:

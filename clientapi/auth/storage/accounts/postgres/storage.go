@@ -207,7 +207,7 @@ func (d *Database) removeMembershipsByEventIDs(
 // insertion and deletion has been successfully processed.
 // Returns a SQL error if there was an issue with any part of the process
 func (d *Database) UpdateMemberships(
-	ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string,
+	ctx context.Context, eventsToAdd []*gomatrixserverlib.Event, idsToRemove []string,
 ) error {
 	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if err := d.removeMembershipsByEventIDs(ctx, txn, idsToRemove); err != nil {
@@ -258,7 +258,7 @@ func (d *Database) GetMembershipsByLocalpart(
 // If the event isn't a valid m.room.member event with type `join`, does nothing.
 // If an error occurred, returns the SQL error
 func (d *Database) newMembership(
-	ctx context.Context, txn *sql.Tx, ev gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.Event,
 ) error {
 	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 		localpart, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())

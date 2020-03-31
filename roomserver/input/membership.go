@@ -61,13 +61,13 @@ func updateMemberships(
 		if change.removedEventNID != 0 {
 			ev, _ := eventMap(events).lookup(change.removedEventNID)
 			if ev != nil {
-				re = &ev.Event
+				re = ev.Event
 			}
 		}
 		if change.addedEventNID != 0 {
 			ev, _ := eventMap(events).lookup(change.addedEventNID)
 			if ev != nil {
-				ae = &ev.Event
+				ae = ev.Event
 			}
 		}
 		if updates, err = updateMembership(updater, targetUserNID, re, ae, updates); err != nil {

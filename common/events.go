@@ -57,7 +57,7 @@ func BuildEvent(
 		return nil, err
 	}
 
-	return &event, nil
+	return event, nil
 }
 
 // AddPrevEventsToEvent fills out the prev_events and auth_events fields in builder
@@ -94,7 +94,7 @@ func AddPrevEventsToEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(&queryRes.StateEvents[i].Event)
+		err = authEvents.AddEvent(queryRes.StateEvents[i].Event)
 		if err != nil {
 			return err
 		}

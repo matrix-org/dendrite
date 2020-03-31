@@ -25,7 +25,7 @@ import (
 
 type Database interface {
 	statedb.RoomStateDatabase
-	StoreEvent(ctx context.Context, event gomatrixserverlib.Event, txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
+	StoreEvent(ctx context.Context, event *gomatrixserverlib.Event, txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID) (types.RoomNID, types.StateAtEvent, error)
 	StateEntriesForEventIDs(ctx context.Context, eventIDs []string) ([]types.StateEntry, error)
 	EventStateKeys(ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error)
 	EventNIDs(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error)

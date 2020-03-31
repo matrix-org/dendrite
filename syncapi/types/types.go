@@ -40,7 +40,7 @@ type StreamPosition int64
 
 // Same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
-	gomatrixserverlib.HeaderedEvent
+	*gomatrixserverlib.HeaderedEvent
 	StreamPosition  StreamPosition
 	TransactionID   *api.TransactionID
 	ExcludeFromSync bool

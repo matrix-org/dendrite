@@ -101,24 +101,24 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 // lookupStateEvents looks up the state events that are added by a new event.
 func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.Event,
-) ([]gomatrixserverlib.Event, error) {
+	addsStateEventIDs []string, event *gomatrixserverlib.Event,
+) ([]*gomatrixserverlib.Event, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
 		// If the event is a membership update (e.g. for a profile update), it won't
 		// show up in AddsStateEventIDs, so we need to add it manually
 		if event.Type() == "m.room.member" {
-			return []gomatrixserverlib.Event{event}, nil
+			return []*gomatrixserverlib.Event{event}, nil
 		}
 		return nil, nil
 	}
 
 	// Fast path if the only state event added is the event itself.
 	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.Event{event}, nil
+		return []*gomatrixserverlib.Event{event}, nil
 	}
 
-	result := []gomatrixserverlib.Event{}
+	result := []*gomatrixserverlib.Event{}
 	missing := []string{}
 	for _, id := range addsStateEventIDs {
 		// Append the current event in the results if its ID is in the events list

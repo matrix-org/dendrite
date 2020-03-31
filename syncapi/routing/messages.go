@@ -189,7 +189,7 @@ func (r *messagesReq) retrieveEvents() (
 		return
 	}
 
-	var events []gomatrixserverlib.HeaderedEvent
+	var events []*gomatrixserverlib.HeaderedEvent
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending
@@ -215,12 +215,12 @@ func (r *messagesReq) retrieveEvents() (
 		sort.SliceStable(events, func(i int, j int) bool {
 			// Backward ordering is antichronological (latest event to oldest
 			// one).
-			return sortEvents(&(events[j]), &(events[i]))
+			return sortEvents(events[j], events[i])
 		})
 	} else {
 		sort.SliceStable(events, func(i int, j int) bool {
 			// Forward ordering is chronological (oldest event to latest one).
-			return sortEvents(&(events[i]), &(events[j]))
+			return sortEvents(events[i], events[j])
 		})
 	}
 
@@ -281,7 +281,7 @@ func (r *messagesReq) retrieveEvents() (
 // Returns an error if there was an issue talking with the database or
 // backfilling.
 func (r *messagesReq) handleEmptyEventsSlice() (
-	events []gomatrixserverlib.HeaderedEvent, err error,
+	events []*gomatrixserverlib.HeaderedEvent, err error,
 ) {
 	backwardExtremities, err := r.db.BackwardExtremitiesForRoom(r.ctx, r.roomID)
 
@@ -295,7 +295,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 	} else {
 		// If not, it means the slice was empty because we reached the room's
 		// creation, so return an empty slice.
-		events = []gomatrixserverlib.HeaderedEvent{}
+		events = []*gomatrixserverlib.HeaderedEvent{}
 	}
 
 	return
@@ -307,7 +307,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 // through backfilling if needed.
 // Returns an error if there was an issue while backfilling.
 func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent) (
-	events []gomatrixserverlib.HeaderedEvent, err error,
+	events []*gomatrixserverlib.HeaderedEvent, err error,
 ) {
 	// Check if we have enough events.
 	isSetLargeEnough := len(streamEvents) >= r.limit
@@ -335,7 +335,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	// Backfill is needed if we've reached a backward extremity and need more
 	// events. It's only needed if the direction is backward.
 	if len(backwardExtremities) > 0 && !isSetLargeEnough && r.backwardOrdering {
-		var pdus []gomatrixserverlib.HeaderedEvent
+		var pdus []*gomatrixserverlib.HeaderedEvent
 		// Only ask the remote server for enough events to reach the limit.
 		pdus, err = r.backfill(backwardExtremities, r.limit-len(streamEvents))
 		if err != nil {
@@ -361,7 +361,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 // event, or if there is no remote homeserver to contact.
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
-func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
+func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: r.roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
 	if err := r.queryAPI.QueryRoomVersionForRoom(r.ctx, &verReq, &verRes); err != nil {
@@ -373,7 +373,7 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 		return nil, fmt.Errorf("Cannot find server to backfill from: %w", err)
 	}
 
-	headered := make([]gomatrixserverlib.HeaderedEvent, 0)
+	headered := make([]*gomatrixserverlib.HeaderedEvent, 0)
 
 	// If the roomserver responded with at least one server that isn't us,
 	// send it a request for backfill.
@@ -390,7 +390,8 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 		if e != nil {
 			continue
 		}
-		headered = append(headered, event.Headered(verRes.RoomVersion))
+		headeredEvent := event.Headered(verRes.RoomVersion)
+		headered = append(headered, &headeredEvent)
 	}
 	util.GetLogger(r.ctx).WithField("server", srvToBackfillFrom).WithField("new_events", len(headered)).Info("Storing new events from backfill")
 
@@ -399,8 +400,8 @@ func (r *messagesReq) backfill(fromEventIDs []string, limit int) ([]gomatrixserv
 	for i := range headered {
 		if _, err = r.db.WriteEvent(
 			r.ctx,
-			&headered[i],
-			[]gomatrixserverlib.HeaderedEvent{},
+			headered[i],
+			[]*gomatrixserverlib.HeaderedEvent{},
 			[]string{},
 			[]string{},
 			nil, true,

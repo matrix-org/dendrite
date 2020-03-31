@@ -38,7 +38,7 @@ func checkAuthEvents(
 	// TODO: check for duplicate state keys here.
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
@@ -102,7 +102,7 @@ func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) *
 	if !ok {
 		return nil
 	}
-	return &event.Event
+	return event.Event
 }
 
 func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *gomatrixserverlib.Event {
@@ -121,7 +121,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *
 	if !ok {
 		return nil
 	}
-	return &event.Event
+	return event.Event
 }
 
 // loadAuthEvents loads the events needed for authentication from the supplied room state.
