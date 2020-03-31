@@ -19,10 +19,10 @@ import (
 	"github.com/matrix-org/dendrite/common/test"
 )
 
-func TestTypingCache(t *testing.T) {
-	tCache := NewTypingCache()
+func TestEDUCache(t *testing.T) {
+	tCache := New()
 	if tCache == nil {
-		t.Fatal("NewTypingCache failed")
+		t.Fatal("New failed")
 	}
 
 	t.Run("AddTypingUser", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestTypingCache(t *testing.T) {
 	})
 }
 
-func testAddTypingUser(t *testing.T, tCache *TypingCache) { // nolint: unparam
+func testAddTypingUser(t *testing.T, tCache *EDUCache) { // nolint: unparam
 	present := time.Now()
 	tests := []struct {
 		userID string
@@ -58,7 +58,7 @@ func testAddTypingUser(t *testing.T, tCache *TypingCache) { // nolint: unparam
 	}
 }
 
-func testGetTypingUsers(t *testing.T, tCache *TypingCache) {
+func testGetTypingUsers(t *testing.T, tCache *EDUCache) {
 	tests := []struct {
 		roomID    string
 		wantUsers []string
@@ -75,7 +75,7 @@ func testGetTypingUsers(t *testing.T, tCache *TypingCache) {
 	}
 }
 
-func testRemoveUser(t *testing.T, tCache *TypingCache) {
+func testRemoveUser(t *testing.T, tCache *EDUCache) {
 	tests := []struct {
 		roomID  string
 		userIDs []string

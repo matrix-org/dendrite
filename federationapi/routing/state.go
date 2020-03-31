@@ -129,17 +129,9 @@ func getState(
 		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	var stateEvents, authEvents []gomatrixserverlib.Event
-	for _, headeredEvent := range response.StateEvents {
-		stateEvents = append(stateEvents, headeredEvent.Event)
-	}
-	for _, headeredEvent := range response.AuthChainEvents {
-		authEvents = append(authEvents, headeredEvent.Event)
-	}
-
 	return &gomatrixserverlib.RespState{
-		StateEvents: stateEvents,
-		AuthEvents:  authEvents,
+		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
+		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
 	}, nil
 }
 

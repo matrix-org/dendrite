@@ -307,10 +307,21 @@ func (d *Database) Events(
 		}
 		results = make([]types.Event, len(eventJSONs))
 		for i, eventJSON := range eventJSONs {
+			var roomNID types.RoomNID
+			var roomVersion gomatrixserverlib.RoomVersion
 			result := &results[i]
 			result.EventNID = eventJSON.EventNID
-			// TODO: Use NewEventFromTrustedJSON for efficiency
-			result.Event, err = gomatrixserverlib.NewEventFromUntrustedJSON(eventJSON.EventJSON)
+			roomNID, err = d.statements.selectRoomNIDForEventNID(ctx, txn, eventJSON.EventNID)
+			if err != nil {
+				return err
+			}
+			roomVersion, err = d.statements.selectRoomVersionForRoomNID(ctx, txn, roomNID)
+			if err != nil {
+				return err
+			}
+			result.Event, err = gomatrixserverlib.NewEventFromTrustedJSON(
+				eventJSON.EventJSON, false, roomVersion,
+			)
 			if err != nil {
 				return nil
 			}

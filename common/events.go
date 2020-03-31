@@ -17,14 +17,12 @@ package common
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
@@ -42,13 +40,19 @@ func BuildEvent(
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Dendrite, evTime time.Time,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
+	if queryRes == nil {
+		queryRes = &api.QueryLatestEventsAndStateResponse{}
+	}
+
 	err := AddPrevEventsToEvent(ctx, builder, queryAPI, queryRes)
 	if err != nil {
 		return nil, err
 	}
 
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(
+		evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey, queryRes.RoomVersion,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -72,9 +76,6 @@ func AddPrevEventsToEvent(
 		RoomID:       builder.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),
 	}
-	if queryRes == nil {
-		queryRes = &api.QueryLatestEventsAndStateResponse{}
-	}
 	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
 		return err
 	}
@@ -83,8 +84,12 @@ func AddPrevEventsToEvent(
 		return ErrRoomNoExists
 	}
 
+	eventFormat, err := queryRes.RoomVersion.EventFormat()
+	if err != nil {
+		return err
+	}
+
 	builder.Depth = queryRes.Depth
-	builder.PrevEvents = queryRes.LatestEvents
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
@@ -99,7 +104,23 @@ func AddPrevEventsToEvent(
 	if err != nil {
 		return err
 	}
-	builder.AuthEvents = refs
+
+	switch eventFormat {
+	case gomatrixserverlib.EventFormatV1:
+		builder.AuthEvents = refs
+		builder.PrevEvents = queryRes.LatestEvents
+	case gomatrixserverlib.EventFormatV2:
+		v2AuthRefs := []string{}
+		v2PrevRefs := []string{}
+		for _, ref := range refs {
+			v2AuthRefs = append(v2AuthRefs, ref.EventID)
+		}
+		for _, ref := range queryRes.LatestEvents {
+			v2PrevRefs = append(v2PrevRefs, ref.EventID)
+		}
+		builder.AuthEvents = v2AuthRefs
+		builder.PrevEvents = v2PrevRefs
+	}
 
 	return nil
 }

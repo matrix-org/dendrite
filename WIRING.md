@@ -72,7 +72,7 @@ Diagram:
     |            |                                                                                |          |
     |            |                                                      +---+                     |          |
     |            |                                           +----------| S |                     |          |
-    |            |                                           | Typing   +---+                     |          |
+    |            |                                           | EDU      +---+                     |          |
     |            |>=========================================>| Server     |>=====================>|          |
     +------------+                                           |            |                       +----------+
                                                    +---+     |            |
@@ -156,7 +156,7 @@ choke-point to implement ratelimiting and backoff correctly.
  * It may be impossible to implement without folding it into the Room Server
    forever coupling the components together.
 
-## Typing Server
+## EDU Server
 
  * Reads new updates to typing from the logs written by the FS and CTS.
  * Updates the current list of people typing in a room.
@@ -179,7 +179,7 @@ choke-point to implement ratelimiting and backoff correctly.
  * Reads new events and the current state of the rooms from logs written by the Room Server.
  * Reads new receipts positions from the logs written by the Receipts Server.
  * Reads changes to presence from the logs written by the Presence Server.
- * Reads changes to typing from the logs written by the Typing Server.
+ * Reads changes to typing from the logs written by the EDU Server.
  * Writes when a client starts and stops syncing to the logs.
 
 ## Client Search
