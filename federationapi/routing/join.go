@@ -129,9 +129,6 @@ func SendJoin(
 		}
 	}
 
-	fmt.Println("Content:", string(request.Content()))
-	fmt.Println("Room version:", verRes.RoomVersion)
-
 	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
 	if err != nil {
 		fmt.Println("gomatrixserverlib.NewEventFromUntrustedJSON:", err)
