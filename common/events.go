@@ -108,29 +108,23 @@ func AddPrevEventsToEvent(
 	// The limits here feel a bit arbitrary but they are currently here
 	// because of https://github.com/matrix-org/matrix-doc/issues/2307
 	// and because Synapse will just drop events that don't comply.
+	truncAuthEvents, truncPrevEvents := refs, queryRes.LatestEvents
+	if len(truncAuthEvents) > 10 {
+		truncAuthEvents = truncAuthEvents[:10]
+	}
+	if len(truncPrevEvents) > 20 {
+		truncPrevEvents = truncPrevEvents[:20]
+	}
 	switch eventFormat {
 	case gomatrixserverlib.EventFormatV1:
-		builder.AuthEvents = refs
-		builder.PrevEvents = queryRes.LatestEvents
-		if len(builder.AuthEvents) > 10 {
-			builder.AuthEvents = builder.AuthEvents[:10]
-		}
-		if len(builder.PrevEvents) > 20 {
-			builder.PrevEvents = builder.PrevEvents[:20]
-		}
+		builder.AuthEvents = truncAuthEvents
+		builder.PrevEvents = truncPrevEvents
 	case gomatrixserverlib.EventFormatV2:
-		v2AuthRefs := []string{}
-		v2PrevRefs := []string{}
-		for _, ref := range refs {
-			if len(v2AuthRefs) == 10 {
-				break
-			}
+		v2AuthRefs, v2PrevRefs := []string{}, []string{}
+		for _, ref := range truncAuthEvents {
 			v2AuthRefs = append(v2AuthRefs, ref.EventID)
 		}
-		for _, ref := range queryRes.LatestEvents {
-			if len(v2PrevRefs) == 20 {
-				break
-			}
+		for _, ref := range truncPrevEvents {
 			v2PrevRefs = append(v2PrevRefs, ref.EventID)
 		}
 		builder.AuthEvents = v2AuthRefs
