@@ -79,27 +79,46 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
 		return nil
 	}
-	if output.Type != api.OutputTypeNewRoomEvent {
+
+	switch output.Type {
+	case api.OutputTypeNewRoomEvent:
+		ev := &output.NewRoomEvent.Event
+		log.WithFields(log.Fields{
+			"event_id":       ev.EventID(),
+			"room_id":        ev.RoomID(),
+			"send_as_server": output.NewRoomEvent.SendAsServer,
+		}).Info("received room event from roomserver")
+
+		if err := s.processMessage(*output.NewRoomEvent); err != nil {
+			// panic rather than continue with an inconsistent database
+			log.WithFields(log.Fields{
+				"event":      string(ev.JSON()),
+				"add":        output.NewRoomEvent.AddsStateEventIDs,
+				"del":        output.NewRoomEvent.RemovesStateEventIDs,
+				log.ErrorKey: err,
+			}).Panicf("roomserver output log: write room event failure")
+			return nil
+		}
+	case api.OutputTypeNewInviteEvent:
+		ev := &output.NewInviteEvent.Event
+		log.WithFields(log.Fields{
+			"event_id":  ev.EventID(),
+			"room_id":   ev.RoomID(),
+			"state_key": ev.StateKey(),
+		}).Info("received invite event from roomserver")
+
+		if err := s.processInvite(*output.NewInviteEvent); err != nil {
+			// panic rather than continue with an inconsistent database
+			log.WithFields(log.Fields{
+				"event":      string(ev.JSON()),
+				log.ErrorKey: err,
+			}).Panicf("roomserver output log: write invite event failure")
+			return nil
+		}
+	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
-		return nil
-	}
-	ev := &output.NewRoomEvent.Event
-	log.WithFields(log.Fields{
-		"event_id":       ev.EventID(),
-		"room_id":        ev.RoomID(),
-		"send_as_server": output.NewRoomEvent.SendAsServer,
-	}).Info("received event from roomserver")
-
-	if err := s.processMessage(*output.NewRoomEvent); err != nil {
-		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			"event":      string(ev.JSON()),
-			log.ErrorKey: err,
-			"add":        output.NewRoomEvent.AddsStateEventIDs,
-			"del":        output.NewRoomEvent.RemovesStateEventIDs,
-		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
 
@@ -157,6 +176,12 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 	return s.queues.SendEvent(
 		&ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	)
+}
+
+// processInvite handles an invite event for sending over federation.
+func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) error {
+	// Send the event.
+	return s.queues.SendInvite(&oie.Event)
 }
 
 // joinedHostsAtEvent works out a list of matrix servers that were joined to

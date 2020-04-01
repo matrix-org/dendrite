@@ -42,6 +42,7 @@ type destinationQueue struct {
 	lastTransactionIDs []gomatrixserverlib.TransactionID
 	pendingEvents      []*gomatrixserverlib.HeaderedEvent
 	pendingEDUs        []*gomatrixserverlib.EDU
+	pendingInvites     []*gomatrixserverlib.HeaderedEvent
 }
 
 // Send event adds the event to the pending queue for the destination.
@@ -64,6 +65,16 @@ func (oq *destinationQueue) sendEDU(e *gomatrixserverlib.EDU) {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
 	oq.pendingEDUs = append(oq.pendingEDUs, e)
+	if !oq.running {
+		oq.running = true
+		go oq.backgroundSend()
+	}
+}
+
+func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.HeaderedEvent) {
+	oq.runningMutex.Lock()
+	defer oq.runningMutex.Unlock()
+	oq.pendingInvites = append(oq.pendingInvites, ev)
 	if !oq.running {
 		oq.running = true
 		go oq.backgroundSend()
@@ -100,6 +111,19 @@ func (oq *destinationQueue) backgroundSend() {
 func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
+
+	if len(oq.pendingInvites) > 0 {
+		for _, invite := range oq.pendingInvites {
+			if _, err := oq.client.SendInvite(context.TODO(), oq.destination, invite.Unwrap()); err != nil {
+				log.WithFields(log.Fields{
+					"event_id":    invite.EventID(),
+					"state_key":   invite.StateKey(),
+					"destination": oq.destination,
+				}).Info("failed to send invite")
+			}
+		}
+		oq.pendingInvites = oq.pendingInvites[:0]
+	}
 
 	if len(oq.pendingEvents) == 0 && len(oq.pendingEDUs) == 0 {
 		oq.running = false
