@@ -96,10 +96,11 @@ func processRoomEvent(
 	input api.InputRoomEvent,
 ) (eventID string, err error) {
 	// Parse and validate the event JSON
-	event := input.Event
+	headered := input.Event
+	event := headered.Unwrap()
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
-	authEventNIDs, err := checkAuthEvents(ctx, db, event.Event, input.AuthEventIDs)
+	authEventNIDs, err := checkAuthEvents(ctx, db, headered, input.AuthEventIDs)
 	if err != nil {
 		return
 	}
@@ -107,7 +108,7 @@ func processRoomEvent(
 	if input.TransactionID != nil {
 		tdID := input.TransactionID
 		eventID, err = db.GetTransactionEventID(
-			ctx, tdID.TransactionID, tdID.SessionID, input.Event.Sender(),
+			ctx, tdID.TransactionID, tdID.SessionID, event.Sender(),
 		)
 		// On error OR event with the transaction already processed/processesing
 		if err != nil || eventID != "" {
@@ -116,7 +117,7 @@ func processRoomEvent(
 	}
 
 	// Store the event
-	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event.Event, input.TransactionID, authEventNIDs)
+	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
 		return
 	}
@@ -131,7 +132,7 @@ func processRoomEvent(
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event.Event)
+		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event)
 		if err != nil {
 			return
 		}
@@ -144,7 +145,7 @@ func processRoomEvent(
 
 	// Update the extremities of the event graph for the room
 	return event.EventID(), updateLatestEvents(
-		ctx, db, ow, roomNID, stateAtEvent, event.Event, input.SendAsServer, input.TransactionID,
+		ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID,
 	)
 }
 
@@ -235,7 +236,8 @@ func processInviteEvent(
 		return nil
 	}
 
-	outputUpdates, err := updateToInviteMembership(updater, &input.Event.Event, nil)
+	event := input.Event.Unwrap()
+	outputUpdates, err := updateToInviteMembership(updater, &event, nil)
 	if err != nil {
 		return err
 	}

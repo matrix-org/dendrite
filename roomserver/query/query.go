@@ -123,6 +123,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return nil
 	}
 	response.RoomExists = true
+	response.RoomVersion = roomVersion
 
 	var currentStateSnapshotNID types.StateSnapshotNID
 	response.LatestEvents, currentStateSnapshotNID, response.Depth, err =
@@ -174,6 +175,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return nil
 	}
 	response.RoomExists = true
+	response.RoomVersion = roomVersion
 
 	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
@@ -713,6 +715,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	if err != nil {
 		return err
 	}
+	response.RoomVersion = roomVersion
 
 	stateEvents, err := r.loadStateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
@@ -868,6 +871,20 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 			response.AvailableRoomVersions[v] = "unstable"
 		}
 	}
+	return nil
+}
+
+// QueryRoomVersionCapabilities implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
+	ctx context.Context,
+	request *api.QueryRoomVersionForRoomRequest,
+	response *api.QueryRoomVersionForRoomResponse,
+) error {
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	response.RoomVersion = roomVersion
 	return nil
 }
 
@@ -1037,6 +1054,20 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryRoomVersionCapabilities(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryRoomVersionForRoomPath,
+		common.MakeInternalAPI("QueryRoomVersionForRoom", func(req *http.Request) util.JSONResponse {
+			var request api.QueryRoomVersionForRoomRequest
+			var response api.QueryRoomVersionForRoomResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryRoomVersionForRoom(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

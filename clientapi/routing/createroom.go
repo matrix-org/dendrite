@@ -237,7 +237,7 @@ func createRoom(
 		historyVisibility = historyVisibilityShared
 	}
 
-	var builtEvents []gomatrixserverlib.Event
+	var builtEvents []gomatrixserverlib.HeaderedEvent
 
 	// send events into the room in order of:
 	//  1- m.room.create
@@ -299,7 +299,7 @@ func createRoom(
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(&builder, &authEvents, cfg, evTime)
+		ev, err = buildEvent(&builder, &authEvents, cfg, evTime, roomVersion)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("buildEvent failed")
 			return jsonerror.InternalServerError()
@@ -311,7 +311,7 @@ func createRoom(
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, *ev)
+		builtEvents = append(builtEvents, (*ev).Headered(roomVersion))
 		err = authEvents.AddEvent(ev)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("authEvents.AddEvent failed")
@@ -368,6 +368,7 @@ func buildEvent(
 	provider gomatrixserverlib.AuthEventProvider,
 	cfg *config.Dendrite,
 	evTime time.Time,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -378,8 +379,10 @@ func buildEvent(
 		return nil, err
 	}
 	builder.AuthEvents = refs
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(
+		evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey, roomVersion,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
 	}

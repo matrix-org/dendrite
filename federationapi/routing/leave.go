@@ -13,7 +13,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -101,8 +100,18 @@ func SendLeave(
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
-	var event gomatrixserverlib.Event
-	if err := json.Unmarshal(request.Content(), &event); err != nil {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := producer.QueryAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
+	// Decode the event JSON from the request.
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
@@ -134,9 +143,10 @@ func SendLeave(
 	}
 
 	// Check that the event is signed by the server sending the request.
+	redacted := event.Redact()
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
 		ServerName: event.Origin(),
-		Message:    event.Redact().JSON(),
+		Message:    redacted.JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
@@ -166,7 +176,14 @@ func SendLeave(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil)
+	_, err = producer.SendEvents(
+		httpReq.Context(),
+		[]gomatrixserverlib.HeaderedEvent{
+			event.Headered(verRes.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		nil,
+	)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()

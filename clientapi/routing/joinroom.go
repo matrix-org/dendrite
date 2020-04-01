@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -238,10 +239,17 @@ func (r joinRoomReq) joinRoomUsingServers(
 		return jsonerror.InternalServerError()
 	}
 
-	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
+	queryRes := roomserverAPI.QueryLatestEventsAndStateResponse{}
 	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.queryAPI, &queryRes)
 	if err == nil {
-		if _, err = r.producer.SendEvents(r.req.Context(), []gomatrixserverlib.Event{*event}, r.cfg.Matrix.ServerName, nil); err != nil {
+		if _, err = r.producer.SendEvents(
+			r.req.Context(),
+			[]gomatrixserverlib.HeaderedEvent{
+				(*event).Headered(queryRes.RoomVersion),
+			},
+			r.cfg.Matrix.ServerName,
+			nil,
+		); err != nil {
 			util.GetLogger(r.req.Context()).WithError(err).Error("r.producer.SendEvents failed")
 			return jsonerror.InternalServerError()
 		}
@@ -299,7 +307,17 @@ func (r joinRoomReq) joinRoomUsingServers(
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
 func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
-	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, []int{1})
+	// Ask the room server for information about room versions.
+	var request api.QueryRoomVersionCapabilitiesRequest
+	var response api.QueryRoomVersionCapabilitiesResponse
+	if err := r.queryAPI.QueryRoomVersionCapabilities(r.req.Context(), &request, &response); err != nil {
+		return nil, err
+	}
+	var supportedVersions []gomatrixserverlib.RoomVersion
+	for version := range response.AvailableRoomVersions {
+		supportedVersions = append(supportedVersions, version)
+	}
+	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, supportedVersions)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
 		return nil, err
@@ -312,9 +330,21 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, err
 	}
 
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.cfg.Matrix.ServerName)
+	if respMakeJoin.RoomVersion == "" {
+		respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
+	}
+	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(
+				fmt.Sprintf("Room version '%s' is not supported", respMakeJoin.RoomVersion),
+			),
+		}, nil
+	}
+
 	event, err := respMakeJoin.JoinEvent.Build(
-		eventID, r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID, r.cfg.Matrix.PrivateKey,
+		r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID,
+		r.cfg.Matrix.PrivateKey, respMakeJoin.RoomVersion,
 	)
 	if err != nil {
 		util.GetLogger(r.req.Context()).WithError(err).Error("respMakeJoin.JoinEvent.Build failed")
@@ -322,7 +352,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return &res, nil
 	}
 
-	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event)
+	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event, respMakeJoin.RoomVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +362,9 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	}
 
 	if err = r.producer.SendEventWithState(
-		r.req.Context(), gomatrixserverlib.RespState(respSendJoin.RespState), event,
+		r.req.Context(),
+		gomatrixserverlib.RespState(respSendJoin.RespState),
+		event.Headered(respMakeJoin.RoomVersion),
 	); err != nil {
 		util.GetLogger(r.req.Context()).WithError(err).Error("gomatrixserverlib.RespState failed")
 		res := jsonerror.InternalServerError()

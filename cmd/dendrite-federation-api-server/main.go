@@ -15,8 +15,11 @@
 package main
 
 import (
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
+	"github.com/matrix-org/dendrite/eduserver"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 )
 
@@ -34,10 +37,12 @@ func main() {
 
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
 	asQuery := base.CreateHTTPAppServiceAPIs()
+	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
+	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 
 	federationapi.SetupFederationAPIComponent(
 		base, accountDB, deviceDB, federation, &keyRing,
-		alias, input, query, asQuery, federationSender,
+		alias, input, query, asQuery, federationSender, eduProducer,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

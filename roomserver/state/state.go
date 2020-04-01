@@ -672,7 +672,7 @@ func (v StateResolution) calculateStateAfterManyEvents(
 			return
 		}
 		algorithm = "full_state_with_conflicts"
-		state = resolved
+		state = resolved[:util.SortAndUnique(stateEntrySorter(resolved))]
 	} else {
 		algorithm = "full_state_no_conflicts"
 		// 6) There weren't any conflicts

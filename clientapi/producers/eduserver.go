@@ -16,32 +16,32 @@ import (
 	"context"
 	"time"
 
-	"github.com/matrix-org/dendrite/typingserver/api"
+	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// TypingServerProducer produces events for the typing server to consume
-type TypingServerProducer struct {
-	InputAPI api.TypingServerInputAPI
+// EDUServerProducer produces events for the EDU server to consume
+type EDUServerProducer struct {
+	InputAPI api.EDUServerInputAPI
 }
 
-// NewTypingServerProducer creates a new TypingServerProducer
-func NewTypingServerProducer(inputAPI api.TypingServerInputAPI) *TypingServerProducer {
-	return &TypingServerProducer{
+// NewEDUServerProducer creates a new EDUServerProducer
+func NewEDUServerProducer(inputAPI api.EDUServerInputAPI) *EDUServerProducer {
+	return &EDUServerProducer{
 		InputAPI: inputAPI,
 	}
 }
 
-// Send typing event to typing server
-func (p *TypingServerProducer) Send(
+// SendTyping sends a typing event to EDU server
+func (p *EDUServerProducer) SendTyping(
 	ctx context.Context, userID, roomID string,
-	typing bool, timeout int64,
+	typing bool, timeoutMS int64,
 ) error {
 	requestData := api.InputTypingEvent{
 		UserID:         userID,
 		RoomID:         roomID,
 		Typing:         typing,
-		Timeout:        timeout,
+		TimeoutMS:      timeoutMS,
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
 

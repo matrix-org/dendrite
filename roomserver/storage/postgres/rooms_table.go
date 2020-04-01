@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -176,6 +177,9 @@ func (s *roomStatements) selectRoomVersionForRoomID(
 	var roomVersion gomatrixserverlib.RoomVersion
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
+	if err == sql.ErrNoRows {
+		return roomVersion, errors.New("room not found")
+	}
 	return roomVersion, err
 }
 
@@ -185,5 +189,8 @@ func (s *roomStatements) selectRoomVersionForRoomNID(
 	var roomVersion gomatrixserverlib.RoomVersion
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
+	if err == sql.ErrNoRows {
+		return roomVersion, errors.New("room not found")
+	}
 	return roomVersion, err
 }
