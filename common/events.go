@@ -105,17 +105,32 @@ func AddPrevEventsToEvent(
 		return err
 	}
 
+	// The limits here feel a bit arbitrary but they are currently here
+	// because of https://github.com/matrix-org/matrix-doc/issues/2307
+	// and because Synapse will just drop events that don't comply.
 	switch eventFormat {
 	case gomatrixserverlib.EventFormatV1:
 		builder.AuthEvents = refs
 		builder.PrevEvents = queryRes.LatestEvents
+		if len(builder.AuthEvents) > 10 {
+			builder.AuthEvents = builder.AuthEvents[:10]
+		}
+		if len(builder.PrevEvents) > 20 {
+			builder.PrevEvents = builder.PrevEvents[:20]
+		}
 	case gomatrixserverlib.EventFormatV2:
 		v2AuthRefs := []string{}
 		v2PrevRefs := []string{}
 		for _, ref := range refs {
+			if len(v2AuthRefs) == 10 {
+				break
+			}
 			v2AuthRefs = append(v2AuthRefs, ref.EventID)
 		}
 		for _, ref := range queryRes.LatestEvents {
+			if len(v2PrevRefs) == 20 {
+				break
+			}
 			v2PrevRefs = append(v2PrevRefs, ref.EventID)
 		}
 		builder.AuthEvents = v2AuthRefs
