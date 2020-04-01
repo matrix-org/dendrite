@@ -15,18 +15,17 @@
 package routing
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-// Invite implements /_matrix/federation/v1/invite/{roomID}/{eventID}
+// Invite implements /_matrix/federation/v2/invite/{roomID}/{eventID}
 func Invite(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -36,18 +35,18 @@ func Invite(
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
-	// Look up the room version for the room.
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := producer.QueryAPI.QueryRoomVersionForRoom(context.Background(), &verReq, &verRes); err != nil {
+	inviteReq := gomatrixserverlib.InviteV2Request{}
+	if err := json.Unmarshal(request.Content(), &inviteReq); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
 		}
 	}
 
+	// In v2, the room_version field is mandatory.
+	// https://matrix.org/docs/spec/server_server/r0.1.3#put-matrix-federation-v2-invite-roomid-eventid
 	// Decode the event JSON from the request.
-	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(inviteReq.Event(), inviteReq.RoomVersion())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -68,14 +67,6 @@ func Invite(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
-		}
-	}
-
-	// Check that the event is from the server sending the request.
-	if event.Origin() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The invite must be sent by the server it originated on"),
 		}
 	}
 

@@ -85,7 +85,7 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
-	v1fedmux.Handle("/invite/{roomID}/{eventID}", common.MakeFedAPI(
+	v2fedmux.Handle("/invite/{roomID}/{eventID}", common.MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
