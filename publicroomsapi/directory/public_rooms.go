@@ -62,6 +62,7 @@ func GetPostPublicRooms(
 		fres, err := fedClient.GetPublicRooms(req.Context(), server, int(request.Limit),
 			request.Since, false, "")
 		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("fedClient.GetPublicRooms failed")
 			return jsonerror.InternalServerError()
 		}
 		return util.JSONResponse{
