@@ -231,3 +231,11 @@ remote user can join room with version 2
 User can invite local user to room with version 2
 Remote user can backfill in a room with version 2
 Inbound federation accepts attempts to join v2 rooms from servers with support
+User can create and send/receive messages in a room with version 3
+local user can join room with version 3
+Remote user can backfill in a room with version 3
+User can create and send/receive messages in a room with version 4
+local user can join room with version 4
+remote user can join room with version 4
+Remote user can backfill in a room with version 4
+Ignore invite in incremental sync
