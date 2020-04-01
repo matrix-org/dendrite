@@ -105,26 +105,17 @@ func AddPrevEventsToEvent(
 		return err
 	}
 
-	// The limits here feel a bit arbitrary but they are currently here
-	// because of https://github.com/matrix-org/matrix-doc/issues/2307
-	// and because Synapse will just drop events that don't comply.
-	truncAuthEvents, truncPrevEvents := refs, queryRes.LatestEvents
-	if len(truncAuthEvents) > 10 {
-		truncAuthEvents = truncAuthEvents[:10]
-	}
-	if len(truncPrevEvents) > 20 {
-		truncPrevEvents = truncPrevEvents[:20]
-	}
+	truncAuth, truncPrev := truncateAuthAndPrevEvents(refs, queryRes.LatestEvents)
 	switch eventFormat {
 	case gomatrixserverlib.EventFormatV1:
-		builder.AuthEvents = truncAuthEvents
-		builder.PrevEvents = truncPrevEvents
+		builder.AuthEvents = truncAuth
+		builder.PrevEvents = truncPrev
 	case gomatrixserverlib.EventFormatV2:
 		v2AuthRefs, v2PrevRefs := []string{}, []string{}
-		for _, ref := range truncAuthEvents {
+		for _, ref := range truncAuth {
 			v2AuthRefs = append(v2AuthRefs, ref.EventID)
 		}
-		for _, ref := range truncPrevEvents {
+		for _, ref := range truncPrev {
 			v2PrevRefs = append(v2PrevRefs, ref.EventID)
 		}
 		builder.AuthEvents = v2AuthRefs
@@ -132,4 +123,22 @@ func AddPrevEventsToEvent(
 	}
 
 	return nil
+}
+
+// truncateAuthAndPrevEvents limits the number of events we add into
+// an event as prev_events or auth_events.
+// The limits here feel a bit arbitrary but they are currently here
+// because of https://github.com/matrix-org/matrix-doc/issues/2307
+// and because Synapse will just drop events that don't comply.
+func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
+	truncAuth, truncPrev []gomatrixserverlib.EventReference,
+) {
+	truncAuth, truncPrev = auth, prev
+	if len(truncAuth) > 10 {
+		truncAuth = truncAuth[:10]
+	}
+	if len(truncPrev) > 20 {
+		truncPrev = truncPrev[:20]
+	}
+	return
 }
