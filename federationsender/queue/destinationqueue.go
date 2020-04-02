@@ -42,7 +42,7 @@ type destinationQueue struct {
 	lastTransactionIDs []gomatrixserverlib.TransactionID
 	pendingEvents      []*gomatrixserverlib.HeaderedEvent
 	pendingEDUs        []*gomatrixserverlib.EDU
-	pendingInvites     []*gomatrixserverlib.HeaderedEvent
+	pendingInvites     []*gomatrixserverlib.InviteV2Request
 }
 
 // Send event adds the event to the pending queue for the destination.
@@ -71,7 +71,7 @@ func (oq *destinationQueue) sendEDU(e *gomatrixserverlib.EDU) {
 	}
 }
 
-func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.HeaderedEvent) {
+func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.InviteV2Request) {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
 	oq.pendingInvites = append(oq.pendingInvites, ev)
@@ -113,36 +113,17 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	defer oq.runningMutex.Unlock()
 
 	if len(oq.pendingInvites) > 0 {
-		for _, invite := range oq.pendingInvites {
-			// TODO: Get the correct stripped state here
-			inviteReq, err := gomatrixserverlib.NewInviteV2Request(
-				invite,
-				[]gomatrixserverlib.InviteV2StrippedState{},
-			)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"event_id":    invite.EventID(),
-					"state_key":   invite.StateKey(),
-					"destination": oq.destination,
-				}).WithError(err).Error("failed to create invite request")
-				continue
-			}
-
+		for _, inviteReq := range oq.pendingInvites {
 			ev := inviteReq.Event()
-			log.WithFields(log.Fields{
-				"event_id":     ev.EventID(),
-				"state_key":    ev.StateKey(),
-				"room_version": inviteReq.RoomVersion(),
-			}).WithError(err).Info("created invite request")
 
 			if _, err := oq.client.SendInviteV2(
 				context.TODO(),
 				oq.destination,
-				inviteReq,
+				*inviteReq,
 			); err != nil {
 				log.WithFields(log.Fields{
-					"event_id":    invite.EventID(),
-					"state_key":   invite.StateKey(),
+					"event_id":    ev.EventID(),
+					"state_key":   ev.StateKey(),
 					"destination": oq.destination,
 				}).WithError(err).Error("failed to send invite")
 			}

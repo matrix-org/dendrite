@@ -82,8 +82,9 @@ func (oqs *OutgoingQueues) SendEvent(
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendInvite(
-	ev *gomatrixserverlib.HeaderedEvent,
+	inviteReq *gomatrixserverlib.InviteV2Request,
 ) error {
+	ev := inviteReq.Event()
 	stateKey := ev.StateKey()
 	if stateKey == nil {
 		log.WithFields(log.Fields{
@@ -117,7 +118,7 @@ func (oqs *OutgoingQueues) SendInvite(
 		oqs.queues[destination] = oq
 	}
 
-	oq.sendInvite(ev)
+	oq.sendInvite(inviteReq)
 
 	return nil
 }

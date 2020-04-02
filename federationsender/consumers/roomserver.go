@@ -180,8 +180,33 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 
 // processInvite handles an invite event for sending over federation.
 func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) error {
+	queryReq := api.QueryLatestEventsAndStateRequest{
+		RoomID: oie.Event.RoomID(),
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{
+			gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomName, StateKey: ""},
+			gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""},
+			gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomAliases, StateKey: ""},
+			gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""},
+		},
+	}
+	queryRes := api.QueryLatestEventsAndStateResponse{}
+	if err := s.query.QueryLatestEventsAndState(context.TODO(), &queryReq, &queryRes); err != nil {
+		return err
+	}
+
+	var strippedState []gomatrixserverlib.InviteV2StrippedState
+	for _, state := range queryRes.StateEvents {
+		event := state.Unwrap()
+		strippedState = append(strippedState, gomatrixserverlib.NewInviteV2StrippedState(&event))
+	}
+
+	inviteReq, err := gomatrixserverlib.NewInviteV2Request(&oie.Event, strippedState)
+	if err != nil {
+		return err
+	}
+
 	// Send the event.
-	return s.queues.SendInvite(&oie.Event)
+	return s.queues.SendInvite(&inviteReq)
 }
 
 // joinedHostsAtEvent works out a list of matrix servers that were joined to
