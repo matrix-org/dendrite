@@ -105,10 +105,12 @@ func (c *RoomserverProducer) SendInputRoomEvents(
 // If we are in the room then the event should be sent using the SendEvents method.
 func (c *RoomserverProducer) SendInvite(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
+	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
 ) error {
 	request := api.InputRoomEventsRequest{
 		InputInviteEvents: []api.InputInviteEvent{{
-			Event: inviteEvent,
+			Event:           inviteEvent,
+			InviteRoomState: inviteRoomState,
 		}},
 	}
 	var response api.InputRoomEventsResponse

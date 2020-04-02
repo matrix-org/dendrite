@@ -244,6 +244,11 @@ func processInviteEvent(
 	}
 
 	event := input.Event.Unwrap()
+
+	if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
+		return err
+	}
+
 	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
 	if err != nil {
 		return err

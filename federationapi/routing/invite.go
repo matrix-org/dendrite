@@ -85,7 +85,11 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = producer.SendInvite(httpReq.Context(), signedEvent.Headered(inviteReq.RoomVersion())); err != nil {
+	if err = producer.SendInvite(
+		httpReq.Context(),
+		signedEvent.Headered(inviteReq.RoomVersion()),
+		inviteReq.InviteRoomState(),
+	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
 		return jsonerror.InternalServerError()
 	}
