@@ -32,6 +32,7 @@ import (
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
+	cfg                *config.Dendrite
 	roomServerConsumer *common.ContinualConsumer
 	db                 storage.Database
 	queues             *queue.OutgoingQueues
@@ -52,6 +53,7 @@ func NewOutputRoomEventConsumer(
 		PartitionStore: store,
 	}
 	s := &OutputRoomEventConsumer{
+		cfg:                cfg,
 		roomServerConsumer: &consumer,
 		db:                 store,
 		queues:             queues,
@@ -128,6 +130,11 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
 func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
+	if ore.SendAsServer == api.DoNotSendToOtherServers {
+		// Ignore event that we don't need to send anywhere.
+		return nil
+	}
+
 	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ore.Event.Event)
 	if err != nil {
 		return err
@@ -161,11 +168,6 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 		return nil
 	}
 
-	if ore.SendAsServer == api.DoNotSendToOtherServers {
-		// Ignore event that we don't need to send anywhere.
-		return nil
-	}
-
 	// Work out which hosts were joined at the event itself.
 	joinedHostsAtEvent, err := s.joinedHostsAtEvent(ore, oldJoinedHosts)
 	if err != nil {
@@ -180,29 +182,61 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 
 // processInvite handles an invite event for sending over federation.
 func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) error {
-	queryReq := api.QueryLatestEventsAndStateRequest{
-		RoomID: oie.Event.RoomID(),
-		StateToFetch: []gomatrixserverlib.StateKeyTuple{
-			gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomName, StateKey: ""},
-			gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""},
-			gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomAliases, StateKey: ""},
-			gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""},
-		},
-	}
-	queryRes := api.QueryLatestEventsAndStateResponse{}
-	if err := s.query.QueryLatestEventsAndState(context.TODO(), &queryReq, &queryRes); err != nil {
-		return err
+	// Don't try to reflect and resend invites that didn't originate from us.
+	if s.cfg.Matrix.ServerName != oie.Event.Origin() {
+		return nil
 	}
 
-	var strippedState []gomatrixserverlib.InviteV2StrippedState
-	for _, state := range queryRes.StateEvents {
-		event := state.Unwrap()
-		strippedState = append(strippedState, gomatrixserverlib.NewInviteV2StrippedState(&event))
+	// When sending a v2 invite, the inviting server should try and include
+	// a "stripped down" version of the room state. This is pretty much just
+	// enough information for the remote side to show something useful to the
+	// user, like the room name, aliases etc.
+	strippedState := []gomatrixserverlib.InviteV2StrippedState{}
+	stateWanted := []string{
+		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
+		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
 	}
 
+	// For each of the state keys that we want to try and send, ask the
+	// roomserver if we have a state event for that room that matches the
+	// state key.
+	for _, wanted := range stateWanted {
+		queryReq := api.QueryLatestEventsAndStateRequest{
+			RoomID: oie.Event.RoomID(),
+			StateToFetch: []gomatrixserverlib.StateKeyTuple{
+				gomatrixserverlib.StateKeyTuple{
+					EventType: wanted,
+					StateKey:  "",
+				},
+			},
+		}
+		// If this fails then we just move onto the next event - we don't
+		// actually know at this point whether the room even has that type
+		// of state.
+		queryRes := api.QueryLatestEventsAndStateResponse{}
+		if err := s.query.QueryLatestEventsAndState(context.TODO(), &queryReq, &queryRes); err != nil {
+			log.WithFields(log.Fields{
+				"room_id":    queryReq.RoomID,
+				"event_type": wanted,
+			}).WithError(err).Info("couldn't find state to strip")
+			continue
+		}
+		// Append the stripped down copy of the state to our list.
+		for _, headeredEvent := range queryRes.StateEvents {
+			event := headeredEvent.Unwrap()
+			strippedState = append(strippedState, gomatrixserverlib.NewInviteV2StrippedState(&event))
+
+			log.WithFields(log.Fields{
+				"room_id":    queryReq.RoomID,
+				"event_type": event.Type(),
+			}).Info("adding stripped state")
+		}
+	}
+
+	// Build the invite request with the info we've got.
 	inviteReq, err := gomatrixserverlib.NewInviteV2Request(&oie.Event, strippedState)
 	if err != nil {
-		return err
+		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
 
 	// Send the event.
