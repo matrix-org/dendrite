@@ -103,10 +103,10 @@ services:
     networks:
       - internal
 
-  typing_server:
-    container_name: dendrite_typing_server
-    hostname: typing_server
-    entrypoint: ["bash", "./docker/services/typing-server.sh"]
+  edu_server:
+    container_name: dendrite_edu_server
+    hostname: edu_server
+    entrypoint: ["bash", "./docker/services/edu-server.sh"]
     build: ./
     volumes:
       - ..:/build

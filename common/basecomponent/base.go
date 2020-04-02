@@ -35,9 +35,9 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
+	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/sirupsen/logrus"
 )
 
@@ -111,10 +111,10 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	return alias, input, query
 }
 
-// CreateHTTPTypingServerAPIs returns typingInputAPI for hitting the typing
+// CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
 // server over HTTP
-func (b *BaseDendrite) CreateHTTPTypingServerAPIs() typingServerAPI.TypingServerInputAPI {
-	return typingServerAPI.NewTypingServerInputAPIHTTP(b.Cfg.TypingServerURL(), nil)
+func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI {
+	return eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), nil)
 }
 
 // CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
