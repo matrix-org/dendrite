@@ -663,6 +663,7 @@ func (d *Database) StateEntriesForTuples(
 // MembershipUpdater implements input.RoomEventDatabase
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) (updater types.MembershipUpdater, err error) {
 	var txn *sql.Tx
 	txn, err = d.db.Begin()
@@ -688,8 +689,7 @@ func (d *Database) MembershipUpdater(
 		}
 	}()
 
-	// TODO: Room version here
-	roomNID, err := d.assignRoomNID(ctx, txn, roomID, "1")
+	roomNID, err := d.assignRoomNID(ctx, txn, roomID, roomVersion)
 	if err != nil {
 		return nil, err
 	}

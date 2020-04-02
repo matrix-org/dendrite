@@ -116,10 +116,10 @@ type OutputNewRoomEvent struct {
 // Invite events can be received outside of an existing room so have to be
 // tracked separately from the room events themselves.
 type OutputNewInviteEvent struct {
+	// The room version of the invited room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The "m.room.member" invite event.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
-	// The stripped room state supplied with the invite.
-	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
 }
 
 // An OutputRetireInviteEvent is written whenever an existing invite is no longer

@@ -85,6 +85,7 @@ type TransactionID struct {
 // the usual context a matrix room event would have. We usually do not have
 // access to the events needed to check the event auth rules for the invite.
 type InputInviteEvent struct {
+	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
 	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
 	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
 }

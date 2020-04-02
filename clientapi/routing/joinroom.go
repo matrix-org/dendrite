@@ -260,6 +260,9 @@ func (r joinRoomReq) joinRoomUsingServers(
 			}{roomID},
 		}
 	}
+	// TODO: This needs to be re-thought, as in the case of an invite, the room
+	// will exist in the database in roomserver_rooms but won't have any state
+	// events, therefore this below check fails.
 	if err != common.ErrRoomNoExists {
 		util.GetLogger(r.req.Context()).WithError(err).Error("common.BuildEvent failed")
 		return jsonerror.InternalServerError()

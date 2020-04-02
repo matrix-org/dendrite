@@ -65,6 +65,7 @@ type RoomEventDatabase interface {
 	// Build a membership updater for the target user in a room.
 	MembershipUpdater(
 		ctx context.Context, roomID, targerUserID string,
+		roomVersion gomatrixserverlib.RoomVersion,
 	) (types.MembershipUpdater, error)
 	// Look up event ID by transaction's info.
 	// This is used to determine if the room event is processed/processing already.
@@ -197,10 +198,11 @@ func processInviteEvent(
 	log.WithFields(log.Fields{
 		"event_id":       input.Event.EventID(),
 		"room_id":        roomID,
+		"room_version":   input.RoomVersion,
 		"target_user_id": targetUserID,
 	}).Info("processing invite event")
 
-	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID)
+	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID, input.RoomVersion)
 	if err != nil {
 		return err
 	}

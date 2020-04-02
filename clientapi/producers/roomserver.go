@@ -111,6 +111,7 @@ func (c *RoomserverProducer) SendInvite(
 		InputInviteEvents: []api.InputInviteEvent{{
 			Event:           inviteEvent,
 			InviteRoomState: inviteRoomState,
+			RoomVersion:     inviteEvent.RoomVersion,
 		}},
 	}
 	var response api.InputRoomEventsResponse
