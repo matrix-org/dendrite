@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
@@ -193,6 +194,12 @@ func processInviteEvent(
 	roomID := input.Event.RoomID()
 	targetUserID := *input.Event.StateKey()
 
+	log.WithFields(log.Fields{
+		"event_id":       input.Event.EventID(),
+		"room_id":        roomID,
+		"target_user_id": targetUserID,
+	}).Info("processing invite event")
+
 	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID)
 	if err != nil {
 		return err
@@ -237,7 +244,7 @@ func processInviteEvent(
 	}
 
 	event := input.Event.Unwrap()
-	outputUpdates, err := updateToInviteMembership(updater, &event, nil)
+	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
 	if err != nil {
 		return err
 	}

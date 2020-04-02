@@ -114,12 +114,37 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 
 	if len(oq.pendingInvites) > 0 {
 		for _, invite := range oq.pendingInvites {
-			if _, err := oq.client.SendInvite(context.TODO(), oq.destination, invite.Unwrap()); err != nil {
+			// TODO: Get the correct stripped state here
+			inviteReq, err := gomatrixserverlib.NewInviteV2Request(
+				invite,
+				[]gomatrixserverlib.InviteV2StrippedState{},
+			)
+			if err != nil {
 				log.WithFields(log.Fields{
 					"event_id":    invite.EventID(),
 					"state_key":   invite.StateKey(),
 					"destination": oq.destination,
-				}).Info("failed to send invite")
+				}).WithError(err).Error("failed to create invite request")
+				continue
+			}
+
+			ev := inviteReq.Event()
+			log.WithFields(log.Fields{
+				"event_id":     ev.EventID(),
+				"state_key":    ev.StateKey(),
+				"room_version": inviteReq.RoomVersion(),
+			}).WithError(err).Info("created invite request")
+
+			if _, err := oq.client.SendInviteV2(
+				context.TODO(),
+				oq.destination,
+				inviteReq,
+			); err != nil {
+				log.WithFields(log.Fields{
+					"event_id":    invite.EventID(),
+					"state_key":   invite.StateKey(),
+					"destination": oq.destination,
+				}).WithError(err).Error("failed to send invite")
 			}
 		}
 		oq.pendingInvites = oq.pendingInvites[:0]

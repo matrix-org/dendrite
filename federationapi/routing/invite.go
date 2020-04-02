@@ -42,17 +42,7 @@ func Invite(
 			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
 		}
 	}
-
-	// In v2, the room_version field is mandatory.
-	// https://matrix.org/docs/spec/server_server/r0.1.3#put-matrix-federation-v2-invite-roomid-eventid
-	// Decode the event JSON from the request.
-	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(inviteReq.Event(), inviteReq.RoomVersion())
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
-		}
-	}
+	event := inviteReq.Event()
 
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
@@ -95,7 +85,7 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = producer.SendInvite(httpReq.Context(), signedEvent); err != nil {
+	if err = producer.SendInvite(httpReq.Context(), signedEvent.Headered(inviteReq.RoomVersion())); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
 		return jsonerror.InternalServerError()
 	}

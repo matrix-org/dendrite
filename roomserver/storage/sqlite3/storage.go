@@ -486,6 +486,12 @@ type roomRecentEventsUpdater struct {
 	currentStateSnapshotNID types.StateSnapshotNID
 }
 
+// RoomVersion implements types.RoomRecentEventsUpdater
+func (u *roomRecentEventsUpdater) RoomVersion() (version gomatrixserverlib.RoomVersion) {
+	version, _ = u.d.GetRoomVersionForRoomNID(u.ctx, u.roomNID)
+	return
+}
+
 // LatestEvents implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) LatestEvents() []types.StateAtEventAndReference {
 	return u.latestEvents

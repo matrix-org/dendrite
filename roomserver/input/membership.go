@@ -112,7 +112,7 @@ func updateMembership(
 
 	switch newMembership {
 	case gomatrixserverlib.Invite:
-		return updateToInviteMembership(mu, add, updates)
+		return updateToInviteMembership(mu, add, updates, updater.RoomVersion())
 	case gomatrixserverlib.Join:
 		return updateToJoinMembership(mu, add, updates)
 	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
@@ -126,6 +126,7 @@ func updateMembership(
 
 func updateToInviteMembership(
 	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
 	// We may have already sent the invite to the user, either because we are
 	// reprocessing this event, or because the we received this invite from a
@@ -136,7 +137,6 @@ func updateToInviteMembership(
 		return nil, err
 	}
 	if needsSending {
-		roomVersion := gomatrixserverlib.RoomVersionV1
 		// We notify the consumers using a special event even though we will
 		// notify them about the change in current state as part of the normal
 		// room event stream. This ensures that the consumers only have to
