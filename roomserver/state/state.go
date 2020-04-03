@@ -681,6 +681,12 @@ func (v StateResolution) calculateStateAfterManyEvents(
 	return
 }
 
+// ResolveConflictsAdhoc is a helper function to assist the query API in
+// performing state resolution when requested. This is a different code
+// path to the rest of state.go because this assumes you already have
+// gomatrixserverlib.Event objects and not just a bunch of NIDs like
+// elsewhere in the state resolution.
+// TODO: Some of this can possibly be deduplicated
 func ResolveConflictsAdhoc(
 	version gomatrixserverlib.RoomVersion,
 	events []gomatrixserverlib.Event,
@@ -720,6 +726,7 @@ func ResolveConflictsAdhoc(
 		resolved = gomatrixserverlib.ResolveStateConflicts(conflicted, authEvents)
 		resolved = append(resolved, notConflicted...)
 	case gomatrixserverlib.StateResV2:
+		// TODO: auth difference here?
 		resolved = gomatrixserverlib.ResolveStateConflictsV2(conflicted, notConflicted, authEvents, authEvents)
 	default:
 		return nil, errors.New("unsupported state resolution algorithm")
