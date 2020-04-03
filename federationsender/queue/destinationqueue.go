@@ -112,6 +112,11 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
 
+	if len(oq.pendingEvents) == 0 && len(oq.pendingEDUs) == 0 && len(oq.pendingInvites) == 0 {
+		oq.running = false
+		return nil
+	}
+
 	if len(oq.pendingInvites) > 0 {
 		for _, inviteReq := range oq.pendingInvites {
 			ev := inviteReq.Event()
@@ -129,11 +134,6 @@ func (oq *destinationQueue) next() *gomatrixserverlib.Transaction {
 			}
 		}
 		oq.pendingInvites = oq.pendingInvites[:0]
-	}
-
-	if len(oq.pendingEvents) == 0 && len(oq.pendingEDUs) == 0 {
-		oq.running = false
-		return nil
 	}
 
 	t := gomatrixserverlib.Transaction{
