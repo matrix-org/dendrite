@@ -15,18 +15,17 @@
 package routing
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-// Invite implements /_matrix/federation/v1/invite/{roomID}/{eventID}
+// Invite implements /_matrix/federation/v2/invite/{roomID}/{eventID}
 func Invite(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -36,24 +35,14 @@ func Invite(
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
-	// Look up the room version for the room.
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := producer.QueryAPI.QueryRoomVersionForRoom(context.Background(), &verReq, &verRes); err != nil {
+	inviteReq := gomatrixserverlib.InviteV2Request{}
+	if err := json.Unmarshal(request.Content(), &inviteReq); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
 		}
 	}
-
-	// Decode the event JSON from the request.
-	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
-		}
-	}
+	event := inviteReq.Event()
 
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
@@ -68,14 +57,6 @@ func Invite(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the invite event JSON"),
-		}
-	}
-
-	// Check that the event is from the server sending the request.
-	if event.Origin() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The invite must be sent by the server it originated on"),
 		}
 	}
 
@@ -104,7 +85,11 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = producer.SendInvite(httpReq.Context(), signedEvent); err != nil {
+	if err = producer.SendInvite(
+		httpReq.Context(),
+		signedEvent.Headered(inviteReq.RoomVersion()),
+		inviteReq.InviteRoomState(),
+	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
 		return jsonerror.InternalServerError()
 	}

@@ -231,3 +231,4 @@ remote user can join room with version 2
 User can invite local user to room with version 2
 Remote user can backfill in a room with version 2
 Inbound federation accepts attempts to join v2 rooms from servers with support
+Outbound federation can send invites via v2 API
