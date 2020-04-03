@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
@@ -58,12 +59,12 @@ const FederationSenderQueryJoinedHostsInRoomPath = "/api/federationsender/queryJ
 const FederationSenderQueryJoinedHostServerNamesInRoomPath = "/api/federationsender/queryJoinedHostServerNamesInRoom"
 
 // NewFederationSenderQueryAPIHTTP creates a FederationSenderQueryAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil then it uses the http.DefaultClient
-func NewFederationSenderQueryAPIHTTP(federationSenderURL string, httpClient *http.Client) FederationSenderQueryAPI {
+// If httpClient is nil an error is returned
+func NewFederationSenderQueryAPIHTTP(federationSenderURL string, httpClient *http.Client) (FederationSenderQueryAPI, error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		return nil, errors.New("NewFederationSenderQueryAPIHTTP: httpClient is <nil>")
 	}
-	return &httpFederationSenderQueryAPI{federationSenderURL, httpClient}
+	return &httpFederationSenderQueryAPI{federationSenderURL, httpClient}, nil
 }
 
 type httpFederationSenderQueryAPI struct {
