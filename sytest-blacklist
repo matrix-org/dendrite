@@ -32,3 +32,6 @@ Alias creators can delete canonical alias with no ops
 # Blacklisted because we need to implement v2 invite endpoints for room versions
 # to be supported (currently fails with M_UNSUPPORTED_ROOM_VERSION) 
 Inbound federation rejects invites which are not signed by the sender
+
+# Blacklisted due to flakiness
+Regular users can add and delete aliases when m.room.aliases is restricted

@@ -1,6 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
+	git.sr.ht/~fnux/yggdrasil-go-coap v0.0.0-20191202152715-614f652b70b2 // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/lib/pq v1.2.0
@@ -23,9 +24,8 @@ require (
 	github.com/tidwall/pretty v1.0.1 // indirect
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible
-	go.uber.org/atomic v1.6.0 // indirect
+	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200115085410-6d4e4cb37c7d
-	golang.org/x/net v0.0.0-20190909003024-a7b16738d86b // indirect
 	gopkg.in/Shopify/sarama.v1 v1.20.1
 	gopkg.in/h2non/bimg.v1 v1.0.18
 	gopkg.in/yaml.v2 v2.2.5
