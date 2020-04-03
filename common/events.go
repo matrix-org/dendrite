@@ -127,8 +127,8 @@ func AddPrevEventsToEvent(
 
 // truncateAuthAndPrevEvents limits the number of events we add into
 // an event as prev_events or auth_events.
-// The limits here feel a bit arbitrary but they are currently here
-// because of https://github.com/matrix-org/matrix-doc/issues/2307
+// NOTSPEC: The limits here feel a bit arbitrary but they are currently
+// here because of https://github.com/matrix-org/matrix-doc/issues/2307
 // and because Synapse will just drop events that don't comply.
 func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
 	truncAuth, truncPrev []gomatrixserverlib.EventReference,
