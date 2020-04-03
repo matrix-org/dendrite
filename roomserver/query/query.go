@@ -736,6 +736,14 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 		return err
 	}
 
+	if request.ResolveState {
+		if stateEvents, err = state.ResolveConflictsAdhoc(
+			roomVersion, stateEvents, authEvents,
+		); err != nil {
+			return err
+		}
+	}
+
 	for _, event := range stateEvents {
 		response.StateEvents = append(response.StateEvents, event.Headered(roomVersion))
 	}

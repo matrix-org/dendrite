@@ -186,6 +186,7 @@ func SendJoin(
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
+		ResolveState: true,
 	}, &stateAndAuthChainResponse)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryStateAndAuthChain failed")

@@ -681,6 +681,53 @@ func (v StateResolution) calculateStateAfterManyEvents(
 	return
 }
 
+func ResolveConflictsAdhoc(
+	version gomatrixserverlib.RoomVersion,
+	events []gomatrixserverlib.Event,
+	authEvents []gomatrixserverlib.Event,
+) ([]gomatrixserverlib.Event, error) {
+	type stateKeyTuple struct {
+		Type     string
+		StateKey *string
+	}
+
+	eventMap := make(map[stateKeyTuple][]gomatrixserverlib.Event)
+	var conflicted, notConflicted, resolved []gomatrixserverlib.Event
+
+	for _, event := range events {
+		tuple := stateKeyTuple{event.Type(), event.StateKey()}
+		if _, ok := eventMap[tuple]; ok {
+			eventMap[tuple] = append(eventMap[tuple], event)
+		} else {
+			eventMap[tuple] = []gomatrixserverlib.Event{event}
+		}
+	}
+
+	for _, list := range eventMap {
+		if len(list) > 1 {
+			conflicted = append(conflicted, list...)
+		} else {
+			notConflicted = append(notConflicted, list...)
+		}
+	}
+
+	stateResAlgo, err := version.StateResAlgorithm()
+	if err != nil {
+		return nil, err
+	}
+	switch stateResAlgo {
+	case gomatrixserverlib.StateResV1:
+		resolved = gomatrixserverlib.ResolveStateConflicts(conflicted, authEvents)
+		resolved = append(resolved, notConflicted...)
+	case gomatrixserverlib.StateResV2:
+		resolved = gomatrixserverlib.ResolveStateConflictsV2(conflicted, notConflicted, authEvents, authEvents)
+	default:
+		return nil, errors.New("unsupported state resolution algorithm")
+	}
+
+	return resolved, nil
+}
+
 func (v StateResolution) resolveConflicts(
 	ctx context.Context, version gomatrixserverlib.RoomVersion,
 	notConflicted, conflicted []types.StateEntry,
