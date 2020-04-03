@@ -145,13 +145,15 @@ def print_stats(header_name, gid_to_tests, gid_to_name):
         total_tests += group_total
         total_passing += group_passing
         pct = "{0:.0f}%".format(group_passing/group_total * 100)
-        line = "%s: %s (%d/%d tests)" % (gid_to_name[gid].rjust(30, ' '), pct.rjust(4, ' '), group_passing, group_total)
+        line = "%s: %s (%d/%d tests)" % (gid_to_name[gid].rjust(25, ' '), pct.rjust(4, ' '), group_passing, group_total)
         subsections.append(line)
     
     pct = "{0:.0f}%".format(total_passing/total_tests * 100)
     print("%s: %s (%d/%d tests)" % (header_name, pct, total_passing, total_tests))
+    print("-" * (len(header_name)+1))
     for line in subsections:
         print("  %s" % (line,))
+    print("")
 
 def main(results_tap_path):
     # Load up test mappings
@@ -207,6 +209,9 @@ def main(results_tap_path):
                 group[name] = test_result["ok"]
                 summary["client"][group_id] = group
 
+    print("Are We Synapse Yet?")
+    print("===================")
+    print("")
     print_stats("Non-Spec APIs", summary["nonspec"], test_mappings)
     print_stats("Client-Server APIs", summary["client"], test_mappings["client_apis"])
     print_stats("Federation APIs", summary["federation"], test_mappings["federation_apis"])
