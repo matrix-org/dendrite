@@ -239,3 +239,4 @@ local user can join room with version 4
 remote user can join room with version 4
 Remote user can backfill in a room with version 4
 Ignore invite in incremental sync
+Outbound federation can send invites via v2 API

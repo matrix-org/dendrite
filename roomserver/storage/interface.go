@@ -41,7 +41,7 @@ type Database interface {
 	GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error)
 	GetCreatorIDForAlias(ctx context.Context, alias string) (string, error)
 	RemoveRoomAlias(ctx context.Context, alias string) error
-	MembershipUpdater(ctx context.Context, roomID, targetUserID string) (types.MembershipUpdater, error)
+	MembershipUpdater(ctx context.Context, roomID, targetUserID string, roomVersion gomatrixserverlib.RoomVersion) (types.MembershipUpdater, error)
 	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error)
 	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error)
 	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
