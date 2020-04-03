@@ -101,8 +101,8 @@ func (oq *destinationQueue) backgroundSend() {
 }
 
 // nextTransaction creates a new transaction from the pending event
-// queue and sends it.
-// Returns nil if the queue was empty.
+// queue and sends it. Returns true if a transaction was sent or
+// false otherwise.
 func (oq *destinationQueue) nextTransaction() bool {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
@@ -154,6 +154,8 @@ func (oq *destinationQueue) nextTransaction() bool {
 	return true
 }
 
+// nextInvite takes pending invite events from the queue and sends
+// them. Returns true if a transaction was sent or false otherwise.
 func (oq *destinationQueue) nextInvites() bool {
 	oq.runningMutex.Lock()
 	defer oq.runningMutex.Unlock()
