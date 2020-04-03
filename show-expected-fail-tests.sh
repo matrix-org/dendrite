@@ -60,7 +60,7 @@ while read -r test_name; do
 	# Ignore empty lines
 	[ "${test_name}" = "" ] && continue
 
-	grep "${test_name}" "${whitelist_file}" > /dev/null 2>&1
+	grep "^${test_name}" "${whitelist_file}" > /dev/null 2>&1
 	if [ "$?" != "0" ]; then
 		# Check if this test name is blacklisted
 		if printf '%s\n' "${blacklisted_tests[@]}" | grep -q -P "^${test_name}$"; then
@@ -80,8 +80,8 @@ done <<< "${passed_but_expected_fail}"
 # TODO: Check that the same test doesn't appear twice in the whitelist|blacklist
 
 # Trim test output strings
-tests_to_add=$(echo -e $tests_to_add | xargs)
-already_in_whitelist=$(echo -e $already_in_whitelist | xargs)
+tests_to_add=$(echo -e $tests_to_add | xargs -d '\n')
+already_in_whitelist=$(echo -e $already_in_whitelist | xargs -d '\n')
 
 # Format output with markdown for buildkite annotation rendering purposes
 if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
