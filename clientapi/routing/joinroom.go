@@ -323,14 +323,14 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, supportedVersions)
 	if err != nil {
 		// TODO: Check if the user was not allowed to join the room.
-		return nil, err
+		return nil, fmt.Errorf("r.federation.MakeJoin: %w", err)
 	}
 
 	// Set all the fields to be what they should be, this should be a no-op
 	// but it's possible that the remote server returned us something "odd"
 	err = r.writeToBuilder(&respMakeJoin.JoinEvent, roomID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("r.writeToBuilder: %w", err)
 	}
 
 	if respMakeJoin.RoomVersion == "" {
@@ -350,18 +350,16 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		r.cfg.Matrix.PrivateKey, respMakeJoin.RoomVersion,
 	)
 	if err != nil {
-		util.GetLogger(r.req.Context()).WithError(err).Error("respMakeJoin.JoinEvent.Build failed")
-		res := jsonerror.InternalServerError()
-		return &res, nil
+		return nil, fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
 	}
 
 	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event, respMakeJoin.RoomVersion)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
 
 	if err = respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("respSendJoin: %w", err)
 	}
 
 	if err = r.producer.SendEventWithState(
@@ -369,9 +367,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		gomatrixserverlib.RespState(respSendJoin.RespState),
 		event.Headered(respMakeJoin.RoomVersion),
 	); err != nil {
-		util.GetLogger(r.req.Context()).WithError(err).Error("gomatrixserverlib.RespState failed")
-		res := jsonerror.InternalServerError()
-		return &res, nil
+		return nil, fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}
 
 	return &util.JSONResponse{
