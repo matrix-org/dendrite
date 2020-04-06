@@ -242,6 +242,9 @@ func (r joinRoomReq) joinRoomUsingServers(
 	queryRes := roomserverAPI.QueryLatestEventsAndStateResponse{}
 	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.queryAPI, &queryRes)
 	if err == nil {
+		// If we have successfully built an event at this point then we can
+		// assert that the room is a local room, as BuildEvent was able to
+		// add prev_events etc successfully.
 		if _, err = r.producer.SendEvents(
 			r.req.Context(),
 			[]gomatrixserverlib.HeaderedEvent{
@@ -260,6 +263,10 @@ func (r joinRoomReq) joinRoomUsingServers(
 			}{roomID},
 		}
 	}
+
+	// Otherwise, if we've reached here, then we haven't been able to populate
+	// prev_events etc for the room, therefore the room is probably federated.
+
 	// TODO: This needs to be re-thought, as in the case of an invite, the room
 	// will exist in the database in roomserver_rooms but won't have any state
 	// events, therefore this below check fails.

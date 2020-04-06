@@ -17,6 +17,7 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/common/config"
@@ -46,6 +47,7 @@ func BuildEvent(
 
 	err := AddPrevEventsToEvent(ctx, builder, queryAPI, queryRes)
 	if err != nil {
+		// This can pass through a ErrRoomNoExists to the caller
 		return nil, err
 	}
 
@@ -68,7 +70,7 @@ func AddPrevEventsToEvent(
 ) error {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
-		return err
+		return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
 	}
 
 	// Ask the roomserver for information about this room
@@ -77,7 +79,7 @@ func AddPrevEventsToEvent(
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
-		return err
+		return fmt.Errorf("queryAPI.QueryLatestEventsAndState: %w", err)
 	}
 
 	if !queryRes.RoomExists {
@@ -86,7 +88,7 @@ func AddPrevEventsToEvent(
 
 	eventFormat, err := queryRes.RoomVersion.EventFormat()
 	if err != nil {
-		return err
+		return fmt.Errorf("queryRes.RoomVersion.EventFormat: %w", err)
 	}
 
 	builder.Depth = queryRes.Depth
@@ -96,13 +98,13 @@ func AddPrevEventsToEvent(
 	for i := range queryRes.StateEvents {
 		err = authEvents.AddEvent(&queryRes.StateEvents[i].Event)
 		if err != nil {
-			return err
+			return fmt.Errorf("authEvents.AddEvent: %w", err)
 		}
 	}
 
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
 	if err != nil {
-		return err
+		return fmt.Errorf("eventsNeeded.AuthEventReferences: %w", err)
 	}
 
 	truncAuth, truncPrev := truncateAuthAndPrevEvents(refs, queryRes.LatestEvents)

@@ -132,7 +132,7 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return err
 	}
 
-	// Look up the currrent state for the requested tuples.
+	// Look up the current state for the requested tuples.
 	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
 		ctx, currentStateSnapshotNID, request.StateToFetch,
 	)
