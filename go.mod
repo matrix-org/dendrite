@@ -25,7 +25,7 @@ require (
 	github.com/uber/jaeger-lib v2.2.0+incompatible
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200115085410-6d4e4cb37c7d
-	golang.org/x/net v0.0.0-20191021144547-ec77196f6094 // indirect
+	golang.org/x/tools v0.0.0-20200402223321-bcf690261a44 // indirect
 	gopkg.in/Shopify/sarama.v1 v1.20.1
 	gopkg.in/h2non/bimg.v1 v1.0.18
 	gopkg.in/yaml.v2 v2.2.5
