@@ -204,6 +204,7 @@ type QueryStateAndAuthChainRequest struct {
 	// The list of auth events for the event. Used to calculate the auth chain
 	AuthEventIDs []string `json:"auth_event_ids"`
 	// Should state resolution be ran on the result events?
+	// TODO: check call sites and remove if we always want to do state res
 	ResolveState bool `json:"resolve_state"`
 }
 
