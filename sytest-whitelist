@@ -238,5 +238,6 @@ User can create and send/receive messages in a room with version 4
 local user can join room with version 4
 remote user can join room with version 4
 Remote user can backfill in a room with version 4
-Ignore invite in incremental sync
+# We don't support ignores yet, so ignore this for now - ha ha.
+# Ignore invite in incremental sync
 Outbound federation can send invites via v2 API
