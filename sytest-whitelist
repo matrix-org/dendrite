@@ -224,6 +224,7 @@ Remote user can backfill in a room with version 1
 POST /createRoom creates a room with the given version
 POST /createRoom rejects attempts to create rooms with numeric versions
 POST /createRoom rejects attempts to create rooms with unknown versions
+Regular users can add and delete aliases when m.room.aliases is restricted
 User can create and send/receive messages in a room with version 2
 local user can join room with version 2
 remote user can join room with version 2
