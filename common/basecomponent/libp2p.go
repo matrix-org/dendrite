@@ -3,7 +3,7 @@ package basecomponent
 import (
 	"errors"
 
-	pstore "github.com/libp2p/go-libp2p-peerstore"
+	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 	record "github.com/libp2p/go-libp2p-record"
 )
 

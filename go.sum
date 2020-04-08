@@ -248,8 +248,6 @@ github.com/libp2p/go-libp2p-discovery v0.2.0 h1:1p3YSOq7VsgaL+xVHPi8XAmtGyas6D2J
 github.com/libp2p/go-libp2p-discovery v0.2.0/go.mod h1:s4VGaxYMbw4+4+tsoQTqh7wfxg97AEdo4GYBt6BadWg=
 github.com/libp2p/go-libp2p-gostream v0.2.1 h1:JjA9roGokaR2BgWmaI/3HQu1/+jSbVVDLatQGnVdGjI=
 github.com/libp2p/go-libp2p-gostream v0.2.1/go.mod h1:1Mjp3LDmkqICe5tH9yLVNCqFaRTy6OwBvuJV6j1b9Nk=
-github.com/libp2p/go-libp2p-host v0.1.0 h1:OZwENiFm6JOK3YR5PZJxkXlJE8a5u8g4YvAUrEV2MjM=
-github.com/libp2p/go-libp2p-host v0.1.0/go.mod h1:5+fWuLbDn8OxoxPN3CV0vsLe1hAKScSMbT84qRfxum8=
 github.com/libp2p/go-libp2p-http v0.1.5 h1:FfLnzjlEzV4/6UCXCpPXRYZNoGCfogqCFjd7eF0Jbm8=
 github.com/libp2p/go-libp2p-http v0.1.5/go.mod h1:2YfPjsQxUlBGFQl2u461unkQ7ukwiSs7NX2eSslOJiU=
 github.com/libp2p/go-libp2p-kad-dht v0.5.0 h1:kDMtCftpQOL2s84/dZmw5z4NmBe6ByeDLKpcn6TcyxU=

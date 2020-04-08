@@ -58,7 +58,9 @@ func NewPublicRoomsServerDatabase(dataSourceName string, pubsub *pubsub.PubSub) 
 		PublicRoomsServerDatabase: *pg,
 		foundRooms:                make(map[string]discoveredRoom),
 	}
-	if sub, err := pubsub.Subscribe("/matrix/publicRooms"); err == nil {
+	if topic, err := pubsub.Join("/matrix/publicRooms"); err != nil {
+		return nil, err
+	} else if sub, err := topic.Subscribe(); err == nil {
 		provider.subscription = sub
 		go provider.MaintenanceTimer()
 		go provider.FindRooms()
@@ -144,7 +146,9 @@ func (d *PublicRoomsServerDatabase) AdvertiseRooms() error {
 	advertised := 0
 	for _, room := range ourRooms {
 		if j, err := json.Marshal(room); err == nil {
-			if err := d.pubsub.Publish("/matrix/publicRooms", j); err != nil {
+			if topic, err := d.pubsub.Join("/matrix/publicRooms"); err != nil {
+				fmt.Println("Failed to subscribe to topic:", err)
+			} else if err := topic.Publish(context.TODO(), j); err != nil {
 				fmt.Println("Failed to publish public room:", err)
 			} else {
 				advertised++

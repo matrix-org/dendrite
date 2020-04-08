@@ -16,11 +16,11 @@ package main
 
 import (
 	"crypto/ed25519"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/user"
 
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	"github.com/matrix-org/dendrite/appservice"
@@ -45,19 +45,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const PrivateKeyFileName = ".dendrite-p2p-private"
-
 func main() {
-	filename := PrivateKeyFileName
-	if u, err := user.Current(); err == nil {
-		filename = fmt.Sprintf("%s/%s", u.HomeDir, PrivateKeyFileName)
-	}
+	instanceName := flag.String("name", "dendrite-p2p", "the name of this P2P demo instance")
+	flag.Parse()
 
+	filename := fmt.Sprintf("%s-private.key", *instanceName)
 	_, err := os.Stat(filename)
 	var privKey ed25519.PrivateKey
 	if os.IsNotExist(err) {
 		_, privKey, _ = ed25519.GenerateKey(nil)
-		if err := ioutil.WriteFile(filename, privKey, 0600); err != nil {
+		if err = ioutil.WriteFile(filename, privKey, 0600); err != nil {
 			fmt.Printf("Couldn't write private key to file '%s': %s\n", filename, err)
 		}
 	} else {
@@ -77,17 +74,19 @@ func main() {
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
 	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
 	cfg.Kafka.Topics.UserUpdates = "userUpdates"
-	cfg.Database.Account = config.DataSource("file:account.db")
-	cfg.Database.Device = config.DataSource("file:device.db")
-	cfg.Database.MediaAPI = config.DataSource("file:media_api.db")
-	cfg.Database.SyncAPI = config.DataSource("file:sync_api.db")
-	cfg.Database.RoomServer = config.DataSource("file:room_server.db")
-	cfg.Database.ServerKey = config.DataSource("file:server_key.db")
-	cfg.Database.FederationSender = config.DataSource("file:federation_sender.db")
-	cfg.Database.AppService = config.DataSource("file:app_service.db")
-	cfg.Database.PublicRoomsAPI = config.DataSource("file:public_rooms_api.db")
-	cfg.Database.Naffka = config.DataSource("file:naffka.db")
-	cfg.Derive()
+	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
+	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
+	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
+	cfg.Database.SyncAPI = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
+	cfg.Database.RoomServer = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
+	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
+	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
+	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
+	cfg.Database.PublicRoomsAPI = config.DataSource(fmt.Sprintf("file:%s-publicroomsa.db", *instanceName))
+	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
+	if err := cfg.Derive(); err != nil {
+		panic(err)
+	}
 
 	base := basecomponent.NewBaseDendrite(&cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
