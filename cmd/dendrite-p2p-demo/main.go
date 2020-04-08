@@ -38,6 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
 
@@ -69,7 +70,7 @@ func main() {
 	cfg := config.Dendrite{}
 	cfg.Matrix.ServerName = "p2p"
 	cfg.Matrix.PrivateKey = privKey
-	cfg.Matrix.KeyID = "ed25519:p2pdemo"
+	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))
 	cfg.Kafka.UseNaffka = true
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
