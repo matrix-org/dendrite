@@ -81,6 +81,9 @@ type BaseDendrite struct {
 	LibP2PPubsub  *pubsub.PubSub
 }
 
+// NewBaseDendrite creates a new instance to be used by a component.
+// The componentName is used for logging purposes, and should be a friendly name
+// of the compontent running, e.g. "SyncAPI"
 func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 	common.SetupStdLogging()
 	common.SetupHookLogging(cfg.Logging, componentName)
@@ -101,7 +104,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		}
 
 		//defaultIP6ListenAddr, _ := multiaddr.NewMultiaddr("/ip6/::/tcp/0")
-
 		var libp2pdht *dht.IpfsDHT
 		libp2p, err := libp2p.New(ctx,
 			libp2p.Identity(privKey),
@@ -113,7 +115,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 				if err != nil {
 					return nil, err
 				}
-				//libp2pdht.Validator = LibP2PValidator{}
+				libp2pdht.Validator = LibP2PValidator{}
 				r = libp2pdht
 				return
 			}),
