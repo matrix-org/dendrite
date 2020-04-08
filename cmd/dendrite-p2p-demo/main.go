@@ -15,8 +15,12 @@
 package main
 
 import (
-	"flag"
+	"crypto/ed25519"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"os/user"
 
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	"github.com/matrix-org/dendrite/appservice"
@@ -24,10 +28,10 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/mediaapi"
@@ -35,20 +39,57 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
 
+	"github.com/matrix-org/dendrite/eduserver/cache"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
-)
+const PrivateKeyFileName = ".dendrite-p2p-private"
 
 func main() {
-	cfg := basecomponent.ParseMonolithFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
+	filename := PrivateKeyFileName
+	if u, err := user.Current(); err == nil {
+		filename = fmt.Sprintf("%s/%s", u.HomeDir, PrivateKeyFileName)
+	}
+
+	_, err := os.Stat(filename)
+	var privKey ed25519.PrivateKey
+	if os.IsNotExist(err) {
+		_, privKey, _ = ed25519.GenerateKey(nil)
+		if err := ioutil.WriteFile(filename, privKey, 0600); err != nil {
+			fmt.Printf("Couldn't write private key to file '%s': %s\n", filename, err)
+		}
+	} else {
+		privKey, err = ioutil.ReadFile(filename)
+		if err != nil {
+			fmt.Printf("Couldn't read private key from file '%s': %s\n", filename, err)
+			_, privKey, _ = ed25519.GenerateKey(nil)
+		}
+	}
+
+	cfg := config.Dendrite{}
+	cfg.Matrix.ServerName = "p2p"
+	cfg.Matrix.PrivateKey = privKey
+	cfg.Matrix.KeyID = "ed25519:p2pdemo"
+	cfg.Kafka.UseNaffka = true
+	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
+	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
+	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
+	cfg.Kafka.Topics.UserUpdates = "userUpdates"
+	cfg.Database.Account = config.DataSource("file:account.db")
+	cfg.Database.Device = config.DataSource("file:device.db")
+	cfg.Database.MediaAPI = config.DataSource("file:media_api.db")
+	cfg.Database.SyncAPI = config.DataSource("file:sync_api.db")
+	cfg.Database.RoomServer = config.DataSource("file:room_server.db")
+	cfg.Database.ServerKey = config.DataSource("file:server_key.db")
+	cfg.Database.FederationSender = config.DataSource("file:federation_sender.db")
+	cfg.Database.AppService = config.DataSource("file:app_service.db")
+	cfg.Database.PublicRoomsAPI = config.DataSource("file:public_rooms_api.db")
+	cfg.Database.Naffka = config.DataSource("file:naffka.db")
+	cfg.Derive()
+
+	base := basecomponent.NewBaseDendrite(&cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -72,8 +113,8 @@ func main() {
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, query, federation, nil)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, query, federation, nil) // Check this later
+	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, &cfg)
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 
@@ -84,8 +125,9 @@ func main() {
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		logrus.Info("Listening on ", *httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(*httpBindAddr, nil))
+		httpBindAddr := ":8080"
+		logrus.Info("Listening on ", httpBindAddr)
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
 	}()
 	// Expose the matrix APIs also via libp2p
 	if base.LibP2P != nil {
@@ -101,13 +143,6 @@ func main() {
 			logrus.Fatal(http.Serve(listener, nil))
 		}()
 	}
-	// Handle HTTPS if certificate and key are provided
-	go func() {
-		if *certFile != "" && *keyFile != "" {
-			logrus.Info("Listening on ", *httpsBindAddr)
-			logrus.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, nil))
-		}
-	}()
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
 	select {}

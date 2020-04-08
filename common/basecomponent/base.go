@@ -15,14 +15,28 @@
 package basecomponent
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"time"
 
 	"golang.org/x/crypto/ed25519"
 
+	"github.com/libp2p/go-libp2p"
+	circuit "github.com/libp2p/go-libp2p-circuit"
+	"github.com/libp2p/go-libp2p-core/peer"
+	crypto "github.com/libp2p/go-libp2p-crypto"
+	routing "github.com/libp2p/go-libp2p-routing"
+
+	host "github.com/libp2p/go-libp2p-host"
+	p2phttp "github.com/libp2p/go-libp2p-http"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
@@ -57,11 +71,16 @@ type BaseDendrite struct {
 	Cfg           *config.Dendrite
 	KafkaConsumer sarama.Consumer
 	KafkaProducer sarama.SyncProducer
+
+	// Store our libp2p object so that we can make outgoing connections from it
+	// later
+	LibP2P        host.Host
+	LibP2PContext context.Context
+	LibP2PCancel  context.CancelFunc
+	LibP2PDHT     *dht.IpfsDHT
+	LibP2PPubsub  *pubsub.PubSub
 }
 
-// NewBaseDendrite creates a new instance to be used by a component.
-// The componentName is used for logging purposes, and should be a friendly name
-// of the compontent running, e.g. "SyncAPI"
 func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 	common.SetupStdLogging()
 	common.SetupHookLogging(cfg.Logging, componentName)
@@ -71,24 +90,75 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}
 
-	var kafkaConsumer sarama.Consumer
-	var kafkaProducer sarama.SyncProducer
-	if cfg.Kafka.UseNaffka {
-		kafkaConsumer, kafkaProducer = setupNaffka(cfg)
+	kafkaConsumer, kafkaProducer := setupKafka(cfg)
+
+	if cfg.Matrix.ServerName == "p2p" {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		privKey, err := crypto.UnmarshalEd25519PrivateKey(cfg.Matrix.PrivateKey[:])
+		if err != nil {
+			panic(err)
+		}
+
+		//defaultIP6ListenAddr, _ := multiaddr.NewMultiaddr("/ip6/::/tcp/0")
+
+		var libp2pdht *dht.IpfsDHT
+		libp2p, err := libp2p.New(ctx,
+			libp2p.Identity(privKey),
+			libp2p.DefaultListenAddrs,
+			//libp2p.ListenAddrs(defaultIP6ListenAddr),
+			libp2p.DefaultTransports,
+			libp2p.Routing(func(h host.Host) (r routing.PeerRouting, err error) {
+				libp2pdht, err = dht.New(ctx, h)
+				if err != nil {
+					return nil, err
+				}
+				//libp2pdht.Validator = LibP2PValidator{}
+				r = libp2pdht
+				return
+			}),
+			libp2p.EnableAutoRelay(),
+			libp2p.EnableRelay(circuit.OptHop),
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		libp2ppubsub, err := pubsub.NewFloodSub(context.Background(), libp2p, []pubsub.Option{
+			pubsub.WithMessageSigning(true),
+		}...)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("Our public key:", privKey.GetPublic())
+		fmt.Println("Our node ID:", libp2p.ID())
+		fmt.Println("Our addresses:", libp2p.Addrs())
+
+		cfg.Matrix.ServerName = gomatrixserverlib.ServerName(libp2p.ID().String())
+
+		return &BaseDendrite{
+			componentName: componentName,
+			tracerCloser:  closer,
+			Cfg:           cfg,
+			APIMux:        mux.NewRouter().UseEncodedPath(),
+			KafkaConsumer: kafkaConsumer,
+			KafkaProducer: kafkaProducer,
+			LibP2P:        libp2p,
+			LibP2PContext: ctx,
+			LibP2PCancel:  cancel,
+			LibP2PDHT:     libp2pdht,
+			LibP2PPubsub:  libp2ppubsub,
+		}
 	} else {
-		kafkaConsumer, kafkaProducer = setupKafka(cfg)
-	}
-
-	const defaultHTTPTimeout = 30 * time.Second
-
-	return &BaseDendrite{
-		componentName: componentName,
-		tracerCloser:  closer,
-		Cfg:           cfg,
-		APIMux:        mux.NewRouter().UseEncodedPath(),
-		httpClient:    &http.Client{Timeout: defaultHTTPTimeout},
-		KafkaConsumer: kafkaConsumer,
-		KafkaProducer: kafkaProducer,
+		return &BaseDendrite{
+			componentName: componentName,
+			tracerCloser:  closer,
+			Cfg:           cfg,
+			APIMux:        mux.NewRouter().UseEncodedPath(),
+			KafkaConsumer: kafkaConsumer,
+			KafkaProducer: kafkaProducer,
+		}
 	}
 }
 
@@ -184,6 +254,22 @@ func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to keys db")
 	}
+	if b.LibP2P != nil {
+		mdns := mDNSListener{
+			host:  b.LibP2P,
+			keydb: db,
+		}
+		serv, err := p2pdisc.NewMdnsService(
+			b.LibP2PContext,
+			b.LibP2P,
+			time.Second*10,
+			"_matrix-dendrite-p2p._tcp",
+		)
+		if err != nil {
+			panic(err)
+		}
+		serv.RegisterNotifee(&mdns)
+	}
 
 	return db
 }
@@ -191,9 +277,23 @@ func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
-	return gomatrixserverlib.NewFederationClient(
-		b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
-	)
+	if b.LibP2P != nil {
+		fmt.Println("Running in libp2p federation mode")
+		fmt.Println("Warning: Federation with non-libp2p homeservers will not work in this mode yet!")
+		tr := &http.Transport{}
+		tr.RegisterProtocol(
+			"matrix",
+			p2phttp.NewTransport(b.LibP2P, p2phttp.ProtocolOption("/matrix")),
+		)
+		return gomatrixserverlib.NewFederationClientWithTransport(
+			b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey, tr,
+		)
+	} else {
+		fmt.Println("Running in regular federation mode")
+		return gomatrixserverlib.NewFederationClient(
+			b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
+		)
+	}
 }
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
@@ -220,8 +320,50 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 	logrus.Infof("Stopped %s server on %s", b.componentName, addr)
 }
 
-// setupKafka creates kafka consumer/producer pair from the config.
+// setupKafka creates kafka consumer/producer pair from the config. Checks if
+// should use naffka.
 func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
+	if cfg.Kafka.UseNaffka {
+		var naffkaDB *naffka.DatabaseImpl
+		uri, err := url.Parse(string(cfg.Database.Naffka))
+		if err != nil {
+			panic(err)
+		}
+		switch uri.Scheme {
+		case "file":
+			db, err := sql.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka))
+			if err != nil {
+				logrus.WithError(err).Panic("Failed to open naffka database")
+			}
+
+			naffkaDB, err = naffka.NewSqliteDatabase(db)
+			if err != nil {
+				logrus.WithError(err).Panic("Failed to setup naffka database")
+			}
+		case "postgres":
+			fallthrough
+		default:
+			db, err := sql.Open("postgres", string(cfg.Database.Naffka))
+			if err != nil {
+				logrus.WithError(err).Panic("Failed to open naffka database")
+			}
+
+			naffkaDB, err = naffka.NewPostgresqlDatabase(db)
+			if err != nil {
+				logrus.WithError(err).Panic("Failed to setup naffka database")
+			}
+		}
+
+		naff, err := naffka.New(naffkaDB)
+		if err != nil {
+			panic(err)
+		}
+
+		//logrus.WithError(err).Panic("Failed to setup naffka")
+
+		return naff, naff
+	}
+
 	consumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start kafka consumer")
@@ -274,4 +416,42 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 	}
 
 	return naff, naff
+}
+
+type mDNSListener struct {
+	keydb keydb.Database
+	host  host.Host
+}
+
+func (n *mDNSListener) HandlePeerFound(p peer.AddrInfo) {
+	//fmt.Println("Found libp2p peer via mDNS:", p)
+	if err := n.host.Connect(context.Background(), p); err != nil {
+		fmt.Println("Error adding peer", p.ID.String(), "via mDNS:", err)
+	}
+	if pubkey, err := p.ID.ExtractPublicKey(); err == nil {
+		raw, _ := pubkey.Raw()
+		if err := n.keydb.StoreKeys(
+			context.Background(),
+			map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{
+				gomatrixserverlib.PublicKeyLookupRequest{
+					ServerName: gomatrixserverlib.ServerName(p.ID.String()),
+					KeyID:      "ed25519:p2pdemo",
+				}: gomatrixserverlib.PublicKeyLookupResult{
+					VerifyKey: gomatrixserverlib.VerifyKey{
+						Key: gomatrixserverlib.Base64String(raw),
+					},
+					ValidUntilTS: math.MaxUint64 >> 1,
+					ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
+				},
+			},
+		); err != nil {
+			fmt.Println("Failed to store keys:", err)
+		}
+	}
+	fmt.Println("Discovered", len(n.host.Peerstore().Peers())-1, "other libp2p peer(s):")
+	for _, peer := range n.host.Peerstore().Peers() {
+		if peer != n.host.ID() {
+			fmt.Println("-", peer)
+		}
+	}
 }

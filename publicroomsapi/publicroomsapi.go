@@ -35,7 +35,13 @@ func SetupPublicRoomsAPIComponent(
 	fedClient *gomatrixserverlib.FederationClient,
 	extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	var err error
+	var publicRoomsDB storage.Database
+	if base.LibP2P != nil {
+		publicRoomsDB, err = storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub)
+	} else {
+		publicRoomsDB, err = storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	}
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}

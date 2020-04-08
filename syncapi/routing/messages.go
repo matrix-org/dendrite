@@ -352,6 +352,54 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	return
 }
 
+// containsBackwardExtremity checks if a slice of StreamEvent contains a
+// backward extremity. It does so by selecting the earliest event in the slice
+// and by checking the presence in the database of all of its parent events, and
+// considers the event itself a backward extremity if at least one of the parent
+// events doesn't exist in the database.
+// Returns an error if there was an issue with talking to the database.
+//
+// This function is unused but currently set to nolint for now until we are
+// absolutely sure that the changes in matrix-org/dendrite#847 are behaving
+// properly.
+// nolint:unused
+func (r *messagesReq) containsBackwardExtremity(events []types.StreamEvent) (bool, error) {
+	// Select the earliest retrieved event.
+	var ev *types.StreamEvent
+	if r.backwardOrdering {
+		ev = &(events[len(events)-1])
+	} else {
+		ev = &(events[0])
+	}
+	// Get the earliest retrieved event's parents.
+	prevIDs := ev.PrevEventIDs()
+	prevs, err := r.db.Events(r.ctx, prevIDs)
+	if err != nil {
+		return false, nil
+	}
+	// Check if we have all of the events we requested. If not, it means we've
+	// reached a backward extremity.
+	var eventInDB bool
+	var id string
+	// Iterate over the IDs we used in the request.
+	for _, id = range prevIDs {
+		eventInDB = false
+		// Iterate over the events we got in response.
+		for _, ev := range prevs {
+			if ev.EventID() == id {
+				eventInDB = true
+			}
+		}
+		// One occurrence of one the event's parents not being present in the
+		// database is enough to say that the event is a backward extremity.
+		if !eventInDB {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // backfill performs a backfill request over the federation on another
 // homeserver in the room.
 // See: https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid

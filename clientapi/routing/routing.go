@@ -68,13 +68,15 @@ func Setup(
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: struct {
-					Versions []string `json:"versions"`
+					Versions         []string        `json:"versions"`
+					UnstableFeatures map[string]bool `json:"unstable_features"`
 				}{[]string{
 					"r0.0.1",
 					"r0.1.0",
 					"r0.2.0",
 					"r0.3.0",
-				}},
+				}, map[string]bool{},
+				},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
