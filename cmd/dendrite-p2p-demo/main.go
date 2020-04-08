@@ -47,6 +47,7 @@ import (
 
 func main() {
 	instanceName := flag.String("name", "dendrite-p2p", "the name of this P2P demo instance")
+	instancePort := flag.Int("port", 8080, "the port that the client API will listen on")
 	flag.Parse()
 
 	filename := fmt.Sprintf("%s-private.key", *instanceName)
@@ -124,7 +125,7 @@ func main() {
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		httpBindAddr := ":8080"
+		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
 		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
 	}()
