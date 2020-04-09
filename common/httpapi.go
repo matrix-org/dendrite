@@ -1,7 +1,11 @@
 package common
 
 import (
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -40,10 +44,46 @@ func MakeAuthAPI(
 func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		// Log outgoing response
+		ww := httptest.NewRecorder()
+		defer func() {
+			resp := ww.Result()
+			dump, err := httputil.DumpResponse(resp, true)
+			if err != nil {
+				util.GetLogger(req.Context()).Debug("Failed to dump outgoing response: %s", err)
+			} else {
+				strSlice := strings.Split(string(dump), "\n")
+				for _, s := range strSlice {
+					util.GetLogger(req.Context()).Debug(s)
+				}
+			}
+			// copy the response to the client
+			for hdr, vals := range resp.Header {
+				for _, val := range vals {
+					w.Header().Add(hdr, val)
+				}
+			}
+			w.WriteHeader(resp.StatusCode)
+			io.Copy(w, resp.Body)
+			resp.Body.Close()
+		}()
+
+		// Log incoming request
+		dump, err := httputil.DumpRequest(req, true)
+		if err != nil {
+			util.GetLogger(req.Context()).Debug("Failed to dump incoming request: %s", err)
+		} else {
+			strSlice := strings.Split(string(dump), "\n")
+			for _, s := range strSlice {
+				util.GetLogger(req.Context()).Debug(s)
+			}
+		}
+
 		span := opentracing.StartSpan(metricsName)
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
-		h.ServeHTTP(w, req)
+		h.ServeHTTP(ww, req)
+
 	}
 
 	return http.HandlerFunc(withSpan)
