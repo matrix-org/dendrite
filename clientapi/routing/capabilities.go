@@ -29,7 +29,7 @@ func GetCapabilities(
 	req *http.Request, queryAPI roomserverAPI.RoomserverQueryAPI,
 ) util.JSONResponse {
 	roomVersionsQueryReq := roomserverAPI.QueryRoomVersionCapabilitiesRequest{}
-	var roomVersionsQueryRes roomserverAPI.QueryRoomVersionCapabilitiesResponse
+	roomVersionsQueryRes := roomserverAPI.QueryRoomVersionCapabilitiesResponse{}
 	if err := queryAPI.QueryRoomVersionCapabilities(
 		req.Context(),
 		&roomVersionsQueryReq,

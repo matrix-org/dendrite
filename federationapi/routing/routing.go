@@ -198,7 +198,7 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/make_join/{roomID}/{userID}", common.MakeFedAPI(
+	v1fedmux.Handle("/make_join/{roomID}/{eventID}", common.MakeFedAPI(
 		"federation_make_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
@@ -206,14 +206,28 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			roomID := vars["roomID"]
-			userID := vars["userID"]
+			eventID := vars["eventID"]
+			queryVars := httpReq.URL.Query()
+			remoteVersions := []gomatrixserverlib.RoomVersion{}
+			if vers, ok := queryVars["ver"]; ok {
+				// The remote side supplied a ?=ver so use that to build up the list
+				// of supported room versions
+				for _, v := range vers {
+					remoteVersions = append(remoteVersions, gomatrixserverlib.RoomVersion(v))
+				}
+			} else {
+				// The remote side didn't supply a ?ver= so just assume that they only
+				// support room version 1, as per the spec
+				// https://matrix.org/docs/spec/server_server/r0.1.3#get-matrix-federation-v1-make-join-roomid-userid
+				remoteVersions = append(remoteVersions, gomatrixserverlib.RoomVersionV1)
+			}
 			return MakeJoin(
-				httpReq, request, cfg, query, roomID, userID,
+				httpReq, request, cfg, query, roomID, eventID, remoteVersions,
 			)
 		},
 	)).Methods(http.MethodGet)
 
-	v2fedmux.Handle("/send_join/{roomID}/{userID}", common.MakeFedAPI(
+	v2fedmux.Handle("/send_join/{roomID}/{eventID}", common.MakeFedAPI(
 		"federation_send_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
@@ -221,14 +235,14 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			roomID := vars["roomID"]
-			userID := vars["userID"]
+			eventID := vars["eventID"]
 			return SendJoin(
-				httpReq, request, cfg, query, producer, keys, roomID, userID,
+				httpReq, request, cfg, query, producer, keys, roomID, eventID,
 			)
 		},
 	)).Methods(http.MethodPut)
 
-	v1fedmux.Handle("/make_leave/{roomID}/{userID}", common.MakeFedAPI(
+	v1fedmux.Handle("/make_leave/{roomID}/{eventID}", common.MakeFedAPI(
 		"federation_make_leave", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
@@ -236,14 +250,14 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			roomID := vars["roomID"]
-			userID := vars["userID"]
+			eventID := vars["eventID"]
 			return MakeLeave(
-				httpReq, request, cfg, query, roomID, userID,
+				httpReq, request, cfg, query, roomID, eventID,
 			)
 		},
 	)).Methods(http.MethodGet)
 
-	v2fedmux.Handle("/send_leave/{roomID}/{userID}", common.MakeFedAPI(
+	v2fedmux.Handle("/send_leave/{roomID}/{eventID}", common.MakeFedAPI(
 		"federation_send_leave", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
@@ -251,9 +265,9 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			roomID := vars["roomID"]
-			userID := vars["userID"]
+			eventID := vars["eventID"]
 			return SendLeave(
-				httpReq, request, cfg, producer, keys, roomID, userID,
+				httpReq, request, cfg, producer, keys, roomID, eventID,
 			)
 		},
 	)).Methods(http.MethodPut)
