@@ -237,6 +237,7 @@ local user can join room with version 3
 Remote user can backfill in a room with version 3
 User can create and send/receive messages in a room with version 4
 local user can join room with version 4
+remote user can join room with version 3
 remote user can join room with version 4
 Remote user can backfill in a room with version 4
 # We don't support ignores yet, so ignore this for now - ha ha.
