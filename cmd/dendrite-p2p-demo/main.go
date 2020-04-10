@@ -87,7 +87,7 @@ func main() {
 	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Database.PublicRoomsAPI = config.DataSource(fmt.Sprintf("file:%s-publicroomsa.db", *instanceName))
 	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
-	if err := cfg.Derive(); err != nil {
+	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
 
