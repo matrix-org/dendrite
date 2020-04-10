@@ -18,7 +18,6 @@ import (
 	"flag"
 	"net/http"
 
-	gostream "github.com/libp2p/go-libp2p-gostream"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -87,20 +86,6 @@ func main() {
 		logrus.Info("Listening on ", *httpBindAddr)
 		logrus.Fatal(http.ListenAndServe(*httpBindAddr, nil))
 	}()
-	// Expose the matrix APIs also via libp2p
-	if base.LibP2P != nil {
-		go func() {
-			logrus.Info("Listening on libp2p host ID ", base.LibP2P.ID())
-			listener, err := gostream.Listen(base.LibP2P, "/matrix")
-			if err != nil {
-				panic(err)
-			}
-			defer func() {
-				logrus.Fatal(listener.Close())
-			}()
-			logrus.Fatal(http.Serve(listener, nil))
-		}()
-	}
 	// Handle HTTPS if certificate and key are provided
 	go func() {
 		if *certFile != "" && *keyFile != "" {
