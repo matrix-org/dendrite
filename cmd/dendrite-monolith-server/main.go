@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
+	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
 
@@ -71,7 +72,11 @@ func main() {
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, query, federation, nil)
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to public rooms db")
+	}
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, query, federation, nil)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
