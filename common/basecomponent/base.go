@@ -19,24 +19,20 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"net/url"
-	"time"
 
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
 	routing "github.com/libp2p/go-libp2p-core/routing"
 
 	host "github.com/libp2p/go-libp2p-core/host"
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
@@ -256,22 +252,6 @@ func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to keys db")
 	}
-	if b.LibP2P != nil {
-		mdns := mDNSListener{
-			host:  b.LibP2P,
-			keydb: db,
-		}
-		serv, err := p2pdisc.NewMdnsService(
-			b.LibP2PContext,
-			b.LibP2P,
-			time.Second*10,
-			"_matrix-dendrite-p2p._tcp",
-		)
-		if err != nil {
-			panic(err)
-		}
-		serv.RegisterNotifee(&mdns)
-	}
 
 	return db
 }
@@ -381,42 +361,4 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 	}
 
 	return naff, naff
-}
-
-type mDNSListener struct {
-	keydb keydb.Database
-	host  host.Host
-}
-
-func (n *mDNSListener) HandlePeerFound(p peer.AddrInfo) {
-	//fmt.Println("Found libp2p peer via mDNS:", p)
-	if err := n.host.Connect(context.Background(), p); err != nil {
-		fmt.Println("Error adding peer", p.ID.String(), "via mDNS:", err)
-	}
-	if pubkey, err := p.ID.ExtractPublicKey(); err == nil {
-		raw, _ := pubkey.Raw()
-		if err := n.keydb.StoreKeys(
-			context.Background(),
-			map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{
-				gomatrixserverlib.PublicKeyLookupRequest{
-					ServerName: gomatrixserverlib.ServerName(p.ID.String()),
-					KeyID:      "ed25519:p2pdemo",
-				}: gomatrixserverlib.PublicKeyLookupResult{
-					VerifyKey: gomatrixserverlib.VerifyKey{
-						Key: gomatrixserverlib.Base64String(raw),
-					},
-					ValidUntilTS: math.MaxUint64 >> 1,
-					ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-				},
-			},
-		); err != nil {
-			fmt.Println("Failed to store keys:", err)
-		}
-	}
-	fmt.Println("Discovered", len(n.host.Peerstore().Peers())-1, "other libp2p peer(s):")
-	for _, peer := range n.host.Peerstore().Peers() {
-		if peer != n.host.ID() {
-			fmt.Println("-", peer)
-		}
-	}
 }

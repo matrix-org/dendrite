@@ -21,8 +21,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 
 	gostream "github.com/libp2p/go-libp2p-gostream"
+	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -46,6 +48,35 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
+
+func createKeyDB(
+	base *basecomponent.BaseDendrite,
+) keydb.Database {
+	db, err := keydb.NewDatabase(
+		string(base.Cfg.Database.ServerKey),
+		base.Cfg.Matrix.ServerName,
+		base.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
+		base.Cfg.Matrix.KeyID,
+	)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to keys db")
+	}
+	mdns := mDNSListener{
+		host:  base.LibP2P,
+		keydb: db,
+	}
+	serv, err := p2pdisc.NewMdnsService(
+		base.LibP2PContext,
+		base.LibP2P,
+		time.Second*10,
+		"_matrix-dendrite-p2p._tcp",
+	)
+	if err != nil {
+		panic(err)
+	}
+	serv.RegisterNotifee(&mdns)
+	return db
+}
 
 func main() {
 	instanceName := flag.String("name", "dendrite-p2p", "the name of this P2P demo instance")
@@ -96,7 +127,7 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	keyDB := base.CreateKeyDB()
+	keyDB := createKeyDB(base)
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
