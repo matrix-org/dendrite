@@ -20,8 +20,6 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
-
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -146,7 +144,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 	if event.Type() != gomatrixserverlib.MRoomCreate {
 		return gomatrixserverlib.RoomVersion(""), nil
 	}
-	roomVersion = roomserverVersion.DefaultRoomVersion()
+	roomVersion = gomatrixserverlib.RoomVersionV1
 	var createContent gomatrixserverlib.CreateContent
 	// The m.room.create event contains an optional "room_version" key in
 	// the event content, so we need to unmarshal that first.
