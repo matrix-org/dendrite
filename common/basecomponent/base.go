@@ -30,7 +30,6 @@ import (
 	routing "github.com/libp2p/go-libp2p-core/routing"
 
 	host "github.com/libp2p/go-libp2p-core/host"
-	p2phttp "github.com/libp2p/go-libp2p-http"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/matrix-org/dendrite/common/keydb"
@@ -259,23 +258,9 @@ func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
-	if b.LibP2P != nil {
-		fmt.Println("Running in libp2p federation mode")
-		fmt.Println("Warning: Federation with non-libp2p homeservers will not work in this mode yet!")
-		tr := &http.Transport{}
-		tr.RegisterProtocol(
-			"matrix",
-			p2phttp.NewTransport(b.LibP2P, p2phttp.ProtocolOption("/matrix")),
-		)
-		return gomatrixserverlib.NewFederationClientWithTransport(
-			b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey, tr,
-		)
-	} else {
-		fmt.Println("Running in regular federation mode")
-		return gomatrixserverlib.NewFederationClient(
-			b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
-		)
-	}
+	return gomatrixserverlib.NewFederationClient(
+		b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
+	)
 }
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on

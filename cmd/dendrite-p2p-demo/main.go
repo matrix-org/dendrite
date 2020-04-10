@@ -24,6 +24,7 @@ import (
 	"time"
 
 	gostream "github.com/libp2p/go-libp2p-gostream"
+	p2phttp "github.com/libp2p/go-libp2p-http"
 	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
@@ -78,6 +79,21 @@ func createKeyDB(
 	return db
 }
 
+func createFederationClient(
+	base *basecomponent.BaseDendrite,
+) *gomatrixserverlib.FederationClient {
+	fmt.Println("Running in libp2p federation mode")
+	fmt.Println("Warning: Federation with non-libp2p homeservers will not work in this mode yet!")
+	tr := &http.Transport{}
+	tr.RegisterProtocol(
+		"matrix",
+		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
+	)
+	return gomatrixserverlib.NewFederationClientWithTransport(
+		base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey, tr,
+	)
+}
+
 func main() {
 	instanceName := flag.String("name", "dendrite-p2p", "the name of this P2P demo instance")
 	instancePort := flag.Int("port", 8080, "the port that the client API will listen on")
@@ -128,7 +144,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	keyDB := createKeyDB(base)
-	federation := base.CreateFederationClient()
+	federation := createFederationClient(base)
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
