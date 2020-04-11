@@ -19,15 +19,15 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/typingserver/api"
 	log "github.com/sirupsen/logrus"
 	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
-// OutputTypingEventConsumer consumes events that originated in the typing server.
+// OutputTypingEventConsumer consumes events that originated in the EDU server.
 type OutputTypingEventConsumer struct {
 	typingConsumer *common.ContinualConsumer
 	db             storage.Database
@@ -35,7 +35,7 @@ type OutputTypingEventConsumer struct {
 }
 
 // NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
-// Call Start() to begin consuming from the typing server.
+// Call Start() to begin consuming from the EDU server.
 func NewOutputTypingEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
@@ -60,7 +60,7 @@ func NewOutputTypingEventConsumer(
 	return s
 }
 
-// Start consuming from typing api
+// Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
 	s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
 		s.notifier.OnNewEvent(
@@ -78,7 +78,7 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 	var output api.OutputTypingEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("typing server output log: message parse failure")
+		log.WithError(err).Errorf("EDU server output log: message parse failure")
 		return nil
 	}
 
@@ -86,7 +86,7 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		"room_id": output.Event.RoomID,
 		"user_id": output.Event.UserID,
 		"typing":  output.Event.Typing,
-	}).Debug("received data from typing server")
+	}).Debug("received data from EDU server")
 
 	var typingPos types.StreamPosition
 	typingEvent := output.Event

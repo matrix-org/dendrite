@@ -18,15 +18,15 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/Shopify/sarama.v1"
 )
 
-// OutputTypingEventConsumer consumes events that originate in typing server.
+// OutputTypingEventConsumer consumes events that originate in EDU server.
 type OutputTypingEventConsumer struct {
 	consumer   *common.ContinualConsumer
 	db         storage.Database
@@ -34,7 +34,7 @@ type OutputTypingEventConsumer struct {
 	ServerName gomatrixserverlib.ServerName
 }
 
-// NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer. Call Start() to begin consuming from typing servers.
+// NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer. Call Start() to begin consuming from EDU servers.
 func NewOutputTypingEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
@@ -57,19 +57,30 @@ func NewOutputTypingEventConsumer(
 	return c
 }
 
-// Start consuming from typing servers
+// Start consuming from EDU servers
 func (t *OutputTypingEventConsumer) Start() error {
 	return t.consumer.Start()
 }
 
-// onMessage is called for OutputTypingEvent received from the typing servers.
+// onMessage is called for OutputTypingEvent received from the EDU servers.
 // Parses the msg, creates a matrix federation EDU and sends it to joined hosts.
 func (t *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Extract the typing event from msg.
 	var ote api.OutputTypingEvent
 	if err := json.Unmarshal(msg.Value, &ote); err != nil {
 		// Skip this msg but continue processing messages.
-		log.WithError(err).Errorf("typingserver output log: message parse failed")
+		log.WithError(err).Errorf("eduserver output log: message parse failed")
+		return nil
+	}
+
+	// only send typing events which originated from us
+	_, typingServerName, err := gomatrixserverlib.SplitID('@', ote.Event.UserID)
+	if err != nil {
+		log.WithError(err).WithField("user_id", ote.Event.UserID).Error("Failed to extract domain from typing sender")
+		return nil
+	}
+	if typingServerName != t.ServerName {
+		log.WithField("other_server", typingServerName).Info("Suppressing typing notif: originated elsewhere")
 		return nil
 	}
 

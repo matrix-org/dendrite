@@ -58,7 +58,7 @@ docker-compose up kafka zookeeper postgres
 and the following dendrite components 
 
 ```
-docker-compose up client_api media_api sync_api room_server public_rooms_api typing_server
+docker-compose up client_api media_api sync_api room_server public_rooms_api edu_server
 docker-compose up client_api_proxy
 ```
 

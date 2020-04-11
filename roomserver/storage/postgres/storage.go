@@ -393,6 +393,12 @@ type roomRecentEventsUpdater struct {
 	currentStateSnapshotNID types.StateSnapshotNID
 }
 
+// RoomVersion implements types.RoomRecentEventsUpdater
+func (u *roomRecentEventsUpdater) RoomVersion() (version gomatrixserverlib.RoomVersion) {
+	version, _ = u.d.GetRoomVersionForRoomNID(u.ctx, u.roomNID)
+	return
+}
+
 // LatestEvents implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) LatestEvents() []types.StateAtEventAndReference {
 	return u.latestEvents
@@ -534,6 +540,7 @@ func (d *Database) StateEntriesForTuples(
 // MembershipUpdater implements input.RoomEventDatabase
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) (types.MembershipUpdater, error) {
 	txn, err := d.db.Begin()
 	if err != nil {
@@ -546,8 +553,7 @@ func (d *Database) MembershipUpdater(
 		}
 	}()
 
-	// TODO: Room version here
-	roomNID, err := d.assignRoomNID(ctx, txn, roomID, "1")
+	roomNID, err := d.assignRoomNID(ctx, txn, roomID, roomVersion)
 	if err != nil {
 		return nil, err
 	}

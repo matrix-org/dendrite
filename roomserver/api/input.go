@@ -17,6 +17,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
@@ -85,7 +86,9 @@ type TransactionID struct {
 // the usual context a matrix room event would have. We usually do not have
 // access to the events needed to check the event auth rules for the invite.
 type InputInviteEvent struct {
-	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
+	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
+	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
 }
 
 // InputRoomEventsRequest is a request to InputRoomEvents
@@ -112,12 +115,12 @@ type RoomserverInputAPI interface {
 const RoomserverInputRoomEventsPath = "/api/roomserver/inputRoomEvents"
 
 // NewRoomserverInputAPIHTTP creates a RoomserverInputAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil then it uses the http.DefaultClient
-func NewRoomserverInputAPIHTTP(roomserverURL string, httpClient *http.Client) RoomserverInputAPI {
+// If httpClient is nil an error is returned
+func NewRoomserverInputAPIHTTP(roomserverURL string, httpClient *http.Client) (RoomserverInputAPI, error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		return nil, errors.New("NewRoomserverInputAPIHTTP: httpClient is <nil>")
 	}
-	return &httpRoomserverInputAPI{roomserverURL, httpClient}
+	return &httpRoomserverInputAPI{roomserverURL, httpClient}, nil
 }
 
 type httpRoomserverInputAPI struct {

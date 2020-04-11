@@ -43,12 +43,12 @@ var roomVersions = map[gomatrixserverlib.RoomVersion]RoomVersionDescription{
 		Stable:    true,
 	},
 	gomatrixserverlib.RoomVersionV3: RoomVersionDescription{
-		Supported: false,
-		Stable:    false,
+		Supported: true,
+		Stable:    true,
 	},
 	gomatrixserverlib.RoomVersionV4: RoomVersionDescription{
-		Supported: false,
-		Stable:    false,
+		Supported: true,
+		Stable:    true,
 	},
 	gomatrixserverlib.RoomVersionV5: RoomVersionDescription{
 		Supported: false,

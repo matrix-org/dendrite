@@ -15,6 +15,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
@@ -30,13 +31,13 @@ type InputTypingEvent struct {
 	RoomID string `json:"room_id"`
 	// Typing is true if the user is typing, false if they have stopped.
 	Typing bool `json:"typing"`
-	// Timeout is the interval for which the user should be marked as typing.
-	Timeout int64 `json:"timeout"`
+	// Timeout is the interval in milliseconds for which the user should be marked as typing.
+	TimeoutMS int64 `json:"timeout"`
 	// OriginServerTS when the server received the update.
 	OriginServerTS gomatrixserverlib.Timestamp `json:"origin_server_ts"`
 }
 
-// InputTypingEventRequest is a request to TypingServerInputAPI
+// InputTypingEventRequest is a request to EDUServerInputAPI
 type InputTypingEventRequest struct {
 	InputTypingEvent InputTypingEvent `json:"input_typing_event"`
 }
@@ -44,8 +45,8 @@ type InputTypingEventRequest struct {
 // InputTypingEventResponse is a response to InputTypingEvents
 type InputTypingEventResponse struct{}
 
-// TypingServerInputAPI is used to write events to the typing server.
-type TypingServerInputAPI interface {
+// EDUServerInputAPI is used to write events to the typing server.
+type EDUServerInputAPI interface {
 	InputTypingEvent(
 		ctx context.Context,
 		request *InputTypingEventRequest,
@@ -53,24 +54,24 @@ type TypingServerInputAPI interface {
 	) error
 }
 
-// TypingServerInputTypingEventPath is the HTTP path for the InputTypingEvent API.
-const TypingServerInputTypingEventPath = "/api/typingserver/input"
+// EDUServerInputTypingEventPath is the HTTP path for the InputTypingEvent API.
+const EDUServerInputTypingEventPath = "/api/eduserver/input"
 
-// NewTypingServerInputAPIHTTP creates a TypingServerInputAPI implemented by talking to a HTTP POST API.
-func NewTypingServerInputAPIHTTP(typingServerURL string, httpClient *http.Client) TypingServerInputAPI {
+// NewEDUServerInputAPIHTTP creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
+func NewEDUServerInputAPIHTTP(eduServerURL string, httpClient *http.Client) (EDUServerInputAPI, error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		return nil, errors.New("NewTypingServerInputAPIHTTP: httpClient is <nil>")
 	}
-	return &httpTypingServerInputAPI{typingServerURL, httpClient}
+	return &httpEDUServerInputAPI{eduServerURL, httpClient}, nil
 }
 
-type httpTypingServerInputAPI struct {
-	typingServerURL string
-	httpClient      *http.Client
+type httpEDUServerInputAPI struct {
+	eduServerURL string
+	httpClient   *http.Client
 }
 
-// InputRoomEvents implements TypingServerInputAPI
-func (h *httpTypingServerInputAPI) InputTypingEvent(
+// InputRoomEvents implements EDUServerInputAPI
+func (h *httpEDUServerInputAPI) InputTypingEvent(
 	ctx context.Context,
 	request *InputTypingEventRequest,
 	response *InputTypingEventResponse,
@@ -78,6 +79,6 @@ func (h *httpTypingServerInputAPI) InputTypingEvent(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "InputTypingEvent")
 	defer span.Finish()
 
-	apiURL := h.typingServerURL + TypingServerInputTypingEventPath
+	apiURL := h.eduServerURL + EDUServerInputTypingEventPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
