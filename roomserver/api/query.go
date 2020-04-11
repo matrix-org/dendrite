@@ -18,6 +18,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
@@ -202,6 +203,9 @@ type QueryStateAndAuthChainRequest struct {
 	PrevEventIDs []string `json:"prev_event_ids"`
 	// The list of auth events for the event. Used to calculate the auth chain
 	AuthEventIDs []string `json:"auth_event_ids"`
+	// Should state resolution be ran on the result events?
+	// TODO: check call sites and remove if we always want to do state res
+	ResolveState bool `json:"resolve_state"`
 }
 
 // QueryStateAndAuthChainResponse is a response to QueryStateAndAuthChain
@@ -406,12 +410,12 @@ const RoomserverQueryRoomVersionCapabilitiesPath = "/api/roomserver/queryRoomVer
 const RoomserverQueryRoomVersionForRoomPath = "/api/roomserver/queryRoomVersionForRoom"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil then it uses the http.DefaultClient
-func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client) RoomserverQueryAPI {
+// If httpClient is nil an error is returned
+func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client) (RoomserverQueryAPI, error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		return nil, errors.New("NewRoomserverQueryAPIHTTP: httpClient is <nil>")
 	}
-	return &httpRoomserverQueryAPI{roomserverURL, httpClient}
+	return &httpRoomserverQueryAPI{roomserverURL, httpClient}, nil
 }
 
 type httpRoomserverQueryAPI struct {

@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -34,6 +35,7 @@ func MakeJoin(
 	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	roomID, userID string,
+	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
@@ -41,6 +43,27 @@ func MakeJoin(
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
+		}
+	}
+
+	// Check that the room that the remote side is trying to join is actually
+	// one of the room versions that they listed in their supported ?ver= in
+	// the make_join URL.
+	// https://matrix.org/docs/spec/server_server/r0.1.3#get-matrix-federation-v1-make-join-roomid-userid
+	remoteSupportsVersion := false
+	for _, v := range remoteVersions {
+		if v == verRes.RoomVersion {
+			remoteSupportsVersion = true
+			break
+		}
+	}
+	// If it isn't, stop trying to join the room.
+	if !remoteSupportsVersion {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(
+				fmt.Sprintf("Joining server does not support room version %s", verRes.RoomVersion),
+			),
 		}
 	}
 
@@ -140,7 +163,12 @@ func SendJoin(
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the join event JSON"),
+			JSON: jsonerror.BadJSON(
+				fmt.Sprintf(
+					"The room ID in the request path (%q) must match the room ID in the join event JSON (%q)",
+					roomID, event.RoomID(),
+				),
+			),
 		}
 	}
 
@@ -148,7 +176,12 @@ func SendJoin(
 	if event.EventID() != eventID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the join event JSON"),
+			JSON: jsonerror.BadJSON(
+				fmt.Sprintf(
+					"The event ID in the request path (%q) must match the event ID in the join event JSON (%q)",
+					eventID, event.EventID(),
+				),
+			),
 		}
 	}
 
@@ -186,6 +219,7 @@ func SendJoin(
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
+		ResolveState: true,
 	}, &stateAndAuthChainResponse)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryStateAndAuthChain failed")

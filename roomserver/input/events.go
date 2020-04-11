@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
@@ -64,6 +65,7 @@ type RoomEventDatabase interface {
 	// Build a membership updater for the target user in a room.
 	MembershipUpdater(
 		ctx context.Context, roomID, targerUserID string,
+		roomVersion gomatrixserverlib.RoomVersion,
 	) (types.MembershipUpdater, error)
 	// Look up event ID by transaction's info.
 	// This is used to determine if the room event is processed/processing already.
@@ -193,7 +195,14 @@ func processInviteEvent(
 	roomID := input.Event.RoomID()
 	targetUserID := *input.Event.StateKey()
 
-	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID)
+	log.WithFields(log.Fields{
+		"event_id":       input.Event.EventID(),
+		"room_id":        roomID,
+		"room_version":   input.RoomVersion,
+		"target_user_id": targetUserID,
+	}).Info("processing invite event")
+
+	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID, input.RoomVersion)
 	if err != nil {
 		return err
 	}
@@ -237,7 +246,12 @@ func processInviteEvent(
 	}
 
 	event := input.Event.Unwrap()
-	outputUpdates, err := updateToInviteMembership(updater, &event, nil)
+
+	if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
+		return err
+	}
+
+	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
 	if err != nil {
 		return err
 	}

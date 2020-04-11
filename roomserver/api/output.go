@@ -116,6 +116,8 @@ type OutputNewRoomEvent struct {
 // Invite events can be received outside of an existing room so have to be
 // tracked separately from the room events themselves.
 type OutputNewInviteEvent struct {
+	// The room version of the invited room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The "m.room.member" invite event.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 }

@@ -18,7 +18,6 @@ package state
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -681,6 +680,83 @@ func (v StateResolution) calculateStateAfterManyEvents(
 	return
 }
 
+// ResolveConflictsAdhoc is a helper function to assist the query API in
+// performing state resolution when requested. This is a different code
+// path to the rest of state.go because this assumes you already have
+// gomatrixserverlib.Event objects and not just a bunch of NIDs like
+// elsewhere in the state resolution.
+// TODO: Some of this can possibly be deduplicated
+func ResolveConflictsAdhoc(
+	version gomatrixserverlib.RoomVersion,
+	events []gomatrixserverlib.Event,
+	authEvents []gomatrixserverlib.Event,
+) ([]gomatrixserverlib.Event, error) {
+	type stateKeyTuple struct {
+		Type     string
+		StateKey string
+	}
+
+	// Prepare our data structures.
+	eventMap := make(map[stateKeyTuple][]gomatrixserverlib.Event)
+	var conflicted, notConflicted, resolved []gomatrixserverlib.Event
+
+	// Run through all of the events that we were given and sort them
+	// into a map, sorted by (event_type, state_key) tuple. This means
+	// that we can easily spot events that are "conflicted", e.g.
+	// there are duplicate values for the same tuple key.
+	for _, event := range events {
+		if event.StateKey() == nil {
+			// Ignore events that are not state events.
+			continue
+		}
+		// Append the events if there is already a conflicted list for
+		// this tuple key, create it if not.
+		tuple := stateKeyTuple{event.Type(), *event.StateKey()}
+		if _, ok := eventMap[tuple]; ok {
+			eventMap[tuple] = append(eventMap[tuple], event)
+		} else {
+			eventMap[tuple] = []gomatrixserverlib.Event{event}
+		}
+	}
+
+	// Split out the events in the map into conflicted and unconflicted
+	// buckets. The conflicted events will be ran through state res,
+	// whereas unconfliced events will always going to appear in the
+	// final resolved state.
+	for _, list := range eventMap {
+		if len(list) > 1 {
+			conflicted = append(conflicted, list...)
+		} else {
+			notConflicted = append(notConflicted, list...)
+		}
+	}
+
+	// Work out which state resolution algorithm we want to run for
+	// the room version.
+	stateResAlgo, err := version.StateResAlgorithm()
+	if err != nil {
+		return nil, err
+	}
+	switch stateResAlgo {
+	case gomatrixserverlib.StateResV1:
+		// Currently state res v1 doesn't handle unconflicted events
+		// for us, like state res v2 does, so we will need to add the
+		// unconflicted events into the state ourselves.
+		// TODO: Fix state res v1 so this is handled for the caller.
+		resolved = gomatrixserverlib.ResolveStateConflicts(conflicted, authEvents)
+		resolved = append(resolved, notConflicted...)
+	case gomatrixserverlib.StateResV2:
+		// TODO: auth difference here?
+		resolved = gomatrixserverlib.ResolveStateConflictsV2(conflicted, notConflicted, authEvents, authEvents)
+	default:
+		return nil, fmt.Errorf("unsupported state resolution algorithm %v", stateResAlgo)
+	}
+
+	// Return the final resolved state events, including both the
+	// resolved set of conflicted events, and the unconflicted events.
+	return resolved, nil
+}
+
 func (v StateResolution) resolveConflicts(
 	ctx context.Context, version gomatrixserverlib.RoomVersion,
 	notConflicted, conflicted []types.StateEntry,
@@ -695,7 +771,7 @@ func (v StateResolution) resolveConflicts(
 	case gomatrixserverlib.StateResV2:
 		return v.resolveConflictsV2(ctx, notConflicted, conflicted)
 	}
-	return nil, errors.New("unsupported state resolution algorithm")
+	return nil, fmt.Errorf("unsupported state resolution algorithm %v", stateResAlgo)
 }
 
 // resolveConflicts resolves a list of conflicted state entries. It takes two lists.
