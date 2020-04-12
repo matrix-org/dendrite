@@ -36,7 +36,8 @@ type P2PDendrite struct {
 // The componentName is used for logging purposes, and should be a friendly name
 // of the component running, e.g. SyncAPI.
 func NewP2PDendrite(cfg *config.Dendrite, componentName string) *P2PDendrite {
-	// baseDendrite :=
+	baseDendrite := basecomponent.NewBaseDendrite(cfg, componentName)
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	privKey, err := crypto.UnmarshalEd25519PrivateKey(cfg.Matrix.PrivateKey[:])
@@ -79,8 +80,6 @@ func NewP2PDendrite(cfg *config.Dendrite, componentName string) *P2PDendrite {
 	fmt.Println("Our addresses:", libp2p.Addrs())
 
 	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(libp2p.ID().String())
-
-	baseDendrite := basecomponent.NewBaseDendrite(cfg, componentName)
 
 	return &P2PDendrite{
 		Base:          *baseDendrite,
