@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
@@ -51,13 +50,13 @@ import (
 )
 
 func createKeyDB(
-	base *basecomponent.BaseDendrite,
+	base *P2PDendrite,
 ) keydb.Database {
 	db, err := keydb.NewDatabase(
-		string(base.Cfg.Database.ServerKey),
-		base.Cfg.Matrix.ServerName,
-		base.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
-		base.Cfg.Matrix.KeyID,
+		string(base.Base.Cfg.Database.ServerKey),
+		base.Base.Cfg.Matrix.ServerName,
+		base.Base.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
+		base.Base.Cfg.Matrix.KeyID,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to keys db")
@@ -80,7 +79,7 @@ func createKeyDB(
 }
 
 func createFederationClient(
-	base *basecomponent.BaseDendrite,
+	base *P2PDendrite,
 ) *gomatrixserverlib.FederationClient {
 	fmt.Println("Running in libp2p federation mode")
 	fmt.Println("Warning: Federation with non-libp2p homeservers will not work in this mode yet!")
@@ -90,7 +89,7 @@ func createFederationClient(
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
 	return gomatrixserverlib.NewFederationClientWithTransport(
-		base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey, tr,
+		base.Base.Cfg.Matrix.ServerName, base.Base.Cfg.Matrix.KeyID, base.Base.Cfg.Matrix.PrivateKey, tr,
 	)
 }
 
@@ -138,38 +137,38 @@ func main() {
 		panic(err)
 	}
 
-	base := basecomponent.NewBaseDendrite(&cfg, "Monolith")
-	defer base.Close() // nolint: errcheck
+	base := NewP2PDendrite(&cfg, "Monolith")
+	defer base.Base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
+	accountDB := base.Base.CreateAccountsDB()
+	deviceDB := base.Base.CreateDeviceDB()
 	keyDB := createKeyDB(base)
 	federation := createFederationClient(base)
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
 
-	alias, input, query := roomserver.SetupRoomServerComponent(base)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
+	alias, input, query := roomserver.SetupRoomServerComponent(&base.Base)
+	eduInputAPI := eduserver.SetupEDUServerComponent(&base.Base, cache.New())
 	asQuery := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
+		&base.Base, accountDB, deviceDB, federation, alias, query, transactions.New(),
 	)
-	fedSenderAPI := federationsender.SetupFederationSenderComponent(base, federation, query)
+	fedSenderAPI := federationsender.SetupFederationSenderComponent(&base.Base, federation, query)
 
 	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
+		&base.Base, deviceDB, accountDB,
 		federation, &keyRing, alias, input, query,
 		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub)
+	federationapi.SetupFederationAPIComponent(&base.Base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI, eduProducer)
+	mediaapi.SetupMediaAPIComponent(&base.Base, deviceDB)
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, query, federation, nil) // Check this later
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, &cfg)
+	publicroomsapi.SetupPublicRoomsAPIComponent(&base.Base, deviceDB, publicRoomsDB, query, federation, nil) // Check this later
+	syncapi.SetupSyncAPIComponent(&base.Base, deviceDB, accountDB, query, federation, &cfg)
 
-	httpHandler := common.WrapHandlerInCORS(base.APIMux)
+	httpHandler := common.WrapHandlerInCORS(base.Base.APIMux)
 
 	// Set up the API endpoints we handle. /metrics is for prometheus, and is
 	// not wrapped by CORS, while everything else is

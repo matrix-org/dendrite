@@ -1,17 +1,20 @@
 module github.com/matrix-org/dendrite
 
 require (
+	github.com/Shopify/sarama v1.26.1
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/lib/pq v1.2.0
 	github.com/libp2p/go-libp2p v0.6.0
 	github.com/libp2p/go-libp2p-circuit v0.1.4
 	github.com/libp2p/go-libp2p-core v0.5.0
+	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-gostream v0.2.1
 	github.com/libp2p/go-libp2p-http v0.1.5
 	github.com/libp2p/go-libp2p-kad-dht v0.5.0
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
 	github.com/libp2p/go-libp2p-record v0.1.2
+	github.com/libp2p/go-libp2p-routing v0.1.0
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200318135427-31631a9ef51f
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200325174927-327088cdef10
@@ -36,7 +39,7 @@ require (
 	golang.org/x/tools v0.0.0-20200402223321-bcf690261a44 // indirect
 	gopkg.in/Shopify/sarama.v1 v1.20.1
 	gopkg.in/h2non/bimg.v1 v1.0.18
-	gopkg.in/yaml.v2 v2.2.5
+	gopkg.in/yaml.v2 v2.2.8
 )
 
 go 1.13

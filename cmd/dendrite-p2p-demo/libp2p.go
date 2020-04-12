@@ -1,4 +1,4 @@
-package basecomponent
+package main
 
 import (
 	"errors"
