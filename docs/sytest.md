@@ -20,18 +20,27 @@ You should proceed after you see no build problems for dendrite after running:
 ./build.sh
 ```
 
-### Using a SyTest Docker image
+### Using the SyTest Docker image
 
-Ensure you have the latest image for SyTest, then run the tests:
+Use the following commands to pull the latest SyTest image and run the tests:
 
 ```sh
 docker pull matrixdotorg/sytest-dendrite
-docker run --rm -v /path/to/dendrite/:/src/ matrixdotorg/sytest-dendrite
+docker run --rm -v /path/to/dendrite/:/src/ -v /path/to/log/output/:/logs/ matrixdotorg/sytest-dendrite
 ```
 
-where `/path/to/dendrite/` should be replaced with the actual path to your
-dendrite source code. The output should tell you if you need to add any tests to
-`sytest-whitelist`.
+`/path/to/dendrite/` should be replaced with the actual path to your dendrite
+source code. The test results TAP file and homeserver logging output will go to
+`/path/to/log/output`. The output of the command should tell you if you need to
+add any tests to `sytest-whitelist`.
+
+When debugging, the following Docker `run` options may also be useful:
+* `-v /path/to/sytest/:/sytest/`: Use your local SyTest repository at
+  `/path/to/sytest` instead of pulling from GitHub. This is useful when you want
+  to speed things up or make modifications to SyTest.
+* `--entrypoint bash`: Prevent the container from automatically starting the
+  tests.  When used, you need to manually run `/bootstrap.sh dendrite` inside
+  the container to start them.
 
 ### Manually Setting up SyTest
 
@@ -82,10 +91,12 @@ POSTGRES=1 ./run-tests.pl -I Dendrite::Monolith -d ../dendrite/bin -W ../dendrit
 
 where `tee` lets you see the results while they're being piped to the file, and
 `POSTGRES=1` enables testing with PostgeSQL. If the `POSTGRES` environment
-variable is not set or is set to 0, SyTest will fall back to SQLite 3.
+variable is not set or is set to 0, SyTest will fall back to SQLite 3. For more
+flags and options, see https://github.com/matrix-org/sytest#running.
 
 Once the tests are complete, run the helper script to see if you need to add
-any newly passing test names to `sytest-whitelist` in the project's root directory:
+any newly passing test names to `sytest-whitelist` in the project's root
+directory:
 
 ```sh
 ../dendrite/show-expected-fail-tests.sh results.tap ../dendrite/sytest-whitelist ../dendrite/sytest-blacklist
