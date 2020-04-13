@@ -18,6 +18,10 @@ import (
 	"context"
 	"fmt"
 
+	"errors"
+
+	pstore "github.com/libp2p/go-libp2p-core/peerstore"
+	record "github.com/libp2p/go-libp2p-record"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 
 	"github.com/libp2p/go-libp2p"
@@ -71,7 +75,7 @@ func NewP2PDendrite(cfg *config.Dendrite, componentName string) *P2PDendrite {
 			if err != nil {
 				return nil, err
 			}
-			libp2pdht.Validator = LibP2PValidator{}
+			libp2pdht.Validator = libP2PValidator{}
 			r = libp2pdht
 			return
 		}),
@@ -103,4 +107,20 @@ func NewP2PDendrite(cfg *config.Dendrite, componentName string) *P2PDendrite {
 		LibP2PDHT:     libp2pdht,
 		LibP2PPubsub:  libp2ppubsub,
 	}
+}
+
+type libP2PValidator struct {
+	KeyBook pstore.KeyBook
+}
+
+func (v libP2PValidator) Validate(key string, value []byte) error {
+	ns, _, err := record.SplitKey(key)
+	if err != nil || ns != "matrix" {
+		return errors.New("not Matrix path")
+	}
+	return nil
+}
+
+func (v libP2PValidator) Select(k string, vals [][]byte) (int, error) {
+	return 0, nil
 }
