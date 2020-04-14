@@ -822,3 +822,4 @@ syn Multiple calls to /sync should not cause 500 errors
 gst Guest user can call /events on another world_readable room (SYN-606) 
 gst Real user can call /events on another world_readable room (SYN-606) 
 gst Events come down the correct room
+pub Asking for a remote rooms list, but supplying the local server's name, returns the local rooms list

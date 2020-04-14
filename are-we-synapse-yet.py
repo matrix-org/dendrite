@@ -1,29 +1,35 @@
 #!/usr/bin/env python3
 
-# Usage: $ ./are-we-synapse-yet.py results.tap
+from __future__ import division
+import argparse
+import re
+import sys
+
+# Usage: $ ./are-we-synapse-yet.py [-v] results.tap
 # This script scans a results.tap file from Dendrite's CI process and spits out
 # a rating of how close we are to Synapse parity, based purely on SyTests.
 # The main complexity is grouping tests sensibly into features like 'Registration'
 # and 'Federation'. Then it just checks the ones which are passing and calculates
 # percentages for each group. Produces results like:
+# 
+# Client-Server APIs: 29% (196/666 tests)
+# -------------------
+#   Registration             :  62% (20/32 tests)
+#   Login                    :   7% (1/15 tests)
+#   V1 CS APIs               :  10% (3/30 tests)
+#   ...
 #
-# Client-Server APIs: 43% (240/543 tests)
-#    Registration: 100% (13/13 tests)
-#    Login:         11% (9/85 tests)
+# or in verbose mode:
+#
+# Client-Server APIs: 29% (196/666 tests)
+# -------------------
+#  Registration             :  62% (20/32 tests)
+#    ✓ GET /register yields a set of flows
+#    ✓ POST /register can create a user
+#    ✓ POST /register downcases capitals in usernames
 #    ...
-#
-# Federation APIs: 22% (29/142 tests)
-#    Key API:       55% (17/33 tests)
-#    send_join API: 95% (10/11 tests)
-#    ....
-#
-# Non-Spec APIs: (33%)
-#
+# 
 # You can also tack `-v` on to see exactly which tests each category falls under.
-
-from __future__ import division
-import re
-import sys
 
 test_mappings = {
     "nsp": "Non-Spec API",
@@ -127,35 +133,55 @@ def parse_test_line(line):
 #   header_name => "Client-Server APIs"
 #   gid_to_tests => { gid: { <name>: True|False }}
 #   gid_to_name  => { gid: "Group Name" }
+#   verbose => True|False
 # Produces:
-# Client-Server APIs: 43% (240/543 tests)
-#    Registration: 100% (13/13 tests)
-#    Login:         11% (9/85 tests)
+# Client-Server APIs: 29% (196/666 tests)
+# -------------------
+#   Registration             :  62% (20/32 tests)
+#   Login                    :   7% (1/15 tests)
+#   V1 CS APIs               :  10% (3/30 tests)
+#   ...
+# or in verbose mode:
+# Client-Server APIs: 29% (196/666 tests)
+# -------------------
+#  Registration             :  62% (20/32 tests)
+#    ✓ GET /register yields a set of flows
+#    ✓ POST /register can create a user
+#    ✓ POST /register downcases capitals in usernames
 #    ...
-def print_stats(header_name, gid_to_tests, gid_to_name):
+def print_stats(header_name, gid_to_tests, gid_to_name, verbose):
     subsections = [] # Registration: 100% (13/13 tests)
+    subsection_test_names = {} # 'subsection name': ["✓ Test 1", "✓ Test 2", "× Test 3"]
     total_passing = 0
     total_tests = 0
     for gid, tests in gid_to_tests.items():
         group_total = len(tests)
         group_passing = 0
+        test_names_and_marks = []
         for name, passing in tests.items():
             if passing:
                 group_passing += 1
+            test_names_and_marks.append(f"{'✓' if passing else '×'} {name}")
+            
         total_tests += group_total
         total_passing += group_passing
         pct = "{0:.0f}%".format(group_passing/group_total * 100)
-        line = "%s: %s (%d/%d tests)" % (gid_to_name[gid].rjust(25, ' '), pct.rjust(4, ' '), group_passing, group_total)
+        line = "%s: %s (%d/%d tests)" % (gid_to_name[gid].ljust(25, ' '), pct.rjust(4, ' '), group_passing, group_total)
         subsections.append(line)
+        subsection_test_names[line] = test_names_and_marks
     
     pct = "{0:.0f}%".format(total_passing/total_tests * 100)
     print("%s: %s (%d/%d tests)" % (header_name, pct, total_passing, total_tests))
     print("-" * (len(header_name)+1))
     for line in subsections:
         print("  %s" % (line,))
+        if verbose:
+            for test_name_and_pass_mark in subsection_test_names[line]:
+                print("    %s" % (test_name_and_pass_mark,))
+            print("")
     print("")
 
-def main(results_tap_path):
+def main(results_tap_path, verbose):
     # Load up test mappings
     test_name_to_group_id = {}
     fed_tests = set()
@@ -212,11 +238,15 @@ def main(results_tap_path):
     print("Are We Synapse Yet?")
     print("===================")
     print("")
-    print_stats("Non-Spec APIs", summary["nonspec"], test_mappings)
-    print_stats("Client-Server APIs", summary["client"], test_mappings["client_apis"])
-    print_stats("Federation APIs", summary["federation"], test_mappings["federation_apis"])
+    print_stats("Non-Spec APIs", summary["nonspec"], test_mappings, verbose)
+    print_stats("Client-Server APIs", summary["client"], test_mappings["client_apis"], verbose)
+    print_stats("Federation APIs", summary["federation"], test_mappings["federation_apis"], verbose)
 
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("tap_file", help="path to results.tap")
+    parser.add_argument("-v", action="store_true", help="show individual test names in output")
+    args = parser.parse_args()
+    main(args.tap_file, args.v)
