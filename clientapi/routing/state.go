@@ -15,11 +15,12 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -39,22 +40,29 @@ type stateEventInStateResp struct {
 // TODO: Check if the user is in the room. If not, check if the room's history
 // is publicly visible. Current behaviour is returning an empty array if the
 // user cannot see the room's history.
-func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID string) util.JSONResponse {
+func OnIncomingStateRequest(ctx context.Context, queryAPI api.RoomserverQueryAPI, roomID string) util.JSONResponse {
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
+	stateReq := api.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+	}
+	stateRes := api.QueryLatestEventsAndStateResponse{}
 
-	stateFilter := gomatrixserverlib.DefaultStateFilter()
-	// TODO: stateFilter should not limit the number of state events (or only limits abusive number of events)
-
-	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID, &stateFilter)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("db.GetStateEventsForRoom failed")
+	if err := queryAPI.QueryLatestEventsAndState(ctx, &stateReq, &stateRes); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return jsonerror.InternalServerError()
+	}
+
+	if len(stateRes.StateEvents) == 0 {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("cannot find state"),
+		}
 	}
 
 	resp := []stateEventInStateResp{}
 	// Fill the prev_content and replaces_state keys if necessary
-	for _, event := range stateEvents {
+	for _, event := range stateRes.StateEvents {
 		stateEvent := stateEventInStateResp{
 			ClientEvent: gomatrixserverlib.HeaderedToClientEvents(
 				[]gomatrixserverlib.HeaderedEvent{event}, gomatrixserverlib.FormatAll,
@@ -63,7 +71,7 @@ func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID strin
 		var prevEventRef types.PrevEventRef
 		if len(event.Unsigned()) > 0 {
 			if err := json.Unmarshal(event.Unsigned(), &prevEventRef); err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
+				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal failed")
 				return jsonerror.InternalServerError()
 			}
 			// Fills the previous state event ID if the state event replaces another
@@ -90,24 +98,32 @@ func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID strin
 // /rooms/{roomID}/state/{type}/{statekey} request. It will look in current
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
-func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID string, evType, stateKey string) util.JSONResponse {
+func OnIncomingStateTypeRequest(ctx context.Context, queryAPI api.RoomserverQueryAPI, roomID string, evType, stateKey string) util.JSONResponse {
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
-
-	logger := util.GetLogger(req.Context())
-	logger.WithFields(log.Fields{
+	util.GetLogger(ctx).WithFields(log.Fields{
 		"roomID":   roomID,
 		"evType":   evType,
 		"stateKey": stateKey,
 	}).Info("Fetching state")
 
-	event, err := db.GetStateEvent(req.Context(), roomID, evType, stateKey)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("db.GetStateEvent failed")
+	stateReq := api.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{
+			gomatrixserverlib.StateKeyTuple{
+				EventType: evType,
+				StateKey:  stateKey,
+			},
+		},
+	}
+	stateRes := api.QueryLatestEventsAndStateResponse{}
+
+	if err := queryAPI.QueryLatestEventsAndState(ctx, &stateReq, &stateRes); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return jsonerror.InternalServerError()
 	}
 
-	if event == nil {
+	if len(stateRes.StateEvents) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("cannot find state"),
@@ -115,7 +131,7 @@ func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID s
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(*event, gomatrixserverlib.FormatAll),
+		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(stateRes.StateEvents[0], gomatrixserverlib.FormatAll),
 	}
 
 	return util.JSONResponse{
