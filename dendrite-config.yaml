@@ -58,7 +58,7 @@ metrics:
     # Whether or not metrics are enabled
     enabled: false
     # Use basic auth to protect the metrics. Uncomment to the complete block to enable.
-    #basicAuth:
+    #basic_auth:
     #  username: prometheusUser
     #  password: y0ursecr3tPa$$w0rd
 
