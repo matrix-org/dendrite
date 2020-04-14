@@ -73,6 +73,10 @@ func AddPrevEventsToEvent(
 		return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
 	}
 
+	if len(eventsNeeded.Tuples()) == 0 {
+		return errors.New("expecting state tuples for event builder, got none")
+	}
+
 	// Ask the roomserver for information about this room
 	queryReq := api.QueryLatestEventsAndStateRequest{
 		RoomID:       builder.RoomID,
