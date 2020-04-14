@@ -23,18 +23,19 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/common/transactions"
+	"github.com/matrix-org/dendrite/eduserver"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/matrix-org/dendrite/typingserver"
-	"github.com/matrix-org/dendrite/typingserver/cache"
 	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -122,7 +123,7 @@ func main() {
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(base)
-	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
 	)
@@ -131,9 +132,10 @@ func main() {
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
 		federation, &keyRing, alias, input, query,
-		typingInputAPI, asQuery, transactions.New(), fedSenderAPI,
+		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI)
+	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
+	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, query, federation, p2pPublicRoomProvider)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)

@@ -16,22 +16,22 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/typingserver"
-	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/dendrite/eduserver"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "TypingServerAPI")
+	base := basecomponent.NewBaseDendrite(cfg, "EDUServerAPI")
 	defer func() {
 		if err := base.Close(); err != nil {
 			logrus.WithError(err).Warn("BaseDendrite close failed")
 		}
 	}()
 
-	typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	eduserver.SetupEDUServerComponent(base, cache.New())
 
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.TypingServer), string(base.Cfg.Listen.TypingServer))
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.EDUServer), string(base.Cfg.Listen.EDUServer))
 
 }

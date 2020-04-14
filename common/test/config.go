@@ -106,7 +106,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Listen.RoomServer = assignAddress()
 	cfg.Listen.SyncAPI = assignAddress()
 	cfg.Listen.PublicRoomsAPI = assignAddress()
-	cfg.Listen.TypingServer = assignAddress()
+	cfg.Listen.EDUServer = assignAddress()
 
 	// Bind to the same address as the listen address
 	// All microservices are run on the same host in testing
@@ -117,7 +117,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Bind.RoomServer = cfg.Listen.RoomServer
 	cfg.Bind.SyncAPI = cfg.Listen.SyncAPI
 	cfg.Bind.PublicRoomsAPI = cfg.Listen.PublicRoomsAPI
-	cfg.Bind.TypingServer = cfg.Listen.TypingServer
+	cfg.Bind.EDUServer = cfg.Listen.EDUServer
 
 	return &cfg, port, nil
 }

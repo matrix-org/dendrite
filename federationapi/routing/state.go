@@ -107,7 +107,6 @@ func getState(
 		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	prevEventIDs := getIDsFromEventRef(event.PrevEvents())
 	authEventIDs := getIDsFromEventRef(event.AuthEvents())
 
 	var response api.QueryStateAndAuthChainResponse
@@ -115,7 +114,7 @@ func getState(
 		ctx,
 		&api.QueryStateAndAuthChainRequest{
 			RoomID:       roomID,
-			PrevEventIDs: prevEventIDs,
+			PrevEventIDs: []string{eventID},
 			AuthEventIDs: authEventIDs,
 		},
 		&response,

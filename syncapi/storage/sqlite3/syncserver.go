@@ -33,8 +33,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/typingserver/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -57,7 +57,7 @@ type SyncServerDatasource struct {
 	events              outputRoomEventsStatements
 	roomstate           currentRoomStateStatements
 	invites             inviteEventsStatements
-	typingCache         *cache.TypingCache
+	eduCache            *cache.EDUCache
 	topology            outputRoomEventsTopologyStatements
 	backwardExtremities backwardExtremitiesStatements
 }
@@ -84,7 +84,7 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	if err = d.prepare(); err != nil {
 		return nil, err
 	}
-	d.typingCache = cache.NewTypingCache()
+	d.eduCache = cache.New()
 	return &d, nil
 }
 
@@ -429,7 +429,7 @@ func (d *SyncServerDatasource) syncPositionTx(
 		maxEventID = maxInviteID
 	}
 	sp.PDUPosition = types.StreamPosition(maxEventID)
-	sp.EDUTypingPosition = types.StreamPosition(d.typingCache.GetLatestSyncPosition())
+	sp.EDUTypingPosition = types.StreamPosition(d.eduCache.GetLatestSyncPosition())
 	return
 }
 
@@ -502,7 +502,7 @@ func (d *SyncServerDatasource) addTypingDeltaToResponse(
 	var ok bool
 	var err error
 	for _, roomID := range joinedRoomIDs {
-		if typingUsers, updated := d.typingCache.GetTypingUsersIfUpdatedAfter(
+		if typingUsers, updated := d.eduCache.GetTypingUsersIfUpdatedAfter(
 			roomID, int64(since.EDUTypingPosition),
 		); updated {
 			ev := gomatrixserverlib.ClientEvent{
@@ -766,7 +766,7 @@ func (d *SyncServerDatasource) RetireInviteEvent(
 }
 
 func (d *SyncServerDatasource) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
-	d.typingCache.SetTimeoutCallback(fn)
+	d.eduCache.SetTimeoutCallback(fn)
 }
 
 // AddTypingUser adds a typing user to the typing cache.
@@ -774,7 +774,7 @@ func (d *SyncServerDatasource) SetTypingTimeoutCallback(fn cache.TimeoutCallback
 func (d *SyncServerDatasource) AddTypingUser(
 	userID, roomID string, expireTime *time.Time,
 ) types.StreamPosition {
-	return types.StreamPosition(d.typingCache.AddTypingUser(userID, roomID, expireTime))
+	return types.StreamPosition(d.eduCache.AddTypingUser(userID, roomID, expireTime))
 }
 
 // RemoveTypingUser removes a typing user from the typing cache.
@@ -782,7 +782,7 @@ func (d *SyncServerDatasource) AddTypingUser(
 func (d *SyncServerDatasource) RemoveTypingUser(
 	userID, roomID string,
 ) types.StreamPosition {
-	return types.StreamPosition(d.typingCache.RemoveUser(userID, roomID))
+	return types.StreamPosition(d.eduCache.RemoveUser(userID, roomID))
 }
 
 func (d *SyncServerDatasource) addInvitesToResponse(

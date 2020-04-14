@@ -19,6 +19,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"golang.org/x/crypto/ed25519"
 
@@ -35,9 +36,9 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
+	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/sirupsen/logrus"
 )
 
@@ -52,6 +53,7 @@ type BaseDendrite struct {
 
 	// APIMux should be used to register new public matrix api endpoints
 	APIMux        *mux.Router
+	httpClient    *http.Client
 	Cfg           *config.Dendrite
 	KafkaConsumer sarama.Consumer
 	KafkaProducer sarama.SyncProducer
@@ -77,11 +79,14 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
+	const defaultHTTPTimeout = 30 * time.Second
+
 	return &BaseDendrite{
 		componentName: componentName,
 		tracerCloser:  closer,
 		Cfg:           cfg,
 		APIMux:        mux.NewRouter().UseEncodedPath(),
+		httpClient:    &http.Client{Timeout: defaultHTTPTimeout},
 		KafkaConsumer: kafkaConsumer,
 		KafkaProducer: kafkaProducer,
 	}
@@ -95,7 +100,11 @@ func (b *BaseDendrite) Close() error {
 // CreateHTTPAppServiceAPIs returns the QueryAPI for hitting the appservice
 // component over HTTP.
 func (b *BaseDendrite) CreateHTTPAppServiceAPIs() appserviceAPI.AppServiceQueryAPI {
-	return appserviceAPI.NewAppServiceQueryAPIHTTP(b.Cfg.AppServiceURL(), nil)
+	a, err := appserviceAPI.NewAppServiceQueryAPIHTTP(b.Cfg.AppServiceURL(), b.httpClient)
+	if err != nil {
+		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")
+	}
+	return a
 }
 
 // CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI for hitting
@@ -105,22 +114,40 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	roomserverAPI.RoomserverInputAPI,
 	roomserverAPI.RoomserverQueryAPI,
 ) {
-	alias := roomserverAPI.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), nil)
-	input := roomserverAPI.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), nil)
-	query := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
+
+	alias, err := roomserverAPI.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
+	if err != nil {
+		logrus.WithError(err).Panic("NewRoomserverAliasAPIHTTP failed")
+	}
+	input, err := roomserverAPI.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
+	if err != nil {
+		logrus.WithError(err).Panic("NewRoomserverInputAPIHTTP failed", b.httpClient)
+	}
+	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
+	if err != nil {
+		logrus.WithError(err).Panic("NewRoomserverQueryAPIHTTP failed", b.httpClient)
+	}
 	return alias, input, query
 }
 
-// CreateHTTPTypingServerAPIs returns typingInputAPI for hitting the typing
+// CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
 // server over HTTP
-func (b *BaseDendrite) CreateHTTPTypingServerAPIs() typingServerAPI.TypingServerInputAPI {
-	return typingServerAPI.NewTypingServerInputAPIHTTP(b.Cfg.TypingServerURL(), nil)
+func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI {
+	e, err := eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), nil)
+	if err != nil {
+		logrus.WithError(err).Panic("NewEDUServerInputAPIHTTP failed", b.httpClient)
+	}
+	return e
 }
 
 // CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
 // the federation sender over HTTP
 func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
-	return federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), nil)
+	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), nil)
+	if err != nil {
+		logrus.WithError(err).Panic("NewFederationSenderQueryAPIHTTP failed", b.httpClient)
+	}
+	return f
 }
 
 // CreateDeviceDB creates a new instance of the device database. Should only be

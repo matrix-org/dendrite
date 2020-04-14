@@ -10,27 +10,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package typingserver
+package eduserver
 
 import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/typingserver/api"
-	"github.com/matrix-org/dendrite/typingserver/cache"
-	"github.com/matrix-org/dendrite/typingserver/input"
+	"github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/eduserver/input"
 )
 
-// SetupTypingServerComponent sets up and registers HTTP handlers for the
-// TypingServer component. Returns instances of the various roomserver APIs,
+// SetupEDUServerComponent sets up and registers HTTP handlers for the
+// EDUServer component. Returns instances of the various roomserver APIs,
 // allowing other components running in the same process to hit the query the
 // APIs directly instead of having to use HTTP.
-func SetupTypingServerComponent(
+func SetupEDUServerComponent(
 	base *basecomponent.BaseDendrite,
-	typingCache *cache.TypingCache,
-) api.TypingServerInputAPI {
-	inputAPI := &input.TypingServerInputAPI{
-		Cache:                  typingCache,
+	eduCache *cache.EDUCache,
+) api.EDUServerInputAPI {
+	inputAPI := &input.EDUServerInputAPI{
+		Cache:                  eduCache,
 		Producer:               base.KafkaProducer,
 		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),
 	}
