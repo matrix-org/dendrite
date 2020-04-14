@@ -208,7 +208,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		addr = listenaddr
 	}
 
-	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux))
+	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux), b.Cfg)
 	logrus.Infof("Starting %s server on %s", b.componentName, addr)
 
 	err := http.ListenAndServe(addr, nil)
