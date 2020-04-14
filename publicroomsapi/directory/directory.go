@@ -88,7 +88,7 @@ func SetVisibility(
 	}
 	var queryEventsRes api.QueryLatestEventsAndStateResponse
 	err = queryAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
-	if err != nil {
+	if err != nil || len(queryEventsRes.StateEvents) == 0 {
 		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
 		return jsonerror.InternalServerError()
 	}
