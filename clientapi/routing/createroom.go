@@ -15,9 +15,11 @@
 package routing
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -55,6 +57,8 @@ const (
 	presetPrivateChat        = "private_chat"
 	presetTrustedPrivateChat = "trusted_private_chat"
 	presetPublicChat         = "public_chat"
+	visibilityPublic         = "public"
+	visibilityPrivate        = "private"
 )
 
 const (
@@ -87,8 +91,31 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 			}
 		}
 	}
+
+	switch r.Visibility {
+	case visibilityPrivate, visibilityPublic:
+	// Rooms default to private visibility if this key is not included.
+	case "":
+		r.Visibility = visibilityPrivate
+	default:
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("visibility must be any of 'public', 'private"),
+		}
+	}
+
 	switch r.Preset {
-	case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat, "":
+	case presetPrivateChat, presetTrustedPrivateChat, presetPublicChat:
+	// If unspecified, the server should use the
+	// visibility to determine which preset to use.
+	// A visibility of public equates to a preset of public_chat
+	// and private visibility equates to a preset of private_chat.
+	case "":
+		if r.Visibility == visibilityPrivate {
+			r.Preset = presetPrivateChat
+		} else {
+			r.Preset = presetPublicChat
+		}
 	default:
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -323,6 +350,39 @@ func createRoom(
 	_, err = producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName, nil)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
+	}
+
+	client := http.DefaultClient
+	scheme := "http"
+	if req.TLS != nil {
+		scheme = "https"
+	}
+	visibilityURL := url.URL{
+		Scheme: scheme,
+		Host:   req.Host,
+		Path:   fmt.Sprintf("_matrix/client/r0/directory/list/room/%s", roomID),
+	}
+	data, err := json.Marshal(map[string]string{
+		"visibility": r.Visibility,
+	})
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("json.Marshal failed")
+		return jsonerror.InternalServerError()
+	}
+	request, err := http.NewRequest(http.MethodPut, visibilityURL.String(), bytes.NewReader(data))
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("could not create request")
+		return jsonerror.InternalServerError()
+	}
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", device.AccessToken))
+	res, err := client.Do(request)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("client.Do failed")
+		return jsonerror.InternalServerError()
+	}
+	if res.StatusCode != http.StatusOK {
+		util.GetLogger(req.Context()).Error("could not set room visibility")
 		return jsonerror.InternalServerError()
 	}
 
