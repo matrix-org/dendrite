@@ -33,8 +33,8 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
-
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -78,7 +78,9 @@ func main() {
 
 	// Set up the API endpoints we handle. /metrics is for prometheus, and is
 	// not wrapped by CORS, while everything else is
-	http.Handle("/metrics", promhttp.Handler())
+	if cfg.Metrics.Enabled {
+		http.Handle("/metrics", common.WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
+	}
 	http.Handle("/", httpHandler)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
