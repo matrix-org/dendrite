@@ -53,6 +53,15 @@ media:
         height: 600
         method: scale
 
+# Metrics config for Prometheus
+metrics:
+    # Whether or not metrics are enabled
+    enabled: false
+    # Use basic auth to protect the metrics. Uncomment to the complete block to enable.
+    #basic_auth:
+    #  username: prometheusUser
+    #  password: y0ursecr3tPa$$w0rd
+
 # The config for the TURN server
 turn:
     # Whether or not guests can request TURN credentials
