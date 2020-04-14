@@ -98,6 +98,22 @@ func (a *ApplicationService) IsInterestedInUserID(
 	return false
 }
 
+// OwnsNamespaceCoveringUserId returns a bool on whether an application service's
+// namespace is exclusive and includes the given user ID
+func (a *ApplicationService) OwnsNamespaceCoveringUserId(
+	userID string,
+) bool {
+	if namespaceSlice, ok := a.NamespaceMap["users"]; ok {
+		for _, namespace := range namespaceSlice {
+			if namespace.Exclusive && namespace.RegexpObject.MatchString(userID) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // IsInterestedInRoomAlias returns a bool on whether an application service's
 // namespace includes the given room alias
 func (a *ApplicationService) IsInterestedInRoomAlias(
