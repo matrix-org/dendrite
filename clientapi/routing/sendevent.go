@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid
@@ -43,11 +44,20 @@ func SendEvent(
 	req *http.Request,
 	device *authtypes.Device,
 	roomID, eventType string, txnID, stateKey *string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+		}
+	}
+
 	if txnID != nil {
 		// Try to fetch response from transactionsCache
 		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
@@ -71,11 +81,22 @@ func SendEvent(
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	eventID, err := producer.SendEvents(
-		req.Context(), []gomatrixserverlib.Event{*e}, cfg.Matrix.ServerName, txnAndSessionID,
+		req.Context(),
+		[]gomatrixserverlib.HeaderedEvent{
+			e.Headered(verRes.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		txnAndSessionID,
 	)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
+	util.GetLogger(req.Context()).WithFields(logrus.Fields{
+		"event_id":     eventID,
+		"room_id":      roomID,
+		"room_version": verRes.RoomVersion,
+	}).Info("Sent event to roomserver")
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,
@@ -93,7 +114,7 @@ func generateSendEvent(
 	req *http.Request,
 	device *authtypes.Device,
 	roomID, eventType string, stateKey *string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	queryAPI api.RoomserverQueryAPI,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request
@@ -121,7 +142,8 @@ func generateSendEvent(
 	}
 	err = builder.SetContent(r)
 	if err != nil {
-		resErr := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
 
@@ -133,14 +155,15 @@ func generateSendEvent(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
-		resErr := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("common.BuildEvent failed")
+		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
 
 	// check to see if this user can perform this operation
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i]
+		stateEvents[i] = &queryRes.StateEvents[i].Event
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(*e, &provider); err != nil {

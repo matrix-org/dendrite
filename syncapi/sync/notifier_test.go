@@ -16,6 +16,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -29,9 +30,9 @@ import (
 )
 
 var (
-	randomMessageEvent  gomatrixserverlib.Event
-	aliceInviteBobEvent gomatrixserverlib.Event
-	bobLeaveEvent       gomatrixserverlib.Event
+	randomMessageEvent  gomatrixserverlib.HeaderedEvent
+	aliceInviteBobEvent gomatrixserverlib.HeaderedEvent
+	bobLeaveEvent       gomatrixserverlib.HeaderedEvent
 	syncPositionVeryOld types.PaginationToken
 	syncPositionBefore  types.PaginationToken
 	syncPositionAfter   types.PaginationToken
@@ -67,7 +68,8 @@ func init() {
 	syncPositionAfter2.PDUPosition = 13
 
 	var err error
-	randomMessageEvent, err = gomatrixserverlib.NewEventFromTrustedJSON([]byte(`{
+	err = json.Unmarshal([]byte(`{
+		"_room_version": "1",
 		"type": "m.room.message",
 		"content": {
 			"body": "Hello World",
@@ -75,13 +77,15 @@ func init() {
 		},
 		"sender": "@noone:localhost",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$randomMessageEvent:localhost"
-	}`), false)
+	}`), &randomMessageEvent)
 	if err != nil {
 		panic(err)
 	}
-	aliceInviteBobEvent, err = gomatrixserverlib.NewEventFromTrustedJSON([]byte(`{
+	err = json.Unmarshal([]byte(`{
+		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",
 		"content": {
@@ -89,13 +93,15 @@ func init() {
 		},
 		"sender": "`+alice+`",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$aliceInviteBobEvent:localhost"
-	}`), false)
+	}`), &aliceInviteBobEvent)
 	if err != nil {
 		panic(err)
 	}
-	bobLeaveEvent, err = gomatrixserverlib.NewEventFromTrustedJSON([]byte(`{
+	err = json.Unmarshal([]byte(`{
+		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",
 		"content": {
@@ -103,9 +109,10 @@ func init() {
 		},
 		"sender": "`+bob+`",
 		"room_id": "`+roomID+`",
+		"origin": "localhost",
 		"origin_server_ts": 12345,
 		"event_id": "$bobLeaveEvent:localhost"
-	}`), false)
+	}`), &bobLeaveEvent)
 	if err != nil {
 		panic(err)
 	}
@@ -135,7 +142,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewEventAndJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndJoinedToRoom error: %w", err)
 		}
 		if pos != syncPositionAfter {
 			t.Errorf("TestNewEventAndJoinedToRoom want %v, got %v", syncPositionAfter, pos)
@@ -163,7 +170,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewInviteEventForUser error: %s", err)
+			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
 		if pos != syncPositionAfter {
 			t.Errorf("TestNewInviteEventForUser want %v, got %v", syncPositionAfter, pos)
@@ -191,7 +198,7 @@ func TestEDUWakeup(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionAfter))
 		if err != nil {
-			t.Errorf("TestNewInviteEventForUser error: %s", err)
+			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
 		if pos != syncPositionNewEDU {
 			t.Errorf("TestNewInviteEventForUser want %v, got %v", syncPositionNewEDU, pos)
@@ -219,7 +226,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	poll := func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestMultipleRequestWakeup error: %s", err)
+			t.Errorf("TestMultipleRequestWakeup error: %w", err)
 		}
 		if pos != syncPositionAfter {
 			t.Errorf("TestMultipleRequestWakeup want %v, got %v", syncPositionAfter, pos)
@@ -259,7 +266,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
 		if pos != syncPositionAfter {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom want %v, got %v", syncPositionAfter, pos)
@@ -278,7 +285,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(alice, syncPositionAfter))
 		if err != nil {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
 		if pos != syncPositionAfter2 {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom want %v, got %v", syncPositionAfter2, pos)

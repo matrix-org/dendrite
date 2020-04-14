@@ -114,7 +114,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKeyNID: rows.close() failed")
 
 	result := make(map[string]types.EventStateKeyNID, len(eventStateKeys))
 	for rows.Next() {
@@ -125,7 +125,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 		}
 		result[stateKey] = types.EventStateKeyNID(stateKeyNID)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *eventStateKeyStatements) bulkSelectEventStateKey(
@@ -139,7 +139,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKey: rows.close() failed")
 
 	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
 	for rows.Next() {
@@ -150,5 +150,5 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 		}
 		result[types.EventStateKeyNID(stateKeyNID)] = stateKey
 	}
-	return result, nil
+	return result, rows.Err()
 }

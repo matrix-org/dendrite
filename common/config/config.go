@@ -134,7 +134,7 @@ type Dendrite struct {
 			OutputRoomEvent Topic `yaml:"output_room_event"`
 			// Topic for sending account data from client API to sync API
 			OutputClientData Topic `yaml:"output_client_data"`
-			// Topic for typingserver/api.OutputTypingEvent events.
+			// Topic for eduserver/api.OutputTypingEvent events.
 			OutputTypingEvent Topic `yaml:"output_typing_event"`
 			// Topic for user updates (profile, presence)
 			UserUpdates Topic `yaml:"user_updates"`
@@ -206,7 +206,7 @@ type Dendrite struct {
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
-		TypingServer     Address `yaml:"typing_server"`
+		EDUServer        Address `yaml:"edu_server"`
 	} `yaml:"bind"`
 
 	// The addresses for talking to other microservices.
@@ -219,11 +219,13 @@ type Dendrite struct {
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
-		TypingServer     Address `yaml:"typing_server"`
+		EDUServer        Address `yaml:"edu_server"`
 	} `yaml:"listen"`
 
 	// The config for tracing the dendrite servers.
 	Tracing struct {
+		// Set to true to enable tracer hooks. If false, no tracing is set up.
+		Enabled bool `yaml:"enabled"`
 		// The config for the jaeger opentracing reporter.
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	} `yaml:"tracing"`
@@ -365,7 +367,7 @@ func loadConfig(
 		return nil, err
 	}
 
-	config.setDefaults()
+	config.SetDefaults()
 
 	if err = config.check(monolithic); err != nil {
 		return nil, err
@@ -398,7 +400,7 @@ func loadConfig(
 	config.Media.AbsBasePath = Path(absPath(basePath, config.Media.BasePath))
 
 	// Generate data from config options
-	err = config.derive()
+	err = config.Derive()
 	if err != nil {
 		return nil, err
 	}
@@ -406,9 +408,9 @@ func loadConfig(
 	return &config, nil
 }
 
-// derive generates data that is derived from various values provided in
+// Derive generates data that is derived from various values provided in
 // the config file.
-func (config *Dendrite) derive() error {
+func (config *Dendrite) Derive() error {
 	// Determine registrations flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
@@ -433,8 +435,8 @@ func (config *Dendrite) derive() error {
 	return nil
 }
 
-// setDefaults sets default config values if they are not explicitly set.
-func (config *Dendrite) setDefaults() {
+// SetDefaults sets default config values if they are not explicitly set.
+func (config *Dendrite) SetDefaults() {
 	if config.Matrix.KeyValidityPeriod == 0 {
 		config.Matrix.KeyValidityPeriod = 24 * time.Hour
 	}
@@ -569,7 +571,7 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "listen.federation_api", string(config.Listen.FederationAPI))
 	checkNotEmpty(configErrs, "listen.sync_api", string(config.Listen.SyncAPI))
 	checkNotEmpty(configErrs, "listen.room_server", string(config.Listen.RoomServer))
-	checkNotEmpty(configErrs, "listen.typing_server", string(config.Listen.TypingServer))
+	checkNotEmpty(configErrs, "listen.edu_server", string(config.Listen.EDUServer))
 }
 
 // checkLogging verifies the parameters logging.* are valid.
@@ -667,7 +669,7 @@ func fingerprintPEM(data []byte) *gomatrixserverlib.TLSFingerprint {
 
 // AppServiceURL returns a HTTP URL for where the appservice component is listening.
 func (config *Dendrite) AppServiceURL() string {
-	// Hard code the roomserver to talk HTTP for now.
+	// Hard code the appservice server to talk HTTP for now.
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
@@ -683,18 +685,18 @@ func (config *Dendrite) RoomServerURL() string {
 	return "http://" + string(config.Listen.RoomServer)
 }
 
-// TypingServerURL returns an HTTP URL for where the typing server is listening.
-func (config *Dendrite) TypingServerURL() string {
-	// Hard code the typing server to talk HTTP for now.
+// EDUServerURL returns an HTTP URL for where the EDU server is listening.
+func (config *Dendrite) EDUServerURL() string {
+	// Hard code the EDU server to talk HTTP for now.
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.Listen.TypingServer)
+	return "http://" + string(config.Listen.EDUServer)
 }
 
 // FederationSenderURL returns an HTTP URL for where the federation sender is listening.
 func (config *Dendrite) FederationSenderURL() string {
-	// Hard code the typing server to talk HTTP for now.
+	// Hard code the federation sender server to talk HTTP for now.
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
@@ -703,6 +705,9 @@ func (config *Dendrite) FederationSenderURL() string {
 
 // SetupTracing configures the opentracing using the supplied configuration.
 func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err error) {
+	if !config.Tracing.Enabled {
+		return ioutil.NopCloser(bytes.NewReader([]byte{})), nil
+	}
 	return config.Tracing.Jaeger.InitGlobalTracer(
 		serviceName,
 		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),

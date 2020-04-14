@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
@@ -64,6 +65,7 @@ type RoomEventDatabase interface {
 	// Build a membership updater for the target user in a room.
 	MembershipUpdater(
 		ctx context.Context, roomID, targerUserID string,
+		roomVersion gomatrixserverlib.RoomVersion,
 	) (types.MembershipUpdater, error)
 	// Look up event ID by transaction's info.
 	// This is used to determine if the room event is processed/processing already.
@@ -72,6 +74,10 @@ type RoomEventDatabase interface {
 		ctx context.Context, transactionID string,
 		sessionID int64, userID string,
 	) (string, error)
+	// Look up the room version for a given room.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomID string,
+	) (gomatrixserverlib.RoomVersion, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -92,10 +98,11 @@ func processRoomEvent(
 	input api.InputRoomEvent,
 ) (eventID string, err error) {
 	// Parse and validate the event JSON
-	event := input.Event
+	headered := input.Event
+	event := headered.Unwrap()
 
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
-	authEventNIDs, err := checkAuthEvents(ctx, db, event, input.AuthEventIDs)
+	authEventNIDs, err := checkAuthEvents(ctx, db, headered, input.AuthEventIDs)
 	if err != nil {
 		return
 	}
@@ -103,7 +110,7 @@ func processRoomEvent(
 	if input.TransactionID != nil {
 		tdID := input.TransactionID
 		eventID, err = db.GetTransactionEventID(
-			ctx, tdID.TransactionID, tdID.SessionID, input.Event.Sender(),
+			ctx, tdID.TransactionID, tdID.SessionID, event.Sender(),
 		)
 		// On error OR event with the transaction already processed/processesing
 		if err != nil || eventID != "" {
@@ -152,11 +159,8 @@ func calculateAndSetState(
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
-	// TODO: get the correct room version
-	roomState, err := state.GetStateResolutionAlgorithm(state.StateResolutionAlgorithmV1, db)
-	if err != nil {
-		return err
-	}
+	var err error
+	roomState := state.NewStateResolution(db)
 
 	if input.HasState {
 		// We've been told what the state at the event is so we don't need to calculate it.
@@ -191,12 +195,24 @@ func processInviteEvent(
 	roomID := input.Event.RoomID()
 	targetUserID := *input.Event.StateKey()
 
-	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID)
+	log.WithFields(log.Fields{
+		"event_id":       input.Event.EventID(),
+		"room_id":        roomID,
+		"room_version":   input.RoomVersion,
+		"target_user_id": targetUserID,
+	}).Info("processing invite event")
+
+	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID, input.RoomVersion)
 	if err != nil {
 		return err
 	}
 	succeeded := false
-	defer common.EndTransaction(updater, &succeeded)
+	defer func() {
+		txerr := common.EndTransaction(updater, &succeeded)
+		if err == nil && txerr != nil {
+			err = txerr
+		}
+	}()
 
 	if updater.IsJoin() {
 		// If the user is joined to the room then that takes precedence over this
@@ -229,7 +245,13 @@ func processInviteEvent(
 		return nil
 	}
 
-	outputUpdates, err := updateToInviteMembership(updater, &input.Event, nil)
+	event := input.Event.Unwrap()
+
+	if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
+		return err
+	}
+
+	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
 	if err != nil {
 		return err
 	}

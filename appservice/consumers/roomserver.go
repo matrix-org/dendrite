@@ -33,8 +33,8 @@ import (
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
-	db                 *accounts.Database
-	asDB               *storage.Database
+	db                 accounts.Database
+	asDB               storage.Database
 	query              api.RoomserverQueryAPI
 	alias              api.RoomserverAliasAPI
 	serverName         string
@@ -46,8 +46,8 @@ type OutputRoomEventConsumer struct {
 func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
-	store *accounts.Database,
-	appserviceDB *storage.Database,
+	store accounts.Database,
+	appserviceDB storage.Database,
 	queryAPI api.RoomserverQueryAPI,
 	aliasAPI api.RoomserverAliasAPI,
 	workerStates []types.ApplicationServiceWorkerState,
@@ -114,19 +114,19 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // lookupMissingStateEvents looks up the state events that are added by a new event,
 // and returns any not already present.
 func (s *OutputRoomEventConsumer) lookupMissingStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.Event,
-) ([]gomatrixserverlib.Event, error) {
+	addsStateEventIDs []string, event gomatrixserverlib.HeaderedEvent,
+) ([]gomatrixserverlib.HeaderedEvent, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
-		return []gomatrixserverlib.Event{}, nil
+		return []gomatrixserverlib.HeaderedEvent{}, nil
 	}
 
 	// Fast path if the only state event added is the event itself.
 	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.Event{}, nil
+		return []gomatrixserverlib.HeaderedEvent{}, nil
 	}
 
-	result := []gomatrixserverlib.Event{}
+	result := []gomatrixserverlib.HeaderedEvent{}
 	missing := []string{}
 	for _, id := range addsStateEventIDs {
 		if id != event.EventID() {
@@ -155,7 +155,7 @@ func (s *OutputRoomEventConsumer) lookupMissingStateEvents(
 // application service.
 func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 	ctx context.Context,
-	events []gomatrixserverlib.Event,
+	events []gomatrixserverlib.HeaderedEvent,
 ) error {
 	for _, ws := range s.workerStates {
 		for _, event := range events {
@@ -178,7 +178,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 
 // appserviceIsInterestedInEvent returns a boolean depending on whether a given
 // event falls within one of a given application service's namespaces.
-func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event gomatrixserverlib.Event, appservice config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
 	// No reason to queue events if they'll never be sent to the application
 	// service
 	if appservice.URL == "" {
@@ -189,6 +189,12 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	if appservice.IsInterestedInUserID(event.Sender()) ||
 		appservice.IsInterestedInRoomID(event.RoomID()) {
 		return true
+	}
+
+	if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
+		if appservice.IsInterestedInUserID(*event.StateKey()) {
+			return true
+		}
 	}
 
 	// Check all known room aliases of the room the event came from

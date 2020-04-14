@@ -19,6 +19,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -91,7 +93,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectServerKeys: rows.close() failed")
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	for rows.Next() {
 		var serverName string
@@ -117,7 +119,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 			ExpiredTS:    gomatrixserverlib.Timestamp(expiredTS),
 		}
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 func (s *serverKeyStatements) upsertServerKeys(

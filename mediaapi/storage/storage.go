@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +build !wasm
+
 package storage
 
 import (
-	"context"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/mediaapi/storage/postgres"
-	"github.com/matrix-org/dendrite/mediaapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/mediaapi/storage/sqlite3"
 )
-
-type Database interface {
-	StoreMediaMetadata(ctx context.Context, mediaMetadata *types.MediaMetadata) error
-	GetMediaMetadata(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) (*types.MediaMetadata, error)
-	StoreThumbnail(ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata) error
-	GetThumbnail(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName, width, height int, resizeMethod string) (*types.ThumbnailMetadata, error)
-	GetThumbnails(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) ([]*types.ThumbnailMetadata, error)
-}
 
 // Open opens a postgres database.
 func Open(dataSourceName string) (Database, error) {
@@ -40,6 +32,8 @@ func Open(dataSourceName string) (Database, error) {
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.Open(dataSourceName)
+	case "file":
+		return sqlite3.Open(dataSourceName)
 	default:
 		return postgres.Open(dataSourceName)
 	}

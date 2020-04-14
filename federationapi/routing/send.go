@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
@@ -34,34 +33,47 @@ func Send(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	txnID gomatrixserverlib.TransactionID,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
+	eduProducer *producers.EDUServerProducer,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-
 	t := txnReq{
-		context:    httpReq.Context(),
-		query:      query,
-		producer:   producer,
-		keys:       keys,
-		federation: federation,
+		context:     httpReq.Context(),
+		query:       query,
+		producer:    producer,
+		eduProducer: eduProducer,
+		keys:        keys,
+		federation:  federation,
 	}
-	if err := json.Unmarshal(request.Content(), &t); err != nil {
+
+	var txnEvents struct {
+		PDUs []json.RawMessage       `json:"pdus"`
+		EDUs []gomatrixserverlib.EDU `json:"edus"`
+	}
+
+	if err := json.Unmarshal(request.Content(), &txnEvents); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
 
+	// TODO: Really we should have a function to convert FederationRequest to txnReq
+	t.PDUs = txnEvents.PDUs
+	t.EDUs = txnEvents.EDUs
 	t.Origin = request.Origin()
 	t.TransactionID = txnID
 	t.Destination = cfg.Matrix.ServerName
 
+	util.GetLogger(httpReq.Context()).Infof("Received transaction %q containing %d PDUs, %d EDUs", txnID, len(t.PDUs), len(t.EDUs))
+
 	resp, err := t.processTransaction()
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -72,23 +84,46 @@ func Send(
 
 type txnReq struct {
 	gomatrixserverlib.Transaction
-	context    context.Context
-	query      api.RoomserverQueryAPI
-	producer   *producers.RoomserverProducer
-	keys       gomatrixserverlib.KeyRing
-	federation *gomatrixserverlib.FederationClient
+	context     context.Context
+	query       api.RoomserverQueryAPI
+	producer    *producers.RoomserverProducer
+	eduProducer *producers.EDUServerProducer
+	keys        gomatrixserverlib.KeyRing
+	federation  *gomatrixserverlib.FederationClient
 }
 
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
-	// Check the event signatures
-	if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, t.PDUs, t.keys); err != nil {
-		return nil, err
+	var pdus []gomatrixserverlib.HeaderedEvent
+	for _, pdu := range t.PDUs {
+		var header struct {
+			RoomID string `json:"room_id"`
+		}
+		if err := json.Unmarshal(pdu, &header); err != nil {
+			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to extract room ID from event")
+			return nil, err
+		}
+		verReq := api.QueryRoomVersionForRoomRequest{RoomID: header.RoomID}
+		verRes := api.QueryRoomVersionForRoomResponse{}
+		if err := t.query.QueryRoomVersionForRoom(t.context, &verReq, &verRes); err != nil {
+			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to query room version for room", verReq.RoomID)
+			return nil, err
+		}
+		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, verRes.RoomVersion)
+		if err != nil {
+			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
+			return nil, err
+		}
+		if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
+			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
+			return nil, err
+		}
+		pdus = append(pdus, event.Headered(verRes.RoomVersion))
 	}
 
 	// Process the events.
 	results := map[string]gomatrixserverlib.PDUResult{}
-	for _, e := range t.PDUs {
-		err := t.processEvent(e)
+	for _, e := range pdus {
+		err := t.processEvent(e.Unwrap())
 		if err != nil {
 			// If the error is due to the event itself being bad then we skip
 			// it and move onto the next event. We report an error so that the
@@ -116,13 +151,14 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
 			}
+			util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).Warn("Failed to process incoming federation event, skipping it.")
 		} else {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
 		}
 	}
 
-	// TODO: Process the EDUs.
-
+	t.processEDUs(t.EDUs)
+	util.GetLogger(t.context).Infof("Processed %d PDUs from transaction %q", len(results), t.TransactionID)
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
@@ -131,6 +167,29 @@ type unknownRoomError struct {
 }
 
 func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e.roomID) }
+
+func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
+	for _, e := range edus {
+		switch e.Type {
+		case gomatrixserverlib.MTyping:
+			// https://matrix.org/docs/spec/server_server/latest#typing-notifications
+			var typingPayload struct {
+				RoomID string `json:"room_id"`
+				UserID string `json:"user_id"`
+				Typing bool   `json:"typing"`
+			}
+			if err := json.Unmarshal(e.Content, &typingPayload); err != nil {
+				util.GetLogger(t.context).WithError(err).Error("Failed to unmarshal typing event")
+				continue
+			}
+			if err := t.eduProducer.SendTyping(t.context, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
+				util.GetLogger(t.context).WithError(err).Error("Failed to send typing event to edu server")
+			}
+		default:
+			util.GetLogger(t.context).WithField("type", e.Type).Warn("unhandled edu")
+		}
+	}
+}
 
 func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	prevEventIDs := e.PrevEventIDs()
@@ -158,11 +217,15 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	}
 
 	if !stateResp.PrevEventsExist {
-		return t.processEventWithMissingState(e)
+		return t.processEventWithMissingState(e, stateResp.RoomVersion)
 	}
 
 	// Check that the event is allowed by the state at the event.
-	if err := checkAllowedByState(e, stateResp.StateEvents); err != nil {
+	var events []gomatrixserverlib.Event
+	for _, headeredEvent := range stateResp.StateEvents {
+		events = append(events, headeredEvent.Unwrap())
+	}
+	if err := checkAllowedByState(e, events); err != nil {
 		return err
 	}
 
@@ -170,7 +233,14 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 	// TODO: Check that the event is allowed by its auth_events.
 
 	// pass the event to the roomserver
-	_, err := t.producer.SendEvents(t.context, []gomatrixserverlib.Event{e}, api.DoNotSendToOtherServers, nil)
+	_, err := t.producer.SendEvents(
+		t.context,
+		[]gomatrixserverlib.HeaderedEvent{
+			e.Headered(stateResp.RoomVersion),
+		},
+		api.DoNotSendToOtherServers,
+		nil,
+	)
 	return err
 }
 
@@ -185,7 +255,7 @@ func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserver
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
-func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
+func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) error {
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
@@ -202,7 +272,7 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 	// need to fallback to /state.
 	// TODO: Attempt to fill in the gap using /get_missing_events
 	// TODO: Attempt to fetch the state using /state_ids and /events
-	state, err := t.federation.LookupState(t.context, t.Origin, e.RoomID(), e.EventID())
+	state, err := t.federation.LookupState(t.context, t.Origin, e.RoomID(), e.EventID(), roomVersion)
 	if err != nil {
 		return err
 	}
@@ -211,9 +281,27 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event) error {
 		return err
 	}
 	// Check that the event is allowed by the state.
+retryAllowedState:
 	if err := checkAllowedByState(e, state.StateEvents); err != nil {
+		switch missing := err.(type) {
+		case gomatrixserverlib.MissingAuthEventError:
+			// An auth event was missing so let's look up that event over federation
+			for _, s := range state.StateEvents {
+				if s.EventID() != missing.AuthEventID {
+					continue
+				}
+				err = t.processEventWithMissingState(s, roomVersion)
+				// If there was no error retrieving the event from federation then
+				// we assume that it succeeded, so retry the original state check
+				if err == nil {
+					goto retryAllowedState
+				}
+			}
+		default:
+		}
 		return err
 	}
+
 	// pass the event along with the state to the roomserver
-	return t.producer.SendEventWithState(t.context, state, e)
+	return t.producer.SendEventWithState(t.context, state, e.Headered(roomVersion))
 }

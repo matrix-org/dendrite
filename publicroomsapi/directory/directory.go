@@ -17,7 +17,11 @@ package directory
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/roomserver/api"
+
 	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -35,7 +39,8 @@ func GetVisibility(
 ) util.JSONResponse {
 	isPublic, err := publicRoomsDatabase.GetRoomVisibility(req.Context(), roomID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("publicRoomsDatabase.GetRoomVisibility failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var v roomVisibility
@@ -52,11 +57,51 @@ func GetVisibility(
 }
 
 // SetVisibility implements PUT /directory/list/room/{roomID}
-// TODO: Check if user has the power level to edit the room visibility
+// TODO: Allow admin users to edit the room visibility
 func SetVisibility(
-	req *http.Request, publicRoomsDatabase storage.Database,
+	req *http.Request, publicRoomsDatabase storage.Database, queryAPI api.RoomserverQueryAPI, dev *authtypes.Device,
 	roomID string,
 ) util.JSONResponse {
+	queryMembershipReq := api.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: dev.UserID,
+	}
+	var queryMembershipRes api.QueryMembershipForUserResponse
+	err := queryAPI.QueryMembershipForUser(req.Context(), &queryMembershipReq, &queryMembershipRes)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("could not query membership for user")
+		return jsonerror.InternalServerError()
+	}
+	// Check if user id is in room
+	if !queryMembershipRes.IsInRoom {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user does not belong to room"),
+		}
+	}
+	queryEventsReq := api.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
+			EventType: gomatrixserverlib.MRoomPowerLevels,
+			StateKey:  "",
+		}},
+	}
+	var queryEventsRes api.QueryLatestEventsAndStateResponse
+	err = queryAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
+	if err != nil || len(queryEventsRes.StateEvents) == 0 {
+		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
+		return jsonerror.InternalServerError()
+	}
+	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
+
+	// Check if the user's power is greater than power required to change m.room.aliases event
+	if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomAliases, true) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("userID doesn't have power level to change visibility"),
+		}
+	}
+
 	var v roomVisibility
 	if reqErr := httputil.UnmarshalJSONRequest(req, &v); reqErr != nil {
 		return *reqErr
@@ -64,7 +109,8 @@ func SetVisibility(
 
 	isPublic := v.Visibility == gomatrixserverlib.Public
 	if err := publicRoomsDatabase.SetRoomVisibility(req.Context(), isPublic, roomID); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("publicRoomsDatabase.SetRoomVisibility failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

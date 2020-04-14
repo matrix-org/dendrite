@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
@@ -138,7 +140,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
 
 	results := make([]types.StateEntryList, len(stateBlockNIDs))
 	// current is a pointer to the StateEntryList to append the state entries to.
@@ -152,7 +154,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 			eventNID         int64
 			entry            types.StateEntry
 		)
-		if err := rows.Scan(
+		if err = rows.Scan(
 			&stateBlockNID, &eventTypeNID, &eventStateKeyNID, &eventNID,
 		); err != nil {
 			return nil, err
@@ -169,10 +171,13 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 		}
 		current.StateEntries = append(current.StateEntries, entry)
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	if i != len(stateBlockNIDs) {
 		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(stateBlockNIDs))
 	}
-	return results, nil
+	return results, err
 }
 
 func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
@@ -194,7 +199,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectFilteredStateBlockEntries: rows.close() failed")
 
 	var results []types.StateEntryList
 	var current types.StateEntryList
@@ -237,7 +242,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	if current.StateEntries != nil {
 		results = append(results, current)
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 func stateBlockNIDsAsArray(stateBlockNIDs []types.StateBlockNID) pq.Int64Array {

@@ -67,7 +67,7 @@ func NewNotifier(pos types.PaginationToken) *Notifier {
 // Typically a consumer supplies a posUpdate with the latest sync position for the
 // event type it handles, leaving other fields as 0.
 func (n *Notifier) OnNewEvent(
-	ev *gomatrixserverlib.Event, roomID string, userIDs []string,
+	ev *gomatrixserverlib.HeaderedEvent, roomID string, userIDs []string,
 	posUpdate types.PaginationToken,
 ) {
 	// update the current position then notify relevant /sync streams.

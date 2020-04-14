@@ -23,9 +23,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/transactions"
+	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	typingServerAPI "github.com/matrix-org/dendrite/typingserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -34,20 +34,20 @@ import (
 // component.
 func SetupClientAPIComponent(
 	base *basecomponent.BaseDendrite,
-	deviceDB *devices.Database,
-	accountsDB *accounts.Database,
+	deviceDB devices.Database,
+	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
 	inputAPI roomserverAPI.RoomserverInputAPI,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
-	typingInputAPI typingServerAPI.TypingServerInputAPI,
+	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 	fedSenderAPI federationSenderAPI.FederationSenderQueryAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
-	typingProducer := producers.NewTypingServerProducer(typingInputAPI)
+	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
+	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 
 	userUpdateProducer := &producers.UserUpdateProducer{
 		Producer: base.KafkaProducer,
@@ -67,8 +67,8 @@ func SetupClientAPIComponent(
 	}
 
 	routing.Setup(
-		base.APIMux, *base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
+		base.APIMux, base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
-		syncProducer, typingProducer, transactionsCache, fedSenderAPI,
+		syncProducer, eduProducer, transactionsCache, fedSenderAPI,
 	)
 }

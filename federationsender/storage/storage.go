@@ -12,22 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +build !wasm
+
 package storage
 
 import (
-	"context"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
-	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
 )
-
-type Database interface {
-	common.PartitionStorer
-	UpdateRoom(ctx context.Context, roomID, oldEventID, newEventID string, addHosts []types.JoinedHost, removeHosts []string) (joinedHosts []types.JoinedHost, err error)
-	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
-}
 
 // NewDatabase opens a new database
 func NewDatabase(dataSourceName string) (Database, error) {
@@ -36,6 +30,8 @@ func NewDatabase(dataSourceName string) (Database, error) {
 		return postgres.NewDatabase(dataSourceName)
 	}
 	switch uri.Scheme {
+	case "file":
+		return sqlite3.NewDatabase(dataSourceName)
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName)
 	default:

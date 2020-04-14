@@ -440,11 +440,10 @@ func validateApplicationService(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
@@ -472,7 +471,8 @@ func Register(
 	if r.Username == "" {
 		id, err := accountDB.GetNewNumericLocalpart(req.Context())
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetNewNumericLocalpart failed")
+			return jsonerror.InternalServerError()
 		}
 
 		r.Username = strconv.FormatInt(id, 10)
@@ -513,18 +513,10 @@ func handleGuestRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
-
-	//Generate numeric local part for guest user
-	id, err := accountDB.GetNewNumericLocalpart(req.Context())
-	if err != nil {
-		return httputil.LogThenError(req, err)
-	}
-
-	localpart := strconv.FormatInt(id, 10)
-	acc, err := accountDB.CreateAccount(req.Context(), localpart, "", "")
+	acc, err := accountDB.CreateGuestAccount(req.Context())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -570,8 +562,8 @@ func handleRegistrationFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
@@ -602,7 +594,8 @@ func handleRegistrationFlow(
 		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Auth.Mac)
 
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
+			return jsonerror.InternalServerError()
 		} else if !valid {
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
@@ -668,8 +661,8 @@ func handleApplicationServiceRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
@@ -707,8 +700,8 @@ func checkAndCompleteFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
@@ -730,8 +723,8 @@ func checkAndCompleteFlow(
 // LegacyRegister process register requests from the legacy v1 API
 func LegacyRegister(
 	req *http.Request,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var r legacyRegisterRequest
@@ -758,7 +751,8 @@ func LegacyRegister(
 
 		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Mac)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if !valid {
@@ -814,8 +808,8 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 // not all
 func completeRegistration(
 	ctx context.Context,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	username, password, appserviceID string,
 	inhibitLogin common.WeakBoolean,
 	displayName, deviceID *string,
@@ -991,8 +985,8 @@ type availableResponse struct {
 // RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
-	cfg config.Dendrite,
-	accountDB *accounts.Database,
+	cfg *config.Dendrite,
+	accountDB accounts.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 

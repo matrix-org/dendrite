@@ -15,11 +15,10 @@
 package routing
 
 import (
-	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
@@ -33,10 +32,41 @@ import (
 func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	roomID, userID string,
+	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+
+	// Check that the room that the remote side is trying to join is actually
+	// one of the room versions that they listed in their supported ?ver= in
+	// the make_join URL.
+	// https://matrix.org/docs/spec/server_server/r0.1.3#get-matrix-federation-v1-make-join-roomid-userid
+	remoteSupportsVersion := false
+	for _, v := range remoteVersions {
+		if v == verRes.RoomVersion {
+			remoteSupportsVersion = true
+			break
+		}
+	}
+	// If it isn't, stop trying to join the room.
+	if !remoteSupportsVersion {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(
+				fmt.Sprintf("Joining server does not support room version %s", verRes.RoomVersion),
+			),
+		}
+	}
+
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return util.JSONResponse{
@@ -60,10 +90,13 @@ func MakeJoin(
 	}
 	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Join})
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
+		return jsonerror.InternalServerError()
 	}
 
-	var queryRes api.QueryLatestEventsAndStateResponse
+	queryRes := api.QueryLatestEventsAndStateResponse{
+		RoomVersion: verRes.RoomVersion,
+	}
 	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), query, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
@@ -71,14 +104,16 @@ func MakeJoin(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("common.BuildEvent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Check that the join is allowed or not
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i]
+		stateEvents[i] = &queryRes.StateEvents[i].Event
 	}
+
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(*event, &provider); err != nil {
 		return util.JSONResponse{
@@ -89,7 +124,10 @@ func MakeJoin(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: map[string]interface{}{"event": builder},
+		JSON: map[string]interface{}{
+			"event":        builder,
+			"room_version": verRes.RoomVersion,
+		},
 	}
 }
 
@@ -97,14 +135,24 @@ func MakeJoin(
 func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	query api.RoomserverQueryAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
-	var event gomatrixserverlib.Event
-	if err := json.Unmarshal(request.Content(), &event); err != nil {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryRoomVersionForRoom failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
@@ -115,7 +163,12 @@ func SendJoin(
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the join event JSON"),
+			JSON: jsonerror.BadJSON(
+				fmt.Sprintf(
+					"The room ID in the request path (%q) must match the room ID in the join event JSON (%q)",
+					roomID, event.RoomID(),
+				),
+			),
 		}
 	}
 
@@ -123,7 +176,12 @@ func SendJoin(
 	if event.EventID() != eventID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The event ID in the request path must match the event ID in the join event JSON"),
+			JSON: jsonerror.BadJSON(
+				fmt.Sprintf(
+					"The event ID in the request path (%q) must match the event ID in the join event JSON (%q)",
+					eventID, event.EventID(),
+				),
+			),
 		}
 	}
 
@@ -136,19 +194,21 @@ func SendJoin(
 	}
 
 	// Check that the event is signed by the server sending the request.
+	redacted := event.Redact()
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
 		ServerName: event.Origin(),
-		Message:    event.Redact().JSON(),
+		Message:    redacted.JSON(),
 		AtTS:       event.OriginServerTS(),
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+		return jsonerror.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The join must be signed by the server it originated on"),
+			JSON: jsonerror.Forbidden("Signature check failed: " + verifyResults[0].Error.Error()),
 		}
 	}
 
@@ -159,9 +219,11 @@ func SendJoin(
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
+		ResolveState: true,
 	}, &stateAndAuthChainResponse)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryStateAndAuthChain failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if !stateAndAuthChainResponse.RoomExists {
@@ -175,17 +237,23 @@ func SendJoin(
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	_, err = producer.SendEvents(
-		httpReq.Context(), []gomatrixserverlib.Event{event}, cfg.Matrix.ServerName, nil,
+		httpReq.Context(),
+		[]gomatrixserverlib.HeaderedEvent{
+			event.Headered(stateAndAuthChainResponse.RoomVersion),
+		},
+		cfg.Matrix.ServerName,
+		nil,
 	)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"state":      stateAndAuthChainResponse.StateEvents,
-			"auth_chain": stateAndAuthChainResponse.AuthChainEvents,
+			"state":      gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.StateEvents),
+			"auth_chain": gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
 		},
 	}
 }

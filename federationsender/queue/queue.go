@@ -43,7 +43,7 @@ func NewOutgoingQueues(origin gomatrixserverlib.ServerName, client *gomatrixserv
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
-	ev *gomatrixserverlib.Event, origin gomatrixserverlib.ServerName,
+	ev *gomatrixserverlib.HeaderedEvent, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if origin != oqs.origin {
@@ -76,6 +76,49 @@ func (oqs *OutgoingQueues) SendEvent(
 
 		oq.sendEvent(ev)
 	}
+
+	return nil
+}
+
+// SendEvent sends an event to the destinations
+func (oqs *OutgoingQueues) SendInvite(
+	inviteReq *gomatrixserverlib.InviteV2Request,
+) error {
+	ev := inviteReq.Event()
+	stateKey := ev.StateKey()
+	if stateKey == nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+		}).Info("invite had no state key, dropping")
+		return nil
+	}
+
+	_, destination, err := gomatrixserverlib.SplitID('@', *stateKey)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"event_id":  ev.EventID(),
+			"state_key": stateKey,
+		}).Info("failed to split destination from state key")
+		return nil
+	}
+
+	log.WithFields(log.Fields{
+		"event_id": ev.EventID(),
+	}).Info("Sending invite")
+
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+	oq := oqs.queues[destination]
+	if oq == nil {
+		oq = &destinationQueue{
+			origin:      oqs.origin,
+			destination: destination,
+			client:      oqs.client,
+		}
+		oqs.queues[destination] = oq
+	}
+
+	oq.sendInvite(inviteReq)
 
 	return nil
 }

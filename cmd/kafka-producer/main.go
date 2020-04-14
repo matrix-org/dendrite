@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Shopify/sarama"
+	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 const usage = `Usage: %s

@@ -18,11 +18,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -45,24 +43,28 @@ func OnIncomingStateRequest(req *http.Request, db storage.Database, roomID strin
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 
-	stateFilterPart := gomatrix.DefaultFilterPart()
-	// TODO: stateFilterPart should not limit the number of state events (or only limits abusive number of events)
+	stateFilter := gomatrixserverlib.DefaultStateFilter()
+	// TODO: stateFilter should not limit the number of state events (or only limits abusive number of events)
 
-	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID, &stateFilterPart)
+	stateEvents, err := db.GetStateEventsForRoom(req.Context(), roomID, &stateFilter)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("db.GetStateEventsForRoom failed")
+		return jsonerror.InternalServerError()
 	}
 
 	resp := []stateEventInStateResp{}
 	// Fill the prev_content and replaces_state keys if necessary
 	for _, event := range stateEvents {
 		stateEvent := stateEventInStateResp{
-			ClientEvent: gomatrixserverlib.ToClientEvent(event, gomatrixserverlib.FormatAll),
+			ClientEvent: gomatrixserverlib.HeaderedToClientEvents(
+				[]gomatrixserverlib.HeaderedEvent{event}, gomatrixserverlib.FormatAll,
+			)[0],
 		}
 		var prevEventRef types.PrevEventRef
 		if len(event.Unsigned()) > 0 {
 			if err := json.Unmarshal(event.Unsigned(), &prevEventRef); err != nil {
-				return httputil.LogThenError(req, err)
+				util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
+				return jsonerror.InternalServerError()
 			}
 			// Fills the previous state event ID if the state event replaces another
 			// state event
@@ -101,7 +103,8 @@ func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID s
 
 	event, err := db.GetStateEvent(req.Context(), roomID, evType, stateKey)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("db.GetStateEvent failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if event == nil {
@@ -112,7 +115,7 @@ func OnIncomingStateTypeRequest(req *http.Request, db storage.Database, roomID s
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.ToClientEvent(*event, gomatrixserverlib.FormatAll),
+		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(*event, gomatrixserverlib.FormatAll),
 	}
 
 	return util.JSONResponse{
