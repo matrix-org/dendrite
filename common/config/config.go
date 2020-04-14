@@ -129,7 +129,7 @@ type Dendrite struct {
 			// Hardcoded Username and Password
 			Username string `yaml:"username"`
 			Password string `yaml:"password"`
-		} `yaml:"basicAuth"`
+		} `yaml:"basic_auth"`
 	} `yaml:"metrics"`
 
 	// The configuration for talking to kafka.
