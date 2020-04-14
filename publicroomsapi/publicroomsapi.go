@@ -31,19 +31,15 @@ import (
 func SetupPublicRoomsAPIComponent(
 	base *basecomponent.BaseDendrite,
 	deviceDB devices.Database,
+	publicRoomsDB storage.Database,
 	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
 	fedClient *gomatrixserverlib.FederationClient,
 	extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
-	}
-
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, publicRoomsDB, rsQueryAPI,
 	)
-	if err = rsConsumer.Start(); err != nil {
+	if err := rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start public rooms server consumer")
 	}
 
