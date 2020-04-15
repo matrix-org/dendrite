@@ -20,7 +20,9 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/sirupsen/logrus"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -39,7 +41,8 @@ type Database struct {
 func Open(dataSourceName string) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
+	logrus.WithField("yep", "no").Info("NOT ENTIRELY CRAZY")
+	if d.db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = d.statements.prepare(d.db); err != nil {

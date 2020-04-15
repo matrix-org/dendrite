@@ -22,6 +22,7 @@ import (
 	"errors"
 	"net/url"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/common"
@@ -52,7 +53,7 @@ func Open(dataSourceName string) (*Database, error) {
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sql.Open(common.SQLiteDriverName(), cs); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs); err != nil {
 		return nil, err
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")

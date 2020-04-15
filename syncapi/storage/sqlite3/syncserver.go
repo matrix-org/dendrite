@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	// Import the sqlite3 package
@@ -78,7 +79,7 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sql.Open(common.SQLiteDriverName(), cs); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs); err != nil {
 		return nil, err
 	}
 	if err = d.prepare(); err != nil {

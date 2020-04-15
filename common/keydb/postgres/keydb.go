@@ -17,11 +17,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"math"
 
 	"golang.org/x/crypto/ed25519"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -41,7 +41,7 @@ func NewDatabase(
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (*Database, error) {
-	db, err := sql.Open("postgres", dataSourceName)
+	db, err := sqlutil.Open("postgres", dataSourceName)
 	if err != nil {
 		return nil, err
 	}
