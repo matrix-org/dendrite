@@ -76,7 +76,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 					}
 				}
 				w.WriteHeader(resp.StatusCode)
-				_ = io.Copy(w, resp.Body)
+				_, _ = io.Copy(w, resp.Body)
 				resp.Body.Close()
 			}()
 
