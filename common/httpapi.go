@@ -47,7 +47,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	// TODO: We shouldn't be directly reading env vars here, inject it in instead.
 	// Refactor this when we split out config structs.
 	verbose := true
-	if os.Getenv("DENDRITE_TRACE") == "1" {
+	if os.Getenv("DENDRITE_TRACE_HTTP") == "1" {
 		verbose = true
 	}
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
