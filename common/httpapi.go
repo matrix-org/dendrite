@@ -76,8 +76,9 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 					}
 				}
 				w.WriteHeader(resp.StatusCode)
+				// discard errors as this is for debugging
 				_, _ = io.Copy(w, resp.Body)
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}()
 
 			// Log incoming request
