@@ -60,7 +60,7 @@ const insertBackwardExtremitySQL = "" +
 	" ON CONFLICT DO NOTHING"
 
 const selectBackwardExtremitiesForRoomSQL = "" +
-	"SELECT event_id FROM syncapi_backward_extremities WHERE room_id = $1"
+	"SELECT DISTINCT event_id FROM syncapi_backward_extremities WHERE room_id = $1"
 
 const deleteBackwardExtremitySQL = "" +
 	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND prev_event_id = $2"
