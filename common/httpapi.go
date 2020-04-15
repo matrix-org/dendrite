@@ -56,12 +56,13 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 		if verbose {
 			logger := logrus.NewEntry(logrus.StandardLogger())
 			// Log outgoing response
-			nextWriter := httptest.NewRecorder()
+			rec := httptest.NewRecorder()
+			nextWriter = rec
 			defer func() {
-				resp := nextWriter.Result()
+				resp := rec.Result()
 				dump, err := httputil.DumpResponse(resp, true)
 				if err != nil {
-					logger.Debug("Failed to dump outgoing response: %s", err)
+					logger.Debugf("Failed to dump outgoing response: %s", err)
 				} else {
 					strSlice := strings.Split(string(dump), "\n")
 					for _, s := range strSlice {
@@ -82,7 +83,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			// Log incoming request
 			dump, err := httputil.DumpRequest(req, true)
 			if err != nil {
-				logger.Debug("Failed to dump incoming request: %s", err)
+				logger.Debugf("Failed to dump incoming request: %s", err)
 			} else {
 				strSlice := strings.Split(string(dump), "\n")
 				for _, s := range strSlice {
