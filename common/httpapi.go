@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"os"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 )
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
@@ -42,47 +44,57 @@ func MakeAuthAPI(
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.
 // This is used for APIs that are called from the internet.
 func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+	// TODO: We shouldn't be directly reading env vars here, inject it in instead.
+	// Refactor this when we split out config structs.
+	verbose := true
+	if os.Getenv("DENDRITE_TRACE") == "1" {
+		verbose = true
+	}
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
-		// Log outgoing response
-		ww := httptest.NewRecorder()
-		defer func() {
-			resp := ww.Result()
-			dump, err := httputil.DumpResponse(resp, true)
+		nextWriter := w
+		if verbose {
+			logger := logrus.NewEntry(logrus.StandardLogger())
+			// Log outgoing response
+			nextWriter := httptest.NewRecorder()
+			defer func() {
+				resp := nextWriter.Result()
+				dump, err := httputil.DumpResponse(resp, true)
+				if err != nil {
+					logger.Debug("Failed to dump outgoing response: %s", err)
+				} else {
+					strSlice := strings.Split(string(dump), "\n")
+					for _, s := range strSlice {
+						logger.Debug(s)
+					}
+				}
+				// copy the response to the client
+				for hdr, vals := range resp.Header {
+					for _, val := range vals {
+						w.Header().Add(hdr, val)
+					}
+				}
+				w.WriteHeader(resp.StatusCode)
+				io.Copy(w, resp.Body)
+				resp.Body.Close()
+			}()
+
+			// Log incoming request
+			dump, err := httputil.DumpRequest(req, true)
 			if err != nil {
-				util.GetLogger(req.Context()).Debug("Failed to dump outgoing response: %s", err)
+				logger.Debug("Failed to dump incoming request: %s", err)
 			} else {
 				strSlice := strings.Split(string(dump), "\n")
 				for _, s := range strSlice {
-					util.GetLogger(req.Context()).Debug(s)
+					logger.Debug(s)
 				}
-			}
-			// copy the response to the client
-			for hdr, vals := range resp.Header {
-				for _, val := range vals {
-					w.Header().Add(hdr, val)
-				}
-			}
-			w.WriteHeader(resp.StatusCode)
-			io.Copy(w, resp.Body)
-			resp.Body.Close()
-		}()
-
-		// Log incoming request
-		dump, err := httputil.DumpRequest(req, true)
-		if err != nil {
-			util.GetLogger(req.Context()).Debug("Failed to dump incoming request: %s", err)
-		} else {
-			strSlice := strings.Split(string(dump), "\n")
-			for _, s := range strSlice {
-				util.GetLogger(req.Context()).Debug(s)
 			}
 		}
 
 		span := opentracing.StartSpan(metricsName)
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
-		h.ServeHTTP(ww, req)
+		h.ServeHTTP(nextWriter, req)
 
 	}
 
