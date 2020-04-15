@@ -17,6 +17,7 @@ package alias
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -217,6 +218,9 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
 	if err != nil {
 		return err
+	}
+	if len(eventsNeeded.Tuples()) == 0 {
+		return errors.New("expecting state tuples for event builder, got none")
 	}
 	req := roomserverAPI.QueryLatestEventsAndStateRequest{
 		RoomID:       roomID,
