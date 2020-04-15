@@ -1,7 +1,12 @@
 package common
 
 import (
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -46,12 +51,60 @@ func MakeAuthAPI(
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.
 // This is used for APIs that are called from the internet.
 func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+	// TODO: We shouldn't be directly reading env vars here, inject it in instead.
+	// Refactor this when we split out config structs.
+	verbose := false
+	if os.Getenv("DENDRITE_TRACE_HTTP") == "1" {
+		verbose = true
+	}
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		nextWriter := w
+		if verbose {
+			logger := logrus.NewEntry(logrus.StandardLogger())
+			// Log outgoing response
+			rec := httptest.NewRecorder()
+			nextWriter = rec
+			defer func() {
+				resp := rec.Result()
+				dump, err := httputil.DumpResponse(resp, true)
+				if err != nil {
+					logger.Debugf("Failed to dump outgoing response: %s", err)
+				} else {
+					strSlice := strings.Split(string(dump), "\n")
+					for _, s := range strSlice {
+						logger.Debug(s)
+					}
+				}
+				// copy the response to the client
+				for hdr, vals := range resp.Header {
+					for _, val := range vals {
+						w.Header().Add(hdr, val)
+					}
+				}
+				w.WriteHeader(resp.StatusCode)
+				// discard errors as this is for debugging
+				_, _ = io.Copy(w, resp.Body)
+				_ = resp.Body.Close()
+			}()
+
+			// Log incoming request
+			dump, err := httputil.DumpRequest(req, true)
+			if err != nil {
+				logger.Debugf("Failed to dump incoming request: %s", err)
+			} else {
+				strSlice := strings.Split(string(dump), "\n")
+				for _, s := range strSlice {
+					logger.Debug(s)
+				}
+			}
+		}
+
 		span := opentracing.StartSpan(metricsName)
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
-		h.ServeHTTP(w, req)
+		h.ServeHTTP(nextWriter, req)
+
 	}
 
 	return http.HandlerFunc(withSpan)
