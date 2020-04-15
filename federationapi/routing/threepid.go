@@ -271,6 +271,10 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
+	if len(eventsNeeded.Tuples()) == 0 {
+		return nil, errors.New("expecting state tuples for event builder, got none")
+	}
+
 	// Ask the roomserver for information about this room
 	queryReq := roomserverAPI.QueryLatestEventsAndStateRequest{
 		RoomID:       builder.RoomID,

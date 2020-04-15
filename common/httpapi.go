@@ -11,6 +11,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -20,6 +21,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
+
+// BasicAuth is used for authorization on /metrics handlers
+type BasicAuth struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
@@ -177,9 +184,32 @@ func MakeFedAPI(
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
 // listener.
-func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler) {
-	servMux.Handle("/metrics", promhttp.Handler())
+func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler, cfg *config.Dendrite) {
+	if cfg.Metrics.Enabled {
+		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
+	}
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
+}
+
+// WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
+func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
+	if b.Username == "" || b.Password == "" {
+		logrus.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Serve without authorization if either Username or Password is unset
+		if b.Username == "" || b.Password == "" {
+			h.ServeHTTP(w, r)
+			return
+		}
+		user, pass, ok := r.BasicAuth()
+
+		if !ok || user != b.Username || pass != b.Password {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}
 }
 
 // WrapHandlerInCORS adds CORS headers to all responses, including all error

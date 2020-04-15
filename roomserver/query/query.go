@@ -132,10 +132,18 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return err
 	}
 
-	// Look up the current state for the requested tuples.
-	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
-		ctx, currentStateSnapshotNID, request.StateToFetch,
-	)
+	var stateEntries []types.StateEntry
+	if len(request.StateToFetch) == 0 {
+		// Look up all room state.
+		stateEntries, err = roomState.LoadStateAtSnapshot(
+			ctx, currentStateSnapshotNID,
+		)
+	} else {
+		// Look up the current state for the requested tuples.
+		stateEntries, err = roomState.LoadStateAtSnapshotForStringTuples(
+			ctx, currentStateSnapshotNID, request.StateToFetch,
+		)
+	}
 	if err != nil {
 		return err
 	}

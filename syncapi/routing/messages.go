@@ -209,18 +209,12 @@ func (r *messagesReq) retrieveEvents() (
 		return []gomatrixserverlib.ClientEvent{}, r.from, r.to, nil
 	}
 
-	// Sort the events to ensure we send them in the right order. We currently
-	// do that based on the event's timestamp.
+	// Sort the events to ensure we send them in the right order.
+	events = gomatrixserverlib.HeaderedReverseTopologicalOrdering(events)
 	if r.backwardOrdering {
-		sort.SliceStable(events, func(i int, j int) bool {
-			// Backward ordering is antichronological (latest event to oldest
-			// one).
-			return sortEvents(&(events[j]), &(events[i]))
-		})
-	} else {
-		sort.SliceStable(events, func(i int, j int) bool {
-			// Forward ordering is chronological (oldest event to latest one).
-			return sortEvents(&(events[i]), &(events[j]))
+		// This reverses the array from old->new to new->old
+		sort.SliceStable(events, func(i, j int) bool {
+			return true
 		})
 	}
 
@@ -492,13 +486,4 @@ func setToDefault(
 	}
 
 	return
-}
-
-// sortEvents is a function to give to sort.SliceStable, and compares the
-// timestamp of two Matrix events.
-// Returns true if the first event happened before the second one, false
-// otherwise.
-func sortEvents(e1 *gomatrixserverlib.HeaderedEvent, e2 *gomatrixserverlib.HeaderedEvent) bool {
-	t := e1.OriginServerTS().Time()
-	return e2.OriginServerTS().Time().After(t)
 }
