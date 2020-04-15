@@ -46,7 +46,7 @@ func MakeAuthAPI(
 func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
 	// TODO: We shouldn't be directly reading env vars here, inject it in instead.
 	// Refactor this when we split out config structs.
-	verbose := true
+	verbose := false
 	if os.Getenv("DENDRITE_TRACE_HTTP") == "1" {
 		verbose = true
 	}
