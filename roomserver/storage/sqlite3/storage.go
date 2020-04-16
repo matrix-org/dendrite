@@ -23,7 +23,6 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -176,7 +175,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 	if event.Type() != gomatrixserverlib.MRoomCreate {
 		return gomatrixserverlib.RoomVersion(""), nil
 	}
-	roomVersion = roomserverVersion.DefaultRoomVersion()
+	roomVersion = gomatrixserverlib.RoomVersionV1
 	var createContent gomatrixserverlib.CreateContent
 	// The m.room.create event contains an optional "room_version" key in
 	// the event content, so we need to unmarshal that first.
