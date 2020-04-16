@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/common/keydb"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
 
@@ -243,7 +244,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
 	if err != nil || uri.Scheme == "file" {
-		db, err = sql.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka))
+		db, err = sqlutil.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}
@@ -253,7 +254,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
 	} else {
-		db, err = sql.Open("postgres", string(cfg.Database.Naffka))
+		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}

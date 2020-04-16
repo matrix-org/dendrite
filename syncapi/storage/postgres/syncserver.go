@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	// Import the postgres database driver.
@@ -62,7 +63,7 @@ type SyncServerDatasource struct {
 func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
-	if d.db, err = sql.Open("postgres", dbDataSourceName); err != nil {
+	if d.db, err = sqlutil.Open("postgres", dbDataSourceName); err != nil {
 		return nil, err
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
