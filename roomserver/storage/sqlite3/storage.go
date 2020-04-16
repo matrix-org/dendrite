@@ -23,6 +23,7 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
