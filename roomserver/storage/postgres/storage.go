@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
