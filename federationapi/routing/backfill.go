@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -75,7 +76,7 @@ func Backfill(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("limit is invalid format"),
+			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("limit %q is invalid format", limit)),
 		}
 	}
 
