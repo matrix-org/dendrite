@@ -79,7 +79,6 @@ func Send(
 			JSON: resp,
 		}
 	// Handle known error cases as we will return a 400 error for these.
-	case unknownRoomError:
 	case roomNotFoundError:
 	case unmarshalError:
 	case verifySigError:
@@ -117,7 +116,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 		}
 		if err := json.Unmarshal(pdu, &header); err != nil {
 			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to extract room ID from event")
-			return nil, unknownRoomError{}
+			return nil, unmarshalError{err}
 		}
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: header.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
@@ -178,7 +177,6 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
-type unknownRoomError struct{}
 type roomNotFoundError struct {
 	roomID string
 }
@@ -190,7 +188,6 @@ type verifySigError struct {
 	err     error
 }
 
-func (e unknownRoomError) Error() string  { return "unable to extract room ID" }
 func (e roomNotFoundError) Error() string { return fmt.Sprintf("room %q not found", e.roomID) }
 func (e unmarshalError) Error() string    { return fmt.Sprintf("unable to parse event: %s", e.err) }
 func (e verifySigError) Error() string {
