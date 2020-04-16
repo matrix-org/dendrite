@@ -17,12 +17,12 @@ package sqlite3
 
 import (
 	"context"
-	"database/sql"
 	"math"
 
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -44,7 +44,7 @@ func NewDatabase(
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (*Database, error) {
-	db, err := sql.Open(common.SQLiteDriverName(), dataSourceName)
+	db, err := sqlutil.Open(common.SQLiteDriverName(), dataSourceName)
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 // Database stores information needed by the federation sender
@@ -35,7 +36,7 @@ type Database struct {
 func NewDatabase(dataSourceName string) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if result.db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {

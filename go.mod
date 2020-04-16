@@ -22,6 +22,7 @@ require (
 	github.com/matrix-org/util v0.0.0-20190711121626-527ce5ddefc7
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
+	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pierrec/lz4 v2.5.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1
