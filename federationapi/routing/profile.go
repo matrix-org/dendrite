@@ -46,12 +46,17 @@ func GetProfile(
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Format of user ID is invalid."),
+		}
 	}
 
 	if domain != cfg.Matrix.ServerName {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("domain != cfg.Matrix.ServerName failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue("Domain does not match this server."),
+		}
 	}
 
 	profile, err := appserviceAPI.RetrieveUserProfile(httpReq.Context(), userID, asAPI, accountDB)
