@@ -14,7 +14,10 @@
 
 package keydb
 
-import "github.com/matrix-org/gomatrixserverlib"
+import (
+	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/ed25519"
+)
 
 // CreateKeyRing creates and configures a KeyRing object.
 //
@@ -22,10 +25,21 @@ import "github.com/matrix-org/gomatrixserverlib"
 // backed by the given KeyDatabase.
 func CreateKeyRing(client gomatrixserverlib.Client,
 	keyDB gomatrixserverlib.KeyDatabase) gomatrixserverlib.KeyRing {
+
 	return gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
 			// TODO: Use perspective key fetchers for production.
-			&gomatrixserverlib.DirectKeyFetcher{Client: client},
+			&gomatrixserverlib.DirectKeyFetcher{
+				Client: client,
+			},
+			&gomatrixserverlib.PerspectiveKeyFetcher{
+				PerspectiveServerName: "matrix.org",
+				PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{
+					"ed25519:auto":   ed25519.PublicKey(gomatrixserverlib.Base64String("Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw")),
+					"ed25519:a_RXGa": ed25519.PublicKey(gomatrixserverlib.Base64String("l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ")),
+				},
+				Client: client,
+			},
 		},
 		KeyDatabase: keyDB,
 	}
