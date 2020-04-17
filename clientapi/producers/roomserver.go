@@ -16,7 +16,6 @@ package producers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -62,11 +61,6 @@ func (c *RoomserverProducer) SendEventWithState(
 	outliers, err := state.Events()
 	if err != nil {
 		return err
-	}
-
-	fmt.Println("OUTLIERS:")
-	for _, o := range outliers {
-		fmt.Println("*", o.EventID(), o.Type(), o.StateKey())
 	}
 
 	var ires []api.InputRoomEvent

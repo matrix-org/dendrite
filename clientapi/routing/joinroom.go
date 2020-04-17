@@ -370,14 +370,6 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 	retries := map[string]bool{}
 
 retryCheck:
-	fmt.Println("STATE EVENTS:")
-	for _, e := range respSendJoin.StateEvents {
-		fmt.Println("*", e.EventID())
-	}
-	fmt.Println("AUTH EVENTS:")
-	for _, e := range respSendJoin.AuthEvents {
-		fmt.Println("*", e.EventID())
-	}
 	if err = respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
 		switch e := err.(type) {
 		case gomatrixserverlib.MissingAuthEventError:
