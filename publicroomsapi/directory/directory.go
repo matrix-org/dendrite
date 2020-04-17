@@ -92,17 +92,18 @@ func SetVisibility(
 		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
 		return jsonerror.InternalServerError()
 	}
-	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
 
 	// NOTSPEC: Check if the user's power is greater than power required to change m.room.aliases event
 	// p2p relies on anyone being able to publish rooms.
 	/*
-		if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomAliases, true) {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("userID doesn't have power level to change visibility"),
+		power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
+			if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomAliases, true) {
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: jsonerror.Forbidden("userID doesn't have power level to change visibility"),
+				}
 			}
-		} */
+	*/
 
 	var v roomVisibility
 	if reqErr := httputil.UnmarshalJSONRequest(req, &v); reqErr != nil {
