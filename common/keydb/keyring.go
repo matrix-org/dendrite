@@ -15,6 +15,8 @@
 package keydb
 
 import (
+	"encoding/base64"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/ed25519"
 )
@@ -26,6 +28,10 @@ import (
 func CreateKeyRing(client gomatrixserverlib.Client,
 	keyDB gomatrixserverlib.KeyDatabase) gomatrixserverlib.KeyRing {
 
+	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
+	matrixOrgKey1, _ := b64e.DecodeString("Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw")
+	matrixOrgKey2, _ := b64e.DecodeString("l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ")
+
 	return gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
 			// TODO: Use perspective key fetchers for production.
@@ -35,8 +41,8 @@ func CreateKeyRing(client gomatrixserverlib.Client,
 			&gomatrixserverlib.PerspectiveKeyFetcher{
 				PerspectiveServerName: "matrix.org",
 				PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{
-					"ed25519:auto":   ed25519.PublicKey(gomatrixserverlib.Base64String("Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw")),
-					"ed25519:a_RXGa": ed25519.PublicKey(gomatrixserverlib.Base64String("l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ")),
+					"ed25519:auto":   matrixOrgKey1,
+					"ed25519:a_RXGa": matrixOrgKey2,
 				},
 				Client: client,
 			},
