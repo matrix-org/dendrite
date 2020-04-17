@@ -35,9 +35,9 @@ func CreateKeyRing(client gomatrixserverlib.Client,
 	return gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
 			// TODO: Use perspective key fetchers for production.
-			&gomatrixserverlib.DirectKeyFetcher{
-				Client: client,
-			},
+			//&gomatrixserverlib.DirectKeyFetcher{
+			//	Client: client,
+			//},
 			&gomatrixserverlib.PerspectiveKeyFetcher{
 				PerspectiveServerName: "matrix.org",
 				PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{
