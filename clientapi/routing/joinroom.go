@@ -365,8 +365,46 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
 
+	// A list of events that we have retried, if they were not included in
+	// the auth events supplied in the send_join.
+	retries := map[string]bool{}
+
+retryCheck:
+	fmt.Println("STATE EVENTS:")
+	for _, e := range respSendJoin.StateEvents {
+		fmt.Println("*", e.EventID())
+	}
+	fmt.Println("AUTH EVENTS:")
+	for _, e := range respSendJoin.AuthEvents {
+		fmt.Println("*", e.EventID())
+	}
 	if err = respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
-		return nil, fmt.Errorf("respSendJoin: %w", err)
+		switch e := err.(type) {
+		case gomatrixserverlib.MissingAuthEventError:
+			// Check that we haven't already retried for this event, prevents
+			// us from ending up in endless loops
+			if _, ok := retries[e.AuthEventID]; !ok {
+				// Ask the server that we're talking to right now for the event
+				tx, txerr := r.federation.GetEvent(r.req.Context(), server, e.AuthEventID)
+				if txerr != nil {
+					return nil, fmt.Errorf("r.federation.GetEvent: %w", txerr)
+				}
+				// For each event returned, add it to the auth events.
+				for _, pdu := range tx.PDUs {
+					ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, respMakeJoin.RoomVersion)
+					if everr != nil {
+						return nil, fmt.Errorf("gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
+					}
+					respSendJoin.AuthEvents = append(respSendJoin.AuthEvents, ev)
+				}
+				// Mark the event as retried and then give the check another go.
+				retries[e.AuthEventID] = true
+				goto retryCheck
+			}
+			return nil, fmt.Errorf("respSendJoin (after retries): %w", e)
+		default:
+			return nil, fmt.Errorf("respSendJoin: %w", err)
+		}
 	}
 
 	if err = r.producer.SendEventWithState(
