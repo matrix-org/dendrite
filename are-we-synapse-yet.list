@@ -405,6 +405,7 @@ syn Unnamed room comes with a name summary
 syn Named room comes with just joined member count summary 
 syn Room summary only has 5 heroes 
 syn Room summary counts change when membership changes 
+rmv User can create and send/receive messages in a room with version 1 
 rmv User can create and send/receive messages in a room with version 1 (2 subtests)
 rmv local user can join room with version 1
 rmv User can invite local user to room with version 1
@@ -413,6 +414,7 @@ rmv User can invite remote user to room with version 1
 rmv Remote user can backfill in a room with version 1
 rmv Can reject invites over federation for rooms with version 1 
 rmv Can receive redactions from regular users over federation in room version 1 
+rmv User can create and send/receive messages in a room with version 2 
 rmv User can create and send/receive messages in a room with version 2 (2 subtests)
 rmv local user can join room with version 2
 rmv User can invite local user to room with version 2
@@ -422,6 +424,7 @@ rmv Remote user can backfill in a room with version 2
 rmv Can reject invites over federation for rooms with version 2 
 rmv Can receive redactions from regular users over federation in room version 2 
 rmv User can create and send/receive messages in a room with version 3 
+rmv User can create and send/receive messages in a room with version 3 (2 subtests)
 rmv local user can join room with version 3 
 rmv User can invite local user to room with version 3 
 rmv remote user can join room with version 3 
@@ -430,6 +433,7 @@ rmv Remote user can backfill in a room with version 3
 rmv Can reject invites over federation for rooms with version 3 
 rmv Can receive redactions from regular users over federation in room version 3 
 rmv User can create and send/receive messages in a room with version 4 
+rmv User can create and send/receive messages in a room with version 4 (2 subtests)
 rmv local user can join room with version 4 
 rmv User can invite local user to room with version 4 
 rmv remote user can join room with version 4 
@@ -438,6 +442,7 @@ rmv Remote user can backfill in a room with version 4
 rmv Can reject invites over federation for rooms with version 4 
 rmv Can receive redactions from regular users over federation in room version 4 
 rmv User can create and send/receive messages in a room with version 5 
+rmv User can create and send/receive messages in a room with version 5 (2 subtests)
 rmv local user can join room with version 5 
 rmv User can invite local user to room with version 5 
 rmv remote user can join room with version 5 
