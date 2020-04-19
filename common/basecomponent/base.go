@@ -124,7 +124,7 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverInputAPIHTTP failed", b.httpClient)
 	}
-	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
+	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverQueryAPIHTTP failed", b.httpClient)
 	}
@@ -134,7 +134,7 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 // CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
 // server over HTTP
 func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI {
-	e, err := eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), nil)
+	e, err := eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewEDUServerInputAPIHTTP failed", b.httpClient)
 	}
@@ -144,7 +144,7 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 // CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
 // the federation sender over HTTP
 func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
-	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), nil)
+	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewFederationSenderQueryAPIHTTP failed", b.httpClient)
 	}
