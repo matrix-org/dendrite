@@ -62,6 +62,8 @@ func CreateKeyRing(client gomatrixserverlib.Client,
 			perspective.PerspectiveServerKeys[key.KeyID] = rawkey
 		}
 
+		fetchers = append(fetchers, perspective)
+
 		logrus.WithFields(logrus.Fields{
 			"server_name":     ps.ServerName,
 			"num_public_keys": len(ps.Keys),
