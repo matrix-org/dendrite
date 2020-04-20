@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // JoinRoomByIDOrAlias implements the "/join/{roomIDOrAlias}" API.
@@ -408,11 +409,21 @@ retryCheck:
 		}
 	}
 
-	// TODO: think about this some more, otherwise the request blocks and can time
-	// out on the roomserver processing the new room state, when the syncapi etc
-	// would eventually get those events anyway?
+	util.GetLogger(r.req.Context()).WithFields(logrus.Fields{
+		"room_id":          roomID,
+		"num_auth_events":  len(respSendJoin.AuthEvents),
+		"num_state_events": len(respSendJoin.StateEvents),
+	}).Info("Room join signature and auth verification passed")
+
+	// By this point we've verified all of the signatures, retrieved all of the
+	// missing auth events and verified that everything checks out. Nothing
+	// *should* go wrong in the roomserver after this point, so rather than have
+	// the client block on the roomserver taking in all of the new events, we
+	// should be okay to do this in a goroutine and return the successful join
+	// back to the client.
+	// TODO: Verify that this is really the case.
 	go func() {
-		ctx := context.TODO()
+		ctx := context.Background()
 		if err = r.producer.SendEventWithState(
 			ctx, //r.req.Context(),
 			gomatrixserverlib.RespState(respSendJoin.RespState),
