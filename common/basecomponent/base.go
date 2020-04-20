@@ -60,6 +60,9 @@ type BaseDendrite struct {
 	KafkaProducer sarama.SyncProducer
 }
 
+const HTTPServerTimeout = time.Minute * 5
+const HTTPClientTimeout = time.Second * 30
+
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
@@ -80,14 +83,12 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
-	const defaultHTTPTimeout = 30 * time.Second
-
 	return &BaseDendrite{
 		componentName: componentName,
 		tracerCloser:  closer,
 		Cfg:           cfg,
 		APIMux:        mux.NewRouter().UseEncodedPath(),
-		httpClient:    &http.Client{Timeout: defaultHTTPTimeout},
+		httpClient:    &http.Client{Timeout: HTTPClientTimeout},
 		KafkaConsumer: kafkaConsumer,
 		KafkaProducer: kafkaProducer,
 	}
@@ -212,8 +213,12 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux), b.Cfg)
 	logrus.Infof("Starting %s server on %s", b.componentName, addr)
 
-	err := http.ListenAndServe(addr, nil)
+	serv := http.Server{
+		Addr:         addr,
+		WriteTimeout: HTTPServerTimeout,
+	}
 
+	err := serv.ListenAndServe()
 	if err != nil {
 		logrus.WithError(err).Fatal("failed to serve http")
 	}

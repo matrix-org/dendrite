@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -385,23 +384,13 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		"num_state_events": len(respSendJoin.StateEvents),
 	}).Info("Room join signature and auth verification passed")
 
-	// By this point we've verified all of the signatures, retrieved all of the
-	// missing auth events and verified that everything checks out. Nothing
-	// *should* go wrong in the roomserver after this point, so rather than have
-	// the client block on the roomserver taking in all of the new events, we
-	// should be okay to do this in a goroutine and return the successful join
-	// back to the client.
-	// TODO: Verify that this is really the case.
-	go func() {
-		ctx := context.Background()
-		if err = r.producer.SendEventWithState(
-			ctx,
-			gomatrixserverlib.RespState(respSendJoin.RespState),
-			event.Headered(respMakeJoin.RoomVersion),
-		); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("r.producer.SendEventWithState")
-		}
-	}()
+	if err = r.producer.SendEventWithState(
+		r.req.Context(),
+		gomatrixserverlib.RespState(respSendJoin.RespState),
+		event.Headered(respMakeJoin.RoomVersion),
+	); err != nil {
+		util.GetLogger(r.req.Context()).WithError(err).Error("r.producer.SendEventWithState")
+	}
 
 	return &util.JSONResponse{
 		Code: http.StatusOK,

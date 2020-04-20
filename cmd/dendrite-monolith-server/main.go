@@ -90,16 +90,26 @@ func main() {
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		logrus.Info("Listening on ", *httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(*httpBindAddr, nil))
+		serv := http.Server{
+			Addr:         *httpBindAddr,
+			WriteTimeout: basecomponent.HTTPServerTimeout,
+		}
+
+		logrus.Info("Listening on ", serv.Addr)
+		logrus.Fatal(serv.ListenAndServe())
 	}()
 	// Handle HTTPS if certificate and key are provided
-	go func() {
-		if *certFile != "" && *keyFile != "" {
+	if *certFile != "" && *keyFile != "" {
+		go func() {
+			serv := http.Server{
+				Addr:         *httpBindAddr,
+				WriteTimeout: basecomponent.HTTPServerTimeout,
+			}
+
 			logrus.Info("Listening on ", *httpsBindAddr)
-			logrus.Fatal(http.ListenAndServeTLS(*httpsBindAddr, *certFile, *keyFile, nil))
-		}
-	}()
+			logrus.Fatal(serv.ListenAndServeTLS(*certFile, *keyFile))
+		}()
+	}
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
 	select {}
