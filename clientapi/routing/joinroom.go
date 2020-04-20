@@ -290,7 +290,15 @@ func (r joinRoomReq) joinRoomUsingServers(
 			// There was a problem talking to one of the servers.
 			util.GetLogger(r.req.Context()).WithError(lastErr).WithField("server", server).Warn("Failed to join room using server")
 			// Try the next server.
-			continue
+			if r.req.Context().Err() != nil {
+				// The request context has expired so don't bother trying any
+				// more servers - they will immediately fail due to the expired
+				// context.
+				break
+			} else {
+				// The request context hasn't expired yet so try the next server.
+				continue
+			}
 		}
 		return *response
 	}

@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
@@ -91,7 +92,14 @@ func main() {
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		logrus.Info("Listening on ", *httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(*httpBindAddr, nil))
+		serv := http.Server{
+			Addr:              *httpBindAddr,
+			ReadTimeout:       time.Second * 300,
+			ReadHeaderTimeout: time.Second * 300,
+			WriteTimeout:      time.Second * 300,
+			IdleTimeout:       time.Second * 300,
+		}
+		logrus.Fatal(serv.ListenAndServe())
 	}()
 	// Handle HTTPS if certificate and key are provided
 	go func() {
