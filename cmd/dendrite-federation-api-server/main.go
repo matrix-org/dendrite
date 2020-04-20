@@ -33,7 +33,7 @@ func main() {
 	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
 	federationSender := base.CreateHTTPFederationSenderAPIs()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg)
 
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
 	asQuery := base.CreateHTTPAppServiceAPIs()

@@ -39,6 +39,7 @@ require (
 	gopkg.in/Shopify/sarama.v1 v1.20.1
 	gopkg.in/h2non/bimg.v1 v1.0.18
 	gopkg.in/yaml.v2 v2.2.8
+	honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099
 )
 
 go 1.13

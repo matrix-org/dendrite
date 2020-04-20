@@ -15,9 +15,13 @@
 package keydb
 
 import (
+	"context"
 	"encoding/base64"
 
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -26,27 +30,42 @@ import (
 // It creates the necessary key fetchers and collects them into a KeyRing
 // backed by the given KeyDatabase.
 func CreateKeyRing(client gomatrixserverlib.Client,
-	keyDB gomatrixserverlib.KeyDatabase) gomatrixserverlib.KeyRing {
+	keyDB gomatrixserverlib.KeyDatabase,
+	cfg *config.Dendrite) gomatrixserverlib.KeyRing {
 
-	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
-	matrixOrgKey1, _ := b64e.DecodeString("Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw")
-	matrixOrgKey2, _ := b64e.DecodeString("l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ")
-
-	return gomatrixserverlib.KeyRing{
+	fetchers := gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			// TODO: Use perspective key fetchers for production.
-			//&gomatrixserverlib.DirectKeyFetcher{
-			//	Client: client,
-			//},
-			&gomatrixserverlib.PerspectiveKeyFetcher{
-				PerspectiveServerName: "matrix.org",
-				PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{
-					"ed25519:auto":   matrixOrgKey1,
-					"ed25519:a_RXGa": matrixOrgKey2,
-				},
+			&gomatrixserverlib.DirectKeyFetcher{
 				Client: client,
 			},
 		},
 		KeyDatabase: keyDB,
 	}
+
+	util.GetLogger(context.TODO()).Info("Enabled direct key fetcher")
+
+	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
+	for _, ps := range cfg.Matrix.KeyPerspectives {
+		perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
+			PerspectiveServerName: ps.ServerName,
+			PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},
+			Client:                client,
+		}
+
+		for _, key := range ps.Keys {
+			rawkey, err := b64e.DecodeString(key.PublicKey)
+			if err != nil {
+				util.GetLogger(context.TODO()).WithError(err).WithFields(logrus.Fields{
+					"server_name": ps.ServerName,
+					"public_key":  key.PublicKey,
+				}).Warn("Couldn't parse perspective key")
+				continue
+			}
+			perspective.PerspectiveServerKeys[key.KeyID] = rawkey
+		}
+
+		util.GetLogger(context.TODO()).WithField("server_name", ps.ServerName).Info("Enabled perspective key fetcher")
+	}
+
+	return fetchers
 }
