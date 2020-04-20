@@ -146,7 +146,7 @@ func main() {
 	deviceDB := base.Base.CreateDeviceDB()
 	keyDB := createKeyDB(base)
 	federation := createFederationClient(base)
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
 	alias, input, query := roomserver.SetupRoomServerComponent(&base.Base)
 	eduInputAPI := eduserver.SetupEDUServerComponent(&base.Base, cache.New())

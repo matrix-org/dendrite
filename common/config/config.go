@@ -99,6 +99,9 @@ type Dendrite struct {
 		// If set disables new users from registering (except via shared
 		// secrets)
 		RegistrationDisabled bool `yaml:"registration_disabled"`
+		// Perspective keyservers, to use as a backup when direct key fetch
+		// requests don't succeed
+		KeyPerspectives KeyPerspectives `yaml:"key_perspectives"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.
@@ -283,6 +286,21 @@ type Dendrite struct {
 		// Note: An Exclusive Regex for room ID isn't necessary as we aren't blocking
 		// servers from creating RoomIDs in exclusive application service namespaces
 	} `yaml:"-"`
+}
+
+// KeyPerspectives are used to configure perspective key servers for
+// retrieving server keys.
+type KeyPerspectives []struct {
+	// The server name of the perspective key server
+	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
+	// Server keys for the perspective user, used to verify the
+	// keys have been signed by the perspective server
+	Keys []struct {
+		// The key ID, e.g. ed25519:auto
+		KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
+		// The public key in base64 unpadded format
+		PublicKey string `yaml:"public_key"`
+	} `yaml:"keys"`
 }
 
 // A Path on the filesystem.
