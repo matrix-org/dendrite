@@ -92,9 +92,9 @@ func SetVisibility(
 		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
 		return jsonerror.InternalServerError()
 	}
-	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
 
-	// Check if the user's power is greater than power required to change m.room.aliases event
+	// NOTSPEC: Check if the user's power is greater than power required to change m.room.aliases event
+	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
 	if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomAliases, true) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
