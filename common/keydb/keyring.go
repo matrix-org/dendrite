@@ -15,12 +15,10 @@
 package keydb
 
 import (
-	"context"
 	"encoding/base64"
 
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 )
@@ -42,7 +40,7 @@ func CreateKeyRing(client gomatrixserverlib.Client,
 		KeyDatabase: keyDB,
 	}
 
-	util.GetLogger(context.TODO()).Info("Enabled direct key fetcher")
+	logrus.Info("Enabled direct key fetcher")
 
 	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
 	for _, ps := range cfg.Matrix.KeyPerspectives {
@@ -55,7 +53,7 @@ func CreateKeyRing(client gomatrixserverlib.Client,
 		for _, key := range ps.Keys {
 			rawkey, err := b64e.DecodeString(key.PublicKey)
 			if err != nil {
-				util.GetLogger(context.TODO()).WithError(err).WithFields(logrus.Fields{
+				logrus.WithError(err).WithFields(logrus.Fields{
 					"server_name": ps.ServerName,
 					"public_key":  key.PublicKey,
 				}).Warn("Couldn't parse perspective key")
@@ -64,7 +62,10 @@ func CreateKeyRing(client gomatrixserverlib.Client,
 			perspective.PerspectiveServerKeys[key.KeyID] = rawkey
 		}
 
-		util.GetLogger(context.TODO()).WithField("server_name", ps.ServerName).Info("Enabled perspective key fetcher")
+		logrus.WithFields(logrus.Fields{
+			"server_name":     ps.ServerName,
+			"num_public_keys": len(ps.Keys),
+		}).Info("Enabled perspective key fetcher")
 	}
 
 	return fetchers
