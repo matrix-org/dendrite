@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"runtime/debug"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
@@ -179,8 +178,7 @@ func (s *roomStatements) selectRoomVersionForRoomID(
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
 	if err == sql.ErrNoRows {
-		debug.PrintStack()
-		return roomVersion, fmt.Errorf("room ID %q not found", roomID)
+		return roomVersion, fmt.Errorf("room not found")
 	}
 	return roomVersion, err
 }
@@ -192,8 +190,7 @@ func (s *roomStatements) selectRoomVersionForRoomNID(
 	stmt := common.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
 	if err == sql.ErrNoRows {
-		debug.PrintStack()
-		return roomVersion, fmt.Errorf("room NID %d not found", roomNID)
+		return roomVersion, fmt.Errorf("room not found")
 	}
 	return roomVersion, err
 }
