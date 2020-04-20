@@ -29,7 +29,7 @@ import (
 // backed by the given KeyDatabase.
 func CreateKeyRing(client gomatrixserverlib.Client,
 	keyDB gomatrixserverlib.KeyDatabase,
-	cfg *config.Dendrite) gomatrixserverlib.KeyRing {
+	cfg config.KeyPerspectives) gomatrixserverlib.KeyRing {
 
 	fetchers := gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
@@ -43,7 +43,7 @@ func CreateKeyRing(client gomatrixserverlib.Client,
 	logrus.Info("Enabled direct key fetcher")
 
 	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
-	for _, ps := range cfg.Matrix.KeyPerspectives {
+	for _, ps := range cfg {
 		perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
 			PerspectiveServerName: ps.ServerName,
 			PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},

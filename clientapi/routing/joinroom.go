@@ -425,12 +425,14 @@ func (r joinRoomReq) checkSendJoinResponse(
 	retries := map[string]bool{}
 
 retryCheck:
+	// TODO: Can we expand Check here to return a list of missing auth
+	// events rather than failing one at a time?
 	if err := respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
 		switch e := err.(type) {
 		case gomatrixserverlib.MissingAuthEventError:
 			// Check that we haven't already retried for this event, prevents
 			// us from ending up in endless loops
-			if _, ok := retries[e.AuthEventID]; !ok {
+			if !retries[e.AuthEventID] {
 				// Ask the server that we're talking to right now for the event
 				tx, txerr := r.federation.GetEvent(r.req.Context(), server, e.AuthEventID)
 				if txerr != nil {
