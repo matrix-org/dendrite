@@ -102,11 +102,11 @@ func main() {
 	if *certFile != "" && *keyFile != "" {
 		go func() {
 			serv := http.Server{
-				Addr:         *httpBindAddr,
+				Addr:         *httpsBindAddr,
 				WriteTimeout: basecomponent.HTTPServerTimeout,
 			}
 
-			logrus.Info("Listening on ", *httpsBindAddr)
+			logrus.Info("Listening on ", serv.Addr)
 			logrus.Fatal(serv.ListenAndServeTLS(*certFile, *keyFile))
 		}()
 	}

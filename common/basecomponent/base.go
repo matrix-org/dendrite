@@ -210,20 +210,20 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		addr = listenaddr
 	}
 
-	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux), b.Cfg)
-	logrus.Infof("Starting %s server on %s", b.componentName, addr)
-
 	serv := http.Server{
 		Addr:         addr,
 		WriteTimeout: HTTPServerTimeout,
 	}
+
+	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux), b.Cfg)
+	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 
 	err := serv.ListenAndServe()
 	if err != nil {
 		logrus.WithError(err).Fatal("failed to serve http")
 	}
 
-	logrus.Infof("Stopped %s server on %s", b.componentName, addr)
+	logrus.Infof("Stopped %s server on %s", b.componentName, serv.Addr)
 }
 
 // setupKafka creates kafka consumer/producer pair from the config.
