@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -407,13 +408,19 @@ retryCheck:
 		}
 	}
 
-	if err = r.producer.SendEventWithState(
-		r.req.Context(),
-		gomatrixserverlib.RespState(respSendJoin.RespState),
-		event.Headered(respMakeJoin.RoomVersion),
-	); err != nil {
-		return nil, fmt.Errorf("r.producer.SendEventWithState: %w", err)
-	}
+	// TODO: think about this some more, otherwise the request blocks and can time
+	// out on the roomserver processing the new room state, when the syncapi etc
+	// would eventually get those events anyway?
+	go func() {
+		ctx := context.TODO()
+		if err = r.producer.SendEventWithState(
+			ctx, //r.req.Context(),
+			gomatrixserverlib.RespState(respSendJoin.RespState),
+			event.Headered(respMakeJoin.RoomVersion),
+		); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("r.producer.SendEventWithState")
+		}
+	}()
 
 	return &util.JSONResponse{
 		Code: http.StatusOK,
