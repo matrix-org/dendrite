@@ -54,12 +54,12 @@ type BaseDendrite struct {
 	tracerCloser  io.Closer
 
 	// APIMux should be used to register new public matrix api endpoints
-	APIMux        *mux.Router
-	httpClient    *http.Client
-	Cfg           *config.Dendrite
-	Cache         caching.Cache
-	KafkaConsumer sarama.Consumer
-	KafkaProducer sarama.SyncProducer
+	APIMux         *mux.Router
+	httpClient     *http.Client
+	Cfg            *config.Dendrite
+	ImmutableCache caching.ImmutableCache
+	KafkaConsumer  sarama.Consumer
+	KafkaProducer  sarama.SyncProducer
 }
 
 const HTTPServerTimeout = time.Minute * 5
@@ -85,20 +85,20 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
-	cache, err := caching.NewInMemoryLRUCache()
+	cache, err := caching.NewImmutableInMemoryLRUCache()
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
 	return &BaseDendrite{
-		componentName: componentName,
-		tracerCloser:  closer,
-		Cfg:           cfg,
-		Cache:         cache,
-		APIMux:        mux.NewRouter().UseEncodedPath(),
-		httpClient:    &http.Client{Timeout: HTTPClientTimeout},
-		KafkaConsumer: kafkaConsumer,
-		KafkaProducer: kafkaProducer,
+		componentName:  componentName,
+		tracerCloser:   closer,
+		Cfg:            cfg,
+		ImmutableCache: cache,
+		APIMux:         mux.NewRouter().UseEncodedPath(),
+		httpClient:     &http.Client{Timeout: HTTPClientTimeout},
+		KafkaConsumer:  kafkaConsumer,
+		KafkaProducer:  kafkaProducer,
 	}
 }
 
@@ -132,7 +132,7 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverInputAPIHTTP failed", b.httpClient)
 	}
-	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.Cache)
+	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverQueryAPIHTTP failed", b.httpClient)
 	}

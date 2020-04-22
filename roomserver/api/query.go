@@ -412,7 +412,7 @@ const RoomserverQueryRoomVersionForRoomPath = "/api/roomserver/queryRoomVersionF
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil an error is returned
-func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client, cache caching.Cache) (RoomserverQueryAPI, error) {
+func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client, cache caching.ImmutableCache) (RoomserverQueryAPI, error) {
 	if httpClient == nil {
 		return nil, errors.New("NewRoomserverQueryAPIHTTP: httpClient is <nil>")
 	}
@@ -420,9 +420,9 @@ func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client, ca
 }
 
 type httpRoomserverQueryAPI struct {
-	roomserverURL string
-	httpClient    *http.Client
-	cache         caching.Cache
+	roomserverURL  string
+	httpClient     *http.Client
+	immutableCache caching.ImmutableCache
 }
 
 // QueryLatestEventsAndState implements RoomserverQueryAPI
@@ -587,7 +587,7 @@ func (h *httpRoomserverQueryAPI) QueryRoomVersionForRoom(
 	request *QueryRoomVersionForRoomRequest,
 	response *QueryRoomVersionForRoomResponse,
 ) error {
-	if roomVersion, ok := h.cache.GetRoomVersion(request.RoomID); ok {
+	if roomVersion, ok := h.immutableCache.GetRoomVersion(request.RoomID); ok {
 		response.RoomVersion = roomVersion
 		return nil
 	}
@@ -598,7 +598,7 @@ func (h *httpRoomserverQueryAPI) QueryRoomVersionForRoom(
 	apiURL := h.roomserverURL + RoomserverQueryRoomVersionForRoomPath
 	err := commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err == nil {
-		h.cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
+		h.immutableCache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	}
 	return err
 }

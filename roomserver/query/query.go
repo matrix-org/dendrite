@@ -98,8 +98,8 @@ type RoomserverQueryAPIDatabase interface {
 
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
 type RoomserverQueryAPI struct {
-	DB    RoomserverQueryAPIDatabase
-	Cache caching.Cache
+	DB             RoomserverQueryAPIDatabase
+	ImmutableCache caching.ImmutableCache
 }
 
 // QueryLatestEventsAndState implements api.RoomserverQueryAPI
@@ -898,7 +898,7 @@ func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
 	request *api.QueryRoomVersionForRoomRequest,
 	response *api.QueryRoomVersionForRoomResponse,
 ) error {
-	if roomVersion, ok := r.Cache.GetRoomVersion(request.RoomID); ok {
+	if roomVersion, ok := r.ImmutableCache.GetRoomVersion(request.RoomID); ok {
 		response.RoomVersion = roomVersion
 		return nil
 	}
@@ -908,7 +908,7 @@ func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
 		return err
 	}
 	response.RoomVersion = roomVersion
-	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
+	r.ImmutableCache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	return nil
 }
 
