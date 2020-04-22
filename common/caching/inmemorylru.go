@@ -10,7 +10,7 @@ type InMemoryLRUCache struct {
 }
 
 func NewInMemoryLRUCache() (*InMemoryLRUCache, error) {
-	roomVersionCache, rvErr := lru.New(128)
+	roomVersionCache, rvErr := lru.New(MaxRoomVersionCacheEntries)
 	if rvErr != nil {
 		return nil, rvErr
 	}
