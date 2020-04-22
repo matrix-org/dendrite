@@ -28,6 +28,7 @@ import (
 
 	"net/http"
 
+	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/common/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -253,6 +254,11 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		panic(err)
 	}
 
+	cache, err := caching.NewImmutableInMemoryLRUCache()
+	if err != nil {
+		panic(err)
+	}
+
 	doInput := func() {
 		fmt.Printf("Roomserver is ready to receive input, sending %d events\n", len(input))
 		if err = writeToRoomServer(input, cfg.RoomServerURL()); err != nil {
@@ -270,7 +276,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	cmd.Args = []string{"dendrite-room-server", "--config", filepath.Join(dir, test.ConfigFile)}
 
 	gotOutput, err := runAndReadFromTopic(cmd, cfg.RoomServerURL()+"/metrics", doInput, outputTopic, len(wantOutput), func() {
-		queryAPI, _ := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), &http.Client{Timeout: timeoutHTTP}, nil)
+		queryAPI, _ := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), &http.Client{Timeout: timeoutHTTP}, cache)
 		checkQueries(queryAPI)
 	})
 	if err != nil {

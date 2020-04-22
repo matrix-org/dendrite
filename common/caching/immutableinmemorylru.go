@@ -28,9 +28,6 @@ func checkForInvalidMutation(cache *lru.Cache, key string, value interface{}) {
 }
 
 func (c *ImmutableInMemoryLRUCache) GetRoomVersion(roomID string) (gomatrixserverlib.RoomVersion, bool) {
-	if c == nil {
-		return "", false
-	}
 	val, found := c.roomVersions.Get(roomID)
 	if found && val != nil {
 		if roomVersion, ok := val.(gomatrixserverlib.RoomVersion); ok {
@@ -41,9 +38,6 @@ func (c *ImmutableInMemoryLRUCache) GetRoomVersion(roomID string) (gomatrixserve
 }
 
 func (c *ImmutableInMemoryLRUCache) StoreRoomVersion(roomID string, roomVersion gomatrixserverlib.RoomVersion) {
-	if c == nil {
-		return
-	}
 	checkForInvalidMutation(c.roomVersions, roomID, roomVersion)
 	c.roomVersions.Add(roomID, roomVersion)
 }
