@@ -15,6 +15,8 @@
 package sync
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -124,6 +126,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 		if !syncData.IsEmpty() || hasTimedOut {
 			logger.WithField("next", syncData.NextBatch).WithField("timed_out", hasTimedOut).Info("Responding")
+
+			j, _ := json.MarshalIndent(syncData, "", "  ")
+			fmt.Println(string(j))
+
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: syncData,

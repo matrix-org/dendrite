@@ -247,14 +247,19 @@ func NewJoinResponse() *JoinResponse {
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
 type InviteResponse struct {
 	InviteState struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
+		Events json.RawMessage `json:"events"`
 	} `json:"invite_state"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse() *InviteResponse {
+func NewInviteResponse(ev gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
-	res.InviteState.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	var unsigned struct {
+		InviteRoomState json.RawMessage `json:"invite_room_state"`
+	}
+	if err := json.Unmarshal(ev.Unsigned(), &unsigned); err == nil {
+		res.InviteState.Events = unsigned.InviteRoomState
+	}
 	return &res
 }
 

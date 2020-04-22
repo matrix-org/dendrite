@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/Shopify/sarama"
@@ -154,6 +155,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) error {
+	stateKey := msg.Event.StateKey()
+	if stateKey == nil {
+		return errors.New("invite has no state key")
+	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -164,7 +169,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&msg.Event, "", nil, types.PaginationToken{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(&msg.Event, "", []string{*stateKey}, types.PaginationToken{PDUPosition: pduPos})
 	return nil
 }
 

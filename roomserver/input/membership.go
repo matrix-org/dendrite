@@ -143,8 +143,7 @@ func updateToInviteMembership(
 		// consider a single stream of events when determining whether a user
 		// is invited, rather than having to combine multiple streams themselves.
 		onie := api.OutputNewInviteEvent{
-			Event:       (*add).Headered(roomVersion),
-			RoomVersion: roomVersion,
+			Event: (*add).Headered(roomVersion),
 		}
 		updates = append(updates, api.OutputEvent{
 			Type:           api.OutputTypeNewInviteEvent,
