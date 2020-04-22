@@ -1,7 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
-	github.com/Shopify/sarama v1.26.0
+	github.com/Shopify/sarama v1.26.1
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/lib/pq v1.2.0
@@ -18,7 +18,7 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200325174927-327088cdef10
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20200422082552-d7b4202c47f3
-	github.com/matrix-org/naffka v0.0.0-20200127221512-0716baaabaf1
+	github.com/matrix-org/naffka v0.0.0-20200422132410-a5393070ecda
 	github.com/matrix-org/util v0.0.0-20190711121626-527ce5ddefc7
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
