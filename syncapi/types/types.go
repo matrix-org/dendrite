@@ -254,12 +254,14 @@ type InviteResponse struct {
 // NewInviteResponse creates an empty response with initialised arrays.
 func NewInviteResponse(ev gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
-	res.InviteState.Events = json.RawMessage{'[', ']'}
 	var unsigned struct {
 		InviteRoomState json.RawMessage `json:"invite_room_state"`
 	}
 	if err := json.Unmarshal(ev.Unsigned(), &unsigned); err == nil {
 		res.InviteState.Events = unsigned.InviteRoomState
+	}
+	if res.InviteState.Events == nil {
+		res.InviteState.Events = json.RawMessage{'[', ']'}
 	}
 	return &res
 }
