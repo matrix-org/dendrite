@@ -17,6 +17,11 @@ POST /register rejects registration of usernames with 'é'
 POST /register rejects registration of usernames with '\n'
 POST /register rejects registration of usernames with '''
 GET /login yields a set of flows
+POST /login can log in as a user
+POST /login returns the same device_id as that in the request
+POST /login can log in as a user with just the local part of the id
+POST /login as non-existing user is rejected
+POST /login wrong password is rejected
 GET /events initially
 GET /initialSync initially
 Version responds 200 OK with valid structure
@@ -55,8 +60,9 @@ Request to logout with invalid an access token is rejected
 Request to logout without an access token is rejected
 Room creation reports m.room.create to myself
 Room creation reports m.room.member to myself
-New room members see their own join event
-Existing members see new members' join events
+# Blacklisted because these tests call /r0/events which we don't implement
+# New room members see their own join event
+# Existing members see new members' join events
 setting 'm.room.power_levels' respects room powerlevel
 Unprivileged users can set m.room.topic if it only needs level 0
 Users cannot set ban powerlevel higher than their own
@@ -245,3 +251,5 @@ Remote user can backfill in a room with version 4
 Outbound federation can send invites via v2 API
 User can invite local user to room with version 3
 User can invite local user to room with version 4
+A pair of servers can establish a join in a v2 room
+Can logout all devices

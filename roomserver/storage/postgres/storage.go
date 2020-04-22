@@ -20,7 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -39,7 +39,7 @@ type Database struct {
 func Open(dataSourceName string) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if d.db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = d.statements.prepare(d.db); err != nil {
@@ -146,7 +146,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 	if event.Type() != gomatrixserverlib.MRoomCreate {
 		return gomatrixserverlib.RoomVersion(""), nil
 	}
-	roomVersion = roomserverVersion.DefaultRoomVersion()
+	roomVersion = gomatrixserverlib.RoomVersionV1
 	var createContent gomatrixserverlib.CreateContent
 	// The m.room.create event contains an optional "room_version" key in
 	// the event content, so we need to unmarshal that first.

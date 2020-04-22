@@ -21,6 +21,7 @@ import (
 
 	// Import the postgres database driver.
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
@@ -36,7 +37,7 @@ type Database struct {
 func Open(dataSourceName string) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, err = sql.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
 		return nil, err
 	}
 	if err = d.statements.prepare(d.db); err != nil {

@@ -23,7 +23,9 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
+	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/common/keydb"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
 
@@ -52,12 +54,16 @@ type BaseDendrite struct {
 	tracerCloser  io.Closer
 
 	// APIMux should be used to register new public matrix api endpoints
-	APIMux        *mux.Router
-	httpClient    *http.Client
-	Cfg           *config.Dendrite
-	KafkaConsumer sarama.Consumer
-	KafkaProducer sarama.SyncProducer
+	APIMux         *mux.Router
+	httpClient     *http.Client
+	Cfg            *config.Dendrite
+	ImmutableCache caching.ImmutableCache
+	KafkaConsumer  sarama.Consumer
+	KafkaProducer  sarama.SyncProducer
 }
+
+const HTTPServerTimeout = time.Minute * 5
+const HTTPClientTimeout = time.Second * 30
 
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
@@ -79,16 +85,20 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
-	const defaultHTTPTimeout = 30 * time.Second
+	cache, err := caching.NewImmutableInMemoryLRUCache()
+	if err != nil {
+		logrus.WithError(err).Warnf("Failed to create cache")
+	}
 
 	return &BaseDendrite{
-		componentName: componentName,
-		tracerCloser:  closer,
-		Cfg:           cfg,
-		APIMux:        mux.NewRouter().UseEncodedPath(),
-		httpClient:    &http.Client{Timeout: defaultHTTPTimeout},
-		KafkaConsumer: kafkaConsumer,
-		KafkaProducer: kafkaProducer,
+		componentName:  componentName,
+		tracerCloser:   closer,
+		Cfg:            cfg,
+		ImmutableCache: cache,
+		APIMux:         mux.NewRouter().UseEncodedPath(),
+		httpClient:     &http.Client{Timeout: HTTPClientTimeout},
+		KafkaConsumer:  kafkaConsumer,
+		KafkaProducer:  kafkaProducer,
 	}
 }
 
@@ -114,7 +124,6 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	roomserverAPI.RoomserverInputAPI,
 	roomserverAPI.RoomserverQueryAPI,
 ) {
-
 	alias, err := roomserverAPI.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverAliasAPIHTTP failed")
@@ -123,7 +132,7 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverInputAPIHTTP failed", b.httpClient)
 	}
-	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), nil)
+	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverQueryAPIHTTP failed", b.httpClient)
 	}
@@ -133,7 +142,7 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 // CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
 // server over HTTP
 func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI {
-	e, err := eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), nil)
+	e, err := eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewEDUServerInputAPIHTTP failed", b.httpClient)
 	}
@@ -143,7 +152,7 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 // CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
 // the federation sender over HTTP
 func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
-	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), nil)
+	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewFederationSenderQueryAPIHTTP failed", b.httpClient)
 	}
@@ -208,16 +217,20 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		addr = listenaddr
 	}
 
-	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux))
-	logrus.Infof("Starting %s server on %s", b.componentName, addr)
+	serv := http.Server{
+		Addr:         addr,
+		WriteTimeout: HTTPServerTimeout,
+	}
 
-	err := http.ListenAndServe(addr, nil)
+	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux), b.Cfg)
+	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 
+	err := serv.ListenAndServe()
 	if err != nil {
 		logrus.WithError(err).Fatal("failed to serve http")
 	}
 
-	logrus.Infof("Stopped %s server on %s", b.componentName, addr)
+	logrus.Infof("Stopped %s server on %s", b.componentName, serv.Addr)
 }
 
 // setupKafka creates kafka consumer/producer pair from the config.
@@ -243,7 +256,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
 	if err != nil || uri.Scheme == "file" {
-		db, err = sql.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka))
+		db, err = sqlutil.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}
@@ -253,7 +266,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
 	} else {
-		db, err = sql.Open("postgres", string(cfg.Database.Naffka))
+		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}

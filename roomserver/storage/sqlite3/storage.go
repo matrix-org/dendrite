@@ -22,7 +22,7 @@ import (
 	"errors"
 	"net/url"
 
-	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -52,7 +52,7 @@ func Open(dataSourceName string) (*Database, error) {
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sql.Open(common.SQLiteDriverName(), cs); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs); err != nil {
 		return nil, err
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
@@ -175,7 +175,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 	if event.Type() != gomatrixserverlib.MRoomCreate {
 		return gomatrixserverlib.RoomVersion(""), nil
 	}
-	roomVersion = roomserverVersion.DefaultRoomVersion()
+	roomVersion = gomatrixserverlib.RoomVersionV1
 	var createContent gomatrixserverlib.CreateContent
 	// The m.room.create event contains an optional "room_version" key in
 	// the event content, so we need to unmarshal that first.

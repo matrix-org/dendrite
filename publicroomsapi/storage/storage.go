@@ -23,6 +23,9 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
 )
 
+const schemePostgres = "postgres"
+const schemeFile = "file"
+
 // NewPublicRoomsServerDatabase opens a database connection.
 func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
@@ -30,9 +33,9 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
 		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
 	}
 	switch uri.Scheme {
-	case "postgres":
+	case schemePostgres:
 		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
-	case "file":
+	case schemeFile:
 		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
 	default:
 		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
