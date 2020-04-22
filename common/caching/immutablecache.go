@@ -3,7 +3,6 @@ package caching
 import "github.com/matrix-org/gomatrixserverlib"
 
 const (
-	RoomVersionCachingEnabled  = true
 	RoomVersionMaxCacheEntries = 128
 )
 

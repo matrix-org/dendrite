@@ -1,6 +1,8 @@
 package caching
 
 import (
+	"fmt"
+
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -21,12 +23,12 @@ func NewImmutableInMemoryLRUCache() (*ImmutableInMemoryLRUCache, error) {
 
 func checkForInvalidMutation(cache *lru.Cache, key string, value interface{}) {
 	if peek, ok := cache.Peek(key); ok && peek != value {
-		panic("invalid use of immutable cache tries to mutate existing value")
+		panic(fmt.Sprintf("invalid use of immutable cache tries to mutate existing value of %q", key))
 	}
 }
 
 func (c *ImmutableInMemoryLRUCache) GetRoomVersion(roomID string) (gomatrixserverlib.RoomVersion, bool) {
-	if c == nil || !RoomVersionCachingEnabled {
+	if c == nil {
 		return "", false
 	}
 	val, found := c.roomVersions.Get(roomID)
@@ -39,7 +41,7 @@ func (c *ImmutableInMemoryLRUCache) GetRoomVersion(roomID string) (gomatrixserve
 }
 
 func (c *ImmutableInMemoryLRUCache) StoreRoomVersion(roomID string, roomVersion gomatrixserverlib.RoomVersion) {
-	if c == nil || !RoomVersionCachingEnabled {
+	if c == nil {
 		return
 	}
 	checkForInvalidMutation(c.roomVersions, roomID, roomVersion)
