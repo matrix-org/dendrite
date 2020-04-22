@@ -1,6 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
+	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/kr/pretty v0.2.0 // indirect
