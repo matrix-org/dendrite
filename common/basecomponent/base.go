@@ -85,11 +85,16 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
+	cache, err := caching.NewInMemoryLRUCache()
+	if err != nil {
+		logrus.WithError(err).Warnf("Failed to create cache")
+	}
+
 	return &BaseDendrite{
 		componentName: componentName,
 		tracerCloser:  closer,
 		Cfg:           cfg,
-		Cache:         caching.NewInMemoryLRUCache(), // TODO: make configurable
+		Cache:         cache,
 		APIMux:        mux.NewRouter().UseEncodedPath(),
 		httpClient:    &http.Client{Timeout: HTTPClientTimeout},
 		KafkaConsumer: kafkaConsumer,

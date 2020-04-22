@@ -1,30 +1,29 @@
 package caching
 
 import (
-	"sync"
-
-	"github.com/golang/groupcache/lru"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type InMemoryLRUCache struct {
-	roomVersions      *lru.Cache
-	roomVersionsMutex sync.RWMutex
+	roomVersions *lru.Cache
 }
 
-func NewInMemoryLRUCache() *InMemoryLRUCache {
-	return &InMemoryLRUCache{
-		roomVersions: lru.New(128),
+func NewInMemoryLRUCache() (*InMemoryLRUCache, error) {
+	roomVersionCache, rvErr := lru.New(128)
+	if rvErr != nil {
+		return nil, rvErr
 	}
+	return &InMemoryLRUCache{
+		roomVersions: roomVersionCache,
+	}, nil
 }
 
 func (c *InMemoryLRUCache) GetRoomVersion(roomID string) (gomatrixserverlib.RoomVersion, bool) {
 	if c == nil {
 		return "", false
 	}
-	c.roomVersionsMutex.RLock()
 	val, found := c.roomVersions.Get(roomID)
-	c.roomVersionsMutex.RUnlock()
 	if found && val != nil {
 		if roomVersion, ok := val.(gomatrixserverlib.RoomVersion); ok {
 			return roomVersion, true
@@ -37,7 +36,5 @@ func (c *InMemoryLRUCache) StoreRoomVersion(roomID string, roomVersion gomatrixs
 	if c == nil {
 		return
 	}
-	c.roomVersionsMutex.Lock()
-	defer c.roomVersionsMutex.Unlock()
 	c.roomVersions.Add(roomID, roomVersion)
 }
