@@ -43,6 +43,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -361,7 +362,7 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 	// Check namespaces and see if more than one match
 	matchCount := 0
 	for _, appservice := range cfg.Derived.ApplicationServices {
-		if appservice.IsInterestedInUserID(userID) {
+		if appservice.OwnsNamespaceCoveringUserId(userID) {
 			if matchCount++; matchCount > 1 {
 				return true
 			}
@@ -439,15 +440,17 @@ func validateApplicationService(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
+	}
+	if req.URL.Query().Get("kind") == "guest" {
+		return handleGuestRegistration(req, r, cfg, accountDB, deviceDB)
 	}
 
 	// Retrieve or generate the sessionID
@@ -468,7 +471,8 @@ func Register(
 	if r.Username == "" {
 		id, err := accountDB.GetNewNumericLocalpart(req.Context())
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetNewNumericLocalpart failed")
+			return jsonerror.InternalServerError()
 		}
 
 		r.Username = strconv.FormatInt(id, 10)
@@ -505,6 +509,51 @@ func Register(
 	return handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
 }
 
+func handleGuestRegistration(
+	req *http.Request,
+	r registerRequest,
+	cfg *config.Dendrite,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
+) util.JSONResponse {
+	acc, err := accountDB.CreateGuestAccount(req.Context())
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
+		}
+	}
+	token, err := tokens.GenerateLoginToken(tokens.TokenOptions{
+		ServerPrivateKey: cfg.Matrix.PrivateKey.Seed(),
+		ServerName:       string(acc.ServerName),
+		UserID:           acc.UserID,
+	})
+
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("Failed to generate access token"),
+		}
+	}
+	//we don't allow guests to specify their own device_id
+	dev, err := deviceDB.CreateDevice(req.Context(), acc.Localpart, nil, token, r.InitialDisplayName)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("failed to create device: " + err.Error()),
+		}
+	}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: registerResponse{
+			UserID:      dev.UserID,
+			AccessToken: dev.AccessToken,
+			HomeServer:  acc.ServerName,
+			DeviceID:    dev.ID,
+		},
+	}
+}
+
 // handleRegistrationFlow will direct and complete registration flow stages
 // that the client has requested.
 // nolint: gocyclo
@@ -513,8 +562,8 @@ func handleRegistrationFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
@@ -545,7 +594,8 @@ func handleRegistrationFlow(
 		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Auth.Mac)
 
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
+			return jsonerror.InternalServerError()
 		} else if !valid {
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
@@ -611,8 +661,8 @@ func handleApplicationServiceRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
@@ -650,8 +700,8 @@ func checkAndCompleteFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
@@ -673,8 +723,8 @@ func checkAndCompleteFlow(
 // LegacyRegister process register requests from the legacy v1 API
 func LegacyRegister(
 	req *http.Request,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var r legacyRegisterRequest
@@ -701,7 +751,8 @@ func LegacyRegister(
 
 		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Mac)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if !valid {
@@ -757,8 +808,8 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 // not all
 func completeRegistration(
 	ctx context.Context,
-	accountDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountDB accounts.Database,
+	deviceDB devices.Database,
 	username, password, appserviceID string,
 	inhibitLogin common.WeakBoolean,
 	displayName, deviceID *string,
@@ -934,8 +985,8 @@ type availableResponse struct {
 // RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
-	cfg config.Dendrite,
-	accountDB *accounts.Database,
+	cfg *config.Dendrite,
+	accountDB accounts.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 
@@ -949,7 +1000,7 @@ func RegisterAvailable(
 	// Check if this username is reserved by an application service
 	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
 	for _, appservice := range cfg.Derived.ApplicationServices {
-		if appservice.IsInterestedInUserID(userID) {
+		if appservice.OwnsNamespaceCoveringUserId(userID) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.UserInUse("Desired user ID is reserved by an application service."),

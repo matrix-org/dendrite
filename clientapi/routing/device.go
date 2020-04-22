@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -40,14 +39,19 @@ type deviceUpdateJSON struct {
 	DisplayName *string `json:"display_name"`
 }
 
+type devicesDeleteJSON struct {
+	Devices []string `json:"devices"`
+}
+
 // GetDeviceByID handles /devices/{deviceID}
 func GetDeviceByID(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	ctx := req.Context()
@@ -58,7 +62,8 @@ func GetDeviceByID(
 			JSON: jsonerror.NotFound("Unknown device"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDeviceByID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
@@ -72,18 +77,20 @@ func GetDeviceByID(
 
 // GetDevicesByLocalpart handles /devices
 func GetDevicesByLocalpart(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	ctx := req.Context()
 	deviceList, err := deviceDB.GetDevicesByLocalpart(ctx, localpart)
 
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDevicesByLocalpart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	res := devicesJSON{}
@@ -103,12 +110,13 @@ func GetDevicesByLocalpart(
 
 // UpdateDeviceByID handles PUT on /devices/{deviceID}
 func UpdateDeviceByID(
-	req *http.Request, deviceDB *devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	ctx := req.Context()
@@ -119,7 +127,8 @@ func UpdateDeviceByID(
 			JSON: jsonerror.NotFound("Unknown device"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDeviceByID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if dev.UserID != device.UserID {
@@ -134,11 +143,69 @@ func UpdateDeviceByID(
 	payload := deviceUpdateJSON{}
 
 	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("json.NewDecoder.Decode failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if err := deviceDB.UpdateDevice(ctx, localpart, deviceID, payload.DisplayName); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.UpdateDevice failed")
+		return jsonerror.InternalServerError()
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+// DeleteDeviceById handles DELETE requests to /devices/{deviceId}
+func DeleteDeviceById(
+	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	deviceID string,
+) util.JSONResponse {
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
+	}
+	ctx := req.Context()
+
+	defer req.Body.Close() // nolint: errcheck
+
+	if err := deviceDB.RemoveDevice(ctx, deviceID, localpart); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveDevice failed")
+		return jsonerror.InternalServerError()
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+// DeleteDevices handles POST requests to /delete_devices
+func DeleteDevices(
+	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+) util.JSONResponse {
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
+	}
+
+	ctx := req.Context()
+	payload := devicesDeleteJSON{}
+
+	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("json.NewDecoder.Decode failed")
+		return jsonerror.InternalServerError()
+	}
+
+	defer req.Body.Close() // nolint: errcheck
+
+	if err := deviceDB.RemoveDevices(ctx, localpart, payload.Devices); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveDevices failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

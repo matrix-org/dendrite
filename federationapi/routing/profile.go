@@ -15,11 +15,11 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
@@ -30,8 +30,8 @@ import (
 // GetProfile implements GET /_matrix/federation/v1/query/profile
 func GetProfile(
 	httpReq *http.Request,
-	accountDB *accounts.Database,
-	cfg config.Dendrite,
+	accountDB accounts.Database,
+	cfg *config.Dendrite,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	userID, field := httpReq.FormValue("user_id"), httpReq.FormValue("field")
@@ -46,16 +46,24 @@ func GetProfile(
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument(fmt.Sprintf("Format of user ID %q is invalid", userID)),
+		}
 	}
 
 	if domain != cfg.Matrix.ServerName {
-		return httputil.LogThenError(httpReq, err)
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("Domain %q does not match this server", domain)),
+		}
 	}
 
 	profile, err := appserviceAPI.RetrieveUserProfile(httpReq.Context(), userID, asAPI, accountDB)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var res interface{}

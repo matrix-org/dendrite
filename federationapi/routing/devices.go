@@ -17,7 +17,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/util"
@@ -30,7 +29,7 @@ type userDevicesResponse struct {
 // GetUserDevices for the given user id
 func GetUserDevices(
 	req *http.Request,
-	deviceDB *devices.Database,
+	deviceDB devices.Database,
 	userID string,
 ) util.JSONResponse {
 	localpart, err := userutil.ParseUsernameParam(userID, nil)
@@ -43,7 +42,8 @@ func GetUserDevices(
 
 	devs, err := deviceDB.GetDevicesByLocalpart(req.Context(), localpart)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDevicesByLocalPart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

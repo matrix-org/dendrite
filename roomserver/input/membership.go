@@ -112,7 +112,7 @@ func updateMembership(
 
 	switch newMembership {
 	case gomatrixserverlib.Invite:
-		return updateToInviteMembership(mu, add, updates)
+		return updateToInviteMembership(mu, add, updates, updater.RoomVersion())
 	case gomatrixserverlib.Join:
 		return updateToJoinMembership(mu, add, updates)
 	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
@@ -126,6 +126,7 @@ func updateMembership(
 
 func updateToInviteMembership(
 	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
 	// We may have already sent the invite to the user, either because we are
 	// reprocessing this event, or because the we received this invite from a
@@ -142,7 +143,8 @@ func updateToInviteMembership(
 		// consider a single stream of events when determining whether a user
 		// is invited, rather than having to combine multiple streams themselves.
 		onie := api.OutputNewInviteEvent{
-			Event: *add,
+			Event:       (*add).Headered(roomVersion),
+			RoomVersion: roomVersion,
 		}
 		updates = append(updates, api.OutputEvent{
 			Type:           api.OutputTypeNewInviteEvent,

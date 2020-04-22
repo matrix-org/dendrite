@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
@@ -39,16 +38,23 @@ var ErrRoomNoExists = errors.New("Room does not exist")
 // Returns an error if something else went wrong
 func BuildEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, cfg config.Dendrite, evTime time.Time,
+	builder *gomatrixserverlib.EventBuilder, cfg *config.Dendrite, evTime time.Time,
 	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
+	if queryRes == nil {
+		queryRes = &api.QueryLatestEventsAndStateResponse{}
+	}
+
 	err := AddPrevEventsToEvent(ctx, builder, queryAPI, queryRes)
 	if err != nil {
+		// This can pass through a ErrRoomNoExists to the caller
 		return nil, err
 	}
 
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(
+		evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey, queryRes.RoomVersion,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +70,11 @@ func AddPrevEventsToEvent(
 ) error {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
-		return err
+		return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
+	}
+
+	if len(eventsNeeded.Tuples()) == 0 {
+		return errors.New("expecting state tuples for event builder, got none")
 	}
 
 	// Ask the roomserver for information about this room
@@ -72,34 +82,69 @@ func AddPrevEventsToEvent(
 		RoomID:       builder.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),
 	}
-	if queryRes == nil {
-		queryRes = &api.QueryLatestEventsAndStateResponse{}
-	}
 	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
-		return err
+		return fmt.Errorf("queryAPI.QueryLatestEventsAndState: %w", err)
 	}
 
 	if !queryRes.RoomExists {
 		return ErrRoomNoExists
 	}
 
+	eventFormat, err := queryRes.RoomVersion.EventFormat()
+	if err != nil {
+		return fmt.Errorf("queryRes.RoomVersion.EventFormat: %w", err)
+	}
+
 	builder.Depth = queryRes.Depth
-	builder.PrevEvents = queryRes.LatestEvents
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(&queryRes.StateEvents[i])
+		err = authEvents.AddEvent(&queryRes.StateEvents[i].Event)
 		if err != nil {
-			return err
+			return fmt.Errorf("authEvents.AddEvent: %w", err)
 		}
 	}
 
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
 	if err != nil {
-		return err
+		return fmt.Errorf("eventsNeeded.AuthEventReferences: %w", err)
 	}
-	builder.AuthEvents = refs
+
+	truncAuth, truncPrev := truncateAuthAndPrevEvents(refs, queryRes.LatestEvents)
+	switch eventFormat {
+	case gomatrixserverlib.EventFormatV1:
+		builder.AuthEvents = truncAuth
+		builder.PrevEvents = truncPrev
+	case gomatrixserverlib.EventFormatV2:
+		v2AuthRefs, v2PrevRefs := []string{}, []string{}
+		for _, ref := range truncAuth {
+			v2AuthRefs = append(v2AuthRefs, ref.EventID)
+		}
+		for _, ref := range truncPrev {
+			v2PrevRefs = append(v2PrevRefs, ref.EventID)
+		}
+		builder.AuthEvents = v2AuthRefs
+		builder.PrevEvents = v2PrevRefs
+	}
 
 	return nil
+}
+
+// truncateAuthAndPrevEvents limits the number of events we add into
+// an event as prev_events or auth_events.
+// NOTSPEC: The limits here feel a bit arbitrary but they are currently
+// here because of https://github.com/matrix-org/matrix-doc/issues/2307
+// and because Synapse will just drop events that don't comply.
+func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
+	truncAuth, truncPrev []gomatrixserverlib.EventReference,
+) {
+	truncAuth, truncPrev = auth, prev
+	if len(truncAuth) > 10 {
+		truncAuth = truncAuth[:10]
+	}
+	if len(truncPrev) > 20 {
+		truncPrev = truncPrev[:20]
+	}
+	return
 }

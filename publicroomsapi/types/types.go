@@ -14,15 +14,11 @@
 
 package types
 
-// PublicRoom represents a local public room
-type PublicRoom struct {
-	RoomID           string   `json:"room_id"`
-	Aliases          []string `json:"aliases,omitempty"`
-	CanonicalAlias   string   `json:"canonical_alias,omitempty"`
-	Name             string   `json:"name,omitempty"`
-	Topic            string   `json:"topic,omitempty"`
-	AvatarURL        string   `json:"avatar_url,omitempty"`
-	NumJoinedMembers int64    `json:"num_joined_members"`
-	WorldReadable    bool     `json:"world_readable"`
-	GuestCanJoin     bool     `json:"guest_can_join"`
+// ExternalPublicRoomsProvider provides a list of homeservers who should be queried
+// periodically for a list of public rooms on their server.
+type ExternalPublicRoomsProvider interface {
+	// The list of homeserver domains to query. These servers will receive a request
+	// via this API: https://matrix.org/docs/spec/server_server/latest#public-room-directory
+	// This will be called -on demand- by clients, so cache appropriately!
+	Homeservers() []string
 }

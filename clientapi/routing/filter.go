@@ -27,7 +27,7 @@ import (
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
 func GetFilter(
-	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string, filterID string,
+	req *http.Request, device *authtypes.Device, accountDB accounts.Database, userID string, filterID string,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -37,7 +37,8 @@ func GetFilter(
 	}
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	filter, err := accountDB.GetFilter(req.Context(), localpart, filterID)
@@ -63,7 +64,7 @@ type filterResponse struct {
 
 //PutFilter implements POST /_matrix/client/r0/user/{userId}/filter
 func PutFilter(
-	req *http.Request, device *authtypes.Device, accountDB *accounts.Database, userID string,
+	req *http.Request, device *authtypes.Device, accountDB accounts.Database, userID string,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -74,7 +75,8 @@ func PutFilter(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
 	}
 
 	var filter gomatrixserverlib.Filter
@@ -93,7 +95,8 @@ func PutFilter(
 
 	filterID, err := accountDB.PutFilter(req.Context(), localpart, &filter)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.PutFilter failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

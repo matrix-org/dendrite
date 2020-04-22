@@ -23,6 +23,7 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -38,15 +39,16 @@ import (
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomRequest struct {
-	Invite          []string               `json:"invite"`
-	Name            string                 `json:"name"`
-	Visibility      string                 `json:"visibility"`
-	Topic           string                 `json:"topic"`
-	Preset          string                 `json:"preset"`
-	CreationContent map[string]interface{} `json:"creation_content"`
-	InitialState    []fledglingEvent       `json:"initial_state"`
-	RoomAliasName   string                 `json:"room_alias_name"`
-	GuestCanJoin    bool                   `json:"guest_can_join"`
+	Invite          []string                      `json:"invite"`
+	Name            string                        `json:"name"`
+	Visibility      string                        `json:"visibility"`
+	Topic           string                        `json:"topic"`
+	Preset          string                        `json:"preset"`
+	CreationContent map[string]interface{}        `json:"creation_content"`
+	InitialState    []fledglingEvent              `json:"initial_state"`
+	RoomAliasName   string                        `json:"room_alias_name"`
+	GuestCanJoin    bool                          `json:"guest_can_join"`
+	RoomVersion     gomatrixserverlib.RoomVersion `json:"room_version"`
 }
 
 const (
@@ -134,8 +136,8 @@ type fledglingEvent struct {
 // CreateRoom implements /createRoom
 func CreateRoom(
 	req *http.Request, device *authtypes.Device,
-	cfg config.Dendrite, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	cfg *config.Dendrite, producer *producers.RoomserverProducer,
+	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
@@ -148,8 +150,8 @@ func CreateRoom(
 // nolint: gocyclo
 func createRoom(
 	req *http.Request, device *authtypes.Device,
-	cfg config.Dendrite, roomID string, producer *producers.RoomserverProducer,
-	accountDB *accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	cfg *config.Dendrite, roomID string, producer *producers.RoomserverProducer,
+	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
@@ -180,20 +182,34 @@ func createRoom(
 	}
 
 	r.CreationContent["creator"] = userID
-	r.CreationContent["room_version"] = "1" // TODO: We set this to 1 before we support Room versioning
+	roomVersion := roomserverVersion.DefaultRoomVersion()
+	if r.RoomVersion != "" {
+		candidateVersion := gomatrixserverlib.RoomVersion(r.RoomVersion)
+		_, roomVersionError := roomserverVersion.SupportedRoomVersion(candidateVersion)
+		if roomVersionError != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.UnsupportedRoomVersion(roomVersionError.Error()),
+			}
+		}
+		roomVersion = candidateVersion
+	}
+	r.CreationContent["room_version"] = roomVersion
 
 	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association
 	// Make sure this doesn't fall into an application service's namespace though!
 
 	logger.WithFields(log.Fields{
-		"userID": userID,
-		"roomID": roomID,
+		"userID":      userID,
+		"roomID":      roomID,
+		"roomVersion": r.CreationContent["room_version"],
 	}).Info("Creating new room")
 
 	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		return jsonerror.InternalServerError()
 	}
 
 	membershipContent := gomatrixserverlib.MemberContent{
@@ -221,7 +237,7 @@ func createRoom(
 		historyVisibility = historyVisibilityShared
 	}
 
-	var builtEvents []gomatrixserverlib.Event
+	var builtEvents []gomatrixserverlib.HeaderedEvent
 
 	// send events into the room in order of:
 	//  1- m.room.create
@@ -276,33 +292,38 @@ func createRoom(
 		}
 		err = builder.SetContent(e.Content)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+			return jsonerror.InternalServerError()
 		}
 		if i > 0 {
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(&builder, &authEvents, cfg, evTime)
+		ev, err = buildEvent(&builder, &authEvents, cfg, evTime, roomVersion)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("buildEvent failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if err = gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.Allowed failed")
+			return jsonerror.InternalServerError()
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, *ev)
+		builtEvents = append(builtEvents, (*ev).Headered(roomVersion))
 		err = authEvents.AddEvent(ev)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("authEvents.AddEvent failed")
+			return jsonerror.InternalServerError()
 		}
 	}
 
 	// send events to the room server
 	_, err = producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName, nil)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// TODO(#269): Reserve room alias while we create the room. This stops us
@@ -321,7 +342,8 @@ func createRoom(
 		var aliasResp roomserverAPI.SetRoomAliasResponse
 		err = aliasAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if aliasResp.AliasExists {
@@ -344,8 +366,9 @@ func createRoom(
 func buildEvent(
 	builder *gomatrixserverlib.EventBuilder,
 	provider gomatrixserverlib.AuthEventProvider,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	evTime time.Time,
+	roomVersion gomatrixserverlib.RoomVersion,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -356,10 +379,12 @@ func buildEvent(
 		return nil, err
 	}
 	builder.AuthEvents = refs
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	event, err := builder.Build(eventID, evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	event, err := builder.Build(
+		evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey, roomVersion,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %s", builder.Type, err)
+		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
 	}
 	return &event, nil
 }

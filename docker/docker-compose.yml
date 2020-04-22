@@ -1,13 +1,21 @@
 version: "3.4"
 services:
+  riot:
+    image: vectorim/riot-web
+    networks:
+      - internal
+    ports:
+      - "8500:80"
+
   monolith:
     container_name: dendrite_monolith
     hostname: monolith
-    entrypoint: ["bash", "./docker/services/monolith.sh"]
+    entrypoint: ["bash", "./docker/services/monolith.sh", "--config", "/etc/dendrite/dendrite.yaml"]
     build: ./
     volumes:
       - ..:/build
       - ./build/bin:/build/bin
+      - ../cfg:/etc/dendrite
     networks:
       - internal
     depends_on:
@@ -95,10 +103,10 @@ services:
     networks:
       - internal
 
-  typing_server:
-    container_name: dendrite_typing_server
-    hostname: typing_server
-    entrypoint: ["bash", "./docker/services/typing-server.sh"]
+  edu_server:
+    container_name: dendrite_edu_server
+    hostname: edu_server
+    entrypoint: ["bash", "./docker/services/edu-server.sh"]
     build: ./
     volumes:
       - ..:/build

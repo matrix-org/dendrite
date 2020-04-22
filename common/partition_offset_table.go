@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS ${prefix}_partition_offsets (
     partition INTEGER NOT NULL,
     -- The 64-bit offset.
     partition_offset BIGINT NOT NULL,
-    CONSTRAINT ${prefix}_topic_partition_unique UNIQUE (topic, partition)
+    UNIQUE (topic, partition)
 );
 `
 
@@ -38,7 +38,7 @@ const selectPartitionOffsetsSQL = "" +
 
 const upsertPartitionOffsetsSQL = "" +
 	"INSERT INTO ${prefix}_partition_offsets (topic, partition, partition_offset) VALUES ($1, $2, $3)" +
-	" ON CONFLICT ON CONSTRAINT ${prefix}_topic_partition_unique" +
+	" ON CONFLICT (topic, partition)" +
 	" DO UPDATE SET partition_offset = $3"
 
 // PartitionOffsetStatements represents a set of statements that can be run on a partition_offsets table.
@@ -90,7 +90,7 @@ func (s *PartitionOffsetStatements) selectPartitionOffsets(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer CloseAndLogIfError(ctx, rows, "selectPartitionOffsets: rows.close() failed")
 	var results []PartitionOffset
 	for rows.Next() {
 		var offset PartitionOffset
@@ -99,7 +99,7 @@ func (s *PartitionOffsetStatements) selectPartitionOffsets(
 		}
 		results = append(results, offset)
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 // UpsertPartitionOffset updates or inserts the partition offset for the given topic.

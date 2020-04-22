@@ -20,7 +20,9 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/consumers"
 	"github.com/matrix-org/dendrite/publicroomsapi/routing"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
+	"github.com/matrix-org/dendrite/publicroomsapi/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,20 +30,18 @@ import (
 // component.
 func SetupPublicRoomsAPIComponent(
 	base *basecomponent.BaseDendrite,
-	deviceDB *devices.Database,
+	deviceDB devices.Database,
+	publicRoomsDB storage.Database,
 	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
+	fedClient *gomatrixserverlib.FederationClient,
+	extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
-	}
-
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, publicRoomsDB, rsQueryAPI,
 	)
-	if err = rsConsumer.Start(); err != nil {
+	if err := rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start public rooms server consumer")
 	}
 
-	routing.Setup(base.APIMux, deviceDB, publicRoomsDB)
+	routing.Setup(base.APIMux, deviceDB, publicRoomsDB, rsQueryAPI, fedClient, extRoomsProvider)
 }

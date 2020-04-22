@@ -17,6 +17,14 @@ matrix:
     trusted_third_party_id_servers:
       - vector.im
       - matrix.org
+    # Perspective key servers which are used when direct key requests fail
+    #key_perspectives:
+    #  - server_name: matrix.org
+    #    keys:
+    #      - key_id: ed25519:auto
+    #        public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+    #      - key_id: ed25519:a_RXGa
+    #        public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 
 # The media repository config
 media:
@@ -53,6 +61,15 @@ media:
         height: 600
         method: scale
 
+# Metrics config for Prometheus
+metrics:
+    # Whether or not metrics are enabled
+    enabled: false
+    # Use basic auth to protect the metrics. Uncomment to the complete block to enable.
+    #basic_auth:
+    #  username: prometheusUser
+    #  password: y0ursecr3tPa$$w0rd
+
 # The config for the TURN server
 turn:
     # Whether or not guests can request TURN credentials
@@ -85,7 +102,7 @@ kafka:
     topics:
         output_room_event: roomserverOutput
         output_client_data: clientapiOutput
-        output_typing_event: typingServerOutput
+        output_typing_event: eduServerOutput
         user_updates: userUpdates
 
 # The postgres connection configs for connecting to the databases e.g a postgres:// URI
@@ -114,7 +131,7 @@ listen:
     public_rooms_api: "localhost:7775"
     federation_sender: "localhost:7776"
     appservice_api: "localhost:7777"
-    typing_server: "localhost:7778"
+    edu_server: "localhost:7778"
 
 # The configuration for tracing the dendrite components.
 tracing:

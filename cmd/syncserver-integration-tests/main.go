@@ -104,7 +104,7 @@ func clientEventJSONForOutputRoomEvent(outputRoomEvent string) string {
 		panic("failed to unmarshal output room event: " + err.Error())
 	}
 	clientEvs := gomatrixserverlib.ToClientEvents([]gomatrixserverlib.Event{
-		out.NewRoomEvent.Event,
+		out.NewRoomEvent.Event.Event,
 	}, gomatrixserverlib.FormatSync)
 	b, err := json.Marshal(clientEvs[0])
 	if err != nil {

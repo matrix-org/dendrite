@@ -140,6 +140,8 @@ type StateEntryList struct {
 // (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
 //  lock on the row in the rooms table holding the latest events for the room.)
 type RoomRecentEventsUpdater interface {
+	// The room version of the room.
+	RoomVersion() gomatrixserverlib.RoomVersion
 	// The latest event IDs and state in the room.
 	LatestEvents() []StateAtEventAndReference
 	// The event ID of the latest event written to the output log in the room.

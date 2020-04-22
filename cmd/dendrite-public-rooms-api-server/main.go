@@ -17,6 +17,8 @@ package main
 import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/publicroomsapi"
+	"github.com/matrix-org/dendrite/publicroomsapi/storage"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -27,8 +29,11 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 
 	_, _, query := base.CreateHTTPRoomserverAPIs()
-
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, query)
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to public rooms db")
+	}
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, query, nil, nil)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.PublicRoomsAPI), string(base.Cfg.Listen.PublicRoomsAPI))
 

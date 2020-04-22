@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +build !wasm
+
 package keydb
 
 import (
-	"context"
 	"net/url"
 
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/common/keydb/postgres"
+	"github.com/matrix-org/dendrite/common/keydb/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
-
-type Database interface {
-	FetcherName() string
-	FetchKeys(ctx context.Context, requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error)
-	StoreKeys(ctx context.Context, keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult) error
-}
 
 // NewDatabase opens a database connection.
 func NewDatabase(
@@ -44,6 +40,8 @@ func NewDatabase(
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
+	case "file":
+		return sqlite3.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
 	default:
 		return postgres.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
 	}

@@ -16,8 +16,8 @@ package common
 
 import (
 	"database/sql"
-
-	"github.com/lib/pq"
+	"fmt"
+	"runtime"
 )
 
 // A Transaction is something that can be committed or rolledback.
@@ -30,11 +30,13 @@ type Transaction interface {
 
 // EndTransaction ends a transaction.
 // If the transaction succeeded then it is committed, otherwise it is rolledback.
-func EndTransaction(txn Transaction, succeeded *bool) {
+// You MUST check the error returned from this function to be sure that the transaction
+// was applied correctly. For example, 'database is locked' errors in sqlite will happen here.
+func EndTransaction(txn Transaction, succeeded *bool) error {
 	if *succeeded {
-		txn.Commit() // nolint: errcheck
+		return txn.Commit() // nolint: errcheck
 	} else {
-		txn.Rollback() // nolint: errcheck
+		return txn.Rollback() // nolint: errcheck
 	}
 }
 
@@ -47,7 +49,12 @@ func WithTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 		return
 	}
 	succeeded := false
-	defer EndTransaction(txn, &succeeded)
+	defer func() {
+		err2 := EndTransaction(txn, &succeeded)
+		if err == nil && err2 != nil { // failed to commit/rollback
+			err = err2
+		}
+	}()
 
 	err = fn(txn)
 	if err != nil {
@@ -69,8 +76,26 @@ func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 	return statement
 }
 
-// IsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation error
-func IsUniqueConstraintViolationErr(err error) bool {
-	pqErr, ok := err.(*pq.Error)
-	return ok && pqErr.Code == "23505"
+// Hack of the century
+func QueryVariadic(count int) string {
+	return QueryVariadicOffset(count, 0)
+}
+
+func QueryVariadicOffset(count, offset int) string {
+	str := "("
+	for i := 0; i < count; i++ {
+		str += fmt.Sprintf("$%d", i+offset+1)
+		if i < (count - 1) {
+			str += ", "
+		}
+	}
+	str += ")"
+	return str
+}
+
+func SQLiteDriverName() string {
+	if runtime.GOOS == "js" {
+		return "sqlite3_js"
+	}
+	return "sqlite3"
 }

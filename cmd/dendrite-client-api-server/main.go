@@ -19,8 +19,8 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
-	"github.com/matrix-org/dendrite/typingserver"
-	"github.com/matrix-org/dendrite/typingserver/cache"
+	"github.com/matrix-org/dendrite/eduserver"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 )
 
 func main() {
@@ -33,16 +33,16 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB)
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
 	asQuery := base.CreateHTTPAppServiceAPIs()
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
 	fedSenderAPI := base.CreateHTTPFederationSenderAPIs()
-	typingInputAPI := typingserver.SetupTypingServerComponent(base, cache.NewTypingCache())
+	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, &keyRing,
-		alias, input, query, typingInputAPI, asQuery, transactions.New(), fedSenderAPI,
+		alias, input, query, eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))

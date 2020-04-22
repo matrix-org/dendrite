@@ -24,18 +24,20 @@ import (
 // RoomserverProducer produces events for the roomserver to consume.
 type RoomserverProducer struct {
 	InputAPI api.RoomserverInputAPI
+	QueryAPI api.RoomserverQueryAPI
 }
 
 // NewRoomserverProducer creates a new RoomserverProducer
-func NewRoomserverProducer(inputAPI api.RoomserverInputAPI) *RoomserverProducer {
+func NewRoomserverProducer(inputAPI api.RoomserverInputAPI, queryAPI api.RoomserverQueryAPI) *RoomserverProducer {
 	return &RoomserverProducer{
 		InputAPI: inputAPI,
+		QueryAPI: queryAPI,
 	}
 }
 
 // SendEvents writes the given events to the roomserver input log. The events are written with KindNew.
 func (c *RoomserverProducer) SendEvents(
-	ctx context.Context, events []gomatrixserverlib.Event, sendAsServer gomatrixserverlib.ServerName,
+	ctx context.Context, events []gomatrixserverlib.HeaderedEvent, sendAsServer gomatrixserverlib.ServerName,
 	txnID *api.TransactionID,
 ) (string, error) {
 	ires := make([]api.InputRoomEvent, len(events))
@@ -54,20 +56,20 @@ func (c *RoomserverProducer) SendEvents(
 // SendEventWithState writes an event with KindNew to the roomserver input log
 // with the state at the event as KindOutlier before it.
 func (c *RoomserverProducer) SendEventWithState(
-	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.Event,
+	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.HeaderedEvent,
 ) error {
 	outliers, err := state.Events()
 	if err != nil {
 		return err
 	}
 
-	ires := make([]api.InputRoomEvent, len(outliers)+1)
-	for i, outlier := range outliers {
-		ires[i] = api.InputRoomEvent{
+	var ires []api.InputRoomEvent
+	for _, outlier := range outliers {
+		ires = append(ires, api.InputRoomEvent{
 			Kind:         api.KindOutlier,
-			Event:        outlier,
+			Event:        outlier.Headered(event.RoomVersion),
 			AuthEventIDs: outlier.AuthEventIDs(),
-		}
+		})
 	}
 
 	stateEventIDs := make([]string, len(state.StateEvents))
@@ -75,13 +77,13 @@ func (c *RoomserverProducer) SendEventWithState(
 		stateEventIDs[i] = state.StateEvents[i].EventID()
 	}
 
-	ires[len(outliers)] = api.InputRoomEvent{
+	ires = append(ires, api.InputRoomEvent{
 		Kind:          api.KindNew,
 		Event:         event,
 		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateEventIDs,
-	}
+	})
 
 	_, err = c.SendInputRoomEvents(ctx, ires)
 	return err
@@ -102,10 +104,15 @@ func (c *RoomserverProducer) SendInputRoomEvents(
 // This should only be needed for invite events that occur outside of a known room.
 // If we are in the room then the event should be sent using the SendEvents method.
 func (c *RoomserverProducer) SendInvite(
-	ctx context.Context, inviteEvent gomatrixserverlib.Event,
+	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
+	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
 ) error {
 	request := api.InputRoomEventsRequest{
-		InputInviteEvents: []api.InputInviteEvent{{Event: inviteEvent}},
+		InputInviteEvents: []api.InputInviteEvent{{
+			Event:           inviteEvent,
+			InviteRoomState: inviteRoomState,
+			RoomVersion:     inviteEvent.RoomVersion,
+		}},
 	}
 	var response api.InputRoomEventsResponse
 	return c.InputAPI.InputRoomEvents(ctx, &request, &response)

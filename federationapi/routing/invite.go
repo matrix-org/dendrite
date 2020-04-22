@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
@@ -26,25 +25,24 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// Invite implements /_matrix/federation/v1/invite/{roomID}/{eventID}
+// Invite implements /_matrix/federation/v2/invite/{roomID}/{eventID}
 func Invite(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
 	eventID string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
-
-	// Decode the event JSON from the request.
-	var event gomatrixserverlib.Event
-	if err := json.Unmarshal(request.Content(), &event); err != nil {
+	inviteReq := gomatrixserverlib.InviteV2Request{}
+	if err := json.Unmarshal(request.Content(), &inviteReq); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
 		}
 	}
+	event := inviteReq.Event()
 
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
@@ -62,23 +60,18 @@ func Invite(
 		}
 	}
 
-	// Check that the event is from the server sending the request.
-	if event.Origin() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The invite must be sent by the server it originated on"),
-		}
-	}
-
 	// Check that the event is signed by the server sending the request.
+	redacted := event.Redact()
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName: event.Origin(),
-		Message:    event.Redact().JSON(),
-		AtTS:       event.OriginServerTS(),
+		ServerName:             event.Origin(),
+		Message:                redacted.JSON(),
+		AtTS:                   event.OriginServerTS(),
+		StrictValidityChecking: true,
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+		return jsonerror.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
@@ -93,8 +86,13 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = producer.SendInvite(httpReq.Context(), signedEvent); err != nil {
-		return httputil.LogThenError(httpReq, err)
+	if err = producer.SendInvite(
+		httpReq.Context(),
+		signedEvent.Headered(inviteReq.RoomVersion()),
+		inviteReq.InviteRoomState(),
+	); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Return the signed event to the originating server, it should then tell

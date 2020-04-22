@@ -20,6 +20,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -97,15 +98,15 @@ type httpAppServiceQueryAPI struct {
 
 // NewAppServiceQueryAPIHTTP creates a AppServiceQueryAPI implemented by talking
 // to a HTTP POST API.
-// If httpClient is nil then it uses http.DefaultClient
+// If httpClient is nil an error is returned
 func NewAppServiceQueryAPIHTTP(
 	appserviceURL string,
 	httpClient *http.Client,
-) AppServiceQueryAPI {
+) (AppServiceQueryAPI, error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		return nil, errors.New("NewRoomserverAliasAPIHTTP: httpClient is <nil>")
 	}
-	return &httpAppServiceQueryAPI{appserviceURL, httpClient}
+	return &httpAppServiceQueryAPI{appserviceURL, httpClient}, nil
 }
 
 // RoomAliasExists implements AppServiceQueryAPI
@@ -140,7 +141,7 @@ func RetrieveUserProfile(
 	ctx context.Context,
 	userID string,
 	asAPI AppServiceQueryAPI,
-	accountDB *accounts.Database,
+	accountDB accounts.Database,
 ) (*authtypes.Profile, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {

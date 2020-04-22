@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/util"
@@ -102,7 +101,7 @@ func serveTemplate(w http.ResponseWriter, templateHTML string, data map[string]s
 // AuthFallback implements GET and POST /auth/{authType}/fallback/web?session={sessionID}
 func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 ) *util.JSONResponse {
 	sessionID := req.URL.Query().Get("session")
 
@@ -130,7 +129,7 @@ func AuthFallback(
 	if req.Method == http.MethodGet {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			if err := checkRecaptchaEnabled(&cfg, w, req); err != nil {
+			if err := checkRecaptchaEnabled(cfg, w, req); err != nil {
 				return err
 			}
 
@@ -144,19 +143,20 @@ func AuthFallback(
 	} else if req.Method == http.MethodPost {
 		// Handle Recaptcha
 		if authType == authtypes.LoginTypeRecaptcha {
-			if err := checkRecaptchaEnabled(&cfg, w, req); err != nil {
+			if err := checkRecaptchaEnabled(cfg, w, req); err != nil {
 				return err
 			}
 
 			clientIP := req.RemoteAddr
 			err := req.ParseForm()
 			if err != nil {
-				res := httputil.LogThenError(req, err)
+				util.GetLogger(req.Context()).WithError(err).Error("req.ParseForm failed")
+				res := jsonerror.InternalServerError()
 				return &res
 			}
 
 			response := req.Form.Get("g-recaptcha-response")
-			if err := validateRecaptcha(&cfg, response, clientIP); err != nil {
+			if err := validateRecaptcha(cfg, response, clientIP); err != nil {
 				util.GetLogger(req.Context()).Error(err)
 				return err
 			}
@@ -203,7 +203,8 @@ func writeHTTPMessage(
 	w.WriteHeader(header)
 	_, err := w.Write([]byte(message))
 	if err != nil {
-		res := httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("w.Write failed")
+		res := jsonerror.InternalServerError()
 		return &res
 	}
 	return nil

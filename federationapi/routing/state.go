@@ -107,7 +107,6 @@ func getState(
 		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	prevEventIDs := getIDsFromEventRef(event.PrevEvents())
 	authEventIDs := getIDsFromEventRef(event.AuthEvents())
 
 	var response api.QueryStateAndAuthChainResponse
@@ -115,7 +114,7 @@ func getState(
 		ctx,
 		&api.QueryStateAndAuthChainRequest{
 			RoomID:       roomID,
-			PrevEventIDs: prevEventIDs,
+			PrevEventIDs: []string{eventID},
 			AuthEventIDs: authEventIDs,
 		},
 		&response,
@@ -130,8 +129,8 @@ func getState(
 	}
 
 	return &gomatrixserverlib.RespState{
-		StateEvents: response.StateEvents,
-		AuthEvents:  response.AuthChainEvents,
+		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
+		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
 	}, nil
 }
 

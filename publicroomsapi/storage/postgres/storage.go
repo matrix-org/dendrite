@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/publicroomsapi/types"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -39,7 +39,7 @@ type attributeValue interface{}
 func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerDatabase, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open("postgres", dataSourceName); err != nil {
+	if db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
 		return nil, err
 	}
 	storage := PublicRoomsServerDatabase{
@@ -85,7 +85,7 @@ func (d *PublicRoomsServerDatabase) CountPublicRooms(ctx context.Context) (int64
 // Returns an error if the retrieval failed.
 func (d *PublicRoomsServerDatabase) GetPublicRooms(
 	ctx context.Context, offset int64, limit int16, filter string,
-) ([]types.PublicRoom, error) {
+) ([]gomatrixserverlib.PublicRoom, error) {
 	return d.statements.selectPublicRooms(ctx, offset, limit, filter)
 }
 

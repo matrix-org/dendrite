@@ -1,4 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
+// Copyright 2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,10 +22,13 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -39,7 +44,7 @@ type RoomserverQueryAPIEventDB interface {
 
 // RoomserverQueryAPIDatabase has the storage APIs needed to implement the query API.
 type RoomserverQueryAPIDatabase interface {
-	state.RoomStateDatabase
+	database.RoomStateDatabase
 	RoomserverQueryAPIEventDB
 	// Look up the numeric ID for the room.
 	// Returns 0 if the room doesn't exists.
@@ -85,11 +90,16 @@ type RoomserverQueryAPIDatabase interface {
 	EventStateKeys(
 		context.Context, []types.EventStateKeyNID,
 	) (map[types.EventStateKeyNID]string, error)
+	// Look up the room version for a given room.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomID string,
+	) (gomatrixserverlib.RoomVersion, error)
 }
 
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
 type RoomserverQueryAPI struct {
-	DB RoomserverQueryAPIDatabase
+	DB             RoomserverQueryAPIDatabase
+	ImmutableCache caching.ImmutableCache
 }
 
 // QueryLatestEventsAndState implements api.RoomserverQueryAPI
@@ -98,6 +108,14 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
+	if err != nil {
+		response.RoomExists = false
+		return nil
+	}
+
+	roomState := state.NewStateResolution(r.DB)
+
 	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -107,6 +125,8 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return nil
 	}
 	response.RoomExists = true
+	response.RoomVersion = roomVersion
+
 	var currentStateSnapshotNID types.StateSnapshotNID
 	response.LatestEvents, currentStateSnapshotNID, response.Depth, err =
 		r.DB.LatestEventIDs(ctx, roomNID)
@@ -114,10 +134,18 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return err
 	}
 
-	// Look up the currrent state for the requested tuples.
-	stateEntries, err := state.LoadStateAtSnapshotForStringTuples(
-		ctx, r.DB, currentStateSnapshotNID, request.StateToFetch,
-	)
+	var stateEntries []types.StateEntry
+	if len(request.StateToFetch) == 0 {
+		// Look up all room state.
+		stateEntries, err = roomState.LoadStateAtSnapshot(
+			ctx, currentStateSnapshotNID,
+		)
+	} else {
+		// Look up the current state for the requested tuples.
+		stateEntries, err = roomState.LoadStateAtSnapshotForStringTuples(
+			ctx, currentStateSnapshotNID, request.StateToFetch,
+		)
+	}
 	if err != nil {
 		return err
 	}
@@ -127,7 +155,10 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 		return err
 	}
 
-	response.StateEvents = stateEvents
+	for _, event := range stateEvents {
+		response.StateEvents = append(response.StateEvents, event.Headered(roomVersion))
+	}
+
 	return nil
 }
 
@@ -137,6 +168,14 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
 ) error {
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
+	if err != nil {
+		response.RoomExists = false
+		return nil
+	}
+
+	roomState := state.NewStateResolution(r.DB)
+
 	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
 	if err != nil {
@@ -146,6 +185,7 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return nil
 	}
 	response.RoomExists = true
+	response.RoomVersion = roomVersion
 
 	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
@@ -159,8 +199,8 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	response.PrevEventsExist = true
 
 	// Look up the currrent state for the requested tuples.
-	stateEntries, err := state.LoadStateAfterEventsForStringTuples(
-		ctx, r.DB, prevStates, request.StateToFetch,
+	stateEntries, err := roomState.LoadStateAfterEventsForStringTuples(
+		ctx, roomNID, prevStates, request.StateToFetch,
 	)
 	if err != nil {
 		return err
@@ -171,7 +211,10 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return err
 	}
 
-	response.StateEvents = stateEvents
+	for _, event := range stateEvents {
+		response.StateEvents = append(response.StateEvents, event.Headered(roomVersion))
+	}
+
 	return nil
 }
 
@@ -198,7 +241,15 @@ func (r *RoomserverQueryAPI) QueryEventsByID(
 		return err
 	}
 
-	response.Events = events
+	for _, event := range events {
+		roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
+		if verr != nil {
+			return verr
+		}
+
+		response.Events = append(response.Events, event.Headered(roomVersion))
+	}
+
 	return nil
 }
 
@@ -315,6 +366,7 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	ctx context.Context, eventNID types.EventNID, joinedOnly bool,
 ) ([]types.Event, error) {
+	roomState := state.NewStateResolution(r.DB)
 	events := []types.Event{}
 	// Lookup the event NID
 	eIDs, err := r.DB.EventIDs(ctx, []types.EventNID{eventNID})
@@ -329,7 +381,7 @@ func (r *RoomserverQueryAPI) getMembershipsBeforeEventNID(
 	}
 
 	// Fetch the state as it was when this event was fired
-	stateEntries, err := state.LoadCombinedStateAfterEvents(ctx, r.DB, prevState)
+	stateEntries, err := roomState.LoadCombinedStateAfterEvents(ctx, prevState)
 	if err != nil {
 		return nil, err
 	}
@@ -407,16 +459,29 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	request *api.QueryServerAllowedToSeeEventRequest,
 	response *api.QueryServerAllowedToSeeEventResponse,
 ) (err error) {
+	events, err := r.DB.EventsFromIDs(ctx, []string{request.EventID})
+	if err != nil {
+		return
+	}
+	if len(events) == 0 {
+		response.AllowedToSeeEvent = false // event doesn't exist so not allowed to see
+		return
+	}
+	isServerInRoom, err := r.isServerCurrentlyInRoom(ctx, request.ServerName, events[0].RoomID())
+	if err != nil {
+		return
+	}
 	response.AllowedToSeeEvent, err = r.checkServerAllowedToSeeEvent(
-		ctx, request.EventID, request.ServerName,
+		ctx, request.EventID, request.ServerName, isServerInRoom,
 	)
 	return
 }
 
 func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
-	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
 ) (bool, error) {
-	stateEntries, err := state.LoadStateAtEvent(ctx, r.DB, eventID)
+	roomState := state.NewStateResolution(r.DB)
+	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		return false, err
 	}
@@ -428,7 +493,7 @@ func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 		return false, err
 	}
 
-	return auth.IsServerAllowed(serverName, stateAtEvent), nil
+	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
 }
 
 // QueryMissingEvents implements api.RoomserverQueryAPI
@@ -461,10 +526,15 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 		return err
 	}
 
-	response.Events = make([]gomatrixserverlib.Event, 0, len(loadedEvents)-len(eventsToFilter))
+	response.Events = make([]gomatrixserverlib.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
 	for _, event := range loadedEvents {
 		if !eventsToFilter[event.EventID()] {
-			response.Events = append(response.Events, event)
+			roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
+			if verr != nil {
+				return verr
+			}
+
+			response.Events = append(response.Events, event.Headered(roomVersion))
 		}
 	}
 
@@ -500,20 +570,72 @@ func (r *RoomserverQueryAPI) QueryBackfill(
 	}
 
 	// Retrieve events from the list that was filled previously.
-	response.Events, err = r.loadEvents(ctx, resultNIDs)
+	var loadedEvents []gomatrixserverlib.Event
+	loadedEvents, err = r.loadEvents(ctx, resultNIDs)
+	if err != nil {
+		return err
+	}
+
+	for _, event := range loadedEvents {
+		roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
+		if verr != nil {
+			return verr
+		}
+
+		response.Events = append(response.Events, event.Headered(roomVersion))
+	}
+
 	return err
 }
 
+func (r *RoomserverQueryAPI) isServerCurrentlyInRoom(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
+	roomNID, err := r.DB.RoomNID(ctx, roomID)
+	if err != nil {
+		return false, err
+	}
+
+	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true)
+	if err != nil {
+		return false, err
+	}
+
+	events, err := r.DB.Events(ctx, eventNIDs)
+	if err != nil {
+		return false, err
+	}
+	gmslEvents := make([]gomatrixserverlib.Event, len(events))
+	for i := range events {
+		gmslEvents[i] = events[i].Event
+	}
+	return auth.IsAnyUserOnServerWithMembership(serverName, gmslEvents, gomatrixserverlib.Join), nil
+}
+
+// TODO: Remove this when we have tests to assert correctness of this function
+// nolint:gocyclo
 func (r *RoomserverQueryAPI) scanEventTree(
 	ctx context.Context, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,
-) (resultNIDs []types.EventNID, err error) {
+) ([]types.EventNID, error) {
+	var resultNIDs []types.EventNID
+	var err error
 	var allowed bool
 	var events []types.Event
 	var next []string
 	var pre string
 
+	// TODO: add tests for this function to ensure it meets the contract that callers expect (and doc what that is supposed to be)
+	// Currently, callers like QueryBackfill will call scanEventTree with a pre-populated `visited` map, assuming that by doing
+	// so means that the events in that map will NOT be returned from this function. That is not currently true, resulting in
+	// duplicate events being sent in response to /backfill requests.
+	initialIgnoreList := make(map[string]bool, len(visited))
+	for k, v := range visited {
+		initialIgnoreList[k] = v
+	}
+
 	resultNIDs = make([]types.EventNID, 0, limit)
+
+	var checkedServerInRoom bool
+	var isServerInRoom bool
 
 	// Loop through the event IDs to retrieve the requested events and go
 	// through the whole tree (up to the provided limit) using the events'
@@ -527,7 +649,18 @@ BFSLoop:
 		// Retrieve the events to process from the database.
 		events, err = r.DB.EventsFromIDs(ctx, front)
 		if err != nil {
-			return
+			return resultNIDs, err
+		}
+
+		if !checkedServerInRoom && len(events) > 0 {
+			// It's nasty that we have to extract the room ID from an event, but many federation requests
+			// only talk in event IDs, no room IDs at all (!!!)
+			ev := events[0]
+			isServerInRoom, err = r.isServerCurrentlyInRoom(ctx, serverName, ev.RoomID())
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to check if server is currently in room, assuming not.")
+			}
+			checkedServerInRoom = true
 		}
 
 		for _, ev := range events {
@@ -535,17 +668,23 @@ BFSLoop:
 			if len(resultNIDs) == limit {
 				break BFSLoop
 			}
-			// Update the list of events to retrieve.
-			resultNIDs = append(resultNIDs, ev.EventNID)
+
+			if !initialIgnoreList[ev.EventID()] {
+				// Update the list of events to retrieve.
+				resultNIDs = append(resultNIDs, ev.EventNID)
+			}
 			// Loop through the event's parents.
 			for _, pre = range ev.PrevEventIDs() {
 				// Only add an event to the list of next events to process if it
 				// hasn't been seen before.
 				if !visited[pre] {
 					visited[pre] = true
-					allowed, err = r.checkServerAllowedToSeeEvent(ctx, pre, serverName)
+					allowed, err = r.checkServerAllowedToSeeEvent(ctx, pre, serverName, isServerInRoom)
 					if err != nil {
-						return
+						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
+							"Error checking if allowed to see event",
+						)
+						return resultNIDs, err
 					}
 
 					// If the event hasn't been seen before and the HS
@@ -553,6 +692,8 @@ BFSLoop:
 					// the list of events to retrieve.
 					if allowed {
 						next = append(next, pre)
+					} else {
+						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).Info("Not allowed to see event")
 					}
 				}
 			}
@@ -561,7 +702,7 @@ BFSLoop:
 		front = next
 	}
 
-	return
+	return resultNIDs, err
 }
 
 // QueryStateAndAuthChain implements api.RoomserverQueryAPI
@@ -580,33 +721,71 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	}
 	response.RoomExists = true
 
-	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
-		switch err.(type) {
-		case types.MissingEventError:
-			return nil
-		default:
-			return err
-		}
+		return err
+	}
+	response.RoomVersion = roomVersion
+
+	stateEvents, err := r.loadStateAtEventIDs(ctx, request.PrevEventIDs)
+	if err != nil {
+		return err
 	}
 	response.PrevEventsExist = true
 
+	// add the auth event IDs for the current state events too
+	var authEventIDs []string
+	authEventIDs = append(authEventIDs, request.AuthEventIDs...)
+	for _, se := range stateEvents {
+		authEventIDs = append(authEventIDs, se.AuthEventIDs()...)
+	}
+	authEventIDs = util.UniqueStrings(authEventIDs) // de-dupe
+
+	authEvents, err := getAuthChain(ctx, r.DB, authEventIDs)
+	if err != nil {
+		return err
+	}
+
+	if request.ResolveState {
+		if stateEvents, err = state.ResolveConflictsAdhoc(
+			roomVersion, stateEvents, authEvents,
+		); err != nil {
+			return err
+		}
+	}
+
+	for _, event := range stateEvents {
+		response.StateEvents = append(response.StateEvents, event.Headered(roomVersion))
+	}
+
+	for _, event := range authEvents {
+		response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(roomVersion))
+	}
+
+	return err
+}
+
+func (r *RoomserverQueryAPI) loadStateAtEventIDs(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+	roomState := state.NewStateResolution(r.DB)
+	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
+	if err != nil {
+		switch err.(type) {
+		case types.MissingEventError:
+			return nil, nil
+		default:
+			return nil, err
+		}
+	}
+
 	// Look up the currrent state for the requested tuples.
-	stateEntries, err := state.LoadCombinedStateAfterEvents(
-		ctx, r.DB, prevStates,
+	stateEntries, err := roomState.LoadCombinedStateAfterEvents(
+		ctx, prevStates,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	stateEvents, err := r.loadStateEvents(ctx, stateEntries)
-	if err != nil {
-		return err
-	}
-
-	response.StateEvents = stateEvents
-	response.AuthChainEvents, err = getAuthChain(ctx, r.DB, request.AuthEventIDs)
-	return err
+	return r.loadStateEvents(ctx, stateEntries)
 }
 
 // getAuthChain fetches the auth chain for the given auth events. An auth chain
@@ -692,6 +871,44 @@ func (r *RoomserverQueryAPI) QueryServersInRoomAtEvent(
 		response.Servers = append(response.Servers, server)
 	}
 
+	return nil
+}
+
+// QueryRoomVersionCapabilities implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
+	ctx context.Context,
+	request *api.QueryRoomVersionCapabilitiesRequest,
+	response *api.QueryRoomVersionCapabilitiesResponse,
+) error {
+	response.DefaultRoomVersion = version.DefaultRoomVersion()
+	response.AvailableRoomVersions = make(map[gomatrixserverlib.RoomVersion]string)
+	for v, desc := range version.SupportedRoomVersions() {
+		if desc.Stable {
+			response.AvailableRoomVersions[v] = "stable"
+		} else {
+			response.AvailableRoomVersions[v] = "unstable"
+		}
+	}
+	return nil
+}
+
+// QueryRoomVersionCapabilities implements api.RoomserverQueryAPI
+func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
+	ctx context.Context,
+	request *api.QueryRoomVersionForRoomRequest,
+	response *api.QueryRoomVersionForRoomResponse,
+) error {
+	if roomVersion, ok := r.ImmutableCache.GetRoomVersion(request.RoomID); ok {
+		response.RoomVersion = roomVersion
+		return nil
+	}
+
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	response.RoomVersion = roomVersion
+	r.ImmutableCache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	return nil
 }
 
@@ -847,6 +1064,34 @@ func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 				return util.ErrorResponse(err)
 			}
 			if err := r.QueryServersInRoomAtEvent(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryRoomVersionCapabilitiesPath,
+		common.MakeInternalAPI("QueryRoomVersionCapabilities", func(req *http.Request) util.JSONResponse {
+			var request api.QueryRoomVersionCapabilitiesRequest
+			var response api.QueryRoomVersionCapabilitiesResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryRoomVersionCapabilities(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	servMux.Handle(
+		api.RoomserverQueryRoomVersionForRoomPath,
+		common.MakeInternalAPI("QueryRoomVersionForRoom", func(req *http.Request) util.JSONResponse {
+			var request api.QueryRoomVersionForRoomRequest
+			var response api.QueryRoomVersionForRoomResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryRoomVersionForRoom(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

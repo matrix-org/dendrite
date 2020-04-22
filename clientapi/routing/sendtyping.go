@@ -34,8 +34,8 @@ type typingContentJSON struct {
 // sends the typing events to client API typingProducer
 func SendTyping(
 	req *http.Request, device *authtypes.Device, roomID string,
-	userID string, accountDB *accounts.Database,
-	typingProducer *producers.TypingServerProducer,
+	userID string, accountDB accounts.Database,
+	eduProducer *producers.EDUServerProducer,
 ) util.JSONResponse {
 	if device.UserID != userID {
 		return util.JSONResponse{
@@ -46,7 +46,8 @@ func SendTyping(
 
 	localpart, err := userutil.ParseUsernameParam(userID, nil)
 	if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("userutil.ParseUsernameParam failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Verify that the user is a member of this room
@@ -57,7 +58,8 @@ func SendTyping(
 			JSON: jsonerror.Forbidden("User not in this room"),
 		}
 	} else if err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetMembershipInRoomByLocalPart failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// parse the incoming http request
@@ -67,10 +69,11 @@ func SendTyping(
 		return *resErr
 	}
 
-	if err = typingProducer.Send(
+	if err = eduProducer.SendTyping(
 		req.Context(), userID, roomID, r.Typing, r.Timeout,
 	); err != nil {
-		return httputil.LogThenError(req, err)
+		util.GetLogger(req.Context()).WithError(err).Error("eduProducer.Send failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{

@@ -28,6 +28,7 @@ import (
 
 	"net/http"
 
+	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/common/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -44,6 +45,8 @@ var (
 	// This needs to be high enough to account for the time it takes to create
 	// the postgres database tables which can take a while on travis.
 	timeoutString = defaulting(os.Getenv("TIMEOUT"), "60s")
+	// Timeout for http client
+	timeoutHTTPClient = defaulting(os.Getenv("TIMEOUT_HTTP"), "30s")
 	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
 	// The name of the test database to create.
@@ -68,11 +71,18 @@ func defaulting(value, defaultValue string) string {
 	return value
 }
 
-var timeout time.Duration
+var (
+	timeout     time.Duration
+	timeoutHTTP time.Duration
+)
 
 func init() {
 	var err error
 	timeout, err = time.ParseDuration(timeoutString)
+	if err != nil {
+		panic(err)
+	}
+	timeoutHTTP, err = time.ParseDuration(timeoutHTTPClient)
 	if err != nil {
 		panic(err)
 	}
@@ -199,7 +209,10 @@ func writeToRoomServer(input []string, roomserverURL string) error {
 			return err
 		}
 	}
-	x := api.NewRoomserverInputAPIHTTP(roomserverURL, nil)
+	x, err := api.NewRoomserverInputAPIHTTP(roomserverURL, &http.Client{Timeout: timeoutHTTP})
+	if err != nil {
+		return err
+	}
 	return x.InputRoomEvents(context.Background(), &request, &response)
 }
 
@@ -241,6 +254,11 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		panic(err)
 	}
 
+	cache, err := caching.NewImmutableInMemoryLRUCache()
+	if err != nil {
+		panic(err)
+	}
+
 	doInput := func() {
 		fmt.Printf("Roomserver is ready to receive input, sending %d events\n", len(input))
 		if err = writeToRoomServer(input, cfg.RoomServerURL()); err != nil {
@@ -258,7 +276,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	cmd.Args = []string{"dendrite-room-server", "--config", filepath.Join(dir, test.ConfigFile)}
 
 	gotOutput, err := runAndReadFromTopic(cmd, cfg.RoomServerURL()+"/metrics", doInput, outputTopic, len(wantOutput), func() {
-		queryAPI := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), nil)
+		queryAPI, _ := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), &http.Client{Timeout: timeoutHTTP}, cache)
 		checkQueries(queryAPI)
 	})
 	if err != nil {

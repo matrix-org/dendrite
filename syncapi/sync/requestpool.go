@@ -20,11 +20,9 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -33,12 +31,12 @@ import (
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
 	db        storage.Database
-	accountDB *accounts.Database
+	accountDB accounts.Database
 	notifier  *Notifier
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db storage.Database, n *Notifier, adb *accounts.Database) *RequestPool {
+func NewRequestPool(db storage.Database, n *Notifier, adb accounts.Database) *RequestPool {
 	return &RequestPool{db, adb, n}
 }
 
@@ -49,7 +47,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	var syncData *types.Response
 
 	// Extract values from request
-	logger := util.GetLogger(req.Context())
 	userID := device.UserID
 	syncReq, err := newSyncRequest(req, *device)
 	if err != nil {
@@ -58,19 +55,21 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			JSON: jsonerror.Unknown(err.Error()),
 		}
 	}
-	logger.WithFields(log.Fields{
+	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
 		"userID":  userID,
 		"since":   syncReq.since,
 		"timeout": syncReq.timeout,
-	}).Info("Incoming /sync request")
+	})
 
 	currPos := rp.notifier.CurrentPosition()
 
 	if shouldReturnImmediately(syncReq) {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			logger.WithError(err).Error("rp.currentSyncForUser failed")
+			return jsonerror.InternalServerError()
 		}
+		logger.WithField("next", syncData.NextBatch).Info("Responding immediately")
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: syncData,
@@ -108,7 +107,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			hasTimedOut = true
 		// Or for the request to be cancelled
 		case <-req.Context().Done():
-			return httputil.LogThenError(req, req.Context().Err())
+			logger.WithError(err).Error("request cancelled")
+			return jsonerror.InternalServerError()
 		}
 
 		// Note that we don't time out during calculation of sync
@@ -118,10 +118,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
-			return httputil.LogThenError(req, err)
+			logger.WithError(err).Error("rp.currentSyncForUser failed")
+			return jsonerror.InternalServerError()
 		}
 
 		if !syncData.IsEmpty() || hasTimedOut {
+			logger.WithField("next", syncData.NextBatch).WithField("timed_out", hasTimedOut).Info("Responding")
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: syncData,
@@ -142,14 +144,14 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Pagin
 		return
 	}
 
-	accountDataFilter := gomatrix.DefaultFilterPart() // TODO: use filter provided in req instead
-	res, err = rp.appendAccountData(res, req.device.UserID, req, int64(latestPos.PDUPosition), &accountDataFilter)
+	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
+	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
 	return
 }
 
 func (rp *RequestPool) appendAccountData(
-	data *types.Response, userID string, req syncRequest, currentPos int64,
-	accountDataFilter *gomatrix.FilterPart,
+	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
+	accountDataFilter *gomatrixserverlib.EventFilter,
 ) (*types.Response, error) {
 	// TODO: Account data doesn't have a sync position of its own, meaning that
 	// account data might be sent multiple time to the client if multiple account

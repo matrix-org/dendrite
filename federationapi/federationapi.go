@@ -32,8 +32,8 @@ import (
 // FederationAPI component.
 func SetupFederationAPIComponent(
 	base *basecomponent.BaseDendrite,
-	accountsDB *accounts.Database,
-	deviceDB *devices.Database,
+	accountsDB accounts.Database,
+	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
@@ -41,12 +41,13 @@ func SetupFederationAPIComponent(
 	queryAPI roomserverAPI.RoomserverQueryAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federationSenderAPI federationSenderAPI.FederationSenderQueryAPI,
+	eduProducer *producers.EDUServerProducer,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(inputAPI)
+	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
 
 	routing.Setup(
-		base.APIMux, *base.Cfg, queryAPI, aliasAPI, asAPI,
-		roomserverProducer, federationSenderAPI, *keyRing, federation, accountsDB,
-		deviceDB,
+		base.APIMux, base.Cfg, queryAPI, aliasAPI, asAPI,
+		roomserverProducer, eduProducer, federationSenderAPI, *keyRing,
+		federation, accountsDB, deviceDB,
 	)
 }

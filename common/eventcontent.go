@@ -48,6 +48,7 @@ func InitialPowerLevelsContent(roomCreator string) (c gomatrixserverlib.PowerLev
 		"m.room.history_visibility": 100,
 		"m.room.canonical_alias":    50,
 		"m.room.avatar":             50,
+		"m.room.aliases":            0, // anyone can publish aliases by default. Has to be 0 else state_default is used.
 	}
 	c.Users = map[string]int64{roomCreator: 100}
 	return c

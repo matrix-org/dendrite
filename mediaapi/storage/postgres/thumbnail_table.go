@@ -20,6 +20,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/matrix-org/dendrite/common"
+
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -144,6 +146,7 @@ func (s *thumbnailStatements) selectThumbnails(
 	if err != nil {
 		return nil, err
 	}
+	defer common.CloseAndLogIfError(ctx, rows, "selectThumbnails: rows.close() failed")
 
 	var thumbnails []*types.ThumbnailMetadata
 	for rows.Next() {
@@ -167,5 +170,5 @@ func (s *thumbnailStatements) selectThumbnails(
 		thumbnails = append(thumbnails, &thumbnailMetadata)
 	}
 
-	return thumbnails, err
+	return thumbnails, rows.Err()
 }

@@ -15,11 +15,12 @@
 package routing
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -34,7 +35,7 @@ func Backfill(
 	request *gomatrixserverlib.FederationRequest,
 	query api.RoomserverQueryAPI,
 	roomID string,
-	cfg config.Dendrite,
+	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var res api.QueryBackfillResponse
 	var eIDs []string
@@ -72,27 +73,37 @@ func Backfill(
 		ServerName:        request.Origin(),
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("limit %q is invalid format", limit)),
+		}
 	}
 
 	// Query the roomserver.
 	if err = query.QueryBackfill(httpReq.Context(), &req, &res); err != nil {
-		return httputil.LogThenError(httpReq, err)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryBackfill failed")
+		return jsonerror.InternalServerError()
 	}
 
 	// Filter any event that's not from the requested room out.
 	evs := make([]gomatrixserverlib.Event, 0)
 
-	var ev gomatrixserverlib.Event
+	var ev gomatrixserverlib.HeaderedEvent
 	for _, ev = range res.Events {
 		if ev.RoomID() == roomID {
-			evs = append(evs, ev)
+			evs = append(evs, ev.Event)
 		}
+	}
+
+	var eventJSONs []json.RawMessage
+	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(evs) {
+		eventJSONs = append(eventJSONs, e.JSON())
 	}
 
 	txn := gomatrixserverlib.Transaction{
 		Origin:         cfg.Matrix.ServerName,
-		PDUs:           evs,
+		PDUs:           eventJSONs,
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
 

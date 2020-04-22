@@ -17,7 +17,7 @@ package alias
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"time"
 
@@ -46,6 +46,10 @@ type RoomserverAliasAPIDatabase interface {
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(ctx context.Context, alias string) error
+	// Look up the room version for a given room.
+	GetRoomVersionForRoom(
+		ctx context.Context, roomID string,
+	) (gomatrixserverlib.RoomVersion, error)
 }
 
 // RoomserverAliasAPI is an implementation of alias.RoomserverAliasAPI
@@ -215,6 +219,9 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	if err != nil {
 		return err
 	}
+	if len(eventsNeeded.Tuples()) == 0 {
+		return errors.New("expecting state tuples for event builder, got none")
+	}
 	req := roomserverAPI.QueryLatestEventsAndStateRequest{
 		RoomID:       roomID,
 		StateToFetch: eventsNeeded.Tuples(),
@@ -229,7 +236,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	// Add auth events
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range res.StateEvents {
-		err = authEvents.AddEvent(&res.StateEvents[i])
+		err = authEvents.AddEvent(&res.StateEvents[i].Event)
 		if err != nil {
 			return err
 		}
@@ -240,11 +247,16 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	}
 	builder.AuthEvents = refs
 
+	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomID)
+	if err != nil {
+		return err
+	}
+
 	// Build the event
-	eventID := fmt.Sprintf("$%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
 	now := time.Now()
 	event, err := builder.Build(
-		eventID, now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey,
+		now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID,
+		r.Cfg.Matrix.PrivateKey, roomVersion,
 	)
 	if err != nil {
 		return err
@@ -253,7 +265,7 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	// Create the request
 	ire := roomserverAPI.InputRoomEvent{
 		Kind:         roomserverAPI.KindNew,
-		Event:        event,
+		Event:        event.Headered(roomVersion),
 		AuthEventIDs: event.AuthEventIDs(),
 		SendAsServer: serverName,
 	}
