@@ -31,7 +31,6 @@ require (
 	github.com/uber/jaeger-lib v1.5.0
 	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d
-	gopkg.in/Shopify/sarama.v1 v1.20.1
 	gopkg.in/h2non/bimg.v1 v1.0.18
 	gopkg.in/yaml.v2 v2.2.8
 )
