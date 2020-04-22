@@ -25,9 +25,14 @@ func (c *InMemoryLRUCache) GetRoomVersion(roomID string) (gomatrixserverlib.Room
 		return "", false
 	}
 	c.roomVersionsMutex.RLock()
-	defer c.roomVersionsMutex.RUnlock()
 	val, found := c.roomVersions.Get(roomID)
-	return val.(gomatrixserverlib.RoomVersion), found
+	c.roomVersionsMutex.RUnlock()
+	if found && val != nil {
+		if roomVersion, ok := val.(gomatrixserverlib.RoomVersion); ok {
+			return roomVersion, true
+		}
+	}
+	return "", false
 }
 
 func (c *InMemoryLRUCache) StoreRoomVersion(roomID string, roomVersion gomatrixserverlib.RoomVersion) {
