@@ -902,6 +902,7 @@ func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
 		response.RoomVersion = roomVersion
 		return nil
 	}
+
 	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
 		return err

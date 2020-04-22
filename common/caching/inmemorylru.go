@@ -1,7 +1,6 @@
 package caching
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/golang/groupcache/lru"
@@ -20,7 +19,6 @@ func NewInMemoryLRUCache() *InMemoryLRUCache {
 }
 
 func (c *InMemoryLRUCache) GetRoomVersion(roomID string) (gomatrixserverlib.RoomVersion, bool) {
-	fmt.Println("Cache hit for", roomID)
 	if c == nil {
 		return "", false
 	}
@@ -36,7 +34,6 @@ func (c *InMemoryLRUCache) GetRoomVersion(roomID string) (gomatrixserverlib.Room
 }
 
 func (c *InMemoryLRUCache) StoreRoomVersion(roomID string, roomVersion gomatrixserverlib.RoomVersion) {
-	fmt.Println("Cache store for", roomID)
 	if c == nil {
 		return
 	}

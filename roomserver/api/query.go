@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/common/caching"
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	"github.com/matrix-org/gomatrixserverlib"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -411,16 +412,17 @@ const RoomserverQueryRoomVersionForRoomPath = "/api/roomserver/queryRoomVersionF
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil an error is returned
-func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client) (RoomserverQueryAPI, error) {
+func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client, cache caching.Cache) (RoomserverQueryAPI, error) {
 	if httpClient == nil {
 		return nil, errors.New("NewRoomserverQueryAPIHTTP: httpClient is <nil>")
 	}
-	return &httpRoomserverQueryAPI{roomserverURL, httpClient}, nil
+	return &httpRoomserverQueryAPI{roomserverURL, httpClient, cache}, nil
 }
 
 type httpRoomserverQueryAPI struct {
 	roomserverURL string
 	httpClient    *http.Client
+	cache         caching.Cache
 }
 
 // QueryLatestEventsAndState implements RoomserverQueryAPI
@@ -585,9 +587,18 @@ func (h *httpRoomserverQueryAPI) QueryRoomVersionForRoom(
 	request *QueryRoomVersionForRoomRequest,
 	response *QueryRoomVersionForRoomResponse,
 ) error {
+	if roomVersion, ok := h.cache.GetRoomVersion(request.RoomID); ok {
+		response.RoomVersion = roomVersion
+		return nil
+	}
+
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomVersionForRoom")
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryRoomVersionForRoomPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	err := commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err == nil {
+		h.cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
+	}
+	return err
 }

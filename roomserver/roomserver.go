@@ -21,7 +21,6 @@ import (
 
 	asQuery "github.com/matrix-org/dendrite/appservice/query"
 	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/roomserver/alias"
 	"github.com/matrix-org/dendrite/roomserver/input"
 	"github.com/matrix-org/dendrite/roomserver/query"
@@ -51,7 +50,7 @@ func SetupRoomServerComponent(
 
 	queryAPI := query.RoomserverQueryAPI{
 		DB:    roomserverDB,
-		Cache: caching.NewInMemoryLRUCache(),
+		Cache: base.Cache,
 	}
 
 	queryAPI.SetupHTTP(http.DefaultServeMux)

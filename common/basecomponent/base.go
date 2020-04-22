@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
+	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -56,6 +57,7 @@ type BaseDendrite struct {
 	APIMux        *mux.Router
 	httpClient    *http.Client
 	Cfg           *config.Dendrite
+	Cache         caching.Cache
 	KafkaConsumer sarama.Consumer
 	KafkaProducer sarama.SyncProducer
 }
@@ -87,6 +89,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 		componentName: componentName,
 		tracerCloser:  closer,
 		Cfg:           cfg,
+		Cache:         caching.NewInMemoryLRUCache(), // TODO: make configurable
 		APIMux:        mux.NewRouter().UseEncodedPath(),
 		httpClient:    &http.Client{Timeout: HTTPClientTimeout},
 		KafkaConsumer: kafkaConsumer,
@@ -116,7 +119,6 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	roomserverAPI.RoomserverInputAPI,
 	roomserverAPI.RoomserverQueryAPI,
 ) {
-
 	alias, err := roomserverAPI.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverAliasAPIHTTP failed")
@@ -125,7 +127,7 @@ func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverInputAPIHTTP failed", b.httpClient)
 	}
-	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
+	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.Cache)
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverQueryAPIHTTP failed", b.httpClient)
 	}
