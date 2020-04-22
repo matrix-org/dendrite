@@ -260,7 +260,7 @@ func NewInviteResponse(ev gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	if err := json.Unmarshal(ev.Unsigned(), &unsigned); err == nil {
 		res.InviteState.Events = unsigned.InviteRoomState
 	}
-	if res.InviteState.Events == nil {
+	if len(res.InviteState.Events) == 0 || res.InviteState.Events == nil {
 		res.InviteState.Events = json.RawMessage{'[', ']'}
 	}
 	return &res
