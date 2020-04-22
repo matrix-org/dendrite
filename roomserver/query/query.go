@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -97,7 +98,8 @@ type RoomserverQueryAPIDatabase interface {
 
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
 type RoomserverQueryAPI struct {
-	DB RoomserverQueryAPIDatabase
+	DB             RoomserverQueryAPIDatabase
+	ImmutableCache caching.ImmutableCache
 }
 
 // QueryLatestEventsAndState implements api.RoomserverQueryAPI
@@ -896,11 +898,17 @@ func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
 	request *api.QueryRoomVersionForRoomRequest,
 	response *api.QueryRoomVersionForRoomResponse,
 ) error {
+	if roomVersion, ok := r.ImmutableCache.GetRoomVersion(request.RoomID); ok {
+		response.RoomVersion = roomVersion
+		return nil
+	}
+
 	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
 	response.RoomVersion = roomVersion
+	r.ImmutableCache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	return nil
 }
 

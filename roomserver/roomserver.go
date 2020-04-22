@@ -48,7 +48,10 @@ func SetupRoomServerComponent(
 
 	inputAPI.SetupHTTP(http.DefaultServeMux)
 
-	queryAPI := query.RoomserverQueryAPI{DB: roomserverDB}
+	queryAPI := query.RoomserverQueryAPI{
+		DB:             roomserverDB,
+		ImmutableCache: base.ImmutableCache,
+	}
 
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 
