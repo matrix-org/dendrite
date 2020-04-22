@@ -18,12 +18,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"gopkg.in/Shopify/sarama.v1"
 )
 
 // EDUServerInputAPI implements api.EDUServerInputAPI
