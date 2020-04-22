@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -73,7 +74,10 @@ func Backfill(
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("limit %q is invalid format", limit)),
+		}
 	}
 
 	// Query the roomserver.
@@ -93,7 +97,7 @@ func Backfill(
 	}
 
 	var eventJSONs []json.RawMessage
-	for _, e := range evs {
+	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(evs) {
 		eventJSONs = append(eventJSONs, e.JSON())
 	}
 

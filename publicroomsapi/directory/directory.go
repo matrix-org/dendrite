@@ -17,6 +17,9 @@ package directory
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/roomserver/api"
+
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
@@ -54,11 +57,51 @@ func GetVisibility(
 }
 
 // SetVisibility implements PUT /directory/list/room/{roomID}
-// TODO: Check if user has the power level to edit the room visibility
+// TODO: Allow admin users to edit the room visibility
 func SetVisibility(
-	req *http.Request, publicRoomsDatabase storage.Database,
+	req *http.Request, publicRoomsDatabase storage.Database, queryAPI api.RoomserverQueryAPI, dev *authtypes.Device,
 	roomID string,
 ) util.JSONResponse {
+	queryMembershipReq := api.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: dev.UserID,
+	}
+	var queryMembershipRes api.QueryMembershipForUserResponse
+	err := queryAPI.QueryMembershipForUser(req.Context(), &queryMembershipReq, &queryMembershipRes)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("could not query membership for user")
+		return jsonerror.InternalServerError()
+	}
+	// Check if user id is in room
+	if !queryMembershipRes.IsInRoom {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user does not belong to room"),
+		}
+	}
+	queryEventsReq := api.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
+			EventType: gomatrixserverlib.MRoomPowerLevels,
+			StateKey:  "",
+		}},
+	}
+	var queryEventsRes api.QueryLatestEventsAndStateResponse
+	err = queryAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
+	if err != nil || len(queryEventsRes.StateEvents) == 0 {
+		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
+		return jsonerror.InternalServerError()
+	}
+
+	// NOTSPEC: Check if the user's power is greater than power required to change m.room.aliases event
+	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
+	if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomAliases, true) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("userID doesn't have power level to change visibility"),
+		}
+	}
+
 	var v roomVisibility
 	if reqErr := httputil.UnmarshalJSONRequest(req, &v); reqErr != nil {
 		return *reqErr

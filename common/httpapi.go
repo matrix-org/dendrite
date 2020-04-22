@@ -1,11 +1,17 @@
 package common
 
 import (
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -13,7 +19,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 )
+
+// BasicAuth is used for authorization on /metrics handlers
+type BasicAuth struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
@@ -38,12 +51,60 @@ func MakeAuthAPI(
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.
 // This is used for APIs that are called from the internet.
 func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+	// TODO: We shouldn't be directly reading env vars here, inject it in instead.
+	// Refactor this when we split out config structs.
+	verbose := false
+	if os.Getenv("DENDRITE_TRACE_HTTP") == "1" {
+		verbose = true
+	}
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
+		nextWriter := w
+		if verbose {
+			logger := logrus.NewEntry(logrus.StandardLogger())
+			// Log outgoing response
+			rec := httptest.NewRecorder()
+			nextWriter = rec
+			defer func() {
+				resp := rec.Result()
+				dump, err := httputil.DumpResponse(resp, true)
+				if err != nil {
+					logger.Debugf("Failed to dump outgoing response: %s", err)
+				} else {
+					strSlice := strings.Split(string(dump), "\n")
+					for _, s := range strSlice {
+						logger.Debug(s)
+					}
+				}
+				// copy the response to the client
+				for hdr, vals := range resp.Header {
+					for _, val := range vals {
+						w.Header().Add(hdr, val)
+					}
+				}
+				w.WriteHeader(resp.StatusCode)
+				// discard errors as this is for debugging
+				_, _ = io.Copy(w, resp.Body)
+				_ = resp.Body.Close()
+			}()
+
+			// Log incoming request
+			dump, err := httputil.DumpRequest(req, true)
+			if err != nil {
+				logger.Debugf("Failed to dump incoming request: %s", err)
+			} else {
+				strSlice := strings.Split(string(dump), "\n")
+				for _, s := range strSlice {
+					logger.Debug(s)
+				}
+			}
+		}
+
 		span := opentracing.StartSpan(metricsName)
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
-		h.ServeHTTP(w, req)
+		h.ServeHTTP(nextWriter, req)
+
 	}
 
 	return http.HandlerFunc(withSpan)
@@ -123,9 +184,32 @@ func MakeFedAPI(
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
 // listener.
-func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler) {
-	servMux.Handle("/metrics", promhttp.Handler())
+func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler, cfg *config.Dendrite) {
+	if cfg.Metrics.Enabled {
+		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
+	}
 	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
+}
+
+// WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
+func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
+	if b.Username == "" || b.Password == "" {
+		logrus.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Serve without authorization if either Username or Password is unset
+		if b.Username == "" || b.Password == "" {
+			h.ServeHTTP(w, r)
+			return
+		}
+		user, pass, ok := r.BasicAuth()
+
+		if !ok || user != b.Username || pass != b.Password {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}
 }
 
 // WrapHandlerInCORS adds CORS headers to all responses, including all error

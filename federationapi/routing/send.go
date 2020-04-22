@@ -71,14 +71,28 @@ func Send(
 	util.GetLogger(httpReq.Context()).Infof("Received transaction %q containing %d PDUs, %d EDUs", txnID, len(t.PDUs), len(t.EDUs))
 
 	resp, err := t.processTransaction()
-	if err != nil {
+	switch err.(type) {
+	// No error? Great! Send back a 200.
+	case nil:
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: resp,
+		}
+	// Handle known error cases as we will return a 400 error for these.
+	case roomNotFoundError:
+	case unmarshalError:
+	case verifySigError:
+	// Handle unknown error cases. Sending 500 errors back should be a last
+	// resort as this can make other homeservers back off sending federation
+	// events.
+	default:
 		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
 		return jsonerror.InternalServerError()
 	}
-
+	// Return a 400 error for bad requests as fallen through from above.
 	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: resp,
+		Code: http.StatusBadRequest,
+		JSON: jsonerror.BadJSON(err.Error()),
 	}
 }
 
@@ -93,6 +107,8 @@ type txnReq struct {
 }
 
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
+	results := make(map[string]gomatrixserverlib.PDUResult)
+
 	var pdus []gomatrixserverlib.HeaderedEvent
 	for _, pdu := range t.PDUs {
 		var header struct {
@@ -100,28 +116,27 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 		}
 		if err := json.Unmarshal(pdu, &header); err != nil {
 			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to extract room ID from event")
-			return nil, err
+			return nil, unmarshalError{err}
 		}
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: header.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
 		if err := t.query.QueryRoomVersionForRoom(t.context, &verReq, &verRes); err != nil {
 			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to query room version for room", verReq.RoomID)
-			return nil, err
+			return nil, roomNotFoundError{verReq.RoomID}
 		}
 		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, verRes.RoomVersion)
 		if err != nil {
 			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
-			return nil, err
+			return nil, unmarshalError{err}
 		}
 		if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
 			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
-			return nil, err
+			return nil, verifySigError{event.EventID(), err}
 		}
 		pdus = append(pdus, event.Headered(verRes.RoomVersion))
 	}
 
 	// Process the events.
-	results := map[string]gomatrixserverlib.PDUResult{}
 	for _, e := range pdus {
 		err := t.processEvent(e.Unwrap())
 		if err != nil {
@@ -141,7 +156,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			// If we bail and stop processing then we risk wedging incoming
 			// transactions from that server forever.
 			switch err.(type) {
-			case unknownRoomError:
+			case roomNotFoundError:
 			case *gomatrixserverlib.NotAllowed:
 			default:
 				// Any other error should be the result of a temporary error in
@@ -162,11 +177,22 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
-type unknownRoomError struct {
+type roomNotFoundError struct {
 	roomID string
 }
+type unmarshalError struct {
+	err error
+}
+type verifySigError struct {
+	eventID string
+	err     error
+}
 
-func (e unknownRoomError) Error() string { return fmt.Sprintf("unknown room %q", e.roomID) }
+func (e roomNotFoundError) Error() string { return fmt.Sprintf("room %q not found", e.roomID) }
+func (e unmarshalError) Error() string    { return fmt.Sprintf("unable to parse event: %s", e.err) }
+func (e verifySigError) Error() string {
+	return fmt.Sprintf("unable to verify signature of event %q: %s", e.eventID, e.err)
+}
 
 func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 	for _, e := range edus {
@@ -213,7 +239,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 		// that this server is unaware of.
 		// However generally speaking we should reject events for rooms we
 		// aren't a member of.
-		return unknownRoomError{e.RoomID()}
+		return roomNotFoundError{e.RoomID()}
 	}
 
 	if !stateResp.PrevEventsExist {

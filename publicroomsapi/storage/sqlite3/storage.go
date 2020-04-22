@@ -23,6 +23,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -40,7 +41,7 @@ type attributeValue interface{}
 func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerDatabase, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sql.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
+	if db, err = sqlutil.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
 		return nil, err
 	}
 	storage := PublicRoomsServerDatabase{

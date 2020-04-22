@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -46,12 +47,17 @@ func GetProfile(
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument(fmt.Sprintf("Format of user ID %q is invalid", userID)),
+		}
 	}
 
 	if domain != cfg.Matrix.ServerName {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("domain != cfg.Matrix.ServerName failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("Domain %q does not match this server", domain)),
+		}
 	}
 
 	profile, err := appserviceAPI.RetrieveUserProfile(httpReq.Context(), userID, asAPI, accountDB)

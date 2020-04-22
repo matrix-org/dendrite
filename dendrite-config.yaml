@@ -17,6 +17,14 @@ matrix:
     trusted_third_party_id_servers:
       - vector.im
       - matrix.org
+    # Perspective key servers which are used when direct key requests fail
+    #key_perspectives:
+    #  - server_name: matrix.org
+    #    keys:
+    #      - key_id: ed25519:auto
+    #        public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+    #      - key_id: ed25519:a_RXGa
+    #        public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 
 # The media repository config
 media:
@@ -52,6 +60,15 @@ media:
       - width: 800
         height: 600
         method: scale
+
+# Metrics config for Prometheus
+metrics:
+    # Whether or not metrics are enabled
+    enabled: false
+    # Use basic auth to protect the metrics. Uncomment to the complete block to enable.
+    #basic_auth:
+    #  username: prometheusUser
+    #  password: y0ursecr3tPa$$w0rd
 
 # The config for the TURN server
 turn:

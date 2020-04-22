@@ -362,7 +362,7 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 	// Check namespaces and see if more than one match
 	matchCount := 0
 	for _, appservice := range cfg.Derived.ApplicationServices {
-		if appservice.IsInterestedInUserID(userID) {
+		if appservice.OwnsNamespaceCoveringUserId(userID) {
 			if matchCount++; matchCount > 1 {
 				return true
 			}
@@ -1000,7 +1000,7 @@ func RegisterAvailable(
 	// Check if this username is reserved by an application service
 	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
 	for _, appservice := range cfg.Derived.ApplicationServices {
-		if appservice.IsInterestedInUserID(userID) {
+		if appservice.OwnsNamespaceCoveringUserId(userID) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.UserInUse("Desired user ID is reserved by an application service."),

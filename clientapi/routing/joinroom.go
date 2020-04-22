@@ -32,6 +32,7 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // JoinRoomByIDOrAlias implements the "/join/{roomIDOrAlias}" API.
@@ -290,7 +291,15 @@ func (r joinRoomReq) joinRoomUsingServers(
 			// There was a problem talking to one of the servers.
 			util.GetLogger(r.req.Context()).WithError(lastErr).WithField("server", server).Warn("Failed to join room using server")
 			// Try the next server.
-			continue
+			if r.req.Context().Err() != nil {
+				// The request context has expired so don't bother trying any
+				// more servers - they will immediately fail due to the expired
+				// context.
+				break
+			} else {
+				// The request context hasn't expired yet so try the next server.
+				continue
+			}
 		}
 		return *response
 	}
@@ -365,16 +374,22 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		return nil, fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
 
-	if err = respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
-		return nil, fmt.Errorf("respSendJoin: %w", err)
+	if err = r.checkSendJoinResponse(event, server, respMakeJoin, respSendJoin); err != nil {
+		return nil, err
 	}
+
+	util.GetLogger(r.req.Context()).WithFields(logrus.Fields{
+		"room_id":          roomID,
+		"num_auth_events":  len(respSendJoin.AuthEvents),
+		"num_state_events": len(respSendJoin.StateEvents),
+	}).Info("Room join signature and auth verification passed")
 
 	if err = r.producer.SendEventWithState(
 		r.req.Context(),
 		gomatrixserverlib.RespState(respSendJoin.RespState),
 		event.Headered(respMakeJoin.RoomVersion),
 	); err != nil {
-		return nil, fmt.Errorf("r.producer.SendEventWithState: %w", err)
+		util.GetLogger(r.req.Context()).WithError(err).Error("r.producer.SendEventWithState")
 	}
 
 	return &util.JSONResponse{
@@ -384,4 +399,50 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 			RoomID string `json:"room_id"`
 		}{roomID},
 	}, nil
+}
+
+// checkSendJoinResponse checks that all of the signatures are correct
+// and that the join is allowed by the supplied state.
+func (r joinRoomReq) checkSendJoinResponse(
+	event gomatrixserverlib.Event,
+	server gomatrixserverlib.ServerName,
+	respMakeJoin gomatrixserverlib.RespMakeJoin,
+	respSendJoin gomatrixserverlib.RespSendJoin,
+) error {
+	// A list of events that we have retried, if they were not included in
+	// the auth events supplied in the send_join.
+	retries := map[string]bool{}
+
+retryCheck:
+	// TODO: Can we expand Check here to return a list of missing auth
+	// events rather than failing one at a time?
+	if err := respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
+		switch e := err.(type) {
+		case gomatrixserverlib.MissingAuthEventError:
+			// Check that we haven't already retried for this event, prevents
+			// us from ending up in endless loops
+			if !retries[e.AuthEventID] {
+				// Ask the server that we're talking to right now for the event
+				tx, txerr := r.federation.GetEvent(r.req.Context(), server, e.AuthEventID)
+				if txerr != nil {
+					return fmt.Errorf("r.federation.GetEvent: %w", txerr)
+				}
+				// For each event returned, add it to the auth events.
+				for _, pdu := range tx.PDUs {
+					ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, respMakeJoin.RoomVersion)
+					if everr != nil {
+						return fmt.Errorf("gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
+					}
+					respSendJoin.AuthEvents = append(respSendJoin.AuthEvents, ev)
+				}
+				// Mark the event as retried and then give the check another go.
+				retries[e.AuthEventID] = true
+				goto retryCheck
+			}
+			return fmt.Errorf("respSendJoin (after retries): %w", e)
+		default:
+			return fmt.Errorf("respSendJoin: %w", err)
+		}
+	}
+	return nil
 }
