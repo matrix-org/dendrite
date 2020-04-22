@@ -386,7 +386,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 
 	if err = r.producer.SendEventWithState(
 		r.req.Context(),
-		gomatrixserverlib.RespState(respSendJoin.RespState),
+		respSendJoin.ToRespState(),
 		event.Headered(respMakeJoin.RoomVersion),
 	); err != nil {
 		util.GetLogger(r.req.Context()).WithError(err).Error("r.producer.SendEventWithState")
