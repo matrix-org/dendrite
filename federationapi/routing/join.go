@@ -252,9 +252,12 @@ func SendJoin(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: map[string]interface{}{
-			"state":      gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.StateEvents),
-			"auth_chain": gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
+		JSON: gomatrixserverlib.RespSendJoin{
+			RespState: gomatrixserverlib.RespState{
+				StateEvents: gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.StateEvents),
+				AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
+			},
+			Origin: cfg.Matrix.ServerName,
 		},
 	}
 }
