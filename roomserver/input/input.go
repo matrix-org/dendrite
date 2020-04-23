@@ -72,6 +72,24 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 	return nil
 }
 
+// InputNewInviteEvents implements api.RoomserverInputAPI
+func (r *RoomserverInputAPI) InputNewInviteEvents(
+	ctx context.Context,
+	request *api.InputRoomEventsRequest,
+	response *api.InputRoomEventsResponse,
+) (err error) {
+	for i := range request.InputRoomEvents {
+		inviteRoomState, err := buildInviteStrippedState(ctx, r.DB, request.InputRoomEvents[i])
+		if err != nil {
+			return err
+		}
+		if err := request.InputRoomEvents[i].Event.SetUnsignedField("invite_room_state", inviteRoomState); err != nil {
+			return err
+		}
+	}
+	return r.InputRoomEvents(ctx, request, response)
+}
+
 // SetupHTTP adds the RoomserverInputAPI handlers to the http.ServeMux.
 func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(api.RoomserverInputRoomEventsPath,

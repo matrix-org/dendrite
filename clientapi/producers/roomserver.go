@@ -99,3 +99,16 @@ func (c *RoomserverProducer) SendInputRoomEvents(
 	eventID = response.EventID
 	return
 }
+
+// SendInputNewInviteEvents writes the given input new events to the roomserver input API.
+// The roomserver will automatically populate the invite room state for us before sending
+// the invite onward.
+func (c *RoomserverProducer) SendInputNewInviteEvents(
+	ctx context.Context, ires []api.InputRoomEvent,
+) (eventID string, err error) {
+	request := api.InputRoomEventsRequest{InputRoomEvents: ires}
+	var response api.InputRoomEventsResponse
+	err = c.InputAPI.InputNewInviteEvents(ctx, &request, &response)
+	eventID = response.EventID
+	return
+}

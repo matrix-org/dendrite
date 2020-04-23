@@ -99,10 +99,17 @@ type RoomserverInputAPI interface {
 		request *InputRoomEventsRequest,
 		response *InputRoomEventsResponse,
 	) error
+
+	InputNewInviteEvents(
+		ctx context.Context,
+		request *InputRoomEventsRequest,
+		response *InputRoomEventsResponse,
+	) error
 }
 
 // RoomserverInputRoomEventsPath is the HTTP path for the InputRoomEvents API.
 const RoomserverInputRoomEventsPath = "/api/roomserver/inputRoomEvents"
+const RoomserverInputNewInviteEventsPath = "/api/roomserver/inputRoomEvents"
 
 // NewRoomserverInputAPIHTTP creates a RoomserverInputAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil an error is returned
@@ -128,5 +135,18 @@ func (h *httpRoomserverInputAPI) InputRoomEvents(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverInputRoomEventsPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// InputRoomEvents implements RoomserverInputAPI
+func (h *httpRoomserverInputAPI) InputNewInviteEvents(
+	ctx context.Context,
+	request *InputRoomEventsRequest,
+	response *InputRoomEventsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputNewInviteEvents")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverInputNewInviteEventsPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

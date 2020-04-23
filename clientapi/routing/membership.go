@@ -104,14 +104,31 @@ func SendMembership(
 		return jsonerror.InternalServerError()
 	}
 
-	if _, err := producer.SendEvents(
-		req.Context(),
-		[]gomatrixserverlib.HeaderedEvent{(*event).Headered(verRes.RoomVersion)},
-		cfg.Matrix.ServerName,
-		nil,
-	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
-		return jsonerror.InternalServerError()
+	if membership == gomatrixserverlib.Invite {
+		if _, err := producer.SendInputNewInviteEvents(
+			req.Context(),
+			[]api.InputRoomEvent{
+				api.InputRoomEvent{
+					Kind:         api.KindNew,
+					Event:        event.Headered(verRes.RoomVersion),
+					AuthEventIDs: event.AuthEventIDs(),
+					SendAsServer: string(cfg.Matrix.ServerName),
+				},
+			},
+		); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
+	} else {
+		if _, err := producer.SendEvents(
+			req.Context(),
+			[]gomatrixserverlib.HeaderedEvent{(*event).Headered(verRes.RoomVersion)},
+			cfg.Matrix.ServerName,
+			nil,
+		); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	var returnData interface{} = struct{}{}
