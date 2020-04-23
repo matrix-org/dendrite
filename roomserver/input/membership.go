@@ -16,6 +16,7 @@ package input
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -111,8 +112,8 @@ func updateMembership(
 	}
 
 	switch newMembership {
-	case gomatrixserverlib.Invite:
-		return updateToInviteMembership(mu, add, updates, updater.RoomVersion())
+	//case gomatrixserverlib.Invite:
+	//	return updateToInviteMembership(mu, add, updates, updater.RoomVersion())
 	case gomatrixserverlib.Join:
 		return updateToJoinMembership(mu, add, updates)
 	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
@@ -125,14 +126,17 @@ func updateMembership(
 }
 
 func updateToInviteMembership(
-	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu types.MembershipUpdater,
+	add gomatrixserverlib.Event,
+	addState json.RawMessage,
+	updates []api.OutputEvent,
 	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
 	// We may have already sent the invite to the user, either because we are
 	// reprocessing this event, or because the we received this invite from a
 	// remote server via the federation invite API. In those cases we don't need
 	// to send the event.
-	needsSending, err := mu.SetToInvite(*add)
+	needsSending, err := mu.SetToInvite(add)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +147,8 @@ func updateToInviteMembership(
 		// consider a single stream of events when determining whether a user
 		// is invited, rather than having to combine multiple streams themselves.
 		onie := api.OutputNewInviteEvent{
-			Event: (*add).Headered(roomVersion),
+			Event:           add.Headered(roomVersion),
+			InviteRoomState: addState,
 		}
 		updates = append(updates, api.OutputEvent{
 			Type:           api.OutputTypeNewInviteEvent,

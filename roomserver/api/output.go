@@ -15,6 +15,8 @@
 package api
 
 import (
+	"encoding/json"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -118,6 +120,8 @@ type OutputNewRoomEvent struct {
 type OutputNewInviteEvent struct {
 	// The "m.room.member" invite event.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	// The invite stripped event state, if available.
+	InviteRoomState json.RawMessage
 }
 
 // An OutputRetireInviteEvent is written whenever an existing invite is no longer
