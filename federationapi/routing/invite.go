@@ -127,7 +127,6 @@ func Invite(
 	if err = producer.SendInvite(
 		httpReq.Context(),
 		signedEvent.Headered(intermediate.RoomVersion),
-		inviteStates,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
 		return jsonerror.InternalServerError()
