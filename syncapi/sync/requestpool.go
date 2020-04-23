@@ -69,6 +69,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
 			return jsonerror.InternalServerError()
 		}
+
 		logger.WithField("next", syncData.NextBatch).Info("Responding immediately")
 		return util.JSONResponse{
 			Code: http.StatusOK,

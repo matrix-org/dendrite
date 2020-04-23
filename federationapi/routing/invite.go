@@ -37,10 +37,12 @@ func Invite(
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
+	fmt.Println("Receiving invite:", string(request.Content()))
+
 	var intermediate struct {
-		Event           json.RawMessage                           `json:"event"`
-		InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
-		RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
+		Event           json.RawMessage               `json:"event"`
+		InviteRoomState []json.RawMessage             `json:"invite_stripped_state"`
+		RoomVersion     gomatrixserverlib.RoomVersion `json:"room_version"`
 	}
 
 	// Unmarshal the request into the intermediate form.
@@ -111,11 +113,21 @@ func Invite(
 		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
+	// Try parsing invite states one by one. This allows us to drop only the invite
+	// states that are invalid rather than dropping all of them in one go.
+	inviteStates := []gomatrixserverlib.InviteV2StrippedState{}
+	for _, isj := range intermediate.InviteRoomState {
+		var inviteState gomatrixserverlib.InviteV2StrippedState
+		if err = json.Unmarshal(isj, &inviteState); err == nil {
+			inviteStates = append(inviteStates, inviteState)
+		}
+	}
+
 	// Add the invite event to the roomserver.
 	if err = producer.SendInvite(
 		httpReq.Context(),
 		signedEvent.Headered(intermediate.RoomVersion),
-		intermediate.InviteRoomState,
+		inviteStates,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
 		return jsonerror.InternalServerError()

@@ -449,11 +449,6 @@ func (d *SyncServerDatasource) addPDUDeltaToResponse(
 		}
 	}
 
-	// TODO: This should be done in getStateDeltas
-	if err = d.addInvitesToResponse(ctx, txn, device.UserID, fromPos, toPos, res); err != nil {
-		return nil, err
-	}
-
 	succeeded = true
 	return joinedRoomIDs, nil
 }
