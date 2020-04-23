@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 )
 
 // updateMembership updates the current membership and the invites for each
@@ -112,8 +113,8 @@ func updateMembership(
 	}
 
 	switch newMembership {
-	//case gomatrixserverlib.Invite:
-	//	return updateToInviteMembership(mu, add, updates, updater.RoomVersion())
+	case gomatrixserverlib.Invite:
+		return updateToInviteMembership(mu, *add, updates, updater.RoomVersion())
 	case gomatrixserverlib.Join:
 		return updateToJoinMembership(mu, add, updates)
 	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
@@ -128,7 +129,6 @@ func updateMembership(
 func updateToInviteMembership(
 	mu types.MembershipUpdater,
 	add gomatrixserverlib.Event,
-	addState json.RawMessage,
 	updates []api.OutputEvent,
 	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
@@ -141,6 +141,14 @@ func updateToInviteMembership(
 		return nil, err
 	}
 	if needsSending {
+		// If there's any invite_room_state in the unsigned key from another
+		// homeserver then let's capture it.
+		var addState json.RawMessage
+		if unsigned := gjson.GetBytes(add.Unsigned(), "invite_room_state"); unsigned.Exists() {
+			if a, ok := unsigned.Value().([]byte); ok {
+				addState = a
+			}
+		}
 		// We notify the consumers using a special event even though we will
 		// notify them about the change in current state as part of the normal
 		// room event stream. This ensures that the consumers only have to

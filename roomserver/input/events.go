@@ -266,7 +266,7 @@ func processInviteEvent(
 		return err
 	}
 
-	outputUpdates, err := updateToInviteMembership(updater, event, inviteStrippedState, nil, input.Event.RoomVersion)
+	outputUpdates, err := updateToInviteMembership(updater, event, nil, input.Event.RoomVersion)
 	if err != nil {
 		return err
 	}
