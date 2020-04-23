@@ -52,7 +52,7 @@ func Invite(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Users of %q cannot join version %q rooms.", cfg.Matrix.ServerName, roomVersion),
+				fmt.Sprintf("Users of this server cannot join version %q rooms.", roomVersion),
 			),
 		}
 	}
