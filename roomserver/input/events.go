@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -104,6 +105,7 @@ func processRoomEvent(
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(ctx, db, headered, input.AuthEventIDs)
 	if err != nil {
+		logrus.WithError(err).WithField("event_id", event.EventID()).Error("processRoomEvent.checkAuthEvents failed for event")
 		return
 	}
 
@@ -128,6 +130,7 @@ func processRoomEvent(
 		// For outliers we can stop after we've stored the event itself as it
 		// doesn't have any associated state to store and we don't need to
 		// notify anyone about it.
+		logrus.WithField("event_id", event.EventID()).WithField("type", event.Type()).WithField("room", event.RoomID()).Info("Stored outlier")
 		return event.EventID(), nil
 	}
 

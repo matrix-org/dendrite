@@ -69,6 +69,7 @@ func Backfill(
 
 	// Populate the request.
 	req := api.QueryBackfillRequest{
+		RoomID:            roomID,
 		EarliestEventsIDs: eIDs,
 		ServerName:        request.Origin(),
 	}
