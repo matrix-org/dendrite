@@ -16,11 +16,13 @@ package routing
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -43,6 +45,16 @@ func Invite(
 		}
 	}
 	event := inviteReq.Event()
+
+	// Check if we support the room version for the invite.
+	if roomVersion, err := version.SupportedRoomVersion(inviteReq.RoomVersion()); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(
+				fmt.Sprintf("Users of %q cannot join version %q rooms.", cfg.Matrix.ServerName, roomVersion),
+			),
+		}
+	}
 
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
