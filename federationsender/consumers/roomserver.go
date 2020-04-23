@@ -187,6 +187,10 @@ func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) er
 		return nil
 	}
 
+	fmt.Println("FEDERATION SENDER IS PROCESSING INVITE")
+	fmt.Println("Event:", string(oie.Event.JSON()))
+	fmt.Println("Invite room state:", string(oie.InviteRoomState))
+
 	// Try to unmarshal the invite room state to pass to the destination queue.
 	inviteRoomState := []gomatrixserverlib.InviteV2StrippedState{}
 	if err := json.Unmarshal(oie.InviteRoomState, &inviteRoomState); err != nil {

@@ -41,7 +41,7 @@ func Invite(
 
 	var intermediate struct {
 		Event           json.RawMessage               `json:"event"`
-		InviteRoomState []json.RawMessage             `json:"invite_room_state"`
+		InviteRoomState json.RawMessage               `json:"invite_room_state"`
 		RoomVersion     gomatrixserverlib.RoomVersion `json:"room_version"`
 	}
 
@@ -88,6 +88,12 @@ func Invite(
 		}
 	}
 
+	// Populate the unsigned key with the invite room state.
+	if err = event.SetUnsignedField("invite_room_state", intermediate.InviteRoomState); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("event.SetUnsignedField failed")
+		return jsonerror.InternalServerError()
+	}
+
 	// Check that the event is signed by the server sending the request.
 	redacted := event.Redact()
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
@@ -114,11 +120,13 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = producer.SendInvite(
+	if _, err := producer.SendEvents(
 		httpReq.Context(),
-		signedEvent.Headered(intermediate.RoomVersion),
+		[]gomatrixserverlib.HeaderedEvent{signedEvent.Headered(intermediate.RoomVersion)},
+		signedEvent.Origin(),
+		nil,
 	); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 

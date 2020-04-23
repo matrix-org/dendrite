@@ -18,16 +18,12 @@ package input
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/state/database"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	log "github.com/sirupsen/logrus"
 )
 
 // A RoomEventDatabase has the storage APIs needed to store a room event.
@@ -185,6 +181,7 @@ func calculateAndSetState(
 	return db.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 }
 
+/*
 func processInviteEvent(
 	ctx context.Context,
 	db RoomEventDatabase,
@@ -250,6 +247,11 @@ func processInviteEvent(
 
 	event := input.Event.Unwrap()
 	inviteStrippedState := input.InviteRoomState
+
+	fmt.Println("ROOM SERVER RECEIVED EVENT:")
+	j1, _ := json.MarshalIndent(event, "", "  ")
+	j2, _ := json.MarshalIndent(inviteStrippedState, "", "  ")
+	fmt.Printf("Event: %s\nInvite room state: %s\n", j1, j2)
 
 	// TODO: replace this with a proper origin check
 	if inviteStrippedState == nil {
@@ -327,3 +329,4 @@ func buildInviteStrippedState(
 	}
 	return inviteStrippedState, nil
 }
+*/
