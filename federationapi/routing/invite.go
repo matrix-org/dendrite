@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/version"
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -47,7 +47,8 @@ func Invite(
 	event := inviteReq.Event()
 
 	// Check if we support the room version for the invite.
-	if roomVersion, err := version.SupportedRoomVersion(inviteReq.RoomVersion()); err != nil {
+	roomVersion := inviteReq.RoomVersion()
+	if _, err := roomserverVersion.SupportedRoomVersion(roomVersion); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(
