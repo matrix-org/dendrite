@@ -78,6 +78,8 @@ type RoomEventDatabase interface {
 	GetRoomVersionForRoom(
 		ctx context.Context, roomID string,
 	) (gomatrixserverlib.RoomVersion, error)
+	RoomNID(ctx context.Context, roomID string) (types.RoomNID, error)
+	LatestEventIDs(ctx context.Context, roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error)
 }
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
@@ -248,8 +250,52 @@ func processInviteEvent(
 	event := input.Event.Unwrap()
 
 	if len(input.InviteRoomState) > 0 {
+		// If we were supplied with some invite room state then let's use that.
+		// This will ordinarily happen over federation.
 		if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
 			return err
+		}
+	} else {
+		// Otherwise, we should see if we know anything about the room state
+		// locally. If we have local knowledge of the room, use the locally known
+		// state to build up the invite room state.
+		if roomNID, err := db.RoomNID(ctx, roomID); err == nil && roomNID != 0 {
+			stateWanted := []gomatrixserverlib.StateKeyTuple{}
+			for _, t := range []string{
+				gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
+				gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
+			} {
+				stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
+					EventType: t,
+					StateKey:  "",
+				})
+			}
+			_, currentStateSnapshotNID, _, err := db.LatestEventIDs(ctx, roomNID)
+			if err != nil {
+				return err
+			}
+			roomState := state.NewStateResolution(db)
+			stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
+				ctx, currentStateSnapshotNID, stateWanted,
+			)
+			if err != nil {
+				return err
+			}
+			stateNIDs := []types.EventNID{}
+			for _, stateNID := range stateEntries {
+				stateNIDs = append(stateNIDs, stateNID.EventNID)
+			}
+			stateEvents, err := db.Events(ctx, stateNIDs)
+			if err != nil {
+				return err
+			}
+			strippedState := []gomatrixserverlib.InviteV2StrippedState{}
+			for _, event := range stateEvents {
+				strippedState = append(strippedState, gomatrixserverlib.NewInviteV2StrippedState(&event.Event))
+			}
+			if err = event.SetUnsignedField("invite_room_state", strippedState); err != nil {
+				return err
+			}
 		}
 	}
 
