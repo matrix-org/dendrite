@@ -41,7 +41,7 @@ func Invite(
 
 	var intermediate struct {
 		Event           json.RawMessage               `json:"event"`
-		InviteRoomState []json.RawMessage             `json:"invite_stripped_state"`
+		InviteRoomState []json.RawMessage             `json:"invite_room_state"`
 		RoomVersion     gomatrixserverlib.RoomVersion `json:"room_version"`
 	}
 

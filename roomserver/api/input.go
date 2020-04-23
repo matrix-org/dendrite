@@ -88,7 +88,7 @@ type TransactionID struct {
 type InputInviteEvent struct {
 	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
 	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
-	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_stripped_state"`
+	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
 }
 
 // InputRoomEventsRequest is a request to InputRoomEvents

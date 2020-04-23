@@ -248,13 +248,12 @@ func processInviteEvent(
 	}
 
 	event := input.Event.Unwrap()
+	inviteStrippedState := []gomatrixserverlib.InviteV2StrippedState{}
 
 	if len(input.InviteRoomState) > 0 {
 		// If we were supplied with some invite room state then let's use that.
 		// This will ordinarily happen over federation.
-		if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
-			return err
-		}
+		inviteStrippedState = input.InviteRoomState
 	} else {
 		// Otherwise, we should see if we know anything about the room state
 		// locally. If we have local knowledge of the room, use the locally known
@@ -289,14 +288,14 @@ func processInviteEvent(
 			if err != nil {
 				return err
 			}
-			strippedState := []gomatrixserverlib.InviteV2StrippedState{}
 			for _, event := range stateEvents {
-				strippedState = append(strippedState, gomatrixserverlib.NewInviteV2StrippedState(&event.Event))
-			}
-			if err = event.SetUnsignedField("invite_room_state", strippedState); err != nil {
-				return err
+				inviteStrippedState = append(inviteStrippedState, gomatrixserverlib.NewInviteV2StrippedState(&event.Event))
 			}
 		}
+	}
+
+	if err = event.SetUnsignedField("invite_room_state", inviteStrippedState); err != nil {
+		return err
 	}
 
 	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
