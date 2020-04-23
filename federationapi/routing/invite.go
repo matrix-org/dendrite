@@ -113,16 +113,6 @@ func Invite(
 		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
-	// Try parsing invite states one by one. This allows us to drop only the invite
-	// states that are invalid rather than dropping all of them in one go.
-	inviteStates := []gomatrixserverlib.InviteV2StrippedState{}
-	for _, isj := range intermediate.InviteRoomState {
-		var inviteState gomatrixserverlib.InviteV2StrippedState
-		if err = json.Unmarshal(isj, &inviteState); err == nil {
-			inviteStates = append(inviteStates, inviteState)
-		}
-	}
-
 	// Add the invite event to the roomserver.
 	if err = producer.SendInvite(
 		httpReq.Context(),
