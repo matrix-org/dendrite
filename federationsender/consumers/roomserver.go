@@ -190,12 +190,8 @@ func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) er
 	// When sending a v2 invite, the inviting server should try and include
 	// a "stripped down" version of the room state. This is pretty much just
 	// enough information for the remote side to show something useful to the
-	// user, like the room name, aliases etc. Initially we'll strip down
-	// the invite event itself, as this satisfies the membership event in the
-	// stripped state.
-	strippedState := []gomatrixserverlib.InviteV2StrippedState{
-		gomatrixserverlib.NewInviteV2StrippedState(&oie.Event.Event),
-	}
+	// user, like the room name, aliases etc.
+	strippedState := []gomatrixserverlib.InviteV2StrippedState{}
 	stateWanted := []string{
 		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
 		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,

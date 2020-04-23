@@ -37,23 +37,36 @@ func Invite(
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
-	inviteReq := gomatrixserverlib.InviteV2Request{}
-	if err := json.Unmarshal(request.Content(), &inviteReq); err != nil {
+	var intermediate struct {
+		Event           json.RawMessage                           `json:"event"`
+		InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
+		RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
+	}
+
+	// Unmarshal the request into the intermediate form.
+	if err := json.Unmarshal(request.Content(), &intermediate); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
+			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request: " + err.Error()),
 		}
 	}
-	event := inviteReq.Event()
 
-	// Check if we support the room version for the invite.
-	roomVersion := inviteReq.RoomVersion()
-	if _, err := roomserverVersion.SupportedRoomVersion(roomVersion); err != nil {
+	// Check if we support the supplied room version before doing anything else.
+	if _, err := roomserverVersion.SupportedRoomVersion(intermediate.RoomVersion); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Users of this server cannot join version %q rooms.", roomVersion),
+				fmt.Sprintf("Users of this server cannot join version %q rooms.", intermediate.RoomVersion),
 			),
+		}
+	}
+
+	// Unmarshal the event.
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(intermediate.Event, intermediate.RoomVersion)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("The event in the request body could not be parsed: " + err.Error()),
 		}
 	}
 
@@ -101,8 +114,8 @@ func Invite(
 	// Add the invite event to the roomserver.
 	if err = producer.SendInvite(
 		httpReq.Context(),
-		signedEvent.Headered(inviteReq.RoomVersion()),
-		inviteReq.InviteRoomState(),
+		signedEvent.Headered(intermediate.RoomVersion),
+		intermediate.InviteRoomState,
 	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
 		return jsonerror.InternalServerError()
