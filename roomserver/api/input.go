@@ -89,6 +89,8 @@ type InputInviteEvent struct {
 	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
 	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
 	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
+	SendAsServer    string                                    `json:"send_as_server"`
+	TransactionID   *TransactionID                            `json:"transaction_id"`
 }
 
 // InputRoomEventsRequest is a request to InputRoomEvents
