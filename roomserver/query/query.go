@@ -61,6 +61,14 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	if roomNID == 0 {
 		return nil
 	}
+	isStub, err := r.DB.IsRoomStub(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+	if isStub {
+		response.RoomExists = false
+		return nil
+	}
 	response.RoomExists = true
 	response.RoomVersion = roomVersion
 
@@ -119,6 +127,14 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 		return err
 	}
 	if roomNID == 0 {
+		return nil
+	}
+	isStub, err := r.DB.IsRoomStub(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+	if isStub {
+		response.RoomExists = false
 		return nil
 	}
 	response.RoomExists = true
@@ -654,6 +670,14 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 		return err
 	}
 	if roomNID == 0 {
+		return nil
+	}
+	isStub, err := r.DB.IsRoomStub(ctx, roomNID)
+	if err != nil {
+		return err
+	}
+	if isStub {
+		response.RoomExists = false
 		return nil
 	}
 	response.RoomExists = true

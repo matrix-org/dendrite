@@ -926,6 +926,16 @@ func (d *Database) GetRoomVersionForRoomNID(
 	)
 }
 
+func (d *Database) IsRoomStub(
+	ctx context.Context, roomNID types.RoomNID,
+) (bool, error) {
+	nids, _, err := d.statements.selectLatestEventNIDs(ctx, nil, roomNID)
+	if err != nil {
+		return false, err
+	}
+	return len(nids) == 0, nil
+}
+
 type transaction struct {
 	ctx context.Context
 	txn *sql.Tx
