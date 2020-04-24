@@ -471,6 +471,23 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 	return roomNID, err
 }
 
+// RoomNIDExcludingStubs implements query.RoomserverQueryAPIDB
+func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
+	roomNID, err = d.RoomNID(ctx, roomID)
+	if err != nil {
+		return
+	}
+	latestEvents, _, err := d.statements.selectLatestEventNIDs(ctx, roomNID)
+	if err != nil {
+		return
+	}
+	if len(latestEvents) == 0 {
+		roomNID = 0
+		return
+	}
+	return
+}
+
 // LatestEventIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
@@ -770,16 +787,6 @@ func (d *Database) GetRoomVersionForRoomNID(
 	return d.statements.selectRoomVersionForRoomNID(
 		ctx, nil, roomNID,
 	)
-}
-
-func (d *Database) IsRoomStub(
-	ctx context.Context, roomNID types.RoomNID,
-) (bool, error) {
-	nids, _, err := d.statements.selectLatestEventNIDs(ctx, roomNID)
-	if err != nil {
-		return false, err
-	}
-	return len(nids) == 0, nil
 }
 
 type transaction struct {

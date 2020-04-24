@@ -71,6 +71,10 @@ type Database interface {
 	GetLatestEventsForUpdate(ctx context.Context, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error)
 	GetTransactionEventID(ctx context.Context, transactionID string, sessionID int64, userID string) (string, error)
 	RoomNID(ctx context.Context, roomID string) (types.RoomNID, error)
+	// RoomNIDExcludingStubs is a special variation of RoomNID that will return 0 as if the room
+	// does not exist if the room has no latest events. This can happen when we've received an
+	// invite over federation for a room that we don't know anything else about yet.
+	RoomNIDExcludingStubs(ctx context.Context, roomID string) (types.RoomNID, error)
 	LatestEventIDs(ctx context.Context, roomNID types.RoomNID) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error)
 	GetInvitesForUser(ctx context.Context, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) (senderUserIDs []types.EventStateKeyNID, err error)
 	SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error
@@ -83,5 +87,4 @@ type Database interface {
 	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool) ([]types.EventNID, error)
 	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
 	GetRoomVersionForRoom(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error)
-	IsRoomStub(ctx context.Context, roomNID types.RoomNID) (bool, error)
 }
