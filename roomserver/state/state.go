@@ -22,7 +22,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/state/database"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -31,10 +31,10 @@ import (
 )
 
 type StateResolution struct {
-	db database.RoomStateDatabase
+	db storage.Database
 }
 
-func NewStateResolution(db database.RoomStateDatabase) StateResolution {
+func NewStateResolution(db storage.Database) StateResolution {
 	return StateResolution{
 		db: db,
 	}

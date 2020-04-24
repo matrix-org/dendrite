@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -29,7 +30,7 @@ import (
 // consumers about the invites added or retired by the change in current state.
 func updateMemberships(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	updater types.RoomRecentEventsUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
