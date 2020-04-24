@@ -40,6 +40,8 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
+// TODO: Can we improve the cyclo count here? Separate code paths for invites?
+// nolint:gocyclo
 func SendMembership(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	roomID string, membership string, cfg *config.Dendrite,
