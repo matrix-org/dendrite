@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -10,7 +11,7 @@ import (
 
 // backfillRequester implements gomatrixserverlib.BackfillRequester
 type backfillRequester struct {
-	db         RoomserverQueryAPIDatabase
+	db         storage.Database
 	fedClient  *gomatrixserverlib.FederationClient
 	thisServer gomatrixserverlib.ServerName
 }

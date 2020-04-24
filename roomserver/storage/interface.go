@@ -31,7 +31,8 @@ type Database interface {
 		state []types.StateEntry,
 	) (types.StateSnapshotNID, error)
 	// Look up the state of a room at each event for a list of string event IDs.
-	// Returns an error if there is an error talking to the database
+	// Returns an error if there is an error talking to the database.
+	// The length of []types.StateAtEvent is guaranteed to equal the length of eventIDs if no error is returned.
 	// Returns a types.MissingEventError if the room state for the event IDs aren't in the database
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	// Look up the numeric IDs for a list of string event types.
