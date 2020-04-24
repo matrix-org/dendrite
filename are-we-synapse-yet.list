@@ -28,6 +28,10 @@ log POST /login returns the same device_id as that in the request
 log POST /login can log in as a user with just the local part of the id 
 log POST /login as non-existing user is rejected 
 log POST /login wrong password is rejected 
+log Interactive authentication types include SSO
+log Can perform interactive authentication with SSO
+log The user must be consistent through an interactive authentication session with SSO
+log The operation must be consistent through an interactive authentication session
 v1s GET /events initially
 v1s GET /initialSync initially
 csa Version responds 200 OK with valid structure
@@ -44,6 +48,7 @@ dev DELETE /device/{deviceId}
 dev DELETE /device/{deviceId} requires UI auth user to match device owner 
 dev DELETE /device/{deviceId} with no body gives a 401 
 dev The deleted device must be consistent through an interactive auth session 
+dev Users receive device_list updates for their own devices
 pre GET /presence/:user_id/status fetches initial status 
 pre PUT /presence/:user_id/status updates my presence 
 crm POST /createRoom makes a public room
