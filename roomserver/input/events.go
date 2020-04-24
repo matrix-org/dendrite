@@ -23,62 +23,11 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/state/database"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
-
-// A RoomEventDatabase has the storage APIs needed to store a room event.
-type RoomEventDatabase interface {
-	database.RoomStateDatabase
-	// Stores a matrix room event in the database
-	StoreEvent(
-		ctx context.Context,
-		event gomatrixserverlib.Event,
-		txnAndSessionID *api.TransactionID,
-		authEventNIDs []types.EventNID,
-	) (types.RoomNID, types.StateAtEvent, error)
-	// Look up the state entries for a list of string event IDs
-	// Returns an error if the there is an error talking to the database
-	// Returns a types.MissingEventError if the event IDs aren't in the database.
-	StateEntriesForEventIDs(
-		ctx context.Context, eventIDs []string,
-	) ([]types.StateEntry, error)
-	// Set the state at an event.
-	SetState(
-		ctx context.Context,
-		eventNID types.EventNID,
-		stateNID types.StateSnapshotNID,
-	) error
-	// Look up the latest events in a room in preparation for an update.
-	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
-	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
-	// If this returns an error then no further action is required.
-	GetLatestEventsForUpdate(
-		ctx context.Context, roomNID types.RoomNID,
-	) (updater types.RoomRecentEventsUpdater, err error)
-	// Look up the string event IDs for a list of numeric event IDs
-	EventIDs(
-		ctx context.Context, eventNIDs []types.EventNID,
-	) (map[types.EventNID]string, error)
-	// Build a membership updater for the target user in a room.
-	MembershipUpdater(
-		ctx context.Context, roomID, targerUserID string,
-		roomVersion gomatrixserverlib.RoomVersion,
-	) (types.MembershipUpdater, error)
-	// Look up event ID by transaction's info.
-	// This is used to determine if the room event is processed/processing already.
-	// Returns an empty string if no such event exists.
-	GetTransactionEventID(
-		ctx context.Context, transactionID string,
-		sessionID int64, userID string,
-	) (string, error)
-	// Look up the room version for a given room.
-	GetRoomVersionForRoom(
-		ctx context.Context, roomID string,
-	) (gomatrixserverlib.RoomVersion, error)
-}
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
 type OutputRoomEventWriter interface {
@@ -93,7 +42,7 @@ type OutputRoomEventWriter interface {
 // state deltas when sending to kafka streams
 func processRoomEvent(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	ow OutputRoomEventWriter,
 	input api.InputRoomEvent,
 ) (eventID string, err error) {
@@ -153,7 +102,7 @@ func processRoomEvent(
 
 func calculateAndSetState(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	input api.InputRoomEvent,
 	roomNID types.RoomNID,
 	stateAtEvent *types.StateAtEvent,
@@ -184,7 +133,7 @@ func calculateAndSetState(
 
 func processInviteEvent(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	ow OutputRoomEventWriter,
 	input api.InputInviteEvent,
 ) (err error) {

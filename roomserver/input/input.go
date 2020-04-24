@@ -24,12 +24,13 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/util"
 )
 
 // RoomserverInputAPI implements api.RoomserverInputAPI
 type RoomserverInputAPI struct {
-	DB       RoomEventDatabase
+	DB       storage.Database
 	Producer sarama.SyncProducer
 	// The kafkaesque topic to output new room events to.
 	// This is the name used in kafka to identify the stream to write events to.
