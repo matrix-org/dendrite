@@ -18,7 +18,6 @@ package input
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/common"
@@ -206,7 +205,8 @@ func processInviteEvent(
 		}
 	} else {
 		// There's no invite room state, so let's have a go at building it
-		// up from local data. If we know about the room then we can insert
+		// up from local data (which is most likely to be if the event came
+		// from the CS API). If we know about the room then we can insert
 		// the invite room state, if we don't then we just fail quietly.
 		if irs, ierr := buildInviteStrippedState(ctx, db, input); ierr == nil {
 			if err = event.SetUnsignedField("invite_room_state", irs); err != nil {
@@ -235,7 +235,7 @@ func buildInviteStrippedState(
 ) ([]gomatrixserverlib.InviteV2StrippedState, error) {
 	roomNID, err := db.RoomNID(ctx, input.Event.RoomID())
 	if err != nil || roomNID == 0 {
-		return nil, errors.New("room unknown")
+		return nil, fmt.Errorf("room %q unknown", input.Event.RoomID())
 	}
 	stateWanted := []gomatrixserverlib.StateKeyTuple{}
 	for _, t := range []string{
