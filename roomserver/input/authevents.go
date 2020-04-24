@@ -18,6 +18,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -26,7 +27,7 @@ import (
 // Returns the numeric IDs for the auth events.
 func checkAuthEvents(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	event gomatrixserverlib.HeaderedEvent,
 	authEventIDs []string,
 ) ([]types.EventNID, error) {
@@ -127,7 +128,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *
 // loadAuthEvents loads the events needed for authentication from the supplied room state.
 func loadAuthEvents(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	needed gomatrixserverlib.StateNeeded,
 	state []types.StateEntry,
 ) (result authEvents, err error) {
