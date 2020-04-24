@@ -14,6 +14,30 @@ type backfillRequester struct {
 	db         storage.Database
 	fedClient  *gomatrixserverlib.FederationClient
 	thisServer gomatrixserverlib.ServerName
+
+	// per-request state
+	servers  []gomatrixserverlib.ServerName
+	stateIDs []string
+}
+
+func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, roomID, atEventID string) ([]string, error) {
+	c := gomatrixserverlib.FederatedStateProvider{
+		FedClient:      b.fedClient,
+		AuthEventsOnly: true,
+		Server:         b.servers[0],
+	}
+	res, err := c.StateIDsAtEvent(ctx, roomID, atEventID)
+	b.stateIDs = res
+	return res, err
+}
+
+func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion, roomID, atEventID string, eventIDs []string) (map[string]*gomatrixserverlib.Event, error) {
+	c := gomatrixserverlib.FederatedStateProvider{
+		FedClient:      b.fedClient,
+		AuthEventsOnly: true,
+		Server:         b.servers[0],
+	}
+	return c.StateAtEvent(ctx, roomVer, roomID, atEventID, eventIDs)
 }
 
 // ServersAtEvent is called when trying to determine which server to request from.
@@ -49,6 +73,7 @@ func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID 
 		}
 		servers = append(servers, server)
 	}
+	b.servers = servers
 	return
 }
 
