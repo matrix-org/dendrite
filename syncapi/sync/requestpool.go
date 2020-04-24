@@ -15,8 +15,6 @@
 package sync
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -71,10 +69,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
 			return jsonerror.InternalServerError()
 		}
-
-		j, _ := json.MarshalIndent(syncData, "", "  ")
-		fmt.Println("Sync response:", string(j))
-
 		logger.WithField("next", syncData.NextBatch).Info("Responding immediately")
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -129,9 +123,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		}
 
 		if !syncData.IsEmpty() || hasTimedOut {
-			j, _ := json.MarshalIndent(syncData, "", "  ")
-			fmt.Println("Sync response:", string(j))
-
 			logger.WithField("next", syncData.NextBatch).WithField("timed_out", hasTimedOut).Info("Responding")
 			return util.JSONResponse{
 				Code: http.StatusOK,
