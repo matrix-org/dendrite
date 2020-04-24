@@ -26,79 +26,16 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/state/database"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-// RoomserverQueryAPIEventDB has a convenience API to fetch events directly by
-// EventIDs.
-type RoomserverQueryAPIEventDB interface {
-	// Look up the Events for a list of event IDs. Does not error if event was
-	// not found.
-	// Returns an error if the retrieval went wrong.
-	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
-}
-
-// RoomserverQueryAPIDatabase has the storage APIs needed to implement the query API.
-type RoomserverQueryAPIDatabase interface {
-	database.RoomStateDatabase
-	RoomserverQueryAPIEventDB
-	// Look up the numeric ID for the room.
-	// Returns 0 if the room doesn't exists.
-	// Returns an error if there was a problem talking to the database.
-	RoomNID(ctx context.Context, roomID string) (types.RoomNID, error)
-	// Look up event references for the latest events in the room and the current state snapshot.
-	// Returns the latest events, the current state and the maximum depth of the latest events plus 1.
-	// Returns an error if there was a problem talking to the database.
-	LatestEventIDs(
-		ctx context.Context, roomNID types.RoomNID,
-	) ([]gomatrixserverlib.EventReference, types.StateSnapshotNID, int64, error)
-	// Look up the numeric IDs for a list of events.
-	// Returns an error if there was a problem talking to the database.
-	EventNIDs(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error)
-	// Lookup the event IDs for a batch of event numeric IDs.
-	// Returns an error if the retrieval went wrong.
-	EventIDs(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error)
-	// Lookup the membership of a given user in a given room.
-	// Returns the numeric ID of the latest membership event sent from this user
-	// in this room, along a boolean set to true if the user is still in this room,
-	// false if not.
-	// Returns an error if there was a problem talking to the database.
-	GetMembership(
-		ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
-	) (membershipEventNID types.EventNID, stillInRoom bool, err error)
-	// Lookup the membership event numeric IDs for all user that are or have
-	// been members of a given room. Only lookup events of "join" membership if
-	// joinOnly is set to true.
-	// Returns an error if there was a problem talking to the database.
-	GetMembershipEventNIDsForRoom(
-		ctx context.Context, roomNID types.RoomNID, joinOnly bool,
-	) ([]types.EventNID, error)
-	// Look up the active invites targeting a user in a room and return the
-	// numeric state key IDs for the user IDs who sent them.
-	// Returns an error if there was a problem talking to the database.
-	GetInvitesForUser(
-		ctx context.Context,
-		roomNID types.RoomNID,
-		targetUserNID types.EventStateKeyNID,
-	) (senderUserNIDs []types.EventStateKeyNID, err error)
-	// Look up the string event state keys for a list of numeric event state keys
-	// Returns an error if there was a problem talking to the database.
-	EventStateKeys(
-		context.Context, []types.EventStateKeyNID,
-	) (map[types.EventStateKeyNID]string, error)
-	// Look up the room version for a given room.
-	GetRoomVersionForRoom(
-		ctx context.Context, roomID string,
-	) (gomatrixserverlib.RoomVersion, error)
-}
-
 // RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
 type RoomserverQueryAPI struct {
-	DB             RoomserverQueryAPIDatabase
+	DB             storage.Database
 	ImmutableCache caching.ImmutableCache
 }
 
@@ -741,7 +678,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	}
 	authEventIDs = util.UniqueStrings(authEventIDs) // de-dupe
 
-	authEvents, err := getAuthChain(ctx, r.DB, authEventIDs)
+	authEvents, err := getAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
 	if err != nil {
 		return err
 	}
@@ -788,12 +725,14 @@ func (r *RoomserverQueryAPI) loadStateAtEventIDs(ctx context.Context, eventIDs [
 	return r.loadStateEvents(ctx, stateEntries)
 }
 
+type eventsFromIDs func(context.Context, []string) ([]types.Event, error)
+
 // getAuthChain fetches the auth chain for the given auth events. An auth chain
 // is the list of all events that are referenced in the auth_events section, and
 // all their auth_events, recursively. The returned set of events contain the
 // given events. Will *not* error if we don't have all auth events.
 func getAuthChain(
-	ctx context.Context, dB RoomserverQueryAPIEventDB, authEventIDs []string,
+	ctx context.Context, fn eventsFromIDs, authEventIDs []string,
 ) ([]gomatrixserverlib.Event, error) {
 	// List of event IDs to fetch. On each pass, these events will be requested
 	// from the database and the `eventsToFetch` will be updated with any new
@@ -804,7 +743,7 @@ func getAuthChain(
 
 	for len(eventsToFetch) > 0 {
 		// Try to retrieve the events from the database.
-		events, err := dB.EventsFromIDs(ctx, eventsToFetch)
+		events, err := fn(ctx, eventsToFetch)
 		if err != nil {
 			return nil, err
 		}
