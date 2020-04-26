@@ -60,10 +60,10 @@ type SyncServerDatasource struct {
 }
 
 // NewSyncServerDatasource creates a new sync server database
-func NewSyncServerDatasource(dbDataSourceName string) (*SyncServerDatasource, error) {
+func NewSyncServerDatasource(dbDataSourceName string, dbProperties common.DbProperties) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
-	if d.db, err = sqlutil.Open("postgres", dbDataSourceName); err != nil {
+	if d.db, err = sqlutil.Open("postgres", dbDataSourceName, dbProperties); err != nil {
 		return nil, err
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {

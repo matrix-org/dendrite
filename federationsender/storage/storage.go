@@ -19,22 +19,23 @@ package storage
 import (
 	"net/url"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
 )
 
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (Database, error) {
+func NewDatabase(dataSourceName string, dbProperties common.DbProperties) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewDatabase(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	}
 	switch uri.Scheme {
 	case "file":
 		return sqlite3.NewDatabase(dataSourceName)
 	case "postgres":
-		return postgres.NewDatabase(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	default:
-		return postgres.NewDatabase(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	}
 }

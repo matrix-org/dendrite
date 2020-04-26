@@ -116,6 +116,9 @@ database:
     federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
     appservice: "postgres://dendrite:itsasecret@localhost/dendrite_appservice?sslmode=disable"
     public_rooms_api: "postgres://dendrite:itsasecret@localhost/dendrite_publicroomsapi?sslmode=disable"
+    max_open_conns: 100
+    max_idle_conns: 2
+    conn_max_lifetime: -1
     # If using naffka you need to specify a naffka database
     # naffka: "postgres://dendrite:itsasecret@localhost/dendrite_naffka?sslmode=disable"
 

@@ -50,7 +50,7 @@ type Database struct {
 func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sqlutil.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
+	if db, err = sqlutil.Open(common.SQLiteDriverName(), dataSourceName, nil); err != nil {
 		return nil, err
 	}
 	partitions := common.PartitionOffsetStatements{}

@@ -79,7 +79,7 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = d.prepare(); err != nil {

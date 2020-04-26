@@ -45,7 +45,7 @@ type PublicRoomsServerDatabase struct {
 
 // NewPublicRoomsServerDatabase creates a new public rooms server database.
 func NewPublicRoomsServerDatabase(dataSourceName string, dht *dht.IpfsDHT) (*PublicRoomsServerDatabase, error) {
-	pg, err := postgres.NewPublicRoomsServerDatabase(dataSourceName)
+	pg, err := postgres.NewPublicRoomsServerDatabase(dataSourceName, nil)
 	if err != nil {
 		return nil, err
 	}

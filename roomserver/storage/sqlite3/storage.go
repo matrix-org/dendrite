@@ -37,7 +37,7 @@ type Database struct {
 	db         *sql.DB
 }
 
-// Open a postgres database.
+// Open a sqlite database.
 func Open(dataSourceName string) (*Database, error) {
 	var d Database
 	uri, err := url.Parse(dataSourceName)
@@ -52,7 +52,7 @@ func Open(dataSourceName string) (*Database, error) {
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")

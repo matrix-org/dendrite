@@ -56,6 +56,7 @@ func createKeyDB(
 ) keydb.Database {
 	db, err := keydb.NewDatabase(
 		string(base.Base.Cfg.Database.ServerKey),
+		base.Base.Cfg.DbProperties(),
 		base.Base.Cfg.Matrix.ServerName,
 		base.Base.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
 		base.Base.Cfg.Matrix.KeyID,

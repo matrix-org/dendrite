@@ -162,7 +162,7 @@ func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.Fede
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
 func (b *BaseDendrite) CreateDeviceDB() devices.Database {
-	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.Matrix.ServerName)
+	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to devices db")
 	}
@@ -173,7 +173,7 @@ func (b *BaseDendrite) CreateDeviceDB() devices.Database {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
-	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.Matrix.ServerName)
+	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
@@ -186,6 +186,7 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 	db, err := keydb.NewDatabase(
 		string(b.Cfg.Database.ServerKey),
+		b.Cfg.DbProperties(),
 		b.Cfg.Matrix.ServerName,
 		b.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
 		b.Cfg.Matrix.KeyID,
@@ -256,7 +257,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
 	if err != nil || uri.Scheme == "file" {
-		db, err = sqlutil.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka))
+		db, err = sqlutil.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka), nil)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}
@@ -266,7 +267,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
 	} else {
-		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka))
+		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka), nil)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}
