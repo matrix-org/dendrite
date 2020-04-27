@@ -42,6 +42,7 @@ func SetupRoomServerComponent(
 
 	inputAPI := input.RoomserverInputAPI{
 		DB:                   roomserverDB,
+		Cfg:                  base.Cfg,
 		Producer:             base.KafkaProducer,
 		OutputRoomEventTopic: string(base.Cfg.Kafka.Topics.OutputRoomEvent),
 	}

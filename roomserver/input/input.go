@@ -23,6 +23,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/util"
@@ -31,6 +32,7 @@ import (
 // RoomserverInputAPI implements api.RoomserverInputAPI
 type RoomserverInputAPI struct {
 	DB       storage.Database
+	Cfg      *config.Dendrite
 	Producer sarama.SyncProducer
 	// The kafkaesque topic to output new room events to.
 	// This is the name used in kafka to identify the stream to write events to.
@@ -61,21 +63,24 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) (err error) {
+) error {
 	// We lock as processRoomEvent can only be called once at a time
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	for i := range request.InputRoomEvents {
-		if response.EventID, err = processRoomEvent(ctx, r.DB, r, request.InputRoomEvents[i]); err != nil {
-			return err
-		}
-	}
 	for i := range request.InputInviteEvents {
-		if err = processInviteEvent(ctx, r.DB, r, request.InputInviteEvents[i]); err != nil {
+		roomEvent, err := r.processInviteEvent(ctx, r.DB, r, request.InputInviteEvents[i])
+		if err != nil {
 			return err
 		}
+		request.InputRoomEvents = append(request.InputRoomEvents, roomEvent)
 	}
-	return nil
+	var err error
+	for i := range request.InputRoomEvents {
+		if response.EventID, err = r.processRoomEvent(ctx, r.DB, r, request.InputRoomEvents[i]); err != nil {
+			break
+		}
+	}
+	return err
 }
 
 // SetupHTTP adds the RoomserverInputAPI handlers to the http.ServeMux.
