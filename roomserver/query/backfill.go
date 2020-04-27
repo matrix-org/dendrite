@@ -110,9 +110,9 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 	events, err := b.ProvideEvents(roomVer, eventIDs)
 	if err != nil {
 		// non-fatal, fallthrough
-		logrus.WithError(err).Info("Failed to fetch events banana")
+		logrus.WithError(err).Info("Failed to fetch events")
 	} else {
-		logrus.Infof("Fetched %d/%d events from the database banana", len(events), len(eventIDs))
+		logrus.Infof("Fetched %d/%d events from the database", len(events), len(eventIDs))
 		if len(events) == len(eventIDs) {
 			result := make(map[string]*gomatrixserverlib.Event)
 			for i := range events {
@@ -123,7 +123,6 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 		}
 	}
 
-	logrus.WithField("event_id", event.EventID()).Info("Requesting /state at event banana")
 	c := gomatrixserverlib.FederatedStateProvider{
 		FedClient:      b.fedClient,
 		AuthEventsOnly: false,

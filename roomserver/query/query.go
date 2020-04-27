@@ -489,7 +489,6 @@ func (r *RoomserverQueryAPI) QueryBackfill(
 	request *api.QueryBackfillRequest,
 	response *api.QueryBackfillResponse,
 ) error {
-	logrus.WithField("req", request).Info("QueryBackfill - I am " + r.ServerName)
 	// if we are requesting the backfill then we need to do a federation hit
 	// TODO: we could be more sensible and fetch as many events we already have then request the rest
 	//       which is what the syncapi does already.
