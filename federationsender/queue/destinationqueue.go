@@ -186,6 +186,7 @@ func (oq *destinationQueue) nextInvites() bool {
 				"state_key":   ev.StateKey(),
 				"destination": oq.destination,
 			}).WithError(err).Error("failed to send invite")
+			continue
 		}
 
 		if _, err = oq.rsProducer.SendInviteResponse(
