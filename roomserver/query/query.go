@@ -551,37 +551,18 @@ func (r *RoomserverQueryAPI) backfillViaFederation(ctx context.Context, req *api
 	}
 	logrus.WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
 
-	backfilledEventMap := make(map[string]types.Event)
-	var roomNID types.RoomNID
 	// persist these new events - auth checks have already been done
-	for _, ev := range events {
-		nidMap, err := r.DB.EventNIDs(ctx, ev.AuthEventIDs())
-		if err != nil { // this shouldn't happen as RequestBackill already found them
-			logrus.WithError(err).WithField("auth_events", ev.AuthEventIDs()).Error("Failed to find one or more auth events")
-			continue
-		}
-		authNids := make([]types.EventNID, len(nidMap))
-		i := 0
-		for _, nid := range nidMap {
-			authNids[i] = nid
-			i++
-		}
-		var stateAtEvent types.StateAtEvent
-		roomNID, stateAtEvent, err = r.DB.StoreEvent(ctx, ev.Unwrap(), nil, authNids)
-		if err != nil {
-			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to store backfilled event")
-			continue
-		}
-		backfilledEventMap[ev.EventID()] = types.Event{
-			EventNID: stateAtEvent.StateEntry.EventNID,
-			Event:    ev.Unwrap(),
-		}
+	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, events)
+	if err != nil {
+		return err
 	}
 
 	for _, ev := range backfilledEventMap {
 		// now add state for these events
 		stateIDs, ok := requester.eventIDToBeforeStateIDs[ev.EventID()]
 		if !ok {
+			// this should be impossible as all events returned must have pass Step 5 of the PDU checks
+			// which requires a list of state IDs.
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to find state IDs for event which passed auth checks")
 			continue
 		}
@@ -856,6 +837,35 @@ func getAuthChain(
 	}
 
 	return authEvents, nil
+}
+
+func persistEvents(ctx context.Context, db storage.Database, events []gomatrixserverlib.HeaderedEvent) (types.RoomNID, map[string]types.Event) {
+	var roomNID types.RoomNID
+	backfilledEventMap := make(map[string]types.Event)
+	for _, ev := range events {
+		nidMap, err := db.EventNIDs(ctx, ev.AuthEventIDs())
+		if err != nil { // this shouldn't happen as RequestBackfill already found them
+			logrus.WithError(err).WithField("auth_events", ev.AuthEventIDs()).Error("Failed to find one or more auth events")
+			continue
+		}
+		authNids := make([]types.EventNID, len(nidMap))
+		i := 0
+		for _, nid := range nidMap {
+			authNids[i] = nid
+			i++
+		}
+		var stateAtEvent types.StateAtEvent
+		roomNID, stateAtEvent, err = db.StoreEvent(ctx, ev.Unwrap(), nil, authNids)
+		if err != nil {
+			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to store backfilled event")
+			continue
+		}
+		backfilledEventMap[ev.EventID()] = types.Event{
+			EventNID: stateAtEvent.StateEntry.EventNID,
+			Event:    ev.Unwrap(),
+		}
+	}
+	return roomNID, backfilledEventMap
 }
 
 // QueryRoomVersionCapabilities implements api.RoomserverQueryAPI

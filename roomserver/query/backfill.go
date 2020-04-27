@@ -49,40 +49,12 @@ func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent
 		if !ok {
 			goto FederationHit
 		}
-		// The state IDs BEFORE the target event are the state IDs BEFORE the prev_event PLUS the prev_event itself
-		newStateIDs := prevEventStateIDs[:]
-		if prevEvent.StateKey() == nil {
-			// state is the same as the previous event
+		newStateIDs := b.calculateNewStateIDs(targetEvent.Unwrap(), prevEvent, prevEventStateIDs)
+		if newStateIDs != nil {
 			b.eventIDToBeforeStateIDs[targetEvent.EventID()] = newStateIDs
 			return newStateIDs, nil
 		}
-
-		missingState := false // true if we are missing the info for a state event ID
-		foundEvent := false   // true if we found a (type, state_key) match
-		// find which state ID to replace, if any
-		for i, id := range newStateIDs {
-			ev, ok := b.eventIDMap[id]
-			if !ok {
-				missingState = true
-				continue
-			}
-			if ev.Type() == prevEvent.Type() && ev.StateKey() != nil && ev.StateKey() == prevEvent.StateKey() {
-				newStateIDs[i] = prevEvent.EventID()
-				foundEvent = true
-				break
-			}
-		}
-		if !foundEvent && !missingState {
-			// we can be certain that this is new state
-			newStateIDs = append(newStateIDs, prevEvent.EventID())
-			foundEvent = true
-		}
-
-		if foundEvent {
-			b.eventIDToBeforeStateIDs[targetEvent.EventID()] = newStateIDs
-			return newStateIDs, nil
-		}
-		// else fallthrough because we don't know if one of the missing state IDs was the one we could replace.
+		// else we failed to calculate the new state, so fallthrough
 	}
 
 FederationHit:
@@ -103,6 +75,43 @@ FederationHit:
 		return res, nil
 	}
 	return nil, lastErr
+}
+
+func (b *backfillRequester) calculateNewStateIDs(targetEvent, prevEvent gomatrixserverlib.Event, prevEventStateIDs []string) []string {
+	newStateIDs := prevEventStateIDs[:]
+	if prevEvent.StateKey() == nil {
+		// state is the same as the previous event
+		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = newStateIDs
+		return newStateIDs
+	}
+
+	missingState := false // true if we are missing the info for a state event ID
+	foundEvent := false   // true if we found a (type, state_key) match
+	// find which state ID to replace, if any
+	for i, id := range newStateIDs {
+		ev, ok := b.eventIDMap[id]
+		if !ok {
+			missingState = true
+			continue
+		}
+		// The state IDs BEFORE the target event are the state IDs BEFORE the prev_event PLUS the prev_event itself
+		if ev.Type() == prevEvent.Type() && ev.StateKey() != nil && ev.StateKey() == prevEvent.StateKey() {
+			newStateIDs[i] = prevEvent.EventID()
+			foundEvent = true
+			break
+		}
+	}
+	if !foundEvent && !missingState {
+		// we can be certain that this is new state
+		newStateIDs = append(newStateIDs, prevEvent.EventID())
+		foundEvent = true
+	}
+
+	if foundEvent {
+		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = newStateIDs
+		return newStateIDs
+	}
+	return nil
 }
 
 func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion, event gomatrixserverlib.HeaderedEvent, eventIDs []string) (map[string]*gomatrixserverlib.Event, error) {
