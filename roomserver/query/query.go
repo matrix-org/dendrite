@@ -543,15 +543,17 @@ func (r *RoomserverQueryAPI) backfillViaFederation(ctx context.Context, req *api
 	if err != nil {
 		return fmt.Errorf("backfillViaFederation: unknown room version for room %s : %w", req.RoomID, err)
 	}
-	events, err := gomatrixserverlib.RequestBackfill(ctx, &backfillRequester{
-		db:         r.DB,
-		fedClient:  r.FedClient,
-		thisServer: r.ServerName,
-	}, r.KeyRing, req.RoomID, roomVer, req.EarliestEventsIDs, req.Limit)
+	requester := newBackfillRequester(r.DB, r.FedClient, r.ServerName)
+	events, err := gomatrixserverlib.RequestBackfill(
+		ctx, requester,
+		r.KeyRing, req.RoomID, roomVer, req.EarliestEventsIDs, req.Limit)
 	if err != nil {
 		return err
 	}
+	logrus.WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
+
 	backfilledEventMap := make(map[string]types.Event)
+	var roomNID types.RoomNID
 	// persist these new events - auth checks have already been done
 	for _, ev := range events {
 		nidMap, err := r.DB.EventNIDs(ctx, ev.AuthEventIDs())
@@ -565,7 +567,8 @@ func (r *RoomserverQueryAPI) backfillViaFederation(ctx context.Context, req *api
 			authNids[i] = nid
 			i++
 		}
-		_, stateAtEvent, err := r.DB.StoreEvent(ctx, ev.Unwrap(), nil, authNids)
+		var stateAtEvent types.StateAtEvent
+		roomNID, stateAtEvent, err = r.DB.StoreEvent(ctx, ev.Unwrap(), nil, authNids)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to store backfilled event")
 			continue
@@ -576,61 +579,25 @@ func (r *RoomserverQueryAPI) backfillViaFederation(ctx context.Context, req *api
 		}
 	}
 
-	// TODO: This needs tests around it and should probably live in the state package.
-	// Update the state db so we can get state snapshots at these new backfilled events
-	// This will be important if we want to backfill multiple times as we get the join memberships from state snapshots.
-	// The steps for this are:
-	// - load the events `req.EarliestEventIDs`
-	// - get the []state at `req.EarliestEventIDs` which we should know as worst case it's the join event with state from send_join
-	// - loop each earliest event and for each:
-	//    - backwardsStateSnapshot = earliest event ID's state snapshot
-	//    - loop its prev_events, and for each:
-	//       - try to find the prev event in the backfill response. If found:
-	//           * is it a state event?
-	//             YES: create a new state snapshot and use that. backwardsStateSnapshot = this new snapshot.
-	//             NO: use the same state snapshot as backwardsStateSnapshot.
-	// - the remaining backfilled events are outliers so don't need anything done to them.
-	earliestEvents, err := r.DB.EventsFromIDs(ctx, req.EarliestEventsIDs)
-	if err != nil || len(earliestEvents) != len(req.EarliestEventsIDs) { // this should never happen
-		logrus.WithError(err).Error("Cannot find earliest event IDs for backfilling")
-		return err
-	}
-	stateAtEvents, err := r.DB.StateAtEventIDs(ctx, req.EarliestEventsIDs)
-	if err != nil {
-		logrus.WithError(err).Error("Cannot get state at earliest event IDs for backfilling")
-		return err
-	}
-	if len(stateAtEvents) != len(earliestEvents) {
-		err = fmt.Errorf("backfill: loaded %d events but only have state for %d of them", len(earliestEvents), len(stateAtEvents))
-		logrus.Errorf("Cannot calculate state at backfilled events: %s", err)
-		return err
-	}
-	// the best struct here bundles together state and event
-
-	for i := range earliestEvents {
-		currEventExtremity := earliestEvents[i]
-		//currState := stateAtEvents[i]
-		// start working our way back up the DAG
-
-		for _, prevEventID := range currEventExtremity.PrevEventIDs() {
-			prevEvent, ok := backfilledEventMap[prevEventID]
-			if !ok {
-				continue
-			}
-			if prevEvent.StateKey() == nil {
-				// simple case, the state snapshot is the same as the current
-				snapshotNID, err := r.DB.SnapshotNIDFromEventID(ctx, currEventExtremity.EventID())
-				if err != nil {
-					logrus.WithError(err).WithField("event_id", currEventExtremity.EventID()).Error("backfill: Failed to lookup state snapshot for event")
-					continue
-				}
-				if err := r.DB.SetState(ctx, prevEvent.EventNID, snapshotNID); err != nil {
-					logrus.WithError(err).Error("Failed to store state snapshot for backfilled message event")
-				}
-				continue
-			}
+	for _, ev := range backfilledEventMap {
+		// now add state for these events
+		stateIDs, ok := requester.eventIDToBeforeStateIDs[ev.EventID()]
+		if !ok {
+			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to find state IDs for event which passed auth checks")
+			continue
+		}
+		var entries []types.StateEntry
+		if entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs); err != nil {
+			return err
 		}
 
+		var beforeStateSnapshotNID types.StateSnapshotNID
+		if beforeStateSnapshotNID, err = r.DB.AddState(ctx, roomNID, nil, entries); err != nil {
+			return err
+		}
+		if err = r.DB.SetState(ctx, ev.EventNID, beforeStateSnapshotNID); err != nil {
+			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to set state before event")
+		}
 	}
 
 	// TODO: update backwards extremities, as that should be moved from syncapi to roomserver at some point.

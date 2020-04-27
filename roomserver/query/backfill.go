@@ -16,28 +16,127 @@ type backfillRequester struct {
 	thisServer gomatrixserverlib.ServerName
 
 	// per-request state
-	servers  []gomatrixserverlib.ServerName
-	stateIDs []string
+	servers                 []gomatrixserverlib.ServerName
+	eventIDToBeforeStateIDs map[string][]string
+	eventIDMap              map[string]gomatrixserverlib.Event
 }
 
-func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, roomID, atEventID string) ([]string, error) {
-	c := gomatrixserverlib.FederatedStateProvider{
-		FedClient:      b.fedClient,
-		AuthEventsOnly: true,
-		Server:         b.servers[0],
+func newBackfillRequester(db storage.Database, fedClient *gomatrixserverlib.FederationClient, thisServer gomatrixserverlib.ServerName) *backfillRequester {
+	return &backfillRequester{
+		db:                      db,
+		fedClient:               fedClient,
+		thisServer:              thisServer,
+		eventIDToBeforeStateIDs: make(map[string][]string),
+		eventIDMap:              make(map[string]gomatrixserverlib.Event),
 	}
-	res, err := c.StateIDsAtEvent(ctx, roomID, atEventID)
-	b.stateIDs = res
-	return res, err
 }
 
-func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion, roomID, atEventID string, eventIDs []string) (map[string]*gomatrixserverlib.Event, error) {
+func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent gomatrixserverlib.HeaderedEvent) ([]string, error) {
+	b.eventIDMap[targetEvent.EventID()] = targetEvent.Unwrap()
+	if ids, ok := b.eventIDToBeforeStateIDs[targetEvent.EventID()]; ok {
+		return ids, nil
+	}
+	// if we have exactly 1 prev event and we know the state of the room at that prev event, then just roll forward the prev event.
+	// Else, we have to hit /state_ids because either we don't know the state at all at this event (new backwards extremity) or
+	// we don't know the result of state res to merge forks (2 or more prev_events)
+	if len(targetEvent.PrevEventIDs()) == 1 {
+		prevEventID := targetEvent.PrevEventIDs()[0]
+		prevEvent, ok := b.eventIDMap[prevEventID]
+		if !ok {
+			goto FederationHit
+		}
+		prevEventStateIDs, ok := b.eventIDToBeforeStateIDs[prevEventID]
+		if !ok {
+			goto FederationHit
+		}
+		// The state IDs BEFORE the target event are the state IDs BEFORE the prev_event PLUS the prev_event itself
+		newStateIDs := prevEventStateIDs[:]
+		if prevEvent.StateKey() == nil {
+			// state is the same as the previous event
+			b.eventIDToBeforeStateIDs[targetEvent.EventID()] = newStateIDs
+			return newStateIDs, nil
+		}
+
+		missingState := false // true if we are missing the info for a state event ID
+		foundEvent := false   // true if we found a (type, state_key) match
+		// find which state ID to replace, if any
+		for i, id := range newStateIDs {
+			ev, ok := b.eventIDMap[id]
+			if !ok {
+				missingState = true
+				continue
+			}
+			if ev.Type() == prevEvent.Type() && ev.StateKey() != nil && ev.StateKey() == prevEvent.StateKey() {
+				newStateIDs[i] = prevEvent.EventID()
+				foundEvent = true
+				break
+			}
+		}
+		if !foundEvent && !missingState {
+			// we can be certain that this is new state
+			newStateIDs = append(newStateIDs, prevEvent.EventID())
+			foundEvent = true
+		}
+
+		if foundEvent {
+			b.eventIDToBeforeStateIDs[targetEvent.EventID()] = newStateIDs
+			return newStateIDs, nil
+		}
+		// else fallthrough because we don't know if one of the missing state IDs was the one we could replace.
+	}
+
+FederationHit:
+	var lastErr error
+	logrus.WithField("event_id", targetEvent.EventID()).Info("Requesting /state_ids at event")
+	for _, srv := range b.servers { // hit any valid server
+		c := gomatrixserverlib.FederatedStateProvider{
+			FedClient:      b.fedClient,
+			AuthEventsOnly: false,
+			Server:         srv,
+		}
+		res, err := c.StateIDsBeforeEvent(ctx, targetEvent)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = res
+		return res, nil
+	}
+	return nil, lastErr
+}
+
+func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion, event gomatrixserverlib.HeaderedEvent, eventIDs []string) (map[string]*gomatrixserverlib.Event, error) {
+	// try to fetch the events from the database first
+	events, err := b.ProvideEvents(roomVer, eventIDs)
+	if err != nil {
+		// non-fatal, fallthrough
+		logrus.WithError(err).Info("Failed to fetch events banana")
+	} else {
+		logrus.Infof("Fetched %d/%d events from the database banana", len(events), len(eventIDs))
+		if len(events) == len(eventIDs) {
+			result := make(map[string]*gomatrixserverlib.Event)
+			for i := range events {
+				result[events[i].EventID()] = &events[i]
+				b.eventIDMap[events[i].EventID()] = events[i]
+			}
+			return result, nil
+		}
+	}
+
+	logrus.WithField("event_id", event.EventID()).Info("Requesting /state at event banana")
 	c := gomatrixserverlib.FederatedStateProvider{
 		FedClient:      b.fedClient,
-		AuthEventsOnly: true,
+		AuthEventsOnly: false,
 		Server:         b.servers[0],
 	}
-	return c.StateAtEvent(ctx, roomVer, roomID, atEventID, eventIDs)
+	result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
+	if err != nil {
+		return nil, err
+	}
+	for eventID, ev := range result {
+		b.eventIDMap[eventID] = *ev
+	}
+	return result, nil
 }
 
 // ServersAtEvent is called when trying to determine which server to request from.
@@ -85,7 +184,6 @@ func (b *backfillRequester) Backfill(ctx context.Context, server gomatrixserverl
 }
 
 func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.Event, error) {
-	logrus.Info("backfillRequester.ProvideEvents ", eventIDs)
 	ctx := context.Background()
 	nidMap, err := b.db.EventNIDs(ctx, eventIDs)
 	if err != nil {
@@ -107,6 +205,5 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 	for i := range eventsWithNids {
 		events[i] = eventsWithNids[i].Event
 	}
-	logrus.Infof("backfillRequester.ProvideEvents Returning %+v", events)
 	return events, nil
 }

@@ -92,11 +92,6 @@ func processRoomEvent(
 		}
 	}
 
-	if input.Kind == api.KindBackfill {
-		// Backfill is not implemented.
-		panic("Not implemented")
-	}
-
 	// Update the extremities of the event graph for the room
 	return event.EventID(), updateLatestEvents(
 		ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID,
