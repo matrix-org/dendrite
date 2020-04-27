@@ -153,7 +153,7 @@ func main() {
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		&base.Base, accountDB, deviceDB, federation, alias, query, transactions.New(),
 	)
-	fedSenderAPI := federationsender.SetupFederationSenderComponent(&base.Base, federation, query)
+	fedSenderAPI := federationsender.SetupFederationSenderComponent(&base.Base, federation, query, input)
 
 	clientapi.SetupClientAPIComponent(
 		&base.Base, deviceDB, accountDB,

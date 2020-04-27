@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -32,6 +33,7 @@ import (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
+	rsProducer  *producers.RoomserverProducer
 	client      *gomatrixserverlib.FederationClient
 	origin      gomatrixserverlib.ServerName
 	destination gomatrixserverlib.ServerName
@@ -165,18 +167,37 @@ func (oq *destinationQueue) nextInvites() bool {
 	}
 
 	for _, inviteReq := range oq.pendingInvites {
-		ev := inviteReq.Event()
+		ev, roomVersion := inviteReq.Event(), inviteReq.RoomVersion()
 
-		if _, err := oq.client.SendInviteV2(
+		log.WithFields(log.Fields{
+			"event_id":     ev.EventID(),
+			"room_version": roomVersion,
+			"destination":  oq.destination,
+		}).Info("sending invite")
+
+		inviteRes, err := oq.client.SendInviteV2(
 			context.TODO(),
 			oq.destination,
 			*inviteReq,
-		); err != nil {
+		)
+		if err != nil {
 			log.WithFields(log.Fields{
 				"event_id":    ev.EventID(),
 				"state_key":   ev.StateKey(),
 				"destination": oq.destination,
 			}).WithError(err).Error("failed to send invite")
+		}
+
+		if _, err = oq.rsProducer.SendInviteResponse(
+			context.TODO(),
+			inviteRes,
+			roomVersion,
+		); err != nil {
+			log.WithFields(log.Fields{
+				"event_id":    ev.EventID(),
+				"state_key":   ev.StateKey(),
+				"destination": oq.destination,
+			}).WithError(err).Error("failed to return signed invite to roomserver")
 		}
 	}
 

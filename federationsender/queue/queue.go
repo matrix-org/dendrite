@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -25,19 +26,25 @@ import (
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
-	origin gomatrixserverlib.ServerName
-	client *gomatrixserverlib.FederationClient
+	rsProducer *producers.RoomserverProducer
+	origin     gomatrixserverlib.ServerName
+	client     *gomatrixserverlib.FederationClient
 	// The queuesMutex protects queues
 	queuesMutex sync.Mutex
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
 // NewOutgoingQueues makes a new OutgoingQueues
-func NewOutgoingQueues(origin gomatrixserverlib.ServerName, client *gomatrixserverlib.FederationClient) *OutgoingQueues {
+func NewOutgoingQueues(
+	origin gomatrixserverlib.ServerName,
+	client *gomatrixserverlib.FederationClient,
+	rsProducer *producers.RoomserverProducer,
+) *OutgoingQueues {
 	return &OutgoingQueues{
-		origin: origin,
-		client: client,
-		queues: map[gomatrixserverlib.ServerName]*destinationQueue{},
+		rsProducer: rsProducer,
+		origin:     origin,
+		client:     client,
+		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
 }
 
@@ -67,6 +74,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		oq := oqs.queues[destination]
 		if oq == nil {
 			oq = &destinationQueue{
+				rsProducer:  oqs.rsProducer,
 				origin:      oqs.origin,
 				destination: destination,
 				client:      oqs.client,
@@ -111,6 +119,7 @@ func (oqs *OutgoingQueues) SendInvite(
 	oq := oqs.queues[destination]
 	if oq == nil {
 		oq = &destinationQueue{
+			rsProducer:  oqs.rsProducer,
 			origin:      oqs.origin,
 			destination: destination,
 			client:      oqs.client,
@@ -151,6 +160,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		oq := oqs.queues[destination]
 		if oq == nil {
 			oq = &destinationQueue{
+				rsProducer:  oqs.rsProducer,
 				origin:      oqs.origin,
 				destination: destination,
 				client:      oqs.client,
