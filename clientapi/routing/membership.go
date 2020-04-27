@@ -127,6 +127,7 @@ func SendMembership(
 		returnData = struct {
 			RoomID string `json:"room_id"`
 		}{roomID}
+		fallthrough
 	default:
 		_, err = producer.SendEvents(
 			req.Context(),
