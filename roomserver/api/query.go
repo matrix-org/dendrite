@@ -229,6 +229,8 @@ type QueryStateAndAuthChainResponse struct {
 
 // QueryBackfillRequest is a request to QueryBackfill.
 type QueryBackfillRequest struct {
+	// The room to backfill
+	RoomID string `json:"room_id"`
 	// Events to start paginating from.
 	EarliestEventsIDs []string `json:"earliest_event_ids"`
 	// The maximum number of events to retrieve.
@@ -243,21 +245,7 @@ type QueryBackfillResponse struct {
 	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
-// QueryServersInRoomAtEventRequest is a request to QueryServersInRoomAtEvent
-type QueryServersInRoomAtEventRequest struct {
-	// ID of the room to retrieve member servers for.
-	RoomID string `json:"room_id"`
-	// ID of the event for which to retrieve member servers.
-	EventID string `json:"event_id"`
-}
-
-// QueryServersInRoomAtEventResponse is a response to QueryServersInRoomAtEvent
-type QueryServersInRoomAtEventResponse struct {
-	// Servers present in the room for these events.
-	Servers []gomatrixserverlib.ServerName `json:"servers"`
-}
-
-// QueryRoomVersionCapabilities asks for the default room version
+// QueryRoomVersionCapabilitiesRequest asks for the default room version
 type QueryRoomVersionCapabilitiesRequest struct{}
 
 // QueryRoomVersionCapabilitiesResponse is a response to QueryRoomVersionCapabilitiesRequest
@@ -266,12 +254,12 @@ type QueryRoomVersionCapabilitiesResponse struct {
 	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
 }
 
-// QueryRoomVersionForRoom asks for the room version for a given room.
+// QueryRoomVersionForRoomRequest asks for the room version for a given room.
 type QueryRoomVersionForRoomRequest struct {
 	RoomID string `json:"room_id"`
 }
 
-// QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
+// QueryRoomVersionForRoomResponse is a response to QueryRoomVersionForRoomRequest
 type QueryRoomVersionForRoomResponse struct {
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 }
@@ -350,12 +338,6 @@ type RoomserverQueryAPI interface {
 		response *QueryBackfillResponse,
 	) error
 
-	QueryServersInRoomAtEvent(
-		ctx context.Context,
-		request *QueryServersInRoomAtEventRequest,
-		response *QueryServersInRoomAtEventResponse,
-	) error
-
 	// Asks for the default room version as preferred by the server.
 	QueryRoomVersionCapabilities(
 		ctx context.Context,
@@ -401,13 +383,10 @@ const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthC
 // RoomserverQueryBackfillPath is the HTTP path for the QueryBackfillPath API
 const RoomserverQueryBackfillPath = "/api/roomserver/queryBackfill"
 
-// RoomserverQueryServersInRoomAtEventPath is the HTTP path for the QueryServersInRoomAtEvent API
-const RoomserverQueryServersInRoomAtEventPath = "/api/roomserver/queryServersInRoomAtEvents"
-
 // RoomserverQueryRoomVersionCapabilitiesPath is the HTTP path for the QueryRoomVersionCapabilities API
 const RoomserverQueryRoomVersionCapabilitiesPath = "/api/roomserver/queryRoomVersionCapabilities"
 
-// RoomserverQueryRoomVersionCapabilitiesPath is the HTTP path for the QueryRoomVersionCapabilities API
+// RoomserverQueryRoomVersionForRoomPath is the HTTP path for the QueryRoomVersionForRoom API
 const RoomserverQueryRoomVersionForRoomPath = "/api/roomserver/queryRoomVersionForRoom"
 
 // NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
@@ -552,19 +531,6 @@ func (h *httpRoomserverQueryAPI) QueryBackfill(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryBackfillPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryServersInRoomAtEvent implements RoomServerQueryAPI
-func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
-	ctx context.Context,
-	request *QueryServersInRoomAtEventRequest,
-	response *QueryServersInRoomAtEventResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServersInRoomAtEvent")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryServersInRoomAtEventPath
 	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
