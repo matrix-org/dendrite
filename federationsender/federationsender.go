@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
+	"github.com/matrix-org/dendrite/federationsender/input"
 	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/query"
 	"github.com/matrix-org/dendrite/federationsender/queue"
@@ -36,7 +37,7 @@ func SetupFederationSenderComponent(
 	federation *gomatrixserverlib.FederationClient,
 	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
 	rsInputAPI roomserverAPI.RoomserverInputAPI,
-) api.FederationSenderQueryAPI {
+) (api.FederationSenderQueryAPI, api.FederationSenderInputAPI) {
 	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
@@ -61,10 +62,16 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
+	inputAPI := input.FederationSenderInputAPI{
+		RoomserverInputAPI: rsInputAPI,
+	}
+
+	inputAPI.SetupHTTP(http.DefaultServeMux)
+
 	queryAPI := query.FederationSenderQueryAPI{
 		DB: federationSenderDB,
 	}
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 
-	return &queryAPI
+	return &queryAPI, &inputAPI
 }

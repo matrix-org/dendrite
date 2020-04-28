@@ -19,20 +19,16 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/util"
+
+	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 )
 
 // FederationSenderInputAPI implements api.FederationSenderInputAPI
 type FederationSenderInputAPI struct {
-	DB       storage.Database
-	Producer sarama.SyncProducer
-	// The kafkaesque topic to output new room events to.
-	// This is the name used in kafka to identify the stream to write events to.
-	OutputRoomEventTopic string
+	RoomserverInputAPI rsAPI.RoomserverInputAPI
 }
 
 // SetupHTTP adds the FederationSenderInputAPI handlers to the http.ServeMux.

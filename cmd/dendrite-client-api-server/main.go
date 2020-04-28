@@ -37,12 +37,12 @@ func main() {
 
 	asQuery := base.CreateHTTPAppServiceAPIs()
 	alias, input, query := base.CreateHTTPRoomserverAPIs()
-	fedSenderAPI := base.CreateHTTPFederationSenderAPIs()
+	fedSenderQueryAPI, _ := base.CreateHTTPFederationSenderAPIs()
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, &keyRing,
-		alias, input, query, eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
+		alias, input, query, eduInputAPI, asQuery, transactions.New(), fedSenderQueryAPI,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))
