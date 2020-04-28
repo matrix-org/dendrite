@@ -253,3 +253,8 @@ User can invite local user to room with version 3
 User can invite local user to room with version 4
 A pair of servers can establish a join in a v2 room
 Can logout all devices
+State from remote users is included in the timeline in an incremental sync
+User can invite remote user to room with version 1
+User can invite remote user to room with version 2
+User can invite remote user to room with version 3
+User can invite remote user to room with version 4

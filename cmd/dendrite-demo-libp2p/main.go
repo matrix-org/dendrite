@@ -149,12 +149,12 @@ func main() {
 	federation := createFederationClient(base)
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
-	alias, input, query := roomserver.SetupRoomServerComponent(&base.Base)
+	alias, input, query := roomserver.SetupRoomServerComponent(&base.Base, keyRing)
 	eduInputAPI := eduserver.SetupEDUServerComponent(&base.Base, cache.New())
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		&base.Base, accountDB, deviceDB, federation, alias, query, transactions.New(),
 	)
-	fedSenderAPI := federationsender.SetupFederationSenderComponent(&base.Base, federation, query)
+	fedSenderAPI := federationsender.SetupFederationSenderComponent(&base.Base, federation, query, input)
 
 	clientapi.SetupClientAPIComponent(
 		&base.Base, deviceDB, accountDB,

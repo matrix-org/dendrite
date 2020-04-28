@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	asQuery "github.com/matrix-org/dendrite/appservice/query"
 	"github.com/matrix-org/dendrite/common/basecomponent"
@@ -33,7 +34,7 @@ import (
 // allowing other components running in the same process to hit the query the
 // APIs directly instead of having to use HTTP.
 func SetupRoomServerComponent(
-	base *basecomponent.BaseDendrite,
+	base *basecomponent.BaseDendrite, keyRing gomatrixserverlib.JSONVerifier,
 ) (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
 	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer), base.Cfg.DbProperties())
 	if err != nil {
@@ -51,6 +52,11 @@ func SetupRoomServerComponent(
 	queryAPI := query.RoomserverQueryAPI{
 		DB:             roomserverDB,
 		ImmutableCache: base.ImmutableCache,
+		ServerName:     base.Cfg.Matrix.ServerName,
+		FedClient:      base.CreateFederationClient(),
+		// TODO: We should have a key server so we don't keep adding components
+		// which talk to the same DB.
+		KeyRing: keyRing,
 	}
 
 	queryAPI.SetupHTTP(http.DefaultServeMux)
