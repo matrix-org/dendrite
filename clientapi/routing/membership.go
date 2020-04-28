@@ -127,18 +127,18 @@ func SendMembership(
 		returnData = struct {
 			RoomID string `json:"room_id"`
 		}{roomID}
+		fallthrough
 	default:
-	}
-
-	_, err = producer.SendEvents(
-		req.Context(),
-		[]gomatrixserverlib.HeaderedEvent{event.Headered(verRes.RoomVersion)},
-		cfg.Matrix.ServerName,
-		nil,
-	)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
-		return jsonerror.InternalServerError()
+		_, err = producer.SendEvents(
+			req.Context(),
+			[]gomatrixserverlib.HeaderedEvent{event.Headered(verRes.RoomVersion)},
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	return util.JSONResponse{

@@ -26,10 +26,10 @@ func main() {
 
 	federation := base.CreateFederationClient()
 
-	_, _, query := base.CreateHTTPRoomserverAPIs()
+	_, input, query := base.CreateHTTPRoomserverAPIs()
 
 	federationsender.SetupFederationSenderComponent(
-		base, federation, query,
+		base, federation, query, input,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender), string(base.Cfg.Listen.FederationSender))
