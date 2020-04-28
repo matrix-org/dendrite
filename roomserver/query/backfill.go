@@ -95,7 +95,7 @@ func (b *backfillRequester) calculateNewStateIDs(targetEvent, prevEvent gomatrix
 			continue
 		}
 		// The state IDs BEFORE the target event are the state IDs BEFORE the prev_event PLUS the prev_event itself
-		if ev.Type() == prevEvent.Type() && ev.StateKey() != nil && ev.StateKey() == prevEvent.StateKey() {
+		if ev.Type() == prevEvent.Type() && ev.StateKey() != nil && *ev.StateKey() == *prevEvent.StateKey() {
 			newStateIDs[i] = prevEvent.EventID()
 			foundEvent = true
 			break
