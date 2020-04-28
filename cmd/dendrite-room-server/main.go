@@ -30,7 +30,7 @@ func main() {
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
-	roomserver.SetupRoomServerComponent(base, keyRing)
+	roomserver.SetupRoomServerComponent(base, keyRing, federation)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer), string(base.Cfg.Listen.RoomServer))
 
