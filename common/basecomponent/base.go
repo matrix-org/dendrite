@@ -151,12 +151,18 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 
 // CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
 // the federation sender over HTTP
-func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
+func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() (
+	federationSenderAPI.FederationSenderQueryAPI, federationSenderAPI.FederationSenderInputAPI,
+) {
 	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewFederationSenderQueryAPIHTTP failed", b.httpClient)
 	}
-	return f
+	fi, err := federationSenderAPI.NewFederationSenderInputAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
+	if err != nil {
+		logrus.WithError(err).Panic("NewFederationSenderInputAPIHTTP failed", b.httpClient)
+	}
+	return f, fi
 }
 
 // CreateDeviceDB creates a new instance of the device database. Should only be
