@@ -106,12 +106,15 @@ func (c *RoomserverProducer) SendInputRoomEvents(
 func (c *RoomserverProducer) SendInvite(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
+	sendAsServer gomatrixserverlib.ServerName, txnID *api.TransactionID,
 ) error {
 	request := api.InputRoomEventsRequest{
 		InputInviteEvents: []api.InputInviteEvent{{
 			Event:           inviteEvent,
 			InviteRoomState: inviteRoomState,
 			RoomVersion:     inviteEvent.RoomVersion,
+			SendAsServer:    string(sendAsServer),
+			TransactionID:   txnID,
 		}},
 	}
 	var response api.InputRoomEventsResponse

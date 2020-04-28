@@ -194,8 +194,23 @@ func processInviteEvent(
 
 	event := input.Event.Unwrap()
 
-	if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
-		return err
+	if len(input.InviteRoomState) > 0 {
+		// If we were supplied with some invite room state already (which is
+		// most likely to be if the event came in over federation) then use
+		// that.
+		if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
+			return err
+		}
+	} else {
+		// There's no invite room state, so let's have a go at building it
+		// up from local data (which is most likely to be if the event came
+		// from the CS API). If we know about the room then we can insert
+		// the invite room state, if we don't then we just fail quietly.
+		if irs, ierr := buildInviteStrippedState(ctx, db, input); ierr == nil {
+			if err = event.SetUnsignedField("invite_room_state", irs); err != nil {
+				return err
+			}
+		}
 	}
 
 	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
@@ -209,4 +224,51 @@ func processInviteEvent(
 
 	succeeded = true
 	return nil
+}
+
+func buildInviteStrippedState(
+	ctx context.Context,
+	db storage.Database,
+	input api.InputInviteEvent,
+) ([]gomatrixserverlib.InviteV2StrippedState, error) {
+	roomNID, err := db.RoomNID(ctx, input.Event.RoomID())
+	if err != nil || roomNID == 0 {
+		return nil, fmt.Errorf("room %q unknown", input.Event.RoomID())
+	}
+	stateWanted := []gomatrixserverlib.StateKeyTuple{}
+	for _, t := range []string{
+		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
+		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
+	} {
+		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
+			EventType: t,
+			StateKey:  "",
+		})
+	}
+	_, currentStateSnapshotNID, _, err := db.LatestEventIDs(ctx, roomNID)
+	if err != nil {
+		return nil, err
+	}
+	roomState := state.NewStateResolution(db)
+	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
+		ctx, currentStateSnapshotNID, stateWanted,
+	)
+	if err != nil {
+		return nil, err
+	}
+	stateNIDs := []types.EventNID{}
+	for _, stateNID := range stateEntries {
+		stateNIDs = append(stateNIDs, stateNID.EventNID)
+	}
+	stateEvents, err := db.Events(ctx, stateNIDs)
+	if err != nil {
+		return nil, err
+	}
+	inviteState := []gomatrixserverlib.InviteV2StrippedState{
+		gomatrixserverlib.NewInviteV2StrippedState(&input.Event.Event),
+	}
+	for _, event := range stateEvents {
+		inviteState = append(inviteState, gomatrixserverlib.NewInviteV2StrippedState(&event.Event))
+	}
+	return inviteState, nil
 }

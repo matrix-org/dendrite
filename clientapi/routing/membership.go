@@ -40,6 +40,8 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
+// TODO: Can we improve the cyclo count here? Separate code paths for invites?
+// nolint:gocyclo
 func SendMembership(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	roomID string, membership string, cfg *config.Dendrite,
@@ -104,23 +106,39 @@ func SendMembership(
 		return jsonerror.InternalServerError()
 	}
 
-	if _, err := producer.SendEvents(
-		req.Context(),
-		[]gomatrixserverlib.HeaderedEvent{(*event).Headered(verRes.RoomVersion)},
-		cfg.Matrix.ServerName,
-		nil,
-	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
-		return jsonerror.InternalServerError()
-	}
-
 	var returnData interface{} = struct{}{}
 
-	// The join membership requires the room id to be sent in the response
-	if membership == gomatrixserverlib.Join {
+	switch membership {
+	case gomatrixserverlib.Invite:
+		// Invites need to be handled specially
+		err = producer.SendInvite(
+			req.Context(),
+			event.Headered(verRes.RoomVersion),
+			nil, // ask the roomserver to draw up invite room state for us
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("producer.SendInvite failed")
+			return jsonerror.InternalServerError()
+		}
+	case gomatrixserverlib.Join:
+		// The join membership requires the room id to be sent in the response
 		returnData = struct {
 			RoomID string `json:"room_id"`
 		}{roomID}
+		fallthrough
+	default:
+		_, err = producer.SendEvents(
+			req.Context(),
+			[]gomatrixserverlib.HeaderedEvent{event.Headered(verRes.RoomVersion)},
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	return util.JSONResponse{

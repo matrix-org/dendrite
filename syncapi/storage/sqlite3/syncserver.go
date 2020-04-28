@@ -799,11 +799,7 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 		return err
 	}
 	for roomID, inviteEvent := range invites {
-		ir := types.NewInviteResponse()
-		ir.InviteState.Events = gomatrixserverlib.HeaderedToClientEvents(
-			[]gomatrixserverlib.HeaderedEvent{inviteEvent}, gomatrixserverlib.FormatSync,
-		)
-		// TODO: add the invite state from the invite event.
+		ir := types.NewInviteResponse(inviteEvent)
 		res.Rooms.Invite[roomID] = *ir
 	}
 	return nil

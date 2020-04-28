@@ -210,7 +210,10 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	// Sort the events to ensure we send them in the right order.
-	events = gomatrixserverlib.HeaderedReverseTopologicalOrdering(events, gomatrixserverlib.TopologicalOrderByPrevEvents)
+	events = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+		events,
+		gomatrixserverlib.TopologicalOrderByPrevEvents,
+	)
 	if r.backwardOrdering {
 		// This reverses the array from old->new to new->old
 		sort.SliceStable(events, func(i, j int) bool {

@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -187,49 +188,12 @@ func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) er
 		return nil
 	}
 
-	// When sending a v2 invite, the inviting server should try and include
-	// a "stripped down" version of the room state. This is pretty much just
-	// enough information for the remote side to show something useful to the
-	// user, like the room name, aliases etc.
+	// Try to extract the room invite state. The roomserver will have stashed
+	// this for us in invite_room_state if it didn't already exist.
 	strippedState := []gomatrixserverlib.InviteV2StrippedState{}
-	stateWanted := []string{
-		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
-		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
-	}
-
-	// For each of the state keys that we want to try and send, ask the
-	// roomserver if we have a state event for that room that matches the
-	// state key.
-	for _, wanted := range stateWanted {
-		queryReq := api.QueryLatestEventsAndStateRequest{
-			RoomID: oie.Event.RoomID(),
-			StateToFetch: []gomatrixserverlib.StateKeyTuple{
-				gomatrixserverlib.StateKeyTuple{
-					EventType: wanted,
-					StateKey:  "",
-				},
-			},
-		}
-		// If this fails then we just move onto the next event - we don't
-		// actually know at this point whether the room even has that type
-		// of state.
-		queryRes := api.QueryLatestEventsAndStateResponse{}
-		if err := s.query.QueryLatestEventsAndState(context.TODO(), &queryReq, &queryRes); err != nil {
-			log.WithFields(log.Fields{
-				"room_id":    queryReq.RoomID,
-				"event_type": wanted,
-			}).WithError(err).Info("couldn't find state to strip")
-			continue
-		}
-		// Append the stripped down copy of the state to our list.
-		for _, headeredEvent := range queryRes.StateEvents {
-			event := headeredEvent.Unwrap()
-			strippedState = append(strippedState, gomatrixserverlib.NewInviteV2StrippedState(&event))
-
-			log.WithFields(log.Fields{
-				"room_id":    queryReq.RoomID,
-				"event_type": event.Type(),
-			}).Info("adding stripped state")
+	if inviteRoomState := gjson.GetBytes(oie.Event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
+		if err := json.Unmarshal([]byte(inviteRoomState.Raw), &strippedState); err != nil {
+			log.WithError(err).Warn("failed to extract invite_room_state from event unsigned")
 		}
 	}
 

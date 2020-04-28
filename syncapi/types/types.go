@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 )
 
 var (
@@ -247,14 +248,17 @@ func NewJoinResponse() *JoinResponse {
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
 type InviteResponse struct {
 	InviteState struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
+		Events json.RawMessage `json:"events"`
 	} `json:"invite_state"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse() *InviteResponse {
+func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
-	res.InviteState.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.InviteState.Events = json.RawMessage{'[', ']'}
+	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
+		res.InviteState.Events = json.RawMessage(inviteRoomState.Raw)
+	}
 	return &res
 }
 

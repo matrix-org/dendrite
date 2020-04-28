@@ -17,7 +17,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200318135427-31631a9ef51f
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200325174927-327088cdef10
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20200427152419-6a0535cc473a
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20200428095012-a95e289995b1
 	github.com/matrix-org/naffka v0.0.0-20200422140631-181f1ee7401f
 	github.com/matrix-org/util v0.0.0-20190711121626-527ce5ddefc7
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible
@@ -28,6 +28,7 @@ require (
 	github.com/prometheus/client_golang v1.4.1
 	github.com/prometheus/common v0.9.1
 	github.com/sirupsen/logrus v1.4.2
+	github.com/tidwall/gjson v1.6.0
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0
 	go.uber.org/atomic v1.4.0
