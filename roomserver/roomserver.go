@@ -36,6 +36,7 @@ import (
 // APIs directly instead of having to use HTTP.
 func SetupRoomServerComponent(
 	base *basecomponent.BaseDendrite, keyRing gomatrixserverlib.JSONVerifier,
+	fedClient *gomatrixserverlib.FederationClient,
 ) (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
 	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
 	if err != nil {
@@ -54,7 +55,7 @@ func SetupRoomServerComponent(
 		DB:             roomserverDB,
 		ImmutableCache: base.ImmutableCache,
 		ServerName:     base.Cfg.Matrix.ServerName,
-		FedClient:      base.CreateFederationClient(),
+		FedClient:      fedClient,
 		// TODO: We should have a key server so we don't keep adding components
 		// which talk to the same DB.
 		KeyRing: keyRing,
