@@ -27,7 +27,7 @@ type PerformJoinResponse struct {
 }
 
 // Handle an instruction to make_join & send_join with a remote server.
-func (h *httpFederationSenderInternalAPI) PerformJoinRequest(
+func (h *httpFederationSenderInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *PerformJoinRequest,
 	response *PerformJoinResponse,
@@ -47,7 +47,7 @@ type PerformLeaveResponse struct {
 }
 
 // Handle an instruction to make_leave & send_leave with a remote server.
-func (h *httpFederationSenderInternalAPI) PerformLeaveRequest(
+func (h *httpFederationSenderInternalAPI) PerformLeave(
 	ctx context.Context,
 	request *PerformLeaveRequest,
 	response *PerformLeaveResponse,

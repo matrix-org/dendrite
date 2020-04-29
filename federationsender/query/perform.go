@@ -11,7 +11,7 @@ import (
 )
 
 // PerformJoinRequest implements api.FederationSenderInternalAPI
-func (r *FederationSenderInternalAPI) PerformJoinRequest(
+func (r *FederationSenderInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *api.PerformJoinRequest,
 	response *api.PerformJoinResponse,
@@ -98,7 +98,7 @@ func (r *FederationSenderInternalAPI) PerformJoinRequest(
 }
 
 // PerformLeaveRequest implements api.FederationSenderInternalAPI
-func (r *FederationSenderInternalAPI) PerformLeaveRequest(
+func (r *FederationSenderInternalAPI) PerformLeave(
 	ctx context.Context,
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,

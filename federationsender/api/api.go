@@ -25,13 +25,13 @@ type FederationSenderInternalAPI interface {
 		response *QueryJoinedHostServerNamesInRoomResponse,
 	) error
 	// Handle an instruction to make_join & send_join with a remote server.
-	PerformJoinRequest(
+	PerformJoin(
 		ctx context.Context,
 		request *PerformJoinRequest,
 		response *PerformJoinResponse,
 	) error
 	// Handle an instruction to make_leave & send_leave with a remote server.
-	PerformLeaveRequest(
+	PerformLeave(
 		ctx context.Context,
 		request *PerformLeaveRequest,
 		response *PerformLeaveResponse,
