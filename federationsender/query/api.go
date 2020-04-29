@@ -20,17 +20,20 @@ type FederationSenderInternalAPI struct {
 	cfg        *config.Dendrite
 	producer   *producers.RoomserverProducer
 	federation *gomatrixserverlib.FederationClient
+	keyRing    *gomatrixserverlib.KeyRing
 }
 
 func NewFederationSenderInternalAPI(
 	db storage.Database, cfg *config.Dendrite,
 	producer *producers.RoomserverProducer,
 	federation *gomatrixserverlib.FederationClient,
+	keyRing *gomatrixserverlib.KeyRing,
 ) *FederationSenderInternalAPI {
 	return &FederationSenderInternalAPI{
 		db:         db,
 		producer:   producer,
 		federation: federation,
+		keyRing:    keyRing,
 	}
 }
 

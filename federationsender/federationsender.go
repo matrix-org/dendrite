@@ -36,6 +36,7 @@ func SetupFederationSenderComponent(
 	federation *gomatrixserverlib.FederationClient,
 	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
 	rsInputAPI roomserverAPI.RoomserverInputAPI,
+	keyRing *gomatrixserverlib.KeyRing,
 ) api.FederationSenderInternalAPI {
 	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
 	if err != nil {
@@ -62,7 +63,7 @@ func SetupFederationSenderComponent(
 	}
 
 	queryAPI := query.NewFederationSenderInternalAPI(
-		federationSenderDB, base.Cfg, roomserverProducer, federation,
+		federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing,
 	)
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 

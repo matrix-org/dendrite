@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationsender/query/perform"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -80,6 +81,14 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	)
 	if err != nil {
 		return fmt.Errorf("r.federation.SendJoin: %w", err)
+	}
+
+	// Check that the send_join response was valid.
+	joinCtx := perform.JoinContext(r.federation, r.keyRing)
+	if err = joinCtx.CheckSendJoinResponse(
+		ctx, event, request.ServerName, respMakeJoin, respSendJoin,
+	); err != nil {
+		return fmt.Errorf("perform.JoinRequest.CheckSendJoinResponse: %w", err)
 	}
 
 	// If we successfully performed a send_join above then the other
