@@ -31,6 +31,7 @@ func NewFederationSenderInternalAPI(
 ) *FederationSenderInternalAPI {
 	return &FederationSenderInternalAPI{
 		db:         db,
+		cfg:        cfg,
 		producer:   producer,
 		federation: federation,
 		keyRing:    keyRing,
