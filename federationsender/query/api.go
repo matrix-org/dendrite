@@ -5,17 +5,33 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 // FederationSenderInternalAPI is an implementation of api.FederationSenderInternalAPI
 type FederationSenderInternalAPI struct {
 	api.FederationSenderInternalAPI
-	DB                 storage.Database
-	RoomserverInputAPI rsAPI.RoomserverInputAPI
+	db         storage.Database
+	cfg        *config.Dendrite
+	producer   *producers.RoomserverProducer
+	federation *gomatrixserverlib.FederationClient
+}
+
+func NewFederationSenderInternalAPI(
+	db storage.Database, cfg *config.Dendrite,
+	producer *producers.RoomserverProducer,
+	federation *gomatrixserverlib.FederationClient,
+) *FederationSenderInternalAPI {
+	return &FederationSenderInternalAPI{
+		db:         db,
+		producer:   producer,
+		federation: federation,
+	}
 }
 
 // SetupHTTP adds the FederationSenderInternalAPI handlers to the http.ServeMux.

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -16,7 +17,10 @@ const (
 )
 
 type PerformJoinRequest struct {
-	RoomID string `json:"room_id"`
+	RoomID     string                       `json:"room_id"`
+	UserID     string                       `json:"user_id"`
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	Content    map[string]interface{}       `json:"content"`
 }
 
 type PerformJoinResponse struct {
