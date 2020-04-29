@@ -40,7 +40,7 @@ func SetupFederationAPIComponent(
 	inputAPI roomserverAPI.RoomserverInputAPI,
 	queryAPI roomserverAPI.RoomserverQueryAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
-	federationSenderAPI federationSenderAPI.FederationSenderQueryAPI,
+	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
 	eduProducer *producers.EDUServerProducer,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
