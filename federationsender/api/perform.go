@@ -4,6 +4,7 @@ import (
 	"context"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -16,14 +17,17 @@ const (
 )
 
 type PerformJoinRequest struct {
-	RoomID string `json:"room_id"`
+	RoomID     string                       `json:"room_id"`
+	UserID     string                       `json:"user_id"`
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	Content    map[string]interface{}       `json:"content"`
 }
 
 type PerformJoinResponse struct {
 }
 
 // Handle an instruction to make_join & send_join with a remote server.
-func (h *httpFederationSenderInternalAPI) PerformJoinRequest(
+func (h *httpFederationSenderInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *PerformJoinRequest,
 	response *PerformJoinResponse,
@@ -43,7 +47,7 @@ type PerformLeaveResponse struct {
 }
 
 // Handle an instruction to make_leave & send_leave with a remote server.
-func (h *httpFederationSenderInternalAPI) PerformLeaveRequest(
+func (h *httpFederationSenderInternalAPI) PerformLeave(
 	ctx context.Context,
 	request *PerformLeaveRequest,
 	response *PerformLeaveResponse,

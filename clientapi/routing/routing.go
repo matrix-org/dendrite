@@ -101,7 +101,8 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return JoinRoomByIDOrAlias(
-				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, aliasAPI, keyRing, accountDB,
+				req, device, vars["roomIDOrAlias"], cfg, federation, producer,
+				queryAPI, aliasAPI, federationSender, keyRing, accountDB,
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)

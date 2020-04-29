@@ -13,7 +13,7 @@ func (f *FederationSenderInternalAPI) QueryJoinedHostsInRoom(
 	request *api.QueryJoinedHostsInRoomRequest,
 	response *api.QueryJoinedHostsInRoomResponse,
 ) (err error) {
-	response.JoinedHosts, err = f.DB.GetJoinedHosts(ctx, request.RoomID)
+	response.JoinedHosts, err = f.db.GetJoinedHosts(ctx, request.RoomID)
 	return
 }
 
@@ -23,7 +23,7 @@ func (f *FederationSenderInternalAPI) QueryJoinedHostServerNamesInRoom(
 	request *api.QueryJoinedHostServerNamesInRoomRequest,
 	response *api.QueryJoinedHostServerNamesInRoomResponse,
 ) (err error) {
-	joinedHosts, err := f.DB.GetJoinedHosts(ctx, request.RoomID)
+	joinedHosts, err := f.db.GetJoinedHosts(ctx, request.RoomID)
 	if err != nil {
 		return
 	}
