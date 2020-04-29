@@ -155,7 +155,6 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
 func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) (servers []gomatrixserverlib.ServerName) {
-	logrus.Infof("ServersAtEvent room %s event %d", roomID, eventID)
 	// getMembershipsBeforeEventNID requires a NID, so retrieving the NID for
 	// the event is necessary.
 	NIDs, err := b.db.EventNIDs(ctx, []string{eventID})
