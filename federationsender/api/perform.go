@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	FederationSenderPerformJoinRequestPath  = "/api/federationsender/inputJoinRequest"
-	FederationSenderPerformLeaveRequestPath = "/api/federationsender/inputLeaveRequest"
+	FederationSenderPerformJoinRequestPath  = "/api/federationsender/performJoinRequest"
+	FederationSenderPerformLeaveRequestPath = "/api/federationsender/performLeaveRequest"
 )
 
 type PerformJoinRequest struct {

@@ -57,7 +57,7 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(api.FederationSenderPerformJoinRequestPath,
-		common.MakeInternalAPI("inputJoinRequest", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -70,7 +70,7 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(api.FederationSenderPerformLeaveRequestPath,
-		common.MakeInternalAPI("inputLeaveRequest", func(req *http.Request) util.JSONResponse {
+		common.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
