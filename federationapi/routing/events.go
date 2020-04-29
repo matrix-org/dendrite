@@ -16,7 +16,9 @@ package routing
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -29,13 +31,20 @@ func GetEvent(
 	request *gomatrixserverlib.FederationRequest,
 	query api.RoomserverQueryAPI,
 	eventID string,
+	origin gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	event, err := getEvent(ctx, request, query, eventID)
 	if err != nil {
 		return *err
 	}
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: event}
+	return util.JSONResponse{Code: http.StatusOK, JSON: gomatrixserverlib.Transaction{
+		Origin:         origin,
+		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+		PDUs: []json.RawMessage{
+			event.JSON(),
+		},
+	}}
 }
 
 // getEvent returns the requested event,
