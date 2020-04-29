@@ -48,11 +48,6 @@ const insertEventSQL = `
 	  ON CONFLICT DO NOTHING;
 `
 
-const insertEventResultSQL = `
-	SELECT event_nid, state_snapshot_nid FROM roomserver_events
-		WHERE rowid = last_insert_rowid();
-`
-
 const selectEventSQL = "" +
 	"SELECT event_nid, state_snapshot_nid FROM roomserver_events WHERE event_id = $1"
 
@@ -126,7 +121,6 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 
 	return statementList{
 		{&s.insertEventStmt, insertEventSQL},
-		{&s.insertEventResultStmt, insertEventResultSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
 		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
@@ -153,18 +147,22 @@ func (s *eventStatements) insertEvent(
 	authEventNIDs []types.EventNID,
 	depth int64,
 ) (types.EventNID, types.StateSnapshotNID, error) {
-	var eventNID int64
-	var stateNID int64
-	var err error
+	// attempt to insert: the last_row_id is the event NID
 	insertStmt := common.TxStmt(txn, s.insertEventStmt)
-	resultStmt := common.TxStmt(txn, s.insertEventResultStmt)
-	if _, err = insertStmt.ExecContext(
+	result, err := insertStmt.ExecContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
 		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
-	); err == nil {
-		err = resultStmt.QueryRowContext(ctx).Scan(&eventNID, &stateNID)
+	)
+	if err != nil {
+		return 0, 0, err
 	}
-	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
+	modified, err := result.RowsAffected()
+	if modified == 0 && err == nil {
+		return 0, 0, sql.ErrNoRows
+	}
+	// the snapshot will always be 0 at this point
+	eventNID, err := result.LastInsertId()
+	return types.EventNID(eventNID), types.StateSnapshotNID(0), err
 }
 
 func (s *eventStatements) selectEvent(

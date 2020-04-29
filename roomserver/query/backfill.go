@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -114,7 +115,9 @@ func (b *backfillRequester) calculateNewStateIDs(targetEvent, prevEvent gomatrix
 	return nil
 }
 
-func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion, event gomatrixserverlib.HeaderedEvent, eventIDs []string) (map[string]*gomatrixserverlib.Event, error) {
+func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
+	event gomatrixserverlib.HeaderedEvent, eventIDs []string) (map[string]*gomatrixserverlib.Event, error) {
+
 	// try to fetch the events from the database first
 	events, err := b.ProvideEvents(roomVer, eventIDs)
 	if err != nil {
@@ -152,6 +155,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
 func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) (servers []gomatrixserverlib.ServerName) {
+	logrus.Infof("ServersAtEvent room %s event %d", roomID, eventID)
 	// getMembershipsBeforeEventNID requires a NID, so retrieving the NID for
 	// the event is necessary.
 	NIDs, err := b.db.EventNIDs(ctx, []string{eventID})
@@ -160,18 +164,33 @@ func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID 
 		return
 	}
 
+	stateEntries, err := stateBeforeEvent(ctx, b.db, NIDs[eventID])
+	if err != nil {
+		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
+		return
+	}
+
+	// possibly return all joined servers depending on history visiblity
+	memberEventsFromVis, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries)
+	if err != nil {
+		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
+		return
+	}
+	logrus.Infof("ServersAtEvent including %d current events from history visibility", len(memberEventsFromVis))
+
 	// Retrieve all "m.room.member" state events of "join" membership, which
 	// contains the list of users in the room before the event, therefore all
 	// the servers in it at that moment.
-	events, err := getMembershipsBeforeEventNID(ctx, b.db, NIDs[eventID], true)
+	memberEvents, err := getMembershipsAtState(ctx, b.db, stateEntries, true)
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get memberships before event")
 		return
 	}
+	memberEvents = append(memberEvents, memberEventsFromVis...)
 
 	// Store the server names in a temporary map to avoid duplicates.
 	serverSet := make(map[gomatrixserverlib.ServerName]bool)
-	for _, event := range events {
+	for _, event := range memberEvents {
 		serverSet[event.Origin()] = true
 	}
 	for server := range serverSet {
@@ -186,7 +205,9 @@ func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID 
 
 // Backfill performs a backfill request to the given server.
 // https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid
-func (b *backfillRequester) Backfill(ctx context.Context, server gomatrixserverlib.ServerName, roomID string, fromEventIDs []string, limit int) (*gomatrixserverlib.Transaction, error) {
+func (b *backfillRequester) Backfill(ctx context.Context, server gomatrixserverlib.ServerName, roomID string,
+	fromEventIDs []string, limit int) (*gomatrixserverlib.Transaction, error) {
+
 	tx, err := b.fedClient.Backfill(ctx, server, roomID, limit, fromEventIDs)
 	return &tx, err
 }
@@ -214,4 +235,45 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 		events[i] = eventsWithNids[i].Event
 	}
 	return events, nil
+}
+
+// joinEventsFromHistoryVisibility returns all CURRENTLY joined members if the provided state indicated a 'shared' history visibility.
+// TODO: Long term we probably want a history_visibility table which stores eventNID | visibility_enum so we can just
+//       pull all events and then filter by that table.
+func joinEventsFromHistoryVisibility(
+	ctx context.Context, db storage.Database, roomID string, stateEntries []types.StateEntry) ([]types.Event, error) {
+
+	var eventNIDs []types.EventNID
+	for _, entry := range stateEntries {
+		// Filter the events to retrieve to only keep the membership events
+		if entry.EventTypeNID == types.MRoomHistoryVisibilityNID && entry.EventStateKeyNID == types.EmptyStateKeyNID {
+			eventNIDs = append(eventNIDs, entry.EventNID)
+			break
+		}
+	}
+
+	// Get all of the events in this state
+	stateEvents, err := db.Events(ctx, eventNIDs)
+	if err != nil {
+		return nil, err
+	}
+	events := make([]gomatrixserverlib.Event, len(stateEvents))
+	for i := range stateEvents {
+		events[i] = stateEvents[i].Event
+	}
+	visibility := auth.HistoryVisibilityForRoom(events)
+	if visibility != "shared" {
+		logrus.Infof("ServersAtEvent history visibility not shared: %s", visibility)
+		return nil, nil
+	}
+	// get joined members
+	roomNID, err := db.RoomNID(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	joinEventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, roomNID, true)
+	if err != nil {
+		return nil, err
+	}
+	return db.Events(ctx, joinEventNIDs)
 }
