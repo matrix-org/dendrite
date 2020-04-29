@@ -6,8 +6,8 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/api"
 )
 
-// InputJoinRequest implements api.FederationSenderQueryAPI
-func (r *FederationSenderQueryAPI) InputJoinRequest(
+// InputJoinRequest implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) InputJoinRequest(
 	ctx context.Context,
 	request *api.InputJoinRequest,
 	response *api.InputJoinResponse,
@@ -15,8 +15,8 @@ func (r *FederationSenderQueryAPI) InputJoinRequest(
 	return nil
 }
 
-// InputLeaveRequest implements api.FederationSenderQueryAPI
-func (r *FederationSenderQueryAPI) InputLeaveRequest(
+// InputLeaveRequest implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) InputLeaveRequest(
 	ctx context.Context,
 	request *api.InputLeaveRequest,
 	response *api.InputLeaveResponse,

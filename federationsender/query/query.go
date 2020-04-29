@@ -7,8 +7,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// QueryJoinedHostsInRoom implements api.FederationSenderQueryAPI
-func (f *FederationSenderQueryAPI) QueryJoinedHostsInRoom(
+// QueryJoinedHostsInRoom implements api.FederationSenderInternalAPI
+func (f *FederationSenderInternalAPI) QueryJoinedHostsInRoom(
 	ctx context.Context,
 	request *api.QueryJoinedHostsInRoomRequest,
 	response *api.QueryJoinedHostsInRoomResponse,
@@ -17,8 +17,8 @@ func (f *FederationSenderQueryAPI) QueryJoinedHostsInRoom(
 	return
 }
 
-// QueryJoinedHostServerNamesInRoom implements api.FederationSenderQueryAPI
-func (f *FederationSenderQueryAPI) QueryJoinedHostServerNamesInRoom(
+// QueryJoinedHostServerNamesInRoom implements api.FederationSenderInternalAPI
+func (f *FederationSenderInternalAPI) QueryJoinedHostServerNamesInRoom(
 	ctx context.Context,
 	request *api.QueryJoinedHostServerNamesInRoomRequest,
 	response *api.QueryJoinedHostServerNamesInRoomResponse,

@@ -109,7 +109,7 @@ type InputRoomEventsResponse struct {
 type RoomserverInputAPI interface {
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and the FS input API
-	SetFederationSenderInputAPI(fsInputAPI fsAPI.FederationSenderInputAPI)
+	SetFederationSenderAPI(fsInputAPI fsAPI.FederationSenderInternalAPI)
 	InputRoomEvents(
 		ctx context.Context,
 		request *InputRoomEventsRequest,
@@ -134,13 +134,13 @@ type httpRoomserverInputAPI struct {
 	httpClient    *http.Client
 	// The federation sender API allows us to send federation
 	// requests from the new perform input requests, still TODO.
-	fsInputAPI fsAPI.FederationSenderInputAPI
+	fsInputAPI fsAPI.FederationSenderInternalAPI
 }
 
 // SetFederationSenderInputAPI passes in a federation sender input API reference
 // so that we can avoid the chicken-and-egg problem of both the roomserver input API
 // and the federation sender input API being interdependent.
-func (h *httpRoomserverInputAPI) SetFederationSenderInputAPI(fsInputAPI fsAPI.FederationSenderInputAPI) {
+func (h *httpRoomserverInputAPI) SetFederationSenderAPI(fsInputAPI fsAPI.FederationSenderInternalAPI) {
 	h.fsInputAPI = fsInputAPI
 }
 

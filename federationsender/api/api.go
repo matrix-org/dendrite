@@ -6,8 +6,8 @@ import (
 	"net/http"
 )
 
-// FederationSenderQueryAPI is used to query information from the federation sender.
-type FederationSenderQueryAPI interface {
+// FederationSenderInternalAPI is used to query information from the federation sender.
+type FederationSenderInternalAPI interface {
 	// Query the joined hosts and the membership events accounting for their participation in a room.
 	// Note that if a server has multiple users in the room, it will have multiple entries in the returned slice.
 	// See `QueryJoinedHostServerNamesInRoom` for a de-duplicated version.
@@ -38,16 +38,16 @@ type FederationSenderQueryAPI interface {
 	) error
 }
 
-// NewFederationSenderQueryAPIHTTP creates a FederationSenderQueryAPI implemented by talking to a HTTP POST API.
+// NewFederationSenderInternalAPIHTTP creates a FederationSenderInternalAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil an error is returned
-func NewFederationSenderQueryAPIHTTP(federationSenderURL string, httpClient *http.Client) (FederationSenderQueryAPI, error) {
+func NewFederationSenderInternalAPIHTTP(federationSenderURL string, httpClient *http.Client) (FederationSenderInternalAPI, error) {
 	if httpClient == nil {
-		return nil, errors.New("NewFederationSenderQueryAPIHTTP: httpClient is <nil>")
+		return nil, errors.New("NewFederationSenderInternalAPIHTTP: httpClient is <nil>")
 	}
-	return &httpFederationSenderQueryAPI{federationSenderURL, httpClient}, nil
+	return &httpFederationSenderInternalAPI{federationSenderURL, httpClient}, nil
 }
 
-type httpFederationSenderQueryAPI struct {
+type httpFederationSenderInternalAPI struct {
 	federationSenderURL string
 	httpClient          *http.Client
 }

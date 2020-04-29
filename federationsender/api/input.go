@@ -20,7 +20,7 @@ type InputJoinResponse struct {
 }
 
 // Handle an instruction to make_join & send_join with a remote server.
-func (h *httpFederationSenderQueryAPI) InputJoinRequest(
+func (h *httpFederationSenderInternalAPI) InputJoinRequest(
 	ctx context.Context,
 	request *InputJoinRequest,
 	response *InputJoinResponse,
@@ -40,7 +40,7 @@ type InputLeaveResponse struct {
 }
 
 // Handle an instruction to make_leave & send_leave with a remote server.
-func (h *httpFederationSenderQueryAPI) InputLeaveRequest(
+func (h *httpFederationSenderInternalAPI) InputLeaveRequest(
 	ctx context.Context,
 	request *InputLeaveRequest,
 	response *InputLeaveResponse,

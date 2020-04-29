@@ -19,15 +19,15 @@ type FederationSenderQueryDatabase interface {
 	) ([]types.JoinedHost, error)
 }
 
-// FederationSenderQueryAPI is an implementation of api.FederationSenderQueryAPI
-type FederationSenderQueryAPI struct {
-	api.FederationSenderQueryAPI
+// FederationSenderInternalAPI is an implementation of api.FederationSenderInternalAPI
+type FederationSenderInternalAPI struct {
+	api.FederationSenderInternalAPI
 	DB                 FederationSenderQueryDatabase
 	RoomserverInputAPI rsAPI.RoomserverInputAPI
 }
 
-// SetupHTTP adds the FederationSenderQueryAPI handlers to the http.ServeMux.
-func (f *FederationSenderQueryAPI) SetupHTTP(servMux *http.ServeMux) {
+// SetupHTTP adds the FederationSenderInternalAPI handlers to the http.ServeMux.
+func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.FederationSenderQueryJoinedHostsInRoomPath,
 		common.MakeInternalAPI("QueryJoinedHostsInRoom", func(req *http.Request) util.JSONResponse {

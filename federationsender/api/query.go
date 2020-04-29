@@ -26,8 +26,8 @@ type QueryJoinedHostsInRoomResponse struct {
 	JoinedHosts []types.JoinedHost `json:"joined_hosts"`
 }
 
-// QueryJoinedHostsInRoom implements FederationSenderQueryAPI
-func (h *httpFederationSenderQueryAPI) QueryJoinedHostsInRoom(
+// QueryJoinedHostsInRoom implements FederationSenderInternalAPI
+func (h *httpFederationSenderInternalAPI) QueryJoinedHostsInRoom(
 	ctx context.Context,
 	request *QueryJoinedHostsInRoomRequest,
 	response *QueryJoinedHostsInRoomResponse,
@@ -49,8 +49,8 @@ type QueryJoinedHostServerNamesInRoomResponse struct {
 	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
 }
 
-// QueryJoinedHostServerNamesInRoom implements FederationSenderQueryAPI
-func (h *httpFederationSenderQueryAPI) QueryJoinedHostServerNamesInRoom(
+// QueryJoinedHostServerNamesInRoom implements FederationSenderInternalAPI
+func (h *httpFederationSenderInternalAPI) QueryJoinedHostServerNamesInRoom(
 	ctx context.Context,
 	request *QueryJoinedHostServerNamesInRoomRequest,
 	response *QueryJoinedHostServerNamesInRoomResponse,

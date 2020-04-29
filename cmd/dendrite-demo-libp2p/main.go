@@ -153,15 +153,15 @@ func main() {
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		&base.Base, accountDB, deviceDB, federation, alias, query, transactions.New(),
 	)
-	fedSenderQueryAPI, _ := federationsender.SetupFederationSenderComponent(&base.Base, federation, query, input)
+	fsAPI := federationsender.SetupFederationSenderComponent(&base.Base, federation, query, input)
 
 	clientapi.SetupClientAPIComponent(
 		&base.Base, deviceDB, accountDB,
 		federation, &keyRing, alias, input, query,
-		eduInputAPI, asQuery, transactions.New(), fedSenderQueryAPI,
+		eduInputAPI, asQuery, transactions.New(), fsAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(&base.Base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderQueryAPI, eduProducer)
+	federationapi.SetupFederationAPIComponent(&base.Base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fsAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(&base.Base, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub)
 	if err != nil {

@@ -41,14 +41,14 @@ type RoomserverInputAPI struct {
 	mutex sync.Mutex
 	// The federation sender API allows us to send federation
 	// requests from the new perform input requests, still TODO.
-	fsInputAPI fsAPI.FederationSenderInputAPI
+	fsAPI fsAPI.FederationSenderInternalAPI
 }
 
 // SetFederationSenderInputAPI passes in a federation sender input API reference
 // so that we can avoid the chicken-and-egg problem of both the roomserver input API
 // and the federation sender input API being interdependent.
-func (r *RoomserverInputAPI) SetFederationSenderInputAPI(fsInputAPI fsAPI.FederationSenderInputAPI) {
-	r.fsInputAPI = fsInputAPI
+func (r *RoomserverInputAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
+	r.fsAPI = fsAPI
 }
 
 // WriteOutputEvents implements OutputRoomEventWriter
