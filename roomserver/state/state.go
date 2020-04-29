@@ -86,7 +86,10 @@ func (v StateResolution) LoadStateAtEvent(
 ) ([]types.StateEntry, error) {
 	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %s", eventID, err)
+	}
+	if snapshotNID == 0 {
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID(%s) returned 0 NID, was this event stored?", eventID)
 	}
 
 	stateEntries, err := v.LoadStateAtSnapshot(ctx, snapshotNID)

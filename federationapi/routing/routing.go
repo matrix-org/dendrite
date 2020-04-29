@@ -126,7 +126,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return GetEvent(
-				httpReq.Context(), request, query, vars["eventID"],
+				httpReq.Context(), request, query, vars["eventID"], cfg.Matrix.ServerName,
 			)
 		},
 	)).Methods(http.MethodGet)
