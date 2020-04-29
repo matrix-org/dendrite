@@ -124,7 +124,7 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		if eventNID, stateNID, err = d.statements.insertEvent(
+		if eventNID, err = d.statements.insertEvent(
 			ctx,
 			txn,
 			roomNID,

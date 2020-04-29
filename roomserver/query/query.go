@@ -277,6 +277,7 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 	response.JoinEvents = []gomatrixserverlib.ClientEvent{}
 
 	var events []types.Event
+	var stateEntries []types.StateEntry
 	if stillInRoom {
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, request.JoinedOnly)
@@ -286,7 +287,7 @@ func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
 
 		events, err = r.DB.Events(ctx, eventNIDs)
 	} else {
-		stateEntries, err := stateBeforeEvent(ctx, r.DB, membershipEventNID)
+		stateEntries, err = stateBeforeEvent(ctx, r.DB, membershipEventNID)
 		if err != nil {
 			logrus.WithField("membership_event_nid", membershipEventNID).WithError(err).Error("failed to load state before event")
 			return err

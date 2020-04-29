@@ -97,7 +97,6 @@ const selectRoomNIDForEventNIDSQL = "" +
 type eventStatements struct {
 	db                                     *sql.DB
 	insertEventStmt                        *sql.Stmt
-	insertEventResultStmt                  *sql.Stmt
 	selectEventStmt                        *sql.Stmt
 	bulkSelectStateEventByIDStmt           *sql.Stmt
 	bulkSelectStateAtEventByIDStmt         *sql.Stmt
@@ -146,7 +145,7 @@ func (s *eventStatements) insertEvent(
 	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
 	depth int64,
-) (types.EventNID, types.StateSnapshotNID, error) {
+) (types.EventNID, error) {
 	// attempt to insert: the last_row_id is the event NID
 	insertStmt := common.TxStmt(txn, s.insertEventStmt)
 	result, err := insertStmt.ExecContext(
@@ -154,15 +153,14 @@ func (s *eventStatements) insertEvent(
 		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
 	)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 	modified, err := result.RowsAffected()
 	if modified == 0 && err == nil {
-		return 0, 0, sql.ErrNoRows
+		return 0, sql.ErrNoRows
 	}
-	// the snapshot will always be 0 at this point
 	eventNID, err := result.LastInsertId()
-	return types.EventNID(eventNID), types.StateSnapshotNID(0), err
+	return types.EventNID(eventNID), err
 }
 
 func (s *eventStatements) selectEvent(
