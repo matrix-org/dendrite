@@ -54,6 +54,42 @@ func (c *RoomserverProducer) SendInviteResponse(
 	return c.SendInputRoomEvents(ctx, []api.InputRoomEvent{ire})
 }
 
+// SendEventWithState writes an event with KindNew to the roomserver input log
+// with the state at the event as KindOutlier before it.
+func (c *RoomserverProducer) SendEventWithState(
+	ctx context.Context, state gomatrixserverlib.RespState, event gomatrixserverlib.HeaderedEvent,
+) error {
+	outliers, err := state.Events()
+	if err != nil {
+		return err
+	}
+
+	var ires []api.InputRoomEvent
+	for _, outlier := range outliers {
+		ires = append(ires, api.InputRoomEvent{
+			Kind:         api.KindOutlier,
+			Event:        outlier.Headered(event.RoomVersion),
+			AuthEventIDs: outlier.AuthEventIDs(),
+		})
+	}
+
+	stateEventIDs := make([]string, len(state.StateEvents))
+	for i := range state.StateEvents {
+		stateEventIDs[i] = state.StateEvents[i].EventID()
+	}
+
+	ires = append(ires, api.InputRoomEvent{
+		Kind:          api.KindNew,
+		Event:         event,
+		AuthEventIDs:  event.AuthEventIDs(),
+		HasState:      true,
+		StateEventIDs: stateEventIDs,
+	})
+
+	_, err = c.SendInputRoomEvents(ctx, ires)
+	return err
+}
+
 // SendInputRoomEvents writes the given input room events to the roomserver input API.
 func (c *RoomserverProducer) SendInputRoomEvents(
 	ctx context.Context, ires []api.InputRoomEvent,

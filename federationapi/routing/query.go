@@ -33,7 +33,7 @@ func RoomAliasToID(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 	aliasAPI roomserverAPI.RoomserverAliasAPI,
-	senderAPI federationSenderAPI.FederationSenderQueryAPI,
+	senderAPI federationSenderAPI.FederationSenderInternalAPI,
 ) util.JSONResponse {
 	roomAlias := httpReq.FormValue("room_alias")
 	if roomAlias == "" {

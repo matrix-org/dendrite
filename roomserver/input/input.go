@@ -26,6 +26,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/util"
+
+	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 )
 
 // RoomserverInputAPI implements api.RoomserverInputAPI
@@ -37,6 +39,16 @@ type RoomserverInputAPI struct {
 	OutputRoomEventTopic string
 	// Protects calls to processRoomEvent
 	mutex sync.Mutex
+	// The federation sender API allows us to send federation
+	// requests from the new perform input requests, still TODO.
+	fsAPI fsAPI.FederationSenderInternalAPI
+}
+
+// SetFederationSenderInputAPI passes in a federation sender input API reference
+// so that we can avoid the chicken-and-egg problem of both the roomserver input API
+// and the federation sender input API being interdependent.
+func (r *RoomserverInputAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
+	r.fsAPI = fsAPI
 }
 
 // WriteOutputEvents implements OutputRoomEventWriter
