@@ -47,7 +47,7 @@ func DirectoryRoom(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverAliasAPI,
-	fedSenderAPI federationSenderAPI.FederationSenderQueryAPI,
+	fedSenderAPI federationSenderAPI.FederationSenderInternalAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {

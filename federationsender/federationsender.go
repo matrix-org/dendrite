@@ -36,7 +36,7 @@ func SetupFederationSenderComponent(
 	federation *gomatrixserverlib.FederationClient,
 	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
 	rsInputAPI roomserverAPI.RoomserverInputAPI,
-) api.FederationSenderQueryAPI {
+) api.FederationSenderInternalAPI {
 	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
@@ -61,7 +61,7 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	queryAPI := query.FederationSenderQueryAPI{
+	queryAPI := query.FederationSenderInternalAPI{
 		DB: federationSenderDB,
 	}
 	queryAPI.SetupHTTP(http.DefaultServeMux)

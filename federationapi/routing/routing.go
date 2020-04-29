@@ -49,7 +49,7 @@ func Setup(
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 	eduProducer *producers.EDUServerProducer,
-	federationSenderAPI federationSenderAPI.FederationSenderQueryAPI,
+	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 	accountDB accounts.Database,

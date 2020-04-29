@@ -44,7 +44,7 @@ func SetupClientAPIComponent(
 	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
-	fedSenderAPI federationSenderAPI.FederationSenderQueryAPI,
+	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 ) {
 	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
@@ -69,6 +69,6 @@ func SetupClientAPIComponent(
 	routing.Setup(
 		base.APIMux, base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
-		syncProducer, eduProducer, transactionsCache, fedSenderAPI,
+		syncProducer, eduProducer, transactionsCache, fsAPI,
 	)
 }

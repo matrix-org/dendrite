@@ -129,6 +129,7 @@ func main() {
 		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
 	)
 	fedSenderAPI := federationsender.SetupFederationSenderComponent(base, federation, query, input)
+	input.SetFederationSenderAPI(fedSenderAPI)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,

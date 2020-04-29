@@ -149,12 +149,12 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 	return e
 }
 
-// CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
+// CreateHTTPFederationSenderAPIs returns FederationSenderInternalAPI for hitting
 // the federation sender over HTTP
-func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
-	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
+func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderInternalAPI {
+	f, err := federationSenderAPI.NewFederationSenderInternalAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("NewFederationSenderQueryAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("NewFederationSenderInternalAPIHTTP failed", b.httpClient)
 	}
 	return f
 }
