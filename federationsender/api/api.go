@@ -1,0 +1,53 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"net/http"
+)
+
+// FederationSenderQueryAPI is used to query information from the federation sender.
+type FederationSenderQueryAPI interface {
+	// Query the joined hosts and the membership events accounting for their participation in a room.
+	// Note that if a server has multiple users in the room, it will have multiple entries in the returned slice.
+	// See `QueryJoinedHostServerNamesInRoom` for a de-duplicated version.
+	QueryJoinedHostsInRoom(
+		ctx context.Context,
+		request *QueryJoinedHostsInRoomRequest,
+		response *QueryJoinedHostsInRoomResponse,
+	) error
+	// Query the server names of the joined hosts in a room.
+	// Unlike QueryJoinedHostsInRoom, this function returns a de-duplicated slice
+	// containing only the server names (without information for membership events).
+	QueryJoinedHostServerNamesInRoom(
+		ctx context.Context,
+		request *QueryJoinedHostServerNamesInRoomRequest,
+		response *QueryJoinedHostServerNamesInRoomResponse,
+	) error
+	// Handle an instruction to make_join & send_join with a remote server.
+	InputJoinRequest(
+		ctx context.Context,
+		request *InputJoinRequest,
+		response *InputJoinResponse,
+	) error
+	// Handle an instruction to make_leave & send_leave with a remote server.
+	InputLeaveRequest(
+		ctx context.Context,
+		request *InputLeaveRequest,
+		response *InputLeaveResponse,
+	) error
+}
+
+// NewFederationSenderQueryAPIHTTP creates a FederationSenderQueryAPI implemented by talking to a HTTP POST API.
+// If httpClient is nil an error is returned
+func NewFederationSenderQueryAPIHTTP(federationSenderURL string, httpClient *http.Client) (FederationSenderQueryAPI, error) {
+	if httpClient == nil {
+		return nil, errors.New("NewFederationSenderQueryAPIHTTP: httpClient is <nil>")
+	}
+	return &httpFederationSenderQueryAPI{federationSenderURL, httpClient}, nil
+}
+
+type httpFederationSenderQueryAPI struct {
+	federationSenderURL string
+	httpClient          *http.Client
+}
