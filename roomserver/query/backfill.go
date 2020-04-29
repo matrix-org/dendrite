@@ -63,9 +63,9 @@ FederationHit:
 	logrus.WithField("event_id", targetEvent.EventID()).Info("Requesting /state_ids at event")
 	for _, srv := range b.servers { // hit any valid server
 		c := gomatrixserverlib.FederatedStateProvider{
-			FedClient:      b.fedClient,
-			AuthEventsOnly: false,
-			Server:         srv,
+			FedClient:          b.fedClient,
+			RememberAuthEvents: false,
+			Server:             srv,
 		}
 		res, err := c.StateIDsBeforeEvent(ctx, targetEvent)
 		if err != nil {
@@ -136,9 +136,9 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 	}
 
 	c := gomatrixserverlib.FederatedStateProvider{
-		FedClient:      b.fedClient,
-		AuthEventsOnly: false,
-		Server:         b.servers[0],
+		FedClient:          b.fedClient,
+		RememberAuthEvents: false,
+		Server:             b.servers[0],
 	}
 	result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
 	if err != nil {
