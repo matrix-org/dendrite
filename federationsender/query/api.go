@@ -1,28 +1,20 @@
 package query
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/federationsender/storage"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/util"
 )
 
-// FederationSenderQueryDatabase has the APIs needed to implement the query API.
-type FederationSenderQueryDatabase interface {
-	GetJoinedHosts(
-		ctx context.Context, roomID string,
-	) ([]types.JoinedHost, error)
-}
-
 // FederationSenderInternalAPI is an implementation of api.FederationSenderInternalAPI
 type FederationSenderInternalAPI struct {
 	api.FederationSenderInternalAPI
-	DB                 FederationSenderQueryDatabase
+	DB                 storage.Database
 	RoomserverInputAPI rsAPI.RoomserverInputAPI
 }
 

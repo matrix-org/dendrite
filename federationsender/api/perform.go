@@ -8,7 +8,10 @@ import (
 )
 
 const (
-	FederationSenderPerformJoinRequestPath  = "/api/federationsender/performJoinRequest"
+	// FederationSenderPerformJoinRequestPath is the HTTP path for the PerformJoinRequest API.
+	FederationSenderPerformJoinRequestPath = "/api/federationsender/performJoinRequest"
+
+	// FederationSenderPerformLeaveRequestPath is the HTTP path for the PerformLeaveRequest API.
 	FederationSenderPerformLeaveRequestPath = "/api/federationsender/performLeaveRequest"
 )
 
