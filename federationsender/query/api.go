@@ -56,27 +56,27 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(api.FederationSenderInputJoinRequestPath,
+	servMux.Handle(api.FederationSenderPerformJoinRequestPath,
 		common.MakeInternalAPI("inputJoinRequest", func(req *http.Request) util.JSONResponse {
-			var request api.InputJoinRequest
-			var response api.InputJoinResponse
+			var request api.PerformJoinRequest
+			var response api.PerformJoinResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
-			if err := f.InputJoinRequest(req.Context(), &request, &response); err != nil {
+			if err := f.PerformJoinRequest(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(api.FederationSenderInputLeaveRequestPath,
+	servMux.Handle(api.FederationSenderPerformLeaveRequestPath,
 		common.MakeInternalAPI("inputLeaveRequest", func(req *http.Request) util.JSONResponse {
-			var request api.InputLeaveRequest
-			var response api.InputLeaveResponse
+			var request api.PerformLeaveRequest
+			var response api.PerformLeaveResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
-			if err := f.InputLeaveRequest(req.Context(), &request, &response); err != nil {
+			if err := f.PerformLeaveRequest(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
