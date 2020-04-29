@@ -44,6 +44,10 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	respMakeJoin.JoinEvent.StateKey = &request.UserID
 	respMakeJoin.JoinEvent.RoomID = request.RoomID
 	respMakeJoin.JoinEvent.Redacts = ""
+	if request.Content == nil {
+		request.Content = map[string]interface{}{}
+	}
+	request.Content["membership"] = "join"
 	if err = respMakeJoin.JoinEvent.SetContent(request.Content); err != nil {
 		return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
 	}
