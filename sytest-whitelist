@@ -258,3 +258,9 @@ User can invite remote user to room with version 1
 User can invite remote user to room with version 2
 User can invite remote user to room with version 3
 User can invite remote user to room with version 4
+User can create and send/receive messages in a room with version 5
+local user can join room with version 5
+User can invite local user to room with version 5
+remote user can join room with version 5
+User can invite remote user to room with version 5
+Remote user can backfill in a room with version 5
