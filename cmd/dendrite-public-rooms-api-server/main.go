@@ -28,7 +28,10 @@ func main() {
 
 	deviceDB := base.CreateDeviceDB()
 
+	fsAPI := base.CreateHTTPFederationSenderAPIs()
 	rsAPI := base.CreateHTTPRoomserverAPIs()
+	rsAPI.SetFederationSenderAPI(fsAPI)
+
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")

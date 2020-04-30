@@ -160,6 +160,7 @@ func main() {
 	fsAPI := federationsender.SetupFederationSenderComponent(
 		&base.Base, federation, rsAPI, &keyRing,
 	)
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	clientapi.SetupClientAPIComponent(
 		&base.Base, deviceDB, accountDB,

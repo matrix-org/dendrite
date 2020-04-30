@@ -9,8 +9,9 @@ import (
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {
 	// needed to avoid chicken and egg scenario when setting up the
-	// interdependencies between the roomserver and the FS input API
-	SetFederationSenderAPI(fsInputAPI fsAPI.FederationSenderInternalAPI)
+	// interdependencies between the roomserver and other input APIs
+	SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI)
+
 	InputRoomEvents(
 		ctx context.Context,
 		request *InputRoomEventsRequest,

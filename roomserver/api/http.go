@@ -5,15 +5,13 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/common/caching"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsInputAPI "github.com/matrix-org/dendrite/federationsender/api"
 )
 
 type httpRoomserverInternalAPI struct {
-	roomserverURL string
-	httpClient    *http.Client
-	// The federation sender API allows us to send federation
-	// requests from the new perform input requests, still TODO.
-	fsInputAPI     fsAPI.FederationSenderInternalAPI
+	roomserverURL  string
+	httpClient     *http.Client
+	fsAPI          fsInputAPI.FederationSenderInternalAPI
 	immutableCache caching.ImmutableCache
 }
 
@@ -29,9 +27,8 @@ func NewRoomserverInternalAPIHTTP(
 		return nil, errors.New("NewRoomserverInternalAPIHTTP: httpClient is <nil>")
 	}
 	return &httpRoomserverInternalAPI{
-		roomserverURL: roomserverURL,
-		httpClient:    httpClient,
-		//fsInputAPI:     fsInputAPI,
+		roomserverURL:  roomserverURL,
+		httpClient:     httpClient,
 		immutableCache: immutableCache,
 	}, nil
 }
@@ -39,6 +36,6 @@ func NewRoomserverInternalAPIHTTP(
 // SetFederationSenderInputAPI passes in a federation sender input API reference
 // so that we can avoid the chicken-and-egg problem of both the roomserver input API
 // and the federation sender input API being interdependent.
-func (h *httpRoomserverInternalAPI) SetFederationSenderAPI(fsInputAPI fsAPI.FederationSenderInternalAPI) {
-	h.fsInputAPI = fsInputAPI
+func (h *httpRoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsInputAPI.FederationSenderInternalAPI) {
+	h.fsAPI = fsAPI
 }
