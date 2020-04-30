@@ -39,7 +39,8 @@ type Database interface {
 	// WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 	// when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 	// Returns an error if there was a problem inserting this event.
-	WriteEvent(context.Context, *gomatrixserverlib.HeaderedEvent, []gomatrixserverlib.HeaderedEvent, []string, []string, *api.TransactionID, bool) (types.StreamPosition, error)
+	WriteEvent(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, addStateEvents []gomatrixserverlib.HeaderedEvent,
+		addStateEventIDs []string, removeStateEventIDs []string, transactionID *api.TransactionID, excludeFromSync bool) (types.StreamPosition, error)
 	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
