@@ -26,12 +26,6 @@ var (
 		ID:          "device_id_A",
 		DisplayName: "Device A",
 	}
-	testUserDeviceB = authtypes.Device{
-		UserID:      testUserIDB,
-		ID:          "device_id_B",
-		DisplayName: "Device B",
-	}
-	nullDevice      = authtypes.Device{}
 	testRoomVersion = gomatrixserverlib.RoomVersionV4
 	testKeyID       = gomatrixserverlib.KeyID("ed25519:storage_test")
 	testPrivateKey  = ed25519.NewKeyFromSeed([]byte{
