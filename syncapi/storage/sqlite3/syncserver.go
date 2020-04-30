@@ -330,8 +330,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 			return
 		}
 	}
-
-	return
+	return events, err
 }
 
 // SyncPosition returns the latest positions for syncing.
