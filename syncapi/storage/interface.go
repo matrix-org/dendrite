@@ -91,8 +91,8 @@ type Database interface {
 	// GetEventsInRange retrieves all of the events on a given ordering using the
 	// given extremities and limit.
 	GetEventsInRange(ctx context.Context, from, to *types.PaginationToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
-	// EventPositionInTopology returns the depth of the given event.
-	EventPositionInTopology(ctx context.Context, eventID string) (types.StreamPosition, error)
+	// EventPositionInTopology returns the depth and stream position of the given event.
+	EventPositionInTopology(ctx context.Context, eventID string) (depth types.StreamPosition, stream types.StreamPosition, err error)
 	// EventsAtTopologicalPosition returns all of the events matching a given
 	// position in the topology of a given room.
 	EventsAtTopologicalPosition(ctx context.Context, roomID string, pos types.StreamPosition) ([]types.StreamEvent, error)
@@ -100,7 +100,7 @@ type Database interface {
 	// extremities we know of for a given room.
 	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities []string, err error)
 	// MaxTopologicalPosition returns the highest topological position for a given room.
-	MaxTopologicalPosition(ctx context.Context, roomID string) (types.StreamPosition, error)
+	MaxTopologicalPosition(ctx context.Context, roomID string) (depth types.StreamPosition, stream types.StreamPosition, err error)
 	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.

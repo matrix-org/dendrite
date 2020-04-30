@@ -301,8 +301,9 @@ func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
 
 func (d *SyncServerDatasource) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
-) (types.StreamPosition, error) {
-	return d.topology.selectMaxPositionInTopology(ctx, roomID)
+) (depth types.StreamPosition, stream types.StreamPosition, err error) {
+	depth, err = d.topology.selectMaxPositionInTopology(ctx, roomID)
+	return
 }
 
 func (d *SyncServerDatasource) EventsAtTopologicalPosition(
@@ -318,8 +319,13 @@ func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 
 func (d *SyncServerDatasource) EventPositionInTopology(
 	ctx context.Context, eventID string,
-) (types.StreamPosition, error) {
-	return d.topology.selectPositionInTopology(ctx, eventID)
+) (depth types.StreamPosition, stream types.StreamPosition, err error) {
+	depth, err = d.topology.selectPositionInTopology(ctx, eventID)
+	if err != nil {
+		return
+	}
+	//stream, err = d.events.selectStreamPositionForEventID(ctx, eventID)
+	return
 }
 
 func (d *SyncServerDatasource) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {

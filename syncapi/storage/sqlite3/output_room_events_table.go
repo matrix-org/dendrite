@@ -74,6 +74,9 @@ const selectEarlyEventsSQL = "" +
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
 
+const selectStreamPositionForEventIDSQL = "" +
+	"SELECT id FROM syncapi_output_room_events WHERE event_id = $1"
+
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 /*
 	$1 = oldPos,
@@ -99,14 +102,15 @@ const selectStateInRangeSQL = "" +
 	" LIMIT $8" // limit
 
 type outputRoomEventsStatements struct {
-	streamIDStatements            *streamIDStatements
-	insertEventStmt               *sql.Stmt
-	selectEventsStmt              *sql.Stmt
-	selectMaxEventIDStmt          *sql.Stmt
-	selectRecentEventsStmt        *sql.Stmt
-	selectRecentEventsForSyncStmt *sql.Stmt
-	selectEarlyEventsStmt         *sql.Stmt
-	selectStateInRangeStmt        *sql.Stmt
+	streamIDStatements                 *streamIDStatements
+	insertEventStmt                    *sql.Stmt
+	selectEventsStmt                   *sql.Stmt
+	selectMaxEventIDStmt               *sql.Stmt
+	selectRecentEventsStmt             *sql.Stmt
+	selectRecentEventsForSyncStmt      *sql.Stmt
+	selectEarlyEventsStmt              *sql.Stmt
+	selectStateInRangeStmt             *sql.Stmt
+	selectStreamPositionForEventIDStmt *sql.Stmt
 }
 
 func (s *outputRoomEventsStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
@@ -136,7 +140,16 @@ func (s *outputRoomEventsStatements) prepare(db *sql.DB, streamID *streamIDState
 	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
 		return
 	}
+	if s.selectStreamPositionForEventIDStmt, err = db.Prepare(selectStreamPositionForEventIDSQL); err != nil {
+		return
+	}
 	return
+}
+
+func (s *outputRoomEventsStatements) selectStreamPositionForEventID(ctx context.Context, eventID string) (types.StreamPosition, error) {
+	var id int64
+	err := s.selectStreamPositionForEventIDStmt.QueryRowContext(ctx, eventID).Scan(&id)
+	return types.StreamPosition(id), err
 }
 
 // selectStateInRange returns the state events between the two given PDU stream positions, exclusive of oldPos, inclusive of newPos.
