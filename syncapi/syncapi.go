@@ -38,7 +38,7 @@ func SetupSyncAPIComponent(
 	base *basecomponent.BaseDendrite,
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 ) {
@@ -61,7 +61,7 @@ func SetupSyncAPIComponent(
 	requestPool := sync.NewRequestPool(syncDB, notifier, accountsDB)
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB, queryAPI,
+		base.Cfg, base.KafkaConsumer, notifier, syncDB, rsAPI,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -81,5 +81,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start typing server consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, federation, queryAPI, cfg)
+	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
 }

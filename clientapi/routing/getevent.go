@@ -44,7 +44,7 @@ func GetEvent(
 	roomID string,
 	eventID string,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
@@ -52,7 +52,7 @@ func GetEvent(
 		EventIDs: []string{eventID},
 	}
 	var eventsResp api.QueryEventsByIDResponse
-	err := queryAPI.QueryEventsByID(req.Context(), &eventsReq, &eventsResp)
+	err := rsAPI.QueryEventsByID(req.Context(), &eventsReq, &eventsResp)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryEventsByID failed")
 		return jsonerror.InternalServerError()
@@ -88,7 +88,7 @@ func GetEvent(
 		}},
 	}
 	var stateResp api.QueryStateAfterEventsResponse
-	if err := queryAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
+	if err := rsAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryStateAfterEvents failed")
 		return jsonerror.InternalServerError()
 	}

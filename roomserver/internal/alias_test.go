@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package alias
+package internal
 
 import (
 	"context"
@@ -25,39 +25,39 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type MockRoomserverAliasAPIDatabase struct {
+type MockRoomserverInternalAPIDatabase struct {
 	mode     string
 	attempts int
 }
 
 // These methods can be essentially noop
-func (db MockRoomserverAliasAPIDatabase) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
+func (db MockRoomserverInternalAPIDatabase) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
 	return nil
 }
 
-func (db MockRoomserverAliasAPIDatabase) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
+func (db MockRoomserverInternalAPIDatabase) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
 	aliases := make([]string, 0)
 	return aliases, nil
 }
 
-func (db MockRoomserverAliasAPIDatabase) RemoveRoomAlias(ctx context.Context, alias string) error {
+func (db MockRoomserverInternalAPIDatabase) RemoveRoomAlias(ctx context.Context, alias string) error {
 	return nil
 }
 
-func (db *MockRoomserverAliasAPIDatabase) GetCreatorIDForAlias(
+func (db *MockRoomserverInternalAPIDatabase) GetCreatorIDForAlias(
 	ctx context.Context, alias string,
 ) (string, error) {
 	return "", nil
 }
 
-func (db *MockRoomserverAliasAPIDatabase) GetRoomVersionForRoom(
+func (db *MockRoomserverInternalAPIDatabase) GetRoomVersionForRoom(
 	ctx context.Context, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
 	return gomatrixserverlib.RoomVersionV1, nil
 }
 
 // This method needs to change depending on test case
-func (db *MockRoomserverAliasAPIDatabase) GetRoomIDForAlias(
+func (db *MockRoomserverInternalAPIDatabase) GetRoomIDForAlias(
 	ctx context.Context,
 	alias string,
 ) (string, error) {
@@ -178,11 +178,11 @@ func TestGetRoomIDForAlias(t *testing.T) {
 		},
 	}
 
-	setup := func(dbMode, queryMode string) *RoomserverAliasAPI {
-		mockAliasAPIDB := &MockRoomserverAliasAPIDatabase{dbMode, 0}
+	setup := func(dbMode, queryMode string) *RoomserverInternalAPI {
+		mockAliasAPIDB := &MockRoomserverInternalAPIDatabase{dbMode, 0}
 		mockAppServiceQueryAPI := MockAppServiceQueryAPI{queryMode}
 
-		return &RoomserverAliasAPI{
+		return &RoomserverInternalAPI{
 			DB:            mockAliasAPIDB,
 			AppserviceAPI: mockAppServiceQueryAPI,
 		}

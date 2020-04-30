@@ -20,14 +20,12 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	asQuery "github.com/matrix-org/dendrite/appservice/query"
-
 	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/roomserver/alias"
-	"github.com/matrix-org/dendrite/roomserver/input"
-	"github.com/matrix-org/dendrite/roomserver/query"
+	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/sirupsen/logrus"
+
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 )
 
 // SetupRoomServerComponent sets up and registers HTTP handlers for the
@@ -35,45 +33,29 @@ import (
 // allowing other components running in the same process to hit the query the
 // APIs directly instead of having to use HTTP.
 func SetupRoomServerComponent(
-	base *basecomponent.BaseDendrite, keyRing gomatrixserverlib.JSONVerifier,
+	base *basecomponent.BaseDendrite,
+	keyRing gomatrixserverlib.JSONVerifier,
 	fedClient *gomatrixserverlib.FederationClient,
-) (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
+	asAPI appserviceAPI.AppServiceQueryAPI,
+) api.RoomserverInternalAPI {
 	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	inputAPI := input.RoomserverInputAPI{
+	internalAPI := internal.RoomserverInternalAPI{
 		DB:                   roomserverDB,
+		Cfg:                  base.Cfg,
 		Producer:             base.KafkaProducer,
 		OutputRoomEventTopic: string(base.Cfg.Kafka.Topics.OutputRoomEvent),
+		ImmutableCache:       base.ImmutableCache,
+		ServerName:           base.Cfg.Matrix.ServerName,
+		FedClient:            fedClient,
+		KeyRing:              keyRing,
+		AppserviceAPI:        asAPI,
 	}
 
-	inputAPI.SetupHTTP(http.DefaultServeMux)
+	internalAPI.SetupHTTP(http.DefaultServeMux)
 
-	queryAPI := query.RoomserverQueryAPI{
-		DB:             roomserverDB,
-		ImmutableCache: base.ImmutableCache,
-		ServerName:     base.Cfg.Matrix.ServerName,
-		FedClient:      fedClient,
-		// TODO: We should have a key server so we don't keep adding components
-		// which talk to the same DB.
-		KeyRing: keyRing,
-	}
-
-	queryAPI.SetupHTTP(http.DefaultServeMux)
-
-	asAPI := asQuery.AppServiceQueryAPI{Cfg: base.Cfg}
-
-	aliasAPI := alias.RoomserverAliasAPI{
-		DB:            roomserverDB,
-		Cfg:           base.Cfg,
-		InputAPI:      &inputAPI,
-		QueryAPI:      &queryAPI,
-		AppserviceAPI: &asAPI,
-	}
-
-	aliasAPI.SetupHTTP(http.DefaultServeMux)
-
-	return &aliasAPI, &inputAPI, &queryAPI
+	return &internalAPI
 }

@@ -33,13 +33,13 @@ func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID, userID string,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
@@ -97,7 +97,7 @@ func MakeJoin(
 	queryRes := api.QueryLatestEventsAndStateResponse{
 		RoomVersion: verRes.RoomVersion,
 	}
-	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), query, &queryRes)
+	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), rsAPI, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -136,15 +136,15 @@ func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryRoomVersionForRoom failed")
+	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryRoomVersionForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
@@ -216,14 +216,14 @@ func SendJoin(
 	// Fetch the state and auth chain. We do this before we send the events
 	// on, in case this fails.
 	var stateAndAuthChainResponse api.QueryStateAndAuthChainResponse
-	err = query.QueryStateAndAuthChain(httpReq.Context(), &api.QueryStateAndAuthChainRequest{
+	err = rsAPI.QueryStateAndAuthChain(httpReq.Context(), &api.QueryStateAndAuthChainRequest{
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
 		ResolveState: true,
 	}, &stateAndAuthChainResponse)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryStateAndAuthChain failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryStateAndAuthChain failed")
 		return jsonerror.InternalServerError()
 	}
 

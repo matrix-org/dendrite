@@ -17,11 +17,8 @@ package api
 
 import (
 	"context"
-	"errors"
-	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	opentracing "github.com/opentracing/opentracing-go"
 )
@@ -105,47 +102,11 @@ type InputRoomEventsResponse struct {
 	EventID string `json:"event_id"`
 }
 
-// RoomserverInputAPI is used to write events to the room server.
-type RoomserverInputAPI interface {
-	// needed to avoid chicken and egg scenario when setting up the
-	// interdependencies between the roomserver and the FS input API
-	SetFederationSenderAPI(fsInputAPI fsAPI.FederationSenderInternalAPI)
-	InputRoomEvents(
-		ctx context.Context,
-		request *InputRoomEventsRequest,
-		response *InputRoomEventsResponse,
-	) error
-}
-
 // RoomserverInputRoomEventsPath is the HTTP path for the InputRoomEvents API.
 const RoomserverInputRoomEventsPath = "/api/roomserver/inputRoomEvents"
 
-// NewRoomserverInputAPIHTTP creates a RoomserverInputAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil an error is returned
-func NewRoomserverInputAPIHTTP(roomserverURL string, httpClient *http.Client) (RoomserverInputAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewRoomserverInputAPIHTTP: httpClient is <nil>")
-	}
-	return &httpRoomserverInputAPI{roomserverURL, httpClient, nil}, nil
-}
-
-type httpRoomserverInputAPI struct {
-	roomserverURL string
-	httpClient    *http.Client
-	// The federation sender API allows us to send federation
-	// requests from the new perform input requests, still TODO.
-	fsInputAPI fsAPI.FederationSenderInternalAPI
-}
-
-// SetFederationSenderInputAPI passes in a federation sender input API reference
-// so that we can avoid the chicken-and-egg problem of both the roomserver input API
-// and the federation sender input API being interdependent.
-func (h *httpRoomserverInputAPI) SetFederationSenderAPI(fsInputAPI fsAPI.FederationSenderInternalAPI) {
-	h.fsInputAPI = fsInputAPI
-}
-
 // InputRoomEvents implements RoomserverInputAPI
-func (h *httpRoomserverInputAPI) InputRoomEvents(
+func (h *httpRoomserverInternalAPI) InputRoomEvents(
 	ctx context.Context,
 	request *InputRoomEventsRequest,
 	response *InputRoomEventsResponse,

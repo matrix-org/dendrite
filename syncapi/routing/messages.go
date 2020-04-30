@@ -34,7 +34,7 @@ import (
 type messagesReq struct {
 	ctx              context.Context
 	db               storage.Database
-	queryAPI         api.RoomserverQueryAPI
+	rsAPI            api.RoomserverInternalAPI
 	federation       *gomatrixserverlib.FederationClient
 	cfg              *config.Dendrite
 	roomID           string
@@ -59,7 +59,7 @@ const defaultMessagesLimit = 10
 func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string,
 	federation *gomatrixserverlib.FederationClient,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var err error
@@ -135,7 +135,7 @@ func OnIncomingMessagesRequest(
 	mReq := messagesReq{
 		ctx:              req.Context(),
 		db:               db,
-		queryAPI:         queryAPI,
+		rsAPI:            rsAPI,
 		federation:       federation,
 		cfg:              cfg,
 		roomID:           roomID,
@@ -360,7 +360,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 // the room or sending the request.
 func (r *messagesReq) backfill(roomID string, fromEventIDs []string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
 	var res api.QueryBackfillResponse
-	err := r.queryAPI.QueryBackfill(context.Background(), &api.QueryBackfillRequest{
+	err := r.rsAPI.QueryBackfill(context.Background(), &api.QueryBackfillRequest{
 		RoomID:            roomID,
 		EarliestEventsIDs: fromEventIDs,
 		Limit:             limit,

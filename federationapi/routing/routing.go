@@ -44,8 +44,7 @@ const (
 func Setup(
 	apiMux *mux.Router,
 	cfg *config.Dendrite,
-	query roomserverAPI.RoomserverQueryAPI,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 	eduProducer *producers.EDUServerProducer,
@@ -80,7 +79,7 @@ func Setup(
 			}
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, query, producer, eduProducer, keys, federation,
+				cfg, rsAPI, producer, eduProducer, keys, federation,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
@@ -101,7 +100,7 @@ func Setup(
 
 	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
-			return CreateInvitesFrom3PIDInvites(req, query, asAPI, cfg, producer, federation, accountDB)
+			return CreateInvitesFrom3PIDInvites(req, rsAPI, asAPI, cfg, producer, federation, accountDB)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
@@ -113,7 +112,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return ExchangeThirdPartyInvite(
-				httpReq, request, vars["roomID"], query, cfg, federation, producer,
+				httpReq, request, vars["roomID"], rsAPI, cfg, federation, producer,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
@@ -126,7 +125,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return GetEvent(
-				httpReq.Context(), request, query, vars["eventID"], cfg.Matrix.ServerName,
+				httpReq.Context(), request, rsAPI, vars["eventID"], cfg.Matrix.ServerName,
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -139,7 +138,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return GetState(
-				httpReq.Context(), request, query, vars["roomID"],
+				httpReq.Context(), request, rsAPI, vars["roomID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -152,7 +151,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return GetStateIDs(
-				httpReq.Context(), request, query, vars["roomID"],
+				httpReq.Context(), request, rsAPI, vars["roomID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -162,7 +161,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
 			return GetEventAuth(
-				httpReq.Context(), request, query, vars["roomID"], vars["eventID"],
+				httpReq.Context(), request, rsAPI, vars["roomID"], vars["eventID"],
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -171,7 +170,7 @@ func Setup(
 		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return RoomAliasToID(
-				httpReq, federation, cfg, aliasAPI, federationSenderAPI,
+				httpReq, federation, cfg, rsAPI, federationSenderAPI,
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -222,7 +221,7 @@ func Setup(
 				remoteVersions = append(remoteVersions, gomatrixserverlib.RoomVersionV1)
 			}
 			return MakeJoin(
-				httpReq, request, cfg, query, roomID, eventID, remoteVersions,
+				httpReq, request, cfg, rsAPI, roomID, eventID, remoteVersions,
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -237,7 +236,7 @@ func Setup(
 			roomID := vars["roomID"]
 			eventID := vars["eventID"]
 			return SendJoin(
-				httpReq, request, cfg, query, producer, keys, roomID, eventID,
+				httpReq, request, cfg, rsAPI, producer, keys, roomID, eventID,
 			)
 		},
 	)).Methods(http.MethodPut)
@@ -252,7 +251,7 @@ func Setup(
 			roomID := vars["roomID"]
 			eventID := vars["eventID"]
 			return MakeLeave(
-				httpReq, request, cfg, query, roomID, eventID,
+				httpReq, request, cfg, rsAPI, roomID, eventID,
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -286,7 +285,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetMissingEvents(httpReq, request, query, vars["roomID"])
+			return GetMissingEvents(httpReq, request, rsAPI, vars["roomID"])
 		},
 	)).Methods(http.MethodPost)
 
@@ -297,7 +296,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return Backfill(httpReq, request, query, vars["roomID"], cfg)
+			return Backfill(httpReq, request, rsAPI, vars["roomID"], cfg)
 		},
 	)).Methods(http.MethodGet)
 }
