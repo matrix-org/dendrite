@@ -43,14 +43,14 @@ const insertEventInTopologySQL = "" +
 	" ON CONFLICT DO NOTHING"
 
 const selectEventIDsInRangeASCSQL = "" +
-	"SELECT event_id, topological_position, stream_position FROM syncapi_output_room_events_topology" +
+	"SELECT event_id FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND" +
 	"(topological_position > $2 AND topological_position < $3) OR" +
 	"(topological_position = $4 AND stream_position <= $5)" +
 	" ORDER BY topological_position ASC, stream_position ASC LIMIT $6"
 
 const selectEventIDsInRangeDESCSQL = "" +
-	"SELECT event_id, topological_position, stream_position FROM syncapi_output_room_events_topology" +
+	"SELECT event_id  FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND" +
 	"(topological_position > $2 AND topological_position < $3) OR" +
 	"(topological_position = $4 AND stream_position <= $5)" +
@@ -143,10 +143,8 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 
 	// Return the IDs.
 	var eventID string
-	var streamPos int64
-	var topoPos int64
 	for rows.Next() {
-		if err = rows.Scan(&eventID, &topoPos, &streamPos); err != nil {
+		if err = rows.Scan(&eventID); err != nil {
 			return
 		}
 		eventIDs = append(eventIDs, eventID)

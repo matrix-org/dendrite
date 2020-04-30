@@ -182,7 +182,7 @@ func TestSyncResponse(t *testing.T) {
 				// limit set to 5
 				return db.CompleteSync(ctx, testUserIDA, 5)
 			},
-			// want the last 5 events, NOT the last 10.
+			// want the last 5 events
 			WantTimeline: events[len(events)-5:],
 			// want all state for the room
 			WantState: state,

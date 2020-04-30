@@ -159,7 +159,7 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.topology.insertEventInTopology(ctx, ev); err != nil {
+		if err = d.topology.insertEventInTopology(ctx, ev, pos); err != nil {
 			return err
 		}
 
@@ -240,12 +240,13 @@ func (d *SyncServerDatasource) GetEventsInRange(
 	if from.Type == types.PaginationTokenTypeTopology {
 		// Determine the backward and forward limit, i.e. the upper and lower
 		// limits to the selection in the room's topology, from the direction.
-		var backwardLimit, forwardLimit types.StreamPosition
+		var backwardLimit, forwardLimit, forwardMicroLimit types.StreamPosition
 		if backwardOrdering {
 			// Backward ordering is antichronological (latest event to oldest
 			// one).
 			backwardLimit = to.PDUPosition
 			forwardLimit = from.PDUPosition
+			forwardMicroLimit = from.EDUTypingPosition
 		} else {
 			// Forward ordering is chronological (oldest event to latest one).
 			backwardLimit = from.PDUPosition
@@ -255,7 +256,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		// Select the event IDs from the defined range.
 		var eIDs []string
 		eIDs, err = d.topology.selectEventIDsInRange(
-			ctx, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
+			ctx, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
 		)
 		if err != nil {
 			return
@@ -302,8 +303,7 @@ func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
 func (d *SyncServerDatasource) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
 ) (depth types.StreamPosition, stream types.StreamPosition, err error) {
-	depth, err = d.topology.selectMaxPositionInTopology(ctx, roomID)
-	return
+	return d.topology.selectMaxPositionInTopology(ctx, roomID)
 }
 
 func (d *SyncServerDatasource) EventsAtTopologicalPosition(
@@ -324,7 +324,7 @@ func (d *SyncServerDatasource) EventPositionInTopology(
 	if err != nil {
 		return
 	}
-	//stream, err = d.events.selectStreamPositionForEventID(ctx, eventID)
+	stream, err = d.events.selectStreamPositionForEventID(ctx, eventID)
 	return
 }
 
