@@ -149,7 +149,7 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
 	rsAPI := roomserver.SetupRoomServerComponent(
-		&base.Base, keyRing, federation, nil,
+		&base.Base, keyRing, federation,
 	)
 	eduInputAPI := eduserver.SetupEDUServerComponent(
 		&base.Base, cache.New(),

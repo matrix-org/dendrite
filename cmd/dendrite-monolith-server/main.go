@@ -58,7 +58,7 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
 	rsAPI := roomserver.SetupRoomServerComponent(
-		base, keyRing, federation, nil, // TODO: AS API here
+		base, keyRing, federation,
 	)
 	eduInputAPI := eduserver.SetupEDUServerComponent(
 		base, cache.New(),

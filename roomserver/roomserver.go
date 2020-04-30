@@ -24,8 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/sirupsen/logrus"
-
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 )
 
 // SetupRoomServerComponent sets up and registers HTTP handlers for the
@@ -36,7 +34,6 @@ func SetupRoomServerComponent(
 	base *basecomponent.BaseDendrite,
 	keyRing gomatrixserverlib.JSONVerifier,
 	fedClient *gomatrixserverlib.FederationClient,
-	asAPI appserviceAPI.AppServiceQueryAPI,
 ) api.RoomserverInternalAPI {
 	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
 	if err != nil {
@@ -52,7 +49,6 @@ func SetupRoomServerComponent(
 		ServerName:           base.Cfg.Matrix.ServerName,
 		FedClient:            fedClient,
 		KeyRing:              keyRing,
-		AppserviceAPI:        asAPI,
 	}
 
 	internalAPI.SetupHTTP(http.DefaultServeMux)

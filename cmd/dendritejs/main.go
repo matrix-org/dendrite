@@ -123,7 +123,7 @@ func main() {
 	}
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node)
 
-	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation, nil) // TODO: AS API here
+	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
