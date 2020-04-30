@@ -20,7 +20,6 @@ import (
 	"errors"
 	"time"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -90,22 +89,28 @@ func (r *RoomserverInternalAPI) GetRoomIDForAlias(
 		return err
 	}
 
-	if roomID == "" {
-		// No room found locally, try our application services by making a call to
-		// the appservice component
-		aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
-		var aliasResp appserviceAPI.RoomAliasExistsResponse
-		if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
-			return err
-		}
+	/*
+		TODO: Why is this here? It creates an unnecessary dependency
+		from the roomserver to the appservice component, which should be
+		altogether optional.
 
-		if aliasResp.AliasExists {
-			roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
-			if err != nil {
+		if roomID == "" {
+			// No room found locally, try our application services by making a call to
+			// the appservice component
+			aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
+			var aliasResp appserviceAPI.RoomAliasExistsResponse
+			if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
 				return err
 			}
+
+			if aliasResp.AliasExists {
+				roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
+				if err != nil {
+					return err
+				}
+			}
 		}
-	}
+	*/
 
 	response.RoomID = roomID
 	return nil

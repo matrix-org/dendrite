@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/Shopify/sarama"
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/common/config"
@@ -29,7 +28,6 @@ type RoomserverInternalAPI struct {
 	OutputRoomEventTopic string     // Kafka topic for new output room events
 	mutex                sync.Mutex // Protects calls to processRoomEvent
 	fsAPI                fsAPI.FederationSenderInternalAPI
-	AppserviceAPI        appserviceAPI.AppServiceQueryAPI
 }
 
 // SetupHTTP adds the RoomserverInternalAPI handlers to the http.ServeMux.
