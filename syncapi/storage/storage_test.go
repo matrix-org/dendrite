@@ -72,6 +72,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 		Type:     "m.room.create",
 		StateKey: &emptyStateKey,
 		Sender:   userA,
+		Depth:    int64(len(events) + 1),
 	}))
 	state = append(state, events[len(events)-1])
 	events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
@@ -79,6 +80,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 		Type:     "m.room.member",
 		StateKey: &userA,
 		Sender:   userA,
+		Depth:    int64(len(events) + 1),
 	}))
 	state = append(state, events[len(events)-1])
 	for i := 0; i < 10; i++ {
@@ -86,6 +88,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 			Content: []byte(fmt.Sprintf(`{"body":"Message A %d"}`, i+1)),
 			Type:    "m.room.message",
 			Sender:  userA,
+			Depth:   int64(len(events) + 1),
 		}))
 	}
 	events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
@@ -93,6 +96,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 		Type:     "m.room.member",
 		StateKey: &userB,
 		Sender:   userB,
+		Depth:    int64(len(events) + 1),
 	}))
 	state = append(state, events[len(events)-1])
 	for i := 0; i < 10; i++ {
@@ -100,6 +104,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 			Content: []byte(fmt.Sprintf(`{"body":"Message B %d"}`, i+1)),
 			Type:    "m.room.message",
 			Sender:  userB,
+			Depth:   int64(len(events) + 1),
 		}))
 	}
 
@@ -221,8 +226,8 @@ func TestSyncResponse(t *testing.T) {
 	}
 }
 
-// The purpose of this test is to ensure that backfill does indeed go backwards.
-func TestGetEventsInRange(t *testing.T) {
+// The purpose of this test is to ensure that backfill does indeed go backwards, using a stream token.
+func TestGetEventsInRangeWithStreamToken(t *testing.T) {
 	t.Parallel()
 	db := MustCreateDatabase(t)
 	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
@@ -236,6 +241,29 @@ func TestGetEventsInRange(t *testing.T) {
 
 	// backpaginate 5 messages starting at the latest position.
 	paginatedEvents, err := db.GetEventsInRange(ctx, &latest, to, testRoomID, 5, true)
+	if err != nil {
+		t.Fatalf("GetEventsInRange returned an error: %s", err)
+	}
+	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
+	assertEventsEqual(t, "", true, gots, reversed(events[len(events)-5:]))
+}
+
+// The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
+func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
+	t.Parallel()
+	db := MustCreateDatabase(t)
+	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
+	MustWriteEvents(t, db, events)
+	latest, err := db.MaxTopologicalPosition(ctx, testRoomID)
+	if err != nil {
+		t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
+	}
+	from := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, latest, 0)
+	// head towards the beginning of time
+	to := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
+
+	// backpaginate 5 messages starting at the latest position.
+	paginatedEvents, err := db.GetEventsInRange(ctx, from, to, testRoomID, 5, true)
 	if err != nil {
 		t.Fatalf("GetEventsInRange returned an error: %s", err)
 	}
