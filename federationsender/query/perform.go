@@ -9,6 +9,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/query/perform"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 // PerformJoinRequest implements api.FederationSenderInternalAPI
@@ -87,24 +88,42 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		return fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
 
-	// Check that the send_join response was valid.
-	joinCtx := perform.JoinContext(r.federation, r.keyRing)
-	if err = joinCtx.CheckSendJoinResponse(
-		ctx, event, request.ServerName, respMakeJoin, respSendJoin,
-	); err != nil {
-		return fmt.Errorf("perform.JoinRequest.CheckSendJoinResponse: %w", err)
-	}
+	// At this point, if the above /send_join didn't return an error,
+	// then the resident servers think we're in the room. We need
+	// to verify the state and auth chain and notify the roomserver
+	// but this can take an awful long time in big rooms and there's
+	// every possibility that client may give up waiting on this CS
+	// API request long before that. Therefore for now, until we
+	// have a /confirm_join step, just let the client think that the
+	// request succeeded and work it out in our own time. There's
+	// every possibility this might fail, and if so, the room will
+	// just never appear in the sync stream. That's about the best
+	// we can do for now.
+	go func() {
+		// Don't expire with the original request context.
+		ctx := context.Background()
 
-	// If we successfully performed a send_join above then the other
-	// server now thinks we're a part of the room. Send the newly
-	// returned state to the roomserver to update our local view.
-	if err = r.producer.SendEventWithState(
-		ctx,
-		respSendJoin.ToRespState(),
-		event.Headered(respMakeJoin.RoomVersion),
-	); err != nil {
-		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
-	}
+		// Check that the send_join response was valid.
+		joinCtx := perform.JoinContext(r.federation, r.keyRing)
+		if err = joinCtx.CheckSendJoinResponse(
+			ctx, event, request.ServerName, respMakeJoin, respSendJoin,
+		); err != nil {
+			logrus.WithError(err).Errorf("perform.JoinRequest.CheckSendJoinResponse failed")
+			return
+		}
+
+		// If we successfully performed a send_join above then the other
+		// server now thinks we're a part of the room. Send the newly
+		// returned state to the roomserver to update our local view.
+		if err = r.producer.SendEventWithState(
+			ctx,
+			respSendJoin.ToRespState(),
+			event.Headered(respMakeJoin.RoomVersion),
+		); err != nil {
+			logrus.WithError(err).Errorf("r.producer.SendEventWithState failed")
+			return
+		}
+	}()
 
 	// Everything went to plan.
 	return nil

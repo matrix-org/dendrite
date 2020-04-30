@@ -332,6 +332,7 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 		RoomID:     roomID,
 		UserID:     r.userID,
 		ServerName: server,
+		Content:    r.content,
 	}
 	fedJoinRes := federationSenderAPI.PerformJoinResponse{}
 	if err := r.fsAPI.PerformJoin(r.req.Context(), &fedJoinReq, &fedJoinRes); err != nil {
