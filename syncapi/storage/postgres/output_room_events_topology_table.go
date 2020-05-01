@@ -63,9 +63,13 @@ const selectPositionInTopologySQL = "" +
 	"SELECT topological_position FROM syncapi_output_room_events_topology" +
 	" WHERE event_id = $1"
 
+	// Select the max topological position for the room, then sort by stream position and take the highest,
+	// returning both topological and stream positions.
 const selectMaxPositionInTopologySQL = "" +
-	"SELECT MAX(topological_position), stream_position FROM syncapi_output_room_events_topology" +
-	" WHERE room_id = $1 ORDER BY stream_position DESC"
+	"SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
+	" WHERE topological_position=(" +
+	"SELECT MAX(topological_position) FROM syncapi_output_room_events_topology WHERE room_id=$1" +
+	") ORDER BY stream_position DESC LIMIT 1"
 
 const selectEventIDsFromPositionSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events_topology" +
