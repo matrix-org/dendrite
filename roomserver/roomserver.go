@@ -35,7 +35,7 @@ func SetupRoomServerComponent(
 	keyRing gomatrixserverlib.JSONVerifier,
 	fedClient *gomatrixserverlib.FederationClient,
 ) api.RoomserverInternalAPI {
-	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
+	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
