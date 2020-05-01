@@ -80,8 +80,8 @@ done <<< "${passed_but_expected_fail}"
 # TODO: Check that the same test doesn't appear twice in the whitelist|blacklist
 
 # Trim test output strings
-tests_to_add=$(echo -e $tests_to_add | xargs -d '\n')
-already_in_whitelist=$(echo -e $already_in_whitelist | xargs -d '\n')
+tests_to_add=$(echo -e $tests_to_add | xargs -d '\n\n')
+already_in_whitelist=$(echo -e $already_in_whitelist | xargs -d '\n\n')
 
 # Format output with markdown for buildkite annotation rendering purposes
 if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
