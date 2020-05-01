@@ -1,6 +1,24 @@
 GET /register yields a set of flows
 POST /register can create a user
 POST /register downcases capitals in usernames
+POST /register rejects registration of usernames with '!'
+POST /register rejects registration of usernames with '"'
+POST /register rejects registration of usernames with ':'
+POST /register rejects registration of usernames with '?'
+POST /register rejects registration of usernames with '\'
+POST /register rejects registration of usernames with '@'
+POST /register rejects registration of usernames with '['
+POST /register rejects registration of usernames with ']'
+POST /register rejects registration of usernames with '{'
+POST /register rejects registration of usernames with '|'
+POST /register rejects registration of usernames with '}'
+POST /register rejects registration of usernames with '£'
+POST /register rejects registration of usernames with 'é'
+POST /register rejects registration of usernames with '\n'
+POST /register rejects registration of usernames with '''
+GET /login yields a set of flows
+POST /login can log in as a user
+POST /login returns the same device_id as that in the request
 POST /login can log in as a user with just the local part of the id
 POST /login as non-existing user is rejected
 POST /login wrong password is rejected
