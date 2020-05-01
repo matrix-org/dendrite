@@ -91,14 +91,14 @@ fi
 if [ -n "${tests_to_add}" ]; then
 	echo "**ERROR**: The following tests passed but are not present in \`$2\`. Please append them to the file:"
     echo "\`\`\`"
-        echo -e "${tests_to_add}"
+    echo -e "${tests_to_add}"
     echo "\`\`\`"
 fi
 
 if [ -n "${already_in_whitelist}" ]; then
 	echo "**WARN**: Tests in the whitelist still marked as **expected fail**:"
     echo "\`\`\`"
-        echo -e "${already_in_whitelist}"
+    echo -e "${already_in_whitelist}"
     echo "\`\`\`"
 fi
 
