@@ -28,9 +28,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
-	fsAPI := base.CreateHTTPFederationSenderAPIs()
 	rsAPI := base.CreateHTTPRoomserverAPIs()
-	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
