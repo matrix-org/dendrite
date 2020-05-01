@@ -29,11 +29,11 @@ import (
 func GetEvent(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	eventID string,
 	origin gomatrixserverlib.ServerName,
 ) util.JSONResponse {
-	event, err := getEvent(ctx, request, query, eventID)
+	event, err := getEvent(ctx, request, rsAPI, eventID)
 	if err != nil {
 		return *err
 	}
@@ -52,11 +52,11 @@ func GetEvent(
 func getEvent(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	eventID string,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	var authResponse api.QueryServerAllowedToSeeEventResponse
-	err := query.QueryServerAllowedToSeeEvent(
+	err := rsAPI.QueryServerAllowedToSeeEvent(
 		ctx,
 		&api.QueryServerAllowedToSeeEventRequest{
 			EventID:    eventID,
@@ -75,7 +75,7 @@ func getEvent(
 	}
 
 	var eventsResponse api.QueryEventsByIDResponse
-	err = query.QueryEventsByID(
+	err = rsAPI.QueryEventsByID(
 		ctx,
 		&api.QueryEventsByIDRequest{EventIDs: []string{eventID}},
 		&eventsResponse,

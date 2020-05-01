@@ -39,7 +39,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, queryAPI api.RoomserverQueryAPI,
+	apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, rsAPI api.RoomserverInternalAPI,
 	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
@@ -66,7 +66,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return directory.SetVisibility(req, publicRoomsDB, queryAPI, device, vars["roomID"])
+			return directory.SetVisibility(req, publicRoomsDB, rsAPI, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
