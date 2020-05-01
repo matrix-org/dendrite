@@ -66,9 +66,9 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	res *api.PerformJoinResponse, // nolint:unparam
 ) error {
 	// Get the domain part of the room ID.
-	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
+	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
 	if err != nil {
-		return fmt.Errorf("supplied room alias %q in incorrect format", req.RoomIDOrAlias)
+		return fmt.Errorf("supplied room ID %q in incorrect format", req.RoomIDOrAlias)
 	}
 	req.ServerNames = append(req.ServerNames, domain)
 
@@ -134,10 +134,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// The room doesn't exist. First of all check if the room is a local
 		// room. If it is then there's nothing more to do - the room just
 		// hasn't been created yet.
-		_, domain, derr := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
-		if derr != nil {
-			return fmt.Errorf("room ID %q in incorrect format", req.RoomIDOrAlias)
-		} else if domain == r.Cfg.Matrix.ServerName {
+		if domain == r.Cfg.Matrix.ServerName {
 			return fmt.Errorf("error trying to join %q room: %w", req.RoomIDOrAlias, derr)
 		}
 
