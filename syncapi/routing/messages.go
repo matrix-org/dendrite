@@ -210,10 +210,6 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	// Sort the events to ensure we send them in the right order.
-	events = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
-		events,
-		gomatrixserverlib.TopologicalOrderByPrevEvents,
-	)
 	if r.backwardOrdering {
 		// This reverses the array from old->new to new->old
 		sort.SliceStable(events, func(i, j int) bool {
@@ -349,6 +345,18 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	return
 }
 
+type eventsByDepth []gomatrixserverlib.HeaderedEvent
+
+func (e eventsByDepth) Len() int {
+	return len(e)
+}
+func (e eventsByDepth) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+func (e eventsByDepth) Less(i, j int) bool {
+	return e[i].Depth() < e[j].Depth()
+}
+
 // backfill performs a backfill request over the federation on another
 // homeserver in the room.
 // See: https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid
@@ -375,17 +383,24 @@ func (r *messagesReq) backfill(roomID string, fromEventIDs []string, limit int) 
 	// Currently, this can race with live events for the room and cause problems. It's also just a bit unclear
 	// when you have multiple entry points to write events.
 
+	// we have to order these by depth, starting with the lowest because otherwise the topology tokens
+	// will skip over events that have the same depth but different stream positions due to the query which is:
+	//  - anything less than the depth OR
+	//  - anything with the same depth and a lower stream position.
+	sort.Sort(eventsByDepth(res.Events))
+
 	// Store the events in the database, while marking them as unfit to show
 	// up in responses to sync requests.
 	for i := range res.Events {
-		if _, err = r.db.WriteEvent(
+		_, err = r.db.WriteEvent(
 			r.ctx,
 			&res.Events[i],
 			[]gomatrixserverlib.HeaderedEvent{},
 			[]string{},
 			[]string{},
 			nil, true,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 	}

@@ -434,6 +434,7 @@ func (d *SyncServerDatasource) syncPositionTx(
 	}
 	sp.PDUPosition = types.StreamPosition(maxEventID)
 	sp.EDUTypingPosition = types.StreamPosition(d.eduCache.GetLatestSyncPosition())
+	sp.Type = types.PaginationTokenTypeStream
 	return
 }
 
@@ -658,6 +659,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 			backwardTopologyPos = types.StreamPosition(1)
 		} else {
 			backwardTopologyPos--
+			backwardTopologyStreamPos += 1000 // this has to be bigger than the number of events we backfill per request
 		}
 
 		// We don't include a device here as we don't need to send down
@@ -817,11 +819,13 @@ func (d *SyncServerDatasource) getBackwardTopologyPos(
 	if len(events) > 0 {
 		pos, spos, _ = d.topology.selectPositionInTopology(ctx, txn, events[0].EventID())
 	}
-	// TODO: I have no idea what this is doing.
+	// go to the previous position so we don't pull out the same event twice
+	// FIXME: This could be done more nicely by being explicit with inclusive/exclusive rules
 	if pos-1 <= 0 {
 		pos = types.StreamPosition(1)
 	} else {
 		pos = pos - 1
+		spos += 1000 // this has to be bigger than the number of events we backfill per request
 	}
 	return
 }
