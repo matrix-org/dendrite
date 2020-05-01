@@ -60,7 +60,7 @@ const selectEventIDsInRangeDESCSQL = "" +
 	" ORDER BY topological_position DESC, stream_position DESC LIMIT $6"
 
 const selectPositionInTopologySQL = "" +
-	"SELECT topological_position FROM syncapi_output_room_events_topology" +
+	"SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE event_id = $1"
 
 	// Select the max topological position for the room, then sort by stream position and take the highest,
@@ -163,8 +163,8 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 // topology of the room it belongs to.
 func (s *outputRoomEventsTopologyStatements) selectPositionInTopology(
 	ctx context.Context, eventID string,
-) (pos types.StreamPosition, err error) {
-	err = s.selectPositionInTopologyStmt.QueryRowContext(ctx, eventID).Scan(&pos)
+) (pos, spos types.StreamPosition, err error) {
+	err = s.selectPositionInTopologyStmt.QueryRowContext(ctx, eventID).Scan(&pos, &spos)
 	return
 }
 
