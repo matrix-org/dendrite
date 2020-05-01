@@ -10,11 +10,37 @@ import (
 
 const (
 	// FederationSenderPerformJoinRequestPath is the HTTP path for the PerformJoinRequest API.
+	FederationSenderPerformDirectoryLookupRequestPath = "/api/federationsender/performDirectoryLookup"
+
+	// FederationSenderPerformJoinRequestPath is the HTTP path for the PerformJoinRequest API.
 	FederationSenderPerformJoinRequestPath = "/api/federationsender/performJoinRequest"
 
 	// FederationSenderPerformLeaveRequestPath is the HTTP path for the PerformLeaveRequest API.
 	FederationSenderPerformLeaveRequestPath = "/api/federationsender/performLeaveRequest"
 )
+
+type PerformDirectoryLookupRequest struct {
+	RoomAlias  string                       `json:"room_alias"`
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+}
+
+type PerformDirectoryLookupResponse struct {
+	RoomID      string                         `json:"room_id"`
+	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
+}
+
+// Handle an instruction to make_join & send_join with a remote server.
+func (h *httpFederationSenderInternalAPI) PerformDirectoryLookup(
+	ctx context.Context,
+	request *PerformDirectoryLookupRequest,
+	response *PerformDirectoryLookupResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformDirectoryLookup")
+	defer span.Finish()
+
+	apiURL := h.federationSenderURL + FederationSenderPerformDirectoryLookupRequestPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
 
 type PerformJoinRequest struct {
 	RoomID     string                       `json:"room_id"`

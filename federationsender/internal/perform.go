@@ -11,6 +11,25 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// PerformLeaveRequest implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) PerformDirectoryLookup(
+	ctx context.Context,
+	request *api.PerformDirectoryLookupRequest,
+	response *api.PerformDirectoryLookupResponse,
+) (err error) {
+	dir, err := r.federation.LookupRoomAlias(
+		ctx,
+		request.ServerName,
+		request.RoomAlias,
+	)
+	if err != nil {
+		return err
+	}
+	response.RoomID = dir.RoomID
+	response.ServerNames = dir.Servers
+	return nil
+}
+
 // PerformJoinRequest implements api.FederationSenderInternalAPI
 func (r *FederationSenderInternalAPI) PerformJoin(
 	ctx context.Context,

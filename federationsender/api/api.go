@@ -8,6 +8,12 @@ import (
 
 // FederationSenderInternalAPI is used to query information from the federation sender.
 type FederationSenderInternalAPI interface {
+	// PerformDirectoryLookup looks up a remote room ID from a room alias.
+	PerformDirectoryLookup(
+		ctx context.Context,
+		request *PerformDirectoryLookupRequest,
+		response *PerformDirectoryLookupResponse,
+	) error
 	// Query the joined hosts and the membership events accounting for their participation in a room.
 	// Note that if a server has multiple users in the room, it will have multiple entries in the returned slice.
 	// See `QueryJoinedHostServerNamesInRoom` for a de-duplicated version.

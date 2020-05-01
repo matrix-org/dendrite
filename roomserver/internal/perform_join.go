@@ -21,10 +21,10 @@ func (r *RoomserverInternalAPI) PerformJoin(
 ) error {
 	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
-		return fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)
+		return fmt.Errorf("Supplied user ID %q in incorrect format", req.UserID)
 	}
 	if domain != r.Cfg.Matrix.ServerName {
-		return fmt.Errorf("user ID %q does not belong to this homeserver", req.UserID)
+		return fmt.Errorf("User %q does not belong to this homeserver", req.UserID)
 	}
 	if strings.HasPrefix(req.RoomIDOrAlias, "!") {
 		return r.performJoinRoomByID(ctx, req, res)
@@ -32,7 +32,7 @@ func (r *RoomserverInternalAPI) PerformJoin(
 	if strings.HasPrefix(req.RoomIDOrAlias, "#") {
 		return r.performJoinRoomByAlias(ctx, req, res)
 	}
-	return fmt.Errorf("unexpected sigil on room %q", req.RoomIDOrAlias)
+	return fmt.Errorf("Room ID or alias %q is invalid", req.RoomIDOrAlias)
 }
 
 func (r *RoomserverInternalAPI) performJoinRoomByAlias(
@@ -43,14 +43,39 @@ func (r *RoomserverInternalAPI) performJoinRoomByAlias(
 	// Get the domain part of the room alias.
 	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
 	if err != nil {
-		return fmt.Errorf("supplied room alias %q in incorrect format", req.RoomIDOrAlias)
+		return fmt.Errorf("Alias %q is not in the correct format", req.RoomIDOrAlias)
 	}
 	req.ServerNames = append(req.ServerNames, domain)
 
-	// Look up if we know this room alias.
-	roomID, err := r.DB.GetRoomIDForAlias(ctx, req.RoomIDOrAlias)
-	if err != nil {
-		return err
+	// Check if this alias matches our own server configuration. If it
+	// doesn't then we'll need to try a federated join.
+	var roomID string
+	if domain != r.Cfg.Matrix.ServerName {
+		// The alias isn't owned by us, so we will eed to try joining using
+		// a remote server.
+		dirReq := fsAPI.PerformDirectoryLookupRequest{
+			RoomAlias:  req.RoomIDOrAlias, // the room alias to lookup
+			ServerName: domain,            // the server to ask
+		}
+		dirRes := fsAPI.PerformDirectoryLookupResponse{}
+		err = r.fsAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
+		if err != nil {
+			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
+			return fmt.Errorf("Looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
+		}
+		roomID = dirRes.RoomID
+		req.ServerNames = append(req.ServerNames, dirRes.ServerNames...)
+	} else {
+		// Otherwise, look up if we know this room alias locally.
+		roomID, err = r.DB.GetRoomIDForAlias(ctx, req.RoomIDOrAlias)
+		if err != nil {
+			return fmt.Errorf("Lookup room alias %q failed: %w", req.RoomIDOrAlias, err)
+		}
+	}
+
+	// If the room ID is empty then we failed to look up the alias.
+	if roomID == "" {
+		return fmt.Errorf("Alias %q not found", req.RoomIDOrAlias)
 	}
 
 	// If we do, then pluck out the room ID and continue the join.
@@ -68,7 +93,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	// Get the domain part of the room ID.
 	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
 	if err != nil {
-		return fmt.Errorf("supplied room ID %q in incorrect format", req.RoomIDOrAlias)
+		return fmt.Errorf("Room ID %q is invalid", req.RoomIDOrAlias)
 	}
 	req.ServerNames = append(req.ServerNames, domain)
 
@@ -135,7 +160,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// room. If it is then there's nothing more to do - the room just
 		// hasn't been created yet.
 		if domain == r.Cfg.Matrix.ServerName {
-			return fmt.Errorf("room ID %q does not exist", req.RoomIDOrAlias)
+			return fmt.Errorf("Room ID %q does not exist", req.RoomIDOrAlias)
 		}
 
 		// Try joining by all of the supplied server names.
@@ -164,13 +189,13 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// servers then return an error saying such.
 		if !joined {
 			return fmt.Errorf(
-				"failed to join %q using %d server(s)",
+				"Failed to join %q using %d server(s)",
 				req.RoomIDOrAlias, len(req.ServerNames),
 			)
 		}
 
 	default:
-		return fmt.Errorf("error joining room %q: %w", req.RoomIDOrAlias, err)
+		return fmt.Errorf("Error joining room %q: %w", req.RoomIDOrAlias, err)
 	}
 
 	return nil
