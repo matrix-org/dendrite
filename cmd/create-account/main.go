@@ -63,7 +63,7 @@ func main() {
 
 	serverName := gomatrixserverlib.ServerName(*serverNameStr)
 
-	accountDB, err := accounts.NewDatabase(*database, serverName)
+	accountDB, err := accounts.NewDatabase(*database, nil, serverName)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -78,7 +78,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	deviceDB, err := devices.NewDatabase(*database, serverName)
+	deviceDB, err := devices.NewDatabase(*database, nil, serverName)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

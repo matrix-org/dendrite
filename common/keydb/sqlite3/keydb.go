@@ -44,7 +44,7 @@ func NewDatabase(
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (*Database, error) {
-	db, err := sqlutil.Open(common.SQLiteDriverName(), dataSourceName)
+	db, err := sqlutil.Open(common.SQLiteDriverName(), dataSourceName, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,7 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -37,11 +38,12 @@ type Database struct {
 // Returns an error if there was a problem talking to the database.
 func NewDatabase(
 	dataSourceName string,
+	dbProperties common.DbProperties,
 	serverName gomatrixserverlib.ServerName,
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (*Database, error) {
-	db, err := sqlutil.Open("postgres", dataSourceName)
+	db, err := sqlutil.Open("postgres", dataSourceName, dbProperties)
 	if err != nil {
 		return nil, err
 	}

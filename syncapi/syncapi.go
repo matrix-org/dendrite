@@ -42,7 +42,7 @@ func SetupSyncAPIComponent(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 ) {
-	syncDB, err := storage.NewSyncServerDatasource(string(base.Cfg.Database.SyncAPI))
+	syncDB, err := storage.NewSyncServerDatasource(string(base.Cfg.Database.SyncAPI), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}

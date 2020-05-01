@@ -19,6 +19,7 @@ package storage
 import (
 	"net/url"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/postgres"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
 )
@@ -27,17 +28,17 @@ const schemePostgres = "postgres"
 const schemeFile = "file"
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
+func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties common.DbProperties) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties)
 	}
 	switch uri.Scheme {
 	case schemePostgres:
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties)
 	case schemeFile:
 		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
 	default:
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName)
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties)
 	}
 }

@@ -37,7 +37,7 @@ type Database struct {
 func NewDatabase(dataSourceName string) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sqlutil.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
+	if result.db, err = sqlutil.Open(common.SQLiteDriverName(), dataSourceName, nil); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {

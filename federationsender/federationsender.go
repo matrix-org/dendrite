@@ -37,7 +37,7 @@ func SetupFederationSenderComponent(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 ) api.FederationSenderInternalAPI {
-	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
+	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}

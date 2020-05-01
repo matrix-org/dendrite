@@ -48,7 +48,7 @@ func SetupAppServiceAPIComponent(
 	transactionsCache *transactions.Cache,
 ) appserviceAPI.AppServiceQueryAPI {
 	// Create a connection to the appservice postgres DB
-	appserviceDB, err := storage.NewDatabase(string(base.Cfg.Database.AppService))
+	appserviceDB, err := storage.NewDatabase(string(base.Cfg.Database.AppService), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to appservice db")
 	}

@@ -32,7 +32,7 @@ func main() {
 	rsAPI := base.CreateHTTPRoomserverAPIs()
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
