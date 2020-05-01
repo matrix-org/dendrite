@@ -117,7 +117,8 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// The room doesn't exist. First of all check if the room is a local
 		// room. If it is then there's nothing more to do - the room just
 		// hasn't been created yet.
-		if _, domain, derr := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias); derr != nil {
+		_, domain, derr := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
+		if derr != nil {
 			return fmt.Errorf("room ID %q in incorrect format", req.RoomIDOrAlias)
 		} else if domain == r.Cfg.Matrix.ServerName {
 			return fmt.Errorf("error trying to join %q room: %w", req.RoomIDOrAlias, derr)
@@ -126,10 +127,10 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// Otherwise, if we've reached this point, the room isn't a local room
 		// and we should ask the federation sender to try and join for us.
 		fedReq := fsAPI.PerformJoinRequest{
-			RoomID:     req.RoomIDOrAlias,
-			UserID:     req.UserID,
-			ServerName: r.Cfg.Matrix.ServerName,
-			Content:    req.Content,
+			RoomID:     req.RoomIDOrAlias, // the room ID to try and join
+			UserID:     req.UserID,        // the user ID joining the room
+			ServerName: domain,            // the server to try joining with
+			Content:    req.Content,       // the membership event content
 		}
 		fedRes := fsAPI.PerformJoinResponse{}
 		err = r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
