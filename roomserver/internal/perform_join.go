@@ -135,7 +135,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// room. If it is then there's nothing more to do - the room just
 		// hasn't been created yet.
 		if domain == r.Cfg.Matrix.ServerName {
-			return fmt.Errorf("error trying to join %q room: %w", req.RoomIDOrAlias, derr)
+			return fmt.Errorf("room ID %q does not exist", req.RoomIDOrAlias)
 		}
 
 		// Try joining by all of the supplied server names.
