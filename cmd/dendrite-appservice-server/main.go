@@ -28,11 +28,11 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
-	alias, _, query := base.CreateHTTPRoomserverAPIs()
+	rsAPI := base.CreateHTTPRoomserverAPIs()
 	cache := transactions.New()
 
 	appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, alias, query, cache,
+		base, accountDB, deviceDB, federation, rsAPI, cache,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.AppServiceAPI), string(base.Cfg.Listen.AppServiceAPI))

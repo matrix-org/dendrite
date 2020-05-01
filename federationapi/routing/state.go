@@ -27,7 +27,7 @@ import (
 func GetState(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 ) util.JSONResponse {
 	eventID, err := parseEventIDParam(request)
@@ -35,7 +35,7 @@ func GetState(
 		return *err
 	}
 
-	state, err := getState(ctx, request, query, roomID, eventID)
+	state, err := getState(ctx, request, rsAPI, roomID, eventID)
 	if err != nil {
 		return *err
 	}
@@ -47,7 +47,7 @@ func GetState(
 func GetStateIDs(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 ) util.JSONResponse {
 	eventID, err := parseEventIDParam(request)
@@ -55,7 +55,7 @@ func GetStateIDs(
 		return *err
 	}
 
-	state, err := getState(ctx, request, query, roomID, eventID)
+	state, err := getState(ctx, request, rsAPI, roomID, eventID)
 	if err != nil {
 		return *err
 	}
@@ -94,11 +94,11 @@ func parseEventIDParam(
 func getState(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 	eventID string,
 ) (*gomatrixserverlib.RespState, *util.JSONResponse) {
-	event, resErr := getEvent(ctx, request, query, eventID)
+	event, resErr := getEvent(ctx, request, rsAPI, eventID)
 	if resErr != nil {
 		return nil, resErr
 	}
@@ -110,7 +110,7 @@ func getState(
 	authEventIDs := getIDsFromEventRef(event.AuthEvents())
 
 	var response api.QueryStateAndAuthChainResponse
-	err := query.QueryStateAndAuthChain(
+	err := rsAPI.QueryStateAndAuthChain(
 		ctx,
 		&api.QueryStateAndAuthChainRequest{
 			RoomID:       roomID,

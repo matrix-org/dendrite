@@ -34,7 +34,7 @@ type getMissingEventRequest struct {
 func GetMissingEvents(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 ) util.JSONResponse {
 	var gme getMissingEventRequest
@@ -46,7 +46,7 @@ func GetMissingEvents(
 	}
 
 	var eventsResponse api.QueryMissingEventsResponse
-	if err := query.QueryMissingEvents(
+	if err := rsAPI.QueryMissingEvents(
 		httpReq.Context(), &api.QueryMissingEventsRequest{
 			EarliestEvents: gme.EarliestEvents,
 			LatestEvents:   gme.LatestEvents,

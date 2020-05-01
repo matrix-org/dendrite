@@ -12,25 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package alias
+package internal
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"time"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
-// RoomserverAliasAPIDatabase has the storage APIs needed to implement the alias API.
-type RoomserverAliasAPIDatabase interface {
+// RoomserverInternalAPIDatabase has the storage APIs needed to implement the alias API.
+type RoomserverInternalAPIDatabase interface {
 	// Save a given room alias with the room ID it refers to.
 	// Returns an error if there was a problem talking to the database.
 	SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error
@@ -52,20 +47,11 @@ type RoomserverAliasAPIDatabase interface {
 	) (gomatrixserverlib.RoomVersion, error)
 }
 
-// RoomserverAliasAPI is an implementation of alias.RoomserverAliasAPI
-type RoomserverAliasAPI struct {
-	DB            RoomserverAliasAPIDatabase
-	Cfg           *config.Dendrite
-	InputAPI      roomserverAPI.RoomserverInputAPI
-	QueryAPI      roomserverAPI.RoomserverQueryAPI
-	AppserviceAPI appserviceAPI.AppServiceQueryAPI
-}
-
-// SetRoomAlias implements alias.RoomserverAliasAPI
-func (r *RoomserverAliasAPI) SetRoomAlias(
+// SetRoomAlias implements alias.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) SetRoomAlias(
 	ctx context.Context,
-	request *roomserverAPI.SetRoomAliasRequest,
-	response *roomserverAPI.SetRoomAliasResponse,
+	request *api.SetRoomAliasRequest,
+	response *api.SetRoomAliasResponse,
 ) error {
 	// Check if the alias isn't already referring to a room
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
@@ -91,11 +77,11 @@ func (r *RoomserverAliasAPI) SetRoomAlias(
 	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID)
 }
 
-// GetRoomIDForAlias implements alias.RoomserverAliasAPI
-func (r *RoomserverAliasAPI) GetRoomIDForAlias(
+// GetRoomIDForAlias implements alias.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) GetRoomIDForAlias(
 	ctx context.Context,
-	request *roomserverAPI.GetRoomIDForAliasRequest,
-	response *roomserverAPI.GetRoomIDForAliasResponse,
+	request *api.GetRoomIDForAliasRequest,
+	response *api.GetRoomIDForAliasResponse,
 ) error {
 	// Look up the room ID in the database
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
@@ -103,32 +89,38 @@ func (r *RoomserverAliasAPI) GetRoomIDForAlias(
 		return err
 	}
 
-	if roomID == "" {
-		// No room found locally, try our application services by making a call to
-		// the appservice component
-		aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
-		var aliasResp appserviceAPI.RoomAliasExistsResponse
-		if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
-			return err
-		}
+	/*
+		TODO: Why is this here? It creates an unnecessary dependency
+		from the roomserver to the appservice component, which should be
+		altogether optional.
 
-		if aliasResp.AliasExists {
-			roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
-			if err != nil {
+		if roomID == "" {
+			// No room found locally, try our application services by making a call to
+			// the appservice component
+			aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
+			var aliasResp appserviceAPI.RoomAliasExistsResponse
+			if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
 				return err
 			}
+
+			if aliasResp.AliasExists {
+				roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
+				if err != nil {
+					return err
+				}
+			}
 		}
-	}
+	*/
 
 	response.RoomID = roomID
 	return nil
 }
 
-// GetAliasesForRoomID implements alias.RoomserverAliasAPI
-func (r *RoomserverAliasAPI) GetAliasesForRoomID(
+// GetAliasesForRoomID implements alias.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) GetAliasesForRoomID(
 	ctx context.Context,
-	request *roomserverAPI.GetAliasesForRoomIDRequest,
-	response *roomserverAPI.GetAliasesForRoomIDResponse,
+	request *api.GetAliasesForRoomIDRequest,
+	response *api.GetAliasesForRoomIDResponse,
 ) error {
 	// Look up the aliases in the database for the given RoomID
 	aliases, err := r.DB.GetAliasesForRoomID(ctx, request.RoomID)
@@ -140,11 +132,11 @@ func (r *RoomserverAliasAPI) GetAliasesForRoomID(
 	return nil
 }
 
-// GetCreatorIDForAlias implements alias.RoomserverAliasAPI
-func (r *RoomserverAliasAPI) GetCreatorIDForAlias(
+// GetCreatorIDForAlias implements alias.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) GetCreatorIDForAlias(
 	ctx context.Context,
-	request *roomserverAPI.GetCreatorIDForAliasRequest,
-	response *roomserverAPI.GetCreatorIDForAliasResponse,
+	request *api.GetCreatorIDForAliasRequest,
+	response *api.GetCreatorIDForAliasResponse,
 ) error {
 	// Look up the aliases in the database for the given RoomID
 	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
@@ -156,11 +148,11 @@ func (r *RoomserverAliasAPI) GetCreatorIDForAlias(
 	return nil
 }
 
-// RemoveRoomAlias implements alias.RoomserverAliasAPI
-func (r *RoomserverAliasAPI) RemoveRoomAlias(
+// RemoveRoomAlias implements alias.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	ctx context.Context,
-	request *roomserverAPI.RemoveRoomAliasRequest,
-	response *roomserverAPI.RemoveRoomAliasResponse,
+	request *api.RemoveRoomAliasRequest,
+	response *api.RemoveRoomAliasResponse,
 ) error {
 	// Look up the room ID in the database
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
@@ -186,7 +178,7 @@ type roomAliasesContent struct {
 
 // Build the updated m.room.aliases event to send to the room after addition or
 // removal of an alias
-func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
+func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	ctx context.Context, userID string, roomID string,
 ) error {
 	serverName := string(r.Cfg.Matrix.ServerName)
@@ -222,12 +214,12 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	if len(eventsNeeded.Tuples()) == 0 {
 		return errors.New("expecting state tuples for event builder, got none")
 	}
-	req := roomserverAPI.QueryLatestEventsAndStateRequest{
+	req := api.QueryLatestEventsAndStateRequest{
 		RoomID:       roomID,
 		StateToFetch: eventsNeeded.Tuples(),
 	}
-	var res roomserverAPI.QueryLatestEventsAndStateResponse
-	if err = r.QueryAPI.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
+	var res api.QueryLatestEventsAndStateResponse
+	if err = r.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
 		return err
 	}
 	builder.Depth = res.Depth
@@ -263,91 +255,17 @@ func (r *RoomserverAliasAPI) sendUpdatedAliasesEvent(
 	}
 
 	// Create the request
-	ire := roomserverAPI.InputRoomEvent{
-		Kind:         roomserverAPI.KindNew,
+	ire := api.InputRoomEvent{
+		Kind:         api.KindNew,
 		Event:        event.Headered(roomVersion),
 		AuthEventIDs: event.AuthEventIDs(),
 		SendAsServer: serverName,
 	}
-	inputReq := roomserverAPI.InputRoomEventsRequest{
-		InputRoomEvents: []roomserverAPI.InputRoomEvent{ire},
+	inputReq := api.InputRoomEventsRequest{
+		InputRoomEvents: []api.InputRoomEvent{ire},
 	}
-	var inputRes roomserverAPI.InputRoomEventsResponse
+	var inputRes api.InputRoomEventsResponse
 
 	// Send the request
-	return r.InputAPI.InputRoomEvents(ctx, &inputReq, &inputRes)
-}
-
-// SetupHTTP adds the RoomserverAliasAPI handlers to the http.ServeMux.
-func (r *RoomserverAliasAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(
-		roomserverAPI.RoomserverSetRoomAliasPath,
-		common.MakeInternalAPI("setRoomAlias", func(req *http.Request) util.JSONResponse {
-			var request roomserverAPI.SetRoomAliasRequest
-			var response roomserverAPI.SetRoomAliasResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.SetRoomAlias(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		roomserverAPI.RoomserverGetRoomIDForAliasPath,
-		common.MakeInternalAPI("GetRoomIDForAlias", func(req *http.Request) util.JSONResponse {
-			var request roomserverAPI.GetRoomIDForAliasRequest
-			var response roomserverAPI.GetRoomIDForAliasResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.GetRoomIDForAlias(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		roomserverAPI.RoomserverGetCreatorIDForAliasPath,
-		common.MakeInternalAPI("GetCreatorIDForAlias", func(req *http.Request) util.JSONResponse {
-			var request roomserverAPI.GetCreatorIDForAliasRequest
-			var response roomserverAPI.GetCreatorIDForAliasResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.GetCreatorIDForAlias(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		roomserverAPI.RoomserverGetAliasesForRoomIDPath,
-		common.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
-			var request roomserverAPI.GetAliasesForRoomIDRequest
-			var response roomserverAPI.GetAliasesForRoomIDResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.GetAliasesForRoomID(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		roomserverAPI.RoomserverRemoveRoomAliasPath,
-		common.MakeInternalAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
-			var request roomserverAPI.RemoveRoomAliasRequest
-			var response roomserverAPI.RemoveRoomAliasResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.RemoveRoomAlias(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
+	return r.InputRoomEvents(ctx, &inputReq, &inputRes)
 }

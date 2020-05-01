@@ -28,12 +28,11 @@ func main() {
 	federation := base.CreateFederationClient()
 	keyDB := base.CreateKeyDB()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
-
-	_, input, query := base.CreateHTTPRoomserverAPIs()
-
-	federationsender.SetupFederationSenderComponent(
-		base, federation, query, input, &keyRing,
+	rsAPI := base.CreateHTTPRoomserverAPIs()
+	fsAPI := federationsender.SetupFederationSenderComponent(
+		base, federation, rsAPI, &keyRing,
 	)
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender), string(base.Cfg.Listen.FederationSender))
 

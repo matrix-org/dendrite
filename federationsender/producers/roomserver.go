@@ -23,16 +23,16 @@ import (
 
 // RoomserverProducer produces events for the roomserver to consume.
 type RoomserverProducer struct {
-	InputAPI   api.RoomserverInputAPI
+	InputAPI   api.RoomserverInternalAPI
 	serverName gomatrixserverlib.ServerName
 }
 
 // NewRoomserverProducer creates a new RoomserverProducer
 func NewRoomserverProducer(
-	inputAPI api.RoomserverInputAPI, serverName gomatrixserverlib.ServerName,
+	rsAPI api.RoomserverInternalAPI, serverName gomatrixserverlib.ServerName,
 ) *RoomserverProducer {
 	return &RoomserverProducer{
-		InputAPI:   inputAPI,
+		InputAPI:   rsAPI,
 		serverName: serverName,
 	}
 }

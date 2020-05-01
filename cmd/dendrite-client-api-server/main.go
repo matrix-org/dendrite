@@ -36,13 +36,14 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
 	asQuery := base.CreateHTTPAppServiceAPIs()
-	alias, input, query := base.CreateHTTPRoomserverAPIs()
+	rsAPI := base.CreateHTTPRoomserverAPIs()
 	fsAPI := base.CreateHTTPFederationSenderAPIs()
+	rsAPI.SetFederationSenderAPI(fsAPI)
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, &keyRing,
-		alias, input, query, eduInputAPI, asQuery, transactions.New(), fsAPI,
+		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))

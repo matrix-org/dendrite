@@ -39,7 +39,7 @@ type getJoinedRoomsResponse struct {
 func GetMemberships(
 	req *http.Request, device *authtypes.Device, roomID string, joinedOnly bool,
 	_ *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	queryReq := api.QueryMembershipsForRoomRequest{
 		JoinedOnly: joinedOnly,
@@ -47,8 +47,8 @@ func GetMemberships(
 		Sender:     device.UserID,
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
-	if err := queryAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryMembershipsForRoom failed")
+	if err := rsAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
 		return jsonerror.InternalServerError()
 	}
 

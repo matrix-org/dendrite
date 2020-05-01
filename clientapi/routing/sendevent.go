@@ -45,13 +45,13 @@ func SendEvent(
 	device *authtypes.Device,
 	roomID, eventType string, txnID, stateKey *string,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	producer *producers.RoomserverProducer,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -65,7 +65,7 @@ func SendEvent(
 		}
 	}
 
-	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, queryAPI)
+	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, rsAPI)
 	if resErr != nil {
 		return *resErr
 	}
@@ -115,7 +115,7 @@ func generateSendEvent(
 	device *authtypes.Device,
 	roomID, eventType string, stateKey *string,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request
 	userID := device.UserID
@@ -148,7 +148,7 @@ func generateSendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := common.BuildEvent(req.Context(), &builder, cfg, evTime, queryAPI, &queryRes)
+	e, err := common.BuildEvent(req.Context(), &builder, cfg, evTime, rsAPI, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,

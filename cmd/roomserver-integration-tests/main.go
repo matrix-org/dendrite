@@ -209,7 +209,7 @@ func writeToRoomServer(input []string, roomserverURL string) error {
 			return err
 		}
 	}
-	x, err := api.NewRoomserverInputAPIHTTP(roomserverURL, &http.Client{Timeout: timeoutHTTP})
+	x, err := api.NewRoomserverInternalAPIHTTP(roomserverURL, &http.Client{Timeout: timeoutHTTP}, nil)
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func writeToRoomServer(input []string, roomserverURL string) error {
 // Once those messages have been written it runs the checkQueries function passing
 // a api.RoomserverQueryAPI client. The caller can use this function to check the
 // behaviour of the query API.
-func testRoomserver(input []string, wantOutput []string, checkQueries func(api.RoomserverQueryAPI)) {
+func testRoomserver(input []string, wantOutput []string, checkQueries func(api.RoomserverInternalAPI)) {
 	dir, err := ioutil.TempDir("", "room-server-test")
 	if err != nil {
 		panic(err)
@@ -276,7 +276,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	cmd.Args = []string{"dendrite-room-server", "--config", filepath.Join(dir, test.ConfigFile)}
 
 	gotOutput, err := runAndReadFromTopic(cmd, cfg.RoomServerURL()+"/metrics", doInput, outputTopic, len(wantOutput), func() {
-		queryAPI, _ := api.NewRoomserverQueryAPIHTTP("http://"+string(cfg.Listen.RoomServer), &http.Client{Timeout: timeoutHTTP}, cache)
+		queryAPI, _ := api.NewRoomserverInternalAPIHTTP("http://"+string(cfg.Listen.RoomServer), &http.Client{Timeout: timeoutHTTP}, cache)
 		checkQueries(queryAPI)
 	})
 	if err != nil {
@@ -410,7 +410,7 @@ func main() {
 		}}`,
 	}
 
-	testRoomserver(input, want, func(q api.RoomserverQueryAPI) {
+	testRoomserver(input, want, func(q api.RoomserverInternalAPI) {
 		var response api.QueryLatestEventsAndStateResponse
 		if err := q.QueryLatestEventsAndState(
 			context.Background(),

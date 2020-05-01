@@ -14,16 +14,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package query
+package internal
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -35,17 +31,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// RoomserverQueryAPI is an implementation of api.RoomserverQueryAPI
-type RoomserverQueryAPI struct {
-	DB             storage.Database
-	ImmutableCache caching.ImmutableCache
-	ServerName     gomatrixserverlib.ServerName
-	KeyRing        gomatrixserverlib.JSONVerifier
-	FedClient      *gomatrixserverlib.FederationClient
-}
-
-// QueryLatestEventsAndState implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
+// QueryLatestEventsAndState implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryLatestEventsAndState(
 	ctx context.Context,
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
@@ -104,8 +91,8 @@ func (r *RoomserverQueryAPI) QueryLatestEventsAndState(
 	return nil
 }
 
-// QueryStateAfterEvents implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryStateAfterEvents(
+// QueryStateAfterEvents implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryStateAfterEvents(
 	ctx context.Context,
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
@@ -160,8 +147,8 @@ func (r *RoomserverQueryAPI) QueryStateAfterEvents(
 	return nil
 }
 
-// QueryEventsByID implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryEventsByID(
+// QueryEventsByID implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryEventsByID(
 	ctx context.Context,
 	request *api.QueryEventsByIDRequest,
 	response *api.QueryEventsByIDResponse,
@@ -195,7 +182,7 @@ func (r *RoomserverQueryAPI) QueryEventsByID(
 	return nil
 }
 
-func (r *RoomserverQueryAPI) loadStateEvents(
+func (r *RoomserverInternalAPI) loadStateEvents(
 	ctx context.Context, stateEntries []types.StateEntry,
 ) ([]gomatrixserverlib.Event, error) {
 	eventNIDs := make([]types.EventNID, len(stateEntries))
@@ -205,7 +192,7 @@ func (r *RoomserverQueryAPI) loadStateEvents(
 	return r.loadEvents(ctx, eventNIDs)
 }
 
-func (r *RoomserverQueryAPI) loadEvents(
+func (r *RoomserverInternalAPI) loadEvents(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]gomatrixserverlib.Event, error) {
 	stateEvents, err := r.DB.Events(ctx, eventNIDs)
@@ -220,8 +207,8 @@ func (r *RoomserverQueryAPI) loadEvents(
 	return result, nil
 }
 
-// QueryMembershipForUser implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryMembershipForUser(
+// QueryMembershipForUser implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryMembershipForUser(
 	ctx context.Context,
 	request *api.QueryMembershipForUserRequest,
 	response *api.QueryMembershipForUserResponse,
@@ -251,8 +238,8 @@ func (r *RoomserverQueryAPI) QueryMembershipForUser(
 	return nil
 }
 
-// QueryMembershipsForRoom implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryMembershipsForRoom(
+// QueryMembershipsForRoom implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryMembershipsForRoom(
 	ctx context.Context,
 	request *api.QueryMembershipsForRoomRequest,
 	response *api.QueryMembershipsForRoomResponse,
@@ -366,8 +353,8 @@ func getMembershipsAtState(
 	return events, nil
 }
 
-// QueryInvitesForUser implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryInvitesForUser(
+// QueryInvitesForUser implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryInvitesForUser(
 	ctx context.Context,
 	request *api.QueryInvitesForUserRequest,
 	response *api.QueryInvitesForUserResponse,
@@ -400,8 +387,8 @@ func (r *RoomserverQueryAPI) QueryInvitesForUser(
 	return nil
 }
 
-// QueryServerAllowedToSeeEvent implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
+// QueryServerAllowedToSeeEvent implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
 	request *api.QueryServerAllowedToSeeEventRequest,
 	response *api.QueryServerAllowedToSeeEventResponse,
@@ -424,7 +411,7 @@ func (r *RoomserverQueryAPI) QueryServerAllowedToSeeEvent(
 	return
 }
 
-func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
+func (r *RoomserverInternalAPI) checkServerAllowedToSeeEvent(
 	ctx context.Context, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
 ) (bool, error) {
 	roomState := state.NewStateResolution(r.DB)
@@ -443,8 +430,8 @@ func (r *RoomserverQueryAPI) checkServerAllowedToSeeEvent(
 	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
 }
 
-// QueryMissingEvents implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryMissingEvents(
+// QueryMissingEvents implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryMissingEvents(
 	ctx context.Context,
 	request *api.QueryMissingEventsRequest,
 	response *api.QueryMissingEventsResponse,
@@ -489,7 +476,7 @@ func (r *RoomserverQueryAPI) QueryMissingEvents(
 }
 
 // QueryBackfill implements api.RoomServerQueryAPI
-func (r *RoomserverQueryAPI) QueryBackfill(
+func (r *RoomserverInternalAPI) QueryBackfill(
 	ctx context.Context,
 	request *api.QueryBackfillRequest,
 	response *api.QueryBackfillResponse,
@@ -542,7 +529,7 @@ func (r *RoomserverQueryAPI) QueryBackfill(
 	return err
 }
 
-func (r *RoomserverQueryAPI) backfillViaFederation(ctx context.Context, req *api.QueryBackfillRequest, res *api.QueryBackfillResponse) error {
+func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *api.QueryBackfillRequest, res *api.QueryBackfillResponse) error {
 	roomVer, err := r.DB.GetRoomVersionForRoom(ctx, req.RoomID)
 	if err != nil {
 		return fmt.Errorf("backfillViaFederation: unknown room version for room %s : %w", req.RoomID, err)
@@ -600,7 +587,7 @@ func (r *RoomserverQueryAPI) backfillViaFederation(ctx context.Context, req *api
 	return nil
 }
 
-func (r *RoomserverQueryAPI) isServerCurrentlyInRoom(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
+func (r *RoomserverInternalAPI) isServerCurrentlyInRoom(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
 	roomNID, err := r.DB.RoomNID(ctx, roomID)
 	if err != nil {
 		return false, err
@@ -624,7 +611,7 @@ func (r *RoomserverQueryAPI) isServerCurrentlyInRoom(ctx context.Context, server
 
 // fetchAndStoreMissingEvents does a best-effort fetch and store of missing events specified in stateIDs. Returns no error as it is just
 // best effort.
-func (r *RoomserverQueryAPI) fetchAndStoreMissingEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
+func (r *RoomserverInternalAPI) fetchAndStoreMissingEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
 	backfillRequester *backfillRequester, stateIDs []string) {
 
 	servers := backfillRequester.servers
@@ -684,7 +671,7 @@ func (r *RoomserverQueryAPI) fetchAndStoreMissingEvents(ctx context.Context, roo
 
 // TODO: Remove this when we have tests to assert correctness of this function
 // nolint:gocyclo
-func (r *RoomserverQueryAPI) scanEventTree(
+func (r *RoomserverInternalAPI) scanEventTree(
 	ctx context.Context, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,
 ) ([]types.EventNID, error) {
@@ -777,8 +764,8 @@ BFSLoop:
 	return resultNIDs, err
 }
 
-// QueryStateAndAuthChain implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
+// QueryStateAndAuthChain implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryStateAndAuthChain(
 	ctx context.Context,
 	request *api.QueryStateAndAuthChainRequest,
 	response *api.QueryStateAndAuthChainResponse,
@@ -837,7 +824,7 @@ func (r *RoomserverQueryAPI) QueryStateAndAuthChain(
 	return err
 }
 
-func (r *RoomserverQueryAPI) loadStateAtEventIDs(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+func (r *RoomserverInternalAPI) loadStateAtEventIDs(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(r.DB)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
@@ -942,8 +929,8 @@ func persistEvents(ctx context.Context, db storage.Database, events []gomatrixse
 	return roomNID, backfilledEventMap
 }
 
-// QueryRoomVersionCapabilities implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
+// QueryRoomVersionCapabilities implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryRoomVersionCapabilities(
 	ctx context.Context,
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
@@ -960,8 +947,8 @@ func (r *RoomserverQueryAPI) QueryRoomVersionCapabilities(
 	return nil
 }
 
-// QueryRoomVersionCapabilities implements api.RoomserverQueryAPI
-func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
+// QueryRoomVersionCapabilities implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) QueryRoomVersionForRoom(
 	ctx context.Context,
 	request *api.QueryRoomVersionForRoomRequest,
 	response *api.QueryRoomVersionForRoomResponse,
@@ -978,177 +965,4 @@ func (r *RoomserverQueryAPI) QueryRoomVersionForRoom(
 	response.RoomVersion = roomVersion
 	r.ImmutableCache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	return nil
-}
-
-// SetupHTTP adds the RoomserverQueryAPI handlers to the http.ServeMux.
-// nolint: gocyclo
-func (r *RoomserverQueryAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(
-		api.RoomserverQueryLatestEventsAndStatePath,
-		common.MakeInternalAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
-			var request api.QueryLatestEventsAndStateRequest
-			var response api.QueryLatestEventsAndStateResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryLatestEventsAndState(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryStateAfterEventsPath,
-		common.MakeInternalAPI("queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
-			var request api.QueryStateAfterEventsRequest
-			var response api.QueryStateAfterEventsResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryStateAfterEvents(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryEventsByIDPath,
-		common.MakeInternalAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
-			var request api.QueryEventsByIDRequest
-			var response api.QueryEventsByIDResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryEventsByID(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryMembershipForUserPath,
-		common.MakeInternalAPI("QueryMembershipForUser", func(req *http.Request) util.JSONResponse {
-			var request api.QueryMembershipForUserRequest
-			var response api.QueryMembershipForUserResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryMembershipForUser(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryMembershipsForRoomPath,
-		common.MakeInternalAPI("queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
-			var request api.QueryMembershipsForRoomRequest
-			var response api.QueryMembershipsForRoomResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryMembershipsForRoom(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryInvitesForUserPath,
-		common.MakeInternalAPI("queryInvitesForUser", func(req *http.Request) util.JSONResponse {
-			var request api.QueryInvitesForUserRequest
-			var response api.QueryInvitesForUserResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryInvitesForUser(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryServerAllowedToSeeEventPath,
-		common.MakeInternalAPI("queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
-			var request api.QueryServerAllowedToSeeEventRequest
-			var response api.QueryServerAllowedToSeeEventResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryServerAllowedToSeeEvent(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryMissingEventsPath,
-		common.MakeInternalAPI("queryMissingEvents", func(req *http.Request) util.JSONResponse {
-			var request api.QueryMissingEventsRequest
-			var response api.QueryMissingEventsResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryMissingEvents(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryStateAndAuthChainPath,
-		common.MakeInternalAPI("queryStateAndAuthChain", func(req *http.Request) util.JSONResponse {
-			var request api.QueryStateAndAuthChainRequest
-			var response api.QueryStateAndAuthChainResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryStateAndAuthChain(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryBackfillPath,
-		common.MakeInternalAPI("QueryBackfill", func(req *http.Request) util.JSONResponse {
-			var request api.QueryBackfillRequest
-			var response api.QueryBackfillResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryBackfill(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryRoomVersionCapabilitiesPath,
-		common.MakeInternalAPI("QueryRoomVersionCapabilities", func(req *http.Request) util.JSONResponse {
-			var request api.QueryRoomVersionCapabilitiesRequest
-			var response api.QueryRoomVersionCapabilitiesResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryRoomVersionCapabilities(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	servMux.Handle(
-		api.RoomserverQueryRoomVersionForRoomPath,
-		common.MakeInternalAPI("QueryRoomVersionForRoom", func(req *http.Request) util.JSONResponse {
-			var request api.QueryRoomVersionForRoomRequest
-			var response api.QueryRoomVersionForRoomResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryRoomVersionForRoom(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 }
