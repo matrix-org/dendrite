@@ -137,13 +137,13 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *authtypes.Device,
 	cfg *config.Dendrite, producer *producers.RoomserverProducer,
-	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI, asAPI)
+	return createRoom(req, device, cfg, roomID, producer, accountDB, rsAPI, asAPI)
 }
 
 // createRoom implements /createRoom
@@ -151,7 +151,7 @@ func CreateRoom(
 func createRoom(
 	req *http.Request, device *authtypes.Device,
 	cfg *config.Dendrite, roomID string, producer *producers.RoomserverProducer,
-	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
@@ -340,7 +340,7 @@ func createRoom(
 		}
 
 		var aliasResp roomserverAPI.SetRoomAliasResponse
-		err = aliasAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
+		err = rsAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
 			return jsonerror.InternalServerError()

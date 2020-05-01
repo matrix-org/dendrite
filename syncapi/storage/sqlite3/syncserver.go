@@ -80,7 +80,7 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = d.prepare(); err != nil {
@@ -194,7 +194,7 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.topology.insertEventInTopology(ctx, txn, ev); err != nil {
+		if err = d.topology.insertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return err
 		}
 
@@ -281,14 +281,16 @@ func (d *SyncServerDatasource) GetEventsInRange(
 	// events must be retrieved from the rooms' topology table rather than the
 	// table contaning the syncapi server's whole stream of events.
 	if from.Type == types.PaginationTokenTypeTopology {
+		// TODO: ARGH CONFUSING
 		// Determine the backward and forward limit, i.e. the upper and lower
 		// limits to the selection in the room's topology, from the direction.
-		var backwardLimit, forwardLimit types.StreamPosition
+		var backwardLimit, forwardLimit, forwardMicroLimit types.StreamPosition
 		if backwardOrdering {
 			// Backward ordering is antichronological (latest event to oldest
 			// one).
 			backwardLimit = to.PDUPosition
 			forwardLimit = from.PDUPosition
+			forwardMicroLimit = from.EDUTypingPosition
 		} else {
 			// Forward ordering is chronological (oldest event to latest one).
 			backwardLimit = from.PDUPosition
@@ -298,7 +300,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		// Select the event IDs from the defined range.
 		var eIDs []string
 		eIDs, err = d.topology.selectEventIDsInRange(
-			ctx, nil, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
+			ctx, nil, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
 		)
 		if err != nil {
 			return
@@ -328,8 +330,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 			return
 		}
 	}
-
-	return
+	return events, err
 }
 
 // SyncPosition returns the latest positions for syncing.
@@ -353,7 +354,7 @@ func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
 // room.
 func (d *SyncServerDatasource) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
-) (types.StreamPosition, error) {
+) (types.StreamPosition, types.StreamPosition, error) {
 	return d.topology.selectMaxPositionInTopology(ctx, nil, roomID)
 }
 
@@ -372,7 +373,7 @@ func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 
 func (d *SyncServerDatasource) EventPositionInTopology(
 	ctx context.Context, eventID string,
-) (types.StreamPosition, error) {
+) (depth types.StreamPosition, stream types.StreamPosition, err error) {
 	return d.topology.selectPositionInTopology(ctx, nil, eventID)
 }
 
@@ -651,8 +652,8 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 
 		// Retrieve the backward topology position, i.e. the position of the
 		// oldest event in the room's topology.
-		var backwardTopologyPos types.StreamPosition
-		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
+		var backwardTopologyPos, backwardTopologyStreamPos types.StreamPosition
+		backwardTopologyPos, backwardTopologyStreamPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 		if backwardTopologyPos-1 <= 0 {
 			backwardTopologyPos = types.StreamPosition(1)
 		} else {
@@ -665,7 +666,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
+			types.PaginationTokenTypeTopology, backwardTopologyPos, backwardTopologyStreamPos,
 		).String()
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
@@ -812,10 +813,11 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 func (d *SyncServerDatasource) getBackwardTopologyPos(
 	ctx context.Context, txn *sql.Tx,
 	events []types.StreamEvent,
-) (pos types.StreamPosition) {
+) (pos, spos types.StreamPosition) {
 	if len(events) > 0 {
-		pos, _ = d.topology.selectPositionInTopology(ctx, txn, events[0].EventID())
+		pos, spos, _ = d.topology.selectPositionInTopology(ctx, txn, events[0].EventID())
 	}
+	// TODO: I have no idea what this is doing.
 	if pos-1 <= 0 {
 		pos = types.StreamPosition(1)
 	} else {
@@ -853,14 +855,14 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	}
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents)
-	backwardTopologyPos := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
+	backwardTopologyPos, backwardStreamPos := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
 
 	switch delta.membership {
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
 
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
+			types.PaginationTokenTypeTopology, backwardTopologyPos, backwardStreamPos,
 		).String()
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
@@ -873,7 +875,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
 		lr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
+			types.PaginationTokenTypeTopology, backwardTopologyPos, backwardStreamPos,
 		).String()
 		lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true

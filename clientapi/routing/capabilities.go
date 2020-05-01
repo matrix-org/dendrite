@@ -26,11 +26,11 @@ import (
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
 func GetCapabilities(
-	req *http.Request, queryAPI roomserverAPI.RoomserverQueryAPI,
+	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 	roomVersionsQueryReq := roomserverAPI.QueryRoomVersionCapabilitiesRequest{}
 	roomVersionsQueryRes := roomserverAPI.QueryRoomVersionCapabilitiesResponse{}
-	if err := queryAPI.QueryRoomVersionCapabilities(
+	if err := rsAPI.QueryRoomVersionCapabilities(
 		req.Context(),
 		&roomVersionsQueryReq,
 		&roomVersionsQueryRes,

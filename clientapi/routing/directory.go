@@ -46,7 +46,7 @@ func DirectoryRoom(
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
-	rsAPI roomserverAPI.RoomserverAliasAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	fedSenderAPI federationSenderAPI.FederationSenderInternalAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
@@ -115,7 +115,7 @@ func SetLocalAlias(
 	device *authtypes.Device,
 	alias string,
 	cfg *config.Dendrite,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	aliasAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', alias)
 	if err != nil {
@@ -190,7 +190,7 @@ func RemoveLocalAlias(
 	req *http.Request,
 	device *authtypes.Device,
 	alias string,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	aliasAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 
 	creatorQueryReq := roomserverAPI.GetCreatorIDForAliasRequest{

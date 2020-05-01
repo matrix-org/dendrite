@@ -1,4 +1,4 @@
-package query
+package internal
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/federationsender/query/perform"
+	"github.com/matrix-org/dendrite/federationsender/internal/perform"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"

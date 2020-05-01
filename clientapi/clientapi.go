@@ -38,15 +38,13 @@ func SetupClientAPIComponent(
 	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
-	inputAPI roomserverAPI.RoomserverInputAPI,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
+	roomserverProducer := producers.NewRoomserverProducer(rsAPI)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 
 	userUpdateProducer := &producers.UserUpdateProducer{
@@ -60,14 +58,14 @@ func SetupClientAPIComponent(
 	}
 
 	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, queryAPI,
+		base.Cfg, base.KafkaConsumer, accountsDB, rsAPI,
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	routing.Setup(
-		base.APIMux, base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
+		base.APIMux, base.Cfg, roomserverProducer, rsAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
 		syncProducer, eduProducer, transactionsCache, fsAPI,
 	)

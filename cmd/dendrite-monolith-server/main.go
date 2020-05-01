@@ -57,28 +57,34 @@ func main() {
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
-	alias, input, query := roomserver.SetupRoomServerComponent(base, keyRing, federation)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
-	asQuery := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
+	rsAPI := roomserver.SetupRoomServerComponent(
+		base, keyRing, federation,
 	)
-	fsAPI := federationsender.SetupFederationSenderComponent(base, federation, query, input, &keyRing)
-	input.SetFederationSenderAPI(fsAPI)
+	eduInputAPI := eduserver.SetupEDUServerComponent(
+		base, cache.New(),
+	)
+	asAPI := appservice.SetupAppServiceAPIComponent(
+		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
+	)
+	fsAPI := federationsender.SetupFederationSenderComponent(
+		base, federation, rsAPI, &keyRing,
+	)
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
-		federation, &keyRing, alias, input, query,
-		eduInputAPI, asQuery, transactions.New(), fsAPI,
+		federation, &keyRing, rsAPI,
+		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fsAPI, eduProducer)
+	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asAPI, fsAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, query, federation, nil)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
+	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
 	httpHandler := common.WrapHandlerInCORS(base.APIMux)
 

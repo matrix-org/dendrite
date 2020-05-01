@@ -18,11 +18,15 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
 )
 
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (Database, error) {
+func NewDatabase(
+	dataSourceName string,
+	dbProperties common.DbProperties, // nolint:unparam
+) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot use postgres implementation")

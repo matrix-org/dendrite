@@ -31,8 +31,8 @@ func main() {
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
 	fsAPI := base.CreateHTTPFederationSenderAPIs()
-	_, input, _ := roomserver.SetupRoomServerComponent(base, keyRing, federation)
-	input.SetFederationSenderAPI(fsAPI)
+	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer), string(base.Cfg.Listen.RoomServer))
 

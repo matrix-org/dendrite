@@ -87,7 +87,7 @@ var (
 func CheckAndProcessInvite(
 	ctx context.Context,
 	device *authtypes.Device, body *MembershipRequest, cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI, db accounts.Database,
+	rsAPI api.RoomserverInternalAPI, db accounts.Database,
 	producer *producers.RoomserverProducer, membership string, roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
@@ -112,7 +112,7 @@ func CheckAndProcessInvite(
 		// "m.room.third_party_invite" have to be emitted from the data in
 		// storeInviteRes.
 		err = emit3PIDInviteEvent(
-			ctx, body, storeInviteRes, device, roomID, cfg, queryAPI, producer, evTime,
+			ctx, body, storeInviteRes, device, roomID, cfg, rsAPI, producer, evTime,
 		)
 		inviteStoredOnIDServer = err == nil
 
@@ -331,7 +331,7 @@ func emit3PIDInviteEvent(
 	ctx context.Context,
 	body *MembershipRequest, res *idServerStoreInviteResponse,
 	device *authtypes.Device, roomID string, cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI, producer *producers.RoomserverProducer,
+	rsAPI api.RoomserverInternalAPI, producer *producers.RoomserverProducer,
 	evTime time.Time,
 ) error {
 	builder := &gomatrixserverlib.EventBuilder{
@@ -354,7 +354,7 @@ func emit3PIDInviteEvent(
 	}
 
 	queryRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := common.BuildEvent(ctx, builder, cfg, evTime, queryAPI, &queryRes)
+	event, err := common.BuildEvent(ctx, builder, cfg, evTime, rsAPI, &queryRes)
 	if err != nil {
 		return err
 	}

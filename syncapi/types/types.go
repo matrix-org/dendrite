@@ -64,8 +64,14 @@ const (
 // /sync or /messages, for example.
 type PaginationToken struct {
 	//Position StreamPosition
-	Type              PaginationTokenType
-	PDUPosition       StreamPosition
+	Type PaginationTokenType
+	// For /sync, this is the PDU position. For /messages, this is the topological position (depth).
+	// TODO: Given how different the positions are depending on the token type, they should probably be renamed
+	//       or use different structs altogether.
+	PDUPosition StreamPosition
+	// For /sync, this is the EDU position. For /messages, this is the stream (PDU) position.
+	// TODO: Given how different the positions are depending on the token type, they should probably be renamed
+	//       or use different structs altogether.
 	EDUTypingPosition StreamPosition
 }
 

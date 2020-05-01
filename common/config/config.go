@@ -188,6 +188,12 @@ type Dendrite struct {
 		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
 		// The Naffka database is used internally by the naffka library, if used.
 		Naffka DataSource `yaml:"naffka,omitempty"`
+		// Maximum open connections to the DB (0 = use default, negative means unlimited)
+		MaxOpenConns int `yaml:"max_open_conns"`
+		// Maximum idle connections to the DB (0 = use default, negative means unlimited)
+		MaxIdleConns int `yaml:"max_idle_conns"`
+		// maximum amount of time (in seconds) a connection may be reused (<= 0 means unlimited)
+		ConnMaxLifetimeSec int `yaml:"conn_max_lifetime"`
 	} `yaml:"database"`
 
 	// TURN Server Config
@@ -484,6 +490,15 @@ func (config *Dendrite) SetDefaults() {
 		defaultMaxFileSizeBytes := FileSizeBytes(10485760)
 		config.Media.MaxFileSizeBytes = &defaultMaxFileSizeBytes
 	}
+
+	if config.Database.MaxIdleConns == 0 {
+		config.Database.MaxIdleConns = 2
+	}
+
+	if config.Database.MaxOpenConns == 0 {
+		config.Database.MaxOpenConns = 100
+	}
+
 }
 
 // Error returns a string detailing how many errors were contained within a
@@ -744,6 +759,33 @@ func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err 
 		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
 		jaegerconfig.Metrics(jaegermetrics.NullFactory),
 	)
+}
+
+// MaxIdleConns returns maximum idle connections to the DB
+func (config Dendrite) MaxIdleConns() int {
+	return config.Database.MaxIdleConns
+}
+
+// MaxOpenConns returns maximum open connections to the DB
+func (config Dendrite) MaxOpenConns() int {
+	return config.Database.MaxOpenConns
+}
+
+// ConnMaxLifetime returns maximum amount of time a connection may be reused
+func (config Dendrite) ConnMaxLifetime() time.Duration {
+	return time.Duration(config.Database.ConnMaxLifetimeSec) * time.Second
+}
+
+// DbProperties functions return properties used by database/sql/DB
+type DbProperties interface {
+	MaxIdleConns() int
+	MaxOpenConns() int
+	ConnMaxLifetime() time.Duration
+}
+
+// DbProperties returns cfg as a DbProperties interface
+func (config Dendrite) DbProperties() DbProperties {
+	return config
 }
 
 // logrusLogger is a small wrapper that implements jaeger.Logger using logrus.

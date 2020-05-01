@@ -33,7 +33,7 @@ import (
 func Backfill(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
@@ -82,7 +82,7 @@ func Backfill(
 	}
 
 	// Query the roomserver.
-	if err = query.QueryBackfill(httpReq.Context(), &req, &res); err != nil {
+	if err = rsAPI.QueryBackfill(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryBackfill failed")
 		return jsonerror.InternalServerError()
 	}

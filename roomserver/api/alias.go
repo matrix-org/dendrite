@@ -16,8 +16,6 @@ package api
 
 import (
 	"context"
-	"errors"
-	"net/http"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -86,44 +84,6 @@ type RemoveRoomAliasRequest struct {
 // RemoveRoomAliasResponse is a response to RemoveRoomAlias
 type RemoveRoomAliasResponse struct{}
 
-// RoomserverAliasAPI is used to save, lookup or remove a room alias
-type RoomserverAliasAPI interface {
-	// Set a room alias
-	SetRoomAlias(
-		ctx context.Context,
-		req *SetRoomAliasRequest,
-		response *SetRoomAliasResponse,
-	) error
-
-	// Get the room ID for an alias
-	GetRoomIDForAlias(
-		ctx context.Context,
-		req *GetRoomIDForAliasRequest,
-		response *GetRoomIDForAliasResponse,
-	) error
-
-	// Get all known aliases for a room ID
-	GetAliasesForRoomID(
-		ctx context.Context,
-		req *GetAliasesForRoomIDRequest,
-		response *GetAliasesForRoomIDResponse,
-	) error
-
-	// Get the user ID of the creator of an alias
-	GetCreatorIDForAlias(
-		ctx context.Context,
-		req *GetCreatorIDForAliasRequest,
-		response *GetCreatorIDForAliasResponse,
-	) error
-
-	// Remove a room alias
-	RemoveRoomAlias(
-		ctx context.Context,
-		req *RemoveRoomAliasRequest,
-		response *RemoveRoomAliasResponse,
-	) error
-}
-
 // RoomserverSetRoomAliasPath is the HTTP path for the SetRoomAlias API.
 const RoomserverSetRoomAliasPath = "/api/roomserver/setRoomAlias"
 
@@ -139,22 +99,8 @@ const RoomserverGetCreatorIDForAliasPath = "/api/roomserver/GetCreatorIDForAlias
 // RoomserverRemoveRoomAliasPath is the HTTP path for the RemoveRoomAlias API.
 const RoomserverRemoveRoomAliasPath = "/api/roomserver/removeRoomAlias"
 
-// NewRoomserverAliasAPIHTTP creates a RoomserverAliasAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil an error is returned
-func NewRoomserverAliasAPIHTTP(roomserverURL string, httpClient *http.Client) (RoomserverAliasAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewRoomserverAliasAPIHTTP: httpClient is <nil>")
-	}
-	return &httpRoomserverAliasAPI{roomserverURL, httpClient}, nil
-}
-
-type httpRoomserverAliasAPI struct {
-	roomserverURL string
-	httpClient    *http.Client
-}
-
 // SetRoomAlias implements RoomserverAliasAPI
-func (h *httpRoomserverAliasAPI) SetRoomAlias(
+func (h *httpRoomserverInternalAPI) SetRoomAlias(
 	ctx context.Context,
 	request *SetRoomAliasRequest,
 	response *SetRoomAliasResponse,
@@ -167,7 +113,7 @@ func (h *httpRoomserverAliasAPI) SetRoomAlias(
 }
 
 // GetRoomIDForAlias implements RoomserverAliasAPI
-func (h *httpRoomserverAliasAPI) GetRoomIDForAlias(
+func (h *httpRoomserverInternalAPI) GetRoomIDForAlias(
 	ctx context.Context,
 	request *GetRoomIDForAliasRequest,
 	response *GetRoomIDForAliasResponse,
@@ -180,7 +126,7 @@ func (h *httpRoomserverAliasAPI) GetRoomIDForAlias(
 }
 
 // GetAliasesForRoomID implements RoomserverAliasAPI
-func (h *httpRoomserverAliasAPI) GetAliasesForRoomID(
+func (h *httpRoomserverInternalAPI) GetAliasesForRoomID(
 	ctx context.Context,
 	request *GetAliasesForRoomIDRequest,
 	response *GetAliasesForRoomIDResponse,
@@ -193,7 +139,7 @@ func (h *httpRoomserverAliasAPI) GetAliasesForRoomID(
 }
 
 // GetCreatorIDForAlias implements RoomserverAliasAPI
-func (h *httpRoomserverAliasAPI) GetCreatorIDForAlias(
+func (h *httpRoomserverInternalAPI) GetCreatorIDForAlias(
 	ctx context.Context,
 	request *GetCreatorIDForAliasRequest,
 	response *GetCreatorIDForAliasResponse,
@@ -206,7 +152,7 @@ func (h *httpRoomserverAliasAPI) GetCreatorIDForAlias(
 }
 
 // RemoveRoomAlias implements RoomserverAliasAPI
-func (h *httpRoomserverAliasAPI) RemoveRoomAlias(
+func (h *httpRoomserverInternalAPI) RemoveRoomAlias(
 	ctx context.Context,
 	request *RemoveRoomAliasRequest,
 	response *RemoveRoomAliasResponse,

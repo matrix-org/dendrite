@@ -18,6 +18,7 @@ import (
 	"database/sql"
 	"fmt"
 	"runtime"
+	"time"
 )
 
 // A Transaction is something that can be committed or rolledback.
@@ -98,4 +99,11 @@ func SQLiteDriverName() string {
 		return "sqlite3_js"
 	}
 	return "sqlite3"
+}
+
+// DbProperties functions return properties used by database/sql/DB
+type DbProperties interface {
+	MaxIdleConns() int
+	MaxOpenConns() int
+	ConnMaxLifetime() time.Duration
 }

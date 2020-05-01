@@ -34,7 +34,7 @@ func Send(
 	request *gomatrixserverlib.FederationRequest,
 	txnID gomatrixserverlib.TransactionID,
 	cfg *config.Dendrite,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	producer *producers.RoomserverProducer,
 	eduProducer *producers.EDUServerProducer,
 	keys gomatrixserverlib.KeyRing,
@@ -42,7 +42,7 @@ func Send(
 ) util.JSONResponse {
 	t := txnReq{
 		context:     httpReq.Context(),
-		query:       query,
+		rsAPI:       rsAPI,
 		producer:    producer,
 		eduProducer: eduProducer,
 		keys:        keys,
@@ -99,7 +99,7 @@ func Send(
 type txnReq struct {
 	gomatrixserverlib.Transaction
 	context     context.Context
-	query       api.RoomserverQueryAPI
+	rsAPI       api.RoomserverInternalAPI
 	producer    *producers.RoomserverProducer
 	eduProducer *producers.EDUServerProducer
 	keys        gomatrixserverlib.KeyRing
@@ -120,7 +120,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 		}
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: header.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := t.query.QueryRoomVersionForRoom(t.context, &verReq, &verRes); err != nil {
+		if err := t.rsAPI.QueryRoomVersionForRoom(t.context, &verReq, &verRes); err != nil {
 			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to query room version for room", verReq.RoomID)
 			return nil, roomNotFoundError{verReq.RoomID}
 		}
@@ -228,7 +228,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event) error {
 		StateToFetch: needed.Tuples(),
 	}
 	var stateResp api.QueryStateAfterEventsResponse
-	if err := t.query.QueryStateAfterEvents(t.context, &stateReq, &stateResp); err != nil {
+	if err := t.rsAPI.QueryStateAfterEvents(t.context, &stateReq, &stateResp); err != nil {
 		return err
 	}
 

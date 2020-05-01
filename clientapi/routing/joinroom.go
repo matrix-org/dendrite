@@ -43,8 +43,7 @@ func JoinRoomByIDOrAlias(
 	cfg *config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 	keyRing gomatrixserverlib.KeyRing,
 	accountDB accounts.Database,
@@ -80,7 +79,7 @@ func JoinRoomByIDOrAlias(
 
 	r := joinRoomReq{
 		req, evTime, content, device.UserID, cfg, federation, producer,
-		queryAPI, aliasAPI, fsAPI, keyRing,
+		rsAPI, fsAPI, keyRing,
 	}
 
 	if strings.HasPrefix(roomIDOrAlias, "!") {
@@ -106,8 +105,7 @@ type joinRoomReq struct {
 	cfg        *config.Dendrite
 	federation *gomatrixserverlib.FederationClient
 	producer   *producers.RoomserverProducer
-	queryAPI   roomserverAPI.RoomserverQueryAPI
-	aliasAPI   roomserverAPI.RoomserverAliasAPI
+	rsAPI      roomserverAPI.RoomserverInternalAPI
 	fsAPI      federationSenderAPI.FederationSenderInternalAPI
 	keyRing    gomatrixserverlib.KeyRing
 }
@@ -124,7 +122,7 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 		RoomID: roomID, TargetUserID: r.userID,
 	}
 	var queryRes roomserverAPI.QueryInvitesForUserResponse
-	if err := r.queryAPI.QueryInvitesForUser(r.req.Context(), &queryReq, &queryRes); err != nil {
+	if err := r.rsAPI.QueryInvitesForUser(r.req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(r.req.Context()).WithError(err).Error("r.queryAPI.QueryInvitesForUser failed")
 		return jsonerror.InternalServerError()
 	}
@@ -172,7 +170,7 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 	if domain == r.cfg.Matrix.ServerName {
 		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
 		var queryRes roomserverAPI.GetRoomIDForAliasResponse
-		if err = r.aliasAPI.GetRoomIDForAlias(r.req.Context(), &queryReq, &queryRes); err != nil {
+		if err = r.rsAPI.GetRoomIDForAlias(r.req.Context(), &queryReq, &queryRes); err != nil {
 			util.GetLogger(r.req.Context()).WithError(err).Error("r.aliasAPI.GetRoomIDForAlias failed")
 			return jsonerror.InternalServerError()
 		}
@@ -243,7 +241,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 	}
 
 	queryRes := roomserverAPI.QueryLatestEventsAndStateResponse{}
-	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.queryAPI, &queryRes)
+	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.rsAPI, &queryRes)
 	if err == nil {
 		// If we have successfully built an event at this point then we can
 		// assert that the room is a local room, as BuildEvent was able to

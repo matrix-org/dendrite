@@ -29,7 +29,7 @@ func SetupMediaAPIComponent(
 	base *basecomponent.BaseDendrite,
 	deviceDB devices.Database,
 ) {
-	mediaDB, err := storage.Open(string(base.Cfg.Database.MediaAPI))
+	mediaDB, err := storage.Open(string(base.Cfg.Database.MediaAPI), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to media db")
 	}

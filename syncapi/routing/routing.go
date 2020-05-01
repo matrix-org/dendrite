@@ -40,7 +40,7 @@ const pathPrefixR0 = "/_matrix/client/r0"
 func Setup(
 	apiMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
 	deviceDB devices.Database, federation *gomatrixserverlib.FederationClient,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 ) {
 	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
@@ -61,6 +61,6 @@ func Setup(
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], federation, queryAPI, cfg)
+		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], federation, rsAPI, cfg)
 	})).Methods(http.MethodGet, http.MethodOptions)
 }
