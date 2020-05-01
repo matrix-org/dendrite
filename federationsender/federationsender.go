@@ -34,21 +34,21 @@ import (
 func SetupFederationSenderComponent(
 	base *basecomponent.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
-	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
-	rsInputAPI roomserverAPI.RoomserverInputAPI,
-) api.FederationSenderQueryAPI {
-	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender), base.Cfg.DbProperties())
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	keyRing *gomatrixserverlib.KeyRing,
+) api.FederationSenderInternalAPI {
+	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
-	roomserverProducer := producers.NewRoomserverProducer(rsInputAPI, base.Cfg.Matrix.ServerName)
+	roomserverProducer := producers.NewRoomserverProducer(rsAPI, base.Cfg.Matrix.ServerName)
 
 	queues := queue.NewOutgoingQueues(base.Cfg.Matrix.ServerName, federation, roomserverProducer)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,
-		federationSenderDB, rsQueryAPI,
+		federationSenderDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
@@ -61,10 +61,10 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	queryAPI := query.FederationSenderQueryAPI{
-		DB: federationSenderDB,
-	}
+	queryAPI := query.NewFederationSenderInternalAPI(
+		federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing,
+	)
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 
-	return &queryAPI
+	return queryAPI
 }

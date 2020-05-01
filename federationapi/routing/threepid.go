@@ -58,7 +58,7 @@ var (
 
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
-	req *http.Request, queryAPI roomserverAPI.RoomserverQueryAPI,
+	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
 	producer *producers.RoomserverProducer, federation *gomatrixserverlib.FederationClient,
 	accountDB accounts.Database,
@@ -72,7 +72,7 @@ func CreateInvitesFrom3PIDInvites(
 	for _, inv := range body.Invites {
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+		if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -80,7 +80,7 @@ func CreateInvitesFrom3PIDInvites(
 		}
 
 		event, err := createInviteFrom3PIDInvite(
-			req.Context(), queryAPI, asAPI, cfg, inv, federation, accountDB,
+			req.Context(), rsAPI, asAPI, cfg, inv, federation, accountDB,
 		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("createInviteFrom3PIDInvite failed")
@@ -108,7 +108,7 @@ func ExchangeThirdPartyInvite(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
@@ -148,7 +148,7 @@ func ExchangeThirdPartyInvite(
 
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err = queryAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	if err = rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -156,7 +156,7 @@ func ExchangeThirdPartyInvite(
 	}
 
 	// Auth and build the event from what the remote server sent us
-	event, err := buildMembershipEvent(httpReq.Context(), &builder, queryAPI, cfg)
+	event, err := buildMembershipEvent(httpReq.Context(), &builder, rsAPI, cfg)
 	if err == errNotInRoom {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -199,14 +199,14 @@ func ExchangeThirdPartyInvite(
 // Returns an error if there was a problem building the event or fetching the
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
-	ctx context.Context, queryAPI roomserverAPI.RoomserverQueryAPI,
+	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
 	inv invite, federation *gomatrixserverlib.FederationClient,
 	accountDB accounts.Database,
 ) (*gomatrixserverlib.Event, error) {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := queryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
 		return nil, err
 	}
 
@@ -245,7 +245,7 @@ func createInviteFrom3PIDInvite(
 		return nil, err
 	}
 
-	event, err := buildMembershipEvent(ctx, builder, queryAPI, cfg)
+	event, err := buildMembershipEvent(ctx, builder, rsAPI, cfg)
 	if err == errNotInRoom {
 		return nil, sendToRemoteServer(ctx, inv, federation, cfg, *builder)
 	}
@@ -263,7 +263,7 @@ func createInviteFrom3PIDInvite(
 // Returns an error if something failed during the process.
 func buildMembershipEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, queryAPI roomserverAPI.RoomserverQueryAPI,
+	builder *gomatrixserverlib.EventBuilder, rsAPI roomserverAPI.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
@@ -281,7 +281,7 @@ func buildMembershipEvent(
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
-	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, &queryRes); err != nil {
+	if err = rsAPI.QueryLatestEventsAndState(ctx, &queryReq, &queryRes); err != nil {
 		return nil, err
 	}
 

@@ -49,8 +49,7 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 func Setup(
 	apiMux *mux.Router, cfg *config.Dendrite,
 	producer *producers.RoomserverProducer,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	accountDB accounts.Database,
 	deviceDB devices.Database,
@@ -60,7 +59,7 @@ func Setup(
 	syncProducer *producers.SyncAPIProducer,
 	eduProducer *producers.EDUServerProducer,
 	transactionsCache *transactions.Cache,
-	federationSender federationSenderAPI.FederationSenderQueryAPI,
+	federationSender federationSenderAPI.FederationSenderInternalAPI,
 ) {
 
 	apiMux.Handle("/_matrix/client/versions",
@@ -91,7 +90,7 @@ func Setup(
 
 	r0mux.Handle("/createRoom",
 		common.MakeAuthAPI("createRoom", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return CreateRoom(req, device, cfg, producer, accountDB, aliasAPI, asAPI)
+			return CreateRoom(req, device, cfg, producer, accountDB, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/join/{roomIDOrAlias}",
@@ -101,7 +100,8 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return JoinRoomByIDOrAlias(
-				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, aliasAPI, keyRing, accountDB,
+				req, device, vars["roomIDOrAlias"], cfg, federation, producer,
+				rsAPI, federationSender, keyRing, accountDB,
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
@@ -117,7 +117,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, asAPI, producer)
+			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, rsAPI, asAPI, producer)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
@@ -126,7 +126,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, queryAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, rsAPI, producer, nil)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
@@ -137,7 +137,7 @@ func Setup(
 			}
 			txnID := vars["txnID"]
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID,
-				nil, cfg, queryAPI, producer, transactionsCache)
+				nil, cfg, rsAPI, producer, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/event/{eventID}",
@@ -146,7 +146,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, queryAPI, federation, keyRing)
+			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, federation, keyRing)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -155,7 +155,7 @@ func Setup(
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingStateRequest(req.Context(), queryAPI, vars["roomID"])
+		return OnIncomingStateRequest(req.Context(), rsAPI, vars["roomID"])
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -163,7 +163,7 @@ func Setup(
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingStateTypeRequest(req.Context(), queryAPI, vars["roomID"], vars["type"], "")
+		return OnIncomingStateTypeRequest(req.Context(), rsAPI, vars["roomID"], vars["type"], "")
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
@@ -171,7 +171,7 @@ func Setup(
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingStateTypeRequest(req.Context(), queryAPI, vars["roomID"], vars["type"], vars["stateKey"])
+		return OnIncomingStateTypeRequest(req.Context(), rsAPI, vars["roomID"], vars["type"], vars["stateKey"])
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
@@ -186,7 +186,7 @@ func Setup(
 			if strings.HasSuffix(eventType, "/") {
 				eventType = eventType[:len(eventType)-1]
 			}
-			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, queryAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, producer, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -197,7 +197,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			stateKey := vars["stateKey"]
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, queryAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, producer, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -219,7 +219,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DirectoryRoom(req, vars["roomAlias"], federation, cfg, aliasAPI, federationSender)
+			return DirectoryRoom(req, vars["roomAlias"], federation, cfg, rsAPI, federationSender)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -229,7 +229,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetLocalAlias(req, device, vars["roomAlias"], cfg, aliasAPI)
+			return SetLocalAlias(req, device, vars["roomAlias"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -239,7 +239,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return RemoveLocalAlias(req, device, vars["roomAlias"], aliasAPI)
+			return RemoveLocalAlias(req, device, vars["roomAlias"], rsAPI)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 
@@ -353,7 +353,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetAvatarURL(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, queryAPI)
+			return SetAvatarURL(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -375,7 +375,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetDisplayName(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, queryAPI)
+			return SetDisplayName(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -488,7 +488,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetMemberships(req, device, vars["roomID"], false, cfg, queryAPI)
+			return GetMemberships(req, device, vars["roomID"], false, cfg, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -498,7 +498,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetMemberships(req, device, vars["roomID"], true, cfg, queryAPI)
+			return GetMemberships(req, device, vars["roomID"], true, cfg, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -602,7 +602,7 @@ func Setup(
 
 	r0mux.Handle("/capabilities",
 		common.MakeAuthAPI("capabilities", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return GetCapabilities(req, queryAPI)
+			return GetCapabilities(req, rsAPI)
 		}),
 	).Methods(http.MethodGet)
 }

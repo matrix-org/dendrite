@@ -35,6 +35,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -60,7 +61,7 @@ type SyncServerDatasource struct {
 	invites             inviteEventsStatements
 	eduCache            *cache.EDUCache
 	topology            outputRoomEventsTopologyStatements
-	backwardExtremities backwardExtremitiesStatements
+	backwardExtremities tables.BackwardsExtremities
 }
 
 // NewSyncServerDatasource creates a new sync server database
@@ -102,16 +103,17 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.events.prepare(d.db, &d.streamID); err != nil {
 		return err
 	}
-	if err := d.roomstate.prepare(d.db, &d.streamID); err != nil {
+	if err = d.roomstate.prepare(d.db, &d.streamID); err != nil {
 		return err
 	}
-	if err := d.invites.prepare(d.db, &d.streamID); err != nil {
+	if err = d.invites.prepare(d.db, &d.streamID); err != nil {
 		return err
 	}
-	if err := d.topology.prepare(d.db); err != nil {
+	if err = d.topology.prepare(d.db); err != nil {
 		return err
 	}
-	if err := d.backwardExtremities.prepare(d.db); err != nil {
+	d.backwardExtremities, err = tables.NewBackwardsExtremities(d.db, &tables.SqliteBackwardsExtremitiesStatements{})
+	if err != nil {
 		return err
 	}
 	return nil
@@ -142,7 +144,7 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 // the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
 func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.HeaderedEvent) error {
-	if err := d.backwardExtremities.deleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
+	if err := d.backwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 		return err
 	}
 
@@ -163,7 +165,7 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, tx
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
+			if err = d.backwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
 				return err
 			}
 		}
@@ -192,7 +194,7 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.topology.insertEventInTopology(ctx, txn, ev); err != nil {
+		if err = d.topology.insertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return err
 		}
 
@@ -279,14 +281,16 @@ func (d *SyncServerDatasource) GetEventsInRange(
 	// events must be retrieved from the rooms' topology table rather than the
 	// table contaning the syncapi server's whole stream of events.
 	if from.Type == types.PaginationTokenTypeTopology {
+		// TODO: ARGH CONFUSING
 		// Determine the backward and forward limit, i.e. the upper and lower
 		// limits to the selection in the room's topology, from the direction.
-		var backwardLimit, forwardLimit types.StreamPosition
+		var backwardLimit, forwardLimit, forwardMicroLimit types.StreamPosition
 		if backwardOrdering {
 			// Backward ordering is antichronological (latest event to oldest
 			// one).
 			backwardLimit = to.PDUPosition
 			forwardLimit = from.PDUPosition
+			forwardMicroLimit = from.EDUTypingPosition
 		} else {
 			// Forward ordering is chronological (oldest event to latest one).
 			backwardLimit = from.PDUPosition
@@ -296,7 +300,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		// Select the event IDs from the defined range.
 		var eIDs []string
 		eIDs, err = d.topology.selectEventIDsInRange(
-			ctx, nil, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
+			ctx, nil, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
 		)
 		if err != nil {
 			return
@@ -326,8 +330,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 			return
 		}
 	}
-
-	return
+	return events, err
 }
 
 // SyncPosition returns the latest positions for syncing.
@@ -344,14 +347,14 @@ func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (tok types.Pagi
 func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
 	ctx context.Context, roomID string,
 ) (backwardExtremities []string, err error) {
-	return d.backwardExtremities.selectBackwardExtremitiesForRoom(ctx, roomID)
+	return d.backwardExtremities.SelectBackwardExtremitiesForRoom(ctx, roomID)
 }
 
 // MaxTopologicalPosition returns the highest topological position for a given
 // room.
 func (d *SyncServerDatasource) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
-) (types.StreamPosition, error) {
+) (types.StreamPosition, types.StreamPosition, error) {
 	return d.topology.selectMaxPositionInTopology(ctx, nil, roomID)
 }
 
@@ -370,8 +373,13 @@ func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 
 func (d *SyncServerDatasource) EventPositionInTopology(
 	ctx context.Context, eventID string,
-) (types.StreamPosition, error) {
-	return d.topology.selectPositionInTopology(ctx, nil, eventID)
+) (depth types.StreamPosition, stream types.StreamPosition, err error) {
+	depth, err = d.topology.selectPositionInTopology(ctx, nil, eventID)
+	if err != nil {
+		return
+	}
+	stream, err = d.events.selectStreamPositionForEventID(ctx, eventID)
+	return
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.

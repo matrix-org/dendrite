@@ -32,17 +32,18 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
-	federationSender := base.CreateHTTPFederationSenderAPIs()
+	fsAPI := base.CreateHTTPFederationSenderAPIs()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
-	alias, input, query := base.CreateHTTPRoomserverAPIs()
-	asQuery := base.CreateHTTPAppServiceAPIs()
+	rsAPI := base.CreateHTTPRoomserverAPIs()
+	asAPI := base.CreateHTTPAppServiceAPIs()
+	rsAPI.SetFederationSenderAPI(fsAPI)
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 
 	federationapi.SetupFederationAPIComponent(
 		base, accountDB, deviceDB, federation, &keyRing,
-		alias, input, query, asQuery, federationSender, eduProducer,
+		rsAPI, asAPI, fsAPI, eduProducer,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

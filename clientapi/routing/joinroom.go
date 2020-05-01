@@ -27,12 +27,11 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // JoinRoomByIDOrAlias implements the "/join/{roomIDOrAlias}" API.
@@ -44,8 +43,8 @@ func JoinRoomByIDOrAlias(
 	cfg *config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
 	producer *producers.RoomserverProducer,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 	keyRing gomatrixserverlib.KeyRing,
 	accountDB accounts.Database,
 ) util.JSONResponse {
@@ -79,7 +78,8 @@ func JoinRoomByIDOrAlias(
 	content["avatar_url"] = profile.AvatarURL
 
 	r := joinRoomReq{
-		req, evTime, content, device.UserID, cfg, federation, producer, queryAPI, aliasAPI, keyRing,
+		req, evTime, content, device.UserID, cfg, federation, producer,
+		rsAPI, fsAPI, keyRing,
 	}
 
 	if strings.HasPrefix(roomIDOrAlias, "!") {
@@ -105,8 +105,8 @@ type joinRoomReq struct {
 	cfg        *config.Dendrite
 	federation *gomatrixserverlib.FederationClient
 	producer   *producers.RoomserverProducer
-	queryAPI   roomserverAPI.RoomserverQueryAPI
-	aliasAPI   roomserverAPI.RoomserverAliasAPI
+	rsAPI      roomserverAPI.RoomserverInternalAPI
+	fsAPI      federationSenderAPI.FederationSenderInternalAPI
 	keyRing    gomatrixserverlib.KeyRing
 }
 
@@ -122,7 +122,7 @@ func (r joinRoomReq) joinRoomByID(roomID string) util.JSONResponse {
 		RoomID: roomID, TargetUserID: r.userID,
 	}
 	var queryRes roomserverAPI.QueryInvitesForUserResponse
-	if err := r.queryAPI.QueryInvitesForUser(r.req.Context(), &queryReq, &queryRes); err != nil {
+	if err := r.rsAPI.QueryInvitesForUser(r.req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(r.req.Context()).WithError(err).Error("r.queryAPI.QueryInvitesForUser failed")
 		return jsonerror.InternalServerError()
 	}
@@ -170,7 +170,7 @@ func (r joinRoomReq) joinRoomByAlias(roomAlias string) util.JSONResponse {
 	if domain == r.cfg.Matrix.ServerName {
 		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
 		var queryRes roomserverAPI.GetRoomIDForAliasResponse
-		if err = r.aliasAPI.GetRoomIDForAlias(r.req.Context(), &queryReq, &queryRes); err != nil {
+		if err = r.rsAPI.GetRoomIDForAlias(r.req.Context(), &queryReq, &queryRes); err != nil {
 			util.GetLogger(r.req.Context()).WithError(err).Error("r.aliasAPI.GetRoomIDForAlias failed")
 			return jsonerror.InternalServerError()
 		}
@@ -241,7 +241,7 @@ func (r joinRoomReq) joinRoomUsingServers(
 	}
 
 	queryRes := roomserverAPI.QueryLatestEventsAndStateResponse{}
-	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.queryAPI, &queryRes)
+	event, err := common.BuildEvent(r.req.Context(), &eb, r.cfg, r.evTime, r.rsAPI, &queryRes)
 	if err == nil {
 		// If we have successfully built an event at this point then we can
 		// assert that the room is a local room, as BuildEvent was able to
@@ -326,70 +326,14 @@ func (r joinRoomReq) joinRoomUsingServers(
 // server was invalid this returns an error.
 // Otherwise this returns a JSONResponse.
 func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib.ServerName) (*util.JSONResponse, error) {
-	// Ask the room server for information about room versions.
-	var request api.QueryRoomVersionCapabilitiesRequest
-	var response api.QueryRoomVersionCapabilitiesResponse
-	if err := r.queryAPI.QueryRoomVersionCapabilities(r.req.Context(), &request, &response); err != nil {
+	fedJoinReq := federationSenderAPI.PerformJoinRequest{
+		RoomID:     roomID,
+		UserID:     r.userID,
+		ServerName: server,
+	}
+	fedJoinRes := federationSenderAPI.PerformJoinResponse{}
+	if err := r.fsAPI.PerformJoin(r.req.Context(), &fedJoinReq, &fedJoinRes); err != nil {
 		return nil, err
-	}
-	var supportedVersions []gomatrixserverlib.RoomVersion
-	for version := range response.AvailableRoomVersions {
-		supportedVersions = append(supportedVersions, version)
-	}
-	respMakeJoin, err := r.federation.MakeJoin(r.req.Context(), server, roomID, r.userID, supportedVersions)
-	if err != nil {
-		// TODO: Check if the user was not allowed to join the room.
-		return nil, fmt.Errorf("r.federation.MakeJoin: %w", err)
-	}
-
-	// Set all the fields to be what they should be, this should be a no-op
-	// but it's possible that the remote server returned us something "odd"
-	err = r.writeToBuilder(&respMakeJoin.JoinEvent, roomID)
-	if err != nil {
-		return nil, fmt.Errorf("r.writeToBuilder: %w", err)
-	}
-
-	if respMakeJoin.RoomVersion == "" {
-		respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
-	}
-	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Room version '%s' is not supported", respMakeJoin.RoomVersion),
-			),
-		}, nil
-	}
-
-	event, err := respMakeJoin.JoinEvent.Build(
-		r.evTime, r.cfg.Matrix.ServerName, r.cfg.Matrix.KeyID,
-		r.cfg.Matrix.PrivateKey, respMakeJoin.RoomVersion,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
-	}
-
-	respSendJoin, err := r.federation.SendJoin(r.req.Context(), server, event, respMakeJoin.RoomVersion)
-	if err != nil {
-		return nil, fmt.Errorf("r.federation.SendJoin: %w", err)
-	}
-
-	if err = r.checkSendJoinResponse(event, server, respMakeJoin, respSendJoin); err != nil {
-		return nil, err
-	}
-
-	util.GetLogger(r.req.Context()).WithFields(logrus.Fields{
-		"room_id":          roomID,
-		"num_auth_events":  len(respSendJoin.AuthEvents),
-		"num_state_events": len(respSendJoin.StateEvents),
-	}).Info("Room join signature and auth verification passed")
-
-	if err = r.producer.SendEventWithState(
-		r.req.Context(),
-		respSendJoin.ToRespState(),
-		event.Headered(respMakeJoin.RoomVersion),
-	); err != nil {
-		util.GetLogger(r.req.Context()).WithError(err).Error("r.producer.SendEventWithState")
 	}
 
 	return &util.JSONResponse{
@@ -399,50 +343,4 @@ func (r joinRoomReq) joinRoomUsingServer(roomID string, server gomatrixserverlib
 			RoomID string `json:"room_id"`
 		}{roomID},
 	}, nil
-}
-
-// checkSendJoinResponse checks that all of the signatures are correct
-// and that the join is allowed by the supplied state.
-func (r joinRoomReq) checkSendJoinResponse(
-	event gomatrixserverlib.Event,
-	server gomatrixserverlib.ServerName,
-	respMakeJoin gomatrixserverlib.RespMakeJoin,
-	respSendJoin gomatrixserverlib.RespSendJoin,
-) error {
-	// A list of events that we have retried, if they were not included in
-	// the auth events supplied in the send_join.
-	retries := map[string]bool{}
-
-retryCheck:
-	// TODO: Can we expand Check here to return a list of missing auth
-	// events rather than failing one at a time?
-	if err := respSendJoin.Check(r.req.Context(), r.keyRing, event); err != nil {
-		switch e := err.(type) {
-		case gomatrixserverlib.MissingAuthEventError:
-			// Check that we haven't already retried for this event, prevents
-			// us from ending up in endless loops
-			if !retries[e.AuthEventID] {
-				// Ask the server that we're talking to right now for the event
-				tx, txerr := r.federation.GetEvent(r.req.Context(), server, e.AuthEventID)
-				if txerr != nil {
-					return fmt.Errorf("r.federation.GetEvent: %w", txerr)
-				}
-				// For each event returned, add it to the auth events.
-				for _, pdu := range tx.PDUs {
-					ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, respMakeJoin.RoomVersion)
-					if everr != nil {
-						return fmt.Errorf("gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
-					}
-					respSendJoin.AuthEvents = append(respSendJoin.AuthEvents, ev)
-				}
-				// Mark the event as retried and then give the check another go.
-				retries[e.AuthEventID] = true
-				goto retryCheck
-			}
-			return fmt.Errorf("respSendJoin (after retries): %w", e)
-		default:
-			return fmt.Errorf("respSendJoin: %w", err)
-		}
-	}
-	return nil
 }

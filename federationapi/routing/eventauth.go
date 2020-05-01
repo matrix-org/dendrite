@@ -25,13 +25,13 @@ import (
 func GetEventAuth(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 	eventID string,
 ) util.JSONResponse {
 	// TODO: Optimisation: we shouldn't be querying all the room state
 	// that is in state.StateEvents - we just ignore it.
-	state, err := getState(ctx, request, query, roomID, eventID)
+	state, err := getState(ctx, request, rsAPI, roomID, eventID)
 	if err != nil {
 		return *err
 	}

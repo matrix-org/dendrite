@@ -28,9 +28,9 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
-	_, _, query := base.CreateHTTPRoomserverAPIs()
+	rsAPI := base.CreateHTTPRoomserverAPIs()
 
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)
+	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
 

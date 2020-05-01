@@ -119,24 +119,12 @@ func (b *BaseDendrite) CreateHTTPAppServiceAPIs() appserviceAPI.AppServiceQueryA
 
 // CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI for hitting
 // the roomserver over HTTP.
-func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
-	roomserverAPI.RoomserverAliasAPI,
-	roomserverAPI.RoomserverInputAPI,
-	roomserverAPI.RoomserverQueryAPI,
-) {
-	alias, err := roomserverAPI.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
+func (b *BaseDendrite) CreateHTTPRoomserverAPIs() roomserverAPI.RoomserverInternalAPI {
+	rsAPI, err := roomserverAPI.NewRoomserverInternalAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
 	if err != nil {
-		logrus.WithError(err).Panic("NewRoomserverAliasAPIHTTP failed")
+		logrus.WithError(err).Panic("NewRoomserverInternalAPIHTTP failed", b.httpClient)
 	}
-	input, err := roomserverAPI.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
-	if err != nil {
-		logrus.WithError(err).Panic("NewRoomserverInputAPIHTTP failed", b.httpClient)
-	}
-	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
-	if err != nil {
-		logrus.WithError(err).Panic("NewRoomserverQueryAPIHTTP failed", b.httpClient)
-	}
-	return alias, input, query
+	return rsAPI
 }
 
 // CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
@@ -149,12 +137,12 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 	return e
 }
 
-// CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
+// CreateHTTPFederationSenderAPIs returns FederationSenderInternalAPI for hitting
 // the federation sender over HTTP
-func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
-	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
+func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderInternalAPI {
+	f, err := federationSenderAPI.NewFederationSenderInternalAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("NewFederationSenderQueryAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("NewFederationSenderInternalAPIHTTP failed", b.httpClient)
 	}
 	return f
 }
