@@ -212,9 +212,14 @@ func (r *messagesReq) retrieveEvents() (
 	// Sort the events to ensure we send them in the right order.
 	if r.backwardOrdering {
 		// This reverses the array from old->new to new->old
-		sort.SliceStable(events, func(i, j int) bool {
-			return true
-		})
+		reversed := func(in []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
+			out := make([]gomatrixserverlib.HeaderedEvent, len(in))
+			for i := 0; i < len(in); i++ {
+				out[i] = in[len(in)-i-1]
+			}
+			return out
+		}
+		events = reversed(events)
 	}
 
 	// Convert all of the events into client events.
@@ -255,6 +260,7 @@ func (r *messagesReq) retrieveEvents() (
 		// to them by the event on their left, therefore we need to decrement the
 		// end position we send in the response if we're going backward.
 		end.PDUPosition--
+		end.EDUTypingPosition += 1000
 	}
 
 	// The lowest token value is 1, therefore we need to manually set it to that
@@ -341,6 +347,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 
 	// Append the events ve previously retrieved locally.
 	events = append(events, r.db.StreamEventsToEvents(nil, streamEvents)...)
+	sort.Sort(eventsByDepth(events))
 
 	return
 }
