@@ -10,6 +10,7 @@ import (
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 // WriteOutputEvents implements OutputRoomEventWriter
@@ -39,6 +40,13 @@ func (r *RoomserverInternalAPI) performJoinRoomByAlias(
 	req *api.PerformJoinRequest,
 	res *api.PerformJoinResponse,
 ) error {
+	// Get the domain part of the room alias.
+	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
+	if err != nil {
+		return fmt.Errorf("supplied room alias %q in incorrect format", req.RoomIDOrAlias)
+	}
+	req.ServerNames = append(req.ServerNames, domain)
+
 	// Look up if we know this room alias.
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, req.RoomIDOrAlias)
 	if err != nil {
@@ -50,11 +58,20 @@ func (r *RoomserverInternalAPI) performJoinRoomByAlias(
 	return r.performJoinRoomByID(ctx, req, res)
 }
 
+// TODO: Break this function up a bit
+// nolint:gocyclo
 func (r *RoomserverInternalAPI) performJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
-	res *api.PerformJoinResponse,
+	res *api.PerformJoinResponse, // nolint:unparam
 ) error {
+	// Get the domain part of the room ID.
+	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
+	if err != nil {
+		return fmt.Errorf("supplied room alias %q in incorrect format", req.RoomIDOrAlias)
+	}
+	req.ServerNames = append(req.ServerNames, domain)
+
 	// Prepare the template for the join event.
 	userID := req.UserID
 	eb := gomatrixserverlib.EventBuilder{
@@ -64,18 +81,18 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		RoomID:   req.RoomIDOrAlias,
 		Redacts:  "",
 	}
-	if err := eb.SetUnsigned(struct{}{}); err != nil {
+	if err = eb.SetUnsigned(struct{}{}); err != nil {
 		return fmt.Errorf("eb.SetUnsigned: %w", err)
 	}
 
-	// It is possible for the requestoto include some "content" for the
+	// It is possible for the request to include some "content" for the
 	// event. We'll always overwrite the "membership" key, but the rest,
 	// like "display_name" or "avatar_url", will be kept if supplied.
 	if req.Content == nil {
 		req.Content = map[string]interface{}{}
 	}
 	req.Content["membership"] = "join"
-	if err := eb.SetContent(req.Content); err != nil {
+	if err = eb.SetContent(req.Content); err != nil {
 		return fmt.Errorf("eb.SetContent: %w", err)
 	}
 
@@ -124,18 +141,35 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 			return fmt.Errorf("error trying to join %q room: %w", req.RoomIDOrAlias, derr)
 		}
 
-		// Otherwise, if we've reached this point, the room isn't a local room
-		// and we should ask the federation sender to try and join for us.
-		fedReq := fsAPI.PerformJoinRequest{
-			RoomID:     req.RoomIDOrAlias, // the room ID to try and join
-			UserID:     req.UserID,        // the user ID joining the room
-			ServerName: domain,            // the server to try joining with
-			Content:    req.Content,       // the membership event content
+		// Try joining by all of the supplied server names.
+		// TODO: Update the FS API so that it accepts a list of server names and
+		// does this bit by itself.
+		joined := false
+		for _, serverName := range req.ServerNames {
+			// Otherwise, if we've reached this point, the room isn't a local room
+			// and we should ask the federation sender to try and join for us.
+			fedReq := fsAPI.PerformJoinRequest{
+				RoomID:     req.RoomIDOrAlias, // the room ID to try and join
+				UserID:     req.UserID,        // the user ID joining the room
+				ServerName: serverName,        // the server to try joining with
+				Content:    req.Content,       // the membership event content
+			}
+			fedRes := fsAPI.PerformJoinResponse{}
+			err = r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
+			if err != nil {
+				logrus.WithError(err).Errorf("error joining federated room %q", req.RoomIDOrAlias)
+				continue
+			}
+			joined = true
 		}
-		fedRes := fsAPI.PerformJoinResponse{}
-		err = r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
-		if err != nil {
-			return fmt.Errorf("error joining federated room %q: %w", req.RoomIDOrAlias, err)
+
+		// If we didn't successfully join the room using any of the supplied
+		// servers then return an error saying such.
+		if !joined {
+			return fmt.Errorf(
+				"failed to join %q using %d server(s)",
+				req.RoomIDOrAlias, len(req.ServerNames),
+			)
 		}
 
 	default:

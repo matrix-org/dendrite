@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common/config"
@@ -40,12 +41,21 @@ func JoinRoomByIDOrAlias(
 	keyRing gomatrixserverlib.KeyRing, // nolint:unparam
 	accountDB accounts.Database, // nolint:unparam
 ) util.JSONResponse {
+	// Prepare to ask the roomserver to perform the room join.
 	joinReq := roomserverAPI.PerformJoinRequest{
 		RoomIDOrAlias: roomIDOrAlias,
 		UserID:        device.UserID,
-		Content:       nil,
 	}
 	joinRes := roomserverAPI.PerformJoinResponse{}
+
+	// If content was provided in the request then incude that
+	// in the request. It'll get used as a part of the membership
+	// event content.
+	if err := httputil.UnmarshalJSONRequest(req, &joinReq.Content); err != nil {
+		return *err
+	}
+
+	// Ask the roomserver to perform the join.
 	if err := rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
