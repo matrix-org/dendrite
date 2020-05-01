@@ -220,6 +220,49 @@ func TestSyncResponse(t *testing.T) {
 	}
 }
 
+func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
+	t.Parallel()
+	db := MustCreateDatabase(t)
+	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
+	positions := MustWriteEvents(t, db, events)
+	latest, err := db.SyncPosition(ctx)
+	if err != nil {
+		t.Fatalf("failed to get SyncPosition: %s", err)
+	}
+	from := types.NewPaginationTokenFromTypeAndPosition(
+		types.PaginationTokenTypeStream, positions[len(positions)-2], types.StreamPosition(0),
+	)
+
+	res, err := db.IncrementalSync(ctx, testUserDeviceA, *from, latest, 5, false)
+	if err != nil {
+		t.Fatalf("failed to IncrementalSync with latest token")
+	}
+	roomRes, ok := res.Rooms.Join[testRoomID]
+	if !ok {
+		t.Fatalf("IncrementalSync response missing room %s - response: %+v", testRoomID, res)
+	}
+	// returns the last event "Message 10"
+	assertEventsEqual(t, "IncrementalSync Timeline", false, roomRes.Timeline.Events, reversed(events[len(events)-1:]))
+
+	prev := roomRes.Timeline.PrevBatch
+	if prev == "" {
+		t.Fatalf("IncrementalSync expected prev_batch token")
+	}
+	prevBatchToken, err := types.NewPaginationTokenFromString(prev)
+	if err != nil {
+		t.Fatalf("failed to NewPaginationTokenFromString : %s", err)
+	}
+	// backpaginate 5 messages starting at the latest position.
+	// head towards the beginning of time
+	to := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
+	paginatedEvents, err := db.GetEventsInRange(ctx, prevBatchToken, to, testRoomID, 5, true)
+	if err != nil {
+		t.Fatalf("GetEventsInRange returned an error: %s", err)
+	}
+	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
+	assertEventsEqual(t, "", true, gots, reversed(events[len(events)-6:len(events)-1]))
+}
+
 // The purpose of this test is to ensure that backfill does indeed go backwards, using a stream token.
 func TestGetEventsInRangeWithStreamToken(t *testing.T) {
 	t.Parallel()
