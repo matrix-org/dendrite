@@ -194,7 +194,7 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.topology.insertEventInTopology(ctx, txn, ev); err != nil {
+		if err = d.topology.insertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return err
 		}
 
@@ -281,14 +281,16 @@ func (d *SyncServerDatasource) GetEventsInRange(
 	// events must be retrieved from the rooms' topology table rather than the
 	// table contaning the syncapi server's whole stream of events.
 	if from.Type == types.PaginationTokenTypeTopology {
+		// TODO: ARGH CONFUSING
 		// Determine the backward and forward limit, i.e. the upper and lower
 		// limits to the selection in the room's topology, from the direction.
-		var backwardLimit, forwardLimit types.StreamPosition
+		var backwardLimit, forwardLimit, forwardMicroLimit types.StreamPosition
 		if backwardOrdering {
 			// Backward ordering is antichronological (latest event to oldest
 			// one).
 			backwardLimit = to.PDUPosition
 			forwardLimit = from.PDUPosition
+			forwardMicroLimit = from.EDUTypingPosition
 		} else {
 			// Forward ordering is chronological (oldest event to latest one).
 			backwardLimit = from.PDUPosition
@@ -298,7 +300,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		// Select the event IDs from the defined range.
 		var eIDs []string
 		eIDs, err = d.topology.selectEventIDsInRange(
-			ctx, nil, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
+			ctx, nil, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
 		)
 		if err != nil {
 			return
@@ -328,8 +330,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 			return
 		}
 	}
-
-	return
+	return events, err
 }
 
 // SyncPosition returns the latest positions for syncing.
@@ -353,7 +354,7 @@ func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
 // room.
 func (d *SyncServerDatasource) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
-) (types.StreamPosition, error) {
+) (types.StreamPosition, types.StreamPosition, error) {
 	return d.topology.selectMaxPositionInTopology(ctx, nil, roomID)
 }
 
@@ -372,8 +373,13 @@ func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 
 func (d *SyncServerDatasource) EventPositionInTopology(
 	ctx context.Context, eventID string,
-) (types.StreamPosition, error) {
-	return d.topology.selectPositionInTopology(ctx, nil, eventID)
+) (depth types.StreamPosition, stream types.StreamPosition, err error) {
+	depth, err = d.topology.selectPositionInTopology(ctx, nil, eventID)
+	if err != nil {
+		return
+	}
+	stream, err = d.events.selectStreamPositionForEventID(ctx, eventID)
+	return
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.

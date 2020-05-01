@@ -229,14 +229,14 @@ func (r *messagesReq) retrieveEvents() (
 	// change the way topological positions are defined (as depth isn't the most
 	// reliable way to define it), it would be easier and less troublesome to
 	// only have to change it in one place, i.e. the database.
-	startPos, err := r.db.EventPositionInTopology(
+	startPos, startStreamPos, err := r.db.EventPositionInTopology(
 		r.ctx, events[0].EventID(),
 	)
 	if err != nil {
 		err = fmt.Errorf("EventPositionInTopology: for start event %s: %w", events[0].EventID(), err)
 		return
 	}
-	endPos, err := r.db.EventPositionInTopology(
+	endPos, endStreamPos, err := r.db.EventPositionInTopology(
 		r.ctx, events[len(events)-1].EventID(),
 	)
 	if err != nil {
@@ -246,10 +246,10 @@ func (r *messagesReq) retrieveEvents() (
 	// Generate pagination tokens to send to the client using the positions
 	// retrieved previously.
 	start = types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeTopology, startPos, 0,
+		types.PaginationTokenTypeTopology, startPos, startStreamPos,
 	)
 	end = types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeTopology, endPos, 0,
+		types.PaginationTokenTypeTopology, endPos, endStreamPos,
 	)
 
 	if r.backwardOrdering {
@@ -407,13 +407,13 @@ func setToDefault(
 		// go 1 earlier than the first event so we correctly fetch the earliest event
 		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
 	} else {
-		var pos types.StreamPosition
-		pos, err = db.MaxTopologicalPosition(ctx, roomID)
+		var pos, stream types.StreamPosition
+		pos, stream, err = db.MaxTopologicalPosition(ctx, roomID)
 		if err != nil {
 			return
 		}
 
-		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, pos, 0)
+		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, pos, stream)
 	}
 
 	return
