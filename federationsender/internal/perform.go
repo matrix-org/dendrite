@@ -39,7 +39,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 
 	// Set all the fields to be what they should be, this should be a no-op
 	// but it's possible that the remote server returned us something "odd"
-	respMakeJoin.JoinEvent.Type = "m.room.member"
+	respMakeJoin.JoinEvent.Type = gomatrixserverlib.MRoomMember
 	respMakeJoin.JoinEvent.Sender = request.UserID
 	respMakeJoin.JoinEvent.StateKey = &request.UserID
 	respMakeJoin.JoinEvent.RoomID = request.RoomID

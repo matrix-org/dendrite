@@ -8,23 +8,22 @@ import (
 )
 
 const (
-	// RoomserverPerformJoinPath is the HTTP path for the PerformJoinRequest API.
+	// RoomserverPerformJoinPath is the HTTP path for the PerformJoin API.
 	RoomserverPerformJoinPath = "/api/roomserver/performJoin"
 
-	// RoomserverPerformLeavePath is the HTTP path for the PerformLeaveRequest API.
+	// RoomserverPerformLeavePath is the HTTP path for the PerformLeave API.
 	RoomserverPerformLeavePath = "/api/roomserver/performLeave"
 )
 
 type PerformJoinRequest struct {
-	RoomID  string                 `json:"room_id"`
-	UserID  string                 `json:"user_id"`
-	Content map[string]interface{} `json:"content"`
+	RoomIDOrAlias string                 `json:"room_id_or_alias"`
+	UserID        string                 `json:"user_id"`
+	Content       map[string]interface{} `json:"content"`
 }
 
 type PerformJoinResponse struct {
 }
 
-// Handle an instruction to make_join & send_join with a remote server.
 func (h *httpRoomserverInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *PerformJoinRequest,
@@ -45,7 +44,6 @@ type PerformLeaveRequest struct {
 type PerformLeaveResponse struct {
 }
 
-// Handle an instruction to make_leave & send_leave with a remote server.
 func (h *httpRoomserverInternalAPI) PerformLeave(
 	ctx context.Context,
 	request *PerformLeaveRequest,
