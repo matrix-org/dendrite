@@ -118,6 +118,7 @@ func MustWriteEvents(t *testing.T, db storage.Database, events []gomatrixserverl
 		if err != nil {
 			t.Fatalf("WriteEvent failed: %s", err)
 		}
+		fmt.Println("Event ID", ev.EventID(), " spos=", pos, "depth=", ev.Depth())
 		positions = append(positions, pos)
 	}
 	return
@@ -407,6 +408,64 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 	}
 }
 
+// The purpose of this test is to make sure that events are returned in the right *order* when they have been inserted in a manner similar to
+// how any kind of backfill operation will insert the events. This test inserts the SimpleRoom events in a manner similar to how backfill over
+// federation would:
+// - First inserts join event of test user C
+// - Inserts chunks of history in strata e.g (25-30, 20-25, 15-20, 10-15, 5-10, 0-5).
+// The test then does a backfill to ensure that the response is ordered correctly according to depth.
+func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
+	t.Parallel()
+	db := MustCreateDatabase(t)
+	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
+
+	// "federation" join
+	userC := fmt.Sprintf("@radiance:%s", testOrigin)
+	joinEvent := MustCreateEvent(t, testRoomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+		Content:  []byte(fmt.Sprintf(`{"membership":"join"}`)),
+		Type:     "m.room.member",
+		StateKey: &userC,
+		Sender:   userC,
+		Depth:    int64(len(events) + 1),
+	})
+	MustWriteEvents(t, db, []gomatrixserverlib.HeaderedEvent{joinEvent})
+
+	// Sync will return this for the prev_batch
+	from := topologyTokenBefore(t, db, joinEvent.EventID())
+
+	// inject events in batches as if they were from backfill
+	// e.g [1,2,3,4,5,6] => [4,5,6] , [1,2,3]
+	chunkSize := 5
+	for i := len(events); i >= 0; i -= chunkSize {
+		start := i - chunkSize
+		if start < 0 {
+			start = 0
+		}
+		backfill := events[start:i]
+		MustWriteEvents(t, db, backfill)
+	}
+
+	// head towards the beginning of time
+	to := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
+
+	// starting at `from`, backpaginate to the beginning of time, asserting as we go.
+	chunkSize = 3
+	events = reversed(events)
+	for i := 0; i < len(events); i += chunkSize {
+		paginatedEvents, err := db.GetEventsInRange(ctx, from, to, testRoomID, chunkSize, true)
+		if err != nil {
+			t.Fatalf("GetEventsInRange returned an error: %s", err)
+		}
+		gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
+		endi := i + chunkSize
+		if endi > len(events) {
+			endi = len(events)
+		}
+		assertEventsEqual(t, from.String(), true, gots, events[i:endi])
+		from = topologyTokenBefore(t, db, paginatedEvents[len(paginatedEvents)-1].EventID())
+	}
+}
+
 func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []gomatrixserverlib.HeaderedEvent) {
 	if len(gots) != len(wants) {
 		t.Fatalf("%s response returned %d events, want %d", msg, len(gots), len(wants))
@@ -445,6 +504,21 @@ func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatr
 			}
 		}
 	}
+}
+
+func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *types.PaginationToken {
+	pos, spos, err := db.EventPositionInTopology(ctx, eventID)
+	if err != nil {
+		t.Fatalf("failed to get EventPositionInTopology: %s", err)
+	}
+
+	if pos-1 <= 0 {
+		pos = types.StreamPosition(1)
+	} else {
+		pos = pos - 1
+		spos += 1000 // this has to be bigger than the chunk limit
+	}
+	return types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, pos, spos)
 }
 
 func reversed(in []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
