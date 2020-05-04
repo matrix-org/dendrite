@@ -44,10 +44,10 @@ type Database struct {
 }
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(dataSourceName string, dbProperties common.DbProperties, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
+	if db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
 		return nil, err
 	}
 	partitions := common.PartitionOffsetStatements{}

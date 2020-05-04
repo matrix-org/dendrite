@@ -16,6 +16,7 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/federationsender"
 )
 
@@ -25,12 +26,13 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	federation := base.CreateFederationClient()
-
-	_, _, query := base.CreateHTTPRoomserverAPIs()
-
-	federationsender.SetupFederationSenderComponent(
-		base, federation, query,
+	keyDB := base.CreateKeyDB()
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
+	rsAPI := base.CreateHTTPRoomserverAPIs()
+	fsAPI := federationsender.SetupFederationSenderComponent(
+		base, federation, rsAPI, &keyRing,
 	)
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender), string(base.Cfg.Listen.FederationSender))
 

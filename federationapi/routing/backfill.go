@@ -33,7 +33,7 @@ import (
 func Backfill(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
@@ -69,6 +69,7 @@ func Backfill(
 
 	// Populate the request.
 	req := api.QueryBackfillRequest{
+		RoomID:            roomID,
 		EarliestEventsIDs: eIDs,
 		ServerName:        request.Origin(),
 	}
@@ -81,7 +82,7 @@ func Backfill(
 	}
 
 	// Query the roomserver.
-	if err = query.QueryBackfill(httpReq.Context(), &req, &res); err != nil {
+	if err = rsAPI.QueryBackfill(httpReq.Context(), &req, &res); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryBackfill failed")
 		return jsonerror.InternalServerError()
 	}
@@ -97,7 +98,10 @@ func Backfill(
 	}
 
 	var eventJSONs []json.RawMessage
-	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(evs) {
+	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(
+		evs,
+		gomatrixserverlib.TopologicalOrderByPrevEvents,
+	) {
 		eventJSONs = append(eventJSONs, e.JSON())
 	}
 

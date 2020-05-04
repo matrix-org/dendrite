@@ -24,7 +24,7 @@ import (
 func URLDecodeMapValues(vmap map[string]string) (map[string]string, error) {
 	decoded := make(map[string]string, len(vmap))
 	for key, value := range vmap {
-		decodedVal, err := url.QueryUnescape(value)
+		decodedVal, err := url.PathUnescape(value)
 		if err != nil {
 			return make(map[string]string), err
 		}

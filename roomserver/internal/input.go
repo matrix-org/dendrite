@@ -13,33 +13,27 @@
 // limitations under the License.
 
 // Package input contains the code processes new room events
-package input
+package internal
 
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"sync"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/util"
-	sarama "gopkg.in/Shopify/sarama.v1"
+
+	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 )
 
-// RoomserverInputAPI implements api.RoomserverInputAPI
-type RoomserverInputAPI struct {
-	DB       RoomEventDatabase
-	Producer sarama.SyncProducer
-	// The kafkaesque topic to output new room events to.
-	// This is the name used in kafka to identify the stream to write events to.
-	OutputRoomEventTopic string
-	// Protects calls to processRoomEvent
-	mutex sync.Mutex
+// SetFederationSenderInputAPI passes in a federation sender input API reference
+// so that we can avoid the chicken-and-egg problem of both the roomserver input API
+// and the federation sender input API being interdependent.
+func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
+	r.fsAPI = fsAPI
 }
 
 // WriteOutputEvents implements OutputRoomEventWriter
-func (r *RoomserverInputAPI) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
+func (r *RoomserverInternalAPI) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
 	messages := make([]*sarama.ProducerMessage, len(updates))
 	for i := range updates {
 		value, err := json.Marshal(updates[i])
@@ -55,8 +49,8 @@ func (r *RoomserverInputAPI) WriteOutputEvents(roomID string, updates []api.Outp
 	return r.Producer.SendMessages(messages)
 }
 
-// InputRoomEvents implements api.RoomserverInputAPI
-func (r *RoomserverInputAPI) InputRoomEvents(
+// InputRoomEvents implements api.RoomserverInternalAPI
+func (r *RoomserverInternalAPI) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
@@ -75,21 +69,4 @@ func (r *RoomserverInputAPI) InputRoomEvents(
 		}
 	}
 	return nil
-}
-
-// SetupHTTP adds the RoomserverInputAPI handlers to the http.ServeMux.
-func (r *RoomserverInputAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(api.RoomserverInputRoomEventsPath,
-		common.MakeInternalAPI("inputRoomEvents", func(req *http.Request) util.JSONResponse {
-			var request api.InputRoomEventsRequest
-			var response api.InputRoomEventsResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := r.InputRoomEvents(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 }

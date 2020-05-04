@@ -40,15 +40,17 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
+// TODO: Can we improve the cyclo count here? Separate code paths for invites?
+// nolint:gocyclo
 func SendMembership(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	roomID string, membership string, cfg *config.Dendrite,
-	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -69,7 +71,7 @@ func SendMembership(
 	}
 
 	inviteStored, jsonErrResp := checkAndProcessThreepid(
-		req, device, &body, cfg, queryAPI, accountDB, producer,
+		req, device, &body, cfg, rsAPI, accountDB, producer,
 		membership, roomID, evTime,
 	)
 	if jsonErrResp != nil {
@@ -87,7 +89,7 @@ func SendMembership(
 	}
 
 	event, err := buildMembershipEvent(
-		req.Context(), body, accountDB, device, membership, roomID, cfg, evTime, queryAPI, asAPI,
+		req.Context(), body, accountDB, device, membership, roomID, cfg, evTime, rsAPI, asAPI,
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
@@ -104,23 +106,39 @@ func SendMembership(
 		return jsonerror.InternalServerError()
 	}
 
-	if _, err := producer.SendEvents(
-		req.Context(),
-		[]gomatrixserverlib.HeaderedEvent{(*event).Headered(verRes.RoomVersion)},
-		cfg.Matrix.ServerName,
-		nil,
-	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
-		return jsonerror.InternalServerError()
-	}
-
 	var returnData interface{} = struct{}{}
 
-	// The join membership requires the room id to be sent in the response
-	if membership == gomatrixserverlib.Join {
+	switch membership {
+	case gomatrixserverlib.Invite:
+		// Invites need to be handled specially
+		err = producer.SendInvite(
+			req.Context(),
+			event.Headered(verRes.RoomVersion),
+			nil, // ask the roomserver to draw up invite room state for us
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("producer.SendInvite failed")
+			return jsonerror.InternalServerError()
+		}
+	case gomatrixserverlib.Join:
+		// The join membership requires the room id to be sent in the response
 		returnData = struct {
 			RoomID string `json:"room_id"`
 		}{roomID}
+		fallthrough
+	default:
+		_, err = producer.SendEvents(
+			req.Context(),
+			[]gomatrixserverlib.HeaderedEvent{event.Headered(verRes.RoomVersion)},
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	return util.JSONResponse{
@@ -135,7 +153,7 @@ func buildMembershipEvent(
 	device *authtypes.Device,
 	membership, roomID string,
 	cfg *config.Dendrite, evTime time.Time,
-	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.Event, error) {
 	stateKey, reason, err := getMembershipStateKey(body, device, membership)
 	if err != nil {
@@ -170,7 +188,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return common.BuildEvent(ctx, &builder, cfg, evTime, queryAPI, nil)
+	return common.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns
@@ -230,7 +248,7 @@ func checkAndProcessThreepid(
 	device *authtypes.Device,
 	body *threepid.MembershipRequest,
 	cfg *config.Dendrite,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	accountDB accounts.Database,
 	producer *producers.RoomserverProducer,
 	membership, roomID string,
@@ -238,7 +256,7 @@ func checkAndProcessThreepid(
 ) (inviteStored bool, errRes *util.JSONResponse) {
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req.Context(), device, body, cfg, queryAPI, accountDB, producer,
+		req.Context(), device, body, cfg, rsAPI, accountDB, producer,
 		membership, roomID, evTime,
 	)
 	if err == threepid.ErrMissingParameter {

@@ -39,13 +39,13 @@ var ErrRoomNoExists = errors.New("Room does not exist")
 func BuildEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Dendrite, evTime time.Time,
-	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
+	rsAPI api.RoomserverInternalAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.Event, error) {
 	if queryRes == nil {
 		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
 
-	err := AddPrevEventsToEvent(ctx, builder, queryAPI, queryRes)
+	err := AddPrevEventsToEvent(ctx, builder, rsAPI, queryRes)
 	if err != nil {
 		// This can pass through a ErrRoomNoExists to the caller
 		return nil, err
@@ -66,7 +66,7 @@ func BuildEvent(
 func AddPrevEventsToEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder,
-	queryAPI api.RoomserverQueryAPI, queryRes *api.QueryLatestEventsAndStateResponse,
+	rsAPI api.RoomserverInternalAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) error {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -82,8 +82,8 @@ func AddPrevEventsToEvent(
 		RoomID:       builder.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),
 	}
-	if err = queryAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
-		return fmt.Errorf("queryAPI.QueryLatestEventsAndState: %w", err)
+	if err = rsAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
+		return fmt.Errorf("rsAPI.QueryLatestEventsAndState: %w", err)
 	}
 
 	if !queryRes.RoomExists {

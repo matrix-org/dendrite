@@ -20,7 +20,8 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
-	"github.com/matrix-org/dendrite/federationsender/query"
+	"github.com/matrix-org/dendrite/federationsender/internal"
+	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -33,18 +34,21 @@ import (
 func SetupFederationSenderComponent(
 	base *basecomponent.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
-	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
-) api.FederationSenderQueryAPI {
-	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	keyRing *gomatrixserverlib.KeyRing,
+) api.FederationSenderInternalAPI {
+	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
-	queues := queue.NewOutgoingQueues(base.Cfg.Matrix.ServerName, federation)
+	roomserverProducer := producers.NewRoomserverProducer(rsAPI, base.Cfg.Matrix.ServerName)
+
+	queues := queue.NewOutgoingQueues(base.Cfg.Matrix.ServerName, federation, roomserverProducer)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,
-		federationSenderDB, rsQueryAPI,
+		federationSenderDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
@@ -57,10 +61,10 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	queryAPI := query.FederationSenderQueryAPI{
-		DB: federationSenderDB,
-	}
+	queryAPI := internal.NewFederationSenderInternalAPI(
+		federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing,
+	)
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 
-	return &queryAPI
+	return queryAPI
 }

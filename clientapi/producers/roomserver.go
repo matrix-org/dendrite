@@ -23,15 +23,13 @@ import (
 
 // RoomserverProducer produces events for the roomserver to consume.
 type RoomserverProducer struct {
-	InputAPI api.RoomserverInputAPI
-	QueryAPI api.RoomserverQueryAPI
+	RsAPI api.RoomserverInternalAPI
 }
 
 // NewRoomserverProducer creates a new RoomserverProducer
-func NewRoomserverProducer(inputAPI api.RoomserverInputAPI, queryAPI api.RoomserverQueryAPI) *RoomserverProducer {
+func NewRoomserverProducer(rsAPI api.RoomserverInternalAPI) *RoomserverProducer {
 	return &RoomserverProducer{
-		InputAPI: inputAPI,
-		QueryAPI: queryAPI,
+		RsAPI: rsAPI,
 	}
 }
 
@@ -95,7 +93,7 @@ func (c *RoomserverProducer) SendInputRoomEvents(
 ) (eventID string, err error) {
 	request := api.InputRoomEventsRequest{InputRoomEvents: ires}
 	var response api.InputRoomEventsResponse
-	err = c.InputAPI.InputRoomEvents(ctx, &request, &response)
+	err = c.RsAPI.InputRoomEvents(ctx, &request, &response)
 	eventID = response.EventID
 	return
 }
@@ -106,14 +104,17 @@ func (c *RoomserverProducer) SendInputRoomEvents(
 func (c *RoomserverProducer) SendInvite(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
+	sendAsServer gomatrixserverlib.ServerName, txnID *api.TransactionID,
 ) error {
 	request := api.InputRoomEventsRequest{
 		InputInviteEvents: []api.InputInviteEvent{{
 			Event:           inviteEvent,
 			InviteRoomState: inviteRoomState,
 			RoomVersion:     inviteEvent.RoomVersion,
+			SendAsServer:    string(sendAsServer),
+			TransactionID:   txnID,
 		}},
 	}
 	var response api.InputRoomEventsResponse
-	return c.InputAPI.InputRoomEvents(ctx, &request, &response)
+	return c.RsAPI.InputRoomEvents(ctx, &request, &response)
 }

@@ -35,6 +35,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -60,7 +61,7 @@ type SyncServerDatasource struct {
 	invites             inviteEventsStatements
 	eduCache            *cache.EDUCache
 	topology            outputRoomEventsTopologyStatements
-	backwardExtremities backwardExtremitiesStatements
+	backwardExtremities tables.BackwardsExtremities
 }
 
 // NewSyncServerDatasource creates a new sync server database
@@ -79,7 +80,7 @@ func NewSyncServerDatasource(dataSourceName string) (*SyncServerDatasource, erro
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = d.prepare(); err != nil {
@@ -102,16 +103,17 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.events.prepare(d.db, &d.streamID); err != nil {
 		return err
 	}
-	if err := d.roomstate.prepare(d.db, &d.streamID); err != nil {
+	if err = d.roomstate.prepare(d.db, &d.streamID); err != nil {
 		return err
 	}
-	if err := d.invites.prepare(d.db, &d.streamID); err != nil {
+	if err = d.invites.prepare(d.db, &d.streamID); err != nil {
 		return err
 	}
-	if err := d.topology.prepare(d.db); err != nil {
+	if err = d.topology.prepare(d.db); err != nil {
 		return err
 	}
-	if err := d.backwardExtremities.prepare(d.db); err != nil {
+	d.backwardExtremities, err = tables.NewBackwardsExtremities(d.db, &tables.SqliteBackwardsExtremitiesStatements{})
+	if err != nil {
 		return err
 	}
 	return nil
@@ -142,7 +144,7 @@ func (d *SyncServerDatasource) Events(ctx context.Context, eventIDs []string) ([
 // the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
 func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.HeaderedEvent) error {
-	if err := d.backwardExtremities.deleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
+	if err := d.backwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 		return err
 	}
 
@@ -163,7 +165,7 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, tx
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.backwardExtremities.insertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
+			if err = d.backwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
 				return err
 			}
 		}
@@ -192,7 +194,7 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.topology.insertEventInTopology(ctx, txn, ev); err != nil {
+		if err = d.topology.insertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return err
 		}
 
@@ -279,14 +281,16 @@ func (d *SyncServerDatasource) GetEventsInRange(
 	// events must be retrieved from the rooms' topology table rather than the
 	// table contaning the syncapi server's whole stream of events.
 	if from.Type == types.PaginationTokenTypeTopology {
+		// TODO: ARGH CONFUSING
 		// Determine the backward and forward limit, i.e. the upper and lower
 		// limits to the selection in the room's topology, from the direction.
-		var backwardLimit, forwardLimit types.StreamPosition
+		var backwardLimit, forwardLimit, forwardMicroLimit types.StreamPosition
 		if backwardOrdering {
 			// Backward ordering is antichronological (latest event to oldest
 			// one).
 			backwardLimit = to.PDUPosition
 			forwardLimit = from.PDUPosition
+			forwardMicroLimit = from.EDUTypingPosition
 		} else {
 			// Forward ordering is chronological (oldest event to latest one).
 			backwardLimit = from.PDUPosition
@@ -296,7 +300,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 		// Select the event IDs from the defined range.
 		var eIDs []string
 		eIDs, err = d.topology.selectEventIDsInRange(
-			ctx, nil, roomID, backwardLimit, forwardLimit, limit, !backwardOrdering,
+			ctx, nil, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
 		)
 		if err != nil {
 			return
@@ -326,8 +330,7 @@ func (d *SyncServerDatasource) GetEventsInRange(
 			return
 		}
 	}
-
-	return
+	return events, err
 }
 
 // SyncPosition returns the latest positions for syncing.
@@ -344,14 +347,14 @@ func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (tok types.Pagi
 func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
 	ctx context.Context, roomID string,
 ) (backwardExtremities []string, err error) {
-	return d.backwardExtremities.selectBackwardExtremitiesForRoom(ctx, roomID)
+	return d.backwardExtremities.SelectBackwardExtremitiesForRoom(ctx, roomID)
 }
 
 // MaxTopologicalPosition returns the highest topological position for a given
 // room.
 func (d *SyncServerDatasource) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
-) (types.StreamPosition, error) {
+) (types.StreamPosition, types.StreamPosition, error) {
 	return d.topology.selectMaxPositionInTopology(ctx, nil, roomID)
 }
 
@@ -370,7 +373,7 @@ func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 
 func (d *SyncServerDatasource) EventPositionInTopology(
 	ctx context.Context, eventID string,
-) (types.StreamPosition, error) {
+) (depth types.StreamPosition, stream types.StreamPosition, err error) {
 	return d.topology.selectPositionInTopology(ctx, nil, eventID)
 }
 
@@ -431,6 +434,7 @@ func (d *SyncServerDatasource) syncPositionTx(
 	}
 	sp.PDUPosition = types.StreamPosition(maxEventID)
 	sp.EDUTypingPosition = types.StreamPosition(d.eduCache.GetLatestSyncPosition())
+	sp.Type = types.PaginationTokenTypeStream
 	return
 }
 
@@ -649,12 +653,13 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 
 		// Retrieve the backward topology position, i.e. the position of the
 		// oldest event in the room's topology.
-		var backwardTopologyPos types.StreamPosition
-		backwardTopologyPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
+		var backwardTopologyPos, backwardTopologyStreamPos types.StreamPosition
+		backwardTopologyPos, backwardTopologyStreamPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 		if backwardTopologyPos-1 <= 0 {
 			backwardTopologyPos = types.StreamPosition(1)
 		} else {
 			backwardTopologyPos--
+			backwardTopologyStreamPos += 1000 // this has to be bigger than the number of events we backfill per request
 		}
 
 		// We don't include a device here as we don't need to send down
@@ -663,7 +668,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
+			types.PaginationTokenTypeTopology, backwardTopologyPos, backwardTopologyStreamPos,
 		).String()
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
@@ -799,11 +804,7 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 		return err
 	}
 	for roomID, inviteEvent := range invites {
-		ir := types.NewInviteResponse()
-		ir.InviteState.Events = gomatrixserverlib.HeaderedToClientEvents(
-			[]gomatrixserverlib.HeaderedEvent{inviteEvent}, gomatrixserverlib.FormatSync,
-		)
-		// TODO: add the invite state from the invite event.
+		ir := types.NewInviteResponse(inviteEvent)
 		res.Rooms.Invite[roomID] = *ir
 	}
 	return nil
@@ -814,14 +815,17 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 func (d *SyncServerDatasource) getBackwardTopologyPos(
 	ctx context.Context, txn *sql.Tx,
 	events []types.StreamEvent,
-) (pos types.StreamPosition) {
+) (pos, spos types.StreamPosition) {
 	if len(events) > 0 {
-		pos, _ = d.topology.selectPositionInTopology(ctx, txn, events[0].EventID())
+		pos, spos, _ = d.topology.selectPositionInTopology(ctx, txn, events[0].EventID())
 	}
+	// go to the previous position so we don't pull out the same event twice
+	// FIXME: This could be done more nicely by being explicit with inclusive/exclusive rules
 	if pos-1 <= 0 {
 		pos = types.StreamPosition(1)
 	} else {
 		pos = pos - 1
+		spos += 1000 // this has to be bigger than the number of events we backfill per request
 	}
 	return
 }
@@ -855,14 +859,14 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 	}
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents)
-	backwardTopologyPos := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
+	backwardTopologyPos, backwardStreamPos := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
 
 	switch delta.membership {
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
 
 		jr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
+			types.PaginationTokenTypeTopology, backwardTopologyPos, backwardStreamPos,
 		).String()
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
@@ -875,7 +879,7 @@ func (d *SyncServerDatasource) addRoomDeltaToResponse(
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
 		lr.Timeline.PrevBatch = types.NewPaginationTokenFromTypeAndPosition(
-			types.PaginationTokenTypeTopology, backwardTopologyPos, 0,
+			types.PaginationTokenTypeTopology, backwardTopologyPos, backwardStreamPos,
 		).String()
 		lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true

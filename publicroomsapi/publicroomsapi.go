@@ -32,16 +32,16 @@ func SetupPublicRoomsAPIComponent(
 	base *basecomponent.BaseDendrite,
 	deviceDB devices.Database,
 	publicRoomsDB storage.Database,
-	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	fedClient *gomatrixserverlib.FederationClient,
 	extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, publicRoomsDB, rsQueryAPI,
+		base.Cfg, base.KafkaConsumer, publicRoomsDB, rsAPI,
 	)
 	if err := rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start public rooms server consumer")
 	}
 
-	routing.Setup(base.APIMux, deviceDB, publicRoomsDB, rsQueryAPI, fedClient, extRoomsProvider)
+	routing.Setup(base.APIMux, deviceDB, publicRoomsDB, rsAPI, fedClient, extRoomsProvider)
 }

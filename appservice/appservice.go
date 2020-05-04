@@ -44,12 +44,11 @@ func SetupAppServiceAPIComponent(
 	accountsDB accounts.Database,
 	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
-	roomserverAliasAPI roomserverAPI.RoomserverAliasAPI,
-	roomserverQueryAPI roomserverAPI.RoomserverQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	transactionsCache *transactions.Cache,
 ) appserviceAPI.AppServiceQueryAPI {
 	// Create a connection to the appservice postgres DB
-	appserviceDB, err := storage.NewDatabase(string(base.Cfg.Database.AppService))
+	appserviceDB, err := storage.NewDatabase(string(base.Cfg.Database.AppService), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to appservice db")
 	}
@@ -87,7 +86,7 @@ func SetupAppServiceAPIComponent(
 
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
-		roomserverQueryAPI, roomserverAliasAPI, workerStates,
+		rsAPI, workerStates,
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
@@ -100,7 +99,7 @@ func SetupAppServiceAPIComponent(
 
 	// Set up HTTP Endpoints
 	routing.Setup(
-		base.APIMux, base.Cfg, roomserverQueryAPI, roomserverAliasAPI,
+		base.APIMux, base.Cfg, rsAPI,
 		accountsDB, federation, transactionsCache,
 	)
 

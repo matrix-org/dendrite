@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package input
+package internal
 
 import (
 	"bytes"
@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -47,7 +48,7 @@ import (
 // Can only be called once at a time
 func updateLatestEvents(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	ow OutputRoomEventWriter,
 	roomNID types.RoomNID,
 	stateAtEvent types.StateAtEvent,
@@ -86,7 +87,7 @@ func updateLatestEvents(
 // when there are so many variables to pass around.
 type latestEventsUpdater struct {
 	ctx           context.Context
-	db            RoomEventDatabase
+	db            storage.Database
 	updater       types.RoomRecentEventsUpdater
 	ow            OutputRoomEventWriter
 	roomNID       types.RoomNID

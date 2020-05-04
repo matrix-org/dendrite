@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package input
+package internal
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -29,7 +30,7 @@ import (
 // consumers about the invites added or retired by the change in current state.
 func updateMemberships(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	updater types.RoomRecentEventsUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
@@ -143,7 +144,7 @@ func updateToInviteMembership(
 		// consider a single stream of events when determining whether a user
 		// is invited, rather than having to combine multiple streams themselves.
 		onie := api.OutputNewInviteEvent{
-			Event:       (*add).Headered(roomVersion),
+			Event:       add.Headered(roomVersion),
 			RoomVersion: roomVersion,
 		}
 		updates = append(updates, api.OutputEvent{

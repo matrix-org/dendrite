@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -122,6 +123,12 @@ func ASExclusive(msg string) *MatrixError {
 // forbidden from accessing a resource as a guest.
 func GuestAccessForbidden(msg string) *MatrixError {
 	return &MatrixError{"M_GUEST_ACCESS_FORBIDDEN", msg}
+}
+
+// IncompatibleRoomVersion is an error which is returned when the client
+// requests a room with a version that is unsupported.
+func IncompatibleRoomVersion(roomVersion gomatrixserverlib.RoomVersion) *MatrixError {
+	return &MatrixError{"M_INCOMPATIBLE_ROOM_VERSION", string(roomVersion)}
 }
 
 // UnsupportedRoomVersion is an error which is returned when the client

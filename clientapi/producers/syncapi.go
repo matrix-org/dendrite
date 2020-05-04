@@ -19,7 +19,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 
-	sarama "gopkg.in/Shopify/sarama.v1"
+	"github.com/Shopify/sarama"
 )
 
 // SyncAPIProducer produces events for the sync API server to consume

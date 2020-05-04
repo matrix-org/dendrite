@@ -36,10 +36,10 @@ type PublicRoomsServerDatabase struct {
 type attributeValue interface{}
 
 // NewPublicRoomsServerDatabase creates a new public rooms server database.
-func NewPublicRoomsServerDatabase(dataSourceName string) (*PublicRoomsServerDatabase, error) {
+func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties common.DbProperties) (*PublicRoomsServerDatabase, error) {
 	var db *sql.DB
 	var err error
-	if db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
+	if db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
 		return nil, err
 	}
 	storage := PublicRoomsServerDatabase{

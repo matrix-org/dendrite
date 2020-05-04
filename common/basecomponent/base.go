@@ -33,8 +33,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/common"
 
+	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
-	sarama "gopkg.in/Shopify/sarama.v1"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/common/config"
@@ -119,24 +119,12 @@ func (b *BaseDendrite) CreateHTTPAppServiceAPIs() appserviceAPI.AppServiceQueryA
 
 // CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI for hitting
 // the roomserver over HTTP.
-func (b *BaseDendrite) CreateHTTPRoomserverAPIs() (
-	roomserverAPI.RoomserverAliasAPI,
-	roomserverAPI.RoomserverInputAPI,
-	roomserverAPI.RoomserverQueryAPI,
-) {
-	alias, err := roomserverAPI.NewRoomserverAliasAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
+func (b *BaseDendrite) CreateHTTPRoomserverAPIs() roomserverAPI.RoomserverInternalAPI {
+	rsAPI, err := roomserverAPI.NewRoomserverInternalAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
 	if err != nil {
-		logrus.WithError(err).Panic("NewRoomserverAliasAPIHTTP failed")
+		logrus.WithError(err).Panic("NewRoomserverInternalAPIHTTP failed", b.httpClient)
 	}
-	input, err := roomserverAPI.NewRoomserverInputAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient)
-	if err != nil {
-		logrus.WithError(err).Panic("NewRoomserverInputAPIHTTP failed", b.httpClient)
-	}
-	query, err := roomserverAPI.NewRoomserverQueryAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
-	if err != nil {
-		logrus.WithError(err).Panic("NewRoomserverQueryAPIHTTP failed", b.httpClient)
-	}
-	return alias, input, query
+	return rsAPI
 }
 
 // CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
@@ -149,12 +137,12 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 	return e
 }
 
-// CreateHTTPFederationSenderAPIs returns FederationSenderQueryAPI for hitting
+// CreateHTTPFederationSenderAPIs returns FederationSenderInternalAPI for hitting
 // the federation sender over HTTP
-func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderQueryAPI {
-	f, err := federationSenderAPI.NewFederationSenderQueryAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
+func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderInternalAPI {
+	f, err := federationSenderAPI.NewFederationSenderInternalAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("NewFederationSenderQueryAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("NewFederationSenderInternalAPIHTTP failed", b.httpClient)
 	}
 	return f
 }
@@ -162,7 +150,7 @@ func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.Fede
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
 func (b *BaseDendrite) CreateDeviceDB() devices.Database {
-	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.Matrix.ServerName)
+	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to devices db")
 	}
@@ -173,7 +161,7 @@ func (b *BaseDendrite) CreateDeviceDB() devices.Database {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
-	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.Matrix.ServerName)
+	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
@@ -186,6 +174,7 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 	db, err := keydb.NewDatabase(
 		string(b.Cfg.Database.ServerKey),
+		b.Cfg.DbProperties(),
 		b.Cfg.Matrix.ServerName,
 		b.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
 		b.Cfg.Matrix.KeyID,
@@ -256,7 +245,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
 	if err != nil || uri.Scheme == "file" {
-		db, err = sqlutil.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka))
+		db, err = sqlutil.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka), nil)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}
@@ -266,7 +255,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
 	} else {
-		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka))
+		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka), nil)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}

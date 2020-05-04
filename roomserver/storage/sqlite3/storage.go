@@ -37,7 +37,7 @@ type Database struct {
 	db         *sql.DB
 }
 
-// Open a postgres database.
+// Open a sqlite database.
 func Open(dataSourceName string) (*Database, error) {
 	var d Database
 	uri, err := url.Parse(dataSourceName)
@@ -52,7 +52,7 @@ func Open(dataSourceName string) (*Database, error) {
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs); err != nil {
+	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
@@ -124,7 +124,7 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		if eventNID, stateNID, err = d.statements.insertEvent(
+		if eventNID, err = d.statements.insertEvent(
 			ctx,
 			txn,
 			roomNID,
@@ -587,6 +587,23 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (roomNID types.Ro
 		}
 		return err
 	})
+	return
+}
+
+// RoomNIDExcludingStubs implements query.RoomserverQueryAPIDB
+func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
+	roomNID, err = d.RoomNID(ctx, roomID)
+	if err != nil {
+		return
+	}
+	latestEvents, _, err := d.statements.selectLatestEventNIDs(ctx, nil, roomNID)
+	if err != nil {
+		return
+	}
+	if len(latestEvents) == 0 {
+		roomNID = 0
+		return
+	}
 	return
 }
 

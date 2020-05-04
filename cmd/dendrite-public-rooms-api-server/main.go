@@ -28,12 +28,15 @@ func main() {
 
 	deviceDB := base.CreateDeviceDB()
 
-	_, _, query := base.CreateHTTPRoomserverAPIs()
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	fsAPI := base.CreateHTTPFederationSenderAPIs()
+	rsAPI := base.CreateHTTPRoomserverAPIs()
+	rsAPI.SetFederationSenderAPI(fsAPI)
+
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, query, nil, nil)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, nil, nil)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.PublicRoomsAPI), string(base.Cfg.Listen.PublicRoomsAPI))
 

@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/dendrite/federationsender/queue"
@@ -27,16 +28,16 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
-	sarama "gopkg.in/Shopify/sarama.v1"
+	"github.com/tidwall/gjson"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	cfg                *config.Dendrite
-	roomServerConsumer *common.ContinualConsumer
-	db                 storage.Database
-	queues             *queue.OutgoingQueues
-	query              api.RoomserverQueryAPI
+	cfg        *config.Dendrite
+	rsAPI      api.RoomserverInternalAPI
+	rsConsumer *common.ContinualConsumer
+	db         storage.Database
+	queues     *queue.OutgoingQueues
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -45,7 +46,7 @@ func NewOutputRoomEventConsumer(
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
@@ -53,11 +54,11 @@ func NewOutputRoomEventConsumer(
 		PartitionStore: store,
 	}
 	s := &OutputRoomEventConsumer{
-		cfg:                cfg,
-		roomServerConsumer: &consumer,
-		db:                 store,
-		queues:             queues,
-		query:              queryAPI,
+		cfg:        cfg,
+		rsConsumer: &consumer,
+		db:         store,
+		queues:     queues,
+		rsAPI:      rsAPI,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -66,7 +67,7 @@ func NewOutputRoomEventConsumer(
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	return s.roomServerConsumer.Start()
+	return s.rsConsumer.Start()
 }
 
 // onMessage is called when the federation server receives a new event from the room server output log.
@@ -187,49 +188,12 @@ func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) er
 		return nil
 	}
 
-	// When sending a v2 invite, the inviting server should try and include
-	// a "stripped down" version of the room state. This is pretty much just
-	// enough information for the remote side to show something useful to the
-	// user, like the room name, aliases etc.
+	// Try to extract the room invite state. The roomserver will have stashed
+	// this for us in invite_room_state if it didn't already exist.
 	strippedState := []gomatrixserverlib.InviteV2StrippedState{}
-	stateWanted := []string{
-		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
-		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
-	}
-
-	// For each of the state keys that we want to try and send, ask the
-	// roomserver if we have a state event for that room that matches the
-	// state key.
-	for _, wanted := range stateWanted {
-		queryReq := api.QueryLatestEventsAndStateRequest{
-			RoomID: oie.Event.RoomID(),
-			StateToFetch: []gomatrixserverlib.StateKeyTuple{
-				gomatrixserverlib.StateKeyTuple{
-					EventType: wanted,
-					StateKey:  "",
-				},
-			},
-		}
-		// If this fails then we just move onto the next event - we don't
-		// actually know at this point whether the room even has that type
-		// of state.
-		queryRes := api.QueryLatestEventsAndStateResponse{}
-		if err := s.query.QueryLatestEventsAndState(context.TODO(), &queryReq, &queryRes); err != nil {
-			log.WithFields(log.Fields{
-				"room_id":    queryReq.RoomID,
-				"event_type": wanted,
-			}).WithError(err).Info("couldn't find state to strip")
-			continue
-		}
-		// Append the stripped down copy of the state to our list.
-		for _, headeredEvent := range queryRes.StateEvents {
-			event := headeredEvent.Unwrap()
-			strippedState = append(strippedState, gomatrixserverlib.NewInviteV2StrippedState(&event))
-
-			log.WithFields(log.Fields{
-				"room_id":    queryReq.RoomID,
-				"event_type": event.Type(),
-			}).Info("adding stripped state")
+	if inviteRoomState := gjson.GetBytes(oie.Event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
+		if err := json.Unmarshal([]byte(inviteRoomState.Raw), &strippedState); err != nil {
+			log.WithError(err).Warn("failed to extract invite_room_state from event unsigned")
 		}
 	}
 
@@ -405,7 +369,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	// from the roomserver using the query API.
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
 	var eventResp api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
+	if err := s.rsAPI.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
 		return nil, err
 	}
 

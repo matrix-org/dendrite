@@ -33,13 +33,13 @@ func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID, userID string,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
@@ -61,9 +61,7 @@ func MakeJoin(
 	if !remoteSupportsVersion {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Joining server does not support room version %s", verRes.RoomVersion),
-			),
+			JSON: jsonerror.IncompatibleRoomVersion(verRes.RoomVersion),
 		}
 	}
 
@@ -97,7 +95,7 @@ func MakeJoin(
 	queryRes := api.QueryLatestEventsAndStateResponse{
 		RoomVersion: verRes.RoomVersion,
 	}
-	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), query, &queryRes)
+	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), rsAPI, &queryRes)
 	if err == common.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -132,19 +130,22 @@ func MakeJoin(
 }
 
 // SendJoin implements the /send_join API
+// The make-join send-join dance makes much more sense as a single
+// flow so the cyclomatic complexity is high:
+// nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := query.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryRoomVersionForRoom failed")
+	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryRoomVersionForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
@@ -156,6 +157,16 @@ func SendJoin(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+
+	// Check that a state key is provided.
+	if event.StateKey() == nil || (event.StateKey() != nil && *event.StateKey() == "") {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(
+				fmt.Sprintf("No state key was provided in the join event."),
+			),
 		}
 	}
 
@@ -216,14 +227,14 @@ func SendJoin(
 	// Fetch the state and auth chain. We do this before we send the events
 	// on, in case this fails.
 	var stateAndAuthChainResponse api.QueryStateAndAuthChainResponse
-	err = query.QueryStateAndAuthChain(httpReq.Context(), &api.QueryStateAndAuthChainRequest{
+	err = rsAPI.QueryStateAndAuthChain(httpReq.Context(), &api.QueryStateAndAuthChainRequest{
 		PrevEventIDs: event.PrevEventIDs(),
 		AuthEventIDs: event.AuthEventIDs(),
 		RoomID:       roomID,
 		ResolveState: true,
 	}, &stateAndAuthChainResponse)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryStateAndAuthChain failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryStateAndAuthChain failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -234,27 +245,44 @@ func SendJoin(
 		}
 	}
 
+	// Check if the user is already in the room. If they're already in then
+	// there isn't much point in sending another join event into the room.
+	alreadyJoined := false
+	for _, se := range stateAndAuthChainResponse.StateEvents {
+		if membership, merr := se.Membership(); merr == nil {
+			if se.StateKey() != nil && *se.StateKey() == *event.StateKey() {
+				alreadyJoined = (membership == "join")
+				break
+			}
+		}
+	}
+
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(
-		httpReq.Context(),
-		[]gomatrixserverlib.HeaderedEvent{
-			event.Headered(stateAndAuthChainResponse.RoomVersion),
-		},
-		cfg.Matrix.ServerName,
-		nil,
-	)
-	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
-		return jsonerror.InternalServerError()
+	if !alreadyJoined {
+		_, err = producer.SendEvents(
+			httpReq.Context(),
+			[]gomatrixserverlib.HeaderedEvent{
+				event.Headered(stateAndAuthChainResponse.RoomVersion),
+			},
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: map[string]interface{}{
-			"state":      gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.StateEvents),
-			"auth_chain": gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
+		JSON: gomatrixserverlib.RespSendJoin{
+			RespState: gomatrixserverlib.RespState{
+				StateEvents: gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.StateEvents),
+				AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
+			},
+			Origin: cfg.Matrix.ServerName,
 		},
 	}
 }

@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 )
 
 var (
@@ -63,8 +64,14 @@ const (
 // /sync or /messages, for example.
 type PaginationToken struct {
 	//Position StreamPosition
-	Type              PaginationTokenType
-	PDUPosition       StreamPosition
+	Type PaginationTokenType
+	// For /sync, this is the PDU position. For /messages, this is the topological position (depth).
+	// TODO: Given how different the positions are depending on the token type, they should probably be renamed
+	//       or use different structs altogether.
+	PDUPosition StreamPosition
+	// For /sync, this is the EDU position. For /messages, this is the stream (PDU) position.
+	// TODO: Given how different the positions are depending on the token type, they should probably be renamed
+	//       or use different structs altogether.
 	EDUTypingPosition StreamPosition
 }
 
@@ -247,14 +254,17 @@ func NewJoinResponse() *JoinResponse {
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
 type InviteResponse struct {
 	InviteState struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
+		Events json.RawMessage `json:"events"`
 	} `json:"invite_state"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse() *InviteResponse {
+func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
-	res.InviteState.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.InviteState.Events = json.RawMessage{'[', ']'}
+	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
+		res.InviteState.Events = json.RawMessage(inviteRoomState.Raw)
+	}
 	return &res
 }
 

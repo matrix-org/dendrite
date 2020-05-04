@@ -26,8 +26,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/Shopify/sarama"
 	log "github.com/sirupsen/logrus"
-	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -35,8 +35,7 @@ type OutputRoomEventConsumer struct {
 	roomServerConsumer *common.ContinualConsumer
 	db                 accounts.Database
 	asDB               storage.Database
-	query              api.RoomserverQueryAPI
-	alias              api.RoomserverAliasAPI
+	rsAPI              api.RoomserverInternalAPI
 	serverName         string
 	workerStates       []types.ApplicationServiceWorkerState
 }
@@ -48,8 +47,7 @@ func NewOutputRoomEventConsumer(
 	kafkaConsumer sarama.Consumer,
 	store accounts.Database,
 	appserviceDB storage.Database,
-	queryAPI api.RoomserverQueryAPI,
-	aliasAPI api.RoomserverAliasAPI,
+	rsAPI api.RoomserverInternalAPI,
 	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
 	consumer := common.ContinualConsumer{
@@ -61,8 +59,7 @@ func NewOutputRoomEventConsumer(
 		roomServerConsumer: &consumer,
 		db:                 store,
 		asDB:               appserviceDB,
-		query:              queryAPI,
-		alias:              aliasAPI,
+		rsAPI:              rsAPI,
 		serverName:         string(cfg.Matrix.ServerName),
 		workerStates:       workerStates,
 	}
@@ -139,7 +136,7 @@ func (s *OutputRoomEventConsumer) lookupMissingStateEvents(
 	// Request the missing events from the roomserver
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
 	var eventResp api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
+	if err := s.rsAPI.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
 		return nil, err
 	}
 
@@ -200,7 +197,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	// Check all known room aliases of the room the event came from
 	queryReq := api.GetAliasesForRoomIDRequest{RoomID: event.RoomID()}
 	var queryRes api.GetAliasesForRoomIDResponse
-	if err := s.alias.GetAliasesForRoomID(ctx, &queryReq, &queryRes); err == nil {
+	if err := s.rsAPI.GetAliasesForRoomID(ctx, &queryReq, &queryRes); err == nil {
 		for _, alias := range queryRes.Aliases {
 			if appservice.IsInterestedInRoomAlias(alias) {
 				return true

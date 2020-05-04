@@ -94,7 +94,7 @@ func GetAvatarURL(
 func SetAvatarURL(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
-	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
+	rsProducer *producers.RoomserverProducer, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -154,7 +154,7 @@ func SetAvatarURL(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), memberships, newProfile, userID, cfg, evTime, queryAPI,
+		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
@@ -208,7 +208,7 @@ func GetDisplayName(
 func SetDisplayName(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
-	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
+	rsProducer *producers.RoomserverProducer, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -268,7 +268,7 @@ func SetDisplayName(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), memberships, newProfile, userID, cfg, evTime, queryAPI,
+		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
@@ -337,14 +337,14 @@ func buildMembershipEvents(
 	ctx context.Context,
 	memberships []authtypes.Membership,
 	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
-	evTime time.Time, queryAPI api.RoomserverQueryAPI,
+	evTime time.Time, rsAPI api.RoomserverInternalAPI,
 ) ([]gomatrixserverlib.HeaderedEvent, error) {
 	evs := []gomatrixserverlib.HeaderedEvent{}
 
 	for _, membership := range memberships {
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: membership.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := queryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+		if err := rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
 			return []gomatrixserverlib.HeaderedEvent{}, err
 		}
 
@@ -366,7 +366,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := common.BuildEvent(ctx, &builder, cfg, evTime, queryAPI, nil)
+		event, err := common.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

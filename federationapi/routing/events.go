@@ -16,7 +16,9 @@ package routing
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -27,15 +29,22 @@ import (
 func GetEvent(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	eventID string,
+	origin gomatrixserverlib.ServerName,
 ) util.JSONResponse {
-	event, err := getEvent(ctx, request, query, eventID)
+	event, err := getEvent(ctx, request, rsAPI, eventID)
 	if err != nil {
 		return *err
 	}
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: event}
+	return util.JSONResponse{Code: http.StatusOK, JSON: gomatrixserverlib.Transaction{
+		Origin:         origin,
+		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+		PDUs: []json.RawMessage{
+			event.JSON(),
+		},
+	}}
 }
 
 // getEvent returns the requested event,
@@ -43,11 +52,11 @@ func GetEvent(
 func getEvent(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	eventID string,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	var authResponse api.QueryServerAllowedToSeeEventResponse
-	err := query.QueryServerAllowedToSeeEvent(
+	err := rsAPI.QueryServerAllowedToSeeEvent(
 		ctx,
 		&api.QueryServerAllowedToSeeEventRequest{
 			EventID:    eventID,
@@ -66,7 +75,7 @@ func getEvent(
 	}
 
 	var eventsResponse api.QueryEventsByIDResponse
-	err = query.QueryEventsByID(
+	err = rsAPI.QueryEventsByID(
 		ctx,
 		&api.QueryEventsByIDRequest{EventIDs: []string{eventID}},
 		&eventsResponse,

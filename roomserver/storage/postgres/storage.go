@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	// Import the postgres database driver.
@@ -36,10 +37,10 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(dataSourceName string) (*Database, error) {
+func Open(dataSourceName string, dbProperties common.DbProperties) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
+	if d.db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
 		return nil, err
 	}
 	if err = d.statements.prepare(d.db); err != nil {
@@ -469,6 +470,23 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 		return 0, nil
 	}
 	return roomNID, err
+}
+
+// RoomNIDExcludingStubs implements query.RoomserverQueryAPIDB
+func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
+	roomNID, err = d.RoomNID(ctx, roomID)
+	if err != nil {
+		return
+	}
+	latestEvents, _, err := d.statements.selectLatestEventNIDs(ctx, roomNID)
+	if err != nil {
+		return
+	}
+	if len(latestEvents) == 0 {
+		roomNID = 0
+		return
+	}
+	return
 }
 
 // LatestEventIDs implements query.RoomserverQueryAPIDatabase

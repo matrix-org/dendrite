@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package input
+package internal
 
 import (
 	"context"
@@ -23,62 +23,12 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/state/database"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
-
-// A RoomEventDatabase has the storage APIs needed to store a room event.
-type RoomEventDatabase interface {
-	database.RoomStateDatabase
-	// Stores a matrix room event in the database
-	StoreEvent(
-		ctx context.Context,
-		event gomatrixserverlib.Event,
-		txnAndSessionID *api.TransactionID,
-		authEventNIDs []types.EventNID,
-	) (types.RoomNID, types.StateAtEvent, error)
-	// Look up the state entries for a list of string event IDs
-	// Returns an error if the there is an error talking to the database
-	// Returns a types.MissingEventError if the event IDs aren't in the database.
-	StateEntriesForEventIDs(
-		ctx context.Context, eventIDs []string,
-	) ([]types.StateEntry, error)
-	// Set the state at an event.
-	SetState(
-		ctx context.Context,
-		eventNID types.EventNID,
-		stateNID types.StateSnapshotNID,
-	) error
-	// Look up the latest events in a room in preparation for an update.
-	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
-	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
-	// If this returns an error then no further action is required.
-	GetLatestEventsForUpdate(
-		ctx context.Context, roomNID types.RoomNID,
-	) (updater types.RoomRecentEventsUpdater, err error)
-	// Look up the string event IDs for a list of numeric event IDs
-	EventIDs(
-		ctx context.Context, eventNIDs []types.EventNID,
-	) (map[types.EventNID]string, error)
-	// Build a membership updater for the target user in a room.
-	MembershipUpdater(
-		ctx context.Context, roomID, targerUserID string,
-		roomVersion gomatrixserverlib.RoomVersion,
-	) (types.MembershipUpdater, error)
-	// Look up event ID by transaction's info.
-	// This is used to determine if the room event is processed/processing already.
-	// Returns an empty string if no such event exists.
-	GetTransactionEventID(
-		ctx context.Context, transactionID string,
-		sessionID int64, userID string,
-	) (string, error)
-	// Look up the room version for a given room.
-	GetRoomVersionForRoom(
-		ctx context.Context, roomID string,
-	) (gomatrixserverlib.RoomVersion, error)
-}
 
 // OutputRoomEventWriter has the APIs needed to write an event to the output logs.
 type OutputRoomEventWriter interface {
@@ -93,7 +43,7 @@ type OutputRoomEventWriter interface {
 // state deltas when sending to kafka streams
 func processRoomEvent(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	ow OutputRoomEventWriter,
 	input api.InputRoomEvent,
 ) (eventID string, err error) {
@@ -104,6 +54,7 @@ func processRoomEvent(
 	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(ctx, db, headered, input.AuthEventIDs)
 	if err != nil {
+		logrus.WithError(err).WithField("event_id", event.EventID()).Error("processRoomEvent.checkAuthEvents failed for event")
 		return
 	}
 
@@ -128,6 +79,7 @@ func processRoomEvent(
 		// For outliers we can stop after we've stored the event itself as it
 		// doesn't have any associated state to store and we don't need to
 		// notify anyone about it.
+		logrus.WithField("event_id", event.EventID()).WithField("type", event.Type()).WithField("room", event.RoomID()).Info("Stored outlier")
 		return event.EventID(), nil
 	}
 
@@ -140,11 +92,6 @@ func processRoomEvent(
 		}
 	}
 
-	if input.Kind == api.KindBackfill {
-		// Backfill is not implemented.
-		panic("Not implemented")
-	}
-
 	// Update the extremities of the event graph for the room
 	return event.EventID(), updateLatestEvents(
 		ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID,
@@ -153,7 +100,7 @@ func processRoomEvent(
 
 func calculateAndSetState(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	input api.InputRoomEvent,
 	roomNID types.RoomNID,
 	stateAtEvent *types.StateAtEvent,
@@ -184,7 +131,7 @@ func calculateAndSetState(
 
 func processInviteEvent(
 	ctx context.Context,
-	db RoomEventDatabase,
+	db storage.Database,
 	ow OutputRoomEventWriter,
 	input api.InputInviteEvent,
 ) (err error) {
@@ -247,8 +194,23 @@ func processInviteEvent(
 
 	event := input.Event.Unwrap()
 
-	if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
-		return err
+	if len(input.InviteRoomState) > 0 {
+		// If we were supplied with some invite room state already (which is
+		// most likely to be if the event came in over federation) then use
+		// that.
+		if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
+			return err
+		}
+	} else {
+		// There's no invite room state, so let's have a go at building it
+		// up from local data (which is most likely to be if the event came
+		// from the CS API). If we know about the room then we can insert
+		// the invite room state, if we don't then we just fail quietly.
+		if irs, ierr := buildInviteStrippedState(ctx, db, input); ierr == nil {
+			if err = event.SetUnsignedField("invite_room_state", irs); err != nil {
+				return err
+			}
+		}
 	}
 
 	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
@@ -262,4 +224,51 @@ func processInviteEvent(
 
 	succeeded = true
 	return nil
+}
+
+func buildInviteStrippedState(
+	ctx context.Context,
+	db storage.Database,
+	input api.InputInviteEvent,
+) ([]gomatrixserverlib.InviteV2StrippedState, error) {
+	roomNID, err := db.RoomNID(ctx, input.Event.RoomID())
+	if err != nil || roomNID == 0 {
+		return nil, fmt.Errorf("room %q unknown", input.Event.RoomID())
+	}
+	stateWanted := []gomatrixserverlib.StateKeyTuple{}
+	for _, t := range []string{
+		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
+		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
+	} {
+		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
+			EventType: t,
+			StateKey:  "",
+		})
+	}
+	_, currentStateSnapshotNID, _, err := db.LatestEventIDs(ctx, roomNID)
+	if err != nil {
+		return nil, err
+	}
+	roomState := state.NewStateResolution(db)
+	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
+		ctx, currentStateSnapshotNID, stateWanted,
+	)
+	if err != nil {
+		return nil, err
+	}
+	stateNIDs := []types.EventNID{}
+	for _, stateNID := range stateEntries {
+		stateNIDs = append(stateNIDs, stateNID.EventNID)
+	}
+	stateEvents, err := db.Events(ctx, stateNIDs)
+	if err != nil {
+		return nil, err
+	}
+	inviteState := []gomatrixserverlib.InviteV2StrippedState{
+		gomatrixserverlib.NewInviteV2StrippedState(&input.Event.Event),
+	}
+	for _, event := range stateEvents {
+		inviteState = append(inviteState, gomatrixserverlib.NewInviteV2StrippedState(&event.Event))
+	}
+	return inviteState, nil
 }

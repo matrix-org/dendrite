@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package query
+package internal
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// used to implement RoomserverQueryAPIEventDB to test getAuthChain
+// used to implement RoomserverInternalAPIEventDB to test getAuthChain
 type getEventDB struct {
 	eventMap map[string]gomatrixserverlib.Event
 }
@@ -79,7 +79,7 @@ func (db *getEventDB) addFakeEvents(graph map[string][]string) error {
 	return nil
 }
 
-// EventsFromIDs implements RoomserverQueryAPIEventDB
+// EventsFromIDs implements RoomserverInternalAPIEventDB
 func (db *getEventDB) EventsFromIDs(ctx context.Context, eventIDs []string) (res []types.Event, err error) {
 	for _, evID := range eventIDs {
 		res = append(res, types.Event{
@@ -106,7 +106,7 @@ func TestGetAuthChainSingle(t *testing.T) {
 		t.Fatalf("Failed to add events to db: %v", err)
 	}
 
-	result, err := getAuthChain(context.TODO(), db, []string{"e"})
+	result, err := getAuthChain(context.TODO(), db.EventsFromIDs, []string{"e"})
 	if err != nil {
 		t.Fatalf("getAuthChain failed: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestGetAuthChainMultiple(t *testing.T) {
 		t.Fatalf("Failed to add events to db: %v", err)
 	}
 
-	result, err := getAuthChain(context.TODO(), db, []string{"e", "f"})
+	result, err := getAuthChain(context.TODO(), db.EventsFromIDs, []string{"e", "f"})
 	if err != nil {
 		t.Fatalf("getAuthChain failed: %v", err)
 	}

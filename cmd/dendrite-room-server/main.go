@@ -18,6 +18,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/roomserver"
 )
 
@@ -25,8 +26,13 @@ func main() {
 	cfg := basecomponent.ParseFlags()
 	base := basecomponent.NewBaseDendrite(cfg, "RoomServerAPI")
 	defer base.Close() // nolint: errcheck
+	keyDB := base.CreateKeyDB()
+	federation := base.CreateFederationClient()
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
-	roomserver.SetupRoomServerComponent(base)
+	fsAPI := base.CreateHTTPFederationSenderAPIs()
+	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer), string(base.Cfg.Listen.RoomServer))
 
