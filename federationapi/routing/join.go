@@ -61,9 +61,7 @@ func MakeJoin(
 	if !remoteSupportsVersion {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Joining server does not support room version %s", verRes.RoomVersion),
-			),
+			JSON: jsonerror.IncompatibleRoomVersion(verRes.RoomVersion),
 		}
 	}
 
@@ -132,6 +130,9 @@ func MakeJoin(
 }
 
 // SendJoin implements the /send_join API
+// The make-join send-join dance makes much more sense as a single
+// flow so the cyclomatic complexity is high:
+// nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -156,6 +157,16 @@ func SendJoin(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+
+	// Check that a state key is provided.
+	if event.StateKey() == nil || (event.StateKey() != nil && *event.StateKey() == "") {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(
+				fmt.Sprintf("No state key was provided in the join event."),
+			),
 		}
 	}
 
@@ -234,20 +245,34 @@ func SendJoin(
 		}
 	}
 
+	// Check if the user is already in the room. If they're already in then
+	// there isn't much point in sending another join event into the room.
+	alreadyJoined := false
+	for _, se := range stateAndAuthChainResponse.StateEvents {
+		if membership, merr := se.Membership(); merr == nil {
+			if se.StateKey() != nil && *se.StateKey() == *event.StateKey() {
+				alreadyJoined = (membership == "join")
+				break
+			}
+		}
+	}
+
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(
-		httpReq.Context(),
-		[]gomatrixserverlib.HeaderedEvent{
-			event.Headered(stateAndAuthChainResponse.RoomVersion),
-		},
-		cfg.Matrix.ServerName,
-		nil,
-	)
-	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
-		return jsonerror.InternalServerError()
+	if !alreadyJoined {
+		_, err = producer.SendEvents(
+			httpReq.Context(),
+			[]gomatrixserverlib.HeaderedEvent{
+				event.Headered(stateAndAuthChainResponse.RoomVersion),
+			},
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	return util.JSONResponse{

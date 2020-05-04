@@ -28,6 +28,12 @@ type JoinedHost struct {
 	ServerName gomatrixserverlib.ServerName
 }
 
+type ServerNames []gomatrixserverlib.ServerName
+
+func (s ServerNames) Len() int           { return len(s) }
+func (s ServerNames) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s ServerNames) Less(i, j int) bool { return s[i] < s[j] }
+
 // A EventIDMismatchError indicates that we have got out of sync with the
 // room server.
 type EventIDMismatchError struct {
