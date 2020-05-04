@@ -179,35 +179,16 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		}
 
 		// Try joining by all of the supplied server names.
-		// TODO: Update the FS API so that it accepts a list of server names and
-		// does this bit by itself.
-		joined := false
-		for _, serverName := range req.ServerNames {
-			// Otherwise, if we've reached this point, the room isn't a local room
-			// and we should ask the federation sender to try and join for us.
-			fedReq := fsAPI.PerformJoinRequest{
-				RoomID:     req.RoomIDOrAlias, // the room ID to try and join
-				UserID:     req.UserID,        // the user ID joining the room
-				ServerName: serverName,        // the server to try joining with
-				Content:    req.Content,       // the membership event content
-			}
-			fedRes := fsAPI.PerformJoinResponse{}
-			err = r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
-			if err != nil {
-				logrus.WithError(err).Errorf("error joining federated room %q", req.RoomIDOrAlias)
-				continue
-			}
-			joined = true
-			break
+		fedReq := fsAPI.PerformJoinRequest{
+			RoomID:      req.RoomIDOrAlias, // the room ID to try and join
+			UserID:      req.UserID,        // the user ID joining the room
+			ServerNames: req.ServerNames,   // the server to try joining with
+			Content:     req.Content,       // the membership event content
 		}
-
-		// If we didn't successfully join the room using any of the supplied
-		// servers then return an error saying such.
-		if !joined {
-			return fmt.Errorf(
-				"Failed to join %q using %d server(s)",
-				req.RoomIDOrAlias, len(req.ServerNames),
-			)
+		fedRes := fsAPI.PerformJoinResponse{}
+		err = r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
+		if err != nil {
+			return fmt.Errorf("Error joining federated room: %q", err)
 		}
 
 	default:

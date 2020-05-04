@@ -4,6 +4,7 @@ import (
 	"context"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
@@ -43,10 +44,10 @@ func (h *httpFederationSenderInternalAPI) PerformDirectoryLookup(
 }
 
 type PerformJoinRequest struct {
-	RoomID     string                       `json:"room_id"`
-	UserID     string                       `json:"user_id"`
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
-	Content    map[string]interface{}       `json:"content"`
+	RoomID      string                 `json:"room_id"`
+	UserID      string                 `json:"user_id"`
+	ServerNames types.ServerNames      `json:"server_names"`
+	Content     map[string]interface{} `json:"content"`
 }
 
 type PerformJoinResponse struct {
