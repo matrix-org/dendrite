@@ -136,7 +136,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	for k, v := range eventStateKeyNIDs {
 		iEventStateKeyNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", common.QueryVariadic(len(eventStateKeyNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", common.QueryVariadic(len(eventStateKeyNIDs)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeyNIDs...)
 	if err != nil {
