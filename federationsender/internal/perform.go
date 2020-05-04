@@ -169,7 +169,7 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 		)
 		if err != nil {
 			// TODO: Check if the user was not allowed to leave the room.
-			return fmt.Errorf("r.federation.MakeLeave: %w", err)
+			return err
 		}
 
 		// Set all the fields to be what they should be, this should be a no-op
@@ -225,7 +225,7 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 
 	// If we reach here then we didn't complete a leave for some reason.
 	return fmt.Errorf(
-		"failed to leave user %q from room %q through %d server(s)",
-		request.UserID, request.RoomID, len(request.ServerNames),
+		"Failed to leave room %q through %d server(s)",
+		request.RoomID, len(request.ServerNames),
 	)
 }

@@ -40,10 +40,7 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 	// that.
 	senderUser, err := r.isInvitePending(ctx, req, res)
 	if err == nil {
-		fmt.Println("Responding to invite")
 		return r.performRejectInvite(ctx, req, res, senderUser)
-	} else {
-		fmt.Println("Not responding to invite:", err)
 	}
 
 	// First of all we want to find out if the room exists and if the
@@ -62,21 +59,21 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 		return err
 	}
 	if !latestRes.RoomExists {
-		return fmt.Errorf("room %q does not exist", req.RoomID)
+		return fmt.Errorf("Room %q does not exist", req.RoomID)
 	}
 
 	// Now let's see if the user is in the room.
 	if len(latestRes.StateEvents) == 0 {
-		return fmt.Errorf("user %q is not a member of room %q", req.UserID, req.RoomID)
+		return fmt.Errorf("User %q is not a member of room %q", req.UserID, req.RoomID)
 	}
 	membership, err := latestRes.StateEvents[0].Membership()
 	if err != nil {
-		return fmt.Errorf("error getting membership: %w", err)
+		return fmt.Errorf("Error getting membership: %w", err)
 	}
 	if membership != "join" {
 		// TODO: should be able to handle "invite" in this case too, if
 		// it's a case of kicking or banning or such
-		return fmt.Errorf("user %q is not joined to the room (membership is %q)", req.UserID, membership)
+		return fmt.Errorf("User %q is not joined to the room (membership is %q)", req.UserID, membership)
 	}
 
 	// Prepare the template for the leave event.
@@ -102,7 +99,7 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 	buildRes := api.QueryLatestEventsAndStateResponse{}
 	event, err := common.BuildEvent(
 		ctx,        // the request context
-		&eb,        // the template join event
+		&eb,        // the template leave event
 		r.Cfg,      // the server configuration
 		time.Now(), // the event timestamp to use
 		r,          // the roomserver API to use
@@ -141,7 +138,7 @@ func (r *RoomserverInternalAPI) performRejectInvite(
 ) error {
 	_, domain, err := gomatrixserverlib.SplitID('@', senderUser)
 	if err != nil {
-		return fmt.Errorf("user ID %q invalid: %w", senderUser, err)
+		return fmt.Errorf("User ID %q invalid: %w", senderUser, err)
 	}
 
 	// Ask the federation sender to perform a federated leave for us.
@@ -152,8 +149,11 @@ func (r *RoomserverInternalAPI) performRejectInvite(
 	}
 	leaveRes := fsAPI.PerformLeaveResponse{}
 	if err := r.fsAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
-		return fmt.Errorf("fsAPI.PerformLeave: %w", err)
+		return err
 	}
+
+	// TODO: Withdraw the invite, so that the sync API etc are
+	// notified that we rejected it.
 
 	return nil
 }
