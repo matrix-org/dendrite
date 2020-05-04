@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -52,7 +51,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByAlias(
 	// doesn't then we'll need to try a federated join.
 	var roomID string
 	if domain != r.Cfg.Matrix.ServerName {
-		// The alias isn't owned by us, so we will eed to try joining using
+		// The alias isn't owned by us, so we will need to try joining using
 		// a remote server.
 		dirReq := fsAPI.PerformDirectoryLookupRequest{
 			RoomAlias:  req.RoomIDOrAlias, // the room alias to lookup
@@ -144,16 +143,10 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// a member of the room.
 		alreadyJoined := false
 		for _, se := range buildRes.StateEvents {
-			if se.Type() == gomatrixserverlib.MRoomMember {
-				if se.StateKey() != nil && *se.StateKey() == userID {
-					var content map[string]interface{}
-					if err = json.Unmarshal(se.Content(), &content); err != nil {
-						continue
-					}
-					if membership, ok := content["membership"]; ok {
-						alreadyJoined = (membership == "join")
-						break
-					}
+			if membership, merr := se.Membership(); merr == nil {
+				if se.StateKey() != nil && *se.StateKey() == *event.StateKey() {
+					alreadyJoined = (membership == "join")
+					break
 				}
 			}
 		}
@@ -205,6 +198,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 				continue
 			}
 			joined = true
+			break
 		}
 
 		// If we didn't successfully join the room using any of the supplied

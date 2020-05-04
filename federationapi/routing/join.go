@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -131,6 +130,9 @@ func MakeJoin(
 }
 
 // SendJoin implements the /send_join API
+// TODO: Is there a way to break this function up in a way that actually
+// makes sense?
+// nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -247,16 +249,10 @@ func SendJoin(
 	// there isn't much point in sending another join event into the room.
 	alreadyJoined := false
 	for _, se := range stateAndAuthChainResponse.StateEvents {
-		if se.Type() == gomatrixserverlib.MRoomMember {
+		if membership, merr := se.Membership(); merr == nil {
 			if se.StateKey() != nil && *se.StateKey() == *event.StateKey() {
-				var content map[string]interface{}
-				if err = json.Unmarshal(se.Content(), &content); err != nil {
-					continue
-				}
-				if membership, ok := content["membership"]; ok {
-					alreadyJoined = (membership == "join")
-					break
-				}
+				alreadyJoined = (membership == "join")
+				break
 			}
 		}
 	}
