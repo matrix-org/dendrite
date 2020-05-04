@@ -18,28 +18,17 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common/config"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 func JoinRoomByIDOrAlias(
 	req *http.Request,
 	device *authtypes.Device,
-	roomIDOrAlias string,
-	cfg *config.Dendrite, // nolint:unparam
-	federation *gomatrixserverlib.FederationClient, // nolint:unparam
-	producer *producers.RoomserverProducer, // nolint:unparam
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	fsAPI federationSenderAPI.FederationSenderInternalAPI, // nolint:unparam
-	keyRing gomatrixserverlib.KeyRing, // nolint:unparam
-	accountDB accounts.Database, // nolint:unparam
+	roomIDOrAlias string,
 ) util.JSONResponse {
 	// Prepare to ask the roomserver to perform the room join.
 	joinReq := roomserverAPI.PerformJoinRequest{
