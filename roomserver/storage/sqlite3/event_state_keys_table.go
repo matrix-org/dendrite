@@ -47,14 +47,14 @@ const selectEventStateKeyNIDSQL = `
 
 // Bulk lookup from string state key to numeric ID for that state key.
 // Takes an array of strings as the query parameter.
-const bulkSelectEventStateKeyNIDSQL = `
+const bulkSelectEventStateKeySQL = `
 	SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys
 	  WHERE event_state_key IN ($1)
 `
 
 // Bulk lookup from numeric ID to string state key for that state key.
 // Takes an array of strings as the query parameter.
-const bulkSelectEventStateKeySQL = `
+const bulkSelectEventStateKeyNIDSQL = `
 	SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys
 	  WHERE event_state_key_nid IN ($1)
 `
@@ -110,7 +110,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	for k, v := range eventStateKeys {
 		iEventStateKeys[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", common.QueryVariadic(len(eventStateKeys)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", common.QueryVariadic(len(eventStateKeys)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeys...)
 	if err != nil {
@@ -136,7 +136,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	for k, v := range eventStateKeyNIDs {
 		iEventStateKeyNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", common.QueryVariadic(len(eventStateKeyNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", common.QueryVariadic(len(eventStateKeyNIDs)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeyNIDs...)
 	if err != nil {
