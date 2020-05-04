@@ -169,7 +169,8 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 		)
 		if err != nil {
 			// TODO: Check if the user was not allowed to leave the room.
-			return err
+			logrus.WithError(err).Warnf("r.federation.MakeLeave failed")
+			continue
 		}
 
 		// Set all the fields to be what they should be, this should be a no-op
