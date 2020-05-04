@@ -70,7 +70,7 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 	if err != nil {
 		return fmt.Errorf("Error getting membership: %w", err)
 	}
-	if membership != "join" {
+	if membership != gomatrixserverlib.Join {
 		// TODO: should be able to handle "invite" in this case too, if
 		// it's a case of kicking or banning or such
 		return fmt.Errorf("User %q is not joined to the room (membership is %q)", req.UserID, membership)
