@@ -184,11 +184,13 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 				"membership": "leave",
 			}
 			if err = respMakeLeave.LeaveEvent.SetContent(content); err != nil {
-				return fmt.Errorf("respMakeLeave.LeaveEvent.SetContent: %w", err)
+				logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetContent failed")
+				continue
 			}
 		}
 		if err = respMakeLeave.LeaveEvent.SetUnsigned(struct{}{}); err != nil {
-			return fmt.Errorf("respMakeLeave.LeaveEvent.SetUnsigned: %w", err)
+			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetUnsigned failed")
+			continue
 		}
 
 		// Work out if we support the room version that has been supplied in
@@ -206,7 +208,8 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 			respMakeLeave.RoomVersion,
 		)
 		if err != nil {
-			return fmt.Errorf("respMakeLeave.LeaveEvent.Build: %w", err)
+			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.Build failed")
+			continue
 		}
 
 		// Try to perform a send_leave using the newly built event.

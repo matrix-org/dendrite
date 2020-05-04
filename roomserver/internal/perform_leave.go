@@ -38,13 +38,13 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 ) error {
 	// If there's an invite outstanding for the room then respond to
 	// that.
-	senderUser, err := r.isInvitePending(ctx, req, res)
-	if err == nil {
+	isInvitePending, senderUser, err := r.isInvitePending(ctx, req, res)
+	if err == nil && isInvitePending {
 		return r.performRejectInvite(ctx, req, res, senderUser)
 	}
 
-	// First of all we want to find out if the room exists and if the
-	// user is actually in it.
+	// There's no invite pending, so first of all we want to find out
+	// if the room exists and if the user is actually in it.
 	latestReq := api.QueryLatestEventsAndStateRequest{
 		RoomID: req.RoomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
@@ -162,21 +162,21 @@ func (r *RoomserverInternalAPI) isInvitePending(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse, // nolint:unparam
-) (string, error) {
+) (bool, string, error) {
 	// Look up the room NID for the supplied room ID.
 	roomNID, err := r.DB.RoomNID(ctx, req.RoomID)
 	if err != nil {
-		return "", fmt.Errorf("r.DB.RoomNID: %w", err)
+		return false, "", fmt.Errorf("r.DB.RoomNID: %w", err)
 	}
 
 	// Look up the state key NID for the supplied user ID.
 	targetUserNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{req.UserID})
 	if err != nil {
-		return "", fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
+		return false, "", fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
 	}
 	targetUserNID, targetUserFound := targetUserNIDs[req.UserID]
 	if !targetUserFound {
-		return "", fmt.Errorf("missing NID for user %q (%+v)", req.UserID, targetUserNIDs)
+		return false, "", fmt.Errorf("missing NID for user %q (%+v)", req.UserID, targetUserNIDs)
 	}
 
 	// Let's see if we have an event active for the user in the room. If
@@ -184,25 +184,25 @@ func (r *RoomserverInternalAPI) isInvitePending(
 	// send_leave to.
 	senderUserNIDs, err := r.DB.GetInvitesForUser(ctx, roomNID, targetUserNID)
 	if err != nil {
-		return "", fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
+		return false, "", fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
 	}
 	if len(senderUserNIDs) == 0 {
-		return "", fmt.Errorf("no senderUserNIDs")
+		return false, "", nil
 	}
 
 	// Look up the user ID from the NID.
 	senderUsers, err := r.DB.EventStateKeys(ctx, senderUserNIDs)
 	if err != nil {
-		return "", fmt.Errorf("r.DB.EventStateKeys: %w", err)
+		return false, "", fmt.Errorf("r.DB.EventStateKeys: %w", err)
 	}
 	if len(senderUsers) == 0 {
-		return "", fmt.Errorf("no senderUsers")
+		return false, "", fmt.Errorf("no senderUsers")
 	}
 
 	senderUser, senderUserFound := senderUsers[senderUserNIDs[0]]
 	if !senderUserFound {
-		return "", fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
+		return false, "", fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
 	}
 
-	return senderUser, nil
+	return true, senderUser, nil
 }
