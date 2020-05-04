@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -159,6 +160,16 @@ func SendJoin(
 		}
 	}
 
+	// Check that a state key is provided.
+	if event.StateKey() == nil || (event.StateKey() != nil && *event.StateKey() == "") {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(
+				fmt.Sprintf("No state key was provided in the join event."),
+			),
+		}
+	}
+
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
@@ -234,20 +245,40 @@ func SendJoin(
 		}
 	}
 
+	// Check if the user is already in the room. If they're already in then
+	// there isn't much point in sending another join event into the room.
+	alreadyJoined := false
+	for _, se := range stateAndAuthChainResponse.StateEvents {
+		if se.Type() == gomatrixserverlib.MRoomMember {
+			if se.StateKey() != nil && *se.StateKey() == *event.StateKey() {
+				var content map[string]interface{}
+				if err = json.Unmarshal(se.Content(), &content); err != nil {
+					continue
+				}
+				if membership, ok := content["membership"]; ok {
+					alreadyJoined = (membership == "join")
+					break
+				}
+			}
+		}
+	}
+
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(
-		httpReq.Context(),
-		[]gomatrixserverlib.HeaderedEvent{
-			event.Headered(stateAndAuthChainResponse.RoomVersion),
-		},
-		cfg.Matrix.ServerName,
-		nil,
-	)
-	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
-		return jsonerror.InternalServerError()
+	if !alreadyJoined {
+		_, err = producer.SendEvents(
+			httpReq.Context(),
+			[]gomatrixserverlib.HeaderedEvent{
+				event.Headered(stateAndAuthChainResponse.RoomVersion),
+			},
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	return util.JSONResponse{
