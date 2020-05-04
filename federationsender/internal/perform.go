@@ -49,7 +49,6 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-join send-join dance.
-	succeeded := false
 	for _, serverName := range request.ServerNames {
 		// Try to perform a make_join using the information supplied in the
 		// request.
@@ -138,20 +137,14 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		}
 
 		// We're all good.
-		succeeded = true
-		break
+		return nil
 	}
 
-	if succeeded {
-		// Everything went to plan.
-		return nil
-	} else {
-		// We didn't complete a join for some reason.
-		return fmt.Errorf(
-			"failed to join user %q to room %q through %d server(s)",
-			request.UserID, request.RoomID, len(request.ServerNames),
-		)
-	}
+	// If we reach here then we didn't complete a join for some reason.
+	return fmt.Errorf(
+		"failed to join user %q to room %q through %d server(s)",
+		request.UserID, request.RoomID, len(request.ServerNames),
+	)
 }
 
 // PerformLeaveRequest implements api.FederationSenderInternalAPI
