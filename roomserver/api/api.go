@@ -18,6 +18,12 @@ type RoomserverInternalAPI interface {
 		response *InputRoomEventsResponse,
 	) error
 
+	PerformJoin(
+		ctx context.Context,
+		req *PerformJoinRequest,
+		res *PerformJoinResponse,
+	) error
+
 	// Query the latest events and state for a room from the room server.
 	QueryLatestEventsAndState(
 		ctx context.Context,
