@@ -139,20 +139,38 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	switch err {
 	case nil:
 		// The room join is local. Send the new join event into the
-		// roomserver.
-		inputReq := api.InputRoomEventsRequest{
-			InputRoomEvents: []api.InputRoomEvent{
-				api.InputRoomEvent{
-					Kind:         api.KindNew,
-					Event:        event.Headered(buildRes.RoomVersion),
-					AuthEventIDs: event.AuthEventIDs(),
-					SendAsServer: string(r.Cfg.Matrix.ServerName),
-				},
-			},
+		// roomserver. First of all check that the user isn't already
+		// a member of the room.
+		alreadyJoined := false
+		for _, se := range buildRes.StateEvents {
+			if se.Type() == gomatrixserverlib.MRoomMember {
+				if se.StateKey() != nil && *se.StateKey() == userID {
+					var content map[string]interface{}
+					if membership, ok := content["membership"]; ok {
+						alreadyJoined = (membership == "join")
+						break
+					}
+				}
+			}
 		}
-		inputRes := api.InputRoomEventsResponse{}
-		if err = r.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
-			return fmt.Errorf("r.InputRoomEvents: %w", err)
+
+		// If we haven't already joined the room then send an event
+		// into the room changing our membership status.
+		if !alreadyJoined {
+			inputReq := api.InputRoomEventsRequest{
+				InputRoomEvents: []api.InputRoomEvent{
+					api.InputRoomEvent{
+						Kind:         api.KindNew,
+						Event:        event.Headered(buildRes.RoomVersion),
+						AuthEventIDs: event.AuthEventIDs(),
+						SendAsServer: string(r.Cfg.Matrix.ServerName),
+					},
+				},
+			}
+			inputRes := api.InputRoomEventsResponse{}
+			if err = r.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+				return fmt.Errorf("r.InputRoomEvents: %w", err)
+			}
 		}
 
 	case common.ErrRoomNoExists:
