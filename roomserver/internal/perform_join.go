@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -146,6 +147,9 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 			if se.Type() == gomatrixserverlib.MRoomMember {
 				if se.StateKey() != nil && *se.StateKey() == userID {
 					var content map[string]interface{}
+					if err = json.Unmarshal(se.Content(), &content); err != nil {
+						continue
+					}
 					if membership, ok := content["membership"]; ok {
 						alreadyJoined = (membership == "join")
 						break
