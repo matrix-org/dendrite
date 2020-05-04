@@ -155,9 +155,6 @@ func (r *RoomserverInternalAPI) performRejectInvite(
 		return fmt.Errorf("fsAPI.PerformLeave: %w", err)
 	}
 
-	// If this succeeded then we can clean up the invite.
-	fmt.Println("REMOVE THE INVITE!")
-
 	return nil
 }
 
@@ -189,14 +186,19 @@ func (r *RoomserverInternalAPI) isInvitePending(
 	if err != nil {
 		return "", fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
 	}
-	fmt.Println("Sender user NIDs:", senderUserNIDs)
+	if len(senderUserNIDs) == 0 {
+		return "", fmt.Errorf("no senderUserNIDs")
+	}
 
 	// Look up the user ID from the NID.
 	senderUsers, err := r.DB.EventStateKeys(ctx, senderUserNIDs)
 	if err != nil {
 		return "", fmt.Errorf("r.DB.EventStateKeys: %w", err)
 	}
-	fmt.Println("Sender users:", senderUsers)
+	if len(senderUsers) == 0 {
+		return "", fmt.Errorf("no senderUsers")
+	}
+
 	senderUser, senderUserFound := senderUsers[senderUserNIDs[0]]
 	if !senderUserFound {
 		return "", fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)

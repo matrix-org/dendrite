@@ -193,11 +193,8 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 
 		// Work out if we support the room version that has been supplied in
 		// the make_leave response.
-		if respMakeLeave.RoomVersion == "" {
-			respMakeLeave.RoomVersion = gomatrixserverlib.RoomVersionV1
-		}
 		if _, err = respMakeLeave.RoomVersion.EventFormat(); err != nil {
-			return fmt.Errorf("respMakeLeave.RoomVersion.EventFormat: %w", err)
+			return gomatrixserverlib.UnsupportedRoomVersionError{}
 		}
 
 		// Build the leave event.

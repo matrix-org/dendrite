@@ -33,6 +33,15 @@ func MakeLeave(
 	rsAPI api.RoomserverInternalAPI,
 	roomID, userID string,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return util.JSONResponse{
@@ -87,7 +96,10 @@ func MakeLeave(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: map[string]interface{}{"event": builder},
+		JSON: map[string]interface{}{
+			"room_version": verRes.RoomVersion,
+			"event":        builder,
+		},
 	}
 }
 
