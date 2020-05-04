@@ -156,7 +156,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		if !alreadyJoined {
 			inputReq := api.InputRoomEventsRequest{
 				InputRoomEvents: []api.InputRoomEvent{
-					api.InputRoomEvent{
+					{
 						Kind:         api.KindNew,
 						Event:        event.Headered(buildRes.RoomVersion),
 						AuthEventIDs: event.AuthEventIDs(),

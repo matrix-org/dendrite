@@ -67,7 +67,9 @@ func (h *httpFederationSenderInternalAPI) PerformJoin(
 }
 
 type PerformLeaveRequest struct {
-	RoomID string `json:"room_id"`
+	RoomID      string            `json:"room_id"`
+	UserID      string            `json:"user_id"`
+	ServerNames types.ServerNames `json:"server_names"`
 }
 
 type PerformLeaveResponse struct {

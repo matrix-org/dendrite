@@ -153,5 +153,82 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,
 ) (err error) {
-	return nil
+	// Deduplicate the server names we were provided.
+	util.Unique(request.ServerNames)
+
+	// Try each server that we were provided until we land on one that
+	// successfully completes the make-leave send-leave dance.
+	for _, serverName := range request.ServerNames {
+		// Try to perform a make_leave using the information supplied in the
+		// request.
+		respMakeLeave, err := r.federation.MakeLeave(
+			ctx,
+			serverName,
+			request.RoomID,
+			request.UserID,
+		)
+		if err != nil {
+			// TODO: Check if the user was not allowed to leave the room.
+			return fmt.Errorf("r.federation.MakeLeave: %w", err)
+		}
+
+		// Set all the fields to be what they should be, this should be a no-op
+		// but it's possible that the remote server returned us something "odd"
+		respMakeLeave.LeaveEvent.Type = gomatrixserverlib.MRoomMember
+		respMakeLeave.LeaveEvent.Sender = request.UserID
+		respMakeLeave.LeaveEvent.StateKey = &request.UserID
+		respMakeLeave.LeaveEvent.RoomID = request.RoomID
+		respMakeLeave.LeaveEvent.Redacts = ""
+		if respMakeLeave.LeaveEvent.Content == nil {
+			content := map[string]interface{}{
+				"membership": "leave",
+			}
+			if err = respMakeLeave.LeaveEvent.SetContent(content); err != nil {
+				return fmt.Errorf("respMakeLeave.LeaveEvent.SetContent: %w", err)
+			}
+		}
+		if err = respMakeLeave.LeaveEvent.SetUnsigned(struct{}{}); err != nil {
+			return fmt.Errorf("respMakeLeave.LeaveEvent.SetUnsigned: %w", err)
+		}
+
+		// Work out if we support the room version that has been supplied in
+		// the make_leave response.
+		if respMakeLeave.RoomVersion == "" {
+			respMakeLeave.RoomVersion = gomatrixserverlib.RoomVersionV1
+		}
+		if _, err = respMakeLeave.RoomVersion.EventFormat(); err != nil {
+			return fmt.Errorf("respMakeLeave.RoomVersion.EventFormat: %w", err)
+		}
+
+		// Build the leave event.
+		event, err := respMakeLeave.LeaveEvent.Build(
+			time.Now(),
+			r.cfg.Matrix.ServerName,
+			r.cfg.Matrix.KeyID,
+			r.cfg.Matrix.PrivateKey,
+			respMakeLeave.RoomVersion,
+		)
+		if err != nil {
+			return fmt.Errorf("respMakeLeave.LeaveEvent.Build: %w", err)
+		}
+
+		// Try to perform a send_leave using the newly built event.
+		err = r.federation.SendLeave(
+			ctx,
+			serverName,
+			event,
+		)
+		if err != nil {
+			logrus.WithError(err).Warnf("r.federation.SendLeave failed")
+			continue
+		}
+
+		return nil
+	}
+
+	// If we reach here then we didn't complete a leave for some reason.
+	return fmt.Errorf(
+		"failed to leave user %q from room %q through %d server(s)",
+		request.UserID, request.RoomID, len(request.ServerNames),
+	)
 }
