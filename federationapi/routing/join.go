@@ -62,9 +62,7 @@ func MakeJoin(
 	if !remoteSupportsVersion {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Joining server does not support room version %s", verRes.RoomVersion),
-			),
+			JSON: jsonerror.IncompatibleRoomVersion(verRes.RoomVersion),
 		}
 	}
 
