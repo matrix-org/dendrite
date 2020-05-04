@@ -116,7 +116,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	if req.Content == nil {
 		req.Content = map[string]interface{}{}
 	}
-	req.Content["membership"] = "join"
+	req.Content["membership"] = gomatrixserverlib.Join
 	if err = eb.SetContent(req.Content); err != nil {
 		return fmt.Errorf("eb.SetContent: %w", err)
 	}
@@ -145,7 +145,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		for _, se := range buildRes.StateEvents {
 			if membership, merr := se.Membership(); merr == nil {
 				if se.StateKey() != nil && *se.StateKey() == *event.StateKey() {
-					alreadyJoined = (membership == "join")
+					alreadyJoined = (membership == gomatrixserverlib.Join)
 					break
 				}
 			}
@@ -156,7 +156,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		if !alreadyJoined {
 			inputReq := api.InputRoomEventsRequest{
 				InputRoomEvents: []api.InputRoomEvent{
-					api.InputRoomEvent{
+					{
 						Kind:         api.KindNew,
 						Event:        event.Headered(buildRes.RoomVersion),
 						AuthEventIDs: event.AuthEventIDs(),

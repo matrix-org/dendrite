@@ -109,8 +109,18 @@ func Setup(
 			return GetJoinedRooms(req, device, accountDB)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
-
-	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
+	r0mux.Handle("/rooms/{roomID}/leave",
+		common.MakeAuthAPI("membership", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return LeaveRoomByID(
+				req, device, rsAPI, vars["roomID"],
+			)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|invite)}",
 		common.MakeAuthAPI("membership", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			vars, err := common.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
