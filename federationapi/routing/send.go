@@ -354,29 +354,29 @@ func (t *txnReq) lookupMissingStateViaState(e gomatrixserverlib.Event, roomVersi
 func (t *txnReq) lookupMissingStateViaStateIDs(e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (
 	*gomatrixserverlib.RespState, error) {
 
-	// fetch all the state events we do know about: the current state
-	queryReq := api.QueryLatestEventsAndStateRequest{
-		RoomID:       e.RoomID(),
-		StateToFetch: nil, // fetch all state
-	}
-	var queryRes api.QueryLatestEventsAndStateResponse
-	if err := t.rsAPI.QueryLatestEventsAndState(t.context, &queryReq, &queryRes); err != nil {
-		return nil, err
-	}
-	if !queryRes.RoomExists {
-		return nil, fmt.Errorf("room %s doesn't exist", e.RoomID())
-	}
-	// allow indexing of current state by event ID
-	haveEventMap := make(map[string]*gomatrixserverlib.HeaderedEvent, len(queryRes.StateEvents))
-	for i := range queryRes.StateEvents {
-		haveEventMap[queryRes.StateEvents[i].EventID()] = &queryRes.StateEvents[i]
-	}
-
 	// fetch the state event IDs at the time of the event
 	stateIDs, err := t.federation.LookupStateIDs(t.context, t.Origin, e.RoomID(), e.EventID())
 	if err != nil {
 		return nil, err
 	}
+
+	// fetch as many as we can from the roomserver, do them as 2 calls rather than
+	// 1 to try to reduce the number of parameters in the bulk query this will use
+	haveEventMap := make(map[string]*gomatrixserverlib.HeaderedEvent, len(stateIDs.StateEventIDs))
+	for _, eventList := range [][]string{stateIDs.StateEventIDs, stateIDs.AuthEventIDs} {
+		queryReq := api.QueryEventsByIDRequest{
+			EventIDs: eventList,
+		}
+		var queryRes api.QueryEventsByIDResponse
+		if err := t.rsAPI.QueryEventsByID(t.context, &queryReq, &queryRes); err != nil {
+			return nil, err
+		}
+		// allow indexing of current state by event ID
+		for i := range queryRes.Events {
+			haveEventMap[queryRes.Events[i].EventID()] = &queryRes.Events[i]
+		}
+	}
+
 	// work out which auth/state IDs are missing
 	wantIDs := append(stateIDs.StateEventIDs, stateIDs.AuthEventIDs...)
 	missing := make(map[string]bool)
@@ -389,7 +389,7 @@ func (t *txnReq) lookupMissingStateViaStateIDs(e gomatrixserverlib.Event, roomVe
 		"missing":           len(missing),
 		"event_id":          e.EventID(),
 		"room_id":           e.RoomID(),
-		"already_have":      len(queryRes.StateEvents),
+		"already_have":      len(haveEventMap),
 		"total_state":       len(stateIDs.StateEventIDs),
 		"total_auth_events": len(stateIDs.AuthEventIDs),
 	}).Info("Fetching missing state at event")
