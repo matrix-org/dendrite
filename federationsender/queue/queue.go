@@ -30,7 +30,7 @@ type OutgoingQueues struct {
 	origin     gomatrixserverlib.ServerName
 	client     *gomatrixserverlib.FederationClient
 	// The queuesMutex protects queues
-	queuesMutex sync.Mutex
+	queuesMutex sync.RWMutex
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
@@ -68,10 +68,10 @@ func (oqs *OutgoingQueues) SendEvent(
 		"destinations": destinations, "event": ev.EventID(),
 	}).Info("Sending event")
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
 	for _, destination := range destinations {
+		oqs.queuesMutex.RLock()
 		oq := oqs.queues[destination]
+		oqs.queuesMutex.RUnlock()
 		if oq == nil {
 			oq = &destinationQueue{
 				rsProducer:  oqs.rsProducer,
@@ -79,10 +79,12 @@ func (oqs *OutgoingQueues) SendEvent(
 				destination: destination,
 				client:      oqs.client,
 			}
+			oqs.queuesMutex.Lock()
 			oqs.queues[destination] = oq
+			oqs.queuesMutex.Unlock()
 		}
 
-		oq.sendEvent(ev)
+		go oq.sendEvent(ev)
 	}
 
 	return nil
@@ -114,9 +116,9 @@ func (oqs *OutgoingQueues) SendInvite(
 		"event_id": ev.EventID(),
 	}).Info("Sending invite")
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
+	oqs.queuesMutex.RLock()
 	oq := oqs.queues[destination]
+	oqs.queuesMutex.RUnlock()
 	if oq == nil {
 		oq = &destinationQueue{
 			rsProducer:  oqs.rsProducer,
@@ -124,10 +126,12 @@ func (oqs *OutgoingQueues) SendInvite(
 			destination: destination,
 			client:      oqs.client,
 		}
+		oqs.queuesMutex.Lock()
 		oqs.queues[destination] = oq
+		oqs.queuesMutex.Unlock()
 	}
 
-	oq.sendInvite(inviteReq)
+	go oq.sendInvite(inviteReq)
 
 	return nil
 }
@@ -154,10 +158,10 @@ func (oqs *OutgoingQueues) SendEDU(
 		}).Info("Sending EDU event")
 	}
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
 	for _, destination := range destinations {
+		oqs.queuesMutex.RLock()
 		oq := oqs.queues[destination]
+		oqs.queuesMutex.RUnlock()
 		if oq == nil {
 			oq = &destinationQueue{
 				rsProducer:  oqs.rsProducer,
@@ -165,10 +169,12 @@ func (oqs *OutgoingQueues) SendEDU(
 				destination: destination,
 				client:      oqs.client,
 			}
+			oqs.queuesMutex.Lock()
 			oqs.queues[destination] = oq
+			oqs.queuesMutex.Unlock()
 		}
 
-		oq.sendEDU(e)
+		go oq.sendEDU(e)
 	}
 
 	return nil
