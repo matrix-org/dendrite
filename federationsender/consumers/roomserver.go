@@ -177,7 +177,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 
 	// Send the event.
 	return s.queues.SendEvent(
-		&ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
+		ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	)
 }
 
@@ -204,7 +204,7 @@ func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) er
 	}
 
 	// Send the event.
-	return s.queues.SendInvite(&inviteReq)
+	return s.queues.SendInvite(inviteReq)
 }
 
 // joinedHostsAtEvent works out a list of matrix servers that were joined to
