@@ -575,7 +575,6 @@ func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to persist state entries to get snapshot nid")
 			return err
 		}
-		util.GetLogger(ctx).Infof("Backfilled event %s (nid=%d) getting snapshot %v with entries %+v", ev.EventID(), ev.EventNID, beforeStateSnapshotNID, entries)
 		if err = r.DB.SetState(ctx, ev.EventNID, beforeStateSnapshotNID); err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to persist snapshot nid")
 		}
