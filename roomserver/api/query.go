@@ -29,7 +29,7 @@ type QueryLatestEventsAndStateRequest struct {
 	// The room ID to query the latest events for.
 	RoomID string `json:"room_id"`
 	// The state key tuples to fetch from the room current state.
-	// If this list is empty or nil then no state events are returned.
+	// If this list is empty or nil then *ALL* current state events are returned.
 	StateToFetch []gomatrixserverlib.StateKeyTuple `json:"state_to_fetch"`
 }
 
