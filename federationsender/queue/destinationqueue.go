@@ -124,9 +124,11 @@ func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.HeaderedEvent) {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
+	fmt.Println("Queuing event", ev.EventID())
 	oq.runningMutex.Lock()
 	oq.pendingPDUs = append(oq.pendingPDUs, ev)
 	oq.runningMutex.Unlock()
+	fmt.Println("Queued event", ev.EventID())
 	oq.wake()
 }
 
@@ -204,8 +206,8 @@ func (oq *destinationQueue) backgroundSend() {
 			// the pending events and EDUs.
 			if transaction {
 				oq.runningMutex.Lock()
-				oq.pendingPDUs = oq.pendingPDUs[:0]
-				oq.pendingEDUs = oq.pendingEDUs[:0]
+				oq.pendingPDUs = oq.pendingPDUs[len(pendingPDUs):]
+				oq.pendingEDUs = oq.pendingEDUs[len(pendingEDUs):]
 				oq.runningMutex.Unlock()
 			}
 		}
@@ -224,7 +226,7 @@ func (oq *destinationQueue) backgroundSend() {
 			// the pending invites.
 			if invites {
 				oq.runningMutex.Lock()
-				oq.pendingInvites = oq.pendingInvites[:0]
+				oq.pendingInvites = oq.pendingInvites[len(pendingInvites):]
 				oq.runningMutex.Unlock()
 			}
 		}
