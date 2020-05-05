@@ -306,6 +306,9 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 		// Fallback to /state
 		util.GetLogger(t.context).WithError(err).Warn("processEventWithMissingState failed to /state_ids, falling back to /state")
 		respState, err = t.lookupMissingStateViaState(e, roomVersion)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Check that the event is allowed by the state.
@@ -403,6 +406,11 @@ func (t *txnReq) lookupMissingStateViaStateIDs(e gomatrixserverlib.Event, roomVe
 			haveEventMap[event.EventID()] = &h
 		}
 	}
+	return t.createRespStateFromStateIDs(stateIDs, haveEventMap)
+}
+
+func (t *txnReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib.RespStateIDs, haveEventMap map[string]*gomatrixserverlib.HeaderedEvent) (
+	*gomatrixserverlib.RespState, error) {
 	// create a RespState response using the response to /state_ids as a guide
 	respState := gomatrixserverlib.RespState{
 		AuthEvents:  make([]gomatrixserverlib.Event, len(stateIDs.AuthEventIDs)),
