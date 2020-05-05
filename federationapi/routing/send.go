@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Send implements /_matrix/federation/v1/send/{txnID}
@@ -384,8 +385,15 @@ func (t *txnReq) lookupMissingStateViaStateIDs(e gomatrixserverlib.Event, roomVe
 			missing[sid] = true
 		}
 	}
-	util.GetLogger(t.context).WithField("missing", len(missing)).WithField("event_id", e.EventID()).
-		WithField("room_id", e.RoomID()).Info("Fetching missing state at event")
+	util.GetLogger(t.context).WithFields(logrus.Fields{
+		"missing":           len(missing),
+		"event_id":          e.EventID(),
+		"room_id":           e.RoomID(),
+		"already_have":      len(queryRes.StateEvents),
+		"total_state":       len(stateIDs.StateEventIDs),
+		"total_auth_events": len(stateIDs.AuthEventIDs),
+	}).Info("Fetching missing state at event")
+
 	for missingEventID := range missing {
 		txn, err := t.federation.GetEvent(t.context, t.Origin, missingEventID)
 		if err != nil {
