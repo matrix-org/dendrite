@@ -50,7 +50,7 @@ func NewOutgoingQueues(
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
-	ev gomatrixserverlib.HeaderedEvent, origin gomatrixserverlib.ServerName,
+	ev *gomatrixserverlib.HeaderedEvent, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if origin != oqs.origin {
@@ -84,7 +84,7 @@ func (oqs *OutgoingQueues) SendEvent(
 			oqs.queuesMutex.Unlock()
 		}
 
-		go oq.sendEvent(&ev)
+		go oq.sendEvent(ev)
 	}
 
 	return nil
@@ -92,7 +92,7 @@ func (oqs *OutgoingQueues) SendEvent(
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendInvite(
-	inviteReq gomatrixserverlib.InviteV2Request,
+	inviteReq *gomatrixserverlib.InviteV2Request,
 ) error {
 	ev := inviteReq.Event()
 	stateKey := ev.StateKey()
@@ -131,7 +131,7 @@ func (oqs *OutgoingQueues) SendInvite(
 		oqs.queuesMutex.Unlock()
 	}
 
-	go oq.sendInvite(&inviteReq)
+	go oq.sendInvite(inviteReq)
 
 	return nil
 }
