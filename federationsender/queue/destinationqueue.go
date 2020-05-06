@@ -122,7 +122,8 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// Retrieve any waiting things.
 		oq.runningMutex.RLock()
-		pendingPDUs, pendingEDUs := oq.pendingPDUs, oq.pendingEDUs
+		pendingPDUs, numPDUs := oq.pendingPDUs, len(oq.pendingPDUs)
+		pendingEDUs, numEDUs := oq.pendingEDUs, len(oq.pendingEDUs)
 		pendingInvites := oq.pendingInvites
 		idleCounter, sentCounter := oq.idleCounter.Load(), oq.statistics.SuccessCount()
 		oq.runningMutex.RUnlock()
@@ -156,13 +157,19 @@ func (oq *destinationQueue) backgroundSend() {
 				oq.runningMutex.Lock()
 				// Reallocate so that the underlying arrays can be GC'd, as
 				// opposed to growing forever.
+				for i := 0; i < numPDUs; i++ {
+					oq.pendingPDUs[i] = nil
+				}
+				for i := 0; i < numEDUs; i++ {
+					oq.pendingEDUs[i] = nil
+				}
 				oq.pendingPDUs = append(
 					[]*gomatrixserverlib.HeaderedEvent{},
-					oq.pendingPDUs[len(pendingPDUs):]...,
+					oq.pendingPDUs[numPDUs:]...,
 				)
 				oq.pendingEDUs = append(
 					[]*gomatrixserverlib.EDU{},
-					oq.pendingEDUs[len(pendingEDUs):]...,
+					oq.pendingEDUs[numEDUs:]...,
 				)
 				oq.runningMutex.Unlock()
 			}
@@ -179,7 +186,6 @@ func (oq *destinationQueue) backgroundSend() {
 					// the backoff has exceeded a maximum allowable value.
 					return
 				}
-				continue
 			} else if sent > 0 {
 				// If we successfully sent the invites then clear out
 				// the pending invites.

@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -189,13 +190,18 @@ func (oqs *OutgoingQueues) SendEDU(
 
 // filterDestinations removes our own server from the list of destinations.
 // Otherwise we could end up trying to talk to ourselves.
-func filterDestinations(origin gomatrixserverlib.ServerName, destinations []gomatrixserverlib.ServerName) []gomatrixserverlib.ServerName {
-	var result []gomatrixserverlib.ServerName
-	for _, destination := range destinations {
-		if destination == origin {
+func filterDestinations(origin gomatrixserverlib.ServerName, destinations []gomatrixserverlib.ServerName) (
+	result []gomatrixserverlib.ServerName,
+) {
+	strs := make([]string, len(destinations))
+	for i, d := range destinations {
+		strs[i] = string(d)
+	}
+	for _, destination := range util.UniqueStrings(strs) {
+		if gomatrixserverlib.ServerName(destination) == origin {
 			continue
 		}
-		result = append(result, destination)
+		result = append(result, gomatrixserverlib.ServerName(destination))
 	}
 	return result
 }
