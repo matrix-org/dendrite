@@ -89,7 +89,7 @@ func (oqs *OutgoingQueues) SendEvent(
 			oqs.queuesMutex.Unlock()
 		}
 
-		oq.sendEvent(ev)
+		go oq.sendEvent(ev)
 	}
 
 	return nil
@@ -138,7 +138,7 @@ func (oqs *OutgoingQueues) SendInvite(
 		oqs.queuesMutex.Unlock()
 	}
 
-	oq.sendInvite(inviteReq)
+	go oq.sendInvite(inviteReq)
 
 	return nil
 }
@@ -182,7 +182,7 @@ func (oqs *OutgoingQueues) SendEDU(
 			oqs.queuesMutex.Unlock()
 		}
 
-		oq.sendEDU(e)
+		go oq.sendEDU(e)
 	}
 
 	return nil
