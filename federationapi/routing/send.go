@@ -309,9 +309,7 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 	// TODO: Attempt to fill in the gap using /get_missing_events
 
 	// Attempt to fetch the missing state using /state_ids and /events
-	var respState *gomatrixserverlib.RespState
-	var err error
-	respState, err = t.lookupMissingStateViaStateIDs(e, roomVersion)
+	respState, newEvents, err := t.lookupMissingStateViaStateIDs(e, roomVersion)
 	if err != nil {
 		// Fallback to /state
 		util.GetLogger(t.context).WithError(err).Warn("processEventWithMissingState failed to /state_ids, falling back to /state")
@@ -343,8 +341,16 @@ retryAllowedState:
 		return err
 	}
 
-	// pass the event along with the state to the roomserver
-	return t.producer.SendEventWithState(t.context, respState, e.Headered(roomVersion))
+	if len(newEvents) > 0 {
+		stateEventIDs := make([]string, len(respState.StateEvents))
+		for i := range respState.StateEvents {
+			stateEventIDs[i] = respState.StateEvents[i].EventID()
+		}
+		return t.producer.SendEventWithKnownMissingState(context.Background(), stateEventIDs, newEvents, e.Headered(roomVersion))
+	}
+	// pass the event along with the state to the roomserver using a background context so we don't
+	// needlessly expire
+	return t.producer.SendEventWithState(context.Background(), respState, e.Headered(roomVersion))
 }
 
 func (t *txnReq) lookupMissingStateViaState(e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (
@@ -361,12 +367,12 @@ func (t *txnReq) lookupMissingStateViaState(e gomatrixserverlib.Event, roomVersi
 }
 
 func (t *txnReq) lookupMissingStateViaStateIDs(e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (
-	*gomatrixserverlib.RespState, error) {
+	*gomatrixserverlib.RespState, []gomatrixserverlib.HeaderedEvent, error) {
 
 	// fetch the state event IDs at the time of the event
 	stateIDs, err := t.federation.LookupStateIDs(t.context, t.Origin, e.RoomID(), e.EventID())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// fetch as many as we can from the roomserver, do them as 2 calls rather than
@@ -377,8 +383,8 @@ func (t *txnReq) lookupMissingStateViaStateIDs(e gomatrixserverlib.Event, roomVe
 			EventIDs: eventList,
 		}
 		var queryRes api.QueryEventsByIDResponse
-		if err := t.rsAPI.QueryEventsByID(t.context, &queryReq, &queryRes); err != nil {
-			return nil, err
+		if err = t.rsAPI.QueryEventsByID(t.context, &queryReq, &queryRes); err != nil {
+			return nil, nil, err
 		}
 		// allow indexing of current state by event ID
 		for i := range queryRes.Events {
@@ -402,28 +408,33 @@ func (t *txnReq) lookupMissingStateViaStateIDs(e gomatrixserverlib.Event, roomVe
 		"total_state":       len(stateIDs.StateEventIDs),
 		"total_auth_events": len(stateIDs.AuthEventIDs),
 	}).Info("Fetching missing state at event")
+	var newEvents []gomatrixserverlib.HeaderedEvent
 
 	for missingEventID := range missing {
-		txn, err := t.federation.GetEvent(t.context, t.Origin, missingEventID)
+		var txn gomatrixserverlib.Transaction
+		txn, err = t.federation.GetEvent(t.context, t.Origin, missingEventID)
 		if err != nil {
 			util.GetLogger(t.context).WithError(err).WithField("event_id", missingEventID).Warn("failed to get missing /event for event ID")
-			return nil, err
+			return nil, nil, err
 		}
 		for _, pdu := range txn.PDUs {
-			event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
+			var event gomatrixserverlib.Event
+			event, err = gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
 			if err != nil {
 				util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
-				return nil, unmarshalError{err}
+				return nil, nil, unmarshalError{err}
 			}
-			if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
+			if err = gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
 				util.GetLogger(t.context).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
-				return nil, verifySigError{event.EventID(), err}
+				return nil, nil, verifySigError{event.EventID(), err}
 			}
 			h := event.Headered(roomVersion)
 			haveEventMap[event.EventID()] = &h
+			newEvents = append(newEvents, h)
 		}
 	}
-	return t.createRespStateFromStateIDs(stateIDs, haveEventMap)
+	resp, err := t.createRespStateFromStateIDs(stateIDs, haveEventMap)
+	return resp, newEvents, err
 }
 
 func (t *txnReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib.RespStateIDs, haveEventMap map[string]*gomatrixserverlib.HeaderedEvent) (
