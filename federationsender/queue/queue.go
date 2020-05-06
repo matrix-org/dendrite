@@ -32,7 +32,7 @@ type OutgoingQueues struct {
 	origin      gomatrixserverlib.ServerName
 	client      *gomatrixserverlib.FederationClient
 	statistics  *types.Statistics
-	queuesMutex sync.RWMutex // protects the below
+	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
@@ -50,6 +50,26 @@ func NewOutgoingQueues(
 		statistics: statistics,
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
+}
+
+func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+	oq := oqs.queues[destination]
+	if oq == nil {
+		oq = &destinationQueue{
+			rsProducer:      oqs.rsProducer,
+			origin:          oqs.origin,
+			destination:     destination,
+			client:          oqs.client,
+			statistics:      oqs.statistics.ForServer(destination),
+			incomingPDUs:    make(chan *gomatrixserverlib.HeaderedEvent, 128),
+			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
+			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
+		}
+		oqs.queues[destination] = oq
+	}
+	return oq
 }
 
 // SendEvent sends an event to the destinations
@@ -73,23 +93,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	}).Info("Sending event")
 
 	for _, destination := range destinations {
-		oqs.queuesMutex.RLock()
-		oq := oqs.queues[destination]
-		oqs.queuesMutex.RUnlock()
-		if oq == nil {
-			oq = &destinationQueue{
-				rsProducer:  oqs.rsProducer,
-				origin:      oqs.origin,
-				destination: destination,
-				client:      oqs.client,
-				statistics:  oqs.statistics.ForServer(destination),
-			}
-			oqs.queuesMutex.Lock()
-			oqs.queues[destination] = oq
-			oqs.queuesMutex.Unlock()
-		}
-
-		go oq.sendEvent(ev)
+		oqs.getQueue(destination).sendEvent(ev)
 	}
 
 	return nil
@@ -122,23 +126,7 @@ func (oqs *OutgoingQueues) SendInvite(
 		"server_name": destination,
 	}).Info("Sending invite")
 
-	oqs.queuesMutex.RLock()
-	oq := oqs.queues[destination]
-	oqs.queuesMutex.RUnlock()
-	if oq == nil {
-		oq = &destinationQueue{
-			rsProducer:  oqs.rsProducer,
-			origin:      oqs.origin,
-			destination: destination,
-			client:      oqs.client,
-			statistics:  oqs.statistics.ForServer(destination),
-		}
-		oqs.queuesMutex.Lock()
-		oqs.queues[destination] = oq
-		oqs.queuesMutex.Unlock()
-	}
-
-	go oq.sendInvite(inviteReq)
+	oqs.getQueue(destination).sendInvite(inviteReq)
 
 	return nil
 }
@@ -166,23 +154,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	for _, destination := range destinations {
-		oqs.queuesMutex.RLock()
-		oq := oqs.queues[destination]
-		oqs.queuesMutex.RUnlock()
-		if oq == nil {
-			oq = &destinationQueue{
-				rsProducer:  oqs.rsProducer,
-				origin:      oqs.origin,
-				destination: destination,
-				client:      oqs.client,
-				statistics:  oqs.statistics.ForServer(destination),
-			}
-			oqs.queuesMutex.Lock()
-			oqs.queues[destination] = oq
-			oqs.queuesMutex.Unlock()
-		}
-
-		go oq.sendEDU(e)
+		oqs.getQueue(destination).sendEDU(e)
 	}
 
 	return nil
