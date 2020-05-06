@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -527,5 +529,23 @@ func TestTransactionFetchMissingStateByFallbackState(t *testing.T) {
 	mustProcessTransaction(t, txn, nil)
 	// the roomserver should get all state events and the new input event
 	// TODO: it should really be only giving the missing ones
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, append(stateEvents, inputEvent))
+	got := rsAPI.inputRoomEvents
+	if len(got) != len(stateEvents)+1 {
+		t.Fatalf("wrong number of InputRoomEvents: got %d want %d", len(got), len(stateEvents)+1)
+	}
+	last := got[len(got)-1]
+	if last.Event.EventID() != inputEvent.EventID() {
+		t.Errorf("last event should be the input event but it wasn't. got %s want %s", last.Event.EventID(), inputEvent.EventID())
+	}
+	gots := make([]string, len(stateEvents))
+	wants := make([]string, len(stateEvents))
+	for i := range stateEvents {
+		gots[i] = got[i].Event.EventID()
+		wants[i] = stateEvents[i].EventID()
+	}
+	sort.Strings(gots)
+	sort.Strings(wants)
+	if !reflect.DeepEqual(gots, wants) {
+		t.Errorf("state events returned mismatch, got (sorted): %+v want %+v", gots, wants)
+	}
 }
