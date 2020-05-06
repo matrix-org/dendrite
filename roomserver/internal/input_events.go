@@ -134,9 +134,9 @@ func processInviteEvent(
 	db storage.Database,
 	ow OutputRoomEventWriter,
 	input api.InputInviteEvent,
-) (returned *gomatrixserverlib.HeaderedEvent, err error) {
+) (err error) {
 	if input.Event.StateKey() == nil {
-		return nil, fmt.Errorf("invite must be a state event")
+		return fmt.Errorf("invite must be a state event")
 	}
 
 	roomID := input.Event.RoomID()
@@ -151,7 +151,7 @@ func processInviteEvent(
 
 	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID, input.RoomVersion)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	succeeded := false
 	defer func() {
@@ -189,7 +189,7 @@ func processInviteEvent(
 		// For now we will implement option 2. Since in the abesence of a retry
 		// mechanism it will be equivalent to option 1, and we don't have a
 		// signalling mechanism to implement option 3.
-		return nil, nil
+		return nil
 	}
 
 	event := input.Event.Unwrap()
@@ -199,7 +199,7 @@ func processInviteEvent(
 		// most likely to be if the event came in over federation) then use
 		// that.
 		if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
-			return nil, err
+			return err
 		}
 	} else {
 		// There's no invite room state, so let's have a go at building it
@@ -208,22 +208,22 @@ func processInviteEvent(
 		// the invite room state, if we don't then we just fail quietly.
 		if irs, ierr := buildInviteStrippedState(ctx, db, input); ierr == nil {
 			if err = event.SetUnsignedField("invite_room_state", irs); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
 
 	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err = ow.WriteOutputEvents(roomID, outputUpdates); err != nil {
-		return nil, err
+		return err
 	}
 
 	succeeded = true
-	return &input.Event, nil
+	return nil
 }
 
 func buildInviteStrippedState(

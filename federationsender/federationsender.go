@@ -43,7 +43,9 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
-	roomserverProducer := producers.NewRoomserverProducer(rsAPI, base.Cfg.Matrix.ServerName)
+	roomserverProducer := producers.NewRoomserverProducer(
+		rsAPI, base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey,
+	)
 
 	statistics := &types.Statistics{}
 	queues := queue.NewOutgoingQueues(
