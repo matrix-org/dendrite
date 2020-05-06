@@ -18,22 +18,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/producers"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
-)
-
-const (
-	// How many times should we tolerate consecutive failures before we
-	// just blacklist the host altogether? Bear in mind that the backoff
-	// is exponential, so the max time here to attempt is 2**failures.
-	FailuresUntilBlacklist = 16 // 16 equates to roughly 18 hours.
 )
 
 // destinationQueue is a queue of events for a single destination.
@@ -46,12 +39,9 @@ type destinationQueue struct {
 	origin             gomatrixserverlib.ServerName         // origin of requests
 	destination        gomatrixserverlib.ServerName         // destination of requests
 	running            atomic.Bool                          // is the queue worker running?
-	blacklisted        atomic.Bool                          // is the remote side dead?
-	backoffUntil       atomic.Value                         // time.Time to wait until before sending requests
-	idleCounter        atomic.Uint32                        // how many ticks have we done nothing?
-	failCounter        atomic.Uint32                        // how many times have we failed?
-	sentCounter        atomic.Uint32                        // how many times have we succeeded?
 	wakeup             chan bool                            // wakes up a sleeping worker
+	statistics         *types.ServerStatistics              // statistics about this remote server
+	idleCounter        atomic.Uint32                        // how many ticks have we done nothing?
 	runningMutex       sync.RWMutex                         // protects the below
 	lastTransactionIDs []gomatrixserverlib.TransactionID    // protected by runningMutex
 	pendingPDUs        []*gomatrixserverlib.HeaderedEvent   // protected by runningMutex
@@ -69,58 +59,11 @@ func (oq *destinationQueue) wake() {
 	}
 }
 
-// Backoff marks a failure and works out when to back off until. It
-// returns true if the worker should give up altogether because of
-// too many consecutive failures.
-func (oq *destinationQueue) backoff() bool {
-	// Increase the fail counter.
-	failCounter := oq.failCounter.Load()
-	failCounter++
-	oq.failCounter.Store(failCounter)
-
-	// Check that we haven't failed more times than is acceptable.
-	if failCounter < FailuresUntilBlacklist {
-		// We're still under the threshold so work out the exponential
-		// backoff based on how many times we have failed already. The
-		// worker goroutine will wait until this time before processing
-		// anything from the queue.
-		backoffSeconds := time.Second * time.Duration(math.Exp2(float64(failCounter)))
-		oq.backoffUntil.Store(
-			time.Now().Add(backoffSeconds),
-		)
-		logrus.WithField("server_name", oq.destination).Infof("Increasing backoff to %s", backoffSeconds)
-		return false // Don't give up yet.
-	} else {
-		// We've exceeded the maximum amount of times we're willing
-		// to back off, which is probably in the region of hours by
-		// now. Just give up - clear the queues and reset the queue
-		// back to its default state.
-		oq.blacklisted.Store(true)
-		oq.runningMutex.Lock()
-		oq.pendingPDUs = nil
-		oq.pendingEDUs = nil
-		oq.pendingInvites = nil
-		oq.runningMutex.Unlock()
-		logrus.WithField("server_name", oq.destination).Infof("Blacklisting server due to %d consecutive errors", failCounter)
-		return true // Give up.
-	}
-}
-
-func (oq *destinationQueue) success() {
-	// Reset the idle and fail counters.
-	oq.idleCounter.Store(0)
-	oq.failCounter.Store(0)
-
-	// Increase the sent counter.
-	sentCounter := oq.failCounter.Load()
-	oq.sentCounter.Store(sentCounter + 1)
-}
-
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
 func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.HeaderedEvent) {
-	if oq.blacklisted.Load() {
+	if oq.statistics.Blacklisted() {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
@@ -134,7 +77,7 @@ func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.HeaderedEvent) {
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
 func (oq *destinationQueue) sendEDU(ev *gomatrixserverlib.EDU) {
-	if oq.blacklisted.Load() {
+	if oq.statistics.Blacklisted() {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
@@ -148,7 +91,7 @@ func (oq *destinationQueue) sendEDU(ev *gomatrixserverlib.EDU) {
 // destination. If the queue is empty then it starts a background
 // goroutine to start sending events to that destination.
 func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.InviteV2Request) {
-	if oq.blacklisted.Load() {
+	if oq.statistics.Blacklisted() {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
@@ -168,22 +111,17 @@ func (oq *destinationQueue) backgroundSend() {
 	defer close(oq.wakeup)
 
 	for {
-		// Wait for our backoff timer.
-		backoffUntil := time.Now()
-		if b, ok := oq.backoffUntil.Load().(time.Time); ok {
-			backoffUntil = b
-		}
-
-		// If we have a backoff period then sit and wait for it.
-		if backoffUntil.After(time.Now()) {
-			<-time.After(time.Until(backoffUntil))
+		// If we are backing off this server then wait for the
+		// backoff duration to complete first.
+		if backoff, duration := oq.statistics.BackoffDuration(); backoff {
+			<-time.After(duration)
 		}
 
 		// Retrieve any waiting things.
 		oq.runningMutex.RLock()
 		pendingPDUs, pendingEDUs := oq.pendingPDUs, oq.pendingEDUs
 		pendingInvites := oq.pendingInvites
-		idleCounter, sentCounter := oq.idleCounter.Load(), oq.sentCounter.Load()
+		idleCounter, sentCounter := oq.idleCounter.Load(), oq.statistics.SuccessCount()
 		oq.runningMutex.RUnlock()
 
 		// If we have pending PDUs or EDUs then construct a transaction.
@@ -192,7 +130,7 @@ func (oq *destinationQueue) backgroundSend() {
 			transaction, terr := oq.nextTransaction(pendingPDUs, pendingEDUs, sentCounter)
 			if terr != nil {
 				// We failed to send the transaction.
-				if giveUp := oq.backoff(); giveUp {
+				if giveUp := oq.statistics.Failure(); giveUp {
 					// It's been suggested that we should give up because
 					// the backoff has exceeded a maximum allowable value.
 					return
@@ -224,7 +162,11 @@ func (oq *destinationQueue) backgroundSend() {
 			if ierr != nil {
 				// We failed to send the transaction so increase the
 				// backoff and give it another go shortly.
-				oq.backoffUntil.Store(time.Until(backoffUntil) * 2)
+				if giveUp := oq.statistics.Failure(); giveUp {
+					// It's been suggested that we should give up because
+					// the backoff has exceeded a maximum allowable value.
+					return
+				}
 				continue
 			}
 
@@ -244,7 +186,7 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// If everything was fine at this point then we can update
 		// the counters for the transaction IDs.
-		oq.success()
+		oq.statistics.Success()
 
 		// Wait either for a few seconds, or until a new event is
 		// available.

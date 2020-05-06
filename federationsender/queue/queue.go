@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/matrix-org/dendrite/federationsender/producers"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -26,11 +27,11 @@ import (
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
-	rsProducer *producers.RoomserverProducer
-	origin     gomatrixserverlib.ServerName
-	client     *gomatrixserverlib.FederationClient
-	// The queuesMutex protects queues
-	queuesMutex sync.RWMutex
+	rsProducer  *producers.RoomserverProducer
+	origin      gomatrixserverlib.ServerName
+	client      *gomatrixserverlib.FederationClient
+	statistics  *types.Statistics
+	queuesMutex sync.RWMutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
@@ -39,11 +40,13 @@ func NewOutgoingQueues(
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
 	rsProducer *producers.RoomserverProducer,
+	statistics *types.Statistics,
 ) *OutgoingQueues {
 	return &OutgoingQueues{
 		rsProducer: rsProducer,
 		origin:     origin,
 		client:     client,
+		statistics: statistics,
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
 }
@@ -78,6 +81,7 @@ func (oqs *OutgoingQueues) SendEvent(
 				origin:      oqs.origin,
 				destination: destination,
 				client:      oqs.client,
+				statistics:  oqs.statistics.ForServer(destination),
 			}
 			oqs.queuesMutex.Lock()
 			oqs.queues[destination] = oq
@@ -125,6 +129,7 @@ func (oqs *OutgoingQueues) SendInvite(
 			origin:      oqs.origin,
 			destination: destination,
 			client:      oqs.client,
+			statistics:  oqs.statistics.ForServer(destination),
 		}
 		oqs.queuesMutex.Lock()
 		oqs.queues[destination] = oq
@@ -168,6 +173,7 @@ func (oqs *OutgoingQueues) SendEDU(
 				origin:      oqs.origin,
 				destination: destination,
 				client:      oqs.client,
+				statistics:  oqs.statistics.ForServer(destination),
 			}
 			oqs.queuesMutex.Lock()
 			oqs.queues[destination] = oq
