@@ -63,8 +63,7 @@ type ServerStatistics struct {
 // failure counters. If a host was blacklisted at this point then
 // we will unblacklist it.
 func (s *ServerStatistics) Success() {
-	sentCounter := s.failCounter.Load()
-	s.successCounter.Store(sentCounter + 1)
+	s.successCounter.Add(1)
 	s.failCounter.Store(0)
 	s.blacklisted.Store(false)
 }
@@ -75,9 +74,7 @@ func (s *ServerStatistics) Success() {
 // as blacklisted.
 func (s *ServerStatistics) Failure() bool {
 	// Increase the fail counter.
-	failCounter := s.failCounter.Load()
-	failCounter++
-	s.failCounter.Store(failCounter)
+	failCounter := s.failCounter.Add(1)
 
 	// Check that we haven't failed more times than is acceptable.
 	if failCounter >= FailuresUntilBlacklist {
@@ -100,8 +97,8 @@ func (s *ServerStatistics) Failure() bool {
 	return false
 }
 
-// WaitUntil returns both a bool stating whether to wait, and then
-// if true, a duration to wait for.
+// BackoffDuration returns both a bool stating whether to wait,
+// and then if true, a duration to wait for.
 func (s *ServerStatistics) BackoffDuration() (bool, time.Duration) {
 	backoff, until := false, time.Second
 	if b, ok := s.backoffUntil.Load().(time.Time); ok {
