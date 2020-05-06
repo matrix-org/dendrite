@@ -211,7 +211,7 @@ func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) er
 	// this for us in invite_room_state if it didn't already exist.
 	strippedState := []gomatrixserverlib.InviteV2StrippedState{}
 	if inviteRoomState := gjson.GetBytes(oie.Event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		if err := json.Unmarshal([]byte(inviteRoomState.Raw), &strippedState); err != nil {
+		if err = json.Unmarshal([]byte(inviteRoomState.Raw), &strippedState); err != nil {
 			log.WithError(err).Warn("failed to extract invite_room_state from event unsigned")
 		}
 	}
