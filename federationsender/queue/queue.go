@@ -117,7 +117,8 @@ func (oqs *OutgoingQueues) SendInvite(
 	}
 
 	log.WithFields(log.Fields{
-		"event_id": ev.EventID(),
+		"event_id":    ev.EventID(),
+		"server_name": destination,
 	}).Info("Sending invite")
 
 	oqs.queuesMutex.RLock()
