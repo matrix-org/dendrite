@@ -103,8 +103,17 @@ type txnReq struct {
 	rsAPI       api.RoomserverInternalAPI
 	producer    *producers.RoomserverProducer
 	eduProducer *producers.EDUServerProducer
-	keys        gomatrixserverlib.KeyRing
-	federation  *gomatrixserverlib.FederationClient
+	keys        gomatrixserverlib.JSONVerifier
+	federation  txnFederationClient
+}
+
+// A subset of FederationClient functionality that txn requires. Useful for testing.
+type txnFederationClient interface {
+	LookupState(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
+		res gomatrixserverlib.RespState, err error,
+	)
+	LookupStateIDs(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error)
+	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
 }
 
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
