@@ -69,6 +69,7 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 					Kind:         api.KindNew,
 					Event:        *event,
 					AuthEventIDs: event.AuthEventIDs(),
+					SendAsServer: string(r.Cfg.Matrix.ServerName),
 				})
 			}
 		}
