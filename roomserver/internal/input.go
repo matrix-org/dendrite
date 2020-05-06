@@ -54,21 +54,26 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) (err error) {
+) error {
 	// We lock as processRoomEvent can only be called once at a time
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	for i := range request.InputInviteEvents {
-		if event, e := processInviteEvent(ctx, r.DB, r, request.InputInviteEvents[i]); e != nil {
-			return e
+		if event, err := processInviteEvent(ctx, r.DB, r, request.InputInviteEvents[i]); err != nil {
+			return err
 		} else {
-			request.InputRoomEvents = append(request.InputRoomEvents, api.InputRoomEvent{
-				Kind:         api.KindNew,
-				Event:        *event,
-				AuthEventIDs: event.AuthEventIDs(),
-			})
+			// If the room is one that we know about then append the invite
+			// event to the list of room events to process.
+			if nid, err := r.DB.RoomNIDExcludingStubs(ctx, event.RoomID()); err == nil && nid > 0 {
+				request.InputRoomEvents = append(request.InputRoomEvents, api.InputRoomEvent{
+					Kind:         api.KindNew,
+					Event:        *event,
+					AuthEventIDs: event.AuthEventIDs(),
+				})
+			}
 		}
 	}
+	var err error
 	for i := range request.InputRoomEvents {
 		if response.EventID, err = processRoomEvent(ctx, r.DB, r, request.InputRoomEvents[i]); err != nil {
 			return err
