@@ -51,35 +51,11 @@ func (c *RoomserverProducer) SendEvents(
 	return c.SendInputRoomEvents(ctx, ires)
 }
 
-// SendEventWithKnownMissingState sends the missing state events followed by the new event to the roomserver with the given stateEventIDs.
-func (c *RoomserverProducer) SendEventWithKnownMissingState(
-	ctx context.Context, stateEventIDs []string, missingStateEvents []gomatrixserverlib.HeaderedEvent, event gomatrixserverlib.HeaderedEvent,
-) error {
-	var ires []api.InputRoomEvent
-	for _, outlier := range missingStateEvents {
-		ires = append(ires, api.InputRoomEvent{
-			Kind:         api.KindOutlier,
-			Event:        outlier.Headered(event.RoomVersion),
-			AuthEventIDs: outlier.AuthEventIDs(),
-		})
-	}
-
-	ires = append(ires, api.InputRoomEvent{
-		Kind:          api.KindNew,
-		Event:         event,
-		AuthEventIDs:  event.AuthEventIDs(),
-		HasState:      true,
-		StateEventIDs: stateEventIDs,
-	})
-
-	_, err := c.SendInputRoomEvents(ctx, ires)
-	return err
-}
-
 // SendEventWithState writes an event with KindNew to the roomserver input log
-// with the state at the event as KindOutlier before it.
+// with the state at the event as KindOutlier before it. Will not send any event that is
+// marked as `true` in haveEventIDs
 func (c *RoomserverProducer) SendEventWithState(
-	ctx context.Context, state *gomatrixserverlib.RespState, event gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, state *gomatrixserverlib.RespState, event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool,
 ) error {
 	outliers, err := state.Events()
 	if err != nil {
@@ -88,6 +64,9 @@ func (c *RoomserverProducer) SendEventWithState(
 
 	var ires []api.InputRoomEvent
 	for _, outlier := range outliers {
+		if haveEventIDs[outlier.EventID()] {
+			continue
+		}
 		ires = append(ires, api.InputRoomEvent{
 			Kind:         api.KindOutlier,
 			Event:        outlier.Headered(event.RoomVersion),

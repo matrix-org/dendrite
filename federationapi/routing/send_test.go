@@ -505,10 +505,9 @@ func TestTransactionFetchMissingStateByFallbackState(t *testing.T) {
 		},
 	}
 	inputEvent := testEvents[len(testEvents)-1]
-	var stateEvents []gomatrixserverlib.HeaderedEvent
-	for _, ev := range testStateEvents {
-		stateEvents = append(stateEvents, ev)
-	}
+	// first 5 events are the state events, in auth event order.
+	stateEvents := testEvents[:5]
+
 	cli := &txnFedClient{
 		// /state_ids purposefully unset
 		stateIDs: nil,
