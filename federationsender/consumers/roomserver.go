@@ -188,11 +188,30 @@ func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) er
 		return nil
 	}
 
+	// Ignore invites that don't have state keys - they are invalid.
+	if oie.Event.StateKey() == nil {
+		return fmt.Errorf("event %q doesn't have state key", oie.Event.EventID())
+	}
+
+	// Don't try to handle events that are actually destined for us.
+	stateKey := *oie.Event.StateKey()
+	_, destination, err := gomatrixserverlib.SplitID('@', stateKey)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"event_id":  oie.Event.EventID(),
+			"state_key": stateKey,
+		}).Info("failed to split destination from state key")
+		return nil
+	}
+	if s.cfg.Matrix.ServerName == destination {
+		return nil
+	}
+
 	// Try to extract the room invite state. The roomserver will have stashed
 	// this for us in invite_room_state if it didn't already exist.
 	strippedState := []gomatrixserverlib.InviteV2StrippedState{}
 	if inviteRoomState := gjson.GetBytes(oie.Event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		if err := json.Unmarshal([]byte(inviteRoomState.Raw), &strippedState); err != nil {
+		if err = json.Unmarshal([]byte(inviteRoomState.Raw), &strippedState); err != nil {
 			log.WithError(err).Warn("failed to extract invite_room_state from event unsigned")
 		}
 	}

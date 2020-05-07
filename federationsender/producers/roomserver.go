@@ -16,6 +16,7 @@ package producers
 
 import (
 	"context"
+	"crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -25,15 +26,20 @@ import (
 type RoomserverProducer struct {
 	InputAPI   api.RoomserverInternalAPI
 	serverName gomatrixserverlib.ServerName
+	keyID      gomatrixserverlib.KeyID
+	privateKey ed25519.PrivateKey
 }
 
 // NewRoomserverProducer creates a new RoomserverProducer
 func NewRoomserverProducer(
 	rsAPI api.RoomserverInternalAPI, serverName gomatrixserverlib.ServerName,
+	keyID gomatrixserverlib.KeyID, privateKey ed25519.PrivateKey,
 ) *RoomserverProducer {
 	return &RoomserverProducer{
 		InputAPI:   rsAPI,
 		serverName: serverName,
+		keyID:      keyID,
+		privateKey: privateKey,
 	}
 }
 
@@ -43,7 +49,7 @@ func NewRoomserverProducer(
 func (c *RoomserverProducer) SendInviteResponse(
 	ctx context.Context, res gomatrixserverlib.RespInviteV2, roomVersion gomatrixserverlib.RoomVersion,
 ) (string, error) {
-	ev := res.Event.Headered(roomVersion)
+	ev := res.Event.Sign(string(c.serverName), c.keyID, c.privateKey).Headered(roomVersion)
 	ire := api.InputRoomEvent{
 		Kind:          api.KindNew,
 		Event:         ev,

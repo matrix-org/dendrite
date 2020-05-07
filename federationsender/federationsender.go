@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -42,9 +43,14 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
-	roomserverProducer := producers.NewRoomserverProducer(rsAPI, base.Cfg.Matrix.ServerName)
+	roomserverProducer := producers.NewRoomserverProducer(
+		rsAPI, base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey,
+	)
 
-	queues := queue.NewOutgoingQueues(base.Cfg.Matrix.ServerName, federation, roomserverProducer)
+	statistics := &types.Statistics{}
+	queues := queue.NewOutgoingQueues(
+		base.Cfg.Matrix.ServerName, federation, roomserverProducer, statistics,
+	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,
@@ -63,6 +69,7 @@ func SetupFederationSenderComponent(
 
 	queryAPI := internal.NewFederationSenderInternalAPI(
 		federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing,
+		statistics,
 	)
 	queryAPI.SetupHTTP(http.DefaultServeMux)
 

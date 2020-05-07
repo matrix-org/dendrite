@@ -19,18 +19,20 @@ import (
 	"sync"
 
 	"github.com/matrix-org/dendrite/federationsender/producers"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
-	rsProducer *producers.RoomserverProducer
-	origin     gomatrixserverlib.ServerName
-	client     *gomatrixserverlib.FederationClient
-	// The queuesMutex protects queues
-	queuesMutex sync.Mutex
+	rsProducer  *producers.RoomserverProducer
+	origin      gomatrixserverlib.ServerName
+	client      *gomatrixserverlib.FederationClient
+	statistics  *types.Statistics
+	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
@@ -39,13 +41,35 @@ func NewOutgoingQueues(
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
 	rsProducer *producers.RoomserverProducer,
+	statistics *types.Statistics,
 ) *OutgoingQueues {
 	return &OutgoingQueues{
 		rsProducer: rsProducer,
 		origin:     origin,
 		client:     client,
+		statistics: statistics,
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
+}
+
+func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+	oq := oqs.queues[destination]
+	if oq == nil {
+		oq = &destinationQueue{
+			rsProducer:      oqs.rsProducer,
+			origin:          oqs.origin,
+			destination:     destination,
+			client:          oqs.client,
+			statistics:      oqs.statistics.ForServer(destination),
+			incomingPDUs:    make(chan *gomatrixserverlib.HeaderedEvent, 128),
+			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
+			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
+		}
+		oqs.queues[destination] = oq
+	}
+	return oq
 }
 
 // SendEvent sends an event to the destinations
@@ -62,27 +86,14 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	// Remove our own server from the list of destinations.
-	destinations = filterDestinations(oqs.origin, destinations)
+	destinations = filterAndDedupeDests(oqs.origin, destinations)
 
 	log.WithFields(log.Fields{
 		"destinations": destinations, "event": ev.EventID(),
 	}).Info("Sending event")
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
 	for _, destination := range destinations {
-		oq := oqs.queues[destination]
-		if oq == nil {
-			oq = &destinationQueue{
-				rsProducer:  oqs.rsProducer,
-				origin:      oqs.origin,
-				destination: destination,
-				client:      oqs.client,
-			}
-			oqs.queues[destination] = oq
-		}
-
-		oq.sendEvent(ev)
+		oqs.getQueue(destination).sendEvent(ev)
 	}
 
 	return nil
@@ -111,23 +122,11 @@ func (oqs *OutgoingQueues) SendInvite(
 	}
 
 	log.WithFields(log.Fields{
-		"event_id": ev.EventID(),
+		"event_id":    ev.EventID(),
+		"server_name": destination,
 	}).Info("Sending invite")
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
-	oq := oqs.queues[destination]
-	if oq == nil {
-		oq = &destinationQueue{
-			rsProducer:  oqs.rsProducer,
-			origin:      oqs.origin,
-			destination: destination,
-			client:      oqs.client,
-		}
-		oqs.queues[destination] = oq
-	}
-
-	oq.sendInvite(inviteReq)
+	oqs.getQueue(destination).sendInvite(inviteReq)
 
 	return nil
 }
@@ -146,7 +145,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	// Remove our own server from the list of destinations.
-	destinations = filterDestinations(oqs.origin, destinations)
+	destinations = filterAndDedupeDests(oqs.origin, destinations)
 
 	if len(destinations) > 0 {
 		log.WithFields(log.Fields{
@@ -154,35 +153,27 @@ func (oqs *OutgoingQueues) SendEDU(
 		}).Info("Sending EDU event")
 	}
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
 	for _, destination := range destinations {
-		oq := oqs.queues[destination]
-		if oq == nil {
-			oq = &destinationQueue{
-				rsProducer:  oqs.rsProducer,
-				origin:      oqs.origin,
-				destination: destination,
-				client:      oqs.client,
-			}
-			oqs.queues[destination] = oq
-		}
-
-		oq.sendEDU(e)
+		oqs.getQueue(destination).sendEDU(e)
 	}
 
 	return nil
 }
 
-// filterDestinations removes our own server from the list of destinations.
-// Otherwise we could end up trying to talk to ourselves.
-func filterDestinations(origin gomatrixserverlib.ServerName, destinations []gomatrixserverlib.ServerName) []gomatrixserverlib.ServerName {
-	var result []gomatrixserverlib.ServerName
-	for _, destination := range destinations {
-		if destination == origin {
+// filterAndDedupeDests removes our own server from the list of destinations
+// and deduplicates any servers in the list that may appear more than once.
+func filterAndDedupeDests(origin gomatrixserverlib.ServerName, destinations []gomatrixserverlib.ServerName) (
+	result []gomatrixserverlib.ServerName,
+) {
+	strs := make([]string, len(destinations))
+	for i, d := range destinations {
+		strs[i] = string(d)
+	}
+	for _, destination := range util.UniqueStrings(strs) {
+		if gomatrixserverlib.ServerName(destination) == origin {
 			continue
 		}
-		result = append(result, destination)
+		result = append(result, gomatrixserverlib.ServerName(destination))
 	}
 	return result
 }
