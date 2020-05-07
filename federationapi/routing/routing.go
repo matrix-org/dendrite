@@ -226,6 +226,28 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
+	v1fedmux.Handle("/send_join/{roomID}/{eventID}", common.MakeFedAPI(
+		"federation_send_join", cfg.Matrix.ServerName, keys,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
+			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			roomID := vars["roomID"]
+			eventID := vars["eventID"]
+			res := SendJoin(
+				httpReq, request, cfg, rsAPI, producer, keys, roomID, eventID,
+			)
+			return util.JSONResponse{
+				Headers: res.Headers,
+				Code:    res.Code,
+				JSON: []interface{}{
+					res.Code, res.JSON,
+				},
+			}
+		},
+	)).Methods(http.MethodPut)
+
 	v2fedmux.Handle("/send_join/{roomID}/{eventID}", common.MakeFedAPI(
 		"federation_send_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {

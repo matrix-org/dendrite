@@ -79,9 +79,10 @@ func (p *testEDUProducer) InputTypingEvent(
 }
 
 type testRoomserverAPI struct {
-	inputRoomEvents       []api.InputRoomEvent
-	queryStateAfterEvents func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse
-	queryEventsByID       func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse
+	inputRoomEvents           []api.InputRoomEvent
+	queryStateAfterEvents     func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse
+	queryEventsByID           func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse
+	queryLatestEventsAndState func(*api.QueryLatestEventsAndStateRequest) api.QueryLatestEventsAndStateResponse
 }
 
 func (t *testRoomserverAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {}
@@ -117,6 +118,13 @@ func (t *testRoomserverAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
+	r := t.queryLatestEventsAndState(request)
+	response.QueryLatestEventsAndStateRequest = *request
+	response.RoomExists = r.RoomExists
+	response.RoomVersion = testRoomVersion
+	response.LatestEvents = r.LatestEvents
+	response.StateEvents = r.StateEvents
+	response.Depth = r.Depth
 	return nil
 }
 
@@ -276,9 +284,10 @@ func (t *testRoomserverAPI) RemoveRoomAlias(
 }
 
 type txnFedClient struct {
-	state    map[string]gomatrixserverlib.RespState    // event_id to response
-	stateIDs map[string]gomatrixserverlib.RespStateIDs // event_id to response
-	getEvent map[string]gomatrixserverlib.Transaction  // event_id to response
+	state            map[string]gomatrixserverlib.RespState    // event_id to response
+	stateIDs         map[string]gomatrixserverlib.RespStateIDs // event_id to response
+	getEvent         map[string]gomatrixserverlib.Transaction  // event_id to response
+	getMissingEvents func(gomatrixserverlib.MissingEvents) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
 func (c *txnFedClient) LookupState(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
@@ -309,6 +318,10 @@ func (c *txnFedClient) GetEvent(ctx context.Context, s gomatrixserverlib.ServerN
 	}
 	res = r
 	return
+}
+func (c *txnFedClient) LookupMissingEvents(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents,
+	roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error) {
+	return c.getMissingEvents(missing)
 }
 
 func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
@@ -422,6 +435,77 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 		testEvents[len(testEvents)-1].EventID(),
 	})
 	assertInputRoomEvents(t, rsAPI.inputRoomEvents, nil) // expect no messages to be sent to the roomserver
+}
+
+// The purpose of this test is to make sure that when an event is received for which we do not know the prev_events,
+// we request them from /get_missing_events. It works by setting PrevEventsExist=false in the roomserver query response,
+// resulting in a call to /get_missing_events which returns the missing prev event. Both events should be processed in
+// topological order and sent to the roomserver.
+func TestTransactionFetchMissingPrevEvents(t *testing.T) {
+	haveEvent := testEvents[len(testEvents)-3]
+	prevEvent := testEvents[len(testEvents)-2]
+	inputEvent := testEvents[len(testEvents)-1]
+
+	var rsAPI *testRoomserverAPI // ref here so we can refer to inputRoomEvents inside these functions
+	rsAPI = &testRoomserverAPI{
+		queryStateAfterEvents: func(req *api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse {
+			// we expect this to be called three times:
+			// - first with input event to realise there's a gap
+			// - second with the prevEvent to realise there is no gap
+			// - third with the input event to realise there is no longer a gap
+			prevEventsExist := false
+			if len(req.PrevEventIDs) == 1 {
+				switch req.PrevEventIDs[0] {
+				case haveEvent.EventID():
+					prevEventsExist = true
+				case prevEvent.EventID():
+					// we only have this event if we've been send prevEvent
+					if len(rsAPI.inputRoomEvents) == 1 && rsAPI.inputRoomEvents[0].Event.EventID() == prevEvent.EventID() {
+						prevEventsExist = true
+					}
+				}
+			}
+
+			return api.QueryStateAfterEventsResponse{
+				PrevEventsExist: prevEventsExist,
+				RoomExists:      true,
+				StateEvents:     fromStateTuples(req.StateToFetch, nil),
+			}
+		},
+		queryLatestEventsAndState: func(req *api.QueryLatestEventsAndStateRequest) api.QueryLatestEventsAndStateResponse {
+			return api.QueryLatestEventsAndStateResponse{
+				RoomExists: true,
+				Depth:      haveEvent.Depth(),
+				LatestEvents: []gomatrixserverlib.EventReference{
+					haveEvent.EventReference(),
+				},
+				StateEvents: fromStateTuples(req.StateToFetch, nil),
+			}
+		},
+	}
+
+	cli := &txnFedClient{
+		getMissingEvents: func(missing gomatrixserverlib.MissingEvents) (res gomatrixserverlib.RespMissingEvents, err error) {
+			if !reflect.DeepEqual(missing.EarliestEvents, []string{haveEvent.EventID()}) {
+				t.Errorf("call to /get_missing_events wrong earliest events: got %v want %v", missing.EarliestEvents, haveEvent.EventID())
+			}
+			if !reflect.DeepEqual(missing.LatestEvents, []string{inputEvent.EventID()}) {
+				t.Errorf("call to /get_missing_events wrong latest events: got %v want %v", missing.LatestEvents, inputEvent.EventID())
+			}
+			return gomatrixserverlib.RespMissingEvents{
+				Events: []gomatrixserverlib.Event{
+					prevEvent.Unwrap(),
+				},
+			}, nil
+		},
+	}
+
+	pdus := []json.RawMessage{
+		inputEvent.JSON(),
+	}
+	txn := mustCreateTransaction(rsAPI, cli, pdus)
+	mustProcessTransaction(t, txn, nil)
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []gomatrixserverlib.HeaderedEvent{prevEvent, inputEvent})
 }
 
 // The purpose of this test is to check that when there are missing prev_events that state is fetched via /state_ids
