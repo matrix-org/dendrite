@@ -47,7 +47,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	}
 
 	// Deduplicate the server names we were provided.
-	util.Unique(request.ServerNames)
+	util.SortAndUnique(request.ServerNames)
 
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-join send-join dance.
@@ -159,7 +159,7 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 	response *api.PerformLeaveResponse,
 ) (err error) {
 	// Deduplicate the server names we were provided.
-	util.Unique(request.ServerNames)
+	util.SortAndUnique(request.ServerNames)
 
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-leave send-leave dance.
