@@ -18,7 +18,6 @@ package internal
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -68,7 +67,6 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 		// loopback room event containing the invite, for local invites.
 		// If it does, we should process it with the room events below.
 		if loopback != nil {
-			fmt.Println("LOOPING BACK", string(loopback.Event.JSON()))
 			request.InputRoomEvents = append(request.InputRoomEvents, *loopback)
 		}
 	}

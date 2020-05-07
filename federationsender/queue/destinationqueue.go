@@ -94,8 +94,11 @@ func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.InviteV2Request) {
 // backgroundSend is the worker goroutine for sending events.
 // nolint:gocyclo
 func (oq *destinationQueue) backgroundSend() {
-	// Mark the worker as running for its lifetime.
-	oq.running.Store(true)
+	// Check if a worker is already running, and if it isn't, then
+	// mark it as started.
+	if !oq.running.CAS(false, true) {
+		return
+	}
 	defer oq.running.Store(false)
 
 	for {

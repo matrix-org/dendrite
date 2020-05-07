@@ -86,7 +86,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	// Remove our own server from the list of destinations.
-	destinations = filterDestinations(oqs.origin, destinations)
+	destinations = filterAndDedupeDests(oqs.origin, destinations)
 
 	log.WithFields(log.Fields{
 		"destinations": destinations, "event": ev.EventID(),
@@ -145,7 +145,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	// Remove our own server from the list of destinations.
-	destinations = filterDestinations(oqs.origin, destinations)
+	destinations = filterAndDedupeDests(oqs.origin, destinations)
 
 	if len(destinations) > 0 {
 		log.WithFields(log.Fields{
@@ -160,9 +160,9 @@ func (oqs *OutgoingQueues) SendEDU(
 	return nil
 }
 
-// filterDestinations removes our own server from the list of destinations.
-// Otherwise we could end up trying to talk to ourselves.
-func filterDestinations(origin gomatrixserverlib.ServerName, destinations []gomatrixserverlib.ServerName) (
+// filterAndDedupeDests removes our own server from the list of destinations
+// and deduplicates any servers in the list that may appear more than once.
+func filterAndDedupeDests(origin gomatrixserverlib.ServerName, destinations []gomatrixserverlib.ServerName) (
 	result []gomatrixserverlib.ServerName,
 ) {
 	strs := make([]string, len(destinations))
