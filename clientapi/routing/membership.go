@@ -89,7 +89,8 @@ func SendMembership(
 	}
 
 	event, err := buildMembershipEvent(
-		req.Context(), body, accountDB, device, membership, roomID, cfg, evTime, rsAPI, asAPI,
+		req.Context(), body, accountDB, device, membership,
+		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
@@ -151,7 +152,7 @@ func buildMembershipEvent(
 	ctx context.Context,
 	body threepid.MembershipRequest, accountDB accounts.Database,
 	device *authtypes.Device,
-	membership, roomID string,
+	membership, roomID string, isDirect bool,
 	cfg *config.Dendrite, evTime time.Time,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.Event, error) {
@@ -182,6 +183,7 @@ func buildMembershipEvent(
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
 		Reason:      reason,
+		IsDirect:    isDirect,
 	}
 
 	if err = builder.SetContent(content); err != nil {
