@@ -25,6 +25,8 @@ matrix:
     #        public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
     #      - key_id: ed25519:a_RXGa
     #        public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+    # Disables new users from registering (except via shared secrets)
+    registration_disabled: false
 
 # The media repository config
 media:
