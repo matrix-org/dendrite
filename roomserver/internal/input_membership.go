@@ -100,7 +100,7 @@ func updateMembership(
 			return nil, err
 		}
 	}
-	if oldMembership == newMembership && newMembership != gomatrixserverlib.Join {
+	if oldMembership == newMembership || newMembership == gomatrixserverlib.Leave {
 		// If the membership is the same then nothing changed and we can return
 		// immediately, unless it's a Join update (e.g. profile update).
 		return updates, nil
