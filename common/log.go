@@ -84,7 +84,7 @@ func callerPrettyfier(f *runtime.Frame) (string, string) {
 // simplest, and it gives us the freedom to run pprof on a separate port.
 func SetupPprof() {
 	if hostPort := os.Getenv("PPROFLISTEN"); hostPort != "" {
-		logrus.Warn("Starting pprof on", hostPort)
+		logrus.Warn("Starting pprof on ", hostPort)
 		go func() {
 			logrus.WithError(http.ListenAndServe(hostPort, nil)).Error("Failed to setup pprof listener")
 		}()
