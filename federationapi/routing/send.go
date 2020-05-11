@@ -72,28 +72,17 @@ func Send(
 	util.GetLogger(httpReq.Context()).Infof("Received transaction %q containing %d PDUs, %d EDUs", txnID, len(t.PDUs), len(t.EDUs))
 
 	resp, err := t.processTransaction()
-	switch err.(type) {
-	// No error? Great! Send back a 200.
-	case nil:
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: resp,
-		}
-	// Handle known error cases as we will return a 400 error for these.
-	case roomNotFoundError:
-	case unmarshalError:
-	case verifySigError:
-	// Handle unknown error cases. Sending 500 errors back should be a last
-	// resort as this can make other homeservers back off sending federation
-	// events.
-	default:
+	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
-		return jsonerror.InternalServerError()
 	}
-	// Return a 400 error for bad requests as fallen through from above.
+
+	// https://matrix.org/docs/spec/server_server/r0.1.3#put-matrix-federation-v1-send-txnid
+	// Status code 200:
+	// The result of processing the transaction. The server is to use this response
+	// even in the event of one or more PDUs failing to be processed.
 	return util.JSONResponse{
-		Code: http.StatusBadRequest,
-		JSON: jsonerror.BadJSON(err.Error()),
+		Code: http.StatusOK,
+		JSON: resp,
 	}
 }
 
@@ -116,7 +105,7 @@ type txnFederationClient interface {
 	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
 }
 
-func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
+func (t *txnReq) processTransaction() *gomatrixserverlib.RespSend {
 	results := make(map[string]gomatrixserverlib.PDUResult)
 
 	var pdus []gomatrixserverlib.HeaderedEvent
@@ -126,22 +115,28 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 		}
 		if err := json.Unmarshal(pdu, &header); err != nil {
 			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to extract room ID from event")
-			return nil, unmarshalError{err}
+			continue
 		}
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: header.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
 		if err := t.rsAPI.QueryRoomVersionForRoom(t.context, &verReq, &verRes); err != nil {
 			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to query room version for room", verReq.RoomID)
-			return nil, roomNotFoundError{verReq.RoomID}
+			continue
 		}
 		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, verRes.RoomVersion)
 		if err != nil {
 			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
-			return nil, unmarshalError{err}
+			results[event.EventID()] = gomatrixserverlib.PDUResult{
+				Error: err.Error(),
+			}
+			continue
 		}
-		if err := gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
+		if err = gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
 			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
-			return nil, verifySigError{event.EventID(), err}
+			results[event.EventID()] = gomatrixserverlib.PDUResult{
+				Error: err.Error(),
+			}
+			continue
 		}
 		pdus = append(pdus, event.Headered(verRes.RoomVersion))
 	}
@@ -165,14 +160,16 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			// receive another event referencing it.
 			// If we bail and stop processing then we risk wedging incoming
 			// transactions from that server forever.
-			switch err.(type) {
-			case roomNotFoundError:
-			case *gomatrixserverlib.NotAllowed:
-			default:
-				// Any other error should be the result of a temporary error in
-				// our server so we should bail processing the transaction entirely.
-				return nil, err
-			}
+			/*
+				switch err.(type) {
+				case roomNotFoundError:
+				case *gomatrixserverlib.NotAllowed:
+				default:
+					// Any other error should be the result of a temporary error in
+					// our server so we should bail processing the transaction entirely.
+					return nil, err
+				}
+			*/
 			results[e.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
 			}
@@ -184,7 +181,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 
 	t.processEDUs(t.EDUs)
 	util.GetLogger(t.context).Infof("Processed %d PDUs from transaction %q", len(results), t.TransactionID)
-	return &gomatrixserverlib.RespSend{PDUs: results}, nil
+	return &gomatrixserverlib.RespSend{PDUs: results}
 }
 
 type roomNotFoundError struct {
