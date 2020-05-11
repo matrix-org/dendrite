@@ -92,6 +92,9 @@ func (t *testRoomserverAPI) InputRoomEvents(
 	response *api.InputRoomEventsResponse,
 ) error {
 	t.inputRoomEvents = append(t.inputRoomEvents, request.InputRoomEvents...)
+	for _, ire := range request.InputRoomEvents {
+		fmt.Println("InputRoomEvents: ", ire.Event.EventID())
+	}
 	return nil
 }
 
@@ -292,6 +295,7 @@ type txnFedClient struct {
 func (c *txnFedClient) LookupState(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
 	res gomatrixserverlib.RespState, err error,
 ) {
+	fmt.Println("testFederationClient.LookupState", eventID)
 	r, ok := c.state[eventID]
 	if !ok {
 		err = fmt.Errorf("txnFedClient: no /state for event %s", eventID)
@@ -301,6 +305,7 @@ func (c *txnFedClient) LookupState(ctx context.Context, s gomatrixserverlib.Serv
 	return
 }
 func (c *txnFedClient) LookupStateIDs(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error) {
+	fmt.Println("testFederationClient.LookupStateIDs", eventID)
 	r, ok := c.stateIDs[eventID]
 	if !ok {
 		err = fmt.Errorf("txnFedClient: no /state_ids for event %s", eventID)
@@ -310,6 +315,7 @@ func (c *txnFedClient) LookupStateIDs(ctx context.Context, s gomatrixserverlib.S
 	return
 }
 func (c *txnFedClient) GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error) {
+	fmt.Println("testFederationClient.GetEvent", eventID)
 	r, ok := c.getEvent[eventID]
 	if !ok {
 		err = fmt.Errorf("txnFedClient: no /event for event ID %s", eventID)
@@ -331,6 +337,8 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 		eduProducer: producers.NewEDUServerProducer(&testEDUProducer{}),
 		keys:        &testNopJSONVerifier{},
 		federation:  fedClient,
+		haveEvents:  make(map[string]*gomatrixserverlib.HeaderedEvent),
+		newEvents:   make(map[string]bool),
 	}
 	t.PDUs = pdus
 	t.Origin = testOrigin
@@ -538,30 +546,35 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 	var rsAPI *testRoomserverAPI
 	rsAPI = &testRoomserverAPI{
 		queryStateAfterEvents: func(req *api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse {
-			// if we have event C from GME, then PrevEventsExist: True, else it is false
-			prevEventExists := false
 			omitTuples := []gomatrixserverlib.StateKeyTuple{
-				gomatrixserverlib.StateKeyTuple{
+				{
 					EventType: gomatrixserverlib.MRoomPowerLevels,
 					StateKey:  "",
 				},
 			}
+			askingForEvent := req.PrevEventIDs[0]
+			haveEventB := false
+			haveEventC := false
 			for _, ev := range rsAPI.inputRoomEvents {
-				if ev.Event.EventID() == eventC.EventID() && len(req.PrevEventIDs) == 1 && req.PrevEventIDs[0] == eventC.EventID() {
-					prevEventExists = true
+				switch ev.Event.EventID() {
+				case eventB.EventID():
+					haveEventB = true
+					omitTuples = nil // include event B now
+				case eventC.EventID():
+					haveEventC = true
 				}
-				if ev.Event.EventID() == eventB.EventID() {
-					omitTuples = nil
-				}
+			}
+			prevEventExists := false
+			if askingForEvent == eventC.EventID() {
+				prevEventExists = haveEventC
+			} else if askingForEvent == eventB.EventID() {
+				prevEventExists = haveEventB
 			}
 			var stateEvents []gomatrixserverlib.HeaderedEvent
 			if prevEventExists {
 				stateEvents = fromStateTuples(req.StateToFetch, omitTuples)
 			}
 			return api.QueryStateAfterEventsResponse{
-				// setting this to false should trigger a call to /get_missing_events or /state_ids depending
-				// on far back we've gone. The first time should trigger /get_missing_events but we should
-				// give up on subsequent calls and just use the /state_ids
 				PrevEventsExist: prevEventExists,
 				RoomExists:      true,
 				StateEvents:     stateEvents,
@@ -621,14 +634,14 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 	}
 	cli := &txnFedClient{
 		stateIDs: map[string]gomatrixserverlib.RespStateIDs{
-			eventB.EventID(): gomatrixserverlib.RespStateIDs{
+			eventB.EventID(): {
 				StateEventIDs: stateEventIDs,
 				AuthEventIDs:  authEventIDs,
 			},
 		},
 		// /event for event B returns it
 		getEvent: map[string]gomatrixserverlib.Transaction{
-			eventB.EventID(): gomatrixserverlib.Transaction{
+			eventB.EventID(): {
 				PDUs: []json.RawMessage{
 					eventB.JSON(),
 				},
