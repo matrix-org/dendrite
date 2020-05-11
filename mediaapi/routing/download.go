@@ -118,7 +118,10 @@ func Download(
 	)
 	if err != nil {
 		// TODO: Handle the fact we might have started writing the response
-		dReq.jsonErrorResponse(w, util.ErrorResponse(err))
+		dReq.jsonErrorResponse(w, util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Failed to download: " + err.Error()),
+		})
 		return
 	}
 
@@ -138,7 +141,7 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to marshal JSONResponse")
 		// this should never fail to be marshalled so drop err to the floor
-		res = util.MessageResponse(http.StatusInternalServerError, "Internal Server Error")
+		res = util.MessageResponse(http.StatusNotFound, "Download request failed: "+err.Error())
 		resBytes, _ = json.Marshal(res.JSON)
 	}
 
