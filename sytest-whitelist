@@ -264,3 +264,4 @@ User can invite local user to room with version 5
 remote user can join room with version 5
 User can invite remote user to room with version 5
 Remote user can backfill in a room with version 5
+Alternative server names do not cause a routing loop
