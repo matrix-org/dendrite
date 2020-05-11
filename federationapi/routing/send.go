@@ -105,7 +105,7 @@ type txnFederationClient interface {
 	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
 }
 
-func (t *txnReq) processTransaction() *gomatrixserverlib.RespSend {
+func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	results := make(map[string]gomatrixserverlib.PDUResult)
 
 	var pdus []gomatrixserverlib.HeaderedEvent
@@ -160,16 +160,18 @@ func (t *txnReq) processTransaction() *gomatrixserverlib.RespSend {
 			// receive another event referencing it.
 			// If we bail and stop processing then we risk wedging incoming
 			// transactions from that server forever.
-			/*
-				switch err.(type) {
-				case roomNotFoundError:
-				case *gomatrixserverlib.NotAllowed:
-				default:
-					// Any other error should be the result of a temporary error in
-					// our server so we should bail processing the transaction entirely.
-					return nil, err
+			switch err.(type) {
+			case roomNotFoundError:
+			case *gomatrixserverlib.NotAllowed:
+			default:
+				// We shouldn't return 500s in response to an expired context.
+				if err == context.Canceled || err == context.DeadlineExceeded {
+					break
 				}
-			*/
+				// Any other error should be the result of a temporary error in
+				// our server so we should bail processing the transaction entirely.
+				return nil, err
+			}
 			results[e.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
 			}
@@ -181,7 +183,7 @@ func (t *txnReq) processTransaction() *gomatrixserverlib.RespSend {
 
 	t.processEDUs(t.EDUs)
 	util.GetLogger(t.context).Infof("Processed %d PDUs from transaction %q", len(results), t.TransactionID)
-	return &gomatrixserverlib.RespSend{PDUs: results}
+	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
 type roomNotFoundError struct {
