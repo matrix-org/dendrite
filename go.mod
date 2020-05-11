@@ -17,7 +17,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200318135427-31631a9ef51f
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200325174927-327088cdef10
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20200511150133-f4a8869b5366
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20200511154227-5cc71d36632b
 	github.com/matrix-org/naffka v0.0.0-20200422140631-181f1ee7401f
 	github.com/matrix-org/util v0.0.0-20190711121626-527ce5ddefc7
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible
