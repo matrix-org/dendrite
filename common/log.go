@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -77,6 +78,17 @@ func callerPrettyfier(f *runtime.Frame) (string, string) {
 	filename := fmt.Sprintf(" [%s:%d]", f.File, f.Line)
 
 	return funcname, filename
+}
+
+// SetupPprof starts a pprof listener. We use the DefaultServeMux here because it is
+// simplest, and it gives us the freedom to run pprof on a separate port.
+func SetupPprof() {
+	if hostPort := os.Getenv("PPROFLISTEN"); hostPort != "" {
+		logrus.Print("Starting pprof on", hostPort)
+		go func() {
+			logrus.WithError(http.ListenAndServe(hostPort, nil)).Print("Failed to setup pprof listener")
+		}()
+	}
 }
 
 // SetupStdLogging configures the logging format to standard output. Typically, it is called when the config is not yet loaded.

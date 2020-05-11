@@ -42,6 +42,8 @@ import (
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/sirupsen/logrus"
+
+	_ "net/http/pprof"
 )
 
 // BaseDendrite is a base for creating new instances of dendrite. It parses
@@ -71,6 +73,7 @@ const HTTPClientTimeout = time.Second * 30
 func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 	common.SetupStdLogging()
 	common.SetupHookLogging(cfg.Logging, componentName)
+	common.SetupPprof()
 
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
