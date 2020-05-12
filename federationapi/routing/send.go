@@ -351,7 +351,8 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 	var states []*gomatrixserverlib.RespState
 	needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{*backwardsExtremity}).Tuples()
 	for _, prevEventID := range backwardsExtremity.PrevEventIDs() {
-		prevState, err := t.lookupStateAfterEvent(roomVersion, backwardsExtremity.RoomID(), prevEventID, needed)
+		var prevState *gomatrixserverlib.RespState
+		prevState, err = t.lookupStateAfterEvent(roomVersion, backwardsExtremity.RoomID(), prevEventID, needed)
 		if err != nil {
 			util.GetLogger(t.context).WithError(err).Errorf("Failed to lookup state after prev_event: %s", prevEventID)
 			return err
@@ -379,55 +380,10 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 // lookupStateAfterEvent returns the room state after `eventID`, which is the state before eventID with the state of `eventID` (if it's a state event)
 // added into the mix.
 func (t *txnReq) lookupStateAfterEvent(roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string, needed []gomatrixserverlib.StateKeyTuple) (*gomatrixserverlib.RespState, error) {
-	var res api.QueryStateAfterEventsResponse
-	err := t.rsAPI.QueryStateAfterEvents(t.context, &api.QueryStateAfterEventsRequest{
-		RoomID:       roomID,
-		PrevEventIDs: []string{eventID},
-		StateToFetch: needed,
-	}, &res)
-	if err != nil || !res.PrevEventsExist {
-		util.GetLogger(t.context).WithError(err).Warnf("failed to query state after %s locally; trying remotely", eventID)
-	} else {
-		for i, ev := range res.StateEvents {
-			t.haveEvents[ev.EventID()] = &res.StateEvents[i]
-		}
-		var authEvents []gomatrixserverlib.Event
-		missingAuthEvents := make(map[string]bool)
-		for _, ev := range res.StateEvents {
-			for _, ae := range ev.AuthEventIDs() {
-				aev, ok := t.haveEvents[ae]
-				if ok {
-					authEvents = append(authEvents, aev.Unwrap())
-				} else {
-					missingAuthEvents[ae] = true
-				}
-			}
-		}
-		// QueryStateAfterEvents does not return the auth events, so fetch them now. We know the roomserver has them else it wouldn't
-		// have stored the event.
-		var missingEventList []string
-		for evID := range missingAuthEvents {
-			missingEventList = append(missingEventList, evID)
-		}
-		queryReq := api.QueryEventsByIDRequest{
-			EventIDs: missingEventList,
-		}
-		util.GetLogger(t.context).Infof("Fetching missing auth events: %v", missingEventList)
-		var queryRes api.QueryEventsByIDResponse
-		if err = t.rsAPI.QueryEventsByID(t.context, &queryReq, &queryRes); err != nil {
-			return nil, err
-		}
-		for i := range queryRes.Events {
-			evID := queryRes.Events[i].EventID()
-			t.haveEvents[evID] = &queryRes.Events[i]
-			authEvents = append(authEvents, queryRes.Events[i].Unwrap())
-		}
-
-		evs := gomatrixserverlib.UnwrapEventHeaders(res.StateEvents)
-		return &gomatrixserverlib.RespState{
-			StateEvents: evs,
-			AuthEvents:  authEvents,
-		}, nil
+	// try doing all this locally before we resort to querying federation
+	respState := t.lookupStateAfterEventLocally(roomID, eventID, needed)
+	if respState != nil {
+		return respState, nil
 	}
 
 	respState, err := t.lookupStateBeforeEvent(roomVersion, roomID, eventID)
@@ -457,6 +413,59 @@ func (t *txnReq) lookupStateAfterEvent(roomVersion gomatrixserverlib.RoomVersion
 	}
 
 	return respState, nil
+}
+
+func (t *txnReq) lookupStateAfterEventLocally(roomID, eventID string, needed []gomatrixserverlib.StateKeyTuple) *gomatrixserverlib.RespState {
+	var res api.QueryStateAfterEventsResponse
+	err := t.rsAPI.QueryStateAfterEvents(t.context, &api.QueryStateAfterEventsRequest{
+		RoomID:       roomID,
+		PrevEventIDs: []string{eventID},
+		StateToFetch: needed,
+	}, &res)
+	if err != nil || !res.PrevEventsExist {
+		util.GetLogger(t.context).WithError(err).Warnf("failed to query state after %s locally", eventID)
+		return nil
+	}
+	for i, ev := range res.StateEvents {
+		t.haveEvents[ev.EventID()] = &res.StateEvents[i]
+	}
+	var authEvents []gomatrixserverlib.Event
+	missingAuthEvents := make(map[string]bool)
+	for _, ev := range res.StateEvents {
+		for _, ae := range ev.AuthEventIDs() {
+			aev, ok := t.haveEvents[ae]
+			if ok {
+				authEvents = append(authEvents, aev.Unwrap())
+			} else {
+				missingAuthEvents[ae] = true
+			}
+		}
+	}
+	// QueryStateAfterEvents does not return the auth events, so fetch them now. We know the roomserver has them else it wouldn't
+	// have stored the event.
+	var missingEventList []string
+	for evID := range missingAuthEvents {
+		missingEventList = append(missingEventList, evID)
+	}
+	queryReq := api.QueryEventsByIDRequest{
+		EventIDs: missingEventList,
+	}
+	util.GetLogger(t.context).Infof("Fetching missing auth events: %v", missingEventList)
+	var queryRes api.QueryEventsByIDResponse
+	if err = t.rsAPI.QueryEventsByID(t.context, &queryReq, &queryRes); err != nil {
+		return nil
+	}
+	for i := range queryRes.Events {
+		evID := queryRes.Events[i].EventID()
+		t.haveEvents[evID] = &queryRes.Events[i]
+		authEvents = append(authEvents, queryRes.Events[i].Unwrap())
+	}
+
+	evs := gomatrixserverlib.UnwrapEventHeaders(res.StateEvents)
+	return &gomatrixserverlib.RespState{
+		StateEvents: evs,
+		AuthEvents:  authEvents,
+	}
 }
 
 func (t *txnReq) lookupCurrentState(newEvent *gomatrixserverlib.Event) (*gomatrixserverlib.RespState, error) {
@@ -497,12 +506,8 @@ func (t *txnReq) resolveStatesAndCheck(roomVersion gomatrixserverlib.RoomVersion
 	var authEventList []gomatrixserverlib.Event
 	var stateEventList []gomatrixserverlib.Event
 	for _, state := range states {
-		for _, ae := range state.AuthEvents {
-			authEventList = append(authEventList, ae)
-		}
-		for _, se := range state.StateEvents {
-			stateEventList = append(stateEventList, se)
-		}
+		authEventList = append(authEventList, state.AuthEvents...)
+		stateEventList = append(stateEventList, state.StateEvents...)
 	}
 	resolvedStateEvents, err := gomatrixserverlib.ResolveConflicts(roomVersion, stateEventList, authEventList)
 	if err != nil {
@@ -513,9 +518,9 @@ retryAllowedState:
 	if err = checkAllowedByState(*backwardsExtremity, resolvedStateEvents); err != nil {
 		switch missing := err.(type) {
 		case gomatrixserverlib.MissingAuthEventError:
-			h, err := t.lookupEvent(roomVersion, missing.AuthEventID, true)
-			if err != nil {
-				return nil, fmt.Errorf("missing auth event %s and failed to look it up: %w", missing.AuthEventID, err)
+			h, err2 := t.lookupEvent(roomVersion, missing.AuthEventID, true)
+			if err2 != nil {
+				return nil, fmt.Errorf("missing auth event %s and failed to look it up: %w", missing.AuthEventID, err2)
 			}
 			util.GetLogger(t.context).Infof("fetched event %s", missing.AuthEventID)
 			resolvedStateEvents = append(resolvedStateEvents, h.Unwrap())
