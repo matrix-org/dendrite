@@ -36,7 +36,7 @@ type syncRequest struct {
 	device        authtypes.Device
 	limit         int
 	timeout       time.Duration
-	since         *types.PaginationToken // nil means that no since token was supplied
+	since         *types.StreamingToken // nil means that no since token was supplied
 	wantFullState bool
 	log           *log.Entry
 }
@@ -45,9 +45,14 @@ func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, e
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
-	since, err := getPaginationToken(req.URL.Query().Get("since"))
-	if err != nil {
-		return nil, err
+	var since *types.StreamingToken
+	sinceStr := req.URL.Query().Get("since")
+	if sinceStr != "" {
+		tok, err := types.NewStreamTokenFromString(sinceStr)
+		if err != nil {
+			return nil, err
+		}
+		since = &tok
 	}
 	// TODO: Additional query params: set_presence, filter
 	return &syncRequest{
@@ -70,17 +75,4 @@ func getTimeout(timeoutMS string) time.Duration {
 		return defaultSyncTimeout
 	}
 	return time.Duration(i) * time.Millisecond
-}
-
-// getSyncStreamPosition tries to parse a 'since' token taken from the API to a
-// types.PaginationToken. If the string is empty then (nil, nil) is returned.
-// There are two forms of tokens: The full length form containing all PDU and EDU
-// positions separated by "_", and the short form containing only the PDU
-// position. Short form can be used for, e.g., `prev_batch` tokens.
-func getPaginationToken(since string) (*types.PaginationToken, error) {
-	if since == "" {
-		return nil, nil
-	}
-
-	return types.NewPaginationTokenFromString(since)
 }
