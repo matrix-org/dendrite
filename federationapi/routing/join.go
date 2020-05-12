@@ -17,6 +17,7 @@ package routing
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -275,6 +276,12 @@ func SendJoin(
 		}
 	}
 
+	// sort events deterministically by depth (lower is earlier)
+	// We also do this because sytest's basic federation server isn't good at using the correct
+	// state if these lists are randomised, resulting in flakey tests. :(
+	sort.Sort(eventsByDepth(stateAndAuthChainResponse.StateEvents))
+	sort.Sort(eventsByDepth(stateAndAuthChainResponse.AuthChainEvents))
+
 	// https://matrix.org/docs/spec/server_server/latest#put-matrix-federation-v1-send-join-roomid-eventid
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -284,4 +291,16 @@ func SendJoin(
 			Origin:      cfg.Matrix.ServerName,
 		},
 	}
+}
+
+type eventsByDepth []gomatrixserverlib.HeaderedEvent
+
+func (e eventsByDepth) Len() int {
+	return len(e)
+}
+func (e eventsByDepth) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+func (e eventsByDepth) Less(i, j int) bool {
+	return e[i].Depth() < e[j].Depth()
 }
