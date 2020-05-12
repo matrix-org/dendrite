@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -348,6 +349,50 @@ func createRoom(
 
 		if aliasResp.AliasExists {
 			return util.MessageResponse(400, "Alias already exists")
+		}
+	}
+
+	// If this is a direct message then we should invite the participants.
+	for _, invitee := range r.Invite {
+		// Build the membership request.
+		body := threepid.MembershipRequest{
+			UserID: invitee,
+		}
+		// Build the invite event.
+		inviteEvent, err := buildMembershipEvent(
+			req.Context(), body, accountDB, device, gomatrixserverlib.Invite,
+			roomID, true, cfg, evTime, rsAPI, asAPI,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvent failed")
+			continue
+		}
+		// Build some stripped state for the invite.
+		candidates := append(gomatrixserverlib.UnwrapEventHeaders(builtEvents), *inviteEvent)
+		var strippedState []gomatrixserverlib.InviteV2StrippedState
+		for _, event := range candidates {
+			switch event.Type() {
+			// TODO: case gomatrixserverlib.MRoomEncryption:
+			//	fallthrough
+			case gomatrixserverlib.MRoomMember:
+				fallthrough
+			case gomatrixserverlib.MRoomJoinRules:
+				strippedState = append(
+					strippedState,
+					gomatrixserverlib.NewInviteV2StrippedState(&event),
+				)
+			}
+		}
+		// Send the invite event to the roomserver.
+		if err = producer.SendInvite(
+			req.Context(),
+			inviteEvent.Headered(roomVersion),
+			strippedState,         // invite room state
+			cfg.Matrix.ServerName, // send as server
+			nil,                   // transaction ID
+		); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+			return jsonerror.InternalServerError()
 		}
 	}
 

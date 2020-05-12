@@ -271,3 +271,4 @@ Inbound federation can get state_ids for a room
 Inbound federation of state_ids requires event_id as a mandatory paramater
 Federation rejects inbound events where the prev_events cannot be found
 Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
+Alternative server names do not cause a routing loop

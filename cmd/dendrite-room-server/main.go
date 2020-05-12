@@ -15,8 +15,6 @@
 package main
 
 import (
-	_ "net/http/pprof"
-
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/roomserver"

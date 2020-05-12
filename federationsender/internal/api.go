@@ -9,6 +9,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/storage"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -18,6 +19,7 @@ type FederationSenderInternalAPI struct {
 	api.FederationSenderInternalAPI
 	db         storage.Database
 	cfg        *config.Dendrite
+	statistics *types.Statistics
 	producer   *producers.RoomserverProducer
 	federation *gomatrixserverlib.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
@@ -28,6 +30,7 @@ func NewFederationSenderInternalAPI(
 	producer *producers.RoomserverProducer,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
+	statistics *types.Statistics,
 ) *FederationSenderInternalAPI {
 	return &FederationSenderInternalAPI{
 		db:         db,
@@ -35,6 +38,7 @@ func NewFederationSenderInternalAPI(
 		producer:   producer,
 		federation: federation,
 		keyRing:    keyRing,
+		statistics: statistics,
 	}
 }
 

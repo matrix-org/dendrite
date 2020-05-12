@@ -25,10 +25,12 @@ func (r *FederationSenderInternalAPI) PerformDirectoryLookup(
 		request.RoomAlias,
 	)
 	if err != nil {
+		r.statistics.ForServer(request.ServerName).Failure()
 		return err
 	}
 	response.RoomID = dir.RoomID
 	response.ServerNames = dir.Servers
+	r.statistics.ForServer(request.ServerName).Success()
 	return nil
 }
 
@@ -45,7 +47,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	}
 
 	// Deduplicate the server names we were provided.
-	util.Unique(request.ServerNames)
+	util.SortAndUnique(request.ServerNames)
 
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-join send-join dance.
@@ -61,6 +63,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		)
 		if err != nil {
 			// TODO: Check if the user was not allowed to join the room.
+			r.statistics.ForServer(serverName).Failure()
 			return fmt.Errorf("r.federation.MakeJoin: %w", err)
 		}
 
@@ -112,6 +115,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		)
 		if err != nil {
 			logrus.WithError(err).Warnf("r.federation.SendJoin failed")
+			r.statistics.ForServer(serverName).Failure()
 			continue
 		}
 
@@ -137,6 +141,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		}
 
 		// We're all good.
+		r.statistics.ForServer(serverName).Success()
 		return nil
 	}
 
@@ -154,7 +159,7 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 	response *api.PerformLeaveResponse,
 ) (err error) {
 	// Deduplicate the server names we were provided.
-	util.Unique(request.ServerNames)
+	util.SortAndUnique(request.ServerNames)
 
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-leave send-leave dance.
@@ -170,6 +175,7 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 		if err != nil {
 			// TODO: Check if the user was not allowed to leave the room.
 			logrus.WithError(err).Warnf("r.federation.MakeLeave failed")
+			r.statistics.ForServer(serverName).Failure()
 			continue
 		}
 
@@ -221,9 +227,11 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 		)
 		if err != nil {
 			logrus.WithError(err).Warnf("r.federation.SendLeave failed")
+			r.statistics.ForServer(serverName).Failure()
 			continue
 		}
 
+		r.statistics.ForServer(serverName).Success()
 		return nil
 	}
 
