@@ -561,10 +561,14 @@ func (t *txnReq) getMissingEvents(e gomatrixserverlib.Event, roomVersion gomatri
 		latestEvents[i] = res.LatestEvents[i].EventID
 	}
 	// this server just sent us an event for which we do not know its prev_events - ask that server for those prev_events.
+	minDepth := int(res.Depth) - 20
+	if minDepth < 0 {
+		minDepth = 0
+	}
 	missingResp, err := t.federation.LookupMissingEvents(t.context, t.Origin, e.RoomID(), gomatrixserverlib.MissingEvents{
 		Limit: 20,
 		// synapse uses the min depth they've ever seen in that room
-		MinDepth: int(res.Depth) - 20,
+		MinDepth: minDepth,
 		// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
 		EarliestEvents: latestEvents,
 		// The event IDs to retrieve the previous events for.
