@@ -16,7 +16,6 @@ package producers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -68,7 +67,6 @@ func (c *RoomserverProducer) SendEventWithState(
 		if haveEventIDs[outlier.EventID()] {
 			continue
 		}
-		fmt.Println("append outlier ", outlier.EventID())
 		ires = append(ires, api.InputRoomEvent{
 			Kind:         api.KindOutlier,
 			Event:        outlier.Headered(event.RoomVersion),
