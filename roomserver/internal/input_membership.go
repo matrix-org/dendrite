@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -104,6 +105,13 @@ func updateMembership(
 		// If the membership is the same then nothing changed and we can return
 		// immediately, unless it's a Join update (e.g. profile update).
 		return updates, nil
+	}
+
+	if add == nil {
+		// This shouldn't happen. Returning an error here is better than panicking
+		// in the membership updater functions later on.
+		// TODO: Why does this happen to begin with?
+		return updates, errors.New("add should not be nil")
 	}
 
 	mu, err := updater.MembershipUpdater(targetUserNID)
