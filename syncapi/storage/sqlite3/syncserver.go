@@ -93,7 +93,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.streamID.prepare(d.db); err != nil {
 		return err
 	}
-	accountData, err := NewSqliteAccountDataTable(d.db)
+	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
