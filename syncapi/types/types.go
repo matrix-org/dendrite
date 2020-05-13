@@ -107,6 +107,9 @@ func (t *TopologyToken) Depth() StreamPosition {
 func (t *TopologyToken) PDUPosition() StreamPosition {
 	return t.Positions[1]
 }
+func (t *TopologyToken) StreamToken() StreamingToken {
+	return NewStreamToken(t.PDUPosition(), 0)
+}
 func (t *TopologyToken) String() string {
 	return t.syncToken.String()
 }

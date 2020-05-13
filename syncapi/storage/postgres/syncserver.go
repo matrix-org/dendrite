@@ -263,16 +263,14 @@ func (d *SyncServerDatasource) GetEventsInTopologicalRange(
 	return
 }
 
+// GetEventsInStreamingRange retrieves all of the events on a given ordering using the
+// given extremities and limit.
 func (d *SyncServerDatasource) GetEventsInStreamingRange(
 	ctx context.Context,
 	from, to *types.StreamingToken,
 	roomID string, limit int,
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
-	// If the pagination token's type is types.PaginationTokenTypeStream, the
-	// events must be retrieved from the table contaning the syncapi server's
-	// whole stream of events.
-
 	if backwardOrdering {
 		// When using backward ordering, we want the most recent events first.
 		if events, err = d.events.selectRecentEvents(
@@ -288,8 +286,7 @@ func (d *SyncServerDatasource) GetEventsInStreamingRange(
 			return
 		}
 	}
-
-	return
+	return events, err
 }
 
 func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (types.StreamingToken, error) {
@@ -589,18 +586,17 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		// oldest event in the room's topology.
 		var backwardTopologyPos, backwardStreamPos types.StreamPosition
 		backwardTopologyPos, backwardStreamPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
-		if backwardTopologyPos-1 <= 0 {
-			backwardTopologyPos = types.StreamPosition(1)
-		} else {
-			backwardTopologyPos--
+		if err != nil {
+			return
 		}
+		prevBatch := types.NewTopologyToken(backwardTopologyPos, backwardStreamPos)
+		prevBatch.Decrement()
 
 		// We don't include a device here as we don't need to send down
 		// transaction IDs for complete syncs
 		recentEvents := d.StreamEventsToEvents(nil, recentStreamEvents)
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
-		prevBatch := types.NewTopologyToken(backwardTopologyPos, backwardStreamPos)
 		jr.Timeline.PrevBatch = prevBatch.String()
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true

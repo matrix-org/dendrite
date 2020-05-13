@@ -40,6 +40,7 @@ type messagesReq struct {
 	roomID           string
 	from             *types.TopologyToken
 	to               *types.TopologyToken
+	fromStream       *types.StreamingToken
 	wasToProvided    bool
 	limit            int
 	backwardOrdering bool
@@ -66,11 +67,16 @@ func OnIncomingMessagesRequest(
 
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
+	var fromStream *types.StreamingToken
 	from, err := types.NewTopologyTokenFromString(req.URL.Query().Get("from"))
 	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
+		fs, err2 := types.NewStreamTokenFromString(req.URL.Query().Get("from"))
+		fromStream = &fs
+		if err2 != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err2.Error()),
+			}
 		}
 	}
 
@@ -141,6 +147,7 @@ func OnIncomingMessagesRequest(
 		roomID:           roomID,
 		from:             &from,
 		to:               &to,
+		fromStream:       fromStream,
 		wasToProvided:    wasToProvided,
 		limit:            limit,
 		backwardOrdering: backwardOrdering,
@@ -181,9 +188,21 @@ func (r *messagesReq) retrieveEvents() (
 	end types.TopologyToken, err error,
 ) {
 	// Retrieve the events from the local database.
-	streamEvents, err := r.db.GetEventsInRange(
-		r.ctx, r.from, r.to, r.roomID, r.limit, r.backwardOrdering,
-	)
+	var streamEvents []types.StreamEvent
+	if r.fromStream != nil {
+		toStream := r.to.StreamToken()
+		util.GetLogger(r.ctx).Infof("quack fromStream positions %v", r.fromStream.Positions)
+		util.GetLogger(r.ctx).Infof("quack toStream positions %v", toStream.Positions)
+		streamEvents, err = r.db.GetEventsInStreamingRange(
+			r.ctx, r.fromStream, &toStream, r.roomID, r.limit, r.backwardOrdering,
+		)
+	} else {
+		util.GetLogger(r.ctx).Infof("quack from positions %v", r.from.Positions)
+		util.GetLogger(r.ctx).Infof("quack to positions %v", r.to.Positions)
+		streamEvents, err = r.db.GetEventsInTopologicalRange(
+			r.ctx, r.from, r.to, r.roomID, r.limit, r.backwardOrdering,
+		)
+	}
 	if err != nil {
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return
