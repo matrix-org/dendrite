@@ -564,10 +564,8 @@ func (d *SyncServerDatasource) IncrementalSync(
 	numRecentEventsPerRoom int,
 	wantFullState bool,
 ) (*types.Response, error) {
-	fmt.Println("from ", fromPos, "to", toPos)
 	nextBatchPos := fromPos.WithUpdates(toPos)
 	res := types.NewResponse(nextBatchPos)
-	fmt.Println("from ", fromPos, "to", toPos, "next", nextBatchPos)
 
 	var joinedRoomIDs []string
 	var err error
