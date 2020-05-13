@@ -18,9 +18,11 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -28,6 +30,7 @@ func JoinRoomByIDOrAlias(
 	req *http.Request,
 	device *authtypes.Device,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
+	accountDB accounts.Database,
 	roomIDOrAlias string,
 ) util.JSONResponse {
 	// Prepare to ask the roomserver to perform the room join.
@@ -42,6 +45,21 @@ func JoinRoomByIDOrAlias(
 	// event content.
 	if err := httputil.UnmarshalJSONRequest(req, &joinReq.Content); err != nil {
 		return *err
+	}
+
+	// Work out our localpart for the client profile request.
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+	} else {
+		// Request our profile content to populate the request content with.
+		profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
+		} else {
+			joinReq.Content["displayname"] = profile.DisplayName
+			joinReq.Content["avatar_url"] = profile.AvatarURL
+		}
 	}
 
 	// Ask the roomserver to perform the join.
