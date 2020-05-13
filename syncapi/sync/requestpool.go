@@ -132,7 +132,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	}
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.PaginationToken) (res *types.Response, err error) {
+func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
@@ -145,7 +145,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Pagin
 	}
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
-	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
+	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
 	return
 }
 
@@ -187,7 +187,7 @@ func (rp *RequestPool) appendAccountData(
 	// Sync is not initial, get all account data since the latest sync
 	dataTypes, err := rp.db.GetAccountDataInRange(
 		req.ctx, userID,
-		types.StreamPosition(req.since.PDUPosition), types.StreamPosition(currentPos),
+		types.StreamPosition(req.since.PDUPosition()), types.StreamPosition(currentPos),
 		accountDataFilter,
 	)
 	if err != nil {

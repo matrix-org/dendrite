@@ -154,10 +154,10 @@ func TestSyncResponse(t *testing.T) {
 		{
 			Name: "IncrementalSync penultimate",
 			DoSync: func() (*types.Response, error) {
-				from := types.NewPaginationTokenFromTypeAndPosition( // pretend we are at the penultimate event
-					types.PaginationTokenTypeStream, positions[len(positions)-2], types.StreamPosition(0),
+				from := types.NewStreamToken( // pretend we are at the penultimate event
+					positions[len(positions)-2], types.StreamPosition(0),
 				)
-				return db.IncrementalSync(ctx, testUserDeviceA, *from, latest, 5, false)
+				return db.IncrementalSync(ctx, testUserDeviceA, from, latest, 5, false)
 			},
 			WantTimeline: events[len(events)-1:],
 		},
@@ -166,11 +166,11 @@ func TestSyncResponse(t *testing.T) {
 		{
 			Name: "IncrementalSync limited",
 			DoSync: func() (*types.Response, error) {
-				from := types.NewPaginationTokenFromTypeAndPosition( // pretend we are 10 events behind
-					types.PaginationTokenTypeStream, positions[len(positions)-11], types.StreamPosition(0),
+				from := types.NewStreamToken( // pretend we are 10 events behind
+					positions[len(positions)-11], types.StreamPosition(0),
 				)
 				// limit is set to 5
-				return db.IncrementalSync(ctx, testUserDeviceA, *from, latest, 5, false)
+				return db.IncrementalSync(ctx, testUserDeviceA, from, latest, 5, false)
 			},
 			// want the last 5 events, NOT the last 10.
 			WantTimeline: events[len(events)-5:],
@@ -207,7 +207,7 @@ func TestSyncResponse(t *testing.T) {
 			if err != nil {
 				st.Fatalf("failed to do sync: %s", err)
 			}
-			next := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeStream, latest.PDUPosition, latest.EDUTypingPosition)
+			next := types.NewStreamToken(latest.PDUPosition(), latest.EDUPosition())
 			if res.NextBatch != next.String() {
 				st.Errorf("NextBatch got %s want %s", res.NextBatch, next.String())
 			}
@@ -230,11 +230,11 @@ func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get SyncPosition: %s", err)
 	}
-	from := types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeStream, positions[len(positions)-2], types.StreamPosition(0),
+	from := types.NewStreamToken(
+		positions[len(positions)-2], types.StreamPosition(0),
 	)
 
-	res, err := db.IncrementalSync(ctx, testUserDeviceA, *from, latest, 5, false)
+	res, err := db.IncrementalSync(ctx, testUserDeviceA, from, latest, 5, false)
 	if err != nil {
 		t.Fatalf("failed to IncrementalSync with latest token")
 	}
@@ -249,14 +249,14 @@ func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
 	if prev == "" {
 		t.Fatalf("IncrementalSync expected prev_batch token")
 	}
-	prevBatchToken, err := types.NewPaginationTokenFromString(prev)
+	prevBatchToken, err := types.NewTopologyTokenFromString(prev)
 	if err != nil {
-		t.Fatalf("failed to NewPaginationTokenFromString : %s", err)
+		t.Fatalf("failed to NewTopologyTokenFromString : %s", err)
 	}
 	// backpaginate 5 messages starting at the latest position.
 	// head towards the beginning of time
-	to := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
-	paginatedEvents, err := db.GetEventsInRange(ctx, prevBatchToken, to, testRoomID, 5, true)
+	to := types.NewTopologyToken(0, 0)
+	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &prevBatchToken, &to, testRoomID, 5, true)
 	if err != nil {
 		t.Fatalf("GetEventsInRange returned an error: %s", err)
 	}
@@ -275,10 +275,10 @@ func TestGetEventsInRangeWithStreamToken(t *testing.T) {
 		t.Fatalf("failed to get SyncPosition: %s", err)
 	}
 	// head towards the beginning of time
-	to := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
+	to := types.NewStreamToken(0, 0)
 
 	// backpaginate 5 messages starting at the latest position.
-	paginatedEvents, err := db.GetEventsInRange(ctx, &latest, to, testRoomID, 5, true)
+	paginatedEvents, err := db.GetEventsInStreamingRange(ctx, &latest, &to, testRoomID, 5, true)
 	if err != nil {
 		t.Fatalf("GetEventsInRange returned an error: %s", err)
 	}
@@ -296,12 +296,12 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
 	}
-	from := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, latest, latestStream)
+	from := types.NewTopologyToken(latest, latestStream)
 	// head towards the beginning of time
-	to := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
+	to := types.NewTopologyToken(0, 0)
 
 	// backpaginate 5 messages starting at the latest position.
-	paginatedEvents, err := db.GetEventsInRange(ctx, from, to, testRoomID, 5, true)
+	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, testRoomID, 5, true)
 	if err != nil {
 		t.Fatalf("GetEventsInRange returned an error: %s", err)
 	}
@@ -366,14 +366,14 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get EventPositionInTopology for event: %s", err)
 	}
-	fromLatest := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, latestPos, latestStreamPos)
-	fromFork := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, topoPos, streamPos)
+	fromLatest := types.NewTopologyToken(latestPos, latestStreamPos)
+	fromFork := types.NewTopologyToken(topoPos, streamPos)
 	// head towards the beginning of time
-	to := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
+	to := types.NewTopologyToken(0, 0)
 
 	testCases := []struct {
 		Name  string
-		From  *types.PaginationToken
+		From  types.TopologyToken
 		Limit int
 		Wants []gomatrixserverlib.HeaderedEvent
 	}{
@@ -399,7 +399,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 
 	for _, tc := range testCases {
 		// backpaginate messages starting at the latest position.
-		paginatedEvents, err := db.GetEventsInRange(ctx, tc.From, to, testRoomID, tc.Limit, true)
+		paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &tc.From, &to, testRoomID, tc.Limit, true)
 		if err != nil {
 			t.Fatalf("%s GetEventsInRange returned an error: %s", tc.Name, err)
 		}
@@ -446,13 +446,13 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 	}
 
 	// head towards the beginning of time
-	to := types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
+	to := types.NewTopologyToken(0, 0)
 
 	// starting at `from`, backpaginate to the beginning of time, asserting as we go.
 	chunkSize = 3
 	events = reversed(events)
 	for i := 0; i < len(events); i += chunkSize {
-		paginatedEvents, err := db.GetEventsInRange(ctx, from, to, testRoomID, chunkSize, true)
+		paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, from, &to, testRoomID, chunkSize, true)
 		if err != nil {
 			t.Fatalf("GetEventsInRange returned an error: %s", err)
 		}
@@ -506,19 +506,15 @@ func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatr
 	}
 }
 
-func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *types.PaginationToken {
+func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *types.TopologyToken {
 	pos, spos, err := db.EventPositionInTopology(ctx, eventID)
 	if err != nil {
 		t.Fatalf("failed to get EventPositionInTopology: %s", err)
 	}
 
-	if pos-1 <= 0 {
-		pos = types.StreamPosition(1)
-	} else {
-		pos = pos - 1
-		spos += 1000 // this has to be bigger than the chunk limit
-	}
-	return types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, pos, spos)
+	tok := types.NewTopologyToken(pos, spos)
+	tok.Decrement()
+	return &tok
 }
 
 func reversed(in []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
