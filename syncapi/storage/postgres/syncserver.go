@@ -584,20 +584,24 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 
 		// Retrieve the backward topology position, i.e. the position of the
 		// oldest event in the room's topology.
-		var backwardTopologyPos, backwardStreamPos types.StreamPosition
-		backwardTopologyPos, backwardStreamPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
-		if err != nil {
-			return
+		var prevBatchStr string
+		if len(recentStreamEvents) > 0 {
+			var backwardTopologyPos, backwardStreamPos types.StreamPosition
+			backwardTopologyPos, backwardStreamPos, err = d.topology.selectPositionInTopology(ctx, recentStreamEvents[0].EventID())
+			if err != nil {
+				return
+			}
+			prevBatch := types.NewTopologyToken(backwardTopologyPos, backwardStreamPos)
+			prevBatch.Decrement()
+			prevBatchStr = prevBatch.String()
 		}
-		prevBatch := types.NewTopologyToken(backwardTopologyPos, backwardStreamPos)
-		prevBatch.Decrement()
 
 		// We don't include a device here as we don't need to send down
 		// transaction IDs for complete syncs
 		recentEvents := d.StreamEventsToEvents(nil, recentStreamEvents)
 		stateEvents = removeDuplicates(stateEvents, recentEvents)
 		jr := types.NewJoinResponse()
-		jr.Timeline.PrevBatch = prevBatch.String()
+		jr.Timeline.PrevBatch = prevBatchStr
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = true
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
