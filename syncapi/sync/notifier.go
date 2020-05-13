@@ -36,7 +36,7 @@ type Notifier struct {
 	// Protects currPos and userStreams.
 	streamLock *sync.Mutex
 	// The latest sync position
-	currPos types.PaginationToken
+	currPos types.StreamingToken
 	// A map of user_id => UserStream which can be used to wake a given user's /sync request.
 	userStreams map[string]*UserStream
 	// The last time we cleaned out stale entries from the userStreams map
@@ -46,7 +46,7 @@ type Notifier struct {
 // NewNotifier creates a new notifier set to the given sync position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
 // the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
-func NewNotifier(pos types.PaginationToken) *Notifier {
+func NewNotifier(pos types.StreamingToken) *Notifier {
 	return &Notifier{
 		currPos:             pos,
 		roomIDToJoinedUsers: make(map[string]userIDSet),
@@ -68,7 +68,7 @@ func NewNotifier(pos types.PaginationToken) *Notifier {
 // event type it handles, leaving other fields as 0.
 func (n *Notifier) OnNewEvent(
 	ev *gomatrixserverlib.HeaderedEvent, roomID string, userIDs []string,
-	posUpdate types.PaginationToken,
+	posUpdate types.StreamingToken,
 ) {
 	// update the current position then notify relevant /sync streams.
 	// This needs to be done PRIOR to waking up users as they will read this value.
@@ -151,7 +151,7 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 }
 
 // CurrentPosition returns the current sync position
-func (n *Notifier) CurrentPosition() types.PaginationToken {
+func (n *Notifier) CurrentPosition() types.StreamingToken {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
@@ -173,7 +173,7 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	}
 }
 
-func (n *Notifier) wakeupUsers(userIDs []string, newPos types.PaginationToken) {
+func (n *Notifier) wakeupUsers(userIDs []string, newPos types.StreamingToken) {
 	for _, userID := range userIDs {
 		stream := n.fetchUserStream(userID, false)
 		if stream != nil {

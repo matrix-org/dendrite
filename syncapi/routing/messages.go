@@ -38,8 +38,9 @@ type messagesReq struct {
 	federation       *gomatrixserverlib.FederationClient
 	cfg              *config.Dendrite
 	roomID           string
-	from             *types.PaginationToken
-	to               *types.PaginationToken
+	from             *types.TopologyToken
+	to               *types.TopologyToken
+	fromStream       *types.StreamingToken
 	wasToProvided    bool
 	limit            int
 	backwardOrdering bool
@@ -66,11 +67,16 @@ func OnIncomingMessagesRequest(
 
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
-	from, err := types.NewPaginationTokenFromString(req.URL.Query().Get("from"))
+	var fromStream *types.StreamingToken
+	from, err := types.NewTopologyTokenFromString(req.URL.Query().Get("from"))
 	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
+		fs, err2 := types.NewStreamTokenFromString(req.URL.Query().Get("from"))
+		fromStream = &fs
+		if err2 != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err2.Error()),
+			}
 		}
 	}
 
@@ -88,10 +94,10 @@ func OnIncomingMessagesRequest(
 
 	// Pagination tokens. To is optional, and its default value depends on the
 	// direction ("b" or "f").
-	var to *types.PaginationToken
+	var to types.TopologyToken
 	wasToProvided := true
 	if s := req.URL.Query().Get("to"); len(s) > 0 {
-		to, err = types.NewPaginationTokenFromString(s)
+		to, err = types.NewTopologyTokenFromString(s)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
@@ -139,8 +145,9 @@ func OnIncomingMessagesRequest(
 		federation:       federation,
 		cfg:              cfg,
 		roomID:           roomID,
-		from:             from,
-		to:               to,
+		from:             &from,
+		to:               &to,
+		fromStream:       fromStream,
 		wasToProvided:    wasToProvided,
 		limit:            limit,
 		backwardOrdering: backwardOrdering,
@@ -178,12 +185,20 @@ func OnIncomingMessagesRequest(
 // remote homeserver.
 func (r *messagesReq) retrieveEvents() (
 	clientEvents []gomatrixserverlib.ClientEvent, start,
-	end *types.PaginationToken, err error,
+	end types.TopologyToken, err error,
 ) {
 	// Retrieve the events from the local database.
-	streamEvents, err := r.db.GetEventsInRange(
-		r.ctx, r.from, r.to, r.roomID, r.limit, r.backwardOrdering,
-	)
+	var streamEvents []types.StreamEvent
+	if r.fromStream != nil {
+		toStream := r.to.StreamToken()
+		streamEvents, err = r.db.GetEventsInStreamingRange(
+			r.ctx, r.fromStream, &toStream, r.roomID, r.limit, r.backwardOrdering,
+		)
+	} else {
+		streamEvents, err = r.db.GetEventsInTopologicalRange(
+			r.ctx, r.from, r.to, r.roomID, r.limit, r.backwardOrdering,
+		)
+	}
 	if err != nil {
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return
@@ -206,7 +221,7 @@ func (r *messagesReq) retrieveEvents() (
 
 	// If we didn't get any event, we don't need to proceed any further.
 	if len(events) == 0 {
-		return []gomatrixserverlib.ClientEvent{}, r.from, r.to, nil
+		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
 	}
 
 	// Sort the events to ensure we send them in the right order.
@@ -246,12 +261,8 @@ func (r *messagesReq) retrieveEvents() (
 	}
 	// Generate pagination tokens to send to the client using the positions
 	// retrieved previously.
-	start = types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeTopology, startPos, startStreamPos,
-	)
-	end = types.NewPaginationTokenFromTypeAndPosition(
-		types.PaginationTokenTypeTopology, endPos, endStreamPos,
-	)
+	start = types.NewTopologyToken(startPos, startStreamPos)
+	end = types.NewTopologyToken(endPos, endStreamPos)
 
 	if r.backwardOrdering {
 		// A stream/topological position is a cursor located between two events.
@@ -259,14 +270,7 @@ func (r *messagesReq) retrieveEvents() (
 		// we consider a left to right chronological order), tokens need to refer
 		// to them by the event on their left, therefore we need to decrement the
 		// end position we send in the response if we're going backward.
-		end.PDUPosition--
-		end.EDUTypingPosition += 1000
-	}
-
-	// The lowest token value is 1, therefore we need to manually set it to that
-	// value if we're below it.
-	if end.PDUPosition < types.StreamPosition(1) {
-		end.PDUPosition = types.StreamPosition(1)
+		end.Decrement()
 	}
 
 	return clientEvents, start, end, err
@@ -317,11 +321,11 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 				// The condition in the SQL query is a strict "greater than" so
 				// we need to check against to-1.
 				streamPos := types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition)
-				isSetLargeEnough = (r.to.PDUPosition-1 == streamPos)
+				isSetLargeEnough = (r.to.PDUPosition()-1 == streamPos)
 			}
 		} else {
 			streamPos := types.StreamPosition(streamEvents[0].StreamPosition)
-			isSetLargeEnough = (r.from.PDUPosition-1 == streamPos)
+			isSetLargeEnough = (r.from.PDUPosition()-1 == streamPos)
 		}
 	}
 
@@ -424,18 +428,17 @@ func (r *messagesReq) backfill(roomID string, fromEventIDs []string, limit int) 
 func setToDefault(
 	ctx context.Context, db storage.Database, backwardOrdering bool,
 	roomID string,
-) (to *types.PaginationToken, err error) {
+) (to types.TopologyToken, err error) {
 	if backwardOrdering {
 		// go 1 earlier than the first event so we correctly fetch the earliest event
-		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, 0, 0)
+		to = types.NewTopologyToken(0, 0)
 	} else {
-		var pos, stream types.StreamPosition
-		pos, stream, err = db.MaxTopologicalPosition(ctx, roomID)
+		var depth, stream types.StreamPosition
+		depth, stream, err = db.MaxTopologicalPosition(ctx, roomID)
 		if err != nil {
 			return
 		}
-
-		to = types.NewPaginationTokenFromTypeAndPosition(types.PaginationTokenTypeTopology, pos, stream)
+		to = types.NewTopologyToken(depth, stream)
 	}
 
 	return

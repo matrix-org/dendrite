@@ -2,26 +2,11 @@ package types
 
 import "testing"
 
-func TestNewPaginationTokenFromString(t *testing.T) {
-	shouldPass := map[string]PaginationToken{
-		"2": PaginationToken{
-			Type:        PaginationTokenTypeStream,
-			PDUPosition: 2,
-		},
-		"s4": PaginationToken{
-			Type:        PaginationTokenTypeStream,
-			PDUPosition: 4,
-		},
-		"s3_1": PaginationToken{
-			Type:              PaginationTokenTypeStream,
-			PDUPosition:       3,
-			EDUTypingPosition: 1,
-		},
-		"t3_1_4": PaginationToken{
-			Type:              PaginationTokenTypeTopology,
-			PDUPosition:       3,
-			EDUTypingPosition: 1,
-		},
+func TestNewSyncTokenFromString(t *testing.T) {
+	shouldPass := map[string]syncToken{
+		"s4_0": NewStreamToken(4, 0).syncToken,
+		"s3_1": NewStreamToken(3, 1).syncToken,
+		"t3_1": NewTopologyToken(3, 1).syncToken,
 	}
 
 	shouldFail := []string{
@@ -32,20 +17,21 @@ func TestNewPaginationTokenFromString(t *testing.T) {
 		"b",
 		"b-1",
 		"-4",
+		"2",
 	}
 
 	for test, expected := range shouldPass {
-		result, err := NewPaginationTokenFromString(test)
+		result, err := newSyncTokenFromString(test)
 		if err != nil {
 			t.Error(err)
 		}
-		if *result != expected {
-			t.Errorf("expected %v but got %v", expected.String(), result.String())
+		if result.String() != expected.String() {
+			t.Errorf("%s expected %v but got %v", test, expected.String(), result.String())
 		}
 	}
 
 	for _, test := range shouldFail {
-		if _, err := NewPaginationTokenFromString(test); err == nil {
+		if _, err := newSyncTokenFromString(test); err == nil {
 			t.Errorf("input '%v' should have errored but didn't", test)
 		}
 	}

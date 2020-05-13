@@ -33,11 +33,11 @@ var (
 	randomMessageEvent  gomatrixserverlib.HeaderedEvent
 	aliceInviteBobEvent gomatrixserverlib.HeaderedEvent
 	bobLeaveEvent       gomatrixserverlib.HeaderedEvent
-	syncPositionVeryOld types.PaginationToken
-	syncPositionBefore  types.PaginationToken
-	syncPositionAfter   types.PaginationToken
-	syncPositionNewEDU  types.PaginationToken
-	syncPositionAfter2  types.PaginationToken
+	syncPositionVeryOld = types.NewStreamToken(5, 0)
+	syncPositionBefore  = types.NewStreamToken(11, 0)
+	syncPositionAfter   = types.NewStreamToken(12, 0)
+	syncPositionNewEDU  = types.NewStreamToken(syncPositionAfter.PDUPosition(), 1)
+	syncPositionAfter2  = types.NewStreamToken(13, 0)
 )
 
 var (
@@ -47,26 +47,6 @@ var (
 )
 
 func init() {
-	baseSyncPos := types.PaginationToken{
-		PDUPosition:       0,
-		EDUTypingPosition: 0,
-	}
-
-	syncPositionVeryOld = baseSyncPos
-	syncPositionVeryOld.PDUPosition = 5
-
-	syncPositionBefore = baseSyncPos
-	syncPositionBefore.PDUPosition = 11
-
-	syncPositionAfter = baseSyncPos
-	syncPositionAfter.PDUPosition = 12
-
-	syncPositionNewEDU = syncPositionAfter
-	syncPositionNewEDU.EDUTypingPosition = 1
-
-	syncPositionAfter2 = baseSyncPos
-	syncPositionAfter2.PDUPosition = 13
-
 	var err error
 	err = json.Unmarshal([]byte(`{
 		"_room_version": "1",
@@ -118,6 +98,12 @@ func init() {
 	}
 }
 
+func mustEqualPositions(t *testing.T, got, want types.StreamingToken) {
+	if got.String() != want.String() {
+		t.Fatalf("mustEqualPositions got %s want %s", got.String(), want.String())
+	}
+}
+
 // Test that the current position is returned if a request is already behind.
 func TestImmediateNotification(t *testing.T) {
 	n := NewNotifier(syncPositionBefore)
@@ -125,9 +111,7 @@ func TestImmediateNotification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestImmediateNotification error: %s", err)
 	}
-	if pos != syncPositionBefore {
-		t.Fatalf("TestImmediateNotification want %v, got %v", syncPositionBefore, pos)
-	}
+	mustEqualPositions(t, pos, syncPositionBefore)
 }
 
 // Test that new events to a joined room unblocks the request.
@@ -144,9 +128,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 		if err != nil {
 			t.Errorf("TestNewEventAndJoinedToRoom error: %w", err)
 		}
-		if pos != syncPositionAfter {
-			t.Errorf("TestNewEventAndJoinedToRoom want %v, got %v", syncPositionAfter, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
 	}()
 
@@ -172,9 +154,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 		if err != nil {
 			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
-		if pos != syncPositionAfter {
-			t.Errorf("TestNewInviteEventForUser want %v, got %v", syncPositionAfter, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
 	}()
 
@@ -200,9 +180,7 @@ func TestEDUWakeup(t *testing.T) {
 		if err != nil {
 			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
-		if pos != syncPositionNewEDU {
-			t.Errorf("TestNewInviteEventForUser want %v, got %v", syncPositionNewEDU, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionNewEDU)
 		wg.Done()
 	}()
 
@@ -228,9 +206,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 		if err != nil {
 			t.Errorf("TestMultipleRequestWakeup error: %w", err)
 		}
-		if pos != syncPositionAfter {
-			t.Errorf("TestMultipleRequestWakeup want %v, got %v", syncPositionAfter, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
 	}
 	go poll()
@@ -268,9 +244,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 		if err != nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
-		if pos != syncPositionAfter {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom want %v, got %v", syncPositionAfter, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter)
 		leaveWG.Done()
 	}()
 	bobStream := lockedFetchUserStream(n, bob)
@@ -287,9 +261,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 		if err != nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
-		if pos != syncPositionAfter2 {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom want %v, got %v", syncPositionAfter2, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter2)
 		aliceWG.Done()
 	}()
 
@@ -312,13 +284,13 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 }
 
-func waitForEvents(n *Notifier, req syncRequest) (types.PaginationToken, error) {
+func waitForEvents(n *Notifier, req syncRequest) (types.StreamingToken, error) {
 	listener := n.GetListener(req)
 	defer listener.Close()
 
 	select {
 	case <-time.After(5 * time.Second):
-		return types.PaginationToken{}, fmt.Errorf(
+		return types.StreamingToken{}, fmt.Errorf(
 			"waitForEvents timed out waiting for %s (pos=%v)", req.device.UserID, req.since,
 		)
 	case <-listener.GetNotifyChannel(*req.since):
@@ -344,7 +316,7 @@ func lockedFetchUserStream(n *Notifier, userID string) *UserStream {
 	return n.fetchUserStream(userID, true)
 }
 
-func newTestSyncRequest(userID string, since types.PaginationToken) syncRequest {
+func newTestSyncRequest(userID string, since types.StreamingToken) syncRequest {
 	return syncRequest{
 		device:        authtypes.Device{UserID: userID},
 		timeout:       1 * time.Minute,

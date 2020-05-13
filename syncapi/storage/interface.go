@@ -50,13 +50,13 @@ type Database interface {
 	// Returns an error if there was an issue with the retrieval.
 	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) (stateEvents []gomatrixserverlib.HeaderedEvent, err error)
 	// SyncPosition returns the latest positions for syncing.
-	SyncPosition(ctx context.Context) (types.PaginationToken, error)
+	SyncPosition(ctx context.Context) (types.StreamingToken, error)
 	// IncrementalSync returns all the data needed in order to create an incremental
 	// sync response for the given user. Events returned will include any client
 	// transaction IDs associated with the given device. These transaction IDs come
 	// from when the device sent the event via an API that included a transaction
 	// ID.
-	IncrementalSync(ctx context.Context, device authtypes.Device, fromPos, toPos types.PaginationToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
+	IncrementalSync(ctx context.Context, device authtypes.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
 	// CompleteSync returns a complete /sync API response for the given user.
 	CompleteSync(ctx context.Context, userID string, numRecentEventsPerRoom int) (*types.Response, error)
 	// GetAccountDataInRange returns all account data for a given user inserted or
@@ -88,9 +88,10 @@ type Database interface {
 	// RemoveTypingUser removes a typing user from the typing cache.
 	// Returns the newly calculated sync position for typing notifications.
 	RemoveTypingUser(userID, roomID string) types.StreamPosition
-	// GetEventsInRange retrieves all of the events on a given ordering using the
-	// given extremities and limit.
-	GetEventsInRange(ctx context.Context, from, to *types.PaginationToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
+	// GetEventsInStreamingRange retrieves all of the events on a given ordering using the given extremities and limit.
+	GetEventsInStreamingRange(ctx context.Context, from, to *types.StreamingToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
+	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit.
+	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
 	// EventPositionInTopology returns the depth and stream position of the given event.
 	EventPositionInTopology(ctx context.Context, eventID string) (depth types.StreamPosition, stream types.StreamPosition, err error)
 	// EventsAtTopologicalPosition returns all of the events matching a given
