@@ -35,6 +35,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -58,10 +59,10 @@ type SyncServerDatasource struct {
 	accountData         accountDataStatements
 	events              outputRoomEventsStatements
 	roomstate           currentRoomStateStatements
-	invites             inviteEventsStatements
 	eduCache            *cache.EDUCache
 	topology            outputRoomEventsTopologyStatements
 	backwardExtremities tables.BackwardsExtremities
+	shared              *shared.Database
 }
 
 // NewSyncServerDatasource creates a new sync server database
@@ -106,7 +107,8 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.roomstate.prepare(d.db, &d.streamID); err != nil {
 		return err
 	}
-	if err = d.invites.prepare(d.db, &d.streamID); err != nil {
+	invites, err := NewSqliteInvitesTable(d.db, &d.streamID)
+	if err != nil {
 		return err
 	}
 	if err = d.topology.prepare(d.db); err != nil {
@@ -115,6 +117,10 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	d.backwardExtremities, err = tables.NewBackwardsExtremities(d.db, &tables.SqliteBackwardsExtremitiesStatements{})
 	if err != nil {
 		return err
+	}
+	d.shared = &shared.Database{
+		DB:      d.db,
+		Invites: invites,
 	}
 	return nil
 }
@@ -404,7 +410,7 @@ func (d *SyncServerDatasource) syncStreamPositionTx(
 	if maxAccountDataID > maxID {
 		maxID = maxAccountDataID
 	}
-	maxInviteID, err := d.invites.selectMaxInviteID(ctx, txn)
+	maxInviteID, err := d.shared.Invites.SelectMaxInviteID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}
@@ -429,7 +435,7 @@ func (d *SyncServerDatasource) syncPositionTx(
 	if maxAccountDataID > maxEventID {
 		maxEventID = maxAccountDataID
 	}
-	maxInviteID, err := d.invites.selectMaxInviteID(ctx, txn)
+	maxInviteID, err := d.shared.Invites.SelectMaxInviteID(ctx, txn)
 	if err != nil {
 		return nil, err
 	}
@@ -756,15 +762,8 @@ func (d *SyncServerDatasource) UpsertAccountData(
 // Returns an error if there was a problem communicating with the database.
 func (d *SyncServerDatasource) AddInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
-) (streamPos types.StreamPosition, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		streamPos, err = d.streamID.nextStreamID(ctx, txn)
-		if err != nil {
-			return err
-		}
-		return d.invites.insertInviteEvent(ctx, txn, inviteEvent, streamPos)
-	})
-	return
+) (sp types.StreamPosition, err error) {
+	return d.shared.AddInviteEvent(ctx, inviteEvent)
 }
 
 // RetireInviteEvent removes an old invite event from the database.
@@ -772,10 +771,7 @@ func (d *SyncServerDatasource) AddInviteEvent(
 func (d *SyncServerDatasource) RetireInviteEvent(
 	ctx context.Context, inviteEventID string,
 ) error {
-	// TODO: Record that invite has been retired in a stream so that we can
-	// notify the user in an incremental sync.
-	err := d.invites.deleteInviteEvent(ctx, inviteEventID)
-	return err
+	return d.shared.RetireInviteEvent(ctx, inviteEventID)
 }
 
 func (d *SyncServerDatasource) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
@@ -804,7 +800,7 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 	fromPos, toPos types.StreamPosition,
 	res *types.Response,
 ) error {
-	invites, err := d.invites.selectInviteEventsInRange(
+	invites, err := d.shared.Invites.SelectInviteEventsInRange(
 		ctx, txn, userID, fromPos, toPos,
 	)
 	if err != nil {
