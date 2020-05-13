@@ -43,7 +43,7 @@ import (
 const mediaIDCharacters = "A-Za-z0-9_=-"
 
 // Note: unfortunately regex.MustCompile() cannot be assigned to a const
-var mediaIDRegex = regexp.MustCompile("[" + mediaIDCharacters + "]+")
+var mediaIDRegex = regexp.MustCompile("^[" + mediaIDCharacters + "]+$")
 
 // downloadRequest metadata included in or derivable from a download or thumbnail request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
