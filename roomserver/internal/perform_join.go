@@ -121,6 +121,22 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		return fmt.Errorf("eb.SetContent: %w", err)
 	}
 
+	// First work out if this is in response to an existing invite.
+	// If it is then we avoid the situation where we might think we
+	// know about a room in the following section but don't know the
+	// latest state as all of our users have left.
+	isInvitePending, inviteSender, err := r.isInvitePending(ctx, req.RoomIDOrAlias, req.UserID)
+	if err == nil && isInvitePending {
+		// Add the server of the person who invited us to the server list,
+		// as they should be a fairly good bet.
+		if _, inviterDomain, ierr := gomatrixserverlib.SplitID('!', inviteSender); ierr == nil {
+			req.ServerNames = append(req.ServerNames, inviterDomain)
+		}
+
+		// Perform a federated room join.
+		return r.performFederatedJoinRoomByID(ctx, req, res)
+	}
+
 	// Try to construct an actual join event from the template.
 	// If this succeeds then it is a sign that the room already exists
 	// locally on the homeserver.
@@ -178,21 +194,32 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 			return fmt.Errorf("Room ID %q does not exist", req.RoomIDOrAlias)
 		}
 
-		// Try joining by all of the supplied server names.
-		fedReq := fsAPI.PerformJoinRequest{
-			RoomID:      req.RoomIDOrAlias, // the room ID to try and join
-			UserID:      req.UserID,        // the user ID joining the room
-			ServerNames: req.ServerNames,   // the server to try joining with
-			Content:     req.Content,       // the membership event content
-		}
-		fedRes := fsAPI.PerformJoinResponse{}
-		err = r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
-		if err != nil {
-			return fmt.Errorf("Error joining federated room: %q", err)
-		}
+		// Perform a federated room join.
+		return r.performFederatedJoinRoomByID(ctx, req, res)
 
 	default:
-		return fmt.Errorf("Error joining room %q: %w", req.RoomIDOrAlias, err)
+		// Something else went wrong.
+		return fmt.Errorf("Error joining local room: %q", err)
+	}
+
+	return nil
+}
+
+func (r *RoomserverInternalAPI) performFederatedJoinRoomByID(
+	ctx context.Context,
+	req *api.PerformJoinRequest,
+	res *api.PerformJoinResponse, // nolint:unparam
+) error {
+	// Try joining by all of the supplied server names.
+	fedReq := fsAPI.PerformJoinRequest{
+		RoomID:      req.RoomIDOrAlias, // the room ID to try and join
+		UserID:      req.UserID,        // the user ID joining the room
+		ServerNames: req.ServerNames,   // the server to try joining with
+		Content:     req.Content,       // the membership event content
+	}
+	fedRes := fsAPI.PerformJoinResponse{}
+	if err := r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes); err != nil {
+		return fmt.Errorf("Error joining federated room: %q", err)
 	}
 
 	return nil
