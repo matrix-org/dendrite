@@ -33,7 +33,6 @@ var (
 	randomMessageEvent  gomatrixserverlib.HeaderedEvent
 	aliceInviteBobEvent gomatrixserverlib.HeaderedEvent
 	bobLeaveEvent       gomatrixserverlib.HeaderedEvent
-	baseSyncPos         = types.NewStreamToken(0, 0)
 	syncPositionVeryOld = types.NewStreamToken(5, 0)
 	syncPositionBefore  = types.NewStreamToken(11, 0)
 	syncPositionAfter   = types.NewStreamToken(12, 0)
