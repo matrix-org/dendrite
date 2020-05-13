@@ -124,12 +124,16 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 		}
 		if err := json.Unmarshal(pdu, &header); err != nil {
 			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to extract room ID from event")
+			// We don't know the event ID at this point so we can't return the
+			// failure in the PDU results
 			continue
 		}
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: header.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
 		if err := t.rsAPI.QueryRoomVersionForRoom(t.context, &verReq, &verRes); err != nil {
 			util.GetLogger(t.context).WithError(err).Warn("Transaction: Failed to query room version for room", verReq.RoomID)
+			// We don't know the event ID at this point so we can't return the
+			// failure in the PDU results
 			continue
 		}
 		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, verRes.RoomVersion)
@@ -152,8 +156,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 
 	// Process the events.
 	for _, e := range pdus {
-		err := t.processEvent(e.Unwrap(), true)
-		if err != nil {
+		if err := t.processEvent(e.Unwrap(), true); err != nil {
 			// If the error is due to the event itself being bad then we skip
 			// it and move onto the next event. We report an error so that the
 			// sender knows that we have skipped processing it.
@@ -169,25 +172,17 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 			// receive another event referencing it.
 			// If we bail and stop processing then we risk wedging incoming
 			// transactions from that server forever.
-			switch err.(type) {
-			case roomNotFoundError:
-			case *gomatrixserverlib.NotAllowed:
-			case missingPrevEventsError:
-			default:
-				// We shouldn't return 500s in response to an expired context.
-				if err == context.Canceled || err == context.DeadlineExceeded {
-					break
-				}
-
-				util.GetLogger(t.context).Warnf("Processing %s failed: %s", e.EventID(), err)
+			if isProcessingErrorFatal(err) {
 				// Any other error should be the result of a temporary error in
 				// our server so we should bail processing the transaction entirely.
+				util.GetLogger(t.context).Warnf("Processing %s failed fatally: %s", e.EventID(), err)
 				return nil, err
+			} else {
+				util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).Warn("Failed to process incoming federation event, skipping")
+				results[e.EventID()] = gomatrixserverlib.PDUResult{
+					Error: err.Error(),
+				}
 			}
-			results[e.EventID()] = gomatrixserverlib.PDUResult{
-				Error: err.Error(),
-			}
-			util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).Warn("Failed to process incoming federation event, skipping it.")
 		} else {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
 		}
@@ -196,6 +191,25 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	t.processEDUs(t.EDUs)
 	util.GetLogger(t.context).Infof("Processed %d PDUs from transaction %q", len(results), t.TransactionID)
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
+}
+
+// isProcessingErrorFatal returns true if the error is really bad and
+// we should stop processing the transaction, and returns false if it
+// is just some less serious error about a specific event.
+func isProcessingErrorFatal(err error) bool {
+	switch err.(type) {
+	case roomNotFoundError:
+	case *gomatrixserverlib.NotAllowed:
+	case missingPrevEventsError:
+	default:
+		switch err {
+		case context.Canceled:
+		case context.DeadlineExceeded:
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 type roomNotFoundError struct {
