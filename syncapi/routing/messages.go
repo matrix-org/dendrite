@@ -191,14 +191,10 @@ func (r *messagesReq) retrieveEvents() (
 	var streamEvents []types.StreamEvent
 	if r.fromStream != nil {
 		toStream := r.to.StreamToken()
-		util.GetLogger(r.ctx).Infof("quack fromStream positions %v", r.fromStream.Positions)
-		util.GetLogger(r.ctx).Infof("quack toStream positions %v", toStream.Positions)
 		streamEvents, err = r.db.GetEventsInStreamingRange(
 			r.ctx, r.fromStream, &toStream, r.roomID, r.limit, r.backwardOrdering,
 		)
 	} else {
-		util.GetLogger(r.ctx).Infof("quack from positions %v", r.from.Positions)
-		util.GetLogger(r.ctx).Infof("quack to positions %v", r.to.Positions)
 		streamEvents, err = r.db.GetEventsInTopologicalRange(
 			r.ctx, r.from, r.to, r.roomID, r.limit, r.backwardOrdering,
 		)
