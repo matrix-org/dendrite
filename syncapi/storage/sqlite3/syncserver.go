@@ -53,16 +53,15 @@ type stateDelta struct {
 // SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
+	shared.Database
 	db *sql.DB
 	common.PartitionOffsetStatements
 	streamID            streamIDStatements
-	accountData         accountDataStatements
 	events              outputRoomEventsStatements
 	roomstate           currentRoomStateStatements
 	eduCache            *cache.EDUCache
 	topology            outputRoomEventsTopologyStatements
 	backwardExtremities tables.BackwardsExtremities
-	shared              *shared.Database
 }
 
 // NewSyncServerDatasource creates a new sync server database
@@ -98,7 +97,8 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.streamID.prepare(d.db); err != nil {
 		return err
 	}
-	if err = d.accountData.prepare(d.db, &d.streamID); err != nil {
+	accountData, err := NewSqliteAccountDataTable(d.db)
+	if err != nil {
 		return err
 	}
 	if err = d.events.prepare(d.db, &d.streamID); err != nil {
@@ -118,9 +118,10 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err != nil {
 		return err
 	}
-	d.shared = &shared.Database{
-		DB:      d.db,
-		Invites: invites,
+	d.Database = shared.Database{
+		DB:          d.db,
+		Invites:     invites,
+		AccountData: accountData,
 	}
 	return nil
 }
@@ -403,14 +404,14 @@ func (d *SyncServerDatasource) syncStreamPositionTx(
 	if err != nil {
 		return 0, err
 	}
-	maxAccountDataID, err := d.accountData.selectMaxAccountDataID(ctx, txn)
+	maxAccountDataID, err := d.Database.AccountData.SelectMaxAccountDataID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}
 	if maxAccountDataID > maxID {
 		maxID = maxAccountDataID
 	}
-	maxInviteID, err := d.shared.Invites.SelectMaxInviteID(ctx, txn)
+	maxInviteID, err := d.Database.Invites.SelectMaxInviteID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}
@@ -428,14 +429,14 @@ func (d *SyncServerDatasource) syncPositionTx(
 	if err != nil {
 		return nil, err
 	}
-	maxAccountDataID, err := d.accountData.selectMaxAccountDataID(ctx, txn)
+	maxAccountDataID, err := d.Database.AccountData.SelectMaxAccountDataID(ctx, txn)
 	if err != nil {
 		return nil, err
 	}
 	if maxAccountDataID > maxEventID {
 		maxEventID = maxAccountDataID
 	}
-	maxInviteID, err := d.shared.Invites.SelectMaxInviteID(ctx, txn)
+	maxInviteID, err := d.Database.Invites.SelectMaxInviteID(ctx, txn)
 	if err != nil {
 		return nil, err
 	}
@@ -729,51 +730,6 @@ var txReadOnlySnapshot = sql.TxOptions{
 	ReadOnly:  true,
 }
 
-// GetAccountDataInRange returns all account data for a given user inserted or
-// updated between two given positions
-// Returns a map following the format data[roomID] = []dataTypes
-// If no data is retrieved, returns an empty map
-// If there was an issue with the retrieval, returns an error
-func (d *SyncServerDatasource) GetAccountDataInRange(
-	ctx context.Context, userID string, oldPos, newPos types.StreamPosition,
-	accountDataFilterPart *gomatrixserverlib.EventFilter,
-) (map[string][]string, error) {
-	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos, accountDataFilterPart)
-}
-
-// UpsertAccountData keeps track of new or updated account data, by saving the type
-// of the new/updated data, and the user ID and room ID the data is related to (empty)
-// room ID means the data isn't specific to any room)
-// If no data with the given type, user ID and room ID exists in the database,
-// creates a new row, else update the existing one
-// Returns an error if there was an issue with the upsert
-func (d *SyncServerDatasource) UpsertAccountData(
-	ctx context.Context, userID, roomID, dataType string,
-) (sp types.StreamPosition, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		sp, err = d.accountData.insertAccountData(ctx, txn, userID, roomID, dataType)
-		return err
-	})
-	return
-}
-
-// AddInviteEvent stores a new invite event for a user.
-// If the invite was successfully stored this returns the stream ID it was stored at.
-// Returns an error if there was a problem communicating with the database.
-func (d *SyncServerDatasource) AddInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
-) (sp types.StreamPosition, err error) {
-	return d.shared.AddInviteEvent(ctx, inviteEvent)
-}
-
-// RetireInviteEvent removes an old invite event from the database.
-// Returns an error if there was a problem communicating with the database.
-func (d *SyncServerDatasource) RetireInviteEvent(
-	ctx context.Context, inviteEventID string,
-) error {
-	return d.shared.RetireInviteEvent(ctx, inviteEventID)
-}
-
 func (d *SyncServerDatasource) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
 	d.eduCache.SetTimeoutCallback(fn)
 }
@@ -800,7 +756,7 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 	fromPos, toPos types.StreamPosition,
 	res *types.Response,
 ) error {
-	invites, err := d.shared.Invites.SelectInviteEventsInRange(
+	invites, err := d.Database.Invites.SelectInviteEventsInRange(
 		ctx, txn, userID, fromPos, toPos,
 	)
 	if err != nil {

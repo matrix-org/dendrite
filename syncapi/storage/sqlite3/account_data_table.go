@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -55,25 +56,25 @@ type accountDataStatements struct {
 	selectAccountDataInRangeStmt *sql.Stmt
 }
 
-func (s *accountDataStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
-	s.streamIDStatements = streamID
-	_, err = db.Exec(accountDataSchema)
+func NewSqliteAccountDataTable(db *sql.DB) (tables.AccountData, error) {
+	s := &accountDataStatements{}
+	_, err := db.Exec(accountDataSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectMaxAccountDataIDStmt, err = db.Prepare(selectMaxAccountDataIDSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectAccountDataInRangeStmt, err = db.Prepare(selectAccountDataInRangeSQL); err != nil {
-		return
+		return nil, err
 	}
-	return
+	return s, nil
 }
 
-func (s *accountDataStatements) insertAccountData(
+func (s *accountDataStatements) InsertAccountData(
 	ctx context.Context, txn *sql.Tx,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
@@ -85,7 +86,7 @@ func (s *accountDataStatements) insertAccountData(
 	return
 }
 
-func (s *accountDataStatements) selectAccountDataInRange(
+func (s *accountDataStatements) SelectAccountDataInRange(
 	ctx context.Context,
 	userID string,
 	oldPos, newPos types.StreamPosition,
@@ -146,7 +147,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	return data, nil
 }
 
-func (s *accountDataStatements) selectMaxAccountDataID(
+func (s *accountDataStatements) SelectMaxAccountDataID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64

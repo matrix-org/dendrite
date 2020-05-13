@@ -50,15 +50,14 @@ type stateDelta struct {
 // SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
+	shared.Database
 	db *sql.DB
 	common.PartitionOffsetStatements
-	accountData         accountDataStatements
 	events              outputRoomEventsStatements
 	roomstate           currentRoomStateStatements
 	eduCache            *cache.EDUCache
 	topology            outputRoomEventsTopologyStatements
 	backwardExtremities tables.BackwardsExtremities
-	shared              *shared.Database
 }
 
 // NewSyncServerDatasource creates a new sync server database
@@ -71,7 +70,8 @@ func NewSyncServerDatasource(dbDataSourceName string, dbProperties common.DbProp
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
 		return nil, err
 	}
-	if err = d.accountData.prepare(d.db); err != nil {
+	accountData, err := NewPostgresAccountDataTable(d.db)
+	if err != nil {
 		return nil, err
 	}
 	if err = d.events.prepare(d.db); err != nil {
@@ -92,9 +92,10 @@ func NewSyncServerDatasource(dbDataSourceName string, dbProperties common.DbProp
 		return nil, err
 	}
 	d.eduCache = cache.New()
-	d.shared = &shared.Database{
-		DB:      d.db,
-		Invites: invites,
+	d.Database = shared.Database{
+		DB:          d.db,
+		Invites:     invites,
+		AccountData: accountData,
 	}
 	return &d, nil
 }
@@ -339,14 +340,14 @@ func (d *SyncServerDatasource) syncStreamPositionTx(
 	if err != nil {
 		return 0, err
 	}
-	maxAccountDataID, err := d.accountData.selectMaxAccountDataID(ctx, txn)
+	maxAccountDataID, err := d.Database.AccountData.SelectMaxAccountDataID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}
 	if maxAccountDataID > maxID {
 		maxID = maxAccountDataID
 	}
-	maxInviteID, err := d.shared.Invites.SelectMaxInviteID(ctx, txn)
+	maxInviteID, err := d.Database.Invites.SelectMaxInviteID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}
@@ -364,14 +365,14 @@ func (d *SyncServerDatasource) syncPositionTx(
 	if err != nil {
 		return sp, err
 	}
-	maxAccountDataID, err := d.accountData.selectMaxAccountDataID(ctx, txn)
+	maxAccountDataID, err := d.Database.AccountData.SelectMaxAccountDataID(ctx, txn)
 	if err != nil {
 		return sp, err
 	}
 	if maxAccountDataID > maxEventID {
 		maxEventID = maxAccountDataID
 	}
-	maxInviteID, err := d.shared.Invites.SelectMaxInviteID(ctx, txn)
+	maxInviteID, err := d.Database.Invites.SelectMaxInviteID(ctx, txn)
 	if err != nil {
 		return sp, err
 	}
@@ -653,31 +654,6 @@ var txReadOnlySnapshot = sql.TxOptions{
 	ReadOnly:  true,
 }
 
-func (d *SyncServerDatasource) GetAccountDataInRange(
-	ctx context.Context, userID string, oldPos, newPos types.StreamPosition,
-	accountDataFilterPart *gomatrixserverlib.EventFilter,
-) (map[string][]string, error) {
-	return d.accountData.selectAccountDataInRange(ctx, userID, oldPos, newPos, accountDataFilterPart)
-}
-
-func (d *SyncServerDatasource) UpsertAccountData(
-	ctx context.Context, userID, roomID, dataType string,
-) (types.StreamPosition, error) {
-	return d.accountData.insertAccountData(ctx, userID, roomID, dataType)
-}
-
-func (d *SyncServerDatasource) AddInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
-) (sp types.StreamPosition, err error) {
-	return d.shared.AddInviteEvent(ctx, inviteEvent)
-}
-
-func (d *SyncServerDatasource) RetireInviteEvent(
-	ctx context.Context, inviteEventID string,
-) error {
-	return d.shared.RetireInviteEvent(ctx, inviteEventID)
-}
-
 func (d *SyncServerDatasource) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
 	d.eduCache.SetTimeoutCallback(fn)
 }
@@ -700,7 +676,7 @@ func (d *SyncServerDatasource) addInvitesToResponse(
 	fromPos, toPos types.StreamPosition,
 	res *types.Response,
 ) error {
-	invites, err := d.shared.Invites.SelectInviteEventsInRange(
+	invites, err := d.Database.Invites.SelectInviteEventsInRange(
 		ctx, txn, userID, fromPos, toPos,
 	)
 	if err != nil {
