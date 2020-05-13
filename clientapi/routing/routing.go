@@ -100,7 +100,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return JoinRoomByIDOrAlias(
-				req, device, rsAPI, vars["roomIDOrAlias"],
+				req, device, rsAPI, accountDB, vars["roomIDOrAlias"],
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
