@@ -264,4 +264,18 @@ User can invite local user to room with version 5
 remote user can join room with version 5
 User can invite remote user to room with version 5
 Remote user can backfill in a room with version 5
+Inbound federation can receive v1 /send_join
+Inbound federation can get state for a room
+Inbound federation of state requires event_id as a mandatory paramater
+Inbound federation can get state_ids for a room
+Inbound federation of state_ids requires event_id as a mandatory paramater
+Federation rejects inbound events where the prev_events cannot be found
+Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
 Alternative server names do not cause a routing loop
+Events whose auth_events are in the wrong room do not mess up the room state
+Inbound federation can return events
+Inbound federation can return missing events for world_readable visibility
+Inbound federation can return missing events for invite visibility
+Inbound federation can get public room list
+An event which redacts itself should be ignored
+A pair of events which redact each other should be ignored
