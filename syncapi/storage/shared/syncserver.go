@@ -90,14 +90,16 @@ func (d *Database) SyncStreamPosition(ctx context.Context) (types.StreamPosition
 		if err != nil {
 			return err
 		}
-		maxAccountDataID, err := d.AccountData.SelectMaxAccountDataID(ctx, txn)
+		var maxAccountDataID int64
+		maxAccountDataID, err = d.AccountData.SelectMaxAccountDataID(ctx, txn)
 		if err != nil {
 			return err
 		}
 		if maxAccountDataID > maxID {
 			maxID = maxAccountDataID
 		}
-		maxInviteID, err := d.Invites.SelectMaxInviteID(ctx, txn)
+		var maxInviteID int64
+		maxInviteID, err = d.Invites.SelectMaxInviteID(ctx, txn)
 		if err != nil {
 			return err
 		}
