@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -66,28 +67,29 @@ type inviteEventsStatements struct {
 	selectMaxInviteIDStmt         *sql.Stmt
 }
 
-func (s *inviteEventsStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(inviteEventsSchema)
+func NewPostgresInvitesTable(db *sql.DB) (tables.Invites, error) {
+	s := &inviteEventsStatements{}
+	_, err := db.Exec(inviteEventsSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if s.insertInviteEventStmt, err = db.Prepare(insertInviteEventSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectInviteEventsInRangeStmt, err = db.Prepare(selectInviteEventsInRangeSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.deleteInviteEventStmt, err = db.Prepare(deleteInviteEventSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectMaxInviteIDStmt, err = db.Prepare(selectMaxInviteIDSQL); err != nil {
-		return
+		return nil, err
 	}
-	return
+	return s, nil
 }
 
-func (s *inviteEventsStatements) insertInviteEvent(
-	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
+func (s *inviteEventsStatements) InsertInviteEvent(
+	ctx context.Context, txn *sql.Tx, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
 	var headeredJSON []byte
 	headeredJSON, err = json.Marshal(inviteEvent)
@@ -105,7 +107,7 @@ func (s *inviteEventsStatements) insertInviteEvent(
 	return
 }
 
-func (s *inviteEventsStatements) deleteInviteEvent(
+func (s *inviteEventsStatements) DeleteInviteEvent(
 	ctx context.Context, inviteEventID string,
 ) error {
 	_, err := s.deleteInviteEventStmt.ExecContext(ctx, inviteEventID)
@@ -114,7 +116,7 @@ func (s *inviteEventsStatements) deleteInviteEvent(
 
 // selectInviteEventsInRange returns a map of room ID to invite event for the
 // active invites for the target user ID in the supplied range.
-func (s *inviteEventsStatements) selectInviteEventsInRange(
+func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, startPos, endPos types.StreamPosition,
 ) (map[string]gomatrixserverlib.HeaderedEvent, error) {
 	stmt := common.TxStmt(txn, s.selectInviteEventsInRangeStmt)
@@ -143,7 +145,7 @@ func (s *inviteEventsStatements) selectInviteEventsInRange(
 	return result, rows.Err()
 }
 
-func (s *inviteEventsStatements) selectMaxInviteID(
+func (s *inviteEventsStatements) SelectMaxInviteID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
