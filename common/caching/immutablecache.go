@@ -8,7 +8,8 @@ const (
 )
 
 type ImmutableCache interface {
-	gomatrixserverlib.KeyCache
 	GetRoomVersion(roomId string) (gomatrixserverlib.RoomVersion, bool)
 	StoreRoomVersion(roomId string, roomVersion gomatrixserverlib.RoomVersion)
+	GetServerKey(request gomatrixserverlib.PublicKeyLookupRequest) (gomatrixserverlib.PublicKeyLookupResult, bool)
+	StoreServerKey(request gomatrixserverlib.PublicKeyLookupRequest, response gomatrixserverlib.PublicKeyLookupResult)
 }
