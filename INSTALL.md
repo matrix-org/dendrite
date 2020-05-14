@@ -2,38 +2,63 @@
 
 Dendrite can be run in one of two configurations:
 
- * A cluster of individual components, dealing with different aspects of the
-   Matrix protocol (see [WIRING.md](./WIRING.md)). Components communicate with
-   one another via [Apache Kafka](https://kafka.apache.org).
+* **Polylith mode**: A cluster of individual components, dealing with different
+  aspects of the Matrix protocol (see [WIRING.md](./WIRING.md)). Components communicate with each other using internal HTTP APIs and [Apache Kafka](https://kafka.apache.org). This will almost certainly be the preferred model
+  for large-scale deployments.
 
- * A monolith server, in which all components run in the same process. In this
-   configuration, Kafka can be replaced with an in-process implementation
-   called [naffka](https://github.com/matrix-org/naffka).
+* **Monolith mode**: All components run in the same process. In this mode,
+   Kafka is completely optional and can instead be replaced with an in-process
+   lightweight implementation called [Naffka](https://github.com/matrix-org/naffka). This will usually be the preferred model for low-volume, low-user
+   or experimental deployments.
+
+Regardless of whether you are running in polylith or monolith mode, each Dendrite component that requires storage has its own database. Both Postgres
+and SQLite are supported and can be mixed-and-matched across components as
+needed in the configuration file.
+
+Be advised that Dendrite is still developmental and it's not recommended for
+use in production environments yet!
 
 ## Requirements
 
- - Go 1.13+
- - Postgres 9.5+
- - For Kafka (optional if using the monolith server):
-   - Unix-based system (https://kafka.apache.org/documentation/#os)
-   - JDK 1.8+ / OpenJDK 1.8+
-   - Apache Kafka 0.10.2+ (see [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh) for up-to-date version numbers)
+* Go 1.13+
+* Postgres 9.5+ (if using Postgres databases)
+* Apache Kafka 0.10.2+ (optional if using the monolith server):
+  * UNIX-based system ([read more here](https://kafka.apache.org/documentation/#os))
+  * JDK 1.8+ / OpenJDK 1.8+
+  * See [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh) for up-to-date version numbers
 
+## Building up a monolith deploment
 
-## Setting up a development environment
-
-Assumes Go 1.13+ and JDK 1.8+ are already installed and are on PATH.
+Start by cloning the code:
 
 ```bash
-# Get the code
 git clone https://github.com/matrix-org/dendrite
 cd dendrite
+```
 
-# Build it
+Then build it:
+
+```bash
 ./build.sh
 ```
 
-If using Kafka, install and start it (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
+## Building up a polylith deployment
+
+Start by cloning the code:
+
+```bash
+git clone https://github.com/matrix-org/dendrite
+cd dendrite
+```
+
+Then build it:
+
+```bash
+./build.sh
+```
+
+Install and start Kafka (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
+
 ```bash
 KAFKA_URL=http://archive.apache.org/dist/kafka/2.1.0/kafka_2.11-2.1.0.tgz
 
@@ -51,7 +76,7 @@ kafka/bin/zookeeper-server-start.sh -daemon kafka/config/zookeeper.properties
 kafka/bin/kafka-server-start.sh -daemon kafka/config/server.properties
 ```
 
-On MacOS, you can use [homebrew](https://brew.sh/) for easier setup of kafka
+On MacOS, you can use [homebrew](https://brew.sh/) for easier setup of Kafka:
 
 ```bash
 brew install kafka
@@ -61,15 +86,24 @@ brew services start kafka
 
 ## Configuration
 
+### SQLite database setup
+
+Dendrite can use the built-in SQLite database engine for small setups.
+The SQLite databases do not need to be preconfigured - Dendrite will
+create them automatically at startup.
+
 ### Postgres database setup
 
-Dendrite requires a postgres database engine, version 9.5 or later.
+Assuming that Postgres 9.5 (or later) is installed:
 
-* Create role:
+* Create role, choosing a new password when prompted:
+
   ```bash
-  sudo -u postgres createuser -P dendrite     # prompts for password
+  sudo -u postgres createuser -P dendrite
   ```
-* Create databases:
+
+* Create the component databases:
+
   ```bash
   for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi appservice naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
@@ -78,42 +112,56 @@ Dendrite requires a postgres database engine, version 9.5 or later.
 
 (On macOS, omit `sudo -u postgres` from the above commands.)
 
-### Crypto key generation
+### Server key generation
 
-Generate the keys:
+Each Dendrite server requires unique server keys.
+
+Generate the self-signed SSL certificate for federation:
 
 ```bash
-# Generate a self-signed SSL cert for federation:
 test -f server.key || openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 3650 -nodes -subj /CN=localhost
+```
 
-# generate ed25519 signing key
+Generate the server signing key:
+
+```
 test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
 ```
 
-### Configuration
+### Configuration file
 
 Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Things that will need editing include *at least*:
-* `server_name`
-* `database/*` (All lines in the database section must have the username and password of the user created with the `createuser` command above. eg:`dendrite:password@localhost`)
 
+* The `server_name` entry to reflect the hostname of your Dendrite server
+* The `database` lines with an updated connection string based on your
+  desired setup, e.g. replacing `component` with the name of the component:
+  * For Postgres: `postgres://dendrite:password@localhost/component`
+  * For SQLite on disk: `file:component.db` or `file:///path/to/component.db`
+  * Postgres and SQLite can be mixed and matched.
+* The `use_naffka` option if using Naffka in a monolith deployment
+
+There are other options which may be useful so review them all. In particular,
+if you are trying to federate from your Dendrite instance into public rooms
+then configuring `key_perspectives` (like `matrix.org` in the sample) can
+help to improve reliability considerably by allowing your homeserver to fetch
+public keys for dead homeservers from somewhere else.
 
 ## Starting a monolith server
 
-It is possible to use 'naffka' as an in-process replacement to Kafka when using
-the monolith server. To do this, set `use_naffka: true` in `dendrite.yaml` and uncomment
-the necessary line related to naffka in the `database` section. Be sure to update the
-database username and password if needed.
+It is possible to use Naffka as an in-process replacement to Kafka when using
+the monolith server. To do this, set `use_naffka: true` in your `dendrite.yaml` configuration and uncomment the relevant Naffka line in the `database` section.
+Be sure to update the database username and password if needed.
 
 The monolith server can be started as shown below. By default it listens for
-HTTP connections on port 8008, so point your client at
-`http://localhost:8008`. If you set `--tls-cert` and `--tls-key` as shown
-below, it will also listen for HTTPS connections on port 8448.
+HTTP connections on port 8008, so you can configure your Matrix client to use
+`http://localhost:8008` as the server. If you set `--tls-cert` and `--tls-key`
+as shown below, it will also listen for HTTPS connections on port 8448.
 
 ```bash
 ./bin/dendrite-monolith-server --tls-cert=server.crt --tls-key=server.key
 ```
 
-## Starting a multiprocess server
+## Starting a polylith deployment
 
 The following contains scripts which will run all the required processes in order to point a Matrix client at Dendrite. Conceptually, you are wiring together to form the following diagram:
 
@@ -170,9 +218,10 @@ Servers --->| federation-api-proxy |--------->| dendrite-federation-api-server |
    A ==> B  = Kafka (A = producer, B = consumer)
 ```
 
-### Run a client api proxy
+### Client proxy
 
-This is what Matrix clients will talk to. If you use the script below, point your client at `http://localhost:8008`.
+This is what Matrix clients will talk to. If you use the script below, point
+your client at `http://localhost:8008`.
 
 ```bash
 ./bin/client-api-proxy \
@@ -183,51 +232,10 @@ This is what Matrix clients will talk to. If you use the script below, point you
 --public-rooms-api-server-url "http://localhost:7775" \
 ```
 
-### Run a client api
+### Federation proxy
 
-This is what implements message sending. Clients talk to this via the proxy in order to send messages.
-
-```bash
-./bin/dendrite-client-api-server --config=dendrite.yaml
-```
-
-(If this fails with `pq: syntax error at or near "ON"`, check you are using at least postgres 9.5.)
-
-### Run a room server
-
-This is what implements the room DAG. Clients do not talk to this.
-
-```bash
-./bin/dendrite-room-server --config=dendrite.yaml
-```
-
-### Run a sync server
-
-This is what implements `/sync` requests. Clients talk to this via the proxy in order to receive messages.
-
-```bash
-./bin/dendrite-sync-api-server --config dendrite.yaml
-```
-
-### Run a media server
-
-This implements `/media` requests. Clients talk to this via the proxy in order to upload and retrieve media.
-
-```bash
-./bin/dendrite-media-api-server --config dendrite.yaml
-```
-
-### Run public room server
-
-This implements `/directory` requests. Clients talk to this via the proxy in order to retrieve room directory listings.
-
-```bash
-./bin/dendrite-public-rooms-api-server --config dendrite.yaml
-```
-
-### Run a federation api proxy
-
-This is what Matrix servers will talk to. This is only required if you want to support federation.
+This is what Matrix servers will talk to. This is only required if you want
+to support federation.
 
 ```bash
 ./bin/federation-api-proxy \
@@ -236,7 +244,51 @@ This is what Matrix servers will talk to. This is only required if you want to s
 --media-api-server-url "http://localhost:7774" \
 ```
 
-### Run a federation api server
+### Client API server
+
+This is what implements message sending. Clients talk to this via the proxy in
+order to send messages.
+
+```bash
+./bin/dendrite-client-api-server --config=dendrite.yaml
+```
+
+### Room server
+
+This is what implements the room DAG. Clients do not talk to this.
+
+```bash
+./bin/dendrite-room-server --config=dendrite.yaml
+```
+
+### Sync server
+
+This is what implements `/sync` requests. Clients talk to this via the proxy
+in order to receive messages.
+
+```bash
+./bin/dendrite-sync-api-server --config dendrite.yaml
+```
+
+### Media server
+
+This implements `/media` requests. Clients talk to this via the proxy in
+order to upload and retrieve media.
+
+```bash
+./bin/dendrite-media-api-server --config dendrite.yaml
+```
+
+### Public room server
+
+This implements `/directory` requests. Clients talk to this via the proxy
+in order to retrieve room directory listings.
+
+```bash
+./bin/dendrite-public-rooms-api-server --config dendrite.yaml
+```
+
+### Federation API server
 
 This implements federation requests. Servers talk to this via the proxy in
 order to send transactions.  This is only required if you want to support
@@ -246,7 +298,7 @@ federation.
 ./bin/dendrite-federation-api-server --config dendrite.yaml
 ```
 
-### Run a federation sender server
+### Federation sender
 
 This sends events from our users to other servers.  This is only required if
 you want to support federation.
@@ -255,7 +307,7 @@ you want to support federation.
 ./bin/dendrite-federation-sender-server --config dendrite.yaml
 ```
 
-### Run an appservice server
+### Appservice server
 
 This sends events from the network to [application
 services](https://matrix.org/docs/spec/application_service/unstable.html)
@@ -264,4 +316,13 @@ application services on your homeserver.
 
 ```bash
 ./bin/dendrite-appservice-server --config dendrite.yaml
+```
+
+### Key server
+
+This manages end-to-end encryption keys (or rather, it will do when it's
+finished).
+
+```bash
+./bin/dendrite-key-server --config dendrite.yaml
 ```
