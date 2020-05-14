@@ -17,6 +17,7 @@ package keydb
 import (
 	"encoding/base64"
 
+	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/common/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,7 @@ import (
 // backed by the given KeyDatabase.
 func CreateKeyRing(client gomatrixserverlib.Client,
 	keyDB gomatrixserverlib.KeyDatabase,
+	cache caching.ImmutableCache,
 	cfg config.KeyPerspectives) gomatrixserverlib.KeyRing {
 
 	fetchers := gomatrixserverlib.KeyRing{
@@ -38,6 +40,7 @@ func CreateKeyRing(client gomatrixserverlib.Client,
 			},
 		},
 		KeyDatabase: keyDB,
+		KeyCache:    cache,
 	}
 
 	logrus.Info("Enabled direct key fetcher")

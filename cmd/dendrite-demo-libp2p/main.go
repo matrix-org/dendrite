@@ -147,7 +147,8 @@ func main() {
 	deviceDB := base.Base.CreateDeviceDB()
 	keyDB := createKeyDB(base)
 	federation := createFederationClient(base)
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
+	// TODO: cache here
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, nil, cfg.Matrix.KeyPerspectives)
 
 	rsAPI := roomserver.SetupRoomServerComponent(
 		&base.Base, keyRing, federation,
