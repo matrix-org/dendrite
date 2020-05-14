@@ -34,18 +34,18 @@ type Events interface {
 type Topology interface {
 	// InsertEventInTopology inserts the given event in the room's topology, based
 	// on the event's depth.
-	InsertEventInTopology(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition) (err error)
+	InsertEventInTopology(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition) (err error)
 	// SelectEventIDsInRange selects the IDs of events which positions are within a
 	// given range in a given room's topological order.
 	// Returns an empty slice if no events match the given range.
-	SelectEventIDsInRange(ctx context.Context, roomID string, fromPos, toPos, toMicroPos types.StreamPosition, limit int, chronologicalOrder bool) (eventIDs []string, err error)
+	SelectEventIDsInRange(ctx context.Context, txn *sql.Tx, roomID string, fromPos, toPos, toMicroPos types.StreamPosition, limit int, chronologicalOrder bool) (eventIDs []string, err error)
 	// SelectPositionInTopology returns the position of a given event in the
 	// topology of the room it belongs to.
-	SelectPositionInTopology(ctx context.Context, eventID string) (pos, spos types.StreamPosition, err error)
-	SelectMaxPositionInTopology(ctx context.Context, roomID string) (pos types.StreamPosition, spos types.StreamPosition, err error)
+	SelectPositionInTopology(ctx context.Context, txn *sql.Tx, eventID string) (pos, spos types.StreamPosition, err error)
+	SelectMaxPositionInTopology(ctx context.Context, txn *sql.Tx, roomID string) (pos types.StreamPosition, spos types.StreamPosition, err error)
 	// SelectEventIDsFromPosition returns the IDs of all events that have a given
 	// position in the topology of a given room.
-	SelectEventIDsFromPosition(ctx context.Context, roomID string, pos types.StreamPosition) (eventIDs []string, err error)
+	SelectEventIDsFromPosition(ctx context.Context, txn *sql.Tx, roomID string, pos types.StreamPosition) (eventIDs []string, err error)
 }
 
 type CurrentRoomState interface {

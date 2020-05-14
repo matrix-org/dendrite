@@ -51,7 +51,7 @@ func MustCreateEvent(t *testing.T, roomID string, prevs []gomatrixserverlib.Head
 }
 
 func MustCreateDatabase(t *testing.T) storage.Database {
-	db, err := sqlite3.NewSyncServerDatasource("file::memory:")
+	db, err := sqlite3.NewDatabase("file::memory:")
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
@@ -222,7 +222,7 @@ func TestSyncResponse(t *testing.T) {
 }
 
 func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 	db := MustCreateDatabase(t)
 	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
 	positions := MustWriteEvents(t, db, events)
@@ -233,10 +233,10 @@ func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
 	from := types.NewStreamToken(
 		positions[len(positions)-2], types.StreamPosition(0),
 	)
-
+	db.IncrementalSync(ctx, testUserDeviceA, from, latest, 1, false)
 	res, err := db.IncrementalSync(ctx, testUserDeviceA, from, latest, 5, false)
 	if err != nil {
-		t.Fatalf("failed to IncrementalSync with latest token")
+		t.Fatalf("failed to IncrementalSync with latest token: %s", err)
 	}
 	roomRes, ok := res.Rooms.Join[testRoomID]
 	if !ok {
@@ -258,7 +258,7 @@ func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
 	to := types.NewTopologyToken(0, 0)
 	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &prevBatchToken, &to, testRoomID, 5, true)
 	if err != nil {
-		t.Fatalf("GetEventsInRange returned an error: %s", err)
+		t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
 	}
 	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
 	assertEventsEqual(t, "", true, gots, reversed(events[len(events)-6:len(events)-1]))
@@ -303,7 +303,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	// backpaginate 5 messages starting at the latest position.
 	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, testRoomID, 5, true)
 	if err != nil {
-		t.Fatalf("GetEventsInRange returned an error: %s", err)
+		t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
 	}
 	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
 	assertEventsEqual(t, "", true, gots, reversed(events[len(events)-5:]))

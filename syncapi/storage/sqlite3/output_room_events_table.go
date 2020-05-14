@@ -320,7 +320,6 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	} else {
 		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
 	}
-
 	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
 	if err != nil {
 		return nil, err

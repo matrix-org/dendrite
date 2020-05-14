@@ -143,8 +143,7 @@ func (s *accountDataStatements) SelectMaxAccountDataID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := common.TxStmt(txn, s.selectMaxAccountDataIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	err = txn.Stmt(s.selectMaxAccountDataIDStmt).QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}
