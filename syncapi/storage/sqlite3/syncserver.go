@@ -54,9 +54,8 @@ type SyncServerDatasource struct {
 	shared.Database
 	db *sql.DB
 	common.PartitionOffsetStatements
-	streamID  streamIDStatements
-	roomstate currentRoomStateStatements
-	topology  outputRoomEventsTopologyStatements
+	streamID streamIDStatements
+	topology outputRoomEventsTopologyStatements
 }
 
 // NewSyncServerDatasource creates a new sync server database
@@ -99,7 +98,8 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err != nil {
 		return err
 	}
-	if err = d.roomstate.prepare(d.db, &d.streamID); err != nil {
+	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
+	if err != nil {
 		return err
 	}
 	invites, err := NewSqliteInvitesTable(d.db, &d.streamID)
@@ -119,14 +119,10 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		AccountData:         accountData,
 		OutputEvents:        events,
 		BackwardExtremities: bwExtrem,
+		CurrentRoomState:    roomState,
 		EDUCache:            cache.New(),
 	}
 	return nil
-}
-
-// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
-func (d *SyncServerDatasource) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
-	return d.roomstate.selectJoinedUsers(ctx)
 }
 
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of
@@ -210,7 +206,7 @@ func (d *SyncServerDatasource) updateRoomState(
 ) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 	for _, eventID := range removedEventIDs {
-		if err := d.roomstate.deleteRoomStateByEventID(ctx, txn, eventID); err != nil {
+		if err := d.Database.CurrentRoomState.DeleteRoomStateByEventID(ctx, txn, eventID); err != nil {
 			return err
 		}
 	}
@@ -228,7 +224,7 @@ func (d *SyncServerDatasource) updateRoomState(
 			}
 			membership = &value
 		}
-		if err := d.roomstate.upsertRoomState(ctx, txn, event, membership, pduPosition); err != nil {
+		if err := d.Database.CurrentRoomState.UpsertRoomState(ctx, txn, event, membership, pduPosition); err != nil {
 			return err
 		}
 	}
@@ -245,28 +241,6 @@ func (d *SyncServerDatasource) SyncPosition(ctx context.Context) (tok types.Stre
 		}
 		tok = *pos
 		return nil
-	})
-	return
-}
-
-// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
-// If no event could be found, returns nil
-// If there was an issue during the retrieval, returns an error
-func (d *SyncServerDatasource) GetStateEvent(
-	ctx context.Context, roomID, evType, stateKey string,
-) (*gomatrixserverlib.HeaderedEvent, error) {
-	return d.roomstate.selectStateEvent(ctx, roomID, evType, stateKey)
-}
-
-// GetStateEventsForRoom fetches the state events for a given room.
-// Returns an empty slice if no state events could be found for this room.
-// Returns an error if there was an issue with the retrieval.
-func (d *SyncServerDatasource) GetStateEventsForRoom(
-	ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter,
-) (stateEvents []gomatrixserverlib.HeaderedEvent, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
-		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
-		return err
 	})
 	return
 }
@@ -530,7 +504,7 @@ func (d *SyncServerDatasource) IncrementalSync(
 			ctx, device, fromPos.PDUPosition(), toPos.PDUPosition(), numRecentEventsPerRoom, wantFullState, res,
 		)
 	} else {
-		joinedRoomIDs, err = d.roomstate.selectRoomIDsWithMembership(
+		joinedRoomIDs, err = d.Database.CurrentRoomState.SelectRoomIDsWithMembership(
 			ctx, nil, device.UserID, gomatrixserverlib.Join,
 		)
 	}
@@ -585,7 +559,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	res = types.NewResponse(*toPos)
 
 	// Extract room state and recent events for all rooms the user is joined to.
-	joinedRoomIDs, err = d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
+	joinedRoomIDs, err = d.Database.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
 	if err != nil {
 		return
 	}
@@ -595,7 +569,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
 		var stateEvents []gomatrixserverlib.HeaderedEvent
-		stateEvents, err = d.roomstate.selectCurrentState(ctx, txn, roomID, &stateFilterPart)
+		stateEvents, err = d.Database.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, &stateFilterPart)
 		if err != nil {
 			return
 		}
@@ -849,7 +823,7 @@ func (d *SyncServerDatasource) fetchMissingStateEvents(
 	// If they are missing from the events table then they should be state
 	// events that we received from outside the main event stream.
 	// These should be in the room state table.
-	stateEvents, err := d.roomstate.selectEventsWithEventIDs(ctx, txn, missing)
+	stateEvents, err := d.Database.CurrentRoomState.SelectEventsWithEventIDs(ctx, txn, missing)
 
 	if err != nil {
 		return nil, err
@@ -921,7 +895,7 @@ func (d *SyncServerDatasource) getStateDeltas(
 	}
 
 	// Add in currently joined rooms
-	joinedRoomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
+	joinedRoomIDs, err := d.Database.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -945,7 +919,7 @@ func (d *SyncServerDatasource) getStateDeltasForFullStateSync(
 	fromPos, toPos types.StreamPosition, userID string,
 	stateFilterPart *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
-	joinedRoomIDs, err := d.roomstate.selectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
+	joinedRoomIDs, err := d.Database.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1000,7 +974,7 @@ func (d *SyncServerDatasource) currentStateStreamEventsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilterPart *gomatrixserverlib.StateFilter,
 ) ([]types.StreamEvent, error) {
-	allState, err := d.roomstate.selectCurrentState(ctx, txn, roomID, stateFilterPart)
+	allState, err := d.Database.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilterPart)
 	if err != nil {
 		return nil, err
 	}
