@@ -229,6 +229,7 @@ type Dendrite struct {
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
 		EDUServer        Address `yaml:"edu_server"`
+		KeyServer        Address `yaml:"key_server"`
 	} `yaml:"bind"`
 
 	// The addresses for talking to other microservices.
@@ -242,6 +243,7 @@ type Dendrite struct {
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
 		EDUServer        Address `yaml:"edu_server"`
+		KeyServer        Address `yaml:"key_server"`
 	} `yaml:"listen"`
 
 	// The config for tracing the dendrite servers.
