@@ -348,8 +348,16 @@ func (d *Database) GetEventsInTopologicalRange(
 	return
 }
 
-func (d *Database) SyncPosition(ctx context.Context) (types.StreamingToken, error) {
-	return d.syncPositionTx(ctx, nil)
+func (d *Database) SyncPosition(ctx context.Context) (tok types.StreamingToken, err error) {
+	err = common.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		pos, err := d.SyncPositionTx(ctx, txn)
+		if err != nil {
+			return err
+		}
+		tok = pos
+		return nil
+	})
+	return
 }
 
 func (d *Database) BackwardExtremitiesForRoom(
@@ -381,7 +389,8 @@ func (d *Database) EventPositionInTopology(
 	return d.Topology.SelectPositionInTopology(ctx, nil, eventID)
 }
 
-func (d *Database) syncPositionTx(
+// TODO FIXME TEMPORARY PUBLIC
+func (d *Database) SyncPositionTx(
 	ctx context.Context, txn *sql.Tx,
 ) (sp types.StreamingToken, err error) {
 
@@ -580,7 +589,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}()
 
 	// Get the current sync position which we will base the sync response on.
-	toPos, err = d.syncPositionTx(ctx, txn)
+	toPos, err = d.SyncPositionTx(ctx, txn)
 	if err != nil {
 		return
 	}
