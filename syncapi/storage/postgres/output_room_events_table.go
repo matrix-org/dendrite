@@ -155,13 +155,13 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) SelectStateInRange(
-	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(
-		ctx, oldPos, newPos,
+		ctx, r.Low(), r.High(),
 		pq.StringArray(stateFilter.Senders),
 		pq.StringArray(stateFilter.NotSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
@@ -198,8 +198,8 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		// since it'll just mark the event as not being needed.
 		if len(addIDs) < len(delIDs) {
 			log.WithFields(log.Fields{
-				"since":   oldPos,
-				"current": newPos,
+				"since":   r.From,
+				"current": r.To,
 				"adds":    addIDs,
 				"dels":    delIDs,
 			}).Warn("StateBetween: ignoring deleted state")
@@ -298,7 +298,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 // from sync.
 func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	roomID string, r types.Range, limit int,
 	chronologicalOrder bool, onlySyncEvents bool,
 ) ([]types.StreamEvent, error) {
 	var stmt *sql.Stmt
@@ -307,7 +307,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	} else {
 		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
 	}
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -331,10 +331,10 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 // from a given position, up to a maximum of 'limit'.
 func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	roomID string, r types.Range, limit int,
 ) ([]types.StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectEarlyEventsStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
 	}
