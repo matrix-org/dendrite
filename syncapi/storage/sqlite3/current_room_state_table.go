@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -92,37 +91,35 @@ type currentRoomStateStatements struct {
 	selectStateEventStmt            *sql.Stmt
 }
 
-func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *streamIDStatements) (tables.CurrentRoomState, error) {
-	s := &currentRoomStateStatements{
-		streamIDStatements: streamID,
-	}
-	_, err := db.Exec(currentRoomStateSchema)
+func (s *currentRoomStateStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
+	s.streamIDStatements = streamID
+	_, err = db.Exec(currentRoomStateSchema)
 	if err != nil {
-		return nil, err
+		return
 	}
 	if s.upsertRoomStateStmt, err = db.Prepare(upsertRoomStateSQL); err != nil {
-		return nil, err
+		return
 	}
 	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
-		return nil, err
+		return
 	}
 	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
-		return nil, err
+		return
 	}
 	if s.selectCurrentStateStmt, err = db.Prepare(selectCurrentStateSQL); err != nil {
-		return nil, err
+		return
 	}
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
-		return nil, err
+		return
 	}
 	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
-		return nil, err
+		return
 	}
-	return s, nil
+	return
 }
 
 // JoinedMemberLists returns a map of room ID to a list of joined user IDs.
-func (s *currentRoomStateStatements) SelectJoinedUsers(
+func (s *currentRoomStateStatements) selectJoinedUsers(
 	ctx context.Context,
 ) (map[string][]string, error) {
 	rows, err := s.selectJoinedUsersStmt.QueryContext(ctx)
@@ -146,7 +143,7 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
-func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
+func (s *currentRoomStateStatements) selectRoomIDsWithMembership(
 	ctx context.Context,
 	txn *sql.Tx,
 	userID string,
@@ -171,7 +168,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 }
 
 // CurrentState returns all the current state events for the given room.
-func (s *currentRoomStateStatements) SelectCurrentState(
+func (s *currentRoomStateStatements) selectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilterPart *gomatrixserverlib.StateFilter,
 ) ([]gomatrixserverlib.HeaderedEvent, error) {
@@ -192,7 +189,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	return rowsToEvents(rows)
 }
 
-func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
+func (s *currentRoomStateStatements) deleteRoomStateByEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
 	stmt := common.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
@@ -200,7 +197,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	return err
 }
 
-func (s *currentRoomStateStatements) UpsertRoomState(
+func (s *currentRoomStateStatements) upsertRoomState(
 	ctx context.Context, txn *sql.Tx,
 	event gomatrixserverlib.HeaderedEvent, membership *string, addedAt types.StreamPosition,
 ) error {
@@ -234,7 +231,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	return err
 }
 
-func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
+func (s *currentRoomStateStatements) selectEventsWithEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
 	iEventIDs := make([]interface{}, len(eventIDs))
@@ -267,7 +264,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.HeaderedEvent, error) {
 	return result, nil
 }
 
-func (s *currentRoomStateStatements) SelectStateEvent(
+func (s *currentRoomStateStatements) selectStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := s.selectStateEventStmt

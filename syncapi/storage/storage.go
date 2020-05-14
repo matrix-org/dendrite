@@ -34,7 +34,7 @@ func NewSyncServerDatasource(dataSourceName string, dbProperties common.DbProper
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName, dbProperties)
 	case "file":
-		return sqlite3.NewDatabase(dataSourceName)
+		return sqlite3.NewSyncServerDatasource(dataSourceName)
 	default:
 		return postgres.NewDatabase(dataSourceName, dbProperties)
 	}
