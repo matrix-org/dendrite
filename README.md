@@ -3,15 +3,15 @@
 Dendrite will be a second-generation Matrix homeserver written in Go.
 
 It's still very much a work in progress, but installation instructions can be
-found in [INSTALL.md](INSTALL.md). It is not recommended to use Dendrite as a
+found in [INSTALL.md](docs/INSTALL.md). It is not recommended to use Dendrite as a
 production homeserver at this time.
 
-An overview of the design can be found in [DESIGN.md](DESIGN.md).
+An overview of the design can be found in [DESIGN.md](docs/DESIGN.md).
 
 # Contributing
 
 Everyone is welcome to help out and contribute! See
-[CONTRIBUTING.md](CONTRIBUTING.md) to get started!
+[CONTRIBUTING.md](docs/CONTRIBUTING.md) to get started!
 
 Please note that, as of February 2020, Dendrite now only targets Go 1.13 or
 later. Please ensure that you are using at least Go 1.13 when developing for
