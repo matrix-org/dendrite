@@ -245,24 +245,20 @@ func (r *messagesReq) retrieveEvents() (
 	// change the way topological positions are defined (as depth isn't the most
 	// reliable way to define it), it would be easier and less troublesome to
 	// only have to change it in one place, i.e. the database.
-	startPos, startStreamPos, err := r.db.EventPositionInTopology(
+	start, err = r.db.EventPositionInTopology(
 		r.ctx, events[0].EventID(),
 	)
 	if err != nil {
 		err = fmt.Errorf("EventPositionInTopology: for start event %s: %w", events[0].EventID(), err)
 		return
 	}
-	endPos, endStreamPos, err := r.db.EventPositionInTopology(
+	end, err = r.db.EventPositionInTopology(
 		r.ctx, events[len(events)-1].EventID(),
 	)
 	if err != nil {
 		err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
 		return
 	}
-	// Generate pagination tokens to send to the client using the positions
-	// retrieved previously.
-	start = types.NewTopologyToken(startPos, startStreamPos)
-	end = types.NewTopologyToken(endPos, endStreamPos)
 
 	if r.backwardOrdering {
 		// A stream/topological position is a cursor located between two events.
@@ -431,14 +427,10 @@ func setToDefault(
 ) (to types.TopologyToken, err error) {
 	if backwardOrdering {
 		// go 1 earlier than the first event so we correctly fetch the earliest event
+		// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
 		to = types.NewTopologyToken(0, 0)
 	} else {
-		var depth, stream types.StreamPosition
-		depth, stream, err = db.MaxTopologicalPosition(ctx, roomID)
-		if err != nil {
-			return
-		}
-		to = types.NewTopologyToken(depth, stream)
+		to, err = db.MaxTopologicalPosition(ctx, roomID)
 	}
 
 	return

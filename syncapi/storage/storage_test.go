@@ -292,11 +292,10 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	db := MustCreateDatabase(t)
 	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
 	MustWriteEvents(t, db, events)
-	latest, latestStream, err := db.MaxTopologicalPosition(ctx, testRoomID)
+	from, err := db.MaxTopologicalPosition(ctx, testRoomID)
 	if err != nil {
 		t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
 	}
-	from := types.NewTopologyToken(latest, latestStream)
 	// head towards the beginning of time
 	to := types.NewTopologyToken(0, 0)
 
@@ -358,16 +357,14 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Depth:   depth + 1,
 	}))
 	MustWriteEvents(t, db, events)
-	latestPos, latestStreamPos, err := db.EventPositionInTopology(ctx, events[len(events)-1].EventID())
+	fromLatest, err := db.EventPositionInTopology(ctx, events[len(events)-1].EventID())
 	if err != nil {
 		t.Fatalf("failed to get EventPositionInTopology: %s", err)
 	}
-	topoPos, streamPos, err := db.EventPositionInTopology(ctx, events[len(events)-3].EventID()) // Message 2
+	fromFork, err := db.EventPositionInTopology(ctx, events[len(events)-3].EventID()) // Message 2
 	if err != nil {
 		t.Fatalf("failed to get EventPositionInTopology for event: %s", err)
 	}
-	fromLatest := types.NewTopologyToken(latestPos, latestStreamPos)
-	fromFork := types.NewTopologyToken(topoPos, streamPos)
 	// head towards the beginning of time
 	to := types.NewTopologyToken(0, 0)
 
@@ -507,12 +504,10 @@ func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatr
 }
 
 func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *types.TopologyToken {
-	pos, spos, err := db.EventPositionInTopology(ctx, eventID)
+	tok, err := db.EventPositionInTopology(ctx, eventID)
 	if err != nil {
 		t.Fatalf("failed to get EventPositionInTopology: %s", err)
 	}
-
-	tok := types.NewTopologyToken(pos, spos)
 	tok.Decrement()
 	return &tok
 }

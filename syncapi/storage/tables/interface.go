@@ -11,13 +11,15 @@ import (
 
 type AccountData interface {
 	InsertAccountData(ctx context.Context, txn *sql.Tx, userID, roomID, dataType string) (pos types.StreamPosition, err error)
-	SelectAccountDataInRange(ctx context.Context, userID string, oldPos, newPos types.StreamPosition, accountDataEventFilter *gomatrixserverlib.EventFilter) (data map[string][]string, err error)
+	// SelectAccountDataInRange returns a map of room ID to a list of `dataType`. The range is exclusive of `lowPos` and inclusive of `hiPos`.
+	SelectAccountDataInRange(ctx context.Context, userID string, lowPos, hiPos types.StreamPosition, accountDataEventFilter *gomatrixserverlib.EventFilter) (data map[string][]string, err error)
 	SelectMaxAccountDataID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }
 
 type Invites interface {
 	InsertInviteEvent(ctx context.Context, txn *sql.Tx, inviteEvent gomatrixserverlib.HeaderedEvent) (streamPos types.StreamPosition, err error)
 	DeleteInviteEvent(ctx context.Context, inviteEventID string) error
+	// SelectInviteEventsInRange returns a map of room ID to invite events. The range is exclusive of `startPos` and inclusive of `endPos`.
 	SelectInviteEventsInRange(ctx context.Context, txn *sql.Tx, targetUserID string, startPos, endPos types.StreamPosition) (map[string]gomatrixserverlib.HeaderedEvent, error)
 	SelectMaxInviteID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }
@@ -26,26 +28,30 @@ type Events interface {
 	SelectStateInRange(ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition, stateFilter *gomatrixserverlib.StateFilter) (map[string]map[string]bool, map[string]types.StreamEvent, error)
 	SelectMaxEventID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 	InsertEvent(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, addState, removeState []string, transactionID *api.TransactionID, excludeFromSync bool) (streamPos types.StreamPosition, err error)
+	// SelectRecentEvents returns events between the two stream positions: exclusive of `fromPos` and inclusive of `toPos`.
+	// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude from sync.
+	// Returns up to `limit` events.
 	SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomID string, fromPos, toPos types.StreamPosition, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, error)
+	// SelectEarlyEvents returns the earliest events in the given room, exclusive of `fromPos` and inclusive of `toPos`.
 	SelectEarlyEvents(ctx context.Context, txn *sql.Tx, roomID string, fromPos, toPos types.StreamPosition, limit int) ([]types.StreamEvent, error)
 	SelectEvents(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StreamEvent, error)
 }
 
+// Topology keeps track of the depths and stream positions for all events.
+// These positions are used as types.TopologyToken when backfilling events locally.
 type Topology interface {
-	// InsertEventInTopology inserts the given event in the room's topology, based
-	// on the event's depth.
+	// InsertEventInTopology inserts the given event in the room's topology, based on the event's depth.
+	// `pos` is the stream position of this event in the events table, and is used to order events which have the same depth.
 	InsertEventInTopology(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition) (err error)
-	// SelectEventIDsInRange selects the IDs of events which positions are within a
-	// given range in a given room's topological order.
+	// SelectEventIDsInRange selects the IDs of events whose depths are within a given range in a given room's topological order.
+	// Events with `minDepth` are *exclusive*, as is the event which has exactly `minDepth`,`maxStreamPos`.
+	// `maxStreamPos` is only used when events have the same depth as `maxDepth`, which results in events less than `maxStreamPos` being returned.
 	// Returns an empty slice if no events match the given range.
-	SelectEventIDsInRange(ctx context.Context, txn *sql.Tx, roomID string, fromPos, toPos, toMicroPos types.StreamPosition, limit int, chronologicalOrder bool) (eventIDs []string, err error)
-	// SelectPositionInTopology returns the position of a given event in the
-	// topology of the room it belongs to.
-	SelectPositionInTopology(ctx context.Context, txn *sql.Tx, eventID string) (pos, spos types.StreamPosition, err error)
-	SelectMaxPositionInTopology(ctx context.Context, txn *sql.Tx, roomID string) (pos types.StreamPosition, spos types.StreamPosition, err error)
-	// SelectEventIDsFromPosition returns the IDs of all events that have a given
-	// position in the topology of a given room.
-	SelectEventIDsFromPosition(ctx context.Context, txn *sql.Tx, roomID string, pos types.StreamPosition) (eventIDs []string, err error)
+	SelectEventIDsInRange(ctx context.Context, txn *sql.Tx, roomID string, minDepth, maxDepth, maxStreamPos types.StreamPosition, limit int, chronologicalOrder bool) (eventIDs []string, err error)
+	// SelectPositionInTopology returns the depth and stream position of a given event in the topology of the room it belongs to.
+	SelectPositionInTopology(ctx context.Context, txn *sql.Tx, eventID string) (depth, spos types.StreamPosition, err error)
+	// SelectMaxPositionInTopology returns the event which has the highest depth, and if there are multiple, the event with the highest stream position.
+	SelectMaxPositionInTopology(ctx context.Context, txn *sql.Tx, roomID string) (depth types.StreamPosition, spos types.StreamPosition, err error)
 }
 
 type CurrentRoomState interface {

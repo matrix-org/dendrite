@@ -306,9 +306,6 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	return
 }
 
-// selectRecentEvents returns the most recent events in the given room, up to a maximum of 'limit'.
-// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude
-// from sync.
 func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, fromPos, toPos types.StreamPosition, limit int,
@@ -341,8 +338,6 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	return events, nil
 }
 
-// selectEarlyEvents returns the earliest events in the given room, starting
-// from a given position, up to a maximum of 'limit'.
 func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, fromPos, toPos types.StreamPosition, limit int,
