@@ -231,8 +231,7 @@ func updateToLeaveMembership(
 	return updates, nil
 }
 
-// membershipChanges pairs up the membership state changes from a sorted list
-// of state removed and a sorted list of state added.
+// membershipChanges pairs up the membership state changes.
 func membershipChanges(removed, added []types.StateEntry) []stateChange {
 	changes := pairUpChanges(removed, added)
 	var result []stateChange
@@ -251,64 +250,39 @@ type stateChange struct {
 }
 
 // pairUpChanges pairs up the state events added and removed for each type,
-// state key tuple. Assumes that removed and added are sorted.
+// state key tuple.
 func pairUpChanges(removed, added []types.StateEntry) []stateChange {
-	var ai int
-	var ri int
-	var result []stateChange
-	for {
-		switch {
-		case ai == len(added):
-			// We've reached the end of the added entries.
-			// The rest of the removed list are events that were removed without
-			// an event with the same state key being added.
-			for _, s := range removed[ri:] {
-				result = append(result, stateChange{
-					StateKeyTuple:   s.StateKeyTuple,
-					removedEventNID: s.EventNID,
-				})
-			}
-			return result
-		case ri == len(removed):
-			// We've reached the end of the removed entries.
-			// The rest of the added list are events that were added without
-			// an event with the same state key being removed.
-			for _, s := range added[ai:] {
-				result = append(result, stateChange{
-					StateKeyTuple: s.StateKeyTuple,
-					addedEventNID: s.EventNID,
-				})
-			}
-			return result
-		case added[ai].StateKeyTuple == removed[ri].StateKeyTuple:
-			// The tuple is in both lists so an event with that key is being
-			// removed and another event with the same key is being added.
-			result = append(result, stateChange{
-				StateKeyTuple:   added[ai].StateKeyTuple,
-				removedEventNID: removed[ri].EventNID,
-				addedEventNID:   added[ai].EventNID,
-			})
-			ai++
-			ri++
-		case added[ai].StateKeyTuple.LessThan(removed[ri].StateKeyTuple):
-			// The lists are sorted so the added entry being less than the
-			// removed entry means that the added event was added without an
-			// event with the same key being removed.
-			result = append(result, stateChange{
-				StateKeyTuple: added[ai].StateKeyTuple,
-				addedEventNID: added[ai].EventNID,
-			})
-			ai++
-		default:
-			// Reaching the default case implies that the removed entry is less
-			// than the added entry. Since the lists are sorted this means that
-			// the removed event was removed without an event with the same
-			// key being added.
-			result = append(result, stateChange{
-				StateKeyTuple:   removed[ai].StateKeyTuple,
-				removedEventNID: removed[ri].EventNID,
-			})
-			ri++
+	tuples := make(map[types.StateKeyTuple]stateChange)
+	changes := []stateChange{}
+
+	// First, go through the newly added state entries.
+	for _, add := range added {
+		if change, ok := tuples[add.StateKeyTuple]; ok {
+			// If we already have an entry, update it.
+			change.addedEventNID = add.EventNID
+			tuples[add.StateKeyTuple] = change
+		} else {
+			// Otherwise, create a new entry.
+			tuples[add.StateKeyTuple] = stateChange{add.StateKeyTuple, 0, add.EventNID}
 		}
 	}
+
+	// Now go through the removed state entries.
+	for _, remove := range removed {
+		if change, ok := tuples[remove.StateKeyTuple]; ok {
+			// If we already have an entry, update it.
+			change.removedEventNID = remove.EventNID
+			tuples[remove.StateKeyTuple] = change
+		} else {
+			// Otherwise, create a new entry.
+			tuples[remove.StateKeyTuple] = stateChange{remove.StateKeyTuple, remove.EventNID, 0}
+		}
+	}
+
+	// Now return the changes as an array.
+	for _, change := range tuples {
+		changes = append(changes, change)
+	}
+
+	return changes
 }
