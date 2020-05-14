@@ -35,7 +35,6 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
-	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -55,10 +54,9 @@ type SyncServerDatasource struct {
 	shared.Database
 	db *sql.DB
 	common.PartitionOffsetStatements
-	streamID            streamIDStatements
-	roomstate           currentRoomStateStatements
-	topology            outputRoomEventsTopologyStatements
-	backwardExtremities tables.BackwardsExtremities
+	streamID  streamIDStatements
+	roomstate currentRoomStateStatements
+	topology  outputRoomEventsTopologyStatements
 }
 
 // NewSyncServerDatasource creates a new sync server database
@@ -111,16 +109,17 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.topology.prepare(d.db); err != nil {
 		return err
 	}
-	d.backwardExtremities, err = tables.NewBackwardsExtremities(d.db, &tables.SqliteBackwardsExtremitiesStatements{})
+	bwExtrem, err := NewSqliteBackwardsExtremitiesTable(d.db)
 	if err != nil {
 		return err
 	}
 	d.Database = shared.Database{
-		DB:           d.db,
-		Invites:      invites,
-		AccountData:  accountData,
-		OutputEvents: events,
-		EDUCache:     cache.New(),
+		DB:                  d.db,
+		Invites:             invites,
+		AccountData:         accountData,
+		OutputEvents:        events,
+		BackwardExtremities: bwExtrem,
+		EDUCache:            cache.New(),
 	}
 	return nil
 }
@@ -134,7 +133,7 @@ func (d *SyncServerDatasource) AllJoinedUsersInRooms(ctx context.Context) (map[s
 // the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
 func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.HeaderedEvent) error {
-	if err := d.backwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
+	if err := d.Database.BackwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 		return err
 	}
 
@@ -155,7 +154,7 @@ func (d *SyncServerDatasource) handleBackwardExtremities(ctx context.Context, tx
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.backwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
+			if err = d.Database.BackwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID(), eID); err != nil {
 				return err
 			}
 		}
@@ -308,14 +307,6 @@ func (d *SyncServerDatasource) GetEventsInTopologicalRange(
 	// Retrieve the events' contents using their IDs.
 	events, err = d.Database.OutputEvents.SelectEvents(ctx, nil, eIDs)
 	return
-}
-
-// BackwardExtremitiesForRoom returns the event IDs of all of the backward
-// extremities we know of for a given room.
-func (d *SyncServerDatasource) BackwardExtremitiesForRoom(
-	ctx context.Context, roomID string,
-) (backwardExtremities []string, err error) {
-	return d.backwardExtremities.SelectBackwardExtremitiesForRoom(ctx, roomID)
 }
 
 // MaxTopologicalPosition returns the highest topological position for a given
