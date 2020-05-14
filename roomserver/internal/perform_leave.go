@@ -38,7 +38,7 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 ) error {
 	// If there's an invite outstanding for the room then respond to
 	// that.
-	isInvitePending, senderUser, err := r.isInvitePending(ctx, req, res)
+	isInvitePending, senderUser, err := r.isInvitePending(ctx, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
 		return r.performRejectInvite(ctx, req, res, senderUser)
 	}
@@ -160,23 +160,22 @@ func (r *RoomserverInternalAPI) performRejectInvite(
 
 func (r *RoomserverInternalAPI) isInvitePending(
 	ctx context.Context,
-	req *api.PerformLeaveRequest,
-	res *api.PerformLeaveResponse, // nolint:unparam
+	roomID, userID string,
 ) (bool, string, error) {
 	// Look up the room NID for the supplied room ID.
-	roomNID, err := r.DB.RoomNID(ctx, req.RoomID)
+	roomNID, err := r.DB.RoomNID(ctx, roomID)
 	if err != nil {
 		return false, "", fmt.Errorf("r.DB.RoomNID: %w", err)
 	}
 
 	// Look up the state key NID for the supplied user ID.
-	targetUserNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{req.UserID})
+	targetUserNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{userID})
 	if err != nil {
 		return false, "", fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
 	}
-	targetUserNID, targetUserFound := targetUserNIDs[req.UserID]
+	targetUserNID, targetUserFound := targetUserNIDs[userID]
 	if !targetUserFound {
-		return false, "", fmt.Errorf("missing NID for user %q (%+v)", req.UserID, targetUserNIDs)
+		return false, "", fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
 	}
 
 	// Let's see if we have an event active for the user in the room. If
