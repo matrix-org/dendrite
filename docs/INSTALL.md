@@ -3,7 +3,7 @@
 Dendrite can be run in one of two configurations:
 
 * **Polylith mode**: A cluster of individual components, dealing with different
-  aspects of the Matrix protocol (see [WIRING.md](./WIRING.md)). Components communicate with each other using internal HTTP APIs and [Apache Kafka](https://kafka.apache.org). This will almost certainly be the preferred model
+  aspects of the Matrix protocol (see [WIRING.md](WIRING.md)). Components communicate with each other using internal HTTP APIs and [Apache Kafka](https://kafka.apache.org). This will almost certainly be the preferred model
   for large-scale deployments.
 
 * **Monolith mode**: All components run in the same process. In this mode,
