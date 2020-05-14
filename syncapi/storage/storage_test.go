@@ -51,7 +51,7 @@ func MustCreateEvent(t *testing.T, roomID string, prevs []gomatrixserverlib.Head
 }
 
 func MustCreateDatabase(t *testing.T) storage.Database {
-	db, err := sqlite3.NewSyncServerDatasource("file::memory:")
+	db, err := sqlite3.NewDatabase("file::memory:")
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}

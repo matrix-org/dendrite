@@ -711,18 +711,20 @@ func (d *Database) AddInvitesToResponse(
 // Retrieve the backward topology position, i.e. the position of the
 // oldest event in the room's topology.
 func (d *Database) getBackwardTopologyPos(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	events []types.StreamEvent,
-) (pos, spos types.StreamPosition) {
-	if len(events) > 0 {
-		pos, spos, _ = d.Topology.SelectPositionInTopology(ctx, nil, events[0].EventID())
+) (types.TopologyToken, error) {
+	zeroToken := types.NewTopologyToken(0, 0)
+	if len(events) == 0 {
+		return zeroToken, nil
 	}
-	if pos-1 <= 0 {
-		pos = types.StreamPosition(1)
-	} else {
-		pos = pos - 1
+	pos, spos, err := d.Topology.SelectPositionInTopology(ctx, txn, events[0].EventID())
+	if err != nil {
+		return zeroToken, err
 	}
-	return
+	tok := types.NewTopologyToken(pos, spos)
+	tok.Decrement()
+	return tok, nil
 }
 
 // addRoomDeltaToResponse adds a room state delta to a sync response
@@ -754,10 +756,10 @@ func (d *Database) addRoomDeltaToResponse(
 	}
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
-	backwardTopologyPos, backwardStreamPos := d.getBackwardTopologyPos(ctx, recentStreamEvents)
-	prevBatch := types.NewTopologyToken(
-		backwardTopologyPos, backwardStreamPos,
-	)
+	prevBatch, err := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
+	if err != nil {
+		return err
+	}
 
 	switch delta.membership {
 	case gomatrixserverlib.Join:
