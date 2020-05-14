@@ -119,7 +119,7 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 // given range in a given room's topological order.
 // Returns an empty slice if no events match the given range.
 func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
-	ctx context.Context, txn *sql.Tx, roomID string, minDepth, maxDepth, toMicroPos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, roomID string, minDepth, maxDepth, maxStreamPos types.StreamPosition,
 	limit int, chronologicalOrder bool,
 ) (eventIDs []string, err error) {
 	// Decide on the selection's order according to whether chronological order
@@ -132,7 +132,7 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	}
 
 	// Query the event IDs.
-	rows, err := stmt.QueryContext(ctx, roomID, minDepth, maxDepth, maxDepth, toMicroPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit)
 	if err == sql.ErrNoRows {
 		// If no event matched the request, return an empty slice.
 		return []string{}, nil
