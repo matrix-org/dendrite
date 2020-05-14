@@ -28,14 +28,14 @@ import (
 func NewSyncServerDatasource(dataSourceName string, dbProperties common.DbProperties) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewSyncServerDatasource(dataSourceName, dbProperties)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	}
 	switch uri.Scheme {
 	case "postgres":
-		return postgres.NewSyncServerDatasource(dataSourceName, dbProperties)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	case "file":
-		return sqlite3.NewSyncServerDatasource(dataSourceName)
+		return sqlite3.NewDatabase(dataSourceName)
 	default:
-		return postgres.NewSyncServerDatasource(dataSourceName, dbProperties)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	}
 }

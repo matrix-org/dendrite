@@ -35,7 +35,7 @@ func NewSyncServerDatasource(
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
-		return sqlite3.NewSyncServerDatasource(dataSourceName)
+		return sqlite3.NewDatabase(dataSourceName)
 	default:
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}

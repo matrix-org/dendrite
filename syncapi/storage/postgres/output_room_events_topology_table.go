@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -84,36 +85,37 @@ type outputRoomEventsTopologyStatements struct {
 	selectEventIDsFromPositionStmt  *sql.Stmt
 }
 
-func (s *outputRoomEventsTopologyStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(outputRoomEventsTopologySchema)
+func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
+	s := &outputRoomEventsTopologyStatements{}
+	_, err := db.Exec(outputRoomEventsTopologySchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if s.insertEventInTopologyStmt, err = db.Prepare(insertEventInTopologySQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectEventIDsInRangeASCStmt, err = db.Prepare(selectEventIDsInRangeASCSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectEventIDsInRangeDESCStmt, err = db.Prepare(selectEventIDsInRangeDESCSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectPositionInTopologyStmt, err = db.Prepare(selectPositionInTopologySQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectEventIDsFromPositionStmt, err = db.Prepare(selectEventIDsFromPositionSQL); err != nil {
-		return
+		return nil, err
 	}
-	return
+	return s, nil
 }
 
-// insertEventInTopology inserts the given event in the room's topology, based
+// InsertEventInTopology inserts the given event in the room's topology, based
 // on the event's depth.
-func (s *outputRoomEventsTopologyStatements) insertEventInTopology(
-	ctx context.Context, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
+func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
+	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
 ) (err error) {
 	_, err = s.insertEventInTopologyStmt.ExecContext(
 		ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
@@ -121,11 +123,11 @@ func (s *outputRoomEventsTopologyStatements) insertEventInTopology(
 	return
 }
 
-// selectEventIDsInRange selects the IDs of events which positions are within a
+// SelectEventIDsInRange selects the IDs of events which positions are within a
 // given range in a given room's topological order.
 // Returns an empty slice if no events match the given range.
-func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
-	ctx context.Context, roomID string, fromPos, toPos, toMicroPos types.StreamPosition,
+func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
+	ctx context.Context, txn *sql.Tx, roomID string, fromPos, toPos, toMicroPos types.StreamPosition,
 	limit int, chronologicalOrder bool,
 ) (eventIDs []string, err error) {
 	// Decide on the selection's order according to whether chronological order
@@ -159,26 +161,26 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 	return eventIDs, rows.Err()
 }
 
-// selectPositionInTopology returns the position of a given event in the
+// SelectPositionInTopology returns the position of a given event in the
 // topology of the room it belongs to.
-func (s *outputRoomEventsTopologyStatements) selectPositionInTopology(
-	ctx context.Context, eventID string,
+func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
+	ctx context.Context, txn *sql.Tx, eventID string,
 ) (pos, spos types.StreamPosition, err error) {
 	err = s.selectPositionInTopologyStmt.QueryRowContext(ctx, eventID).Scan(&pos, &spos)
 	return
 }
 
-func (s *outputRoomEventsTopologyStatements) selectMaxPositionInTopology(
-	ctx context.Context, roomID string,
+func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
 	err = s.selectMaxPositionInTopologyStmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
 }
 
-// selectEventIDsFromPosition returns the IDs of all events that have a given
+// SelectEventIDsFromPosition returns the IDs of all events that have a given
 // position in the topology of a given room.
-func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
-	ctx context.Context, roomID string, pos types.StreamPosition,
+func (s *outputRoomEventsTopologyStatements) SelectEventIDsFromPosition(
+	ctx context.Context, txn *sql.Tx, roomID string, pos types.StreamPosition,
 ) (eventIDs []string, err error) {
 	// Query the event IDs.
 	rows, err := s.selectEventIDsFromPositionStmt.QueryContext(ctx, roomID, pos)

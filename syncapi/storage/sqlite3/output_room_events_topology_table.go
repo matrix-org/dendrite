@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -77,35 +78,36 @@ type outputRoomEventsTopologyStatements struct {
 	selectEventIDsFromPositionStmt  *sql.Stmt
 }
 
-func (s *outputRoomEventsTopologyStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(outputRoomEventsTopologySchema)
+func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
+	s := &outputRoomEventsTopologyStatements{}
+	_, err := db.Exec(outputRoomEventsTopologySchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if s.insertEventInTopologyStmt, err = db.Prepare(insertEventInTopologySQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectEventIDsInRangeASCStmt, err = db.Prepare(selectEventIDsInRangeASCSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectEventIDsInRangeDESCStmt, err = db.Prepare(selectEventIDsInRangeDESCSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectPositionInTopologyStmt, err = db.Prepare(selectPositionInTopologySQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectEventIDsFromPositionStmt, err = db.Prepare(selectEventIDsFromPositionSQL); err != nil {
-		return
+		return nil, err
 	}
-	return
+	return s, nil
 }
 
 // insertEventInTopology inserts the given event in the room's topology, based
 // on the event's depth.
-func (s *outputRoomEventsTopologyStatements) insertEventInTopology(
+func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
 ) (err error) {
 	stmt := common.TxStmt(txn, s.insertEventInTopologyStmt)
@@ -118,7 +120,7 @@ func (s *outputRoomEventsTopologyStatements) insertEventInTopology(
 // selectEventIDsInRange selects the IDs of events which positions are within a
 // given range in a given room's topological order.
 // Returns an empty slice if no events match the given range.
-func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
+func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	fromPos, toPos, toMicroPos types.StreamPosition,
 	limit int, chronologicalOrder bool,
@@ -155,7 +157,7 @@ func (s *outputRoomEventsTopologyStatements) selectEventIDsInRange(
 
 // selectPositionInTopology returns the position of a given event in the
 // topology of the room it belongs to.
-func (s *outputRoomEventsTopologyStatements) selectPositionInTopology(
+func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
 	stmt := common.TxStmt(txn, s.selectPositionInTopologyStmt)
@@ -163,7 +165,7 @@ func (s *outputRoomEventsTopologyStatements) selectPositionInTopology(
 	return
 }
 
-func (s *outputRoomEventsTopologyStatements) selectMaxPositionInTopology(
+func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
 	stmt := common.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
@@ -173,7 +175,7 @@ func (s *outputRoomEventsTopologyStatements) selectMaxPositionInTopology(
 
 // selectEventIDsFromPosition returns the IDs of all events that have a given
 // position in the topology of a given room.
-func (s *outputRoomEventsTopologyStatements) selectEventIDsFromPosition(
+func (s *outputRoomEventsTopologyStatements) SelectEventIDsFromPosition(
 	ctx context.Context, txn *sql.Tx, roomID string, pos types.StreamPosition,
 ) (eventIDs []string, err error) {
 	// Query the event IDs.
