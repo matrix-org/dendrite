@@ -260,7 +260,7 @@ func (d *Database) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.Topology.InsertEventInTopology(ctx, nil, ev, pos); err != nil {
+		if err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return err
 		}
 
