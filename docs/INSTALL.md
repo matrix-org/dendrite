@@ -20,12 +20,14 @@ use in production environments yet!
 
 ## Requirements
 
-* Go 1.13+
-* Postgres 9.5+ (if using Postgres databases)
-* Apache Kafka 0.10.2+ (optional if using the monolith server):
-  * UNIX-based system ([read more here](https://kafka.apache.org/documentation/#os))
-  * JDK 1.8+ / OpenJDK 1.8+
-  * See [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh) for up-to-date version numbers
+Dendrite requires:
+
+* Go 1.13 or higher
+* Postgres 9.5 or higher (if using Postgres databases, not needed for SQLite)
+
+If you want to run a polylith deployment, you also need:
+
+* Apache Kafka 0.10.2+
 
 ## Building up a monolith deploment
 
@@ -40,6 +42,7 @@ Then build it:
 
 ```bash
 go build -o bin/dendrite-monolith-server ./cmd/dendrite-monolith-server
+go build -o bin/generate-keys ./cmd/generate-keys
 ```
 
 ## Building up a polylith deployment
