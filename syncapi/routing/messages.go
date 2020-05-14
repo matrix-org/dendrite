@@ -427,6 +427,7 @@ func setToDefault(
 ) (to types.TopologyToken, err error) {
 	if backwardOrdering {
 		// go 1 earlier than the first event so we correctly fetch the earliest event
+		// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
 		to = types.NewTopologyToken(0, 0)
 	} else {
 		to, err = db.MaxTopologicalPosition(ctx, roomID)
