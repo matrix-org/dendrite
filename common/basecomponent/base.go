@@ -25,6 +25,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/common/keydb"
+	"github.com/matrix-org/dendrite/common/keydb/cache"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
@@ -186,7 +187,11 @@ func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 		logrus.WithError(err).Panicf("failed to connect to keys db")
 	}
 
-	return db
+	cachedDB, err := cache.NewDatabase(db, b.ImmutableCache)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to create key cache wrapper")
+	}
+	return cachedDB
 }
 
 // CreateFederationClient creates a new federation client. Should only be called

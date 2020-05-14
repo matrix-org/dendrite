@@ -27,7 +27,7 @@ func main() {
 
 	federation := base.CreateFederationClient()
 	keyDB := base.CreateKeyDB()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, base.ImmutableCache, cfg.Matrix.KeyPerspectives)
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 	rsAPI := base.CreateHTTPRoomserverAPIs()
 	fsAPI := federationsender.SetupFederationSenderComponent(
 		base, federation, rsAPI, &keyRing,

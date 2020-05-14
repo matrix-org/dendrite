@@ -26,7 +26,7 @@ func main() {
 	defer base.Close() // nolint: errcheck
 	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, base.ImmutableCache, cfg.Matrix.KeyPerspectives)
+	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
 	fsAPI := base.CreateHTTPFederationSenderAPIs()
 	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
