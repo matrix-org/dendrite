@@ -129,7 +129,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	if err == nil && isInvitePending {
 		// Add the server of the person who invited us to the server list,
 		// as they should be a fairly good bet.
-		if _, inviterDomain, ierr := gomatrixserverlib.SplitID('!', inviteSender); ierr == nil {
+		if _, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender); ierr == nil {
 			req.ServerNames = append(req.ServerNames, inviterDomain)
 		}
 
