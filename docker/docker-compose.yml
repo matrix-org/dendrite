@@ -153,6 +153,16 @@ services:
       - postgres
     networks:
       - internal
+      
+  key_server:
+    container_name: dendrite_key_server
+    hostname: key_server
+    entrypoint: ["bash", "./docker/services/key-server.sh"]
+    build: ./
+    volumes:
+        - ..:/build
+    networks:
+        - internal
 
   postgres:
     container_name: dendrite_postgres
