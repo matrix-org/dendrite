@@ -119,8 +119,11 @@ func (t *TopologyToken) Decrement() {
 	depth := t.Positions[0]
 	pduPos := t.Positions[1]
 	if depth-1 <= 0 {
+		// nothing can be lower than this
 		depth = 1
 	} else {
+		// this assumes that we will never have 1000 events all with the same
+		// depth. TODO: work out what the right PDU position is to use, probably needs a db hit.
 		depth--
 		pduPos += 1000
 	}

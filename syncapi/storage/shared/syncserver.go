@@ -319,25 +319,25 @@ func (d *Database) GetEventsInTopologicalRange(
 	roomID string, limit int,
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
-	// Determine the backward and forward limit, i.e. the upper and lower
-	// limits to the selection in the room's topology, from the direction.
-	var backwardLimit, forwardLimit, forwardMicroLimit types.StreamPosition
+	var minDepth, maxDepth, maxStreamPosForMaxDepth types.StreamPosition
 	if backwardOrdering {
-		// Backward ordering is antichronological (latest event to oldest
-		// one).
-		backwardLimit = to.Depth()
-		forwardLimit = from.Depth()
-		forwardMicroLimit = from.PDUPosition()
+		// Backward ordering means the 'from' token has a higher depth than the 'to' token
+		minDepth = to.Depth()
+		maxDepth = from.Depth()
+		// for cases where we have say 5 events with the same depth, the TopologyToken needs to
+		// know which of the 5 the client has seen. This is done by using the PDU position.
+		// Events with the same maxDepth but less than this PDU position will be returned.
+		maxStreamPosForMaxDepth = from.PDUPosition()
 	} else {
-		// Forward ordering is chronological (oldest event to latest one).
-		backwardLimit = from.Depth()
-		forwardLimit = to.Depth()
+		// Forward ordering means the 'from' token has a lower depth than the 'to' token.
+		minDepth = from.Depth()
+		maxDepth = to.Depth()
 	}
 
 	// Select the event IDs from the defined range.
 	var eIDs []string
 	eIDs, err = d.Topology.SelectEventIDsInRange(
-		ctx, nil, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
+		ctx, nil, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, limit, !backwardOrdering,
 	)
 	if err != nil {
 		return
@@ -350,7 +350,7 @@ func (d *Database) GetEventsInTopologicalRange(
 
 func (d *Database) SyncPosition(ctx context.Context) (tok types.StreamingToken, err error) {
 	err = common.WithTransaction(d.DB, func(txn *sql.Tx) error {
-		pos, err := d.SyncPositionTx(ctx, txn)
+		pos, err := d.syncPositionTx(ctx, txn)
 		if err != nil {
 			return err
 		}
@@ -368,29 +368,25 @@ func (d *Database) BackwardExtremitiesForRoom(
 
 func (d *Database) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
-) (depth types.StreamPosition, stream types.StreamPosition, err error) {
-	return d.Topology.SelectMaxPositionInTopology(ctx, nil, roomID)
-}
-
-func (d *Database) EventsAtTopologicalPosition(
-	ctx context.Context, roomID string, pos types.StreamPosition,
-) ([]types.StreamEvent, error) {
-	eIDs, err := d.Topology.SelectEventIDsFromPosition(ctx, nil, roomID, pos)
+) (types.TopologyToken, error) {
+	depth, streamPos, err := d.Topology.SelectMaxPositionInTopology(ctx, nil, roomID)
 	if err != nil {
-		return nil, err
+		return types.NewTopologyToken(0, 0), err
 	}
-
-	return d.OutputEvents.SelectEvents(ctx, nil, eIDs)
+	return types.NewTopologyToken(depth, streamPos), nil
 }
 
 func (d *Database) EventPositionInTopology(
 	ctx context.Context, eventID string,
-) (depth types.StreamPosition, stream types.StreamPosition, err error) {
-	return d.Topology.SelectPositionInTopology(ctx, nil, eventID)
+) (types.TopologyToken, error) {
+	depth, stream, err := d.Topology.SelectPositionInTopology(ctx, nil, eventID)
+	if err != nil {
+		return types.NewTopologyToken(0, 0), err
+	}
+	return types.NewTopologyToken(depth, stream), nil
 }
 
-// TODO FIXME TEMPORARY PUBLIC
-func (d *Database) SyncPositionTx(
+func (d *Database) syncPositionTx(
 	ctx context.Context, txn *sql.Tx,
 ) (sp types.StreamingToken, err error) {
 
@@ -466,7 +462,7 @@ func (d *Database) addPDUDeltaToResponse(
 	}
 
 	// TODO: This should be done in getStateDeltas
-	if err = d.AddInvitesToResponse(ctx, txn, device.UserID, fromPos, toPos, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, device.UserID, fromPos, toPos, res); err != nil {
 		return nil, err
 	}
 
@@ -510,8 +506,7 @@ func (d *Database) addTypingDeltaToResponse(
 
 // addEDUDeltaToResponse adds updates for EDUs of each type since fromPos if
 // the positions of that type are not equal in fromPos and toPos.
-// TODO FIXME TEMPORARY PUBLIC
-func (d *Database) AddEDUDeltaToResponse(
+func (d *Database) addEDUDeltaToResponse(
 	fromPos, toPos types.StreamingToken,
 	joinedRoomIDs []string,
 	res *types.Response,
@@ -551,7 +546,7 @@ func (d *Database) IncrementalSync(
 		return nil, err
 	}
 
-	err = d.AddEDUDeltaToResponse(
+	err = d.addEDUDeltaToResponse(
 		fromPos, toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
@@ -590,7 +585,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}()
 
 	// Get the current sync position which we will base the sync response on.
-	toPos, err = d.SyncPositionTx(ctx, txn)
+	toPos, err = d.syncPositionTx(ctx, txn)
 	if err != nil {
 		return
 	}
@@ -649,7 +644,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		res.Rooms.Join[roomID] = *jr
 	}
 
-	if err = d.AddInvitesToResponse(ctx, txn, userID, 0, toPos.PDUPosition(), res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, userID, 0, toPos.PDUPosition(), res); err != nil {
 		return
 	}
 
@@ -668,7 +663,7 @@ func (d *Database) CompleteSync(
 	}
 
 	// Use a zero value SyncPosition for fromPos so all EDU states are added.
-	err = d.AddEDUDeltaToResponse(
+	err = d.addEDUDeltaToResponse(
 		types.NewStreamToken(0, 0), toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
@@ -688,8 +683,7 @@ var txReadOnlySnapshot = sql.TxOptions{
 	ReadOnly:  true,
 }
 
-// TODO FIXME temporary public
-func (d *Database) AddInvitesToResponse(
+func (d *Database) addInvitesToResponse(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
 	fromPos, toPos types.StreamPosition,

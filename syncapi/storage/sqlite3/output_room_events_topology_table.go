@@ -65,17 +65,12 @@ const selectMaxPositionInTopologySQL = "" +
 	"SELECT MAX(topological_position), stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 ORDER BY stream_position DESC"
 
-const selectEventIDsFromPositionSQL = "" +
-	"SELECT event_id FROM syncapi_output_room_events_topology" +
-	" WHERE room_id = $1 AND topological_position = $2"
-
 type outputRoomEventsTopologyStatements struct {
 	insertEventInTopologyStmt       *sql.Stmt
 	selectEventIDsInRangeASCStmt    *sql.Stmt
 	selectEventIDsInRangeDESCStmt   *sql.Stmt
 	selectPositionInTopologyStmt    *sql.Stmt
 	selectMaxPositionInTopologyStmt *sql.Stmt
-	selectEventIDsFromPositionStmt  *sql.Stmt
 }
 
 func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
@@ -99,9 +94,6 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
 		return nil, err
 	}
-	if s.selectEventIDsFromPositionStmt, err = db.Prepare(selectEventIDsFromPositionSQL); err != nil {
-		return nil, err
-	}
 	return s, nil
 }
 
@@ -117,12 +109,9 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	return
 }
 
-// selectEventIDsInRange selects the IDs of events which positions are within a
-// given range in a given room's topological order.
-// Returns an empty slice if no events match the given range.
 func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	fromPos, toPos, toMicroPos types.StreamPosition,
+	minDepth, maxDepth, maxStreamPos types.StreamPosition,
 	limit int, chronologicalOrder bool,
 ) (eventIDs []string, err error) {
 	// Decide on the selection's order according to whether chronological order
@@ -135,7 +124,7 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	}
 
 	// Query the event IDs.
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, toPos, toMicroPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit)
 	if err == sql.ErrNoRows {
 		// If no event matched the request, return an empty slice.
 		return []string{}, nil
@@ -170,30 +159,5 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
 	stmt := common.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
 	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
-	return
-}
-
-// selectEventIDsFromPosition returns the IDs of all events that have a given
-// position in the topology of a given room.
-func (s *outputRoomEventsTopologyStatements) SelectEventIDsFromPosition(
-	ctx context.Context, txn *sql.Tx, roomID string, pos types.StreamPosition,
-) (eventIDs []string, err error) {
-	// Query the event IDs.
-	stmt := common.TxStmt(txn, s.selectEventIDsFromPositionStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, pos)
-	if err == sql.ErrNoRows {
-		// If no event matched the request, return an empty slice.
-		return []string{}, nil
-	} else if err != nil {
-		return
-	}
-	// Return the IDs.
-	var eventID string
-	for rows.Next() {
-		if err = rows.Scan(&eventID); err != nil {
-			return
-		}
-		eventIDs = append(eventIDs, eventID)
-	}
 	return
 }
