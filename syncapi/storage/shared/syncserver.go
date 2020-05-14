@@ -167,10 +167,10 @@ func (d *Database) RetireInviteEvent(
 // If no data is retrieved, returns an empty map
 // If there was an issue with the retrieval, returns an error
 func (d *Database) GetAccountDataInRange(
-	ctx context.Context, userID string, oldPos, newPos types.StreamPosition,
+	ctx context.Context, userID string, r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
 ) (map[string][]string, error) {
-	return d.AccountData.SelectAccountDataInRange(ctx, userID, oldPos, newPos, accountDataFilterPart)
+	return d.AccountData.SelectAccountDataInRange(ctx, userID, r, accountDataFilterPart)
 }
 
 // UpsertAccountData keeps track of new or updated account data, by saving the type

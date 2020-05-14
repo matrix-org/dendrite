@@ -184,11 +184,20 @@ func (rp *RequestPool) appendAccountData(
 		return data, nil
 	}
 
+	r := types.Range{
+		From: req.since.PDUPosition(),
+		To:   currentPos,
+	}
+	// If both positions are the same, it means that the data was saved after the
+	// latest room event. In that case, we need to decrement the old position as
+	// results are exclusive of Low.
+	if r.Low() == r.High() {
+		r.From--
+	}
+
 	// Sync is not initial, get all account data since the latest sync
 	dataTypes, err := rp.db.GetAccountDataInRange(
-		req.ctx, userID,
-		types.StreamPosition(req.since.PDUPosition()), types.StreamPosition(currentPos),
-		accountDataFilter,
+		req.ctx, userID, r, accountDataFilter,
 	)
 	if err != nil {
 		return nil, err
