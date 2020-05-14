@@ -466,7 +466,7 @@ func (d *Database) addPDUDeltaToResponse(
 	}
 
 	// TODO: This should be done in getStateDeltas
-	if err = d.addInvitesToResponse(ctx, txn, device.UserID, fromPos, toPos, res); err != nil {
+	if err = d.AddInvitesToResponse(ctx, txn, device.UserID, fromPos, toPos, res); err != nil {
 		return nil, err
 	}
 
@@ -510,7 +510,8 @@ func (d *Database) addTypingDeltaToResponse(
 
 // addEDUDeltaToResponse adds updates for EDUs of each type since fromPos if
 // the positions of that type are not equal in fromPos and toPos.
-func (d *Database) addEDUDeltaToResponse(
+// TODO FIXME TEMPORARY PUBLIC
+func (d *Database) AddEDUDeltaToResponse(
 	fromPos, toPos types.StreamingToken,
 	joinedRoomIDs []string,
 	res *types.Response,
@@ -550,7 +551,7 @@ func (d *Database) IncrementalSync(
 		return nil, err
 	}
 
-	err = d.addEDUDeltaToResponse(
+	err = d.AddEDUDeltaToResponse(
 		fromPos, toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
@@ -627,7 +628,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		var prevBatchStr string
 		if len(recentStreamEvents) > 0 {
 			var backwardTopologyPos, backwardStreamPos types.StreamPosition
-			backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, nil, recentStreamEvents[0].EventID())
+			backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 			if err != nil {
 				return
 			}
@@ -648,7 +649,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		res.Rooms.Join[roomID] = *jr
 	}
 
-	if err = d.addInvitesToResponse(ctx, txn, userID, 0, toPos.PDUPosition(), res); err != nil {
+	if err = d.AddInvitesToResponse(ctx, txn, userID, 0, toPos.PDUPosition(), res); err != nil {
 		return
 	}
 
@@ -667,7 +668,7 @@ func (d *Database) CompleteSync(
 	}
 
 	// Use a zero value SyncPosition for fromPos so all EDU states are added.
-	err = d.addEDUDeltaToResponse(
+	err = d.AddEDUDeltaToResponse(
 		types.NewStreamToken(0, 0), toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
@@ -687,7 +688,8 @@ var txReadOnlySnapshot = sql.TxOptions{
 	ReadOnly:  true,
 }
 
-func (d *Database) addInvitesToResponse(
+// TODO FIXME temporary public
+func (d *Database) AddInvitesToResponse(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
 	fromPos, toPos types.StreamPosition,
