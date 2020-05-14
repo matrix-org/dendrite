@@ -55,7 +55,6 @@ type SyncServerDatasource struct {
 	db *sql.DB
 	common.PartitionOffsetStatements
 	streamID streamIDStatements
-	topology outputRoomEventsTopologyStatements
 }
 
 // NewSyncServerDatasource creates a new sync server database
@@ -106,7 +105,8 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err != nil {
 		return err
 	}
-	if err = d.topology.prepare(d.db); err != nil {
+	topology, err := NewSqliteTopologyTable(d.db)
+	if err != nil {
 		return err
 	}
 	bwExtrem, err := NewSqliteBackwardsExtremitiesTable(d.db)
@@ -120,6 +120,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		OutputEvents:        events,
 		BackwardExtremities: bwExtrem,
 		CurrentRoomState:    roomState,
+		Topology:            topology,
 		EDUCache:            cache.New(),
 	}
 	return nil
@@ -179,7 +180,7 @@ func (d *SyncServerDatasource) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.topology.insertEventInTopology(ctx, txn, ev, pos); err != nil {
+		if err = d.Database.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return err
 		}
 
@@ -271,7 +272,7 @@ func (d *SyncServerDatasource) GetEventsInTopologicalRange(
 
 	// Select the event IDs from the defined range.
 	var eIDs []string
-	eIDs, err = d.topology.selectEventIDsInRange(
+	eIDs, err = d.Database.Topology.SelectEventIDsInRange(
 		ctx, nil, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
 	)
 	if err != nil {
@@ -288,7 +289,7 @@ func (d *SyncServerDatasource) GetEventsInTopologicalRange(
 func (d *SyncServerDatasource) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
 ) (types.StreamPosition, types.StreamPosition, error) {
-	return d.topology.selectMaxPositionInTopology(ctx, nil, roomID)
+	return d.Database.Topology.SelectMaxPositionInTopology(ctx, nil, roomID)
 }
 
 // EventsAtTopologicalPosition returns all of the events matching a given
@@ -296,7 +297,7 @@ func (d *SyncServerDatasource) MaxTopologicalPosition(
 func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 	ctx context.Context, roomID string, pos types.StreamPosition,
 ) ([]types.StreamEvent, error) {
-	eIDs, err := d.topology.selectEventIDsFromPosition(ctx, nil, roomID, pos)
+	eIDs, err := d.Database.Topology.SelectEventIDsFromPosition(ctx, nil, roomID, pos)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +308,7 @@ func (d *SyncServerDatasource) EventsAtTopologicalPosition(
 func (d *SyncServerDatasource) EventPositionInTopology(
 	ctx context.Context, eventID string,
 ) (depth types.StreamPosition, stream types.StreamPosition, err error) {
-	return d.topology.selectPositionInTopology(ctx, nil, eventID)
+	return d.Database.Topology.SelectPositionInTopology(ctx, nil, eventID)
 }
 
 // SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
@@ -591,7 +592,7 @@ func (d *SyncServerDatasource) getResponseWithPDUsForCompleteSync(
 		var prevBatchStr string
 		if len(recentStreamEvents) > 0 {
 			var backwardTopologyPos, backwardStreamPos types.StreamPosition
-			backwardTopologyPos, backwardStreamPos, err = d.topology.selectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
+			backwardTopologyPos, backwardStreamPos, err = d.Database.Topology.SelectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 			if err != nil {
 				return
 			}
@@ -678,7 +679,7 @@ func (d *SyncServerDatasource) getBackwardTopologyPos(
 	events []types.StreamEvent,
 ) (pos, spos types.StreamPosition) {
 	if len(events) > 0 {
-		pos, spos, _ = d.topology.selectPositionInTopology(ctx, txn, events[0].EventID())
+		pos, spos, _ = d.Database.Topology.SelectPositionInTopology(ctx, txn, events[0].EventID())
 	}
 	// go to the previous position so we don't pull out the same event twice
 	// FIXME: This could be done more nicely by being explicit with inclusive/exclusive rules

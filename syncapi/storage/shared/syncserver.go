@@ -260,7 +260,7 @@ func (d *Database) WriteEvent(
 		}
 		pduPosition = pos
 
-		if err = d.Topology.InsertEventInTopology(ctx, ev, pos); err != nil {
+		if err = d.Topology.InsertEventInTopology(ctx, nil, ev, pos); err != nil {
 			return err
 		}
 
@@ -337,7 +337,7 @@ func (d *Database) GetEventsInTopologicalRange(
 	// Select the event IDs from the defined range.
 	var eIDs []string
 	eIDs, err = d.Topology.SelectEventIDsInRange(
-		ctx, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
+		ctx, nil, roomID, backwardLimit, forwardLimit, forwardMicroLimit, limit, !backwardOrdering,
 	)
 	if err != nil {
 		return
@@ -361,13 +361,13 @@ func (d *Database) BackwardExtremitiesForRoom(
 func (d *Database) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
 ) (depth types.StreamPosition, stream types.StreamPosition, err error) {
-	return d.Topology.SelectMaxPositionInTopology(ctx, roomID)
+	return d.Topology.SelectMaxPositionInTopology(ctx, nil, roomID)
 }
 
 func (d *Database) EventsAtTopologicalPosition(
 	ctx context.Context, roomID string, pos types.StreamPosition,
 ) ([]types.StreamEvent, error) {
-	eIDs, err := d.Topology.SelectEventIDsFromPosition(ctx, roomID, pos)
+	eIDs, err := d.Topology.SelectEventIDsFromPosition(ctx, nil, roomID, pos)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +378,7 @@ func (d *Database) EventsAtTopologicalPosition(
 func (d *Database) EventPositionInTopology(
 	ctx context.Context, eventID string,
 ) (depth types.StreamPosition, stream types.StreamPosition, err error) {
-	return d.Topology.SelectPositionInTopology(ctx, eventID)
+	return d.Topology.SelectPositionInTopology(ctx, nil, eventID)
 }
 
 func (d *Database) syncPositionTx(
@@ -618,7 +618,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		var prevBatchStr string
 		if len(recentStreamEvents) > 0 {
 			var backwardTopologyPos, backwardStreamPos types.StreamPosition
-			backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, recentStreamEvents[0].EventID())
+			backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, nil, recentStreamEvents[0].EventID())
 			if err != nil {
 				return
 			}
@@ -704,7 +704,7 @@ func (d *Database) getBackwardTopologyPos(
 	events []types.StreamEvent,
 ) (pos, spos types.StreamPosition) {
 	if len(events) > 0 {
-		pos, spos, _ = d.Topology.SelectPositionInTopology(ctx, events[0].EventID())
+		pos, spos, _ = d.Topology.SelectPositionInTopology(ctx, nil, events[0].EventID())
 	}
 	if pos-1 <= 0 {
 		pos = types.StreamPosition(1)
