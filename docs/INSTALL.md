@@ -39,7 +39,7 @@ cd dendrite
 Then build it:
 
 ```bash
-./build.sh
+go build -o bin/dendrite-monolith-server ./cmd/dendrite-monolith-server
 ```
 
 ## Building up a polylith deployment
@@ -76,7 +76,7 @@ kafka/bin/zookeeper-server-start.sh -daemon kafka/config/zookeeper.properties
 kafka/bin/kafka-server-start.sh -daemon kafka/config/server.properties
 ```
 
-On MacOS, you can use [homebrew](https://brew.sh/) for easier setup of Kafka:
+On macOS, you can use [Homebrew](https://brew.sh/) for easier setup of Kafka:
 
 ```bash
 brew install kafka
