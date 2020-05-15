@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	RoomVersionMaxCacheEntries = 128
-	ServerKeysMaxCacheEntries  = 128
+	RoomVersionMaxCacheEntries = 1024
+	ServerKeysMaxCacheEntries  = 1024
 )
 
 type ImmutableCache interface {
