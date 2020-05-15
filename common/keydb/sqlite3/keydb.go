@@ -80,7 +80,7 @@ func NewDatabase(
 
 // FetcherName implements KeyFetcher
 func (d Database) FetcherName() string {
-	return "KeyDatabase"
+	return "SqliteKeyDatabase"
 }
 
 // FetchKeys implements gomatrixserverlib.KeyDatabase
