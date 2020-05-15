@@ -405,6 +405,55 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 	}
 }
 
+// The purpose of this test is to make sure that the query to pull out events is honouring the room ID correctly.
+// It works by creating two rooms with the same events in them, then selecting events by topological range.
+// Specifically, we know that events with the same depth but lower stream positions are selected, and it's possible
+// that this check isn't using the room ID if the brackets are wrong in the SQL query.
+func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
+	t.Parallel()
+	db := MustCreateDatabase(t)
+
+	makeEvents := func(roomID string) (events []gomatrixserverlib.HeaderedEvent) {
+		events = append(events, MustCreateEvent(t, roomID, nil, &gomatrixserverlib.EventBuilder{
+			Content:  []byte(fmt.Sprintf(`{"room_version":"4","creator":"%s"}`, testUserIDA)),
+			Type:     "m.room.create",
+			StateKey: &emptyStateKey,
+			Sender:   testUserIDA,
+			Depth:    int64(len(events) + 1),
+		}))
+		events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+			Content:  []byte(fmt.Sprintf(`{"membership":"join"}`)),
+			Type:     "m.room.member",
+			StateKey: &testUserIDA,
+			Sender:   testUserIDA,
+			Depth:    int64(len(events) + 1),
+		}))
+		return
+	}
+
+	roomA := "!room_a:" + string(testOrigin)
+	roomB := "!room_b:" + string(testOrigin)
+	eventsA := makeEvents(roomA)
+	eventsB := makeEvents(roomB)
+	MustWriteEvents(t, db, eventsA)
+	MustWriteEvents(t, db, eventsB)
+	from, err := db.MaxTopologicalPosition(ctx, roomB)
+	if err != nil {
+		t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
+	}
+	// head towards the beginning of time
+	to := types.NewTopologyToken(0, 0)
+
+	// Query using room B as room A was inserted first and hence A will have lower stream positions but identical depths,
+	// allowing this bug to surface.
+	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, roomB, 5, true)
+	if err != nil {
+		t.Fatalf("GetEventsInRange returned an error: %s", err)
+	}
+	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
+	assertEventsEqual(t, "", true, gots, reversed(eventsB))
+}
+
 // The purpose of this test is to make sure that events are returned in the right *order* when they have been inserted in a manner similar to
 // how any kind of backfill operation will insert the events. This test inserts the SimpleRoom events in a manner similar to how backfill over
 // federation would:
