@@ -64,7 +64,8 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		if err != nil {
 			// TODO: Check if the user was not allowed to join the room.
 			r.statistics.ForServer(serverName).Failure()
-			return fmt.Errorf("r.federation.MakeJoin: %w", err)
+			logrus.WithError(err).Errorf("r.federation.MakeJoin failed")
+			continue
 		}
 
 		// Set all the fields to be what they should be, this should be a no-op
@@ -79,10 +80,12 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		}
 		request.Content["membership"] = "join"
 		if err = respMakeJoin.JoinEvent.SetContent(request.Content); err != nil {
-			return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
+			logrus.WithError(err).Errorf("respMakeJoin.JoinEvent.SetContent failed")
+			continue
 		}
 		if err = respMakeJoin.JoinEvent.SetUnsigned(struct{}{}); err != nil {
-			return fmt.Errorf("respMakeJoin.JoinEvent.SetUnsigned: %w", err)
+			logrus.WithError(err).Errorf("respMakeJoin.JoinEvent.SetUnsigned failed")
+			continue
 		}
 
 		// Work out if we support the room version that has been supplied in
@@ -91,7 +94,8 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 			respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
 		}
 		if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
-			return fmt.Errorf("respMakeJoin.RoomVersion.EventFormat: %w", err)
+			logrus.WithError(err).Errorf("respMakeJoin.RoomVersion.EventFormat failed")
+			continue
 		}
 
 		// Build the join event.
@@ -103,7 +107,8 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 			respMakeJoin.RoomVersion,
 		)
 		if err != nil {
-			return fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
+			logrus.WithError(err).Errorf("respMakeJoin.JoinEvent.Build failed")
+			continue
 		}
 
 		// Try to perform a send_join using the newly built event.
