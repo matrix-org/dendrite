@@ -52,101 +52,22 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-join send-join dance.
 	for _, serverName := range request.ServerNames {
-		// Try to perform a make_join using the information supplied in the
-		// request.
-		respMakeJoin, err := r.federation.MakeJoin(
+		if err := r.performJoinUsingServer(
 			ctx,
-			serverName,
 			request.RoomID,
 			request.UserID,
-			supportedVersions,
-		)
-		if err != nil {
-			// TODO: Check if the user was not allowed to join the room.
-			r.statistics.ForServer(serverName).Failure()
-			logrus.WithError(err).Errorf("r.federation.MakeJoin failed")
-			continue
-		}
-
-		// Set all the fields to be what they should be, this should be a no-op
-		// but it's possible that the remote server returned us something "odd"
-		respMakeJoin.JoinEvent.Type = gomatrixserverlib.MRoomMember
-		respMakeJoin.JoinEvent.Sender = request.UserID
-		respMakeJoin.JoinEvent.StateKey = &request.UserID
-		respMakeJoin.JoinEvent.RoomID = request.RoomID
-		respMakeJoin.JoinEvent.Redacts = ""
-		if request.Content == nil {
-			request.Content = map[string]interface{}{}
-		}
-		request.Content["membership"] = "join"
-		if err = respMakeJoin.JoinEvent.SetContent(request.Content); err != nil {
-			logrus.WithError(err).Errorf("respMakeJoin.JoinEvent.SetContent failed")
-			continue
-		}
-		if err = respMakeJoin.JoinEvent.SetUnsigned(struct{}{}); err != nil {
-			logrus.WithError(err).Errorf("respMakeJoin.JoinEvent.SetUnsigned failed")
-			continue
-		}
-
-		// Work out if we support the room version that has been supplied in
-		// the make_join response.
-		if respMakeJoin.RoomVersion == "" {
-			respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
-		}
-		if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
-			logrus.WithError(err).Errorf("respMakeJoin.RoomVersion.EventFormat failed")
-			continue
-		}
-
-		// Build the join event.
-		event, err := respMakeJoin.JoinEvent.Build(
-			time.Now(),
-			r.cfg.Matrix.ServerName,
-			r.cfg.Matrix.KeyID,
-			r.cfg.Matrix.PrivateKey,
-			respMakeJoin.RoomVersion,
-		)
-		if err != nil {
-			logrus.WithError(err).Errorf("respMakeJoin.JoinEvent.Build failed")
-			continue
-		}
-
-		// Try to perform a send_join using the newly built event.
-		respSendJoin, err := r.federation.SendJoin(
-			ctx,
+			request.Content,
 			serverName,
-			event,
-			respMakeJoin.RoomVersion,
-		)
-		if err != nil {
-			logrus.WithError(err).Warnf("r.federation.SendJoin failed")
-			r.statistics.ForServer(serverName).Failure()
-			continue
-		}
-
-		// Check that the send_join response was valid.
-		joinCtx := perform.JoinContext(r.federation, r.keyRing)
-		if err = joinCtx.CheckSendJoinResponse(
-			ctx, event, serverName, respMakeJoin, respSendJoin,
+			supportedVersions,
 		); err != nil {
-			logrus.WithError(err).Warnf("joinCtx.CheckSendJoinResponse failed")
-			continue
-		}
-
-		// If we successfully performed a send_join above then the other
-		// server now thinks we're a part of the room. Send the newly
-		// returned state to the roomserver to update our local view.
-		if err = r.producer.SendEventWithState(
-			ctx,
-			respSendJoin.ToRespState(),
-			event.Headered(respMakeJoin.RoomVersion),
-		); err != nil {
-			logrus.WithError(err).Warnf("r.producer.SendEventWithState failed")
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"server_name": serverName,
+				"room_id":     request.RoomID,
+			}).Warnf("Failed to join room through server")
 			continue
 		}
 
 		// We're all good.
-		r.statistics.ForServer(serverName).Success()
 		return nil
 	}
 
@@ -155,6 +76,103 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		"failed to join user %q to room %q through %d server(s)",
 		request.UserID, request.RoomID, len(request.ServerNames),
 	)
+}
+
+func (r *FederationSenderInternalAPI) performJoinUsingServer(
+	ctx context.Context,
+	roomID, userID string,
+	content map[string]interface{},
+	serverName gomatrixserverlib.ServerName,
+	supportedVersions []gomatrixserverlib.RoomVersion,
+) error {
+	// Try to perform a make_join using the information supplied in the
+	// request.
+	respMakeJoin, err := r.federation.MakeJoin(
+		ctx,
+		serverName,
+		roomID,
+		userID,
+		supportedVersions,
+	)
+	if err != nil {
+		// TODO: Check if the user was not allowed to join the room.
+		r.statistics.ForServer(serverName).Failure()
+		return fmt.Errorf("r.federation.MakeJoin: %w", err)
+	}
+	r.statistics.ForServer(serverName).Success()
+
+	// Set all the fields to be what they should be, this should be a no-op
+	// but it's possible that the remote server returned us something "odd"
+	respMakeJoin.JoinEvent.Type = gomatrixserverlib.MRoomMember
+	respMakeJoin.JoinEvent.Sender = userID
+	respMakeJoin.JoinEvent.StateKey = &userID
+	respMakeJoin.JoinEvent.RoomID = roomID
+	respMakeJoin.JoinEvent.Redacts = ""
+	if content == nil {
+		content = map[string]interface{}{}
+	}
+	content["membership"] = "join"
+	if err = respMakeJoin.JoinEvent.SetContent(content); err != nil {
+		return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
+	}
+	if err = respMakeJoin.JoinEvent.SetUnsigned(struct{}{}); err != nil {
+		return fmt.Errorf("respMakeJoin.JoinEvent.SetUnsigned: %w", err)
+	}
+
+	// Work out if we support the room version that has been supplied in
+	// the make_join response.
+	if respMakeJoin.RoomVersion == "" {
+		respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
+	}
+	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
+		return fmt.Errorf("respMakeJoin.RoomVersion.EventFormat: %w", err)
+	}
+
+	// Build the join event.
+	event, err := respMakeJoin.JoinEvent.Build(
+		time.Now(),
+		r.cfg.Matrix.ServerName,
+		r.cfg.Matrix.KeyID,
+		r.cfg.Matrix.PrivateKey,
+		respMakeJoin.RoomVersion,
+	)
+	if err != nil {
+		return fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
+	}
+
+	// Try to perform a send_join using the newly built event.
+	respSendJoin, err := r.federation.SendJoin(
+		ctx,
+		serverName,
+		event,
+		respMakeJoin.RoomVersion,
+	)
+	if err != nil {
+		r.statistics.ForServer(serverName).Failure()
+		return fmt.Errorf("r.federation.SendJoin: %w", err)
+	}
+	r.statistics.ForServer(serverName).Success()
+
+	// Check that the send_join response was valid.
+	joinCtx := perform.JoinContext(r.federation, r.keyRing)
+	if err = joinCtx.CheckSendJoinResponse(
+		ctx, event, serverName, respMakeJoin, respSendJoin,
+	); err != nil {
+		return fmt.Errorf("joinCtx.CheckSendJoinResponse: %w", err)
+	}
+
+	// If we successfully performed a send_join above then the other
+	// server now thinks we're a part of the room. Send the newly
+	// returned state to the roomserver to update our local view.
+	if err = r.producer.SendEventWithState(
+		ctx,
+		respSendJoin.ToRespState(),
+		event.Headered(respMakeJoin.RoomVersion),
+	); err != nil {
+		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
+	}
+
+	return nil
 }
 
 // PerformLeaveRequest implements api.FederationSenderInternalAPI
