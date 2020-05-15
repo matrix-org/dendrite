@@ -79,7 +79,7 @@ func NewDatabase(
 
 // FetcherName implements KeyFetcher
 func (d Database) FetcherName() string {
-	return "KeyDatabase"
+	return "PostgresKeyDatabase"
 }
 
 // FetchKeys implements gomatrixserverlib.KeyDatabase
