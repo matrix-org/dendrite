@@ -117,10 +117,10 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 // selectInviteEventsInRange returns a map of room ID to invite event for the
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) SelectInviteEventsInRange(
-	ctx context.Context, txn *sql.Tx, targetUserID string, startPos, endPos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
 ) (map[string]gomatrixserverlib.HeaderedEvent, error) {
 	stmt := common.TxStmt(txn, s.selectInviteEventsInRangeStmt)
-	rows, err := stmt.QueryContext(ctx, targetUserID, startPos, endPos)
+	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
 	if err != nil {
 		return nil, err
 	}

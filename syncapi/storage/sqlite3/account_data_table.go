@@ -91,19 +91,12 @@ func (s *accountDataStatements) InsertAccountData(
 func (s *accountDataStatements) SelectAccountDataInRange(
 	ctx context.Context,
 	userID string,
-	oldPos, newPos types.StreamPosition,
+	r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
-	// If both positions are the same, it means that the data was saved after the
-	// latest room event. In that case, we need to decrement the old position as
-	// it would prevent the SQL request from returning anything.
-	if oldPos == newPos {
-		oldPos--
-	}
-
-	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos)
+	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High())
 	if err != nil {
 		return
 	}

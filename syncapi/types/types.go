@@ -47,6 +47,34 @@ type StreamEvent struct {
 	ExcludeFromSync bool
 }
 
+// Range represents a range between two stream positions.
+type Range struct {
+	// From is the position the client has already received.
+	From StreamPosition
+	// To is the position the client is going towards.
+	To StreamPosition
+	// True if the client is going backwards
+	Backwards bool
+}
+
+// Low returns the low number of the range.
+// This represents the position the client already has and hence is exclusive.
+func (r *Range) Low() StreamPosition {
+	if !r.Backwards {
+		return r.From
+	}
+	return r.To
+}
+
+// High returns the high number of the range
+// This represents the position the client is going towards and hence is inclusive.
+func (r *Range) High() StreamPosition {
+	if !r.Backwards {
+		return r.To
+	}
+	return r.From
+}
+
 // SyncTokenType represents the type of a sync token.
 // It can be either "s" (representing a position in the whole stream of events)
 // or "t" (representing a position in a room's topology/depth).

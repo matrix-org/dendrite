@@ -146,13 +146,13 @@ func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Even
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) SelectStateInRange(
-	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilterPart *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(
-		ctx, oldPos, newPos,
+		ctx, r.Low(), r.High(),
 		/*pq.StringArray(stateFilterPart.Senders),
 		pq.StringArray(stateFilterPart.NotSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
@@ -195,8 +195,8 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		// since it'll just mark the event as not being needed.
 		if len(addIDs) < len(delIDs) {
 			log.WithFields(log.Fields{
-				"since":   oldPos,
-				"current": newPos,
+				"since":   r.From,
+				"current": r.To,
 				"adds":    addIDsJSON,
 				"dels":    delIDsJSON,
 			}).Warn("StateBetween: ignoring deleted state")
@@ -308,7 +308,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 
 func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	roomID string, r types.Range, limit int,
 	chronologicalOrder bool, onlySyncEvents bool,
 ) ([]types.StreamEvent, error) {
 	var stmt *sql.Stmt
@@ -318,7 +318,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
 	}
 
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -340,10 +340,10 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 
 func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	roomID string, r types.Range, limit int,
 ) ([]types.StreamEvent, error) {
 	stmt := common.TxStmt(txn, s.selectEarlyEventsStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
 	}
