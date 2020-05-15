@@ -1,6 +1,8 @@
 package caching
 
-import "github.com/matrix-org/gomatrixserverlib"
+import (
+	"github.com/matrix-org/gomatrixserverlib"
+)
 
 const (
 	RoomVersionMaxCacheEntries = 128

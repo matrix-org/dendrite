@@ -5,6 +5,8 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type ImmutableInMemoryLRUCache struct {
@@ -21,10 +23,32 @@ func NewImmutableInMemoryLRUCache() (*ImmutableInMemoryLRUCache, error) {
 	if rvErr != nil {
 		return nil, rvErr
 	}
-	return &ImmutableInMemoryLRUCache{
+	cache := &ImmutableInMemoryLRUCache{
 		roomVersions: roomVersionCache,
 		serverKeys:   serverKeysCache,
-	}, nil
+	}
+	cache.configureMetrics()
+	return cache, nil
+}
+
+func (c *ImmutableInMemoryLRUCache) configureMetrics() {
+	promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "caching",
+		Name:      "number_room_version_entries",
+		Help:      "The number of room version entries cached.",
+	}, func() float64 {
+		return float64(c.roomVersions.Len())
+	})
+
+	promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "caching",
+		Name:      "number_server_key_entries",
+		Help:      "The number of server key entries cached.",
+	}, func() float64 {
+		return float64(c.serverKeys.Len())
+	})
 }
 
 func checkForInvalidMutation(cache *lru.Cache, key string, value interface{}) {
