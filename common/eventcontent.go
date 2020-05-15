@@ -36,6 +36,11 @@ type HistoryVisibilityContent struct {
 	HistoryVisibility string `json:"history_visibility"`
 }
 
+// CanonicalAlias is the event content for https://matrix.org/docs/spec/client_server/r0.6.0#m-room-canonical-alias
+type CanonicalAlias struct {
+	Alias string `json:"alias"`
+}
+
 // InitialPowerLevelsContent returns the initial values for m.room.power_levels on room creation
 // if they have not been specified.
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#m-room-power-levels

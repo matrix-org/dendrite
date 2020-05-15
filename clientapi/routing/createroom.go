@@ -213,6 +213,25 @@ func createRoom(
 		return jsonerror.InternalServerError()
 	}
 
+	var roomAlias string
+	if r.RoomAliasName != "" {
+		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
+		// check it's free TODO: This races but is better than nothing
+		hasAliasReq := roomserverAPI.GetRoomIDForAliasRequest{
+			Alias: roomAlias,
+		}
+
+		var aliasResp roomserverAPI.GetRoomIDForAliasResponse
+		err = rsAPI.GetRoomIDForAlias(req.Context(), &hasAliasReq, &aliasResp)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			return jsonerror.InternalServerError()
+		}
+		if aliasResp.RoomID != "" {
+			return util.MessageResponse(400, "Alias already exists")
+		}
+	}
+
 	membershipContent := gomatrixserverlib.MemberContent{
 		Membership:  gomatrixserverlib.Join,
 		DisplayName: profile.DisplayName,
@@ -244,9 +263,9 @@ func createRoom(
 	//  1- m.room.create
 	//  2- room creator join member
 	//  3- m.room.power_levels
-	//  4- m.room.canonical_alias (opt) TODO
-	//  5- m.room.join_rules
-	//  6- m.room.history_visibility
+	//  4- m.room.join_rules
+	//  5- m.room.history_visibility
+	//  6- m.room.canonical_alias (opt)
 	//  7- m.room.guest_access (opt)
 	//  8- other initial state items
 	//  9- m.room.name (opt)
@@ -262,9 +281,14 @@ func createRoom(
 		{"m.room.create", "", r.CreationContent},
 		{"m.room.member", userID, membershipContent},
 		{"m.room.power_levels", "", common.InitialPowerLevelsContent(userID)},
-		// TODO: m.room.canonical_alias
 		{"m.room.join_rules", "", gomatrixserverlib.JoinRuleContent{JoinRule: joinRules}},
 		{"m.room.history_visibility", "", common.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
+	}
+	if roomAlias != "" {
+		// TODO: bit of a chicken and egg problem here as the alias doesn't exist and cannot until we have made the room.
+		// This means we might fail creating the alias but say the canonical alias is something that doesn't exist.
+		// m.room.aliases is handled when we call roomserver.SetRoomAlias
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.canonical_alias", "", common.CanonicalAlias{Alias: roomAlias}})
 	}
 	if r.GuestCanJoin {
 		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.guest_access", "", common.GuestAccessContent{GuestAccess: "can_join"}})
@@ -278,7 +302,6 @@ func createRoom(
 	}
 	// TODO: invite events
 	// TODO: 3pid invite events
-	// TODO: m.room.aliases
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
@@ -330,10 +353,7 @@ func createRoom(
 	// TODO(#269): Reserve room alias while we create the room. This stops us
 	// from creating the room but still failing due to the alias having already
 	// been taken.
-	var roomAlias string
-	if r.RoomAliasName != "" {
-		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
-
+	if roomAlias != "" {
 		aliasReq := roomserverAPI.SetRoomAliasRequest{
 			Alias:  roomAlias,
 			RoomID: roomID,
