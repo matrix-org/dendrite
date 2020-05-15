@@ -17,7 +17,7 @@ package sqlite3
 
 import (
 	"context"
-	"math"
+	"time"
 
 	"golang.org/x/crypto/ed25519"
 
@@ -63,7 +63,7 @@ func NewDatabase(
 		VerifyKey: gomatrixserverlib.VerifyKey{
 			Key: gomatrixserverlib.Base64String(serverKey),
 		},
-		ValidUntilTS: math.MaxUint64 >> 1,
+		ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(100 * 365 * 24 * time.Hour)),
 		ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
 	}
 	err = d.StoreKeys(
