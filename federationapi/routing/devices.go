@@ -23,7 +23,9 @@ import (
 )
 
 type userDevicesResponse struct {
-	Devices []authtypes.Device `json:"devices"`
+	UserID   string             `json:"user_id"`
+	StreamID int                `json:"stream_id"`
+	Devices  []authtypes.Device `json:"devices"`
 }
 
 // GetUserDevices for the given user id
@@ -48,6 +50,12 @@ func GetUserDevices(
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: userDevicesResponse{devs},
+		// TODO: we should return an incrementing stream ID each time the device
+		// list changes for delta changes to be recognised
+		JSON: userDevicesResponse{
+			UserID:   userID,
+			StreamID: 0,
+			Devices:  devs,
+		},
 	}
 }
