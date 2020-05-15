@@ -444,6 +444,8 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 	// head towards the beginning of time
 	to := types.NewTopologyToken(0, 0)
 
+	// Query using room B as room A was inserted first and hence A will have lower stream positions but identical depths,
+	// allowing this bug to surface.
 	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, roomB, 5, true)
 	if err != nil {
 		t.Fatalf("GetEventsInRange returned an error: %s", err)
