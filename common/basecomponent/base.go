@@ -187,7 +187,7 @@ func (b *BaseDendrite) CreateKeyDB() keydb.Database {
 		logrus.WithError(err).Panicf("failed to connect to keys db")
 	}
 
-	cachedDB, err := cache.NewDatabase(db, b.ImmutableCache)
+	cachedDB, err := cache.NewKeyDatabase(db, b.ImmutableCache)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to create key cache wrapper")
 	}

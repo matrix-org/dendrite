@@ -11,31 +11,31 @@ import (
 
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store
 // the public keys for other matrix servers.
-type Database struct {
+type KeyDatabase struct {
 	inner keydb.Database
 	cache caching.ImmutableCache
 }
 
-func NewDatabase(inner keydb.Database, cache caching.ImmutableCache) (*Database, error) {
+func NewKeyDatabase(inner keydb.Database, cache caching.ImmutableCache) (*KeyDatabase, error) {
 	if inner == nil {
 		return nil, errors.New("inner database can't be nil")
 	}
 	if cache == nil {
 		return nil, errors.New("cache can't be nil")
 	}
-	return &Database{
+	return &KeyDatabase{
 		inner: inner,
 		cache: cache,
 	}, nil
 }
 
 // FetcherName implements KeyFetcher
-func (d Database) FetcherName() string {
+func (d KeyDatabase) FetcherName() string {
 	return "InMemoryKeyCache"
 }
 
 // FetchKeys implements gomatrixserverlib.KeyDatabase
-func (d *Database) FetchKeys(
+func (d *KeyDatabase) FetchKeys(
 	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
@@ -58,7 +58,7 @@ func (d *Database) FetchKeys(
 }
 
 // StoreKeys implements gomatrixserverlib.KeyDatabase
-func (d *Database) StoreKeys(
+func (d *KeyDatabase) StoreKeys(
 	ctx context.Context,
 	keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
