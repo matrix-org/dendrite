@@ -35,6 +35,9 @@ func SetupEDUServerComponent(
 		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),
 	}
 
-	inputAPI.SetupHTTP(http.DefaultServeMux)
+	if base.EnableHTTPAPIs {
+		inputAPI.SetupHTTP(http.DefaultServeMux)
+	}
+
 	return inputAPI
 }

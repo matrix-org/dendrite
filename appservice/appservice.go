@@ -82,7 +82,9 @@ func SetupAppServiceAPIComponent(
 		Cfg: base.Cfg,
 	}
 
-	appserviceQueryAPI.SetupHTTP(http.DefaultServeMux)
+	if base.EnableHTTPAPIs {
+		appserviceQueryAPI.SetupHTTP(http.DefaultServeMux)
+	}
 
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,

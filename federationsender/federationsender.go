@@ -71,7 +71,10 @@ func SetupFederationSenderComponent(
 		federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing,
 		statistics,
 	)
-	queryAPI.SetupHTTP(http.DefaultServeMux)
+
+	if base.EnableHTTPAPIs {
+		queryAPI.SetupHTTP(http.DefaultServeMux)
+	}
 
 	return queryAPI
 }

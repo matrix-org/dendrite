@@ -53,12 +53,12 @@ import (
 // should only be used during start up.
 // Must be closed when shutting down.
 type BaseDendrite struct {
-	componentName  string
-	enableHTTPAPIs bool
-	tracerCloser   io.Closer
+	componentName string
+	tracerCloser  io.Closer
 
 	// APIMux should be used to register new public matrix api endpoints
 	APIMux         *mux.Router
+	EnableHTTPAPIs bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
 	ImmutableCache caching.ImmutableCache
@@ -97,7 +97,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 
 	return &BaseDendrite{
 		componentName:  componentName,
-		enableHTTPAPIs: enableHTTPAPIs,
+		EnableHTTPAPIs: enableHTTPAPIs,
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		ImmutableCache: cache,
