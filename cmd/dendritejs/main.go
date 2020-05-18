@@ -108,7 +108,7 @@ func main() {
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
+	base := basecomponent.NewBaseDendrite(cfg, "Monolith", false)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()

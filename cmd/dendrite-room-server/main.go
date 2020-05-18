@@ -22,7 +22,7 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "RoomServerAPI")
+	base := basecomponent.NewBaseDendrite(cfg, "RoomServerAPI", true)
 	defer base.Close() // nolint: errcheck
 	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()

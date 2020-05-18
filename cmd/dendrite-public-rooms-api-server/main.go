@@ -23,7 +23,7 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "PublicRoomsAPI")
+	base := basecomponent.NewBaseDendrite(cfg, "PublicRoomsAPI", true)
 	defer base.Close() // nolint: errcheck
 
 	deviceDB := base.CreateDeviceDB()

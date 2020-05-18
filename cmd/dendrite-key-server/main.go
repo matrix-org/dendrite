@@ -21,7 +21,7 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "KeyServer")
+	base := basecomponent.NewBaseDendrite(cfg, "KeyServer", true)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()

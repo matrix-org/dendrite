@@ -21,7 +21,7 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "SyncAPI")
+	base := basecomponent.NewBaseDendrite(cfg, "SyncAPI", true)
 	defer base.Close() // nolint: errcheck
 
 	deviceDB := base.CreateDeviceDB()

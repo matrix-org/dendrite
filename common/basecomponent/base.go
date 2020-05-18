@@ -53,8 +53,9 @@ import (
 // should only be used during start up.
 // Must be closed when shutting down.
 type BaseDendrite struct {
-	componentName string
-	tracerCloser  io.Closer
+	componentName  string
+	enableHTTPAPIs bool
+	tracerCloser   io.Closer
 
 	// APIMux should be used to register new public matrix api endpoints
 	APIMux         *mux.Router
@@ -71,7 +72,7 @@ const HTTPClientTimeout = time.Second * 30
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
-func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
+func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs bool) *BaseDendrite {
 	common.SetupStdLogging()
 	common.SetupHookLogging(cfg.Logging, componentName)
 	common.SetupPprof()
@@ -96,6 +97,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 
 	return &BaseDendrite{
 		componentName:  componentName,
+		enableHTTPAPIs: enableHTTPAPIs,
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		ImmutableCache: cache,
