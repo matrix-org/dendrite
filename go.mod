@@ -2,6 +2,7 @@ module github.com/matrix-org/dendrite
 
 require (
 	github.com/Shopify/sarama v1.26.1
+	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/lib/pq v1.2.0
@@ -14,7 +15,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
 	github.com/libp2p/go-libp2p-record v0.1.2
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
-	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518144534-b64c85260c84
+	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200326102434-98eda28055bd
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20200511154227-5cc71d36632b
@@ -28,6 +29,7 @@ require (
 	github.com/prometheus/client_golang v1.4.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/tidwall/gjson v1.6.0
+	github.com/uber-go/atomic v1.3.0 // indirect
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0
 	go.uber.org/atomic v1.4.0
