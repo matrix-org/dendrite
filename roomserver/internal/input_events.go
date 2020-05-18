@@ -52,13 +52,15 @@ func processRoomEvent(
 	headered := input.Event
 	event := headered.Unwrap()
 
-	// Check that the event passes authentication checks and work out the numeric IDs for the auth events.
+	// Check that the event passes authentication checks and work out
+	// the numeric IDs for the auth events.
 	authEventNIDs, err := checkAuthEvents(ctx, db, headered, input.AuthEventIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("processRoomEvent.checkAuthEvents failed for event")
 		return
 	}
 
+	// If we don't have a transaction ID then get one.
 	if input.TransactionID != nil {
 		tdID := input.TransactionID
 		eventID, err = db.GetTransactionEventID(
@@ -70,17 +72,21 @@ func processRoomEvent(
 		}
 	}
 
-	// Store the event
+	// Store the event.
 	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
 		return
 	}
 
+	// For outliers we can stop after we've stored the event itself as it
+	// doesn't have any associated state to store and we don't need to
+	// notify anyone about it.
 	if input.Kind == api.KindOutlier {
-		// For outliers we can stop after we've stored the event itself as it
-		// doesn't have any associated state to store and we don't need to
-		// notify anyone about it.
-		logrus.WithField("event_id", event.EventID()).WithField("type", event.Type()).WithField("room", event.RoomID()).Info("Stored outlier")
+		logrus.WithFields(logrus.Fields{
+			"event_id": event.EventID(),
+			"type":     event.Type(),
+			"room":     event.RoomID(),
+		}).Info("Stored outlier")
 		return event.EventID(), nil
 	}
 
@@ -93,10 +99,21 @@ func processRoomEvent(
 		}
 	}
 
+	if err = updateLatestEvents(
+		ctx,                 // context
+		db,                  // roomserver database
+		ow,                  // output event writer
+		roomNID,             // room NID to update
+		stateAtEvent,        // state at event (below)
+		event,               // event
+		input.SendAsServer,  // send as server
+		input.TransactionID, // transaction ID
+	); err != nil {
+		return
+	}
+
 	// Update the extremities of the event graph for the room
-	return event.EventID(), updateLatestEvents(
-		ctx, db, ow, roomNID, stateAtEvent, event, input.SendAsServer, input.TransactionID,
-	)
+	return event.EventID(), nil
 }
 
 func calculateAndSetState(
@@ -111,6 +128,9 @@ func calculateAndSetState(
 	roomState := state.NewStateResolution(db)
 
 	if input.HasState {
+		// TODO: Check here if we think we're in the room already.
+		stateAtEvent.Overwrite = true
+
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
@@ -122,6 +142,8 @@ func calculateAndSetState(
 			return err
 		}
 	} else {
+		stateAtEvent.Overwrite = false
+
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
 		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, roomNID); err != nil {
 			return err

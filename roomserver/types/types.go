@@ -75,6 +75,10 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 
 // StateAtEvent is the state before and after a matrix event.
 type StateAtEvent struct {
+	// Should this state overwrite the latest events and memberships of the room?
+	// This might be necessary when rejoining a federated room after a period of
+	// absence, as our state and latest events will be out of date.
+	Overwrite bool
 	// The state before the event.
 	BeforeStateSnapshotNID StateSnapshotNID
 	// The state entry for the event itself, allows us to calculate the state after the event.
