@@ -37,7 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
+	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"

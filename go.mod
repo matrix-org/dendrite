@@ -14,8 +14,8 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
 	github.com/libp2p/go-libp2p-record v0.1.2
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
-	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200318135427-31631a9ef51f
-	github.com/matrix-org/go-sqlite3-js v0.0.0-20200325174927-327088cdef10
+	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518144534-b64c85260c84
+	github.com/matrix-org/go-sqlite3-js v0.0.0-20200326102434-98eda28055bd
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20200511154227-5cc71d36632b
 	github.com/matrix-org/naffka v0.0.0-20200422140631-181f1ee7401f
@@ -26,7 +26,7 @@ require (
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.4.1
-	github.com/sirupsen/logrus v1.4.2
+	github.com/sirupsen/logrus v1.6.0
 	github.com/tidwall/gjson v1.6.0
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0

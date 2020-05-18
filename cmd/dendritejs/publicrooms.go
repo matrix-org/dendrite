@@ -17,7 +17,7 @@
 package main
 
 import (
-	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
+	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 )
 
 type libp2pPublicRoomsProvider struct {
