@@ -345,12 +345,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	for _, entry := range u.stateBeforeEventAdds {
 		ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
 	}
-	// If we are overwriting the latest events and state then we don't
-	// want to send out any changes that happened as a result to servers
-	// over federation.
-	if !u.stateAtEvent.Overwrite {
-		ore.SendAsServer = u.sendAsServer
-	}
+	ore.SendAsServer = u.sendAsServer
 
 	return &api.OutputEvent{
 		Type:         api.OutputTypeNewRoomEvent,
