@@ -69,10 +69,17 @@ func updateLatestEvents(
 	}()
 
 	u := latestEventsUpdater{
-		ctx: ctx, db: db, updater: updater, ow: ow, roomNID: roomNID,
-		stateAtEvent: stateAtEvent, event: event, sendAsServer: sendAsServer,
+		ctx:           ctx,
+		db:            db,
+		updater:       updater,
+		ow:            ow,
+		roomNID:       roomNID,
+		stateAtEvent:  stateAtEvent,
+		event:         event,
+		sendAsServer:  sendAsServer,
 		transactionID: transactionID,
 	}
+
 	if err = u.doUpdateLatestEvents(); err != nil {
 		return err
 	}
@@ -115,38 +122,65 @@ type latestEventsUpdater struct {
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	prevEvents := u.event.PrevEvents()
-	oldLatest := u.updater.LatestEvents()
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 	u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 
+	// If we are doing a regular event update then we will get the
+	// previous latest events to use as a part of the calculation. If
+	// we are overwriting the latest events because we have a complete
+	// state snapshot from somewhere else, e.g. a federated room join,
+	// then start with an empty set - none of the forward extremities
+	// that we knew about before matter anymore.
+	oldLatest := []types.StateAtEventAndReference{}
+	if !u.stateAtEvent.Overwrite {
+		oldLatest = u.updater.LatestEvents()
+	}
+
+	// If the event has already been written to the output log then we
+	// don't need to do anything, as we've handled it already.
 	hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID)
 	if err != nil {
 		return err
 	} else if hasBeenSent {
-		// Already sent this event so we can stop processing
 		return nil
 	}
 
+	// Update the roomserver_previous_events table with references. This
+	// is effectively tracking the structure of the DAG.
 	if err = u.updater.StorePreviousEvents(u.stateAtEvent.EventNID, prevEvents); err != nil {
 		return err
 	}
 
+	// Get the event reference for our new event. This will be used when
+	// determining if the event is referenced by an existing event.
 	eventReference := u.event.EventReference()
-	// Check if this event is already referenced by another event in the room.
+
+	// Check if our new event is already referenced by an existing event
+	// in the room. If it is then it isn't a latest event.
 	alreadyReferenced, err := u.updater.IsReferenced(eventReference)
 	if err != nil {
 		return err
 	}
 
-	u.latest = calculateLatest(oldLatest, alreadyReferenced, prevEvents, types.StateAtEventAndReference{
-		EventReference: eventReference,
-		StateAtEvent:   u.stateAtEvent,
-	})
+	// Work out what the latest events are.
+	u.latest = calculateLatest(
+		oldLatest,
+		alreadyReferenced,
+		prevEvents,
+		types.StateAtEventAndReference{
+			EventReference: eventReference,
+			StateAtEvent:   u.stateAtEvent,
+		},
+	)
 
+	// Now that we know what the latest events are, it's time to get the
+	// latest state.
 	if err = u.latestState(); err != nil {
 		return err
 	}
 
+	// If we need to generate any output events then here's where we do it.
+	// TODO: Move this!
 	updates, err := updateMemberships(u.ctx, u.db, u.updater, u.removed, u.added)
 	if err != nil {
 		return err
@@ -181,10 +215,15 @@ func (u *latestEventsUpdater) latestState() error {
 	var err error
 	roomState := state.NewStateResolution(u.db)
 
+	// Get a list of the current latest events.
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
 	for i := range u.latest {
 		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
+
+	// Takes the NIDs of the latest events and creates a state snapshot
+	// of the state after the events. The snapshot state will be resolved
+	// using the correct state resolution algorithm for the room.
 	u.newStateNID, err = roomState.CalculateAndStoreStateAfterEvents(
 		u.ctx, u.roomNID, latestStateAtEvents,
 	)
@@ -192,6 +231,18 @@ func (u *latestEventsUpdater) latestState() error {
 		return err
 	}
 
+	// If we are overwriting the state then we should make sure that we
+	// don't send anything out over federation again, it will very likely
+	// be a repeat.
+	if u.stateAtEvent.Overwrite {
+		u.sendAsServer = ""
+	}
+
+	// Now that we have a new state snapshot based on the latest events,
+	// we can compare that new snapshot to the previous one and see what
+	// has changed. This gives us one list of removed state events and
+	// another list of added ones. Replacing a value for a state-key tuple
+	// will result one removed (the old event) and one added (the new event).
 	u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
 		u.ctx, u.oldStateNID, u.newStateNID,
 	)
@@ -199,6 +250,8 @@ func (u *latestEventsUpdater) latestState() error {
 		return err
 	}
 
+	// Also work out the state before the event removes and the event
+	// adds.
 	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = roomState.DifferenceBetweeenStateSnapshots(
 		u.ctx, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
 	)
