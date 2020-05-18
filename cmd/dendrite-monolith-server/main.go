@@ -45,7 +45,7 @@ var (
 	httpsBindAddr  = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
 	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
 	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
-	enableHTTPAPIs = flag.Bool("enable-http-apis", false, "Expose internal HTTP APIs in monolith mode")
+	enableHTTPAPIs = flag.Bool("api", false, "Expose internal HTTP APIs in monolith mode")
 )
 
 func main() {
