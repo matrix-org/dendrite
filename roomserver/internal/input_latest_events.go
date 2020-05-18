@@ -122,9 +122,19 @@ type latestEventsUpdater struct {
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	prevEvents := u.event.PrevEvents()
-	oldLatest := u.updater.LatestEvents()
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 	u.oldStateNID = u.updater.CurrentStateSnapshotNID()
+
+	// If we are doing a regular event update then we will get the
+	// previous latest events to use as a part of the calculation. If
+	// we are overwriting the latest events because we have a complete
+	// state snapshot from somewhere else, e.g. a federated room join,
+	// then start with an empty set - none of the forward extremities
+	// that we knew about before matter anymore.
+	oldLatest := []types.StateAtEventAndReference{}
+	if !u.stateAtEvent.Overwrite {
+		oldLatest = u.updater.LatestEvents()
+	}
 
 	// If the event has already been written to the output log then we
 	// don't need to do anything, as we've handled it already.
@@ -221,10 +231,11 @@ func (u *latestEventsUpdater) latestState() error {
 		return err
 	}
 
-	// If we are overwriting the state then we don't need to do anything
-	// further here.
+	// If we are overwriting the state then we should make sure that we
+	// don't send anything out over federation again, it will very likely
+	// be a repeat.
 	if u.stateAtEvent.Overwrite {
-		return nil
+		u.sendAsServer = ""
 	}
 
 	// Now that we have a new state snapshot based on the latest events,
