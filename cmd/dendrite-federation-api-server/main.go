@@ -25,7 +25,7 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI")
+	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI", true)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()

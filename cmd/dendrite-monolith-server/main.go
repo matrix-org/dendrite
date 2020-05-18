@@ -41,15 +41,16 @@ import (
 )
 
 var (
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
+	httpBindAddr   = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
+	httpsBindAddr  = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
+	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
+	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
+	enableHTTPAPIs = flag.Bool("api", false, "Expose internal HTTP APIs in monolith mode")
 )
 
 func main() {
 	cfg := basecomponent.ParseMonolithFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
+	base := basecomponent.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()

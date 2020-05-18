@@ -51,7 +51,9 @@ func SetupRoomServerComponent(
 		KeyRing:              keyRing,
 	}
 
-	internalAPI.SetupHTTP(http.DefaultServeMux)
+	if base.EnableHTTPAPIs {
+		internalAPI.SetupHTTP(http.DefaultServeMux)
+	}
 
 	return &internalAPI
 }

@@ -58,6 +58,7 @@ type BaseDendrite struct {
 
 	// APIMux should be used to register new public matrix api endpoints
 	APIMux         *mux.Router
+	EnableHTTPAPIs bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
 	ImmutableCache caching.ImmutableCache
@@ -71,7 +72,7 @@ const HTTPClientTimeout = time.Second * 30
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
-func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
+func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs bool) *BaseDendrite {
 	common.SetupStdLogging()
 	common.SetupHookLogging(cfg.Logging, componentName)
 	common.SetupPprof()
@@ -96,6 +97,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string) *BaseDendrite {
 
 	return &BaseDendrite{
 		componentName:  componentName,
+		EnableHTTPAPIs: enableHTTPAPIs,
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		ImmutableCache: cache,

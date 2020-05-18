@@ -22,7 +22,7 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "FederationSender")
+	base := basecomponent.NewBaseDendrite(cfg, "FederationSender", true)
 	defer base.Close() // nolint: errcheck
 
 	federation := base.CreateFederationClient()

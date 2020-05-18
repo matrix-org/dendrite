@@ -22,7 +22,7 @@ import (
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "AppServiceAPI")
+	base := basecomponent.NewBaseDendrite(cfg, "AppServiceAPI", true)
 
 	defer base.Close() // nolint: errcheck
 	accountDB := base.CreateAccountsDB()
