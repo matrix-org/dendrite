@@ -749,15 +749,15 @@ func (d *Database) GetMembership(
 
 // GetMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
 func (d *Database) GetMembershipEventNIDsForRoom(
-	ctx context.Context, roomNID types.RoomNID, joinOnly bool,
+	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
 ) ([]types.EventNID, error) {
 	if joinOnly {
 		return d.statements.selectMembershipsFromRoomAndMembership(
-			ctx, roomNID, membershipStateJoin,
+			ctx, roomNID, membershipStateJoin, localOnly,
 		)
 	}
 
-	return d.statements.selectMembershipsFromRoom(ctx, roomNID)
+	return d.statements.selectMembershipsFromRoom(ctx, roomNID, localOnly)
 }
 
 // EventsFromIDs implements query.RoomserverQueryAPIEventDB

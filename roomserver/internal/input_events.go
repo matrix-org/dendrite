@@ -117,8 +117,12 @@ func (r *RoomserverInternalAPI) calculateAndSetState(
 	roomState := state.NewStateResolution(r.DB)
 
 	if input.HasState {
-		// TODO: Check here if we think we're in the room already.
+		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
+		var joinEventNIDs []types.EventNID
+		if joinEventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, true); err == nil {
+			stateAtEvent.Overwrite = len(joinEventNIDs) == 0
+		}
 
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.

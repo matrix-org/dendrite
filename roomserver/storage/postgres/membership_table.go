@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 	-- Local target is true if the target_nid refers to a local user rather than
 	-- a federated one. This is an optimisation for resetting state on federated
 	-- room joins.
-	local_target BOOLEAN NOT NULL DEFAULT false,
+	target_local BOOLEAN NOT NULL DEFAULT false,
 	UNIQUE (room_nid, target_nid)
 );
 `
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 // Insert a row in to membership table so that it can be locked by the
 // SELECT FOR UPDATE
 const insertMembershipSQL = "" +
-	"INSERT INTO roomserver_membership (room_nid, target_nid, local_target)" +
+	"INSERT INTO roomserver_membership (room_nid, target_nid, target_local)" +
 	" VALUES ($1, $2, $3)" +
 	" ON CONFLICT DO NOTHING"
 
@@ -82,9 +82,19 @@ const selectMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1 AND membership_nid = $2"
 
+const selectLocalMembershipsFromRoomAndMembershipSQL = "" +
+	"SELECT event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND membership_nid = $2" +
+	" AND target_local = true"
+
 const selectMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1"
+
+const selectLocalMembershipsFromRoomSQL = "" +
+	"SELECT event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1" +
+	" AND target_local = true"
 
 const selectMembershipForUpdateSQL = "" +
 	"SELECT membership_nid FROM roomserver_membership" +
@@ -95,12 +105,14 @@ const updateMembershipSQL = "" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 type membershipStatements struct {
-	insertMembershipStmt                       *sql.Stmt
-	selectMembershipForUpdateStmt              *sql.Stmt
-	selectMembershipFromRoomAndTargetStmt      *sql.Stmt
-	selectMembershipsFromRoomAndMembershipStmt *sql.Stmt
-	selectMembershipsFromRoomStmt              *sql.Stmt
-	updateMembershipStmt                       *sql.Stmt
+	insertMembershipStmt                            *sql.Stmt
+	selectMembershipForUpdateStmt                   *sql.Stmt
+	selectMembershipFromRoomAndTargetStmt           *sql.Stmt
+	selectMembershipsFromRoomAndMembershipStmt      *sql.Stmt
+	selectLocalMembershipsFromRoomAndMembershipStmt *sql.Stmt
+	selectMembershipsFromRoomStmt                   *sql.Stmt
+	selectLocalMembershipsFromRoomStmt              *sql.Stmt
+	updateMembershipStmt                            *sql.Stmt
 }
 
 func (s *membershipStatements) prepare(db *sql.DB) (err error) {
@@ -114,7 +126,9 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 		{&s.selectMembershipForUpdateStmt, selectMembershipForUpdateSQL},
 		{&s.selectMembershipFromRoomAndTargetStmt, selectMembershipFromRoomAndTargetSQL},
 		{&s.selectMembershipsFromRoomAndMembershipStmt, selectMembershipsFromRoomAndMembershipSQL},
+		{&s.selectLocalMembershipsFromRoomAndMembershipStmt, selectLocalMembershipsFromRoomAndMembershipSQL},
 		{&s.selectMembershipsFromRoomStmt, selectMembershipsFromRoomSQL},
+		{&s.selectLocalMembershipsFromRoomStmt, selectLocalMembershipsFromRoomSQL},
 		{&s.updateMembershipStmt, updateMembershipSQL},
 	}.prepare(db)
 }
@@ -150,7 +164,7 @@ func (s *membershipStatements) selectMembershipFromRoomAndTarget(
 }
 
 func (s *membershipStatements) selectMembershipsFromRoom(
-	ctx context.Context, roomNID types.RoomNID,
+	ctx context.Context, roomNID types.RoomNID, localOnly bool,
 ) (eventNIDs []types.EventNID, err error) {
 	rows, err := s.selectMembershipsFromRoomStmt.QueryContext(ctx, roomNID)
 	if err != nil {
@@ -170,10 +184,14 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 
 func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 	ctx context.Context,
-	roomNID types.RoomNID, membership membershipState,
+	roomNID types.RoomNID, membership membershipState, localOnly bool,
 ) (eventNIDs []types.EventNID, err error) {
+	var rows *sql.Rows
 	stmt := s.selectMembershipsFromRoomAndMembershipStmt
-	rows, err := stmt.QueryContext(ctx, roomNID, membership)
+	if localOnly {
+		stmt = s.selectLocalMembershipsFromRoomAndMembershipStmt
+	}
+	rows, err = stmt.QueryContext(ctx, roomNID, membership)
 	if err != nil {
 		return
 	}
