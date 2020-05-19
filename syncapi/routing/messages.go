@@ -412,7 +412,14 @@ func (r *messagesReq) backfill(roomID string, fromEventIDs []string, limit int) 
 		}
 	}
 
-	return res.Events, nil
+	// we may have got more than the requested limit so resize now
+	events := res.Events
+	if len(events) > limit {
+		// last `limit` events
+		events = events[len(events)-limit:]
+	}
+
+	return events, nil
 }
 
 // setToDefault returns the default value for the "to" query parameter of a

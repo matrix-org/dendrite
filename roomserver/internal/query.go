@@ -535,9 +535,14 @@ func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *
 		return fmt.Errorf("backfillViaFederation: unknown room version for room %s : %w", req.RoomID, err)
 	}
 	requester := newBackfillRequester(r.DB, r.FedClient, r.ServerName)
+	// Request 100 items regardless of what the query asks for.
+	// We don't want to go much higher than this.
+	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
+	// (so we don't need to hit /state_ids which the test has no listener for)
+	// Specifically the test "Outbound federation can backfill events"
 	events, err := gomatrixserverlib.RequestBackfill(
 		ctx, requester,
-		r.KeyRing, req.RoomID, roomVer, req.EarliestEventsIDs, req.Limit)
+		r.KeyRing, req.RoomID, roomVer, req.EarliestEventsIDs, 100)
 	if err != nil {
 		return err
 	}
