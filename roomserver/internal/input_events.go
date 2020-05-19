@@ -31,21 +31,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// OutputRoomEventWriter has the APIs needed to write an event to the output logs.
-type OutputRoomEventWriter interface {
-	// Write a list of events for a room
-	WriteOutputEvents(roomID string, updates []api.OutputEvent) error
-}
-
 // processRoomEvent can only be called once at a time
 //
 // TODO(#375): This should be rewritten to allow concurrent calls. The
 // difficulty is in ensuring that we correctly annotate events with the correct
 // state deltas when sending to kafka streams
-func processRoomEvent(
+func (r *RoomserverInternalAPI) processRoomEvent(
 	ctx context.Context,
-	db storage.Database,
-	ow OutputRoomEventWriter,
 	input api.InputRoomEvent,
 ) (eventID string, err error) {
 	// Parse and validate the event JSON
@@ -54,7 +46,7 @@ func processRoomEvent(
 
 	// Check that the event passes authentication checks and work out
 	// the numeric IDs for the auth events.
-	authEventNIDs, err := checkAuthEvents(ctx, db, headered, input.AuthEventIDs)
+	authEventNIDs, err := checkAuthEvents(ctx, r.DB, headered, input.AuthEventIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("processRoomEvent.checkAuthEvents failed for event")
 		return
@@ -63,7 +55,7 @@ func processRoomEvent(
 	// If we don't have a transaction ID then get one.
 	if input.TransactionID != nil {
 		tdID := input.TransactionID
-		eventID, err = db.GetTransactionEventID(
+		eventID, err = r.DB.GetTransactionEventID(
 			ctx, tdID.TransactionID, tdID.SessionID, event.Sender(),
 		)
 		// On error OR event with the transaction already processed/processesing
@@ -73,7 +65,7 @@ func processRoomEvent(
 	}
 
 	// Store the event.
-	roomNID, stateAtEvent, err := db.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
+	roomNID, stateAtEvent, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
 		return
 	}
@@ -93,16 +85,14 @@ func processRoomEvent(
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		err = calculateAndSetState(ctx, db, input, roomNID, &stateAtEvent, event)
+		err = r.calculateAndSetState(ctx, input, roomNID, &stateAtEvent, event)
 		if err != nil {
 			return
 		}
 	}
 
-	if err = updateLatestEvents(
+	if err = r.updateLatestEvents(
 		ctx,                 // context
-		db,                  // roomserver database
-		ow,                  // output event writer
 		roomNID,             // room NID to update
 		stateAtEvent,        // state at event (below)
 		event,               // event
@@ -116,16 +106,15 @@ func processRoomEvent(
 	return event.EventID(), nil
 }
 
-func calculateAndSetState(
+func (r *RoomserverInternalAPI) calculateAndSetState(
 	ctx context.Context,
-	db storage.Database,
 	input api.InputRoomEvent,
 	roomNID types.RoomNID,
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
 	var err error
-	roomState := state.NewStateResolution(db)
+	roomState := state.NewStateResolution(r.DB)
 
 	if input.HasState {
 		// TODO: Check here if we think we're in the room already.
@@ -134,11 +123,11 @@ func calculateAndSetState(
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
-		if entries, err = db.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
+		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
 			return err
 		}
 
-		if stateAtEvent.BeforeStateSnapshotNID, err = db.AddState(ctx, roomNID, nil, entries); err != nil {
+		if stateAtEvent.BeforeStateSnapshotNID, err = r.DB.AddState(ctx, roomNID, nil, entries); err != nil {
 			return err
 		}
 	} else {
@@ -149,12 +138,11 @@ func calculateAndSetState(
 			return err
 		}
 	}
-	return db.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
+	return r.DB.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 }
 
-func processInviteEvent(
+func (r *RoomserverInternalAPI) processInviteEvent(
 	ctx context.Context,
-	db storage.Database,
 	ow *RoomserverInternalAPI,
 	input api.InputInviteEvent,
 ) (*api.InputRoomEvent, error) {
@@ -172,7 +160,10 @@ func processInviteEvent(
 		"target_user_id": targetUserID,
 	}).Info("processing invite event")
 
-	updater, err := db.MembershipUpdater(ctx, roomID, targetUserID, input.RoomVersion)
+	_, domain, _ := gomatrixserverlib.SplitID('@', targetUserID)
+	targetLocal := domain == r.Cfg.Matrix.ServerName
+
+	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, targetLocal, input.RoomVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +230,7 @@ func processInviteEvent(
 		// up from local data (which is most likely to be if the event came
 		// from the CS API). If we know about the room then we can insert
 		// the invite room state, if we don't then we just fail quietly.
-		if irs, ierr := buildInviteStrippedState(ctx, db, input); ierr == nil {
+		if irs, ierr := buildInviteStrippedState(ctx, r.DB, input); ierr == nil {
 			if err = event.SetUnsignedField("invite_room_state", irs); err != nil {
 				return nil, err
 			}

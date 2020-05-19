@@ -38,6 +38,7 @@ const membershipSchema = `
 		sender_nid INTEGER NOT NULL DEFAULT 0,
 		membership_nid INTEGER NOT NULL DEFAULT 1,
 		event_nid INTEGER NOT NULL DEFAULT 0,
+		local_target BOOLEAN NOT NULL DEFAULT false,
 		UNIQUE (room_nid, target_nid)
 	);
 `
@@ -45,8 +46,8 @@ const membershipSchema = `
 // Insert a row in to membership table so that it can be locked by the
 // SELECT FOR UPDATE
 const insertMembershipSQL = "" +
-	"INSERT INTO roomserver_membership (room_nid, target_nid)" +
-	" VALUES ($1, $2)" +
+	"INSERT INTO roomserver_membership (room_nid, target_nid, local_target)" +
+	" VALUES ($1, $2, $3)" +
 	" ON CONFLICT DO NOTHING"
 
 const selectMembershipFromRoomAndTargetSQL = "" +
@@ -97,9 +98,10 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 func (s *membershipStatements) insertMembership(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+	localTarget bool,
 ) error {
 	stmt := common.TxStmt(txn, s.insertMembershipStmt)
-	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID)
+	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID, localTarget)
 	return err
 }
 

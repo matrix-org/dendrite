@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -28,9 +27,8 @@ import (
 // user affected by a change in the current state of the room.
 // Returns a list of output events to write to the kafka log to inform the
 // consumers about the invites added or retired by the change in current state.
-func updateMemberships(
+func (r *RoomserverInternalAPI) updateMemberships(
 	ctx context.Context,
-	db storage.Database,
 	updater types.RoomRecentEventsUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
@@ -48,7 +46,7 @@ func updateMemberships(
 	// Load the event JSON so we can look up the "membership" key.
 	// TODO: Maybe add a membership key to the events table so we can load that
 	// key without having to load the entire event JSON?
-	events, err := db.Events(ctx, eventNIDs)
+	events, err := r.DB.Events(ctx, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +57,7 @@ func updateMemberships(
 		var ae *gomatrixserverlib.Event
 		var re *gomatrixserverlib.Event
 		targetUserNID := change.EventStateKeyNID
+		targetLocal := false
 		if change.removedEventNID != 0 {
 			ev, _ := eventMap(events).lookup(change.removedEventNID)
 			if ev != nil {
@@ -71,15 +70,17 @@ func updateMemberships(
 				ae = &ev.Event
 			}
 		}
-		if updates, err = updateMembership(updater, targetUserNID, re, ae, updates); err != nil {
+		if updates, err = r.updateMembership(updater, targetUserNID, targetLocal, re, ae, updates); err != nil {
 			return nil, err
 		}
 	}
 	return updates, nil
 }
 
-func updateMembership(
-	updater types.RoomRecentEventsUpdater, targetUserNID types.EventStateKeyNID,
+func (r *RoomserverInternalAPI) updateMembership(
+	updater types.RoomRecentEventsUpdater,
+	targetUserNID types.EventStateKeyNID,
+	targetLocal bool,
 	remove, add *gomatrixserverlib.Event,
 	updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
@@ -113,7 +114,13 @@ func updateMembership(
 		return updates, nil
 	}
 
-	mu, err := updater.MembershipUpdater(targetUserNID)
+	targetLocal = false
+	if statekey := add.StateKey(); statekey != nil {
+		_, domain, _ := gomatrixserverlib.SplitID('@', *statekey)
+		targetLocal = domain == r.Cfg.Matrix.ServerName
+	}
+
+	mu, err := updater.MembershipUpdater(targetUserNID, targetLocal)
 	if err != nil {
 		return nil, err
 	}

@@ -569,9 +569,9 @@ func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error
 	return err
 }
 
-func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID) (mu types.MembershipUpdater, err error) {
+func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (mu types.MembershipUpdater, err error) {
 	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
-		mu, err = u.d.membershipUpdaterTxn(u.ctx, txn, u.roomNID, targetUserNID)
+		mu, err = u.d.membershipUpdaterTxn(u.ctx, txn, u.roomNID, targetUserNID, targetLocal)
 		return err
 	})
 	return
@@ -680,7 +680,7 @@ func (d *Database) StateEntriesForTuples(
 // MembershipUpdater implements input.RoomEventDatabase
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
-	roomVersion gomatrixserverlib.RoomVersion,
+	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
 ) (updater types.MembershipUpdater, err error) {
 	var txn *sql.Tx
 	txn, err = d.db.Begin()
@@ -716,7 +716,7 @@ func (d *Database) MembershipUpdater(
 		return nil, err
 	}
 
-	updater, err = d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID)
+	updater, err = d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
 	if err != nil {
 		return nil, err
 	}
@@ -738,9 +738,10 @@ func (d *Database) membershipUpdaterTxn(
 	txn *sql.Tx,
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
+	targetLocal bool,
 ) (types.MembershipUpdater, error) {
 
-	if err := d.statements.insertMembership(ctx, txn, roomNID, targetUserNID); err != nil {
+	if err := d.statements.insertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
 		return nil, err
 	}
 

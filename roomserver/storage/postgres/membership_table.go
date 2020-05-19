@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 	-- This NID is updated if the join event gets updated (e.g. profile update),
 	-- or if the user leaves/joins the room.
 	event_nid BIGINT NOT NULL DEFAULT 0,
+	-- Local target is true if the target_nid refers to a local user rather than
+	-- a federated one. This is an optimisation for resetting state on federated
+	-- room joins.
+	local_target BOOLEAN NOT NULL DEFAULT false,
 	UNIQUE (room_nid, target_nid)
 );
 `
@@ -66,8 +70,8 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 // Insert a row in to membership table so that it can be locked by the
 // SELECT FOR UPDATE
 const insertMembershipSQL = "" +
-	"INSERT INTO roomserver_membership (room_nid, target_nid)" +
-	" VALUES ($1, $2)" +
+	"INSERT INTO roomserver_membership (room_nid, target_nid, local_target)" +
+	" VALUES ($1, $2, $3)" +
 	" ON CONFLICT DO NOTHING"
 
 const selectMembershipFromRoomAndTargetSQL = "" +
@@ -118,9 +122,10 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 func (s *membershipStatements) insertMembership(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+	localTarget bool,
 ) error {
 	stmt := common.TxStmt(txn, s.insertMembershipStmt)
-	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID)
+	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID, localTarget)
 	return err
 }
 

@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -46,17 +45,15 @@ import (
 //      7 <----- latest
 //
 // Can only be called once at a time
-func updateLatestEvents(
+func (r *RoomserverInternalAPI) updateLatestEvents(
 	ctx context.Context,
-	db storage.Database,
-	ow OutputRoomEventWriter,
 	roomNID types.RoomNID,
 	stateAtEvent types.StateAtEvent,
 	event gomatrixserverlib.Event,
 	sendAsServer string,
 	transactionID *api.TransactionID,
 ) (err error) {
-	updater, err := db.GetLatestEventsForUpdate(ctx, roomNID)
+	updater, err := r.DB.GetLatestEventsForUpdate(ctx, roomNID)
 	if err != nil {
 		return
 	}
@@ -70,9 +67,8 @@ func updateLatestEvents(
 
 	u := latestEventsUpdater{
 		ctx:           ctx,
-		db:            db,
+		api:           r,
 		updater:       updater,
-		ow:            ow,
 		roomNID:       roomNID,
 		stateAtEvent:  stateAtEvent,
 		event:         event,
@@ -94,9 +90,8 @@ func updateLatestEvents(
 // when there are so many variables to pass around.
 type latestEventsUpdater struct {
 	ctx           context.Context
-	db            storage.Database
+	api           *RoomserverInternalAPI
 	updater       types.RoomRecentEventsUpdater
-	ow            OutputRoomEventWriter
 	roomNID       types.RoomNID
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event
@@ -181,7 +176,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 	// If we need to generate any output events then here's where we do it.
 	// TODO: Move this!
-	updates, err := updateMemberships(u.ctx, u.db, u.updater, u.removed, u.added)
+	updates, err := u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added)
 	if err != nil {
 		return err
 	}
@@ -200,7 +195,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.ow.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
+	if err = u.api.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
 		return err
 	}
 
@@ -213,7 +208,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
-	roomState := state.NewStateResolution(u.db)
+	roomState := state.NewStateResolution(u.api.DB)
 
 	// Get a list of the current latest events.
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
@@ -303,7 +298,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
-	roomVersion, err := u.db.GetRoomVersionForRoom(u.ctx, u.event.RoomID())
+	roomVersion, err := u.api.DB.GetRoomVersionForRoom(u.ctx, u.event.RoomID())
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +324,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
 	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
-	eventIDMap, err := u.db.EventIDs(u.ctx, stateEventNIDs)
+	eventIDMap, err := u.api.DB.EventIDs(u.ctx, stateEventNIDs)
 	if err != nil {
 		return nil, err
 	}

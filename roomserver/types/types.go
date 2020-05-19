@@ -172,7 +172,7 @@ type RoomRecentEventsUpdater interface {
 	MarkEventAsSent(eventNID EventNID) error
 	// Build a membership updater for the target user in this room.
 	// It will share the same transaction as this updater.
-	MembershipUpdater(targetUserNID EventStateKeyNID) (MembershipUpdater, error)
+	MembershipUpdater(targetUserNID EventStateKeyNID, targetLocal bool) (MembershipUpdater, error)
 	// Implements Transaction so it can be committed or rolledback
 	common.Transaction
 }
