@@ -5,12 +5,13 @@ import (
 
 	"github.com/matrix-org/dendrite/common/caching"
 	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type ServerKeyAPI struct {
-	gomatrixserverlib.KeyDatabase
+	api.ServerKeyInternalAPI
 
 	DB             storage.Database
 	Cfg            *config.Dendrite
@@ -35,4 +36,8 @@ func (s *ServerKeyAPI) FetchKeys(
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	return s.DB.FetchKeys(ctx, requests)
+}
+
+func (s *ServerKeyAPI) FetcherName() string {
+	return s.DB.FetcherName()
 }

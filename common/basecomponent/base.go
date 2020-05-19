@@ -186,29 +186,6 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 	return db
 }
 
-// CreateKeyDB creates a new instance of the key database. Should only be called
-// once per component.
-/*
-func (b *BaseDendrite) CreateKeyDB() keydb.Database {
-	db, err := keydb.NewDatabase(
-		string(b.Cfg.Database.ServerKey),
-		b.Cfg.DbProperties(),
-		b.Cfg.Matrix.ServerName,
-		b.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
-		b.Cfg.Matrix.KeyID,
-	)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to keys db")
-	}
-
-	cachedDB, err := cache.NewKeyDatabase(db, b.ImmutableCache)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to create key cache wrapper")
-	}
-	return cachedDB
-}
-*/
-
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {

@@ -2,37 +2,52 @@ package api
 
 import (
 	"context"
-	"net/http"
 
-	"github.com/matrix-org/dendrite/common/caching"
-	"github.com/matrix-org/gomatrixserverlib"
+	commonHTTP "github.com/matrix-org/dendrite/common/http"
+
+	"github.com/opentracing/opentracing-go"
 )
 
-type httpServerKeyInternalAPI struct {
-	ServerKeyInternalAPI
+const (
+	// RoomserverPerformJoinPath is the HTTP path for the PerformJoin API.
+	ServerKeyInputPublicKeyPath = "/api/serverkeyapi/inputPublicKey"
 
-	serverKeyAPIURL string
-	httpClient      *http.Client
-	immutableCache  caching.ImmutableCache
+	// RoomserverPerformLeavePath is the HTTP path for the PerformLeave API.
+	ServerKeyQueryPublicKeyPath = "/api/serverkeyapi/queryPublicKey"
+)
+
+type InputPublicKeysRequest struct {
 }
 
-func (s *httpServerKeyInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
-	return &gomatrixserverlib.KeyRing{
-		KeyDatabase: s,
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{s},
-	}
+type InputPublicKeysResponse struct {
 }
 
-func (s *httpServerKeyInternalAPI) StoreKeys(
+func (h *httpServerKeyInternalAPI) InputPublicKeys(
 	ctx context.Context,
-	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
+	request *InputPublicKeysRequest,
+	response *InputPublicKeysResponse,
 ) error {
-	return nil
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputPublicKey")
+	defer span.Finish()
+
+	apiURL := h.serverKeyAPIURL + ServerKeyInputPublicKeyPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-func (s *httpServerKeyInternalAPI) FetchKeys(
+type QueryPublicKeysRequest struct {
+}
+
+type QueryPublicKeysResponse struct {
+}
+
+func (h *httpServerKeyInternalAPI) QueryPublicKeys(
 	ctx context.Context,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
-) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
-	return nil, nil
+	request *QueryPublicKeysRequest,
+	response *QueryPublicKeysResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPublicKey")
+	defer span.Finish()
+
+	apiURL := h.serverKeyAPIURL + ServerKeyQueryPublicKeyPath
+	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
