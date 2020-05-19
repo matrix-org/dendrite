@@ -14,7 +14,7 @@
 
 // +build !wasm
 
-package keydb
+package storage
 
 import (
 	"net/url"
@@ -22,8 +22,8 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/keydb/postgres"
-	"github.com/matrix-org/dendrite/common/keydb/sqlite3"
+	"github.com/matrix-org/dendrite/serverkeyapi/storage/postgres"
+	"github.com/matrix-org/dendrite/serverkeyapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

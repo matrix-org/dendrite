@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -34,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -55,9 +55,12 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
+
+	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
+		base, federation,
+	)
+	keyRing := serverKeyAPI.KeyRing()
 
 	rsAPI := roomserver.SetupRoomServerComponent(
 		base, keyRing, federation,
@@ -69,20 +72,20 @@ func main() {
 		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
 	)
 	fsAPI := federationsender.SetupFederationSenderComponent(
-		base, federation, rsAPI, &keyRing,
+		base, federation, rsAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
-		federation, &keyRing, rsAPI,
+		federation, keyRing, rsAPI,
 		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
 	keyserver.SetupKeyServerComponent(
 		base, deviceDB, accountDB,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asAPI, fsAPI, eduProducer)
+	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties())
 	if err != nil {
