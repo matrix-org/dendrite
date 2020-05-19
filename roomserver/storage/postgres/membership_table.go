@@ -166,7 +166,13 @@ func (s *membershipStatements) selectMembershipFromRoomAndTarget(
 func (s *membershipStatements) selectMembershipsFromRoom(
 	ctx context.Context, roomNID types.RoomNID, localOnly bool,
 ) (eventNIDs []types.EventNID, err error) {
-	rows, err := s.selectMembershipsFromRoomStmt.QueryContext(ctx, roomNID)
+	var stmt *sql.Stmt
+	if localOnly {
+		stmt = s.selectLocalMembershipsFromRoomStmt
+	} else {
+		stmt = s.selectMembershipsFromRoomStmt
+	}
+	rows, err := stmt.QueryContext(ctx, roomNID)
 	if err != nil {
 		return
 	}
@@ -187,9 +193,11 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 	roomNID types.RoomNID, membership membershipState, localOnly bool,
 ) (eventNIDs []types.EventNID, err error) {
 	var rows *sql.Rows
-	stmt := s.selectMembershipsFromRoomAndMembershipStmt
+	var stmt *sql.Stmt
 	if localOnly {
 		stmt = s.selectLocalMembershipsFromRoomAndMembershipStmt
+	} else {
+		stmt = s.selectMembershipsFromRoomAndMembershipStmt
 	}
 	rows, err = stmt.QueryContext(ctx, roomNID, membership)
 	if err != nil {

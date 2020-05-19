@@ -57,7 +57,6 @@ func (r *RoomserverInternalAPI) updateMemberships(
 		var ae *gomatrixserverlib.Event
 		var re *gomatrixserverlib.Event
 		targetUserNID := change.EventStateKeyNID
-		targetLocal := false
 		if change.removedEventNID != 0 {
 			ev, _ := eventMap(events).lookup(change.removedEventNID)
 			if ev != nil {
@@ -70,7 +69,7 @@ func (r *RoomserverInternalAPI) updateMemberships(
 				ae = &ev.Event
 			}
 		}
-		if updates, err = r.updateMembership(updater, targetUserNID, targetLocal, re, ae, updates); err != nil {
+		if updates, err = r.updateMembership(updater, targetUserNID, re, ae, updates); err != nil {
 			return nil, err
 		}
 	}
@@ -80,7 +79,6 @@ func (r *RoomserverInternalAPI) updateMemberships(
 func (r *RoomserverInternalAPI) updateMembership(
 	updater types.RoomRecentEventsUpdater,
 	targetUserNID types.EventStateKeyNID,
-	targetLocal bool,
 	remove, add *gomatrixserverlib.Event,
 	updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
@@ -114,13 +112,7 @@ func (r *RoomserverInternalAPI) updateMembership(
 		return updates, nil
 	}
 
-	targetLocal = false
-	if statekey := add.StateKey(); statekey != nil {
-		_, domain, _ := gomatrixserverlib.SplitID('@', *statekey)
-		targetLocal = domain == r.Cfg.Matrix.ServerName
-	}
-
-	mu, err := updater.MembershipUpdater(targetUserNID, targetLocal)
+	mu, err := updater.MembershipUpdater(targetUserNID, r.isLocalTarget(add))
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +129,15 @@ func (r *RoomserverInternalAPI) updateMembership(
 			"input: membership %q is not one of the allowed values", newMembership,
 		))
 	}
+}
+
+func (r *RoomserverInternalAPI) isLocalTarget(event *gomatrixserverlib.Event) bool {
+	targetLocal := false
+	if statekey := event.StateKey(); statekey != nil {
+		_, domain, _ := gomatrixserverlib.SplitID('@', *statekey)
+		targetLocal = domain == r.Cfg.Matrix.ServerName
+	}
+	return targetLocal
 }
 
 func updateToInviteMembership(
