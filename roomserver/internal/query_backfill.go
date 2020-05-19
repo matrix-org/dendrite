@@ -7,6 +7,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,6 +37,11 @@ func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent
 	b.eventIDMap[targetEvent.EventID()] = targetEvent.Unwrap()
 	if ids, ok := b.eventIDToBeforeStateIDs[targetEvent.EventID()]; ok {
 		return ids, nil
+	}
+	if len(targetEvent.PrevEventIDs()) == 0 && targetEvent.Type() == "m.room.create" && targetEvent.StateKeyEquals("") {
+		util.GetLogger(ctx).WithField("room_id", targetEvent.RoomID()).Info("Backfilled to the beginning of the room")
+		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = []string{}
+		return nil, nil
 	}
 	// if we have exactly 1 prev event and we know the state of the room at that prev event, then just roll forward the prev event.
 	// Else, we have to hit /state_ids because either we don't know the state at all at this event (new backwards extremity) or
