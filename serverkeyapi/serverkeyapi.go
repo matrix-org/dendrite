@@ -7,6 +7,7 @@ import (
 	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/serverkeyapi/internal"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage"
+	"github.com/matrix-org/dendrite/serverkeyapi/storage/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -15,7 +16,7 @@ func SetupServerKeyAPIComponent(
 	base *basecomponent.BaseDendrite,
 	fedClient *gomatrixserverlib.FederationClient,
 ) *internal.ServerKeyAPI {
-	serverKeyDB, err := storage.NewDatabase(
+	innerDB, err := storage.NewDatabase(
 		string(base.Cfg.Database.ServerKey),
 		base.Cfg.DbProperties(),
 		base.Cfg.Matrix.ServerName,
@@ -23,7 +24,12 @@ func SetupServerKeyAPIComponent(
 		base.Cfg.Matrix.KeyID,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to room server db")
+		logrus.WithError(err).Panicf("failed to connect to server key database")
+	}
+
+	serverKeyDB, err := cache.NewKeyDatabase(innerDB, base.ImmutableCache)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to set up caching wrapper for server key database")
 	}
 
 	internalAPI := internal.ServerKeyAPI{
