@@ -16,6 +16,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -29,6 +30,14 @@ import (
 
 const defaultSyncTimeout = time.Duration(0)
 const defaultTimelineLimit = 20
+
+type filter struct {
+	Room struct {
+		Timeline struct {
+			Limit *int `json:"limit"`
+		} `json:"timeline"`
+	} `json:"room"`
+}
 
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
@@ -54,6 +63,17 @@ func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, e
 		}
 		since = &tok
 	}
+	timelineLimit := defaultTimelineLimit
+	// TODO: read from stored filters too
+	filterQuery := req.URL.Query().Get("filter")
+	if filterQuery != "" && filterQuery[0] == '{' {
+		// attempt to parse the timeline limit at least
+		var f filter
+		err := json.Unmarshal([]byte(filterQuery), &f)
+		if err == nil && f.Room.Timeline.Limit != nil {
+			timelineLimit = *f.Room.Timeline.Limit
+		}
+	}
 	// TODO: Additional query params: set_presence, filter
 	return &syncRequest{
 		ctx:           req.Context(),
@@ -61,7 +81,7 @@ func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, e
 		timeout:       timeout,
 		since:         since,
 		wantFullState: wantFullState,
-		limit:         defaultTimelineLimit, // TODO: read from filter
+		limit:         timelineLimit,
 		log:           util.GetLogger(req.Context()),
 	}, nil
 }
