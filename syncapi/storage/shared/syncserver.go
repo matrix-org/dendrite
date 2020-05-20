@@ -310,6 +310,7 @@ func (d *Database) updateRoomState(
 			}
 			membership = &value
 		}
+
 		if err := d.CurrentRoomState.UpsertRoomState(ctx, txn, event, membership, pduPosition); err != nil {
 			return err
 		}
@@ -367,7 +368,7 @@ func (d *Database) SyncPosition(ctx context.Context) (tok types.StreamingToken, 
 
 func (d *Database) BackwardExtremitiesForRoom(
 	ctx context.Context, roomID string,
-) (backwardExtremities []string, err error) {
+) (backwardExtremities map[string][]string, err error) {
 	return d.BackwardExtremities.SelectBackwardExtremitiesForRoom(ctx, roomID)
 }
 

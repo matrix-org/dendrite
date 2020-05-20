@@ -94,9 +94,8 @@ type Database interface {
 	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
 	// EventPositionInTopology returns the depth and stream position of the given event.
 	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
-	// BackwardExtremitiesForRoom returns the event IDs of all of the backward
-	// extremities we know of for a given room.
-	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities []string, err error)
+	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.
+	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities map[string][]string, err error)
 	// MaxTopologicalPosition returns the highest topological position for a given room.
 	MaxTopologicalPosition(ctx context.Context, roomID string) (types.TopologyToken, error)
 	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and

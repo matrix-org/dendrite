@@ -205,6 +205,7 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	var events []gomatrixserverlib.HeaderedEvent
+	util.GetLogger(r.ctx).WithField("start", start).WithField("end", end).Infof("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending
@@ -373,13 +374,13 @@ func (e eventsByDepth) Less(i, j int) bool {
 // event, or if there is no remote homeserver to contact.
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
-func (r *messagesReq) backfill(roomID string, fromEventIDs []string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
+func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
 	var res api.QueryBackfillResponse
 	err := r.rsAPI.QueryBackfill(context.Background(), &api.QueryBackfillRequest{
-		RoomID:            roomID,
-		EarliestEventsIDs: fromEventIDs,
-		Limit:             limit,
-		ServerName:        r.cfg.Matrix.ServerName,
+		RoomID:               roomID,
+		BackwardsExtremities: backwardsExtremities,
+		Limit:                limit,
+		ServerName:           r.cfg.Matrix.ServerName,
 	}, &res)
 	if err != nil {
 		return nil, fmt.Errorf("QueryBackfill failed: %w", err)

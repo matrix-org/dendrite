@@ -89,8 +89,8 @@ type CurrentRoomState interface {
 type BackwardsExtremities interface {
 	// InsertsBackwardExtremity inserts a new backwards extremity.
 	InsertsBackwardExtremity(ctx context.Context, txn *sql.Tx, roomID, eventID string, prevEventID string) (err error)
-	// SelectBackwardExtremitiesForRoom retrieves all backwards extremities for the room.
-	SelectBackwardExtremitiesForRoom(ctx context.Context, roomID string) (eventIDs []string, err error)
+	// SelectBackwardExtremitiesForRoom retrieves all backwards extremities for the room, as a map of event_id to list of prev_event_ids.
+	SelectBackwardExtremitiesForRoom(ctx context.Context, roomID string) (bwExtrems map[string][]string, err error)
 	// DeleteBackwardExtremity removes a backwards extremity for a room, if one existed.
 	DeleteBackwardExtremity(ctx context.Context, txn *sql.Tx, roomID, knownEventID string) (err error)
 }

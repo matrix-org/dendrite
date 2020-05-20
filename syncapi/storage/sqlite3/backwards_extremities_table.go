@@ -41,7 +41,7 @@ const insertBackwardExtremitySQL = "" +
 	" ON CONFLICT (room_id, event_id, prev_event_id) DO NOTHING"
 
 const selectBackwardExtremitiesForRoomSQL = "" +
-	"SELECT DISTINCT event_id FROM syncapi_backward_extremities WHERE room_id = $1"
+	"SELECT event_id, prev_event_id FROM syncapi_backward_extremities WHERE room_id = $1"
 
 const deleteBackwardExtremitySQL = "" +
 	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND prev_event_id = $2"
@@ -79,23 +79,24 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 
 func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
 	ctx context.Context, roomID string,
-) (eventIDs []string, err error) {
+) (bwExtrems map[string][]string, err error) {
 	rows, err := s.selectBackwardExtremitiesForRoomStmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return
 	}
 	defer common.CloseAndLogIfError(ctx, rows, "selectBackwardExtremitiesForRoom: rows.close() failed")
 
+	bwExtrems = make(map[string][]string)
 	for rows.Next() {
 		var eID string
-		if err = rows.Scan(&eID); err != nil {
+		var prevEventID string
+		if err = rows.Scan(&eID, &prevEventID); err != nil {
 			return
 		}
-
-		eventIDs = append(eventIDs, eID)
+		bwExtrems[eID] = append(bwExtrems[eID], prevEventID)
 	}
 
-	return eventIDs, rows.Err()
+	return bwExtrems, rows.Err()
 }
 
 func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
