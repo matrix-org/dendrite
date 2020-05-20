@@ -20,6 +20,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"net/http"
+	"syscall/js"
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
@@ -45,14 +46,94 @@ import (
 	_ "github.com/matrix-org/go-sqlite3-js"
 )
 
+var GitCommit string
+
 func init() {
-	fmt.Println("dendrite.js starting...")
+	fmt.Printf("[%s] dendrite.js starting...\n", GitCommit)
+}
+
+const keyNameEd25519 = "_go_ed25519_key"
+
+func readKeyFromLocalStorage() (key ed25519.PrivateKey, err error) {
+	localforage := js.Global().Get("localforage")
+	if !localforage.Truthy() {
+		err = fmt.Errorf("readKeyFromLocalStorage: no localforage")
+		return
+	}
+	// https://localforage.github.io/localForage/
+	item, ok := await(localforage.Call("getItem", keyNameEd25519))
+	if !ok || !item.Truthy() {
+		err = fmt.Errorf("readKeyFromLocalStorage: no key in localforage")
+		return
+	}
+	fmt.Println("Found key in localforage")
+	// extract []byte and make an ed25519 key
+	seed := make([]byte, 32, 32)
+	js.CopyBytesToGo(seed, item)
+
+	return ed25519.NewKeyFromSeed(seed), nil
+}
+
+func writeKeyToLocalStorage(key ed25519.PrivateKey) error {
+	localforage := js.Global().Get("localforage")
+	if !localforage.Truthy() {
+		return fmt.Errorf("writeKeyToLocalStorage: no localforage")
+	}
+
+	// make a Uint8Array from the key's seed
+	seed := key.Seed()
+	jsSeed := js.Global().Get("Uint8Array").New(len(seed))
+	js.CopyBytesToJS(jsSeed, seed)
+	// write it
+	localforage.Call("setItem", keyNameEd25519, jsSeed)
+	return nil
+}
+
+// taken from https://go-review.googlesource.com/c/go/+/150917
+
+// await waits until the promise v has been resolved or rejected and returns the promise's result value.
+// The boolean value ok is true if the promise has been resolved, false if it has been rejected.
+// If v is not a promise, v itself is returned as the value and ok is true.
+func await(v js.Value) (result js.Value, ok bool) {
+	if v.Type() != js.TypeObject || v.Get("then").Type() != js.TypeFunction {
+		return v, true
+	}
+	done := make(chan struct{})
+	onResolve := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		result = args[0]
+		ok = true
+		close(done)
+		return nil
+	})
+	defer onResolve.Release()
+	onReject := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		result = args[0]
+		ok = false
+		close(done)
+		return nil
+	})
+	defer onReject.Release()
+	v.Call("then", onResolve, onReject)
+	<-done
+	return
 }
 
 func generateKey() ed25519.PrivateKey {
-	_, priv, err := ed25519.GenerateKey(nil)
+	// attempt to look for a seed in JS-land and if it exists use it.
+	priv, err := readKeyFromLocalStorage()
+	if err == nil {
+		fmt.Println("Read key from localStorage")
+		return priv
+	}
+	// generate a new key
+	fmt.Println(err, " : Generating new ed25519 key")
+	_, priv, err = ed25519.GenerateKey(nil)
 	if err != nil {
 		logrus.Fatalf("Failed to generate ed25519 key: %s", err)
+	}
+	if err := writeKeyToLocalStorage(priv); err != nil {
+		fmt.Println("failed to write key to localStorage: ", err)
+		// non-fatal, we'll just have amnesia for a while
 	}
 	return priv
 }

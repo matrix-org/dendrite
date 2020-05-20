@@ -59,6 +59,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		"userID":  userID,
 		"since":   syncReq.since,
 		"timeout": syncReq.timeout,
+		"limit":   syncReq.limit,
 	})
 
 	currPos := rp.notifier.CurrentPosition()

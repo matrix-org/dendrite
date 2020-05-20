@@ -7,6 +7,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,6 +16,7 @@ type backfillRequester struct {
 	db         storage.Database
 	fedClient  *gomatrixserverlib.FederationClient
 	thisServer gomatrixserverlib.ServerName
+	bwExtrems  map[string][]string
 
 	// per-request state
 	servers                 []gomatrixserverlib.ServerName
@@ -22,13 +24,14 @@ type backfillRequester struct {
 	eventIDMap              map[string]gomatrixserverlib.Event
 }
 
-func newBackfillRequester(db storage.Database, fedClient *gomatrixserverlib.FederationClient, thisServer gomatrixserverlib.ServerName) *backfillRequester {
+func newBackfillRequester(db storage.Database, fedClient *gomatrixserverlib.FederationClient, thisServer gomatrixserverlib.ServerName, bwExtrems map[string][]string) *backfillRequester {
 	return &backfillRequester{
 		db:                      db,
 		fedClient:               fedClient,
 		thisServer:              thisServer,
 		eventIDToBeforeStateIDs: make(map[string][]string),
 		eventIDMap:              make(map[string]gomatrixserverlib.Event),
+		bwExtrems:               bwExtrems,
 	}
 }
 
@@ -36,6 +39,11 @@ func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent
 	b.eventIDMap[targetEvent.EventID()] = targetEvent.Unwrap()
 	if ids, ok := b.eventIDToBeforeStateIDs[targetEvent.EventID()]; ok {
 		return ids, nil
+	}
+	if len(targetEvent.PrevEventIDs()) == 0 && targetEvent.Type() == "m.room.create" && targetEvent.StateKeyEquals("") {
+		util.GetLogger(ctx).WithField("room_id", targetEvent.RoomID()).Info("Backfilled to the beginning of the room")
+		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = []string{}
+		return nil, nil
 	}
 	// if we have exactly 1 prev event and we know the state of the room at that prev event, then just roll forward the prev event.
 	// Else, we have to hit /state_ids because either we don't know the state at all at this event (new backwards extremity) or
@@ -154,26 +162,44 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // It returns a list of servers which can be queried for backfill requests. These servers
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
-func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) (servers []gomatrixserverlib.ServerName) {
+func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []gomatrixserverlib.ServerName {
+	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
+	// its successor, so look it up.
+	successor := ""
+FindSuccessor:
+	for sucID, prevEventIDs := range b.bwExtrems {
+		for _, pe := range prevEventIDs {
+			if pe == eventID {
+				successor = sucID
+				break FindSuccessor
+			}
+		}
+	}
+	if successor == "" {
+		logrus.WithField("event_id", eventID).Error("ServersAtEvent: failed to find successor of this event to determine room state")
+		return nil
+	}
+	eventID = successor
+
 	// getMembershipsBeforeEventNID requires a NID, so retrieving the NID for
 	// the event is necessary.
 	NIDs, err := b.db.EventNIDs(ctx, []string{eventID})
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get event NID for event")
-		return
+		return nil
 	}
 
 	stateEntries, err := stateBeforeEvent(ctx, b.db, NIDs[eventID])
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
-		return
+		return nil
 	}
 
 	// possibly return all joined servers depending on history visiblity
 	memberEventsFromVis, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries)
 	if err != nil {
 		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
-		return
+		return nil
 	}
 	logrus.Infof("ServersAtEvent including %d current events from history visibility", len(memberEventsFromVis))
 
@@ -183,7 +209,7 @@ func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID 
 	memberEvents, err := getMembershipsAtState(ctx, b.db, stateEntries, true)
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get memberships before event")
-		return
+		return nil
 	}
 	memberEvents = append(memberEvents, memberEventsFromVis...)
 
@@ -192,6 +218,7 @@ func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID 
 	for _, event := range memberEvents {
 		serverSet[event.Origin()] = true
 	}
+	var servers []gomatrixserverlib.ServerName
 	for server := range serverSet {
 		if server == b.thisServer {
 			continue
@@ -199,7 +226,7 @@ func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID 
 		servers = append(servers, server)
 	}
 	b.servers = servers
-	return
+	return servers
 }
 
 // Backfill performs a backfill request to the given server.
