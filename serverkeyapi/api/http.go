@@ -4,6 +4,7 @@ import (
 	"context"
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/opentracing/opentracing-go"
 )
@@ -17,6 +18,7 @@ const (
 )
 
 type InputPublicKeysRequest struct {
+	Keys map[gomatrixserverlib.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyLookupResult `json:"keys"`
 }
 
 type InputPublicKeysResponse struct {
@@ -35,9 +37,11 @@ func (h *httpServerKeyInternalAPI) InputPublicKeys(
 }
 
 type QueryPublicKeysRequest struct {
+	Requests map[gomatrixserverlib.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.Timestamp `json:"requests"`
 }
 
 type QueryPublicKeysResponse struct {
+	Results map[gomatrixserverlib.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyLookupResult `json:"results"`
 }
 
 func (h *httpServerKeyInternalAPI) QueryPublicKeys(

@@ -223,6 +223,7 @@ type Dendrite struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
 		FederationAPI    Address `yaml:"federation_api"`
+		ServerKeyAPI     Address `yaml:"server_key_api"`
 		AppServiceAPI    Address `yaml:"appservice_api"`
 		SyncAPI          Address `yaml:"sync_api"`
 		RoomServer       Address `yaml:"room_server"`
@@ -237,6 +238,7 @@ type Dendrite struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
 		FederationAPI    Address `yaml:"federation_api"`
+		ServerKeyAPI     Address `yaml:"server_key_api"`
 		AppServiceAPI    Address `yaml:"appservice_api"`
 		SyncAPI          Address `yaml:"sync_api"`
 		RoomServer       Address `yaml:"room_server"`
