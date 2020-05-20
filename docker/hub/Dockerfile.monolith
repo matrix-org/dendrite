@@ -1,0 +1,13 @@
+FROM matrixdotorg/dendrite:latest AS base
+
+FROM alpine:latest
+
+COPY --from=base /build/bin/dendrite-monolith-server /usr/bin
+COPY --from=base /build/docker/services/monolith.sh /usr/bin
+
+WORKDIR /usr
+
+ENTRYPOINT ./bin/monolith.sh
+
+EXPOSE 8008
+EXPOSE 8448

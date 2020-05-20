@@ -1,0 +1,12 @@
+FROM matrixdotorg/dendrite:latest AS base
+
+FROM alpine:latest
+
+COPY --from=base /build/bin/dendrite-client-api-server /usr/bin
+COPY --from=base /build/docker/services/dendrite-client-api-server.sh /usr/bin
+
+WORKDIR /usr
+
+ENTRYPOINT ./bin/dendrite-client-api-server.sh
+
+EXPOSE 7771

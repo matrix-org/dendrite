@@ -1,0 +1,12 @@
+FROM matrixdotorg/dendrite:latest AS base
+
+FROM alpine:latest
+
+COPY --from=base /build/bin/dendrite-edu-server /usr/bin
+COPY --from=base /build/docker/services/edu-server.sh /usr/bin
+
+WORKDIR /usr
+
+ENTRYPOINT ./bin/edu-server.sh
+
+EXPOSE 7777

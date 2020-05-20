@@ -1,0 +1,13 @@
+FROM matrixdotorg/dendrite:latest AS base
+
+FROM alpine:latest
+
+COPY --from=base /build/bin/client-api-proxy /usr/bin
+COPY --from=base /build/docker/services/client-api-proxy.sh /usr/bin
+
+WORKDIR /usr
+
+ENTRYPOINT ./bin/client-api-proxy.sh
+
+EXPOSE 8008
+EXPOSE 8448
