@@ -1,13 +1,14 @@
-FROM neilalexander/dendrite:latest AS base
+FROM matrixdotorg/dendrite:latest AS base
 
 FROM alpine:latest
 
 COPY --from=base /build/bin/federation-api-proxy /usr/bin
-COPY --from=base /build/docker/services/federation-api-proxy.sh /usr/bin
 
-WORKDIR /usr
+WORKDIR /etc/dendrite
 
-ENTRYPOINT ./bin/federation-api-proxy.sh
+ENTRYPOINT ["/usr/bin/federation-api-proxy", "--bind-address=:8448", "--federation-api-url=http://federation_api_server:7772", "--media-api-server-url=http://media_api:7774" ]
 
 EXPOSE 8008
 EXPOSE 8448
+
+VOLUME /etc/dendrite

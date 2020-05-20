@@ -1,12 +1,13 @@
-FROM neilalexander/dendrite:latest AS base
+FROM matrixdotorg/dendrite:latest AS base
 
 FROM alpine:latest
 
 COPY --from=base /build/bin/dendrite-federation-sender-server /usr/bin
-COPY --from=base /build/docker/services/federation-sender.sh /usr/bin
 
-WORKDIR /usr
+WORKDIR /etc/dendrite
 
-ENTRYPOINT ./bin/federation-sender.sh
+ENTRYPOINT ["/usr/bin/dendrite-federation-sender-server", "--config=dendrite.yaml"]
 
 EXPOSE 7776
+
+VOLUME /etc/dendrite

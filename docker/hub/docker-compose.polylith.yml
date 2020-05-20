@@ -1,0 +1,118 @@
+version: "3.4"
+services:
+  client_api_proxy:
+    container_name: dendrite_client_api_proxy
+    hostname: client_api_proxy
+    image: matrixdotorg/dendrite:clientproxy
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+    depends_on:
+      - sync_api
+      - client_api
+      - media_api
+      - public_rooms_api
+    ports:
+      - "8008:8008"
+
+  client_api:
+    container_name: dendrite_client_api
+    hostname: client_api
+    image: matrixdotorg/dendrite:clientapi
+    volumes:
+      - ./config:/etc/dendrite
+      - room_server
+    networks:
+      - internal
+
+  media_api:
+    container_name: dendrite_media_api
+    hostname: media_api
+    image: matrixdotorg/dendrite:mediaapi
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+
+  public_rooms_api:
+    container_name: dendrite_public_rooms_api
+    hostname: public_rooms_api
+    image: matrixdotorg/dendrite:publicroomsapi
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+
+  sync_api:
+    container_name: dendrite_sync_api
+    hostname: sync_api
+    image: matrixdotorg/dendrite:syncapi
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+
+  room_server:
+    container_name: dendrite_room_server
+    hostname: room_server
+    image: matrixdotorg/dendrite:roomserver
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+
+  edu_server:
+    container_name: dendrite_edu_server
+    hostname: edu_server
+    image: matrixdotorg/dendrite:eduserver
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+
+  federation_api_proxy:
+    container_name: dendrite_federation_api_proxy
+    hostname: federation_api_proxy
+    image: matrixdotorg/dendrite:federationproxy
+    volumes:
+      - ./config:/etc/dendrite
+    depends_on:
+      - federation_api
+      - federation_sender
+      - media_api
+    networks:
+      - internal
+    ports:
+      - "8448:8448"
+
+  federation_api:
+    container_name: dendrite_federation_api
+    hostname: federation_api
+    image: matrixdotorg/dendrite:federationapi
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+
+  federation_sender:
+    container_name: dendrite_federation_sender
+    hostname: federation_sender
+    image: matrixdotorg/dendrite:federationsender
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+      
+  key_server:
+    container_name: dendrite_key_server
+    hostname: key_server
+    image: matrixdotorg/dendrite:keyserver
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+        - internal
+
+networks:
+  internal:
+    attachable: true

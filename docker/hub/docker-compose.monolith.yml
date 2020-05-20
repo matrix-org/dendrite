@@ -1,0 +1,18 @@
+version: "3.4"
+services:
+  postgres:
+    container_name: dendrite_postgres
+    hostname: postgres
+    image: postgres:9.5
+    restart: always
+    volumes:
+        - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
+    environment:
+        POSTGRES_PASSWORD: itsasecret
+        POSTGRES_USER: dendrite
+    networks:
+        - internal
+
+networks:
+  internal:
+    attachable: true

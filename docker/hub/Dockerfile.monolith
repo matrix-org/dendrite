@@ -1,13 +1,14 @@
-FROM neilalexander/dendrite:latest AS base
+FROM matrixdotorg/dendrite:latest AS base
 
 FROM alpine:latest
 
 COPY --from=base /build/bin/dendrite-monolith-server /usr/bin
-COPY --from=base /build/docker/services/monolith.sh /usr/bin
 
-WORKDIR /usr
+WORKDIR /etc/dendrite
 
-ENTRYPOINT ./bin/monolith.sh
+ENTRYPOINT [ "/usr/bin/dendrite-monolith-server", "--tls-cert=server.crt", "--tls-key=server.key", "--config=dendrite.yaml" ]
 
 EXPOSE 8008
 EXPOSE 8448
+
+VOLUME /etc/dendrite
