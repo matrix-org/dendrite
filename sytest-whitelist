@@ -283,3 +283,4 @@ Outbound federation can backfill events
 Inbound federation can backfill events
 Backfill checks the events requested belong to the room
 Backfilled events whose prev_events are in a different room do not allow cross-room back-pagination
+Outbound federation can request missing events
