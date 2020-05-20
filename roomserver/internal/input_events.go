@@ -120,7 +120,11 @@ func (r *RoomserverInternalAPI) calculateAndSetState(
 		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
 		var joinEventNIDs []types.EventNID
+		// Request join memberships only for local users only.
 		if joinEventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, true); err == nil {
+			// If we have no local users that are joined to the room then any state about
+			// the room that we have is quite possibly out of date. Therefore in that case
+			// we should overwrite it rather than merge it.
 			stateAtEvent.Overwrite = len(joinEventNIDs) == 0
 		}
 
@@ -165,9 +169,9 @@ func (r *RoomserverInternalAPI) processInviteEvent(
 	}).Info("processing invite event")
 
 	_, domain, _ := gomatrixserverlib.SplitID('@', targetUserID)
-	targetLocal := domain == r.Cfg.Matrix.ServerName
+	isTargetLocalUser := domain == r.Cfg.Matrix.ServerName
 
-	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, targetLocal, input.RoomVersion)
+	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocalUser, input.RoomVersion)
 	if err != nil {
 		return nil, err
 	}

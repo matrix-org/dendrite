@@ -132,12 +132,12 @@ func (r *RoomserverInternalAPI) updateMembership(
 }
 
 func (r *RoomserverInternalAPI) isLocalTarget(event *gomatrixserverlib.Event) bool {
-	targetLocal := false
+	isTargetLocalUser := false
 	if statekey := event.StateKey(); statekey != nil {
 		_, domain, _ := gomatrixserverlib.SplitID('@', *statekey)
-		targetLocal = domain == r.Cfg.Matrix.ServerName
+		isTargetLocalUser = domain == r.Cfg.Matrix.ServerName
 	}
-	return targetLocal
+	return isTargetLocalUser
 }
 
 func updateToInviteMembership(
