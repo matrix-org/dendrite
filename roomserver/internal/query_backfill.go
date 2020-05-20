@@ -16,6 +16,7 @@ type backfillRequester struct {
 	db         storage.Database
 	fedClient  *gomatrixserverlib.FederationClient
 	thisServer gomatrixserverlib.ServerName
+	bwExtrems  map[string][]string
 
 	// per-request state
 	servers                 []gomatrixserverlib.ServerName
@@ -23,13 +24,14 @@ type backfillRequester struct {
 	eventIDMap              map[string]gomatrixserverlib.Event
 }
 
-func newBackfillRequester(db storage.Database, fedClient *gomatrixserverlib.FederationClient, thisServer gomatrixserverlib.ServerName) *backfillRequester {
+func newBackfillRequester(db storage.Database, fedClient *gomatrixserverlib.FederationClient, thisServer gomatrixserverlib.ServerName, bwExtrems map[string][]string) *backfillRequester {
 	return &backfillRequester{
 		db:                      db,
 		fedClient:               fedClient,
 		thisServer:              thisServer,
 		eventIDToBeforeStateIDs: make(map[string][]string),
 		eventIDMap:              make(map[string]gomatrixserverlib.Event),
+		bwExtrems:               bwExtrems,
 	}
 }
 
@@ -161,6 +163,24 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
 func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) (servers []gomatrixserverlib.ServerName) {
+	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
+	// its successor, so look it up.
+	successor := ""
+FindSuccessor:
+	for sucID, prevEventIDs := range b.bwExtrems {
+		for _, pe := range prevEventIDs {
+			if pe == eventID {
+				successor = sucID
+				break FindSuccessor
+			}
+		}
+	}
+	if successor == "" {
+		logrus.WithField("event_id", eventID).Error("ServersAtEvent: failed to find successor of this event to determine room state")
+		return
+	}
+	eventID = successor
+
 	// getMembershipsBeforeEventNID requires a NID, so retrieving the NID for
 	// the event is necessary.
 	NIDs, err := b.db.EventNIDs(ctx, []string{eventID})

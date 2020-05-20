@@ -69,9 +69,14 @@ func Backfill(
 
 	// Populate the request.
 	req := api.QueryBackfillRequest{
-		RoomID:            roomID,
-		EarliestEventsIDs: eIDs,
-		ServerName:        request.Origin(),
+		RoomID: roomID,
+		// we don't know who the successors are for these events, which won't
+		// be a problem because we don't use that information when servicing /backfill requests,
+		// only when making them. TODO: Think of a better API shape
+		BackwardsExtremities: map[string][]string{
+			"": eIDs,
+		},
+		ServerName: request.Origin(),
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
@@ -103,6 +108,12 @@ func Backfill(
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	) {
 		eventJSONs = append(eventJSONs, e.JSON())
+	}
+
+	// sytest wants these in reversed order, similar to /messages, so reverse them now.
+	for i := len(eventJSONs)/2 - 1; i >= 0; i-- {
+		opp := len(eventJSONs) - 1 - i
+		eventJSONs[i], eventJSONs[opp] = eventJSONs[opp], eventJSONs[i]
 	}
 
 	txn := gomatrixserverlib.Transaction{

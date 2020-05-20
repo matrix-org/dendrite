@@ -280,3 +280,4 @@ Inbound federation can get public room list
 An event which redacts itself should be ignored
 A pair of events which redact each other should be ignored
 Outbound federation can backfill events
+Inbound federation can backfill events
