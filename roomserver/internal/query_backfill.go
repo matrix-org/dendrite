@@ -162,7 +162,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // It returns a list of servers which can be queried for backfill requests. These servers
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
-func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) (servers []gomatrixserverlib.ServerName) {
+func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []gomatrixserverlib.ServerName {
 	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
 	// its successor, so look it up.
 	successor := ""
@@ -177,7 +177,7 @@ FindSuccessor:
 	}
 	if successor == "" {
 		logrus.WithField("event_id", eventID).Error("ServersAtEvent: failed to find successor of this event to determine room state")
-		return
+		return nil
 	}
 	eventID = successor
 
@@ -186,20 +186,20 @@ FindSuccessor:
 	NIDs, err := b.db.EventNIDs(ctx, []string{eventID})
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get event NID for event")
-		return
+		return nil
 	}
 
 	stateEntries, err := stateBeforeEvent(ctx, b.db, NIDs[eventID])
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
-		return
+		return nil
 	}
 
 	// possibly return all joined servers depending on history visiblity
 	memberEventsFromVis, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries)
 	if err != nil {
 		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
-		return
+		return nil
 	}
 	logrus.Infof("ServersAtEvent including %d current events from history visibility", len(memberEventsFromVis))
 
@@ -209,7 +209,7 @@ FindSuccessor:
 	memberEvents, err := getMembershipsAtState(ctx, b.db, stateEntries, true)
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get memberships before event")
-		return
+		return nil
 	}
 	memberEvents = append(memberEvents, memberEventsFromVis...)
 
@@ -218,6 +218,7 @@ FindSuccessor:
 	for _, event := range memberEvents {
 		serverSet[event.Origin()] = true
 	}
+	var servers []gomatrixserverlib.ServerName
 	for server := range serverSet {
 		if server == b.thisServer {
 			continue
@@ -225,7 +226,7 @@ FindSuccessor:
 		servers = append(servers, server)
 	}
 	b.servers = servers
-	return
+	return servers
 }
 
 // Backfill performs a backfill request to the given server.
