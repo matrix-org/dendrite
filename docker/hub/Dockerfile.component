@@ -1,0 +1,13 @@
+FROM matrixdotorg/dendrite:latest AS base
+
+FROM alpine:latest
+
+ARG component=monolith
+ENV entrypoint=${component}
+
+COPY --from=base /build/bin/${component} /usr/bin
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
+
+ENTRYPOINT /usr/bin/${entrypoint} $@
