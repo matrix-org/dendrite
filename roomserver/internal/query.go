@@ -267,7 +267,7 @@ func (r *RoomserverInternalAPI) QueryMembershipsForRoom(
 	var stateEntries []types.StateEntry
 	if stillInRoom {
 		var eventNIDs []types.EventNID
-		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, request.JoinedOnly)
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, request.JoinedOnly, false)
 		if err != nil {
 			return err
 		}
@@ -495,14 +495,8 @@ func (r *RoomserverInternalAPI) QueryBackfill(
 	// defines the highest number of elements in the map below.
 	visited := make(map[string]bool, request.Limit)
 
-	// The provided event IDs have already been seen by the request's emitter,
-	// and will be retrieved anyway, so there's no need to care about them if
-	// they appear in our exploration of the event tree.
-	for _, id := range request.EarliestEventsIDs {
-		visited[id] = true
-	}
-
-	front = request.EarliestEventsIDs
+	// this will include these events which is what we want
+	front = request.PrevEventIDs()
 
 	// Scan the event tree for events to send back.
 	resultNIDs, err := r.scanEventTree(ctx, front, visited, request.Limit, request.ServerName)
@@ -534,10 +528,15 @@ func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *
 	if err != nil {
 		return fmt.Errorf("backfillViaFederation: unknown room version for room %s : %w", req.RoomID, err)
 	}
-	requester := newBackfillRequester(r.DB, r.FedClient, r.ServerName)
+	requester := newBackfillRequester(r.DB, r.FedClient, r.ServerName, req.BackwardsExtremities)
+	// Request 100 items regardless of what the query asks for.
+	// We don't want to go much higher than this.
+	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
+	// (so we don't need to hit /state_ids which the test has no listener for)
+	// Specifically the test "Outbound federation can backfill events"
 	events, err := gomatrixserverlib.RequestBackfill(
 		ctx, requester,
-		r.KeyRing, req.RoomID, roomVer, req.EarliestEventsIDs, req.Limit)
+		r.KeyRing, req.RoomID, roomVer, req.PrevEventIDs(), 100)
 	if err != nil {
 		return err
 	}
@@ -592,7 +591,7 @@ func (r *RoomserverInternalAPI) isServerCurrentlyInRoom(ctx context.Context, ser
 		return false, err
 	}
 
-	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true)
+	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, false)
 	if err != nil {
 		return false, err
 	}

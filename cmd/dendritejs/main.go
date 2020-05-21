@@ -47,8 +47,10 @@ import (
 	_ "github.com/matrix-org/go-sqlite3-js"
 )
 
+var GitCommit string
+
 func init() {
-	fmt.Println("dendrite.js starting...")
+	fmt.Printf("[%s] dendrite.js starting...\n", GitCommit)
 }
 
 const keyNameEd25519 = "_go_ed25519_key"

@@ -21,6 +21,7 @@ import (
 
 	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -228,12 +229,22 @@ type QueryStateAndAuthChainResponse struct {
 type QueryBackfillRequest struct {
 	// The room to backfill
 	RoomID string `json:"room_id"`
-	// Events to start paginating from.
-	EarliestEventsIDs []string `json:"earliest_event_ids"`
+	// A map of backwards extremity event ID to a list of its prev_event IDs.
+	BackwardsExtremities map[string][]string `json:"backwards_extremities"`
 	// The maximum number of events to retrieve.
 	Limit int `json:"limit"`
 	// The server interested in the events.
 	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+}
+
+// PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.
+func (r *QueryBackfillRequest) PrevEventIDs() []string {
+	var prevEventIDs []string
+	for _, pes := range r.BackwardsExtremities {
+		prevEventIDs = append(prevEventIDs, pes...)
+	}
+	prevEventIDs = util.UniqueStrings(prevEventIDs)
+	return prevEventIDs
 }
 
 // QueryBackfillResponse is a response to QueryBackfill.
