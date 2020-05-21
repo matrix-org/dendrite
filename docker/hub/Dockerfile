@@ -4,7 +4,7 @@ RUN apk --update --no-cache add bash build-base
 
 WORKDIR /build
 
-ADD . /build
+COPY . /build
 
 RUN mkdir -p bin
 RUN sh ./build.sh
