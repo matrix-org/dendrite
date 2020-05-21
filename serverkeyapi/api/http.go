@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	commonHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/opentracing/opentracing-go"

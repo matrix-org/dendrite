@@ -4,12 +4,7 @@ import (
 	"context"
 	"errors"
 
-<<<<<<< HEAD:serverkeyapi/storage/cache/keydb.go
-	"github.com/matrix-org/dendrite/common/caching"
-=======
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/keydb"
->>>>>>> master:internal/keydb/cache/keydb.go
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

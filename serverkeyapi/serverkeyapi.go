@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/serverkeyapi/internal"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage/cache"

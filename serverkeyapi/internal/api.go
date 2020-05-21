@@ -3,8 +3,8 @@ package internal
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/common/caching"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"

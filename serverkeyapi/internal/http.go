@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -12,7 +12,7 @@ import (
 
 func (s *ServerKeyAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(api.ServerKeyQueryPublicKeyPath,
-		common.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
+		internal.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
 			result := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 			request := api.QueryPublicKeysRequest{}
 			response := api.QueryPublicKeysResponse{}
@@ -39,7 +39,7 @@ func (s *ServerKeyAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(api.ServerKeyInputPublicKeyPath,
-		common.MakeInternalAPI("inputPublicKeys", func(req *http.Request) util.JSONResponse {
+		internal.MakeInternalAPI("inputPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.InputPublicKeysRequest{}
 			response := api.InputPublicKeysResponse{}
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

@@ -22,13 +22,8 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
-<<<<<<< HEAD:serverkeyapi/storage/keydb_wasm.go
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/serverkeyapi/storage/sqlite3"
-=======
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/keydb/sqlite3"
->>>>>>> master:internal/keydb/keydb_wasm.go
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
