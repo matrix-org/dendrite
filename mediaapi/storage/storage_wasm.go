@@ -35,7 +35,7 @@ func Open(
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
-		return sqlite3.Open(dataSourceName)
+		return sqlite3.Open(uri.Path)
 	default:
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
