@@ -1,13 +1,13 @@
 #!/bin/bash
 
-docker build matrixdotorg/dendrite:clientapi
-docker build matrixdotorg/dendrite:clientproxy
-docker build matrixdotorg/dendrite:eduserver
-docker build matrixdotorg/dendrite:federationapi
-docker build matrixdotorg/dendrite:federationsender
-docker build matrixdotorg/dendrite:federationproxy
-docker build matrixdotorg/dendrite:keyserver
-docker build matrixdotorg/dendrite:mediaapi
-docker build matrixdotorg/dendrite:publicroomsapi
-docker build matrixdotorg/dendrite:roomserver
-docker build matrixdotorg/dendrite:syncapi
+docker push matrixdotorg/dendrite:clientapi
+docker push matrixdotorg/dendrite:clientproxy
+docker push matrixdotorg/dendrite:eduserver
+docker push matrixdotorg/dendrite:federationapi
+docker push matrixdotorg/dendrite:federationsender
+docker push matrixdotorg/dendrite:federationproxy
+docker push matrixdotorg/dendrite:keyserver
+docker push matrixdotorg/dendrite:mediaapi
+docker push matrixdotorg/dendrite:publicroomsapi
+docker push matrixdotorg/dendrite:roomserver
+docker push matrixdotorg/dendrite:syncapi
