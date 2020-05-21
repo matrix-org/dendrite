@@ -60,7 +60,7 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 	defer r.mutex.Unlock()
 	for i := range request.InputInviteEvents {
 		var loopback *api.InputRoomEvent
-		if loopback, err = processInviteEvent(ctx, r.DB, r, request.InputInviteEvents[i]); err != nil {
+		if loopback, err = r.processInviteEvent(ctx, r, request.InputInviteEvents[i]); err != nil {
 			return err
 		}
 		// The processInviteEvent function can optionally return a
@@ -71,7 +71,7 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 		}
 	}
 	for i := range request.InputRoomEvents {
-		if response.EventID, err = processRoomEvent(ctx, r.DB, r, request.InputRoomEvents[i]); err != nil {
+		if response.EventID, err = r.processRoomEvent(ctx, request.InputRoomEvents[i]); err != nil {
 			return err
 		}
 	}
