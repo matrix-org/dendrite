@@ -1,7 +1,6 @@
 version: "3.4"
 services:
   postgres:
-    container_name: dendrite_postgres
     hostname: postgres
     image: postgres:9.5
     restart: always
@@ -14,7 +13,6 @@ services:
       - internal
 
   zookeeper:
-    container_name: dendrite_zookeeper
     hostname: zookeeper
     image: zookeeper
     networks:

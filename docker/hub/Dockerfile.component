@@ -10,4 +10,4 @@ COPY --from=base /build/bin/${component} /usr/bin
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
 
-ENTRYPOINT /usr/bin/$entrypoint
+ENTRYPOINT /usr/bin/${entrypoint} $@
