@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 const roomAliasesSchema = `
@@ -97,7 +97,7 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectAliasesFromRoomID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectAliasesFromRoomID: rows.close() failed")
 
 	var aliases []string
 	for rows.Next() {

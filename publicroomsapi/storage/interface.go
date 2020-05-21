@@ -17,12 +17,12 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
-	common.PartitionStorer
+	internal.PartitionStorer
 	GetRoomVisibility(ctx context.Context, roomID string) (bool, error)
 	SetRoomVisibility(ctx context.Context, visible bool, roomID string) error
 	CountPublicRooms(ctx context.Context) (int64, error)

@@ -26,7 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -158,7 +158,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
-	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
+	stmt := internal.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(
 		ctx, r.Low(), r.High(),
@@ -172,7 +172,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectStateInRange: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectStateInRange: rows.close() failed")
 	// Fetch all the state change events for all rooms between the two positions then loop each event and:
 	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
 	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
@@ -239,7 +239,7 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := common.TxStmt(txn, s.selectMaxEventIDStmt)
+	stmt := internal.TxStmt(txn, s.selectMaxEventIDStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
@@ -275,7 +275,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return
 	}
 
-	stmt := common.TxStmt(txn, s.insertEventStmt)
+	stmt := internal.TxStmt(txn, s.insertEventStmt)
 	err = stmt.QueryRowContext(
 		ctx,
 		event.RoomID(),
@@ -303,15 +303,15 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 ) ([]types.StreamEvent, error) {
 	var stmt *sql.Stmt
 	if onlySyncEvents {
-		stmt = common.TxStmt(txn, s.selectRecentEventsForSyncStmt)
+		stmt = internal.TxStmt(txn, s.selectRecentEventsForSyncStmt)
 	} else {
-		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
+		stmt = internal.TxStmt(txn, s.selectRecentEventsStmt)
 	}
 	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -333,12 +333,12 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, r types.Range, limit int,
 ) ([]types.StreamEvent, error) {
-	stmt := common.TxStmt(txn, s.selectEarlyEventsStmt)
+	stmt := internal.TxStmt(txn, s.selectEarlyEventsStmt)
 	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectEarlyEvents: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectEarlyEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -357,12 +357,12 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 func (s *outputRoomEventsStatements) SelectEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
-	stmt := common.TxStmt(txn, s.selectEventsStmt)
+	stmt := internal.TxStmt(txn, s.selectEventsStmt)
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
 	return rowsToStreamEvents(rows)
 }
 

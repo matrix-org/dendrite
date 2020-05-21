@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 const roomAliasesSchema = `
@@ -77,7 +77,7 @@ func (s *roomAliasesStatements) prepare(db *sql.DB) (err error) {
 func (s *roomAliasesStatements) insertRoomAlias(
 	ctx context.Context, txn *sql.Tx, alias string, roomID string, creatorUserID string,
 ) (err error) {
-	insertStmt := common.TxStmt(txn, s.insertRoomAliasStmt)
+	insertStmt := internal.TxStmt(txn, s.insertRoomAliasStmt)
 	_, err = insertStmt.ExecContext(ctx, alias, roomID, creatorUserID)
 	return
 }
@@ -85,7 +85,7 @@ func (s *roomAliasesStatements) insertRoomAlias(
 func (s *roomAliasesStatements) selectRoomIDFromAlias(
 	ctx context.Context, txn *sql.Tx, alias string,
 ) (roomID string, err error) {
-	selectStmt := common.TxStmt(txn, s.selectRoomIDFromAliasStmt)
+	selectStmt := internal.TxStmt(txn, s.selectRoomIDFromAliasStmt)
 	err = selectStmt.QueryRowContext(ctx, alias).Scan(&roomID)
 	if err == sql.ErrNoRows {
 		return "", nil
@@ -97,13 +97,13 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (aliases []string, err error) {
 	aliases = []string{}
-	selectStmt := common.TxStmt(txn, s.selectAliasesFromRoomIDStmt)
+	selectStmt := internal.TxStmt(txn, s.selectAliasesFromRoomIDStmt)
 	rows, err := selectStmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return
 	}
 
-	defer common.CloseAndLogIfError(ctx, rows, "selectAliasesFromRoomID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectAliasesFromRoomID: rows.close() failed")
 
 	for rows.Next() {
 		var alias string
@@ -120,7 +120,7 @@ func (s *roomAliasesStatements) selectAliasesFromRoomID(
 func (s *roomAliasesStatements) selectCreatorIDFromAlias(
 	ctx context.Context, txn *sql.Tx, alias string,
 ) (creatorID string, err error) {
-	selectStmt := common.TxStmt(txn, s.selectCreatorIDFromAliasStmt)
+	selectStmt := internal.TxStmt(txn, s.selectCreatorIDFromAliasStmt)
 	err = selectStmt.QueryRowContext(ctx, alias).Scan(&creatorID)
 	if err == sql.ErrNoRows {
 		return "", nil
@@ -131,7 +131,7 @@ func (s *roomAliasesStatements) selectCreatorIDFromAlias(
 func (s *roomAliasesStatements) deleteRoomAlias(
 	ctx context.Context, txn *sql.Tx, alias string,
 ) (err error) {
-	deleteStmt := common.TxStmt(txn, s.deleteRoomAliasStmt)
+	deleteStmt := internal.TxStmt(txn, s.deleteRoomAliasStmt)
 	_, err = deleteStmt.ExecContext(ctx, alias)
 	return
 }

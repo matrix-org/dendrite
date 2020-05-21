@@ -20,7 +20,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/matrix-org/dendrite/common/test"
+	"github.com/matrix-org/dendrite/internal/test"
 )
 
 const usage = `Usage: %s

@@ -21,9 +21,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/transactions"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -148,14 +148,14 @@ func generateSendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := common.BuildEvent(req.Context(), &builder, cfg, evTime, rsAPI, &queryRes)
-	if err == common.ErrRoomNoExists {
+	e, err := internal.BuildEvent(req.Context(), &builder, cfg, evTime, rsAPI, &queryRes)
+	if err == internal.ErrRoomNoExists {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	} else if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("common.BuildEvent failed")
+		util.GetLogger(req.Context()).WithError(err).Error("internal.BuildEvent failed")
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}

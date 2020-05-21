@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/ngrok/sqlmw"
 	"github.com/sirupsen/logrus"
 )
@@ -78,7 +78,7 @@ func (in *traceInterceptor) RowsNext(c context.Context, rows driver.Rows, dest [
 // Open opens a database specified by its database driver name and a driver-specific data source name,
 // usually consisting of at least a database name and connection information. Includes tracing driver
 // if DENDRITE_TRACE_SQL=1
-func Open(driverName, dsn string, dbProperties common.DbProperties) (*sql.DB, error) {
+func Open(driverName, dsn string, dbProperties internal.DbProperties) (*sql.DB, error) {
 	if tracingEnabled {
 		// install the wrapped driver
 		driverName += "-trace"
@@ -87,7 +87,7 @@ func Open(driverName, dsn string, dbProperties common.DbProperties) (*sql.DB, er
 	if err != nil {
 		return nil, err
 	}
-	if driverName != common.SQLiteDriverName() && dbProperties != nil {
+	if driverName != internal.SQLiteDriverName() && dbProperties != nil {
 		logrus.WithFields(logrus.Fields{
 			"MaxOpenConns":    dbProperties.MaxOpenConns(),
 			"MaxIdleConns":    dbProperties.MaxIdleConns(),

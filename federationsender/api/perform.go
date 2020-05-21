@@ -3,8 +3,8 @@ package api
 import (
 	"context"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
@@ -40,7 +40,7 @@ func (h *httpFederationSenderInternalAPI) PerformDirectoryLookup(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformDirectoryLookupRequestPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 type PerformJoinRequest struct {
@@ -63,7 +63,7 @@ func (h *httpFederationSenderInternalAPI) PerformJoin(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformJoinRequestPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 type PerformLeaveRequest struct {
@@ -85,5 +85,5 @@ func (h *httpFederationSenderInternalAPI) PerformLeave(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformLeaveRequestPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

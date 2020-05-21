@@ -16,7 +16,7 @@
 package types
 
 import (
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -174,7 +174,7 @@ type RoomRecentEventsUpdater interface {
 	// It will share the same transaction as this updater.
 	MembershipUpdater(targetUserNID EventStateKeyNID, isTargetLocalUser bool) (MembershipUpdater, error)
 	// Implements Transaction so it can be committed or rolledback
-	common.Transaction
+	internal.Transaction
 }
 
 // A MembershipUpdater is used to update the membership of a user in a room.
@@ -199,7 +199,7 @@ type MembershipUpdater interface {
 	// Returns a list of invite event IDs that this state change retired.
 	SetToLeave(senderUserID string, eventID string) (inviteEventIDs []string, err error)
 	// Implements Transaction so it can be committed or rolledback.
-	common.Transaction
+	internal.Transaction
 }
 
 // A MissingEventError is an error that happened because the roomserver was

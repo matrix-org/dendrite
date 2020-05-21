@@ -27,8 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	"github.com/matrix-org/dendrite/common"
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	"github.com/matrix-org/dendrite/internal"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -119,7 +119,7 @@ func (h *httpAppServiceQueryAPI) RoomAliasExists(
 	defer span.Finish()
 
 	apiURL := h.appserviceURL + AppServiceRoomAliasExistsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // UserIDExists implements AppServiceQueryAPI
@@ -132,7 +132,7 @@ func (h *httpAppServiceQueryAPI) UserIDExists(
 	defer span.Finish()
 
 	apiURL := h.appserviceURL + AppServiceUserIDExistsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // RetrieveUserProfile is a wrapper that queries both the local database and
@@ -165,7 +165,7 @@ func RetrieveUserProfile(
 
 	// If no user exists, return
 	if !userResp.UserIDExists {
-		return nil, common.ErrProfileNoExists
+		return nil, internal.ErrProfileNoExists
 	}
 
 	// Try to query the user from the local database again

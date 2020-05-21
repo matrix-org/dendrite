@@ -15,9 +15,9 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/keydb"
 )
 
 func main() {

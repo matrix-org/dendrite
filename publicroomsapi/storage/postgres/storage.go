@@ -20,7 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -29,14 +29,14 @@ import (
 // PublicRoomsServerDatabase represents a public rooms server database.
 type PublicRoomsServerDatabase struct {
 	db *sql.DB
-	common.PartitionOffsetStatements
+	internal.PartitionOffsetStatements
 	statements publicRoomsStatements
 }
 
 type attributeValue interface{}
 
 // NewPublicRoomsServerDatabase creates a new public rooms server database.
-func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties common.DbProperties) (*PublicRoomsServerDatabase, error) {
+func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties internal.DbProperties) (*PublicRoomsServerDatabase, error) {
 	var db *sql.DB
 	var err error
 	if db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
@@ -136,33 +136,33 @@ func (d *PublicRoomsServerDatabase) UpdateRoomFromEvent(
 	case "m.room.aliases":
 		return d.updateRoomAliases(ctx, event)
 	case "m.room.canonical_alias":
-		var content common.CanonicalAliasContent
+		var content internal.CanonicalAliasContent
 		field := &(content.Alias)
 		attrName := "canonical_alias"
 		return d.updateStringAttribute(ctx, attrName, event, &content, field)
 	case "m.room.name":
-		var content common.NameContent
+		var content internal.NameContent
 		field := &(content.Name)
 		attrName := "name"
 		return d.updateStringAttribute(ctx, attrName, event, &content, field)
 	case "m.room.topic":
-		var content common.TopicContent
+		var content internal.TopicContent
 		field := &(content.Topic)
 		attrName := "topic"
 		return d.updateStringAttribute(ctx, attrName, event, &content, field)
 	case "m.room.avatar":
-		var content common.AvatarContent
+		var content internal.AvatarContent
 		field := &(content.URL)
 		attrName := "avatar_url"
 		return d.updateStringAttribute(ctx, attrName, event, &content, field)
 	case "m.room.history_visibility":
-		var content common.HistoryVisibilityContent
+		var content internal.HistoryVisibilityContent
 		field := &(content.HistoryVisibility)
 		attrName := "world_readable"
 		strForTrue := "world_readable"
 		return d.updateBooleanAttribute(ctx, attrName, event, &content, field, strForTrue)
 	case "m.room.guest_access":
-		var content common.GuestAccessContent
+		var content internal.GuestAccessContent
 		field := &(content.GuestAccess)
 		attrName := "guest_can_join"
 		strForTrue := "can_join"
@@ -243,7 +243,7 @@ func (d *PublicRoomsServerDatabase) updateBooleanAttribute(
 func (d *PublicRoomsServerDatabase) updateRoomAliases(
 	ctx context.Context, aliasesEvent gomatrixserverlib.Event,
 ) error {
-	var content common.AliasesContent
+	var content internal.AliasesContent
 	if err := json.Unmarshal(aliasesEvent.Content(), &content); err != nil {
 		return err
 	}

@@ -20,7 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -123,12 +123,12 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
 ) (map[string]gomatrixserverlib.HeaderedEvent, error) {
-	stmt := common.TxStmt(txn, s.selectInviteEventsInRangeStmt)
+	stmt := internal.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
 	result := map[string]gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var (
@@ -153,7 +153,7 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := common.TxStmt(txn, s.selectMaxInviteIDStmt)
+	stmt := internal.TxStmt(txn, s.selectMaxInviteIDStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64

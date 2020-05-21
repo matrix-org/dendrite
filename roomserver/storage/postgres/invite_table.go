@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -98,7 +98,7 @@ func (s *inviteStatements) insertInviteEvent(
 	targetUserNID, senderUserNID types.EventStateKeyNID,
 	inviteEventJSON []byte,
 ) (bool, error) {
-	result, err := common.TxStmt(txn, s.insertInviteEventStmt).ExecContext(
+	result, err := internal.TxStmt(txn, s.insertInviteEventStmt).ExecContext(
 		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)
 	if err != nil {
@@ -115,12 +115,12 @@ func (s *inviteStatements) updateInviteRetired(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) ([]string, error) {
-	stmt := common.TxStmt(txn, s.updateInviteRetiredStmt)
+	stmt := internal.TxStmt(txn, s.updateInviteRetiredStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "updateInviteRetired: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "updateInviteRetired: rows.close() failed")
 
 	var eventIDs []string
 	for rows.Next() {
@@ -144,7 +144,7 @@ func (s *inviteStatements) selectInviteActiveForUserInRoom(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
 	var result []types.EventStateKeyNID
 	for rows.Next() {
 		var senderUserNID int64

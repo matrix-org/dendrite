@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/common/caching"
 	fsInputAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/caching"
 )
 
 type httpRoomserverInternalAPI struct {

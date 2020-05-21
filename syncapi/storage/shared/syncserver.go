@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -106,7 +106,7 @@ func (d *Database) GetStateEvent(
 func (d *Database) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *gomatrixserverlib.StateFilter,
 ) (stateEvents []gomatrixserverlib.HeaderedEvent, err error) {
-	err = common.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
 		return err
 	})
@@ -116,7 +116,7 @@ func (d *Database) GetStateEventsForRoom(
 func (d *Database) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
 	var maxID int64
 	var err error
-	err = common.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		maxID, err = d.OutputEvents.SelectMaxEventID(ctx, txn)
 		if err != nil {
 			return err
@@ -148,7 +148,7 @@ func (d *Database) SyncStreamPosition(ctx context.Context) (types.StreamPosition
 func (d *Database) AddInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (sp types.StreamPosition, err error) {
-	err = common.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
 		return err
 	})
@@ -187,7 +187,7 @@ func (d *Database) GetAccountDataInRange(
 func (d *Database) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (sp types.StreamPosition, err error) {
-	err = common.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		sp, err = d.AccountData.InsertAccountData(ctx, txn, userID, roomID, dataType)
 		return err
 	})
@@ -255,7 +255,7 @@ func (d *Database) WriteEvent(
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
 ) (pduPosition types.StreamPosition, returnErr error) {
-	returnErr = common.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	returnErr = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.OutputEvents.InsertEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
@@ -355,7 +355,7 @@ func (d *Database) GetEventsInTopologicalRange(
 }
 
 func (d *Database) SyncPosition(ctx context.Context) (tok types.StreamingToken, err error) {
-	err = common.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		pos, err := d.syncPositionTx(ctx, txn)
 		if err != nil {
 			return err
@@ -434,7 +434,7 @@ func (d *Database) addPDUDeltaToResponse(
 	}
 	var succeeded bool
 	defer func() {
-		txerr := common.EndTransaction(txn, &succeeded)
+		txerr := internal.EndTransaction(txn, &succeeded)
 		if err == nil && txerr != nil {
 			err = txerr
 		}
@@ -588,7 +588,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 	var succeeded bool
 	defer func() {
-		txerr := common.EndTransaction(txn, &succeeded)
+		txerr := internal.EndTransaction(txn, &succeeded)
 		if err == nil && txerr != nil {
 			err = txerr
 		}

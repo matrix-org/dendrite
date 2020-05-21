@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -138,7 +138,7 @@ func (s *membershipStatements) insertMembership(
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	localTarget bool,
 ) error {
-	stmt := common.TxStmt(txn, s.insertMembershipStmt)
+	stmt := internal.TxStmt(txn, s.insertMembershipStmt)
 	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID, localTarget)
 	return err
 }
@@ -147,7 +147,7 @@ func (s *membershipStatements) selectMembershipForUpdate(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (membership membershipState, err error) {
-	err = common.TxStmt(txn, s.selectMembershipForUpdateStmt).QueryRowContext(
+	err = internal.TxStmt(txn, s.selectMembershipForUpdateStmt).QueryRowContext(
 		ctx, roomNID, targetUserNID,
 	).Scan(&membership)
 	return
@@ -176,7 +176,7 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 	if err != nil {
 		return
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoom: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoom: rows.close() failed")
 
 	for rows.Next() {
 		var eNID types.EventNID
@@ -203,7 +203,7 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 	if err != nil {
 		return
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoomAndMembership: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoomAndMembership: rows.close() failed")
 
 	for rows.Next() {
 		var eNID types.EventNID
@@ -221,7 +221,7 @@ func (s *membershipStatements) updateMembership(
 	senderUserNID types.EventStateKeyNID, membership membershipState,
 	eventNID types.EventNID,
 ) error {
-	_, err := common.TxStmt(txn, s.updateMembershipStmt).ExecContext(
+	_, err := internal.TxStmt(txn, s.updateMembershipStmt).ExecContext(
 		ctx, roomNID, targetUserNID, senderUserNID, membership, eventNID,
 	)
 	return err

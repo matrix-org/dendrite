@@ -567,7 +567,7 @@ func (v StateResolution) CalculateAndStoreStateAfterEvents(
 			// 3) None of the previous events were state events and they all
 			// have the same state, so this event has exactly the same state
 			// as the previous events.
-			// This should be the common case.
+			// This should be the internal case.
 			metrics.algorithm = "no_change"
 			return metrics.stop(prevState.BeforeStateSnapshotNID, nil)
 		}

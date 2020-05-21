@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/publicroomsapi/directory"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
@@ -51,8 +51,8 @@ func Setup(
 	}
 
 	r0mux.Handle("/directory/list/room/{roomID}",
-		common.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		internal.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
+			vars, err := internal.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -61,8 +61,8 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 	// TODO: Add AS support
 	r0mux.Handle("/directory/list/room/{roomID}",
-		common.MakeAuthAPI("directory_list", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		internal.MakeAuthAPI("directory_list", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars, err := internal.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -70,7 +70,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
-		common.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+		internal.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
 			if extRoomsProvider != nil {
 				return directory.GetPostPublicRoomsWithExternal(req, publicRoomsDB, fedClient, extRoomsProvider)
 			}
@@ -80,7 +80,7 @@ func Setup(
 
 	// Federation - TODO: should this live here or in federation API? It's sure easier if it's here so here it is.
 	apiMux.Handle("/_matrix/federation/v1/publicRooms",
-		common.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
+		internal.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
 			return directory.GetPostPublicRooms(req, publicRoomsDB)
 		}),
 	).Methods(http.MethodGet)

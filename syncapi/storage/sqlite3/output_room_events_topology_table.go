@@ -18,7 +18,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -102,7 +102,7 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
 ) (err error) {
-	stmt := common.TxStmt(txn, s.insertEventInTopologyStmt)
+	stmt := internal.TxStmt(txn, s.insertEventInTopologyStmt)
 	_, err = stmt.ExecContext(
 		ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
 	)
@@ -118,9 +118,9 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	// is requested or not.
 	var stmt *sql.Stmt
 	if chronologicalOrder {
-		stmt = common.TxStmt(txn, s.selectEventIDsInRangeASCStmt)
+		stmt = internal.TxStmt(txn, s.selectEventIDsInRangeASCStmt)
 	} else {
-		stmt = common.TxStmt(txn, s.selectEventIDsInRangeDESCStmt)
+		stmt = internal.TxStmt(txn, s.selectEventIDsInRangeDESCStmt)
 	}
 
 	// Query the event IDs.
@@ -149,7 +149,7 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
-	stmt := common.TxStmt(txn, s.selectPositionInTopologyStmt)
+	stmt := internal.TxStmt(txn, s.selectPositionInTopologyStmt)
 	err = stmt.QueryRowContext(ctx, eventID).Scan(&pos, &spos)
 	return
 }
@@ -157,7 +157,7 @@ func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
 func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
-	stmt := common.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
+	stmt := internal.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
 	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
 }

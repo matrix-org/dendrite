@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -88,7 +88,7 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
 
 	// We know that we will only get as many results as event NIDs
 	// because of the unique constraint on event NIDs.

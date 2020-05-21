@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -31,7 +31,7 @@ import (
 const stateDataSchema = `
 -- The state data map.
 -- Designed to give enough information to run the state resolution algorithm
--- without hitting the database in the common case.
+-- without hitting the database in the internal case.
 -- TODO: Is it worth replacing the unique btree index with a covering index so
 -- that postgres could lookup the state using an index-only scan?
 -- The type and state_key are included in the index to make it easier to
@@ -140,7 +140,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
 
 	results := make([]types.StateEntryList, len(stateBlockNIDs))
 	// current is a pointer to the StateEntryList to append the state entries to.
@@ -199,7 +199,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectFilteredStateBlockEntries: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectFilteredStateBlockEntries: rows.close() failed")
 
 	var results []types.StateEntryList
 	var current types.StateEntryList
