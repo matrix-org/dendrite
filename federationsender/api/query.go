@@ -3,8 +3,8 @@ package api
 import (
 	"context"
 
-	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/opentracing/opentracing-go"

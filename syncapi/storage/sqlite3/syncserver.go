@@ -25,8 +25,8 @@ import (
 	// Import the sqlite3 package
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 

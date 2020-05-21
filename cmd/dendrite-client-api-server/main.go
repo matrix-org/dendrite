@@ -16,11 +16,11 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/clientapi"
+	"github.com/matrix-org/dendrite/eduserver"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/keydb"
 	"github.com/matrix-org/dendrite/internal/transactions"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 )
 
 func main() {

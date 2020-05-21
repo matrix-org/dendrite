@@ -38,9 +38,9 @@ import (
 	"github.com/gorilla/mux"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/internal/config"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/sirupsen/logrus"
 

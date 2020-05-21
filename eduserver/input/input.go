@@ -19,9 +19,9 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )

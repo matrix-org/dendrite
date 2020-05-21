@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 // NewDatabase opens a new database

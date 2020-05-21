@@ -17,8 +17,8 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 type Database interface {

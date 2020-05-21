@@ -22,8 +22,8 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 

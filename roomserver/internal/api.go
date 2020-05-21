@@ -6,10 +6,10 @@ import (
 	"sync"
 
 	"github.com/Shopify/sarama"
+	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"

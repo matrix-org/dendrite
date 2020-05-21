@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )

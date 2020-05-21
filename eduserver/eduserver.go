@@ -15,10 +15,10 @@ package eduserver
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/eduserver/input"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 )
 
 // SetupEDUServerComponent sets up and registers HTTP handlers for the
