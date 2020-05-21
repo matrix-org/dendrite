@@ -28,6 +28,15 @@ runtime config should come from. The mounted folder must contain:
 - `server.crt` certificate file
 - `server.key` private key file for the above certificate
 
+To generate keys:
+
+```
+go run github.com/matrix-org/dendrite/cmd/generate-keys \
+  --private-key=matrix_key.pem \
+  --tls-cert=server.crt \
+  --tls-key=server.key
+```
+
 ## Starting Dendrite
 
 Once in place, start the dependencies:
