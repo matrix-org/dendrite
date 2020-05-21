@@ -19,9 +19,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/transactions"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -45,7 +45,7 @@ func Setup(
 	appMux := apiMux.PathPrefix(pathPrefixApp).Subrouter()
 
 	appMux.Handle("/alias",
-		common.MakeExternalAPI("alias", func(req *http.Request) util.JSONResponse {
+		internal.MakeExternalAPI("alias", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -54,7 +54,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 	appMux.Handle("/user",
-		common.MakeExternalAPI("user", func(req *http.Request) util.JSONResponse {
+		internal.MakeExternalAPI("user", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement
 			return util.JSONResponse{
 				Code: http.StatusOK,

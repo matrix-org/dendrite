@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// FIXME: This should be made common!
+// FIXME: This should be made internal!
 
 package sqlite3
 

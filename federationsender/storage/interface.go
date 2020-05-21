@@ -17,12 +17,12 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 type Database interface {
-	common.PartitionStorer
+	internal.PartitionStorer
 	UpdateRoom(ctx context.Context, roomID, oldEventID, newEventID string, addHosts []types.JoinedHost, removeHosts []string) (joinedHosts []types.JoinedHost, err error)
 	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 }

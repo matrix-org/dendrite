@@ -19,8 +19,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -84,7 +84,7 @@ func (s *joinedHostsStatements) insertJoinedHosts(
 	roomID, eventID string,
 	serverName gomatrixserverlib.ServerName,
 ) error {
-	stmt := common.TxStmt(txn, s.insertJoinedHostsStmt)
+	stmt := internal.TxStmt(txn, s.insertJoinedHostsStmt)
 	_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
 	return err
 }
@@ -93,7 +93,7 @@ func (s *joinedHostsStatements) deleteJoinedHosts(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) error {
 	for _, eventID := range eventIDs {
-		stmt := common.TxStmt(txn, s.deleteJoinedHostsStmt)
+		stmt := internal.TxStmt(txn, s.deleteJoinedHostsStmt)
 		if _, err := stmt.ExecContext(ctx, eventID); err != nil {
 			return err
 		}
@@ -104,7 +104,7 @@ func (s *joinedHostsStatements) deleteJoinedHosts(
 func (s *joinedHostsStatements) selectJoinedHostsWithTx(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) ([]types.JoinedHost, error) {
-	stmt := common.TxStmt(txn, s.selectJoinedHostsStmt)
+	stmt := internal.TxStmt(txn, s.selectJoinedHostsStmt)
 	return joinedHostsFromStmt(ctx, stmt, roomID)
 }
 
@@ -121,7 +121,7 @@ func joinedHostsFromStmt(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "joinedHostsFromStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "joinedHostsFromStmt: rows.close() failed")
 
 	var result []types.JoinedHost
 	for rows.Next() {

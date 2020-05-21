@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
@@ -35,7 +35,7 @@ func (h *httpRoomserverInternalAPI) PerformJoin(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformJoinPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 type PerformLeaveRequest struct {
@@ -55,5 +55,5 @@ func (h *httpRoomserverInternalAPI) PerformLeave(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformLeavePath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

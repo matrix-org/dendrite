@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver"
 )
 

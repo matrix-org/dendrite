@@ -18,14 +18,14 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 // NewDatabase opens a new database
 func NewDatabase(
 	dataSourceName string,
-	dbProperties common.DbProperties, // nolint:unparam
+	dbProperties internal.DbProperties, // nolint:unparam
 ) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {

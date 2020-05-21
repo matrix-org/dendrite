@@ -25,14 +25,14 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
@@ -231,7 +231,7 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
-	httpHandler := common.WrapHandlerInCORS(base.APIMux)
+	httpHandler := internal.WrapHandlerInCORS(base.APIMux)
 
 	http.Handle("/", httpHandler)
 

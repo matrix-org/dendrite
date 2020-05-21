@@ -14,7 +14,7 @@
 
 // +build wasm
 
-package common
+package internal
 
 // IsUniqueConstraintViolationErr no-ops for this architecture
 func IsUniqueConstraintViolationErr(err error) bool {

@@ -27,8 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -97,7 +97,7 @@ func SendMembership(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(err.Error()),
 		}
-	} else if err == common.ErrRoomNoExists {
+	} else if err == internal.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),
@@ -190,7 +190,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return common.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
+	return internal.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns
@@ -271,7 +271,7 @@ func checkAndProcessThreepid(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotTrusted(body.IDServer),
 		}
-	} else if err == common.ErrRoomNoExists {
+	} else if err == internal.ErrRoomNoExists {
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),

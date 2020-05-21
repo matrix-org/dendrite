@@ -20,7 +20,7 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -66,7 +66,7 @@ func (s *eventJSONStatements) prepare(db *sql.DB) (err error) {
 func (s *eventJSONStatements) insertEventJSON(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, eventJSON []byte,
 ) error {
-	_, err := common.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
+	_, err := internal.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
 	return err
 }
 
@@ -82,13 +82,13 @@ func (s *eventJSONStatements) bulkSelectEventJSON(
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", internal.QueryVariadic(len(iEventNIDs)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
 
 	// We know that we will only get as many results as event NIDs
 	// because of the unique constraint on event NIDs.

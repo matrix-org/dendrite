@@ -22,7 +22,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -137,7 +137,7 @@ func (s *devicesStatements) insertDevice(
 ) (*authtypes.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
-	stmt := common.TxStmt(txn, s.insertDeviceStmt)
+	stmt := internal.TxStmt(txn, s.insertDeviceStmt)
 	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName).Scan(&sessionID); err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (s *devicesStatements) insertDevice(
 func (s *devicesStatements) deleteDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart string,
 ) error {
-	stmt := common.TxStmt(txn, s.deleteDeviceStmt)
+	stmt := internal.TxStmt(txn, s.deleteDeviceStmt)
 	_, err := stmt.ExecContext(ctx, id, localpart)
 	return err
 }
@@ -163,7 +163,7 @@ func (s *devicesStatements) deleteDevice(
 func (s *devicesStatements) deleteDevices(
 	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
 ) error {
-	stmt := common.TxStmt(txn, s.deleteDevicesStmt)
+	stmt := internal.TxStmt(txn, s.deleteDevicesStmt)
 	_, err := stmt.ExecContext(ctx, localpart, pq.Array(devices))
 	return err
 }
@@ -173,7 +173,7 @@ func (s *devicesStatements) deleteDevices(
 func (s *devicesStatements) deleteDevicesByLocalpart(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) error {
-	stmt := common.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
+	stmt := internal.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
 	_, err := stmt.ExecContext(ctx, localpart)
 	return err
 }
@@ -181,7 +181,7 @@ func (s *devicesStatements) deleteDevicesByLocalpart(
 func (s *devicesStatements) updateDeviceName(
 	ctx context.Context, txn *sql.Tx, localpart, deviceID string, displayName *string,
 ) error {
-	stmt := common.TxStmt(txn, s.updateDeviceNameStmt)
+	stmt := internal.TxStmt(txn, s.updateDeviceNameStmt)
 	_, err := stmt.ExecContext(ctx, displayName, localpart, deviceID)
 	return err
 }
@@ -226,7 +226,7 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	if err != nil {
 		return devices, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectDevicesByLocalpart: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByLocalpart: rows.close() failed")
 
 	for rows.Next() {
 		var dev authtypes.Device

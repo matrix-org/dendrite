@@ -15,9 +15,9 @@ package main
 import (
 	_ "net/http/pprof"
 
-	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/sirupsen/logrus"
 )
 

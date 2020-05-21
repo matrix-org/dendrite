@@ -19,12 +19,12 @@ import (
 	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
-	common.PartitionStorer
+	internal.PartitionStorer
 	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*authtypes.Account, error)
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
 	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error

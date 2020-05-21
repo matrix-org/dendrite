@@ -20,7 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -113,7 +113,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	if err != nil {
 		return
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
 
 	for rows.Next() {
 		var dataType string
@@ -136,7 +136,7 @@ func (s *accountDataStatements) SelectMaxAccountDataID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := common.TxStmt(txn, s.selectMaxAccountDataIDStmt)
+	stmt := internal.TxStmt(txn, s.selectMaxAccountDataIDStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64

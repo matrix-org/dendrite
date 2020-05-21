@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -89,7 +89,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	for k, v := range stateNIDs {
 		nids[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", common.QueryVariadic(len(nids)), 1)
+	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", internal.QueryVariadic(len(nids)), 1)
 	selectStmt, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockNIDs: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockNIDs: rows.close() failed")
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
 	for ; rows.Next(); i++ {

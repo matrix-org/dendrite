@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
@@ -185,7 +185,7 @@ func makeHTTPClient() *http.Client {
 func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.AppServiceRoomAliasExistsPath,
-		common.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
+		internal.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
 			var request api.RoomAliasExistsRequest
 			var response api.RoomAliasExistsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -199,7 +199,7 @@ func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.AppServiceUserIDExistsPath,
-		common.MakeInternalAPI("appserviceUserIDExists", func(req *http.Request) util.JSONResponse {
+		internal.MakeInternalAPI("appserviceUserIDExists", func(req *http.Request) util.JSONResponse {
 			var request api.UserIDExistsRequest
 			var response api.UserIDExistsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

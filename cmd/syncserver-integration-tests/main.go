@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/test"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )

@@ -20,7 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -91,7 +91,7 @@ func (s *eventStateKeyStatements) insertEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := common.TxStmt(txn, s.insertEventStateKeyNIDStmt)
+	stmt := internal.TxStmt(txn, s.insertEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
@@ -100,7 +100,7 @@ func (s *eventStateKeyStatements) selectEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := common.TxStmt(txn, s.selectEventStateKeyNIDStmt)
+	stmt := internal.TxStmt(txn, s.selectEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
@@ -114,7 +114,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKeyNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKeyNID: rows.close() failed")
 
 	result := make(map[string]types.EventStateKeyNID, len(eventStateKeys))
 	for rows.Next() {
@@ -139,7 +139,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKey: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKey: rows.close() failed")
 
 	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
 	for rows.Next() {

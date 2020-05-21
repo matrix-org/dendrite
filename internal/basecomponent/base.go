@@ -21,22 +21,22 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/matrix-org/dendrite/common/caching"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/common/config"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/sirupsen/logrus"
@@ -70,9 +70,9 @@ const HTTPClientTimeout = time.Second * 30
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
 func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs bool) *BaseDendrite {
-	common.SetupStdLogging()
-	common.SetupHookLogging(cfg.Logging, componentName)
-	common.SetupPprof()
+	internal.SetupStdLogging()
+	internal.SetupHookLogging(cfg.Logging, componentName)
+	internal.SetupPprof()
 
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
@@ -211,7 +211,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		WriteTimeout: HTTPServerTimeout,
 	}
 
-	common.SetupHTTPAPI(http.DefaultServeMux, common.WrapHandlerInCORS(b.APIMux), b.Cfg)
+	internal.SetupHTTPAPI(http.DefaultServeMux, internal.WrapHandlerInCORS(b.APIMux), b.Cfg)
 	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 
 	err := serv.ListenAndServe()
@@ -245,7 +245,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
 	if err != nil || uri.Scheme == "file" {
-		db, err = sqlutil.Open(common.SQLiteDriverName(), string(cfg.Database.Naffka), nil)
+		db, err = sqlutil.Open(internal.SQLiteDriverName(), string(cfg.Database.Naffka), nil)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}

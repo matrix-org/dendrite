@@ -16,10 +16,10 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 )
 
 func main() {

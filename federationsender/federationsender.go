@@ -17,7 +17,6 @@ package federationsender
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/internal"
@@ -25,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"

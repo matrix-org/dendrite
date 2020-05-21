@@ -19,15 +19,15 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
-	common.PartitionStorer
+	internal.PartitionStorer
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
 	// Events lookups a list of event by their event ID.

@@ -19,13 +19,13 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts/sqlite3"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func NewDatabase(
 	dataSourceName string,
-	dbProperties common.DbProperties, // nolint:unparam
+	dbProperties internal.DbProperties, // nolint:unparam
 	serverName gomatrixserverlib.ServerName,
 ) (Database, error) {
 	uri, err := url.Parse(dataSourceName)

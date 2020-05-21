@@ -21,13 +21,13 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
@@ -94,12 +94,12 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
-	httpHandler := common.WrapHandlerInCORS(base.APIMux)
+	httpHandler := internal.WrapHandlerInCORS(base.APIMux)
 
 	// Set up the API endpoints we handle. /metrics is for prometheus, and is
 	// not wrapped by CORS, while everything else is
 	if cfg.Metrics.Enabled {
-		http.Handle("/metrics", common.WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
+		http.Handle("/metrics", internal.WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
 	http.Handle("/", httpHandler)
 

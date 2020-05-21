@@ -28,8 +28,8 @@ import (
 
 	"net/http"
 
-	"github.com/matrix-org/dendrite/common/caching"
-	"github.com/matrix-org/dendrite/common/test"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )

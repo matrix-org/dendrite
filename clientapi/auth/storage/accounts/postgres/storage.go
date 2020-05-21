@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
@@ -33,7 +33,7 @@ import (
 // Database represents an account database
 type Database struct {
 	db *sql.DB
-	common.PartitionOffsetStatements
+	internal.PartitionOffsetStatements
 	accounts     accountsStatements
 	profiles     profilesStatements
 	memberships  membershipStatements
@@ -44,13 +44,13 @@ type Database struct {
 }
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dataSourceName string, dbProperties common.DbProperties, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(dataSourceName string, dbProperties internal.DbProperties, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
 	if db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
 		return nil, err
 	}
-	partitions := common.PartitionOffsetStatements{}
+	partitions := internal.PartitionOffsetStatements{}
 	if err = partitions.Prepare(db, "account"); err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (d *Database) SetDisplayName(
 // CreateGuestAccount makes a new guest account and creates an empty profile
 // for this account.
 func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var numLocalpart int64
 		numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
 		if err != nil {
@@ -142,7 +142,7 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Accou
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
 ) (acc *authtypes.Account, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
 		return err
 	})
@@ -163,7 +163,7 @@ func (d *Database) createAccount(
 		}
 	}
 	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
-		if common.IsUniqueConstraintViolationErr(err) {
+		if internal.IsUniqueConstraintViolationErr(err) {
 			return nil, nil
 		}
 		return nil, err
@@ -210,7 +210,7 @@ func (d *Database) removeMembershipsByEventIDs(
 func (d *Database) UpdateMemberships(
 	ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string,
 ) error {
-	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if err := d.removeMembershipsByEventIDs(ctx, txn, idsToRemove); err != nil {
 			return err
 		}
@@ -297,7 +297,7 @@ func (d *Database) newMembership(
 func (d *Database) SaveAccountData(
 	ctx context.Context, localpart, roomID, dataType, content string,
 ) error {
-	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		return d.accountDatas.insertAccountData(ctx, txn, localpart, roomID, dataType, content)
 	})
 }
@@ -348,7 +348,7 @@ var Err3PIDInUse = errors.New("This third-party identifier is already in use")
 func (d *Database) SaveThreePIDAssociation(
 	ctx context.Context, threepid, localpart, medium string,
 ) (err error) {
-	return common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		user, err := d.threepids.selectLocalpartForThreePID(
 			ctx, txn, threepid, medium,
 		)
