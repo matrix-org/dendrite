@@ -2,7 +2,7 @@
 
 cd $(git rev-parse --show-toplevel)
 
-#docker build -f docker/hub/Dockerfile -t matrixdotorg/dendrite:latest .
+docker build -f docker/hub/Dockerfile -t matrixdotorg/dendrite:latest .
 
 docker build -t matrixdotorg/dendrite:clientapi 		--build-arg component=dendrite-client-api-server 		-f docker/hub/Dockerfile.component .
 docker build -t matrixdotorg/dendrite:clientproxy 		--build-arg component=client-api-proxy	 				-f docker/hub/Dockerfile.component .
