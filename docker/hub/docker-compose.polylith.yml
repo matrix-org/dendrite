@@ -4,11 +4,11 @@ services:
     hostname: client_api_proxy
     image: matrixdotorg/dendrite:clientproxy
     command: [
-        "--bind-address=:8008",
-        "--client-api-server-url=http://client_api:7771",
-        "--sync-api-server-url=http://sync_api:7773",
-        "--media-api-server-url=http://media_api:7774",
-        "--public-rooms-api-server-url=http://public_rooms_api:7775"
+      "--bind-address=:8008",
+      "--client-api-server-url=http://client_api:7771",
+      "--sync-api-server-url=http://sync_api:7773",
+      "--media-api-server-url=http://media_api:7774",
+      "--public-rooms-api-server-url=http://public_rooms_api:7775"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -26,7 +26,7 @@ services:
     hostname: client_api
     image: matrixdotorg/dendrite:clientapi
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -38,7 +38,7 @@ services:
     hostname: media_api
     image: matrixdotorg/dendrite:mediaapi
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -49,7 +49,7 @@ services:
     hostname: public_rooms_api
     image: matrixdotorg/dendrite:publicroomsapi
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -60,7 +60,7 @@ services:
     hostname: sync_api
     image: matrixdotorg/dendrite:syncapi
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -71,7 +71,7 @@ services:
     hostname: room_server
     image: matrixdotorg/dendrite:roomserver
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -82,7 +82,7 @@ services:
     hostname: edu_server
     image: matrixdotorg/dendrite:eduserver
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -93,9 +93,9 @@ services:
     hostname: federation_api_proxy
     image: matrixdotorg/dendrite:federationproxy
     command: [
-        "--bind-address=:8448",
-        "--federation-api-url=http://federation_api_server:7772",
-        "--media-api-server-url=http://media_api:7774"
+      "--bind-address=:8448",
+      "--federation-api-url=http://federation_api_server:7772",
+      "--media-api-server-url=http://media_api:7774"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -112,7 +112,7 @@ services:
     hostname: federation_api
     image: matrixdotorg/dendrite:federationapi
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -123,7 +123,7 @@ services:
     hostname: federation_sender
     image: matrixdotorg/dendrite:federationsender
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -134,7 +134,7 @@ services:
     hostname: key_serverde
     image: matrixdotorg/dendrite:keyserver
     command: [
-        "--config=dendrite.yaml"
+      "--config=dendrite.yaml"
     ]
     volumes:
       - ./config:/etc/dendrite
