@@ -14,7 +14,7 @@
 
 set -eux
 
-cd `dirname $0`/..
+cd `dirname $0`/../..
 
 args=""
 if [ ${1:-""} = "fast" ]
