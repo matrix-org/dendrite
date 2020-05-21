@@ -109,12 +109,14 @@ database:
 listen:
     room_server: "room_server:7770"
     client_api: "client_api:7771"
-    federation_api: "federation_api:7772"
+	federation_api: "federation_api:7772"
+	server_key_api: "server_key_api:7778"
     sync_api: "sync_api:7773"
     media_api: "media_api:7774"
     public_rooms_api: "public_rooms_api:7775"
     federation_sender: "federation_sender:7776"
-    edu_server: "edu_server:7777"
+	edu_server: "edu_server:7777"
+	key_server: "key_server:7779"
 
 # The configuration for tracing the dendrite components.
 tracing:
