@@ -94,7 +94,7 @@ services:
     image: matrixdotorg/dendrite:federationproxy
     command: [
       "--bind-address=:8448",
-      "--federation-api-url=http://federation_api_server:7772",
+      "--federation-api-url=http://federation_api:7772",
       "--media-api-server-url=http://media_api:7774"
     ]
     volumes:
