@@ -25,7 +25,7 @@ import (
 	// Import the sqlite3 package
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
@@ -35,7 +35,7 @@ import (
 type SyncServerDatasource struct {
 	shared.Database
 	db *sql.DB
-	common.PartitionOffsetStatements
+	internal.PartitionOffsetStatements
 	streamID streamIDStatements
 }
 
@@ -55,7 +55,7 @@ func NewDatabase(dataSourceName string) (*SyncServerDatasource, error) {
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs, nil); err != nil {
+	if d.db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = d.prepare(); err != nil {

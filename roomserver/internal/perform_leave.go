@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -97,7 +97,7 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
 	buildRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := common.BuildEvent(
+	event, err := internal.BuildEvent(
 		ctx,        // the request context
 		&eb,        // the template leave event
 		r.Cfg,      // the server configuration
@@ -106,7 +106,7 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 		&buildRes,  // the query response
 	)
 	if err != nil {
-		return fmt.Errorf("common.BuildEvent: %w", err)
+		return fmt.Errorf("internal.BuildEvent: %w", err)
 	}
 
 	// Give our leave event to the roomserver input stream. The

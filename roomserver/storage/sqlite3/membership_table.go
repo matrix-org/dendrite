@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -114,7 +114,7 @@ func (s *membershipStatements) insertMembership(
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	localTarget bool,
 ) error {
-	stmt := common.TxStmt(txn, s.insertMembershipStmt)
+	stmt := internal.TxStmt(txn, s.insertMembershipStmt)
 	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID, localTarget)
 	return err
 }
@@ -123,7 +123,7 @@ func (s *membershipStatements) selectMembershipForUpdate(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (membership membershipState, err error) {
-	stmt := common.TxStmt(txn, s.selectMembershipForUpdateStmt)
+	stmt := internal.TxStmt(txn, s.selectMembershipForUpdateStmt)
 	err = stmt.QueryRowContext(
 		ctx, roomNID, targetUserNID,
 	).Scan(&membership)
@@ -134,7 +134,7 @@ func (s *membershipStatements) selectMembershipFromRoomAndTarget(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventNID types.EventNID, membership membershipState, err error) {
-	selectStmt := common.TxStmt(txn, s.selectMembershipFromRoomAndTargetStmt)
+	selectStmt := internal.TxStmt(txn, s.selectMembershipFromRoomAndTargetStmt)
 	err = selectStmt.QueryRowContext(
 		ctx, roomNID, targetUserNID,
 	).Scan(&membership, &eventNID)
@@ -147,15 +147,15 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 ) (eventNIDs []types.EventNID, err error) {
 	var selectStmt *sql.Stmt
 	if localOnly {
-		selectStmt = common.TxStmt(txn, s.selectLocalMembershipsFromRoomStmt)
+		selectStmt = internal.TxStmt(txn, s.selectLocalMembershipsFromRoomStmt)
 	} else {
-		selectStmt = common.TxStmt(txn, s.selectMembershipsFromRoomStmt)
+		selectStmt = internal.TxStmt(txn, s.selectMembershipsFromRoomStmt)
 	}
 	rows, err := selectStmt.QueryContext(ctx, roomNID)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoom: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoom: rows.close() failed")
 
 	for rows.Next() {
 		var eNID types.EventNID
@@ -173,15 +173,15 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 ) (eventNIDs []types.EventNID, err error) {
 	var stmt *sql.Stmt
 	if localOnly {
-		stmt = common.TxStmt(txn, s.selectLocalMembershipsFromRoomAndMembershipStmt)
+		stmt = internal.TxStmt(txn, s.selectLocalMembershipsFromRoomAndMembershipStmt)
 	} else {
-		stmt = common.TxStmt(txn, s.selectMembershipsFromRoomAndMembershipStmt)
+		stmt = internal.TxStmt(txn, s.selectMembershipsFromRoomAndMembershipStmt)
 	}
 	rows, err := stmt.QueryContext(ctx, roomNID, membership)
 	if err != nil {
 		return
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoomAndMembership: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoomAndMembership: rows.close() failed")
 
 	for rows.Next() {
 		var eNID types.EventNID
@@ -199,7 +199,7 @@ func (s *membershipStatements) updateMembership(
 	senderUserNID types.EventStateKeyNID, membership membershipState,
 	eventNID types.EventNID,
 ) error {
-	stmt := common.TxStmt(txn, s.updateMembershipStmt)
+	stmt := internal.TxStmt(txn, s.updateMembershipStmt)
 	_, err := stmt.ExecContext(
 		ctx, senderUserNID, membership, eventNID, roomNID, targetUserNID,
 	)

@@ -17,8 +17,8 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
@@ -28,7 +28,7 @@ import (
 
 // OutputTypingEventConsumer consumes events that originate in EDU server.
 type OutputTypingEventConsumer struct {
-	consumer   *common.ContinualConsumer
+	consumer   *internal.ContinualConsumer
 	db         storage.Database
 	queues     *queue.OutgoingQueues
 	ServerName gomatrixserverlib.ServerName
@@ -41,7 +41,7 @@ func NewOutputTypingEventConsumer(
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 ) *OutputTypingEventConsumer {
-	consumer := common.ContinualConsumer{
+	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputTypingEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/storage"
@@ -46,7 +46,7 @@ func NewFederationSenderInternalAPI(
 func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 	servMux.Handle(
 		api.FederationSenderQueryJoinedHostsInRoomPath,
-		common.MakeInternalAPI("QueryJoinedHostsInRoom", func(req *http.Request) util.JSONResponse {
+		internal.MakeInternalAPI("QueryJoinedHostsInRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryJoinedHostsInRoomRequest
 			var response api.QueryJoinedHostsInRoomResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -60,7 +60,7 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 	)
 	servMux.Handle(
 		api.FederationSenderQueryJoinedHostServerNamesInRoomPath,
-		common.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
+		internal.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryJoinedHostServerNamesInRoomRequest
 			var response api.QueryJoinedHostServerNamesInRoomResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -73,7 +73,7 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(api.FederationSenderPerformJoinRequestPath,
-		common.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
+		internal.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -86,7 +86,7 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 		}),
 	)
 	servMux.Handle(api.FederationSenderPerformLeaveRequestPath,
-		common.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
+		internal.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -82,7 +82,7 @@ func (s *previousEventStatements) insertPreviousEvent(
 	previousEventReferenceSHA256 []byte,
 	eventNID types.EventNID,
 ) error {
-	stmt := common.TxStmt(txn, s.insertPreviousEventStmt)
+	stmt := internal.TxStmt(txn, s.insertPreviousEventStmt)
 	_, err := stmt.ExecContext(
 		ctx, previousEventID, previousEventReferenceSHA256, int64(eventNID),
 	)
@@ -95,6 +95,6 @@ func (s *previousEventStatements) selectPreviousEventExists(
 	ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte,
 ) error {
 	var ok int64
-	stmt := common.TxStmt(txn, s.selectPreviousEventExistsStmt)
+	stmt := internal.TxStmt(txn, s.selectPreviousEventExistsStmt)
 	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
 }

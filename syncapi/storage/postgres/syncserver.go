@@ -22,7 +22,7 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
@@ -32,11 +32,11 @@ import (
 type SyncServerDatasource struct {
 	shared.Database
 	db *sql.DB
-	common.PartitionOffsetStatements
+	internal.PartitionOffsetStatements
 }
 
 // NewDatabase creates a new sync server database
-func NewDatabase(dbDataSourceName string, dbProperties common.DbProperties) (*SyncServerDatasource, error) {
+func NewDatabase(dbDataSourceName string, dbProperties internal.DbProperties) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
 	if d.db, err = sqlutil.Open("postgres", dbDataSourceName, dbProperties); err != nil {

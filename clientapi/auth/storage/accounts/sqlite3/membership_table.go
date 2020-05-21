@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 const membershipSchema = `
@@ -95,7 +95,7 @@ func (s *membershipStatements) insertMembership(
 func (s *membershipStatements) deleteMembershipsByEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) (err error) {
-	sqlStr := strings.Replace(deleteMembershipsByEventIDsSQL, "($1)", common.QueryVariadic(len(eventIDs)), 1)
+	sqlStr := strings.Replace(deleteMembershipsByEventIDsSQL, "($1)", internal.QueryVariadic(len(eventIDs)), 1)
 	iEventIDs := make([]interface{}, len(eventIDs))
 	for i, e := range eventIDs {
 		iEventIDs[i] = e
@@ -125,7 +125,7 @@ func (s *membershipStatements) selectMembershipsByLocalpart(
 
 	memberships = []authtypes.Membership{}
 
-	defer common.CloseAndLogIfError(ctx, rows, "selectMembershipsByLocalpart: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsByLocalpart: rows.close() failed")
 	for rows.Next() {
 		var m authtypes.Membership
 		m.Localpart = localpart

@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -41,7 +41,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
@@ -136,7 +136,7 @@ type registerRequest struct {
 	DeviceID           *string `json:"device_id"`
 
 	// Prevent this user from logging in
-	InhibitLogin common.WeakBoolean `json:"inhibit_login"`
+	InhibitLogin internal.WeakBoolean `json:"inhibit_login"`
 
 	// Application Services place Type in the root of their registration
 	// request, whereas clients place it in the authDict struct.
@@ -811,7 +811,7 @@ func completeRegistration(
 	accountDB accounts.Database,
 	deviceDB devices.Database,
 	username, password, appserviceID string,
-	inhibitLogin common.WeakBoolean,
+	inhibitLogin internal.WeakBoolean,
 	displayName, deviceID *string,
 ) util.JSONResponse {
 	if username == "" {

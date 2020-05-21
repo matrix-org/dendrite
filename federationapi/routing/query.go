@@ -19,7 +19,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"

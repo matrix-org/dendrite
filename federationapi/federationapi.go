@@ -18,7 +18,7 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 

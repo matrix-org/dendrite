@@ -26,7 +26,7 @@ type UserUpdateProducer struct {
 	Producer sarama.SyncProducer
 }
 
-// TODO: Move this struct to `common` so the components that consume the topic
+// TODO: Move this struct to `internal` so the components that consume the topic
 // can use it when parsing incoming messages
 type profileUpdate struct {
 	Updated  string `json:"updated"`   // Which attribute is updated (can be either `avatar_url` or `displayname`)

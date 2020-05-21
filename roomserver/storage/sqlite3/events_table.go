@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -147,7 +147,7 @@ func (s *eventStatements) insertEvent(
 	depth int64,
 ) (types.EventNID, error) {
 	// attempt to insert: the last_row_id is the event NID
-	insertStmt := common.TxStmt(txn, s.insertEventStmt)
+	insertStmt := internal.TxStmt(txn, s.insertEventStmt)
 	result, err := insertStmt.ExecContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
 		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
@@ -168,7 +168,7 @@ func (s *eventStatements) selectEvent(
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
-	selectStmt := common.TxStmt(txn, s.selectEventStmt)
+	selectStmt := internal.TxStmt(txn, s.selectEventStmt)
 	err := selectStmt.QueryRowContext(ctx, eventID).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -183,19 +183,19 @@ func (s *eventStatements) bulkSelectStateEventByID(
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateEventByIDSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectStateEventByIDSQL, "($1)", internal.QueryVariadic(len(iEventIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
 	///////////////
 
-	selectStmt := common.TxStmt(txn, selectPrep)
+	selectStmt := internal.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
 	// We know that we will only get as many results as event IDs
 	// because of the unique constraint on event IDs.
 	// So we can allocate an array of the correct size now.
@@ -217,7 +217,7 @@ func (s *eventStatements) bulkSelectStateEventByID(
 		// We don't know which ones were missing because we don't return the string IDs in the query.
 		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
 		// If this turns out to be impossible and we do need the debug information here, it would be better
-		// to do it as a separate query rather than slowing down/complicating the common case.
+		// to do it as a separate query rather than slowing down/complicating the internal case.
 		return nil, types.MissingEventError(
 			fmt.Sprintf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs)),
 		)
@@ -236,19 +236,19 @@ func (s *eventStatements) bulkSelectStateAtEventByID(
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateAtEventByIDSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectStateAtEventByIDSQL, "($1)", internal.QueryVariadic(len(iEventIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
 	///////////////
 
-	selectStmt := common.TxStmt(txn, selectPrep)
+	selectStmt := internal.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventByID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventByID: rows.close() failed")
 	results := make([]types.StateAtEvent, len(eventIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -278,7 +278,7 @@ func (s *eventStatements) bulkSelectStateAtEventByID(
 func (s *eventStatements) updateEventState(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	updateStmt := common.TxStmt(txn, s.updateEventStateStmt)
+	updateStmt := internal.TxStmt(txn, s.updateEventStateStmt)
 	_, err := updateStmt.ExecContext(ctx, int64(stateNID), int64(eventNID))
 	return err
 }
@@ -286,7 +286,7 @@ func (s *eventStatements) updateEventState(
 func (s *eventStatements) selectEventSentToOutput(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
 ) (sentToOutput bool, err error) {
-	selectStmt := common.TxStmt(txn, s.selectEventSentToOutputStmt)
+	selectStmt := internal.TxStmt(txn, s.selectEventSentToOutputStmt)
 	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
 	//err = s.selectEventSentToOutputStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
 	if err != nil {
@@ -295,7 +295,7 @@ func (s *eventStatements) selectEventSentToOutput(
 }
 
 func (s *eventStatements) updateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
-	updateStmt := common.TxStmt(txn, s.updateEventSentToOutputStmt)
+	updateStmt := internal.TxStmt(txn, s.updateEventSentToOutputStmt)
 	_, err := updateStmt.ExecContext(ctx, int64(eventNID))
 	//_, err := s.updateEventSentToOutputStmt.ExecContext(ctx, int64(eventNID))
 	return err
@@ -304,7 +304,7 @@ func (s *eventStatements) updateEventSentToOutput(ctx context.Context, txn *sql.
 func (s *eventStatements) selectEventID(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
 ) (eventID string, err error) {
-	selectStmt := common.TxStmt(txn, s.selectEventIDStmt)
+	selectStmt := internal.TxStmt(txn, s.selectEventIDStmt)
 	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&eventID)
 	return
 }
@@ -317,14 +317,14 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateAtEventAndReferenceSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectStateAtEventAndReferenceSQL, "($1)", internal.QueryVariadic(len(iEventNIDs)), 1)
 	//////////////
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventAndReference: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventAndReference: rows.close() failed")
 	results := make([]types.StateAtEventAndReference, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -363,19 +363,19 @@ func (s *eventStatements) bulkSelectEventReference(
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventReferenceSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventReferenceSQL, "($1)", internal.QueryVariadic(len(iEventNIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
 	///////////////
 
-	selectStmt := common.TxStmt(txn, selectPrep)
+	selectStmt := internal.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, iEventNIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventReference: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventReference: rows.close() failed")
 	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -397,19 +397,19 @@ func (s *eventStatements) bulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventIDSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventIDSQL, "($1)", internal.QueryVariadic(len(iEventNIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
 	///////////////
 
-	selectStmt := common.TxStmt(txn, selectPrep)
+	selectStmt := internal.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, iEventNIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventID: rows.close() failed")
 	results := make(map[types.EventNID]string, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -434,19 +434,19 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventNIDSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventNIDSQL, "($1)", internal.QueryVariadic(len(iEventIDs)), 1)
 	selectPrep, err := txn.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
 	///////////////
 
-	selectStmt := common.TxStmt(txn, selectPrep)
+	selectStmt := internal.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventNID: rows.close() failed")
 	results := make(map[string]types.EventNID, len(eventIDs))
 	for rows.Next() {
 		var eventID string
@@ -465,7 +465,7 @@ func (s *eventStatements) selectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 	for i, v := range eventNIDs {
 		iEventIDs[i] = v
 	}
-	sqlStr := strings.Replace(selectMaxEventDepthSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
+	sqlStr := strings.Replace(selectMaxEventDepthSQL, "($1)", internal.QueryVariadic(len(iEventIDs)), 1)
 	err := txn.QueryRowContext(ctx, sqlStr, iEventIDs...).Scan(&result)
 	if err != nil {
 		return 0, err
@@ -476,7 +476,7 @@ func (s *eventStatements) selectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 func (s *eventStatements) selectRoomNIDForEventNID(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
 ) (roomNID types.RoomNID, err error) {
-	selectStmt := common.TxStmt(txn, s.selectRoomNIDForEventNIDStmt)
+	selectStmt := internal.TxStmt(txn, s.selectRoomNIDForEventNIDStmt)
 	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&roomNID)
 	return
 }

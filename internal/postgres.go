@@ -14,7 +14,7 @@
 
 // +build !wasm
 
-package common
+package internal
 
 import "github.com/lib/pq"
 

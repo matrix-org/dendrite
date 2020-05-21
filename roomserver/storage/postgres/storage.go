@@ -20,7 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	// Import the postgres database driver.
@@ -37,7 +37,7 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(dataSourceName string, dbProperties common.DbProperties) (*Database, error) {
+func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {

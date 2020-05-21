@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -36,7 +36,7 @@ func (h *httpFederationSenderInternalAPI) QueryJoinedHostsInRoom(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderQueryJoinedHostsInRoomPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryJoinedHostServerNamesRequest is a request to QueryJoinedHostServerNames
@@ -59,5 +59,5 @@ func (h *httpFederationSenderInternalAPI) QueryJoinedHostServerNamesInRoom(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderQueryJoinedHostServerNamesInRoomPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

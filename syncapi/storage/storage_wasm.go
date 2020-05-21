@@ -18,14 +18,14 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.
 func NewSyncServerDatasource(
 	dataSourceName string,
-	dbProperties common.DbProperties, // nolint:unparam
+	dbProperties internal.DbProperties, // nolint:unparam
 ) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {

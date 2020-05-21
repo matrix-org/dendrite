@@ -17,7 +17,7 @@ package keyserver
 import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/keyserver/routing"
 )
 

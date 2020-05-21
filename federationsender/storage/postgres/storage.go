@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -28,12 +28,12 @@ import (
 type Database struct {
 	joinedHostsStatements
 	roomStatements
-	common.PartitionOffsetStatements
+	internal.PartitionOffsetStatements
 	db *sql.DB
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string, dbProperties common.DbProperties) (*Database, error) {
+func NewDatabase(dataSourceName string, dbProperties internal.DbProperties) (*Database, error) {
 	var result Database
 	var err error
 	if result.db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
@@ -70,7 +70,7 @@ func (d *Database) UpdateRoom(
 	addHosts []types.JoinedHost,
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		err = d.insertRoom(ctx, txn, roomID)
 		if err != nil {
 			return err

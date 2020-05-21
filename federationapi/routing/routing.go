@@ -22,8 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -58,7 +58,7 @@ func Setup(
 	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
 	v2fedmux := apiMux.PathPrefix(pathPrefixV2Federation).Subrouter()
 
-	localKeys := common.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
+	localKeys := internal.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
 		return LocalKeys(cfg)
 	})
 
@@ -70,10 +70,10 @@ func Setup(
 	v2keysmux.Handle("/server/", localKeys).Methods(http.MethodGet)
 	v2keysmux.Handle("/server", localKeys).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/send/{txnID}", common.MakeFedAPI(
+	v1fedmux.Handle("/send/{txnID}", internal.MakeFedAPI(
 		"federation_send", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -84,10 +84,10 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
-	v2fedmux.Handle("/invite/{roomID}/{eventID}", common.MakeFedAPI(
+	v2fedmux.Handle("/invite/{roomID}/{eventID}", internal.MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -98,16 +98,16 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
-	v1fedmux.Handle("/3pid/onbind", common.MakeExternalAPI("3pid_onbind",
+	v1fedmux.Handle("/3pid/onbind", internal.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
 			return CreateInvitesFrom3PIDInvites(req, rsAPI, asAPI, cfg, producer, federation, accountDB)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
-	v1fedmux.Handle("/exchange_third_party_invite/{roomID}", common.MakeFedAPI(
+	v1fedmux.Handle("/exchange_third_party_invite/{roomID}", internal.MakeFedAPI(
 		"exchange_third_party_invite", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -117,10 +117,10 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
-	v1fedmux.Handle("/event/{eventID}", common.MakeFedAPI(
+	v1fedmux.Handle("/event/{eventID}", internal.MakeFedAPI(
 		"federation_get_event", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -130,10 +130,10 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/state/{roomID}", common.MakeFedAPI(
+	v1fedmux.Handle("/state/{roomID}", internal.MakeFedAPI(
 		"federation_get_state", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -143,10 +143,10 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/state_ids/{roomID}", common.MakeFedAPI(
+	v1fedmux.Handle("/state_ids/{roomID}", internal.MakeFedAPI(
 		"federation_get_state_ids", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -156,7 +156,7 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/event_auth/{roomID}/{eventID}", common.MakeFedAPI(
+	v1fedmux.Handle("/event_auth/{roomID}/{eventID}", internal.MakeFedAPI(
 		"federation_get_event_auth", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			vars := mux.Vars(httpReq)
@@ -166,7 +166,7 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/query/directory", common.MakeFedAPI(
+	v1fedmux.Handle("/query/directory", internal.MakeFedAPI(
 		"federation_query_room_alias", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return RoomAliasToID(
@@ -175,7 +175,7 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/query/profile", common.MakeFedAPI(
+	v1fedmux.Handle("/query/profile", internal.MakeFedAPI(
 		"federation_query_profile", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
 			return GetProfile(
@@ -184,10 +184,10 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/user/devices/{userID}", common.MakeFedAPI(
+	v1fedmux.Handle("/user/devices/{userID}", internal.MakeFedAPI(
 		"federation_user_devices", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -197,10 +197,10 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/make_join/{roomID}/{eventID}", common.MakeFedAPI(
+	v1fedmux.Handle("/make_join/{roomID}/{eventID}", internal.MakeFedAPI(
 		"federation_make_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -226,10 +226,10 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/send_join/{roomID}/{eventID}", common.MakeFedAPI(
+	v1fedmux.Handle("/send_join/{roomID}/{eventID}", internal.MakeFedAPI(
 		"federation_send_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -248,10 +248,10 @@ func Setup(
 		},
 	)).Methods(http.MethodPut)
 
-	v2fedmux.Handle("/send_join/{roomID}/{eventID}", common.MakeFedAPI(
+	v2fedmux.Handle("/send_join/{roomID}/{eventID}", internal.MakeFedAPI(
 		"federation_send_join", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -263,10 +263,10 @@ func Setup(
 		},
 	)).Methods(http.MethodPut)
 
-	v1fedmux.Handle("/make_leave/{roomID}/{eventID}", common.MakeFedAPI(
+	v1fedmux.Handle("/make_leave/{roomID}/{eventID}", internal.MakeFedAPI(
 		"federation_make_leave", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -278,10 +278,10 @@ func Setup(
 		},
 	)).Methods(http.MethodGet)
 
-	v2fedmux.Handle("/send_leave/{roomID}/{eventID}", common.MakeFedAPI(
+	v2fedmux.Handle("/send_leave/{roomID}/{eventID}", internal.MakeFedAPI(
 		"federation_send_leave", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -293,17 +293,17 @@ func Setup(
 		},
 	)).Methods(http.MethodPut)
 
-	v1fedmux.Handle("/version", common.MakeExternalAPI(
+	v1fedmux.Handle("/version", internal.MakeExternalAPI(
 		"federation_version",
 		func(httpReq *http.Request) util.JSONResponse {
 			return Version()
 		},
 	)).Methods(http.MethodGet)
 
-	v1fedmux.Handle("/get_missing_events/{roomID}", common.MakeFedAPI(
+	v1fedmux.Handle("/get_missing_events/{roomID}", internal.MakeFedAPI(
 		"federation_get_missing_events", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -311,10 +311,10 @@ func Setup(
 		},
 	)).Methods(http.MethodPost)
 
-	v1fedmux.Handle("/backfill/{roomID}", common.MakeFedAPI(
+	v1fedmux.Handle("/backfill/{roomID}", internal.MakeFedAPI(
 		"federation_backfill", cfg.Matrix.ServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(httpReq))
+			vars, err := internal.URLDecodeMapValues(mux.Vars(httpReq))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}

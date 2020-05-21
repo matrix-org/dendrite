@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/lib/pq"
@@ -205,7 +205,7 @@ func (s *publicRoomsStatements) selectPublicRooms(
 	if err != nil {
 		return []gomatrixserverlib.PublicRoom{}, nil
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectPublicRooms: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectPublicRooms: rows.close() failed")
 
 	rooms := []gomatrixserverlib.PublicRoom{}
 	for rows.Next() {

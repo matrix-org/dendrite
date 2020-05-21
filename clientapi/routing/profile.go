@@ -25,8 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -43,7 +43,7 @@ func GetProfile(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == common.ErrProfileNoExists {
+		if err == internal.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -56,7 +56,7 @@ func GetProfile(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: common.ProfileResponse{
+		JSON: internal.ProfileResponse{
 			AvatarURL:   profile.AvatarURL,
 			DisplayName: profile.DisplayName,
 		},
@@ -71,7 +71,7 @@ func GetAvatarURL(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == common.ErrProfileNoExists {
+		if err == internal.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -84,7 +84,7 @@ func GetAvatarURL(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: common.AvatarURL{
+		JSON: internal.AvatarURL{
 			AvatarURL: profile.AvatarURL,
 		},
 	}
@@ -105,7 +105,7 @@ func SetAvatarURL(
 
 	changedKey := "avatar_url"
 
-	var r common.AvatarURL
+	var r internal.AvatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -185,7 +185,7 @@ func GetDisplayName(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == common.ErrProfileNoExists {
+		if err == internal.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -198,7 +198,7 @@ func GetDisplayName(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: common.DisplayName{
+		JSON: internal.DisplayName{
 			DisplayName: profile.DisplayName,
 		},
 	}
@@ -219,7 +219,7 @@ func SetDisplayName(
 
 	changedKey := "displayname"
 
-	var r common.DisplayName
+	var r internal.DisplayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -294,7 +294,7 @@ func SetDisplayName(
 // getProfile gets the full profile of a user by querying the database or a
 // remote homeserver.
 // Returns an error when something goes wrong or specifically
-// common.ErrProfileNoExists when the profile doesn't exist.
+// internal.ErrProfileNoExists when the profile doesn't exist.
 func getProfile(
 	ctx context.Context, accountDB accounts.Database, cfg *config.Dendrite,
 	userID string,
@@ -311,7 +311,7 @@ func getProfile(
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {
-					return nil, common.ErrProfileNoExists
+					return nil, internal.ErrProfileNoExists
 				}
 			}
 
@@ -366,7 +366,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := common.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
+		event, err := internal.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -129,7 +129,7 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
 
 	result := make(map[string][]string)
 	for rows.Next() {
@@ -152,12 +152,12 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	userID string,
 	membership string, // nolint: unparam
 ) ([]string, error) {
-	stmt := common.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
+	stmt := internal.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
 	rows, err := stmt.QueryContext(ctx, userID, membership)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectRoomIDsWithMembership: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomIDsWithMembership: rows.close() failed")
 
 	var result []string
 	for rows.Next() {
@@ -175,7 +175,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilterPart *gomatrixserverlib.StateFilter,
 ) ([]gomatrixserverlib.HeaderedEvent, error) {
-	stmt := common.TxStmt(txn, s.selectCurrentStateStmt)
+	stmt := internal.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
 		nil, // FIXME: pq.StringArray(stateFilterPart.Senders),
 		nil, // FIXME: pq.StringArray(stateFilterPart.NotSenders),
@@ -187,7 +187,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectCurrentState: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectCurrentState: rows.close() failed")
 
 	return rowsToEvents(rows)
 }
@@ -195,7 +195,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
-	stmt := common.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
+	stmt := internal.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
 	_, err := stmt.ExecContext(ctx, eventID)
 	return err
 }
@@ -218,7 +218,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	}
 
 	// upsert state event
-	stmt := common.TxStmt(txn, s.upsertRoomStateStmt)
+	stmt := internal.TxStmt(txn, s.upsertRoomStateStmt)
 	_, err = stmt.ExecContext(
 		ctx,
 		event.RoomID(),
@@ -241,12 +241,12 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", common.QueryVariadic(len(iEventIDs)), 1)
+	query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", internal.QueryVariadic(len(iEventIDs)), 1)
 	rows, err := txn.QueryContext(ctx, query, iEventIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
 	return rowsToStreamEvents(rows)
 }
 

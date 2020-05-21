@@ -21,7 +21,7 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -44,7 +44,7 @@ func NewDatabase(
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (*Database, error) {
-	db, err := sqlutil.Open(common.SQLiteDriverName(), dataSourceName, nil)
+	db, err := sqlutil.Open(internal.SQLiteDriverName(), dataSourceName, nil)
 	if err != nil {
 		return nil, err
 	}

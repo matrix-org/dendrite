@@ -20,7 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/sirupsen/logrus"

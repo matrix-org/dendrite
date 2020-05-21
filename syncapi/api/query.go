@@ -18,7 +18,7 @@ import (
 	"context"
 	"net/http"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 )
@@ -80,7 +80,7 @@ func (h *httpSyncQueryAPI) QuerySync(
 	defer span.Finish()
 
 	apiURL := h.syncapiURL + SyncAPIQuerySyncPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryStateAfterEvents implements SyncQueryAPI
@@ -93,7 +93,7 @@ func (h *httpSyncQueryAPI) QueryState(
 	defer span.Finish()
 
 	apiURL := h.syncapiURL + SyncAPIQueryStatePath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryEventsByID implements SyncQueryAPI
@@ -106,7 +106,7 @@ func (h *httpSyncQueryAPI) QueryStateType(
 	defer span.Finish()
 
 	apiURL := h.syncapiURL + SyncAPIQueryStateTypePath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryMembershipForUser implements SyncQueryAPI
@@ -119,5 +119,5 @@ func (h *httpSyncQueryAPI) QueryMessages(
 	defer span.Finish()
 
 	apiURL := h.syncapiURL + SyncAPIQueryMessagesPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

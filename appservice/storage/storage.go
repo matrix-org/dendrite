@@ -21,12 +21,12 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/storage/postgres"
 	"github.com/matrix-org/dendrite/appservice/storage/sqlite3"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 // NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
 // and sets DB connection parameters
-func NewDatabase(dataSourceName string, dbProperties common.DbProperties) (Database, error) {
+func NewDatabase(dataSourceName string, dbProperties internal.DbProperties) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return postgres.NewDatabase(dataSourceName, dbProperties)

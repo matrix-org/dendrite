@@ -18,7 +18,7 @@ import (
 	"errors"
 	"net/http"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/gomatrixserverlib"
 	opentracing "github.com/opentracing/opentracing-go"
 )
@@ -80,5 +80,5 @@ func (h *httpEDUServerInputAPI) InputTypingEvent(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputTypingEventPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

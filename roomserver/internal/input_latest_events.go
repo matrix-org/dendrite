@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"context"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -59,7 +59,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 	}
 	succeeded := false
 	defer func() {
-		txerr := common.EndTransaction(updater, &succeeded)
+		txerr := internal.EndTransaction(updater, &succeeded)
 		if err == nil && txerr != nil {
 			err = txerr
 		}

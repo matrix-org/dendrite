@@ -19,7 +19,7 @@ package api
 import (
 	"context"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -318,7 +318,7 @@ func (h *httpRoomserverInternalAPI) QueryLatestEventsAndState(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryLatestEventsAndStatePath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryStateAfterEvents implements RoomserverQueryAPI
@@ -331,7 +331,7 @@ func (h *httpRoomserverInternalAPI) QueryStateAfterEvents(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryEventsByID implements RoomserverQueryAPI
@@ -344,7 +344,7 @@ func (h *httpRoomserverInternalAPI) QueryEventsByID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryMembershipForUser implements RoomserverQueryAPI
@@ -357,7 +357,7 @@ func (h *httpRoomserverInternalAPI) QueryMembershipForUser(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMembershipForUserPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryMembershipsForRoom implements RoomserverQueryAPI
@@ -370,7 +370,7 @@ func (h *httpRoomserverInternalAPI) QueryMembershipsForRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryInvitesForUser implements RoomserverQueryAPI
@@ -383,7 +383,7 @@ func (h *httpRoomserverInternalAPI) QueryInvitesForUser(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryInvitesForUserPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryServerAllowedToSeeEvent implements RoomserverQueryAPI
@@ -396,7 +396,7 @@ func (h *httpRoomserverInternalAPI) QueryServerAllowedToSeeEvent(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryMissingEvents implements RoomServerQueryAPI
@@ -409,7 +409,7 @@ func (h *httpRoomserverInternalAPI) QueryMissingEvents(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMissingEventsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryStateAndAuthChain implements RoomserverQueryAPI
@@ -422,7 +422,7 @@ func (h *httpRoomserverInternalAPI) QueryStateAndAuthChain(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryStateAndAuthChainPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryBackfill implements RoomServerQueryAPI
@@ -435,7 +435,7 @@ func (h *httpRoomserverInternalAPI) QueryBackfill(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryBackfillPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryRoomVersionCapabilities implements RoomServerQueryAPI
@@ -448,7 +448,7 @@ func (h *httpRoomserverInternalAPI) QueryRoomVersionCapabilities(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryRoomVersionCapabilitiesPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryRoomVersionForRoom implements RoomServerQueryAPI
@@ -466,7 +466,7 @@ func (h *httpRoomserverInternalAPI) QueryRoomVersionForRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryRoomVersionForRoomPath
-	err := commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	err := internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err == nil {
 		h.immutableCache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	}

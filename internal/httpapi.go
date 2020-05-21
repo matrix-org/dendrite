@@ -1,4 +1,4 @@
-package common
+package internal
 
 import (
 	"io"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"

@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
@@ -29,7 +29,7 @@ import (
 
 // OutputTypingEventConsumer consumes events that originated in the EDU server.
 type OutputTypingEventConsumer struct {
-	typingConsumer *common.ContinualConsumer
+	typingConsumer *internal.ContinualConsumer
 	db             storage.Database
 	notifier       *sync.Notifier
 }
@@ -43,7 +43,7 @@ func NewOutputTypingEventConsumer(
 	store storage.Database,
 ) *OutputTypingEventConsumer {
 
-	consumer := common.ContinualConsumer{
+	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputTypingEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,

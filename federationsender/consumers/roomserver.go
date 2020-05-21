@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
@@ -35,7 +35,7 @@ import (
 type OutputRoomEventConsumer struct {
 	cfg        *config.Dendrite
 	rsAPI      api.RoomserverInternalAPI
-	rsConsumer *common.ContinualConsumer
+	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
 	queues     *queue.OutgoingQueues
 }
@@ -48,7 +48,7 @@ func NewOutputRoomEventConsumer(
 	store storage.Database,
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
-	consumer := common.ContinualConsumer{
+	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,

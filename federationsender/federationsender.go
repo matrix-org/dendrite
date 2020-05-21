@@ -17,7 +17,7 @@ package federationsender
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/internal"

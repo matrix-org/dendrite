@@ -19,8 +19,8 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -29,7 +29,7 @@ import (
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
-	clientAPIConsumer *common.ContinualConsumer
+	clientAPIConsumer *internal.ContinualConsumer
 	db                storage.Database
 	notifier          *sync.Notifier
 }
@@ -42,7 +42,7 @@ func NewOutputClientDataConsumer(
 	store storage.Database,
 ) *OutputClientDataConsumer {
 
-	consumer := common.ContinualConsumer{
+	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputClientData),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
@@ -67,7 +67,7 @@ func (s *OutputClientDataConsumer) Start() error {
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
-	var output common.AccountData
+	var output internal.AccountData
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("client API server output log: message parse failure")

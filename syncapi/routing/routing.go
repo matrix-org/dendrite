@@ -21,8 +21,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
@@ -52,12 +52,12 @@ func Setup(
 	}
 
 	// TODO: Add AS support for all handlers below.
-	r0mux.Handle("/sync", common.MakeAuthAPI("sync", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/sync", internal.MakeAuthAPI("sync", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/rooms/{roomID}/messages", common.MakeAuthAPI("room_messages", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+	r0mux.Handle("/rooms/{roomID}/messages", internal.MakeAuthAPI("room_messages", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		vars, err := internal.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}

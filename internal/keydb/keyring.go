@@ -17,7 +17,7 @@ package keydb
 import (
 	"encoding/base64"
 
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"

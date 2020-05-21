@@ -24,7 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -52,7 +52,7 @@ func Open(dataSourceName string) (*Database, error) {
 	} else {
 		return nil, errors.New("no filename or path in connect string")
 	}
-	if d.db, err = sqlutil.Open(common.SQLiteDriverName(), cs, nil); err != nil {
+	if d.db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
@@ -83,7 +83,7 @@ func (d *Database) StoreEvent(
 		err              error
 	)
 
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if txnAndSessionID != nil {
 			if err = d.statements.insertTransaction(
 				ctx, txn, txnAndSessionID.TransactionID,
@@ -242,7 +242,7 @@ func (d *Database) assignStateKeyNID(
 func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
 ) (se []types.StateEntry, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		se, err = d.statements.bulkSelectStateEventByID(ctx, txn, eventIDs)
 		return err
 	})
@@ -253,7 +253,7 @@ func (d *Database) StateEntriesForEventIDs(
 func (d *Database) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
 ) (etnids map[string]types.EventTypeNID, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		etnids, err = d.statements.bulkSelectEventTypeNID(ctx, txn, eventTypes)
 		return err
 	})
@@ -264,7 +264,7 @@ func (d *Database) EventTypeNIDs(
 func (d *Database) EventStateKeyNIDs(
 	ctx context.Context, eventStateKeys []string,
 ) (esknids map[string]types.EventStateKeyNID, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		esknids, err = d.statements.bulkSelectEventStateKeyNID(ctx, txn, eventStateKeys)
 		return err
 	})
@@ -275,7 +275,7 @@ func (d *Database) EventStateKeyNIDs(
 func (d *Database) EventStateKeys(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (out map[types.EventStateKeyNID]string, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		out, err = d.statements.bulkSelectEventStateKey(ctx, txn, eventStateKeyNIDs)
 		return err
 	})
@@ -286,7 +286,7 @@ func (d *Database) EventStateKeys(
 func (d *Database) EventNIDs(
 	ctx context.Context, eventIDs []string,
 ) (out map[string]types.EventNID, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		out, err = d.statements.bulkSelectEventNID(ctx, txn, eventIDs)
 		return err
 	})
@@ -300,7 +300,7 @@ func (d *Database) Events(
 	var eventJSONs []eventJSONPair
 	var err error
 	var results []types.Event
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
 		if err != nil || len(eventJSONs) == 0 {
 			return nil
@@ -341,7 +341,7 @@ func (d *Database) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if len(state) > 0 {
 			var stateBlockNID types.StateBlockNID
 			stateBlockNID, err = d.statements.bulkInsertStateData(ctx, txn, state)
@@ -363,7 +363,7 @@ func (d *Database) AddState(
 func (d *Database) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	e := common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	e := internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		return d.statements.updateEventState(ctx, txn, eventNID, stateNID)
 	})
 	return e
@@ -373,7 +373,7 @@ func (d *Database) SetState(
 func (d *Database) StateAtEventIDs(
 	ctx context.Context, eventIDs []string,
 ) (se []types.StateAtEvent, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		se, err = d.statements.bulkSelectStateAtEventByID(ctx, txn, eventIDs)
 		return err
 	})
@@ -384,7 +384,7 @@ func (d *Database) StateAtEventIDs(
 func (d *Database) StateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) (sl []types.StateBlockNIDList, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		sl, err = d.statements.bulkSelectStateBlockNIDs(ctx, txn, stateNIDs)
 		return err
 	})
@@ -395,7 +395,7 @@ func (d *Database) StateBlockNIDs(
 func (d *Database) StateEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) (sel []types.StateEntryList, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		sel, err = d.statements.bulkSelectStateBlockEntries(ctx, txn, stateBlockNIDs)
 		return err
 	})
@@ -406,7 +406,7 @@ func (d *Database) StateEntries(
 func (d *Database) SnapshotNIDFromEventID(
 	ctx context.Context, eventID string,
 ) (stateNID types.StateSnapshotNID, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		_, stateNID, err = d.statements.selectEvent(ctx, txn, eventID)
 		return err
 	})
@@ -417,7 +417,7 @@ func (d *Database) SnapshotNIDFromEventID(
 func (d *Database) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) (out map[types.EventNID]string, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		out, err = d.statements.bulkSelectEventID(ctx, txn, eventNIDs)
 		return err
 	})
@@ -509,7 +509,7 @@ func (u *roomRecentEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotN
 
 // StorePreviousEvents implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
-	err := common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err := internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		for _, ref := range previousEventReferences {
 			if err := u.d.statements.insertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
 				return err
@@ -522,7 +522,7 @@ func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, p
 
 // IsReferenced implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (res bool, err error) {
-	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		err := u.d.statements.selectPreviousEventExists(u.ctx, txn, eventReference.EventID, eventReference.EventSHA256)
 		if err == nil {
 			res = true
@@ -542,7 +542,7 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(
 	roomNID types.RoomNID, latest []types.StateAtEventAndReference, lastEventNIDSent types.EventNID,
 	currentStateSnapshotNID types.StateSnapshotNID,
 ) error {
-	err := common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err := internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		eventNIDs := make([]types.EventNID, len(latest))
 		for i := range latest {
 			eventNIDs[i] = latest[i].EventNID
@@ -554,7 +554,7 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(
 
 // HasEventBeenSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (res bool, err error) {
-	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		res, err = u.d.statements.selectEventSentToOutput(u.ctx, txn, eventNID)
 		return err
 	})
@@ -563,14 +563,14 @@ func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (res
 
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
-	err := common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err := internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		return u.d.statements.updateEventSentToOutput(u.ctx, txn, eventNID)
 	})
 	return err
 }
 
 func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (mu types.MembershipUpdater, err error) {
-	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		mu, err = u.d.membershipUpdaterTxn(u.ctx, txn, u.roomNID, targetUserNID, targetLocal)
 		return err
 	})
@@ -579,7 +579,7 @@ func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventSta
 
 // RoomNID implements query.RoomserverQueryAPIDB
 func (d *Database) RoomNID(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
 		if err == sql.ErrNoRows {
 			roomNID = 0
@@ -611,7 +611,7 @@ func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (ro
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
 ) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		var eventNIDs []types.EventNID
 		eventNIDs, currentStateSnapshotNID, err = d.statements.selectLatestEventNIDs(ctx, txn, roomNID)
 		if err != nil {
@@ -773,7 +773,7 @@ func (u *membershipUpdater) IsLeave() bool {
 
 // SetToInvite implements types.MembershipUpdater
 func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (inserted bool, err error) {
-	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, txn, event.Sender())
 		if err != nil {
 			return err
@@ -798,7 +798,7 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (inserted
 
 // SetToJoin implements types.MembershipUpdater
 func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpdate bool) (inviteEventIDs []string, err error) {
-	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, txn, senderUserID)
 		if err != nil {
 			return err
@@ -836,7 +836,7 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 
 // SetToLeave implements types.MembershipUpdater
 func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) (inviteEventIDs []string, err error) {
-	err = common.WithTransaction(u.d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, txn, senderUserID)
 		if err != nil {
 			return err
@@ -871,7 +871,7 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) (inv
 func (d *Database) GetMembership(
 	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
 ) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		requestSenderUserNID, err := d.assignStateKeyNID(ctx, txn, requestSenderUserID)
 		if err != nil {
 			return err
@@ -899,7 +899,7 @@ func (d *Database) GetMembership(
 func (d *Database) GetMembershipEventNIDsForRoom(
 	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
 ) (eventNIDs []types.EventNID, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if joinOnly {
 			eventNIDs, err = d.statements.selectMembershipsFromRoomAndMembership(
 				ctx, txn, roomNID, membershipStateJoin, localOnly,

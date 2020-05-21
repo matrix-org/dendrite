@@ -20,7 +20,7 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -110,13 +110,13 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	for k, v := range eventStateKeys {
 		iEventStateKeys[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", common.QueryVariadic(len(eventStateKeys)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", internal.QueryVariadic(len(eventStateKeys)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeys...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKeyNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKeyNID: rows.close() failed")
 	result := make(map[string]types.EventStateKeyNID, len(eventStateKeys))
 	for rows.Next() {
 		var stateKey string
@@ -136,13 +136,13 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	for k, v := range eventStateKeyNIDs {
 		iEventStateKeyNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", common.QueryVariadic(len(eventStateKeyNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", internal.QueryVariadic(len(eventStateKeyNIDs)), 1)
 
 	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeyNIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKey: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKey: rows.close() failed")
 	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
 	for rows.Next() {
 		var stateKey string

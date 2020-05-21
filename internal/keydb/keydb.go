@@ -21,16 +21,16 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/keydb/postgres"
-	"github.com/matrix-org/dendrite/common/keydb/sqlite3"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/keydb/postgres"
+	"github.com/matrix-org/dendrite/internal/keydb/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewDatabase opens a database connection.
 func NewDatabase(
 	dataSourceName string,
-	dbProperties common.DbProperties,
+	dbProperties internal.DbProperties,
 	serverName gomatrixserverlib.ServerName,
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,

@@ -13,14 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sqlite3
+package postgres
 
 import (
 	"context"
 	"database/sql"
-	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
+
+	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -42,7 +43,7 @@ CREATE TABLE IF NOT EXISTS keydb_server_keys (
 	expired_ts BIGINT NOT NULL,
 	-- The base64-encoded public key.
 	server_key TEXT NOT NULL,
-	UNIQUE (server_name, server_key_id)
+	CONSTRAINT keydb_server_keys_unique UNIQUE (server_name, server_key_id)
 );
 
 CREATE INDEX IF NOT EXISTS keydb_server_name_and_key_id ON keydb_server_keys (server_name_and_key_id);
@@ -51,23 +52,21 @@ CREATE INDEX IF NOT EXISTS keydb_server_name_and_key_id ON keydb_server_keys (se
 const bulkSelectServerKeysSQL = "" +
 	"SELECT server_name, server_key_id, valid_until_ts, expired_ts, " +
 	"   server_key FROM keydb_server_keys" +
-	" WHERE server_name_and_key_id IN ($1)"
+	" WHERE server_name_and_key_id = ANY($1)"
 
 const upsertServerKeysSQL = "" +
 	"INSERT INTO keydb_server_keys (server_name, server_key_id," +
 	" server_name_and_key_id, valid_until_ts, expired_ts, server_key)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
-	" ON CONFLICT (server_name, server_key_id)" +
+	" ON CONFLICT ON CONSTRAINT keydb_server_keys_unique" +
 	" DO UPDATE SET valid_until_ts = $4, expired_ts = $5, server_key = $6"
 
 type serverKeyStatements struct {
-	db                       *sql.DB
 	bulkSelectServerKeysStmt *sql.Stmt
 	upsertServerKeysStmt     *sql.Stmt
 }
 
 func (s *serverKeyStatements) prepare(db *sql.DB) (err error) {
-	s.db = db
 	_, err = db.Exec(serverKeysSchema)
 	if err != nil {
 		return
@@ -89,19 +88,12 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	for request := range requests {
 		nameAndKeyIDs = append(nameAndKeyIDs, nameAndKeyID(request))
 	}
-
-	query := strings.Replace(bulkSelectServerKeysSQL, "($1)", common.QueryVariadic(len(nameAndKeyIDs)), 1)
-
-	iKeyIDs := make([]interface{}, len(nameAndKeyIDs))
-	for i, v := range nameAndKeyIDs {
-		iKeyIDs[i] = v
-	}
-
-	rows, err := s.db.QueryContext(ctx, query, iKeyIDs...)
+	stmt := s.bulkSelectServerKeysStmt
+	rows, err := stmt.QueryContext(ctx, pq.StringArray(nameAndKeyIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectServerKeys: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectServerKeys: rows.close() failed")
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	for rows.Next() {
 		var serverName string
@@ -127,7 +119,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 			ExpiredTS:    gomatrixserverlib.Timestamp(expiredTS),
 		}
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 func (s *serverKeyStatements) upsertServerKeys(

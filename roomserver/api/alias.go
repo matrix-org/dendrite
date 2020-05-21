@@ -17,7 +17,7 @@ package api
 import (
 	"context"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
+	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -109,7 +109,7 @@ func (h *httpRoomserverInternalAPI) SetRoomAlias(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // GetRoomIDForAlias implements RoomserverAliasAPI
@@ -122,7 +122,7 @@ func (h *httpRoomserverInternalAPI) GetRoomIDForAlias(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverGetRoomIDForAliasPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // GetAliasesForRoomID implements RoomserverAliasAPI
@@ -135,7 +135,7 @@ func (h *httpRoomserverInternalAPI) GetAliasesForRoomID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverGetAliasesForRoomIDPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // GetCreatorIDForAlias implements RoomserverAliasAPI
@@ -148,7 +148,7 @@ func (h *httpRoomserverInternalAPI) GetCreatorIDForAlias(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverGetCreatorIDForAliasPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // RemoveRoomAlias implements RoomserverAliasAPI
@@ -161,5 +161,5 @@ func (h *httpRoomserverInternalAPI) RemoveRoomAlias(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverRemoveRoomAliasPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

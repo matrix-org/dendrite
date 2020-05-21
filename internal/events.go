@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package internal
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 
 	"github.com/matrix-org/gomatrixserverlib"

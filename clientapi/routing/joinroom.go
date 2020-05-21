@@ -72,7 +72,7 @@ func JoinRoomByIDOrAlias(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		// TODO: Put the response struct somewhere common.
+		// TODO: Put the response struct somewhere internal.
 		JSON: struct {
 			RoomID string `json:"room_id"`
 		}{joinReq.RoomIDOrAlias},

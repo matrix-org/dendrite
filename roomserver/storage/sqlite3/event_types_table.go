@@ -20,7 +20,7 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -101,8 +101,8 @@ func (s *eventTypeStatements) insertEventTypeNID(
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
 	var err error
-	insertStmt := common.TxStmt(tx, s.insertEventTypeNIDStmt)
-	resultStmt := common.TxStmt(tx, s.insertEventTypeNIDResultStmt)
+	insertStmt := internal.TxStmt(tx, s.insertEventTypeNIDStmt)
+	resultStmt := internal.TxStmt(tx, s.insertEventTypeNIDResultStmt)
 	if _, err = insertStmt.ExecContext(ctx, eventType); err == nil {
 		err = resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
 	}
@@ -113,7 +113,7 @@ func (s *eventTypeStatements) selectEventTypeNID(
 	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	selectStmt := common.TxStmt(tx, s.selectEventTypeNIDStmt)
+	selectStmt := internal.TxStmt(tx, s.selectEventTypeNIDStmt)
 	err := selectStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
@@ -126,19 +126,19 @@ func (s *eventTypeStatements) bulkSelectEventTypeNID(
 	for k, v := range eventTypes {
 		iEventTypes[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", common.QueryVariadic(len(iEventTypes)), 1)
+	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", internal.QueryVariadic(len(iEventTypes)), 1)
 	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
 	///////////////
 
-	selectStmt := common.TxStmt(tx, selectPrep)
+	selectStmt := internal.TxStmt(tx, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, iEventTypes...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
 
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
 	for rows.Next() {
