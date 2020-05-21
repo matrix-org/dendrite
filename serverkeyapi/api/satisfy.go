@@ -17,10 +17,8 @@ func (s *httpServerKeyInternalAPI) StoreKeys(
 	request := InputPublicKeysRequest{}
 	response := InputPublicKeysResponse{}
 	for req, res := range results {
-		if _, ok := request.Keys[req.ServerName]; !ok {
-			request.Keys[req.ServerName] = map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyLookupResult{}
-		}
-		request.Keys[req.ServerName][req.KeyID] = res
+		request.Keys[req] = res
+		s.immutableCache.StoreServerKey(req, res)
 	}
 	return s.InputPublicKeys(ctx, &request, &response)
 }
@@ -29,27 +27,22 @@ func (s *httpServerKeyInternalAPI) FetchKeys(
 	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
+	result := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	request := QueryPublicKeysRequest{}
 	response := QueryPublicKeysResponse{}
 	for req, ts := range requests {
-		if _, ok := request.Requests[req.ServerName]; !ok {
-			request.Requests[req.ServerName] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Timestamp{}
+		if res, ok := s.immutableCache.GetServerKey(req); ok {
+			result[req] = res
+			continue
 		}
-		request.Requests[req.ServerName][req.KeyID] = ts
+		request.Requests[req] = ts
 	}
 	err := s.QueryPublicKeys(ctx, &request, &response)
 	if err != nil {
 		return nil, err
 	}
-	result := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
-	for serverName, byServerName := range response.Results {
-		for keyID, res := range byServerName {
-			key := gomatrixserverlib.PublicKeyLookupRequest{
-				ServerName: serverName,
-				KeyID:      keyID,
-			}
-			result[key] = res
-		}
+	for req, res := range response.Results {
+		result[req] = res
 	}
 	return result, nil
 }

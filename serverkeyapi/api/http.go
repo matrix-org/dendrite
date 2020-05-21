@@ -18,7 +18,7 @@ const (
 )
 
 type InputPublicKeysRequest struct {
-	Keys map[gomatrixserverlib.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyLookupResult `json:"keys"`
+	Keys map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult `json:"keys"`
 }
 
 type InputPublicKeysResponse struct {
@@ -37,11 +37,11 @@ func (h *httpServerKeyInternalAPI) InputPublicKeys(
 }
 
 type QueryPublicKeysRequest struct {
-	Requests map[gomatrixserverlib.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.Timestamp `json:"requests"`
+	Requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp `json:"requests"`
 }
 
 type QueryPublicKeysResponse struct {
-	Results map[gomatrixserverlib.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyLookupResult `json:"results"`
+	Results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult `json:"results"`
 }
 
 func (h *httpServerKeyInternalAPI) QueryPublicKeys(
