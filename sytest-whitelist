@@ -284,3 +284,7 @@ Inbound federation can backfill events
 Backfill checks the events requested belong to the room
 Backfilled events whose prev_events are in a different room do not allow cross-room back-pagination
 Outbound federation can request missing events
+New room members see their own join event
+Existing members see new members' join events
+Inbound federation can receive events
+Inbound federation can receive redacted events
