@@ -99,4 +99,17 @@ func (f *FederationSenderInternalAPI) SetupHTTP(internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(api.FederationSenderPerformDirectoryLookupRequestPath,
+		internal.MakeInternalAPI("PerformDirectoryLookupRequest", func(req *http.Request) util.JSONResponse {
+			var request api.PerformDirectoryLookupRequest
+			var response api.PerformDirectoryLookupResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := f.PerformDirectoryLookup(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }
