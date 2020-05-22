@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixR0 = "/_matrix/client/r0"
+const pathPrefixR0 = "/client/r0"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -36,11 +36,11 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, cfg *config.Dendrite,
+	publicAPIMux *mux.Router, cfg *config.Dendrite,
 	accountDB accounts.Database,
 	deviceDB devices.Database,
 ) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
 		AccountDB:   accountDB,

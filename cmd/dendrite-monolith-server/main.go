@@ -35,7 +35,6 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/sirupsen/logrus"
 )
@@ -91,14 +90,13 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
-	httpHandler := internal.WrapHandlerInCORS(base.APIMux)
-
-	// Set up the API endpoints we handle. /metrics is for prometheus, and is
-	// not wrapped by CORS, while everything else is
-	if cfg.Metrics.Enabled {
-		http.Handle("/metrics", internal.WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
-	}
-	http.Handle("/", httpHandler)
+	internal.SetupHTTPAPI(
+		http.DefaultServeMux,
+		base.PublicAPIMux,
+		base.InternalAPIMux,
+		cfg,
+		base.EnableHTTPAPIs,
+	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {

@@ -273,40 +273,40 @@ type QueryRoomVersionForRoomResponse struct {
 }
 
 // RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
-const RoomserverQueryLatestEventsAndStatePath = "/api/roomserver/queryLatestEventsAndState"
+const RoomserverQueryLatestEventsAndStatePath = "/roomserver/queryLatestEventsAndState"
 
 // RoomserverQueryStateAfterEventsPath is the HTTP path for the QueryStateAfterEvents API.
-const RoomserverQueryStateAfterEventsPath = "/api/roomserver/queryStateAfterEvents"
+const RoomserverQueryStateAfterEventsPath = "/roomserver/queryStateAfterEvents"
 
 // RoomserverQueryEventsByIDPath is the HTTP path for the QueryEventsByID API.
-const RoomserverQueryEventsByIDPath = "/api/roomserver/queryEventsByID"
+const RoomserverQueryEventsByIDPath = "/roomserver/queryEventsByID"
 
 // RoomserverQueryMembershipForUserPath is the HTTP path for the QueryMembershipForUser API.
-const RoomserverQueryMembershipForUserPath = "/api/roomserver/queryMembershipForUser"
+const RoomserverQueryMembershipForUserPath = "/roomserver/queryMembershipForUser"
 
 // RoomserverQueryMembershipsForRoomPath is the HTTP path for the QueryMembershipsForRoom API
-const RoomserverQueryMembershipsForRoomPath = "/api/roomserver/queryMembershipsForRoom"
+const RoomserverQueryMembershipsForRoomPath = "/roomserver/queryMembershipsForRoom"
 
 // RoomserverQueryInvitesForUserPath is the HTTP path for the QueryInvitesForUser API
-const RoomserverQueryInvitesForUserPath = "/api/roomserver/queryInvitesForUser"
+const RoomserverQueryInvitesForUserPath = "/roomserver/queryInvitesForUser"
 
 // RoomserverQueryServerAllowedToSeeEventPath is the HTTP path for the QueryServerAllowedToSeeEvent API
-const RoomserverQueryServerAllowedToSeeEventPath = "/api/roomserver/queryServerAllowedToSeeEvent"
+const RoomserverQueryServerAllowedToSeeEventPath = "/roomserver/queryServerAllowedToSeeEvent"
 
 // RoomserverQueryMissingEventsPath is the HTTP path for the QueryMissingEvents API
-const RoomserverQueryMissingEventsPath = "/api/roomserver/queryMissingEvents"
+const RoomserverQueryMissingEventsPath = "/roomserver/queryMissingEvents"
 
 // RoomserverQueryStateAndAuthChainPath is the HTTP path for the QueryStateAndAuthChain API
-const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthChain"
+const RoomserverQueryStateAndAuthChainPath = "/roomserver/queryStateAndAuthChain"
 
 // RoomserverQueryBackfillPath is the HTTP path for the QueryBackfillPath API
-const RoomserverQueryBackfillPath = "/api/roomserver/queryBackfill"
+const RoomserverQueryBackfillPath = "/roomserver/queryBackfill"
 
 // RoomserverQueryRoomVersionCapabilitiesPath is the HTTP path for the QueryRoomVersionCapabilities API
-const RoomserverQueryRoomVersionCapabilitiesPath = "/api/roomserver/queryRoomVersionCapabilities"
+const RoomserverQueryRoomVersionCapabilitiesPath = "/roomserver/queryRoomVersionCapabilities"
 
 // RoomserverQueryRoomVersionForRoomPath is the HTTP path for the QueryRoomVersionForRoom API
-const RoomserverQueryRoomVersionForRoomPath = "/api/roomserver/queryRoomVersionForRoom"
+const RoomserverQueryRoomVersionForRoomPath = "/roomserver/queryRoomVersionForRoom"
 
 // QueryLatestEventsAndState implements RoomserverQueryAPI
 func (h *httpRoomserverInternalAPI) QueryLatestEventsAndState(

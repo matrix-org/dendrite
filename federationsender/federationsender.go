@@ -15,8 +15,6 @@
 package federationsender
 
 import (
-	"net/http"
-
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/internal"
@@ -72,9 +70,7 @@ func SetupFederationSenderComponent(
 		statistics,
 	)
 
-	if base.EnableHTTPAPIs {
-		queryAPI.SetupHTTP(http.DefaultServeMux)
-	}
+	queryAPI.SetupHTTP(base.InternalAPIMux)
 
 	return queryAPI
 }

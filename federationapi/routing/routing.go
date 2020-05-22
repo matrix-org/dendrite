@@ -31,9 +31,9 @@ import (
 )
 
 const (
-	pathPrefixV2Keys       = "/_matrix/key/v2"
-	pathPrefixV1Federation = "/_matrix/federation/v1"
-	pathPrefixV2Federation = "/_matrix/federation/v2"
+	pathPrefixV2Keys       = "/key/v2"
+	pathPrefixV1Federation = "/federation/v1"
+	pathPrefixV2Federation = "/federation/v2"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -42,7 +42,7 @@ const (
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router,
+	publicAPIMux *mux.Router,
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -54,9 +54,9 @@ func Setup(
 	accountDB accounts.Database,
 	deviceDB devices.Database,
 ) {
-	v2keysmux := apiMux.PathPrefix(pathPrefixV2Keys).Subrouter()
-	v1fedmux := apiMux.PathPrefix(pathPrefixV1Federation).Subrouter()
-	v2fedmux := apiMux.PathPrefix(pathPrefixV2Federation).Subrouter()
+	v2keysmux := publicAPIMux.PathPrefix(pathPrefixV2Keys).Subrouter()
+	v1fedmux := publicAPIMux.PathPrefix(pathPrefixV1Federation).Subrouter()
+	v2fedmux := publicAPIMux.PathPrefix(pathPrefixV2Federation).Subrouter()
 
 	localKeys := internal.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
 		return LocalKeys(cfg)

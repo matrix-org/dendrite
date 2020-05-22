@@ -35,6 +35,6 @@ func SetupMediaAPIComponent(
 	}
 
 	routing.Setup(
-		base.APIMux, base.Cfg, mediaDB, deviceDB, gomatrixserverlib.NewClient(),
+		base.PublicAPIMux, base.Cfg, mediaDB, deviceDB, gomatrixserverlib.NewClient(),
 	)
 }

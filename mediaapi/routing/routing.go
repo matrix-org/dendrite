@@ -33,7 +33,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const pathPrefixR0 = "/_matrix/media/r0"
+const pathPrefixR0 = "/media/r0"
 
 // Setup registers the media API HTTP handlers
 //
@@ -41,13 +41,13 @@ const pathPrefixR0 = "/_matrix/media/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router,
+	publicAPIMux *mux.Router,
 	cfg *config.Dendrite,
 	db storage.Database,
 	deviceDB devices.Database,
 	client *gomatrixserverlib.Client,
 ) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},

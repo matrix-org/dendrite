@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixR0 = "/_matrix/client/r0"
+const pathPrefixR0 = "/client/r0"
 
 // Setup configures the given mux with sync-server listeners
 //
@@ -38,12 +38,12 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
+	publicAPIMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
 	deviceDB devices.Database, federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 ) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
 		AccountDB:   nil,
