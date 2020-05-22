@@ -354,6 +354,8 @@ github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4 h1:eq
 github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4/go.mod h1:3WluEZ9QXSwU30tWYqktnpC1x9mwZKx1r8uAv8Iq+a4=
 github.com/matrix-org/go-sqlite3-js v0.0.0-20200326102434-98eda28055bd h1:C1FV4dRKF1uuGK8UH01+IoW6zZpfsTV1MvQimZvt418=
 github.com/matrix-org/go-sqlite3-js v0.0.0-20200326102434-98eda28055bd/go.mod h1:e+cg2q7C7yE5QnAXgzo512tgFh1RbQLC0+jozuegKgo=
+github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3 h1:Yb+Wlf/iHhWlLWd+kCgG+Fsg4Dc+xBl7hptfK7lD0zY=
+github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3/go.mod h1:e+cg2q7C7yE5QnAXgzo512tgFh1RbQLC0+jozuegKgo=
 github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26 h1:Hr3zjRsq2bhrnp3Ky1qgx/fzCtCALOoGYylh2tpS9K4=
 github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26/go.mod h1:3fxX6gUjWyI/2Bt7J1OLhpCzOfO/bB3AiX0cJtEKud0=
 github.com/matrix-org/gomatrixserverlib v0.0.0-20200511154227-5cc71d36632b h1:nAmSc1KvQOumoRTz/LD68KyrB6Q5/6q7CmQ5Bswc2nM=
