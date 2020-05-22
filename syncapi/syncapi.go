@@ -81,5 +81,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start typing server consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
+	routing.Setup(base.PublicAPIMux, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
 }

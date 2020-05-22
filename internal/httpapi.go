@@ -184,11 +184,14 @@ func MakeFedAPI(
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
 // listener.
-func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler, cfg *config.Dendrite) {
+func SetupHTTPAPI(servMux *http.ServeMux, publicApiMux http.Handler, internalApiMux http.Handler, cfg *config.Dendrite, enableHTTPAPIs bool) {
 	if cfg.Metrics.Enabled {
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
-	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
+	if enableHTTPAPIs {
+		servMux.Handle("/api/", internalApiMux)
+	}
+	servMux.Handle("/_matrix", publicApiMux)
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics

@@ -101,7 +101,7 @@ func SetupAppServiceAPIComponent(
 
 	// Set up HTTP Endpoints
 	routing.Setup(
-		base.APIMux, base.Cfg, rsAPI,
+		base.PublicAPIMux, base.Cfg, rsAPI,
 		accountsDB, federation, transactionsCache,
 	)
 

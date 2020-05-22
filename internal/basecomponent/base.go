@@ -56,8 +56,9 @@ type BaseDendrite struct {
 	componentName string
 	tracerCloser  io.Closer
 
-	// APIMux should be used to register new public matrix api endpoints
-	APIMux         *mux.Router
+	// PublicAPIMux should be used to register new public matrix api endpoints
+	PublicAPIMux   *mux.Router
+	InternalAPIMux *mux.Router
 	EnableHTTPAPIs bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
@@ -101,7 +102,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		ImmutableCache: cache,
-		APIMux:         mux.NewRouter().UseEncodedPath(),
+		PublicAPIMux:   mux.NewRouter().UseEncodedPath(),
+		InternalAPIMux: mux.NewRouter().UseEncodedPath(),
 		httpClient:     &http.Client{Timeout: HTTPClientTimeout},
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,
@@ -221,7 +223,13 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		WriteTimeout: HTTPServerTimeout,
 	}
 
-	internal.SetupHTTPAPI(http.DefaultServeMux, internal.WrapHandlerInCORS(b.APIMux), b.Cfg)
+	internal.SetupHTTPAPI(
+		http.DefaultServeMux,
+		internal.WrapHandlerInCORS(b.PublicAPIMux),
+		b.InternalAPIMux,
+		b.Cfg,
+		b.EnableHTTPAPIs,
+	)
 	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 
 	err := serv.ListenAndServe()

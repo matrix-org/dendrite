@@ -91,14 +91,17 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
-	httpHandler := internal.WrapHandlerInCORS(base.APIMux)
+	httpHandler := internal.WrapHandlerInCORS(base.PublicAPIMux)
 
 	// Set up the API endpoints we handle. /metrics is for prometheus, and is
 	// not wrapped by CORS, while everything else is
 	if cfg.Metrics.Enabled {
 		http.Handle("/metrics", internal.WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
-	http.Handle("/", httpHandler)
+	http.Handle("/_matrix", httpHandler)
+	if base.EnableHTTPAPIs {
+		http.Handle("/api/", base.InternalAPIMux)
+	}
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {

@@ -10,10 +10,10 @@ import (
 
 const (
 	// RoomserverPerformJoinPath is the HTTP path for the PerformJoin API.
-	RoomserverPerformJoinPath = "/api/roomserver/performJoin"
+	RoomserverPerformJoinPath = "/roomserver/performJoin"
 
 	// RoomserverPerformLeavePath is the HTTP path for the PerformLeave API.
-	RoomserverPerformLeavePath = "/api/roomserver/performLeave"
+	RoomserverPerformLeavePath = "/roomserver/performLeave"
 )
 
 type PerformJoinRequest struct {
