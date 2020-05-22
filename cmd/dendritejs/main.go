@@ -227,10 +227,13 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
-	http.Handle("/_matrix", internal.WrapHandlerInCORS(base.PublicAPIMux))
-	if base.EnableHTTPAPIs {
-		http.Handle("/api/", base.InternalAPIMux)
-	}
+	internal.SetupHTTPAPI(
+		http.DefaultServeMux,
+		base.PublicAPIMux,
+		base.InternalAPIMux,
+		cfg,
+		base.EnableHTTPAPIs,
+	)
 
 	// Expose the matrix APIs via libp2p-js - for federation traffic
 	if node != nil {

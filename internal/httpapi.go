@@ -189,7 +189,7 @@ func SetupHTTPAPI(servMux *http.ServeMux, publicApiMux http.Handler, internalApi
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
 	if enableHTTPAPIs {
-		servMux.Handle("/api/", internalApiMux)
+		servMux.Handle("/api", internalApiMux)
 	}
 	servMux.Handle("/_matrix", WrapHandlerInCORS(publicApiMux))
 }
