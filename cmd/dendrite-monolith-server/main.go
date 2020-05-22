@@ -71,9 +71,10 @@ func main() {
 	federation := base.CreateFederationClient()
 	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
-	rsAPI := roomserver.SetupRoomServerComponent(
+	rsComponent := roomserver.SetupRoomServerComponent(
 		base, keyRing, federation,
 	)
+	rsAPI := rsComponent
 	if base.EnableHTTPAPIs {
 		rsAPI = base.CreateHTTPRoomserverAPIs()
 	}
@@ -98,7 +99,7 @@ func main() {
 	if base.EnableHTTPAPIs {
 		fsAPI = base.CreateHTTPFederationSenderAPIs()
 	}
-	rsAPI.SetFederationSenderAPI(fsAPI)
+	rsComponent.SetFederationSenderAPI(fsAPI)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
