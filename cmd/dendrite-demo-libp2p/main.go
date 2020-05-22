@@ -47,7 +47,6 @@ import (
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -178,12 +177,13 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(&base.Base, deviceDB, publicRoomsDB, rsAPI, federation, nil) // Check this later
 	syncapi.SetupSyncAPIComponent(&base.Base, deviceDB, accountDB, rsAPI, federation, &cfg)
 
-	httpHandler := internal.WrapHandlerInCORS(base.Base.APIMux)
-
-	// Set up the API endpoints we handle. /metrics is for prometheus, and is
-	// not wrapped by CORS, while everything else is
-	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/", httpHandler)
+	internal.SetupHTTPAPI(
+		http.DefaultServeMux,
+		base.Base.PublicAPIMux,
+		base.Base.InternalAPIMux,
+		&cfg,
+		base.Base.EnableHTTPAPIs,
+	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {

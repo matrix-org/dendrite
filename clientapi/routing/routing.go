@@ -36,9 +36,9 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixV1 = "/_matrix/client/api/v1"
-const pathPrefixR0 = "/_matrix/client/r0"
-const pathPrefixUnstable = "/_matrix/client/unstable"
+const pathPrefixV1 = "/client/api/v1"
+const pathPrefixR0 = "/client/r0"
+const pathPrefixUnstable = "/client/unstable"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -47,7 +47,7 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, cfg *config.Dendrite,
+	publicAPIMux *mux.Router, cfg *config.Dendrite,
 	producer *producers.RoomserverProducer,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -62,7 +62,7 @@ func Setup(
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
 ) {
 
-	apiMux.Handle("/_matrix/client/versions",
+	publicAPIMux.Handle("/client/versions",
 		internal.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -78,9 +78,9 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-	v1mux := apiMux.PathPrefix(pathPrefixV1).Subrouter()
-	unstableMux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
+	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
+	v1mux := publicAPIMux.PathPrefix(pathPrefixV1).Subrouter()
+	unstableMux := publicAPIMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	authData := auth.Data{
 		AccountDB:   accountDB,

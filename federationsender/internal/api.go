@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/storage"
@@ -43,8 +44,8 @@ func NewFederationSenderInternalAPI(
 }
 
 // SetupHTTP adds the FederationSenderInternalAPI handlers to the http.ServeMux.
-func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(
+func (f *FederationSenderInternalAPI) SetupHTTP(internalAPIMux *mux.Router) {
+	internalAPIMux.Handle(
 		api.FederationSenderQueryJoinedHostsInRoomPath,
 		internal.MakeInternalAPI("QueryJoinedHostsInRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryJoinedHostsInRoomRequest
@@ -58,7 +59,7 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.FederationSenderQueryJoinedHostServerNamesInRoomPath,
 		internal.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryJoinedHostServerNamesInRoomRequest
@@ -72,7 +73,7 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(api.FederationSenderPerformJoinRequestPath,
+	internalAPIMux.Handle(api.FederationSenderPerformJoinRequestPath,
 		internal.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
@@ -85,7 +86,7 @@ func (f *FederationSenderInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(api.FederationSenderPerformLeaveRequestPath,
+	internalAPIMux.Handle(api.FederationSenderPerformLeaveRequestPath,
 		internal.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse

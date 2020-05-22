@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -20,6 +21,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	HTTPPublicPathPrefix   = "/_matrix/"
+	HTTPInternalPathPrefix = "/api/"
 )
 
 // BasicAuth is used for authorization on /metrics handlers
@@ -184,11 +190,14 @@ func MakeFedAPI(
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
 // listener.
-func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler, cfg *config.Dendrite) {
+func SetupHTTPAPI(servMux *http.ServeMux, publicApiMux *mux.Router, internalApiMux *mux.Router, cfg *config.Dendrite, enableHTTPAPIs bool) {
 	if cfg.Metrics.Enabled {
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
-	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
+	if enableHTTPAPIs {
+		servMux.Handle(HTTPInternalPathPrefix, internalApiMux)
+	}
+	servMux.Handle(HTTPPublicPathPrefix, WrapHandlerInCORS(publicApiMux))
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics

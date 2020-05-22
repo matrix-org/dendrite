@@ -15,8 +15,6 @@
 package roomserver
 
 import (
-	"net/http"
-
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -51,9 +49,7 @@ func SetupRoomServerComponent(
 		KeyRing:              keyRing,
 	}
 
-	if base.EnableHTTPAPIs {
-		internalAPI.SetupHTTP(http.DefaultServeMux)
-	}
+	internalAPI.SetupHTTP(base.InternalAPIMux)
 
 	return &internalAPI
 }
