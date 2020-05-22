@@ -264,6 +264,12 @@ type Dendrite struct {
 	// The config for logging informations. Each hook will be added to logrus.
 	Logging []LogrusHook `yaml:"logging"`
 
+	Proxy *struct {
+		Protocol string `yaml:"protocol"`
+		Host string `yaml:"host"`
+		Port uint16 `yaml:"port"`
+	} `yaml:"proxy"`
+
 	// Any information derived from the configuration options for later use.
 	Derived struct {
 		Registration struct {

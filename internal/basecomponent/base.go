@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"fmt"
 
 	"golang.org/x/crypto/ed25519"
 
@@ -95,6 +96,14 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
+	client := http.Client{Timeout: HTTPClientTimeout}
+	if cfg.Proxy != nil {
+		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL {
+			Scheme: cfg.Proxy.Protocol,
+			Host: fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
+		})}
+	}
+
 	return &BaseDendrite{
 		componentName:  componentName,
 		EnableHTTPAPIs: enableHTTPAPIs,
@@ -102,7 +111,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		Cfg:            cfg,
 		ImmutableCache: cache,
 		APIMux:         mux.NewRouter().UseEncodedPath(),
-		httpClient:     &http.Client{Timeout: HTTPClientTimeout},
+		httpClient:     &client,
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,
 	}
