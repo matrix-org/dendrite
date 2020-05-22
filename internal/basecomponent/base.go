@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httpapis"
 	"github.com/matrix-org/dendrite/internal/keydb"
 	"github.com/matrix-org/dendrite/internal/keydb/cache"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -103,8 +104,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		ImmutableCache: cache,
-		PublicAPIMux:   httpmux.PathPrefix(internal.HTTPPublicPathPrefix).Subrouter().UseEncodedPath(),
-		InternalAPIMux: httpmux.PathPrefix(internal.HTTPInternalPathPrefix).Subrouter().UseEncodedPath(),
+		PublicAPIMux:   httpmux.PathPrefix(httpapis.PublicPathPrefix).Subrouter().UseEncodedPath(),
+		InternalAPIMux: httpmux.PathPrefix(httpapis.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		httpClient:     &http.Client{Timeout: HTTPClientTimeout},
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,

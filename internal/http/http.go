@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
+	"github.com/matrix-org/dendrite/internal/httpapis"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 )
@@ -20,6 +23,14 @@ func PostJSON(
 	if err != nil {
 		return err
 	}
+
+	parsedAPIURL, err := url.Parse(apiURL)
+	if err != nil {
+		return err
+	}
+
+	parsedAPIURL.Path = httpapis.InternalPathPrefix + strings.TrimLeft(parsedAPIURL.Path, "/")
+	apiURL = parsedAPIURL.String()
 
 	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBytes))
 	if err != nil {

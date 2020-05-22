@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httpapis"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -21,11 +22,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	HTTPPublicPathPrefix   = "/_matrix/"
-	HTTPInternalPathPrefix = "/api/"
 )
 
 // BasicAuth is used for authorization on /metrics handlers
@@ -195,9 +191,9 @@ func SetupHTTPAPI(servMux *http.ServeMux, publicApiMux *mux.Router, internalApiM
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
 	if enableHTTPAPIs {
-		servMux.Handle(HTTPInternalPathPrefix, internalApiMux)
+		servMux.Handle(httpapis.InternalPathPrefix, internalApiMux)
 	}
-	servMux.Handle(HTTPPublicPathPrefix, WrapHandlerInCORS(publicApiMux))
+	servMux.Handle(httpapis.PublicPathPrefix, WrapHandlerInCORS(publicApiMux))
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
