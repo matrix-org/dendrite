@@ -178,13 +178,10 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(&base.Base, deviceDB, publicRoomsDB, rsAPI, federation, nil) // Check this later
 	syncapi.SetupSyncAPIComponent(&base.Base, deviceDB, accountDB, rsAPI, federation, &cfg)
 
-	httpHandler := internal.WrapHandlerInCORS(base.Base.PublicAPIMux)
-
 	// Set up the API endpoints we handle. /metrics is for prometheus, and is
 	// not wrapped by CORS, while everything else is
 	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/_matrix", httpHandler)
-	http.Handle("/_matrix", httpHandler)
+	http.Handle("/_matrix", internal.WrapHandlerInCORS(base.Base.PublicAPIMux))
 	if base.Base.EnableHTTPAPIs {
 		http.Handle("/api/", base.Base.InternalAPIMux)
 	}

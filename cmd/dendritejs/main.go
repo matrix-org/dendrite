@@ -227,8 +227,7 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
-	httpHandler := internal.WrapHandlerInCORS(base.PublicAPIMux)
-	http.Handle("/_matrix", httpHandler)
+	http.Handle("/_matrix", internal.WrapHandlerInCORS(base.PublicAPIMux))
 	if base.EnableHTTPAPIs {
 		http.Handle("/api/", base.InternalAPIMux)
 	}

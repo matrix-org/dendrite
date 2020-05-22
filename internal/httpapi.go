@@ -191,7 +191,7 @@ func SetupHTTPAPI(servMux *http.ServeMux, publicApiMux http.Handler, internalApi
 	if enableHTTPAPIs {
 		servMux.Handle("/api/", internalApiMux)
 	}
-	servMux.Handle("/_matrix", publicApiMux)
+	servMux.Handle("/_matrix", WrapHandlerInCORS(publicApiMux))
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics

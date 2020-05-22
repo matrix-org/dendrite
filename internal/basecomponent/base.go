@@ -225,7 +225,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,
-		internal.WrapHandlerInCORS(b.PublicAPIMux),
+		b.PublicAPIMux,
 		b.InternalAPIMux,
 		b.Cfg,
 		b.EnableHTTPAPIs,
