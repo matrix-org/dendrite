@@ -16,11 +16,11 @@ package basecomponent
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
-	"fmt"
 
 	"golang.org/x/crypto/ed25519"
 
