@@ -31,7 +31,7 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
-		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
+		return sqlite3.NewPublicRoomsServerDatabase(uri.Path)
 	default:
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
