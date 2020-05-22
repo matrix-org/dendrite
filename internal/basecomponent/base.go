@@ -96,14 +96,15 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
+	httpmux := mux.NewRouter()
 	return &BaseDendrite{
 		componentName:  componentName,
 		EnableHTTPAPIs: enableHTTPAPIs,
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		ImmutableCache: cache,
-		PublicAPIMux:   mux.NewRouter().UseEncodedPath(),
-		InternalAPIMux: mux.NewRouter().UseEncodedPath(),
+		PublicAPIMux:   httpmux.PathPrefix(internal.HTTPPublicPathPrefix).Subrouter().UseEncodedPath(),
+		InternalAPIMux: httpmux.PathPrefix(internal.HTTPInternalPathPrefix).Subrouter().UseEncodedPath(),
 		httpClient:     &http.Client{Timeout: HTTPClientTimeout},
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,
