@@ -77,6 +77,14 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	if err != nil {
 		return nil, err
 	}
+	stateBlock, err := NewPostgresStateBlockTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	stateSnapshot, err := NewPostgresStateSnapshotTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventTypesTable:     d.eventTypes,
@@ -85,6 +93,8 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 		EventsTable:         d.events,
 		RoomsTable:          d.rooms,
 		TransactionsTable:   d.transactions,
+		StateBlockTable:     stateBlock,
+		StateSnapshotTable:  stateSnapshot,
 	}
 	return &d, nil
 }
@@ -120,41 +130,6 @@ func (d *Database) assignStateKeyNID(
 		}
 	}
 	return eventStateKeyNID, err
-}
-
-// AddState implements input.EventDatabase
-func (d *Database) AddState(
-	ctx context.Context,
-	roomNID types.RoomNID,
-	stateBlockNIDs []types.StateBlockNID,
-	state []types.StateEntry,
-) (types.StateSnapshotNID, error) {
-	if len(state) > 0 {
-		stateBlockNID, err := d.statements.selectNextStateBlockNID(ctx)
-		if err != nil {
-			return 0, err
-		}
-		if err = d.statements.bulkInsertStateData(ctx, stateBlockNID, state); err != nil {
-			return 0, err
-		}
-		stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
-	}
-
-	return d.statements.insertState(ctx, roomNID, stateBlockNIDs)
-}
-
-// StateBlockNIDs implements state.RoomStateDatabase
-func (d *Database) StateBlockNIDs(
-	ctx context.Context, stateNIDs []types.StateSnapshotNID,
-) ([]types.StateBlockNIDList, error) {
-	return d.statements.bulkSelectStateBlockNIDs(ctx, stateNIDs)
-}
-
-// StateEntries implements state.RoomStateDatabase
-func (d *Database) StateEntries(
-	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
-) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectStateBlockEntries(ctx, stateBlockNIDs)
 }
 
 // GetLatestEventsForUpdate implements input.EventDatabase
@@ -301,17 +276,6 @@ func (d *Database) GetCreatorIDForAlias(
 // RemoveRoomAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	return d.statements.deleteRoomAlias(ctx, alias)
-}
-
-// StateEntriesForTuples implements state.RoomStateDatabase
-func (d *Database) StateEntriesForTuples(
-	ctx context.Context,
-	stateBlockNIDs []types.StateBlockNID,
-	stateKeyTuples []types.StateKeyTuple,
-) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectFilteredStateBlockEntries(
-		ctx, stateBlockNIDs, stateKeyTuples,
-	)
 }
 
 // MembershipUpdater implements input.RoomEventDatabase

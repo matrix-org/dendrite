@@ -20,6 +20,8 @@ type Database struct {
 	EventStateKeysTable tables.EventStateKeys
 	RoomsTable          tables.Rooms
 	TransactionsTable   tables.Transactions
+	StateSnapshotTable  tables.StateSnapshot
+	StateBlockTable     tables.StateBlock
 }
 
 // EventTypeNIDs implements state.RoomStateDatabase
@@ -48,6 +50,42 @@ func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateEntry, error) {
 	return d.EventsTable.BulkSelectStateEventByID(ctx, eventIDs)
+}
+
+// StateEntriesForTuples implements state.RoomStateDatabase
+func (d *Database) StateEntriesForTuples(
+	ctx context.Context,
+	stateBlockNIDs []types.StateBlockNID,
+	stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntryList, error) {
+	return d.StateBlockTable.BulkSelectFilteredStateBlockEntries(
+		ctx, stateBlockNIDs, stateKeyTuples,
+	)
+}
+
+// AddState implements input.EventDatabase
+func (d *Database) AddState(
+	ctx context.Context,
+	roomNID types.RoomNID,
+	stateBlockNIDs []types.StateBlockNID,
+	state []types.StateEntry,
+) (stateNID types.StateSnapshotNID, err error) {
+	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		if len(state) > 0 {
+			var stateBlockNID types.StateBlockNID
+			stateBlockNID, err = d.StateBlockTable.BulkInsertStateData(ctx, txn, state)
+			if err != nil {
+				return err
+			}
+			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
+		}
+		stateNID, err = d.StateSnapshotTable.InsertState(ctx, txn, roomNID, stateBlockNIDs)
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	return
 }
 
 // EventNIDs implements query.RoomserverQueryAPIDatabase
@@ -148,6 +186,20 @@ func (d *Database) LatestEventIDs(
 		return nil
 	})
 	return
+}
+
+// StateBlockNIDs implements state.RoomStateDatabase
+func (d *Database) StateBlockNIDs(
+	ctx context.Context, stateNIDs []types.StateSnapshotNID,
+) ([]types.StateBlockNIDList, error) {
+	return d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, stateNIDs)
+}
+
+// StateEntries implements state.RoomStateDatabase
+func (d *Database) StateEntries(
+	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
+) ([]types.StateEntryList, error) {
+	return d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs)
 }
 
 func (d *Database) GetRoomVersionForRoom(

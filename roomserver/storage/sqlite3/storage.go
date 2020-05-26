@@ -97,6 +97,14 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	stateBlock, err := NewSqliteStateBlockTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventsTable:         d.events,
@@ -105,6 +113,8 @@ func Open(dataSourceName string) (*Database, error) {
 		EventJSONTable:      d.eventJSON,
 		RoomsTable:          d.rooms,
 		TransactionsTable:   d.transactions,
+		StateBlockTable:     stateBlock,
+		StateSnapshotTable:  stateSnapshot,
 	}
 	return &d, nil
 }
@@ -139,53 +149,6 @@ func (d *Database) assignStateKeyNID(
 			eventStateKeyNID, err = d.eventStateKeys.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 		}
 	}
-	return
-}
-
-// AddState implements input.EventDatabase
-func (d *Database) AddState(
-	ctx context.Context,
-	roomNID types.RoomNID,
-	stateBlockNIDs []types.StateBlockNID,
-	state []types.StateEntry,
-) (stateNID types.StateSnapshotNID, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if len(state) > 0 {
-			var stateBlockNID types.StateBlockNID
-			stateBlockNID, err = d.statements.bulkInsertStateData(ctx, txn, state)
-			if err != nil {
-				return err
-			}
-			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
-		}
-		stateNID, err = d.statements.insertState(ctx, txn, roomNID, stateBlockNIDs)
-		return err
-	})
-	if err != nil {
-		return 0, err
-	}
-	return
-}
-
-// StateBlockNIDs implements state.RoomStateDatabase
-func (d *Database) StateBlockNIDs(
-	ctx context.Context, stateNIDs []types.StateSnapshotNID,
-) (sl []types.StateBlockNIDList, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		sl, err = d.statements.bulkSelectStateBlockNIDs(ctx, txn, stateNIDs)
-		return err
-	})
-	return
-}
-
-// StateEntries implements state.RoomStateDatabase
-func (d *Database) StateEntries(
-	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
-) (sel []types.StateEntryList, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		sel, err = d.statements.bulkSelectStateBlockEntries(ctx, txn, stateBlockNIDs)
-		return err
-	})
 	return
 }
 
@@ -364,17 +327,6 @@ func (d *Database) GetCreatorIDForAlias(
 // RemoveRoomAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	return d.statements.deleteRoomAlias(ctx, nil, alias)
-}
-
-// StateEntriesForTuples implements state.RoomStateDatabase
-func (d *Database) StateEntriesForTuples(
-	ctx context.Context,
-	stateBlockNIDs []types.StateBlockNID,
-	stateKeyTuples []types.StateKeyTuple,
-) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectFilteredStateBlockEntries(
-		ctx, nil, stateBlockNIDs, stateKeyTuples,
-	)
 }
 
 // MembershipUpdater implements input.RoomEventDatabase

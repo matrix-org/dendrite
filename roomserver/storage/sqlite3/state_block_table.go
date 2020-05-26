@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 )
@@ -77,14 +78,15 @@ type stateBlockStatements struct {
 	bulkSelectFilteredStateBlockEntriesStmt *sql.Stmt
 }
 
-func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
+func NewSqliteStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+	s := &stateBlockStatements{}
 	s.db = db
-	_, err = db.Exec(stateDataSchema)
+	_, err := db.Exec(stateDataSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, statementList{
 		{&s.insertStateDataStmt, insertStateDataSQL},
 		{&s.selectNextStateBlockNIDStmt, selectNextStateBlockNIDSQL},
 		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
@@ -92,7 +94,7 @@ func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *stateBlockStatements) bulkInsertStateData(
+func (s *stateBlockStatements) BulkInsertStateData(
 	ctx context.Context, txn *sql.Tx,
 	entries []types.StateEntry,
 ) (types.StateBlockNID, error) {
@@ -120,19 +122,18 @@ func (s *stateBlockStatements) bulkInsertStateData(
 	return stateBlockNID, nil
 }
 
-func (s *stateBlockStatements) bulkSelectStateBlockEntries(
-	ctx context.Context, txn *sql.Tx, stateBlockNIDs []types.StateBlockNID,
+func (s *stateBlockStatements) BulkSelectStateBlockEntries(
+	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
 	nids := make([]interface{}, len(stateBlockNIDs))
 	for k, v := range stateBlockNIDs {
 		nids[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateBlockEntriesSQL, "($1)", internal.QueryVariadic(len(nids)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
+	selectStmt, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
-	selectStmt := internal.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, nids...)
 	if err != nil {
 		return nil, err
@@ -174,8 +175,8 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	return results, nil
 }
 
-func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
-	ctx context.Context, txn *sql.Tx, // nolint: unparam
+func (s *stateBlockStatements) BulkSelectFilteredStateBlockEntries(
+	ctx context.Context,
 	stateBlockNIDs []types.StateBlockNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
