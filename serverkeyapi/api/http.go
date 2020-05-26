@@ -11,10 +11,10 @@ import (
 
 const (
 	// RoomserverPerformJoinPath is the HTTP path for the PerformJoin API.
-	ServerKeyInputPublicKeyPath = "/api/serverkeyapi/inputPublicKey"
+	ServerKeyInputPublicKeyPath = "/serverkeyapi/inputPublicKey"
 
 	// RoomserverPerformLeavePath is the HTTP path for the PerformLeave API.
-	ServerKeyQueryPublicKeyPath = "/api/serverkeyapi/queryPublicKey"
+	ServerKeyQueryPublicKeyPath = "/serverkeyapi/queryPublicKey"
 )
 
 type InputPublicKeysRequest struct {
