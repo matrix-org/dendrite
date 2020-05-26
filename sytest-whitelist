@@ -288,3 +288,4 @@ New room members see their own join event
 Existing members see new members' join events
 Inbound federation can receive events
 Inbound federation can receive redacted events
+Can logout current device
