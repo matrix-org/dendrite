@@ -79,11 +79,7 @@ func SetupServerKeyAPIComponent(
 		}).Info("Enabled perspective key fetcher")
 	}
 
-	/*
-		if base.EnableHTTPAPIs {
-			internalAPI.SetupHTTP(http.DefaultServeMux)
-		}
-	*/
+	internalAPI.SetupHTTP(base.InternalAPIMux)
 
 	return &internalAPI
 }
