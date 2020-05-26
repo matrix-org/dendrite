@@ -23,7 +23,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/keydb/sqlite3"
+	"github.com/matrix-org/dendrite/serverkeyapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
