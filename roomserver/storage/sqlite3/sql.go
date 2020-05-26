@@ -39,7 +39,6 @@ func (s *statements) prepare(db *sql.DB) error {
 
 	for _, prepare := range []func(db *sql.DB) error{
 		s.roomStatements.prepare,
-		s.eventStatements.prepare,
 		s.stateSnapshotStatements.prepare,
 		s.stateBlockStatements.prepare,
 		s.previousEventStatements.prepare,
