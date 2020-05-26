@@ -121,10 +121,11 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		return fmt.Errorf("eb.SetContent: %w", err)
 	}
 
-	// First work out if this is in response to an existing invite.
-	// If it is then we avoid the situation where we might think we
-	// know about a room in the following section but don't know the
-	// latest state as all of our users have left.
+	// First work out if this is in response to an existing invite
+	// from a federated server. If it is then we avoid the situation
+	// where we might think we know about a room in the following
+	// section but don't know the latest state as all of our users
+	// have left.
 	isInvitePending, inviteSender, err := r.isInvitePending(ctx, req.RoomIDOrAlias, req.UserID)
 	if err == nil && isInvitePending {
 		// Check if there's an invite pending.
@@ -134,7 +135,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		}
 
 		// Check that the domain isn't ours. If it's local then we don't
-		// need to do anythig as our own copy of the room state will be
+		// need to do anything as our own copy of the room state will be
 		// up-to-date.
 		if inviterDomain != r.Cfg.Matrix.ServerName {
 			// Add the server of the person who invited us to the server list,
