@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -67,13 +68,14 @@ type eventStateKeyStatements struct {
 	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
-func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
+func NewSqliteEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
+	s := &eventStateKeyStatements{}
 	s.db = db
-	_, err = db.Exec(eventStateKeysSchema)
+	_, err := db.Exec(eventStateKeysSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
-	return statementList{
+	return s, statementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
@@ -81,7 +83,7 @@ func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *eventStateKeyStatements) insertEventStateKeyNID(
+func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
@@ -94,7 +96,7 @@ func (s *eventStateKeyStatements) insertEventStateKeyNID(
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) selectEventStateKeyNID(
+func (s *eventStateKeyStatements) SelectEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
@@ -103,8 +105,8 @@ func (s *eventStateKeyStatements) selectEventStateKeyNID(
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, eventStateKeys []string,
+func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
+	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
 	iEventStateKeys := make([]interface{}, len(eventStateKeys))
 	for k, v := range eventStateKeys {
@@ -112,7 +114,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	}
 	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", internal.QueryVariadic(len(eventStateKeys)), 1)
 
-	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeys...)
+	rows, err := s.db.QueryContext(ctx, selectOrig, iEventStateKeys...)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +131,8 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	return result, nil
 }
 
-func (s *eventStateKeyStatements) bulkSelectEventStateKey(
-	ctx context.Context, txn *sql.Tx, eventStateKeyNIDs []types.EventStateKeyNID,
+func (s *eventStateKeyStatements) BulkSelectEventStateKey(
+	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
 	iEventStateKeyNIDs := make([]interface{}, len(eventStateKeyNIDs))
 	for k, v := range eventStateKeyNIDs {
@@ -138,7 +140,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	}
 	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", internal.QueryVariadic(len(eventStateKeyNIDs)), 1)
 
-	rows, err := txn.QueryContext(ctx, selectOrig, iEventStateKeyNIDs...)
+	rows, err := s.db.QueryContext(ctx, selectOrig, iEventStateKeyNIDs...)
 	if err != nil {
 		return nil, err
 	}

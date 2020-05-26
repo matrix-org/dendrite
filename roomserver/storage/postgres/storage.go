@@ -26,14 +26,19 @@ import (
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A Database is used to store room events and stream offsets.
 type Database struct {
-	statements statements
-	db         *sql.DB
+	shared.Database
+	statements     statements
+	eventTypes     tables.EventTypes
+	eventStateKeys tables.EventStateKeys
+	db             *sql.DB
 }
 
 // Open a postgres database.
@@ -45,6 +50,18 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	}
 	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
+	}
+	d.eventStateKeys, err = NewPostgresEventStateKeysTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	d.eventTypes, err = NewPostgresEventTypesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	d.Database = shared.Database{
+		EventTypesTable:     d.eventTypes,
+		EventStateKeysTable: d.eventStateKeys,
 	}
 	return &d, nil
 }
@@ -180,17 +197,20 @@ func (d *Database) assignRoomNID(
 
 func (d *Database) assignEventTypeNID(
 	ctx context.Context, eventType string,
-) (types.EventTypeNID, error) {
-	// Check if we already have a numeric ID in the database.
-	eventTypeNID, err := d.statements.selectEventTypeNID(ctx, eventType)
-	if err == sql.ErrNoRows {
-		// We don't have a numeric ID so insert one into the database.
-		eventTypeNID, err = d.statements.insertEventTypeNID(ctx, eventType)
+) (eventTypeNID types.EventTypeNID, err error) {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+		// Check if we already have a numeric ID in the database.
+		eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
 		if err == sql.ErrNoRows {
-			// We raced with another insert so run the select again.
-			eventTypeNID, err = d.statements.selectEventTypeNID(ctx, eventType)
+			// We don't have a numeric ID so insert one into the database.
+			eventTypeNID, err = d.eventTypes.InsertEventTypeNID(ctx, txn, eventType)
+			if err == sql.ErrNoRows {
+				// We raced with another insert so run the select again.
+				eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
+			}
 		}
-	}
+		return err
+	})
 	return eventTypeNID, err
 }
 
@@ -198,13 +218,13 @@ func (d *Database) assignStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	// Check if we already have a numeric ID in the database.
-	eventStateKeyNID, err := d.statements.selectEventStateKeyNID(ctx, txn, eventStateKey)
+	eventStateKeyNID, err := d.eventStateKeys.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventStateKeyNID, err = d.statements.insertEventStateKeyNID(ctx, txn, eventStateKey)
+		eventStateKeyNID, err = d.eventStateKeys.InsertEventStateKeyNID(ctx, txn, eventStateKey)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventStateKeyNID, err = d.statements.selectEventStateKeyNID(ctx, txn, eventStateKey)
+			eventStateKeyNID, err = d.eventStateKeys.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 		}
 	}
 	return eventStateKeyNID, err
@@ -215,27 +235,6 @@ func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateEntry, error) {
 	return d.statements.bulkSelectStateEventByID(ctx, eventIDs)
-}
-
-// EventTypeNIDs implements state.RoomStateDatabase
-func (d *Database) EventTypeNIDs(
-	ctx context.Context, eventTypes []string,
-) (map[string]types.EventTypeNID, error) {
-	return d.statements.bulkSelectEventTypeNID(ctx, eventTypes)
-}
-
-// EventStateKeyNIDs implements state.RoomStateDatabase
-func (d *Database) EventStateKeyNIDs(
-	ctx context.Context, eventStateKeys []string,
-) (map[string]types.EventStateKeyNID, error) {
-	return d.statements.bulkSelectEventStateKeyNID(ctx, eventStateKeys)
-}
-
-// EventStateKeys implements query.RoomserverQueryAPIDatabase
-func (d *Database) EventStateKeys(
-	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
-) (map[types.EventStateKeyNID]string, error) {
-	return d.statements.bulkSelectEventStateKey(ctx, eventStateKeyNIDs)
 }
 
 // EventNIDs implements query.RoomserverQueryAPIDatabase
