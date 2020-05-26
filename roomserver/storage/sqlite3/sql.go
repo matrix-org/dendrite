@@ -38,14 +38,12 @@ func (s *statements) prepare(db *sql.DB) error {
 	var err error
 
 	for _, prepare := range []func(db *sql.DB) error{
-		s.roomStatements.prepare,
 		s.stateSnapshotStatements.prepare,
 		s.stateBlockStatements.prepare,
 		s.previousEventStatements.prepare,
 		s.roomAliasesStatements.prepare,
 		s.inviteStatements.prepare,
 		s.membershipStatements.prepare,
-		s.transactionStatements.prepare,
 	} {
 		if err = prepare(db); err != nil {
 			return err

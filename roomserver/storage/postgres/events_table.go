@@ -426,10 +426,9 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 }
 
 func (s *eventStatements) SelectRoomNIDForEventNID(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
+	ctx context.Context, eventNID types.EventNID,
 ) (roomNID types.RoomNID, err error) {
-	selectStmt := internal.TxStmt(txn, s.selectRoomNIDForEventNIDStmt)
-	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&roomNID)
+	err = s.selectRoomNIDForEventNIDStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&roomNID)
 	return
 }
 
