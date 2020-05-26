@@ -28,7 +28,7 @@ func (s *ServerKeyAPI) SetupHTTP(internalAPIMux *mux.Router) {
 				}
 				lookup[req] = timestamp
 			}
-			keys, err := s.DB.FetchKeys(req.Context(), lookup)
+			keys, err := s.FetchKeys(req.Context(), lookup)
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -51,7 +51,7 @@ func (s *ServerKeyAPI) SetupHTTP(internalAPIMux *mux.Router) {
 				store[req] = res
 				s.ImmutableCache.StoreServerKey(req, res)
 			}
-			if err := s.DB.StoreKeys(req.Context(), store); err != nil {
+			if err := s.StoreKeys(req.Context(), store); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

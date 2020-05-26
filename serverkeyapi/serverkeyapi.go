@@ -34,7 +34,6 @@ func SetupServerKeyAPIComponent(
 	}
 
 	internalAPI := internal.ServerKeyAPI{
-		DB:             serverKeyDB,
 		Cfg:            base.Cfg,
 		ImmutableCache: base.ImmutableCache,
 		FedClient:      fedClient,

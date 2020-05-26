@@ -53,6 +53,11 @@ type httpServerKeyInternalAPI struct {
 }
 
 func (s *httpServerKeyInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
+	// This is a bit of a cheat - we tell gomatrixserverlib that this API is
+	// both the key database and the key fetcher. While this does have the
+	// rather unfortunate effect of preventing gomatrixserverlib from handling
+	// key fetchers directly, we can at least reimplement this behaviour on
+	// the other end of the API.
 	return &gomatrixserverlib.KeyRing{
 		KeyDatabase: s,
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{s},
