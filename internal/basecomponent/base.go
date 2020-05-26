@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httpapis"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
@@ -53,8 +54,9 @@ type BaseDendrite struct {
 	componentName string
 	tracerCloser  io.Closer
 
-	// APIMux should be used to register new public matrix api endpoints
-	APIMux         *mux.Router
+	// PublicAPIMux should be used to register new public matrix api endpoints
+	PublicAPIMux   *mux.Router
+	InternalAPIMux *mux.Router
 	EnableHTTPAPIs bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
@@ -92,13 +94,15 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
+	httpmux := mux.NewRouter()
 	return &BaseDendrite{
 		componentName:  componentName,
 		EnableHTTPAPIs: enableHTTPAPIs,
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		ImmutableCache: cache,
-		APIMux:         mux.NewRouter().UseEncodedPath(),
+		PublicAPIMux:   httpmux.PathPrefix(httpapis.PublicPathPrefix).Subrouter().UseEncodedPath(),
+		InternalAPIMux: httpmux.PathPrefix(httpapis.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		httpClient:     &http.Client{Timeout: HTTPClientTimeout},
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,
@@ -211,7 +215,13 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		WriteTimeout: HTTPServerTimeout,
 	}
 
-	internal.SetupHTTPAPI(http.DefaultServeMux, internal.WrapHandlerInCORS(b.APIMux), b.Cfg)
+	internal.SetupHTTPAPI(
+		http.DefaultServeMux,
+		b.PublicAPIMux,
+		b.InternalAPIMux,
+		b.Cfg,
+		b.EnableHTTPAPIs,
+	)
 	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 
 	err := serv.ListenAndServe()
@@ -245,7 +255,15 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
 	if err != nil || uri.Scheme == "file" {
-		db, err = sqlutil.Open(internal.SQLiteDriverName(), string(cfg.Database.Naffka), nil)
+		var cs string
+		if uri.Opaque != "" { // file:filename.db
+			cs = uri.Opaque
+		} else if uri.Path != "" { // file:///path/to/filename.db
+			cs = uri.Path
+		} else {
+			logrus.Panic("file uri has no filename")
+		}
+		db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}

@@ -55,7 +55,7 @@ type EDUServerInputAPI interface {
 }
 
 // EDUServerInputTypingEventPath is the HTTP path for the InputTypingEvent API.
-const EDUServerInputTypingEventPath = "/api/eduserver/input"
+const EDUServerInputTypingEventPath = "/eduserver/input"
 
 // NewEDUServerInputAPIHTTP creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
 func NewEDUServerInputAPIHTTP(eduServerURL string, httpClient *http.Client) (EDUServerInputAPI, error) {

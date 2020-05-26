@@ -28,5 +28,5 @@ func SetupKeyServerComponent(
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
 ) {
-	routing.Setup(base.APIMux, base.Cfg, accountsDB, deviceDB)
+	routing.Setup(base.PublicAPIMux, base.Cfg, accountsDB, deviceDB)
 }

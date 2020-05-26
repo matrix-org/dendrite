@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/mediaapi"
@@ -35,7 +36,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/sirupsen/logrus"
 )
@@ -45,11 +45,23 @@ var (
 	httpsBindAddr  = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
 	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
 	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
-	enableHTTPAPIs = flag.Bool("api", false, "Expose internal HTTP APIs in monolith mode")
+	enableHTTPAPIs = flag.Bool("api", false, "Use HTTP APIs instead of short-circuiting (warning: exposes API endpoints!)")
 )
 
 func main() {
 	cfg := basecomponent.ParseMonolithFlags()
+	if *enableHTTPAPIs {
+		// If the HTTP APIs are enabled then we need to update the Listen
+		// statements in the configuration so that we know where to find
+		// the API endpoints. They'll listen on the same port as the monolith
+		// itself.
+		addr := config.Address(*httpBindAddr)
+		cfg.Listen.RoomServer = addr
+		cfg.Listen.EDUServer = addr
+		cfg.Listen.AppServiceAPI = addr
+		cfg.Listen.FederationSender = addr
+	}
+
 	base := basecomponent.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
 	defer base.Close() // nolint: errcheck
 
@@ -62,25 +74,42 @@ func main() {
 	)
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsAPI := roomserver.SetupRoomServerComponent(
+	rsComponent := roomserver.SetupRoomServerComponent(
 		base, keyRing, federation,
 	)
+	rsAPI := rsComponent
+	if base.EnableHTTPAPIs {
+		rsAPI = base.CreateHTTPRoomserverAPIs()
+	}
+
 	eduInputAPI := eduserver.SetupEDUServerComponent(
 		base, cache.New(),
 	)
+	if base.EnableHTTPAPIs {
+		eduInputAPI = base.CreateHTTPEDUServerAPIs()
+	}
+
 	asAPI := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
 	)
+	if base.EnableHTTPAPIs {
+		asAPI = base.CreateHTTPAppServiceAPIs()
+	}
+
 	fsAPI := federationsender.SetupFederationSenderComponent(
 		base, federation, rsAPI, keyRing,
 	)
-	rsAPI.SetFederationSenderAPI(fsAPI)
+	if base.EnableHTTPAPIs {
+		fsAPI = base.CreateHTTPFederationSenderAPIs()
+	}
+	rsComponent.SetFederationSenderAPI(fsAPI)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
 		federation, keyRing, rsAPI,
 		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
+
 	keyserver.SetupKeyServerComponent(
 		base, deviceDB, accountDB,
 	)
@@ -94,14 +123,13 @@ func main() {
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
-	httpHandler := internal.WrapHandlerInCORS(base.APIMux)
-
-	// Set up the API endpoints we handle. /metrics is for prometheus, and is
-	// not wrapped by CORS, while everything else is
-	if cfg.Metrics.Enabled {
-		http.Handle("/metrics", internal.WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
-	}
-	http.Handle("/", httpHandler)
+	internal.SetupHTTPAPI(
+		http.DefaultServeMux,
+		base.PublicAPIMux,
+		base.InternalAPIMux,
+		cfg,
+		base.EnableHTTPAPIs,
+	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {

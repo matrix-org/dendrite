@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httpapis"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -184,11 +186,14 @@ func MakeFedAPI(
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
 // listener.
-func SetupHTTPAPI(servMux *http.ServeMux, apiMux http.Handler, cfg *config.Dendrite) {
+func SetupHTTPAPI(servMux *http.ServeMux, publicApiMux *mux.Router, internalApiMux *mux.Router, cfg *config.Dendrite, enableHTTPAPIs bool) {
 	if cfg.Metrics.Enabled {
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
-	servMux.Handle("/api/", http.StripPrefix("/api", apiMux))
+	if enableHTTPAPIs {
+		servMux.Handle(httpapis.InternalPathPrefix, internalApiMux)
+	}
+	servMux.Handle(httpapis.PublicPathPrefix, WrapHandlerInCORS(publicApiMux))
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics

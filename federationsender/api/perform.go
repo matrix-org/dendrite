@@ -11,13 +11,13 @@ import (
 
 const (
 	// FederationSenderPerformJoinRequestPath is the HTTP path for the PerformJoinRequest API.
-	FederationSenderPerformDirectoryLookupRequestPath = "/api/federationsender/performDirectoryLookup"
+	FederationSenderPerformDirectoryLookupRequestPath = "/federationsender/performDirectoryLookup"
 
 	// FederationSenderPerformJoinRequestPath is the HTTP path for the PerformJoinRequest API.
-	FederationSenderPerformJoinRequestPath = "/api/federationsender/performJoinRequest"
+	FederationSenderPerformJoinRequestPath = "/federationsender/performJoinRequest"
 
 	// FederationSenderPerformLeaveRequestPath is the HTTP path for the PerformLeaveRequest API.
-	FederationSenderPerformLeaveRequestPath = "/api/federationsender/performLeaveRequest"
+	FederationSenderPerformLeaveRequestPath = "/federationsender/performLeaveRequest"
 )
 
 type PerformDirectoryLookupRequest struct {

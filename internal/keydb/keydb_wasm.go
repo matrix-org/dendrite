@@ -43,7 +43,7 @@ func NewDatabase(
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
-		return sqlite3.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
+		return sqlite3.NewDatabase(uri.Path, serverName, serverKey, serverKeyID)
 	default:
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}

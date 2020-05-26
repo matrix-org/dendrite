@@ -75,7 +75,6 @@ func makeProxy(targetURL string) (*httputil.ReverseProxy, error) {
 			// Pratically this means that any distinction between '%2F' and '/'
 			// in the URL will be lost by the time it reaches the target.
 			path := req.URL.Path
-			path = "api" + path
 			log.WithFields(log.Fields{
 				"path":   path,
 				"url":    targetURL,
