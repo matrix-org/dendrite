@@ -24,6 +24,7 @@ type PerformJoinRequest struct {
 }
 
 type PerformJoinResponse struct {
+	RoomID string `json:"room_id"`
 }
 
 func (h *httpRoomserverInternalAPI) PerformJoin(

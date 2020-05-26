@@ -90,6 +90,12 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	req *api.PerformJoinRequest,
 	res *api.PerformJoinResponse, // nolint:unparam
 ) error {
+	// By this point, if req.RoomIDOrAlias contained an alias, then
+	// it will have been overwritten with a room ID by performJoinRoomByAlias.
+	// We should now include this in the response so that the CS API can
+	// return the right room ID.
+	res.RoomID = req.RoomIDOrAlias
+
 	// Get the domain part of the room ID.
 	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
 	if err != nil {
