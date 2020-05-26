@@ -111,6 +111,10 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	roomAliases, err := NewSqliteRoomAliasesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventsTable:         d.events,
@@ -122,6 +126,7 @@ func Open(dataSourceName string) (*Database, error) {
 		StateBlockTable:     stateBlock,
 		StateSnapshotTable:  stateSnapshot,
 		PrevEventsTable:     d.prevEvents,
+		RoomAliasesTable:    roomAliases,
 	}
 	return &d, nil
 }

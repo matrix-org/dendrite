@@ -87,6 +87,10 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	if err != nil {
 		return nil, err
 	}
+	roomAliases, err := NewPostgresRoomAliasesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.prevEvents, err = NewPostgresPreviousEventsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -102,6 +106,7 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 		StateBlockTable:     stateBlock,
 		StateSnapshotTable:  stateSnapshot,
 		PrevEventsTable:     d.prevEvents,
+		RoomAliasesTable:    roomAliases,
 	}
 	return &d, nil
 }
