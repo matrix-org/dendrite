@@ -21,6 +21,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -74,12 +75,13 @@ type eventStateKeyStatements struct {
 	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
-func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(eventStateKeysSchema)
+func NewPostgresEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
+	s := &eventStateKeyStatements{}
+	_, err := db.Exec(eventStateKeysSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
-	return statementList{
+	return s, statementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
@@ -87,7 +89,7 @@ func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *eventStateKeyStatements) insertEventStateKeyNID(
+func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
@@ -96,7 +98,7 @@ func (s *eventStateKeyStatements) insertEventStateKeyNID(
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) selectEventStateKeyNID(
+func (s *eventStateKeyStatements) SelectEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
@@ -105,7 +107,7 @@ func (s *eventStateKeyStatements) selectEventStateKeyNID(
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
+func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
 	rows, err := s.bulkSelectEventStateKeyNIDStmt.QueryContext(
@@ -128,7 +130,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	return result, rows.Err()
 }
 
-func (s *eventStateKeyStatements) bulkSelectEventStateKey(
+func (s *eventStateKeyStatements) BulkSelectEventStateKey(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
 	nIDs := make(pq.Int64Array, len(eventStateKeyNIDs))
