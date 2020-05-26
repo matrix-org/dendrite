@@ -206,9 +206,8 @@ func (s *devicesStatements) selectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
 ) (*authtypes.Device, error) {
 	var dev authtypes.Device
-	var created sql.NullInt64
 	stmt := s.selectDeviceByIDStmt
-	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&created)
+	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&dev.DisplayName)
 	if err == nil {
 		dev.ID = deviceID
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
@@ -230,9 +229,16 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 
 	for rows.Next() {
 		var dev authtypes.Device
-		err = rows.Scan(&dev.ID, &dev.DisplayName)
+		var id, displayname sql.NullString
+		err = rows.Scan(&id, &displayname)
 		if err != nil {
 			return devices, err
+		}
+		if id.Valid {
+			dev.ID = id.String
+		}
+		if displayname.Valid {
+			dev.DisplayName = displayname.String
 		}
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		devices = append(devices, dev)
