@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -63,6 +64,10 @@ func (s *ServerKeyAPI) FetchKeys(
 				delete(requests, req)
 			}
 		}
+	}
+	// If we failed to fetch any keys then we should report an error.
+	if len(requests) > 0 {
+		return nil, fmt.Errorf("server key API failed to fetch %d keys", len(requests))
 	}
 	// Return the keys.
 	return results, nil
