@@ -154,11 +154,11 @@ func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.Fede
 	return f
 }
 
-// CreateHTTPFederationSenderAPIs returns FederationSenderInternalAPI for hitting
-// the federation sender over HTTP
+// CreateHTTPServerKeyAPIs returns ServerKeyInternalAPI for hitting the server key
+// API over HTTP
 func (b *BaseDendrite) CreateHTTPServerKeyAPIs() serverKeyAPI.ServerKeyInternalAPI {
 	f, err := serverKeyAPI.NewServerKeyInternalAPIHTTP(
-		b.Cfg.FederationSenderURL(),
+		b.Cfg.ServerKeyAPIURL(),
 		b.httpClient,
 		b.ImmutableCache,
 	)
