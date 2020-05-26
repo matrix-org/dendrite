@@ -98,6 +98,7 @@ func Open(dataSourceName string) (*Database, error) {
 		return nil, err
 	}
 	d.Database = shared.Database{
+		DB:                  d.db,
 		EventsTable:         d.events,
 		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,
