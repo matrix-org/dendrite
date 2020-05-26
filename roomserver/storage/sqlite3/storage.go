@@ -41,10 +41,12 @@ type Database struct {
 	eventStateKeys tables.EventStateKeys
 	rooms          tables.Rooms
 	transactions   tables.Transactions
+	prevEvents     tables.PreviousEvents
 	db             *sql.DB
 }
 
 // Open a sqlite database.
+// nolint: gocyclo
 func Open(dataSourceName string) (*Database, error) {
 	var d Database
 	uri, err := url.Parse(dataSourceName)
@@ -105,6 +107,10 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.prevEvents, err = NewSqlitePrevEventsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventsTable:         d.events,
@@ -115,6 +121,7 @@ func Open(dataSourceName string) (*Database, error) {
 		TransactionsTable:   d.transactions,
 		StateBlockTable:     stateBlock,
 		StateSnapshotTable:  stateSnapshot,
+		PrevEventsTable:     d.prevEvents,
 	}
 	return &d, nil
 }
@@ -227,7 +234,7 @@ func (u *roomRecentEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotN
 func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
 	err := internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		for _, ref := range previousEventReferences {
-			if err := u.d.statements.insertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			if err := u.d.prevEvents.InsertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
 				return err
 			}
 		}
@@ -239,7 +246,7 @@ func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, p
 // IsReferenced implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (res bool, err error) {
 	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
-		err := u.d.statements.selectPreviousEventExists(u.ctx, txn, eventReference.EventID, eventReference.EventSHA256)
+		err := u.d.prevEvents.SelectPreviousEventExists(u.ctx, txn, eventReference.EventID, eventReference.EventSHA256)
 		if err == nil {
 			res = true
 			err = nil
@@ -300,33 +307,6 @@ func (d *Database) GetInvitesForUser(
 	targetUserNID types.EventStateKeyNID,
 ) (senderUserIDs []types.EventStateKeyNID, err error) {
 	return d.statements.selectInviteActiveForUserInRoom(ctx, targetUserNID, roomNID)
-}
-
-// SetRoomAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
-	return d.statements.insertRoomAlias(ctx, nil, alias, roomID, creatorUserID)
-}
-
-// GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
-	return d.statements.selectRoomIDFromAlias(ctx, nil, alias)
-}
-
-// GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
-func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
-	return d.statements.selectAliasesFromRoomID(ctx, nil, roomID)
-}
-
-// GetCreatorIDForAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) GetCreatorIDForAlias(
-	ctx context.Context, alias string,
-) (string, error) {
-	return d.statements.selectCreatorIDFromAlias(ctx, nil, alias)
-}
-
-// RemoveRoomAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
-	return d.statements.deleteRoomAlias(ctx, nil, alias)
 }
 
 // MembershipUpdater implements input.RoomEventDatabase

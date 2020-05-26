@@ -81,3 +81,18 @@ type StateBlock interface {
 	BulkSelectStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
 	BulkSelectFilteredStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 }
+
+type RoomAliases interface {
+	InsertRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) (err error)
+	SelectRoomIDFromAlias(ctx context.Context, alias string) (roomID string, err error)
+	SelectAliasesFromRoomID(ctx context.Context, roomID string) ([]string, error)
+	SelectCreatorIDFromAlias(ctx context.Context, alias string) (creatorID string, err error)
+	DeleteRoomAlias(ctx context.Context, alias string) (err error)
+}
+
+type PreviousEvents interface {
+	InsertPreviousEvent(ctx context.Context, txn *sql.Tx, previousEventID string, previousEventReferenceSHA256 []byte, eventNID types.EventNID) error
+	// Check if the event reference exists
+	// Returns sql.ErrNoRows if the event reference doesn't exist.
+	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte) error
+}

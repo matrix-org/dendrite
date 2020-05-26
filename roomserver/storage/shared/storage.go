@@ -22,6 +22,8 @@ type Database struct {
 	TransactionsTable   tables.Transactions
 	StateSnapshotTable  tables.StateSnapshot
 	StateBlockTable     tables.StateBlock
+	RoomAliasesTable    tables.RoomAliases
+	PrevEventsTable     tables.PreviousEvents
 }
 
 // EventTypeNIDs implements state.RoomStateDatabase
@@ -216,6 +218,33 @@ func (d *Database) GetRoomVersionForRoomNID(
 	return d.RoomsTable.SelectRoomVersionForRoomNID(
 		ctx, roomNID,
 	)
+}
+
+// SetRoomAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
+	return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
+}
+
+// GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
+	return d.RoomAliasesTable.SelectRoomIDFromAlias(ctx, alias)
+}
+
+// GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
+func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
+	return d.RoomAliasesTable.SelectAliasesFromRoomID(ctx, roomID)
+}
+
+// GetCreatorIDForAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) GetCreatorIDForAlias(
+	ctx context.Context, alias string,
+) (string, error) {
+	return d.RoomAliasesTable.SelectCreatorIDFromAlias(ctx, alias)
+}
+
+// RemoveRoomAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
+	return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
 }
 
 // Events implements input.EventDatabase
