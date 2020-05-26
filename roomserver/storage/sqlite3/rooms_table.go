@@ -178,11 +178,10 @@ func (s *roomStatements) SelectRoomVersionForRoomID(
 }
 
 func (s *roomStatements) SelectRoomVersionForRoomNID(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+	ctx context.Context, roomNID types.RoomNID,
 ) (gomatrixserverlib.RoomVersion, error) {
 	var roomVersion gomatrixserverlib.RoomVersion
-	stmt := internal.TxStmt(txn, s.selectRoomVersionForRoomNIDStmt)
-	err := stmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
+	err := s.selectRoomVersionForRoomNIDStmt.QueryRowContext(ctx, roomNID).Scan(&roomVersion)
 	if err == sql.ErrNoRows {
 		return roomVersion, errors.New("room not found")
 	}

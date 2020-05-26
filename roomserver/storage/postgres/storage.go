@@ -18,14 +18,12 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -91,119 +89,6 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	return &d, nil
 }
 
-// StoreEvent implements input.EventDatabase
-func (d *Database) StoreEvent(
-	ctx context.Context, event gomatrixserverlib.Event,
-	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
-) (types.RoomNID, types.StateAtEvent, error) {
-	var (
-		roomNID          types.RoomNID
-		eventTypeNID     types.EventTypeNID
-		eventStateKeyNID types.EventStateKeyNID
-		eventNID         types.EventNID
-		stateNID         types.StateSnapshotNID
-		err              error
-	)
-
-	if txnAndSessionID != nil {
-		if err = d.transactions.InsertTransaction(
-			ctx, nil, txnAndSessionID.TransactionID,
-			txnAndSessionID.SessionID, event.Sender(), event.EventID(),
-		); err != nil {
-			return 0, types.StateAtEvent{}, err
-		}
-	}
-
-	// TODO: Here we should aim to have two different code paths for new rooms
-	// vs existing ones.
-
-	// Get the default room version. If the client doesn't supply a room_version
-	// then we will use our configured default to create the room.
-	// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
-	// Note that the below logic depends on the m.room.create event being the
-	// first event that is persisted to the database when creating or joining a
-	// room.
-	var roomVersion gomatrixserverlib.RoomVersion
-	if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
-		return 0, types.StateAtEvent{}, err
-	}
-
-	if roomNID, err = d.assignRoomNID(ctx, nil, event.RoomID(), roomVersion); err != nil {
-		return 0, types.StateAtEvent{}, err
-	}
-
-	if eventTypeNID, err = d.assignEventTypeNID(ctx, event.Type()); err != nil {
-		return 0, types.StateAtEvent{}, err
-	}
-
-	eventStateKey := event.StateKey()
-	// Assigned a numeric ID for the state_key if there is one present.
-	// Otherwise set the numeric ID for the state_key to 0.
-	if eventStateKey != nil {
-		if eventStateKeyNID, err = d.assignStateKeyNID(ctx, nil, *eventStateKey); err != nil {
-			return 0, types.StateAtEvent{}, err
-		}
-	}
-
-	if eventNID, stateNID, err = d.events.InsertEvent(
-		ctx,
-		nil,
-		roomNID,
-		eventTypeNID,
-		eventStateKeyNID,
-		event.EventID(),
-		event.EventReference().EventSHA256,
-		authEventNIDs,
-		event.Depth(),
-	); err != nil {
-		if err == sql.ErrNoRows {
-			// We've already inserted the event so select the numeric event ID
-			eventNID, stateNID, err = d.events.SelectEvent(ctx, nil, event.EventID())
-		}
-		if err != nil {
-			return 0, types.StateAtEvent{}, err
-		}
-	}
-
-	if err = d.eventJSON.InsertEventJSON(ctx, nil, eventNID, event.JSON()); err != nil {
-		return 0, types.StateAtEvent{}, err
-	}
-
-	return roomNID, types.StateAtEvent{
-		BeforeStateSnapshotNID: stateNID,
-		StateEntry: types.StateEntry{
-			StateKeyTuple: types.StateKeyTuple{
-				EventTypeNID:     eventTypeNID,
-				EventStateKeyNID: eventStateKeyNID,
-			},
-			EventNID: eventNID,
-		},
-	}, nil
-}
-
-func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
-	gomatrixserverlib.RoomVersion, error,
-) {
-	var err error
-	var roomVersion gomatrixserverlib.RoomVersion
-	// Look for m.room.create events.
-	if event.Type() != gomatrixserverlib.MRoomCreate {
-		return gomatrixserverlib.RoomVersion(""), nil
-	}
-	roomVersion = gomatrixserverlib.RoomVersionV1
-	var createContent gomatrixserverlib.CreateContent
-	// The m.room.create event contains an optional "room_version" key in
-	// the event content, so we need to unmarshal that first.
-	if err = json.Unmarshal(event.Content(), &createContent); err != nil {
-		return gomatrixserverlib.RoomVersion(""), err
-	}
-	// A room version was specified in the event content?
-	if createContent.RoomVersion != nil {
-		roomVersion = gomatrixserverlib.RoomVersion(*createContent.RoomVersion)
-	}
-	return roomVersion, err
-}
-
 func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
@@ -221,25 +106,6 @@ func (d *Database) assignRoomNID(
 	return roomNID, err
 }
 
-func (d *Database) assignEventTypeNID(
-	ctx context.Context, eventType string,
-) (eventTypeNID types.EventTypeNID, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		// Check if we already have a numeric ID in the database.
-		eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
-		if err == sql.ErrNoRows {
-			// We don't have a numeric ID so insert one into the database.
-			eventTypeNID, err = d.eventTypes.InsertEventTypeNID(ctx, txn, eventType)
-			if err == sql.ErrNoRows {
-				// We raced with another insert so run the select again.
-				eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
-			}
-		}
-		return err
-	})
-	return eventTypeNID, err
-}
-
 func (d *Database) assignStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
@@ -254,38 +120,6 @@ func (d *Database) assignStateKeyNID(
 		}
 	}
 	return eventStateKeyNID, err
-}
-
-// Events implements input.EventDatabase
-func (d *Database) Events(
-	ctx context.Context, eventNIDs []types.EventNID,
-) ([]types.Event, error) {
-	eventJSONs, err := d.eventJSON.BulkSelectEventJSON(ctx, eventNIDs)
-	if err != nil {
-		return nil, err
-	}
-	results := make([]types.Event, len(eventJSONs))
-	for i, eventJSON := range eventJSONs {
-		var roomNID types.RoomNID
-		var roomVersion gomatrixserverlib.RoomVersion
-		result := &results[i]
-		result.EventNID = eventJSON.EventNID
-		roomNID, err = d.events.SelectRoomNIDForEventNID(ctx, nil, eventJSON.EventNID)
-		if err != nil {
-			return nil, err
-		}
-		roomVersion, err = d.rooms.SelectRoomVersionForRoomNID(ctx, nil, roomNID)
-		if err != nil {
-			return nil, err
-		}
-		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSON(
-			eventJSON.EventJSON, false, roomVersion,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return results, nil
 }
 
 // AddState implements input.EventDatabase
@@ -683,21 +517,6 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 	}
 
 	return d.statements.selectMembershipsFromRoom(ctx, roomNID, localOnly)
-}
-
-// EventsFromIDs implements query.RoomserverQueryAPIEventDB
-func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
-	nidMap, err := d.EventNIDs(ctx, eventIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	var nids []types.EventNID
-	for _, nid := range nidMap {
-		nids = append(nids, nid)
-	}
-
-	return d.Events(ctx, nids)
 }
 
 type transaction struct {
