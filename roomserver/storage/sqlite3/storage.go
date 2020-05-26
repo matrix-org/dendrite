@@ -37,6 +37,8 @@ import (
 type Database struct {
 	shared.Database
 	statements     statements
+	events         tables.Events
+	eventJSON      tables.EventJSON
 	eventTypes     tables.EventTypes
 	eventStateKeys tables.EventStateKeys
 	db             *sql.DB
@@ -79,9 +81,19 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.eventJSON, err = NewSqliteEventJSONTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	d.events, err = NewSqliteEventsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
+		EventsTable:         d.events,
 		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,
+		EventJSONTable:      d.eventJSON,
 	}
 	return &d, nil
 }
@@ -141,7 +153,7 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		if eventNID, err = d.statements.insertEvent(
+		if eventNID, stateNID, err = d.events.InsertEvent(
 			ctx,
 			txn,
 			roomNID,
@@ -154,14 +166,14 @@ func (d *Database) StoreEvent(
 		); err != nil {
 			if err == sql.ErrNoRows {
 				// We've already inserted the event so select the numeric event ID
-				eventNID, stateNID, err = d.statements.selectEvent(ctx, txn, event.EventID())
+				eventNID, stateNID, err = d.events.SelectEvent(ctx, txn, event.EventID())
 			}
 			if err != nil {
 				return err
 			}
 		}
 
-		if err = d.statements.insertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
+		if err = d.eventJSON.InsertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
 			return err
 		}
 
@@ -255,47 +267,25 @@ func (d *Database) assignStateKeyNID(
 	return
 }
 
-// StateEntriesForEventIDs implements input.EventDatabase
-func (d *Database) StateEntriesForEventIDs(
-	ctx context.Context, eventIDs []string,
-) (se []types.StateEntry, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		se, err = d.statements.bulkSelectStateEventByID(ctx, txn, eventIDs)
-		return err
-	})
-	return
-}
-
-// EventNIDs implements query.RoomserverQueryAPIDatabase
-func (d *Database) EventNIDs(
-	ctx context.Context, eventIDs []string,
-) (out map[string]types.EventNID, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		out, err = d.statements.bulkSelectEventNID(ctx, txn, eventIDs)
-		return err
-	})
-	return
-}
-
 // Events implements input.EventDatabase
 func (d *Database) Events(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]types.Event, error) {
-	var eventJSONs []eventJSONPair
+	var eventJSONs []tables.EventJSONPair
 	var err error
 	var results []types.Event
+	eventJSONs, err = d.eventJSON.BulkSelectEventJSON(ctx, eventNIDs)
+	if err != nil || len(eventJSONs) == 0 {
+		return nil, nil
+	}
 	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
-		if err != nil || len(eventJSONs) == 0 {
-			return nil
-		}
 		results = make([]types.Event, len(eventJSONs))
 		for i, eventJSON := range eventJSONs {
 			var roomNID types.RoomNID
 			var roomVersion gomatrixserverlib.RoomVersion
 			result := &results[i]
 			result.EventNID = eventJSON.EventNID
-			roomNID, err = d.statements.selectRoomNIDForEventNID(ctx, txn, eventJSON.EventNID)
+			roomNID, err = d.events.SelectRoomNIDForEventNID(ctx, txn, eventJSON.EventNID)
 			if err != nil {
 				return err
 			}
@@ -343,27 +333,6 @@ func (d *Database) AddState(
 	return
 }
 
-// SetState implements input.EventDatabase
-func (d *Database) SetState(
-	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
-) error {
-	e := internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		return d.statements.updateEventState(ctx, txn, eventNID, stateNID)
-	})
-	return e
-}
-
-// StateAtEventIDs implements input.EventDatabase
-func (d *Database) StateAtEventIDs(
-	ctx context.Context, eventIDs []string,
-) (se []types.StateAtEvent, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		se, err = d.statements.bulkSelectStateAtEventByID(ctx, txn, eventIDs)
-		return err
-	})
-	return
-}
-
 // StateBlockNIDs implements state.RoomStateDatabase
 func (d *Database) StateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
@@ -386,28 +355,6 @@ func (d *Database) StateEntries(
 	return
 }
 
-// SnapshotNIDFromEventID implements state.RoomStateDatabase
-func (d *Database) SnapshotNIDFromEventID(
-	ctx context.Context, eventID string,
-) (stateNID types.StateSnapshotNID, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		_, stateNID, err = d.statements.selectEvent(ctx, txn, eventID)
-		return err
-	})
-	return
-}
-
-// EventIDs implements input.RoomEventDatabase
-func (d *Database) EventIDs(
-	ctx context.Context, eventNIDs []types.EventNID,
-) (out map[types.EventNID]string, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		out, err = d.statements.bulkSelectEventID(ctx, txn, eventNIDs)
-		return err
-	})
-	return
-}
-
 // GetLatestEventsForUpdate implements input.EventDatabase
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
@@ -422,14 +369,14 @@ func (d *Database) GetLatestEventsForUpdate(
 		txn.Rollback() // nolint: errcheck
 		return nil, err
 	}
-	stateAndRefs, err := d.statements.bulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
+	stateAndRefs, err := d.events.BulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
 	if err != nil {
 		txn.Rollback() // nolint: errcheck
 		return nil, err
 	}
 	var lastEventIDSent string
 	if lastEventNIDSent != 0 {
-		lastEventIDSent, err = d.statements.selectEventID(ctx, txn, lastEventNIDSent)
+		lastEventIDSent, err = d.events.SelectEventID(ctx, txn, lastEventNIDSent)
 		if err != nil {
 			txn.Rollback() // nolint: errcheck
 			return nil, err
@@ -539,7 +486,7 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(
 // HasEventBeenSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (res bool, err error) {
 	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
-		res, err = u.d.statements.selectEventSentToOutput(u.ctx, txn, eventNID)
+		res, err = u.d.events.SelectEventSentToOutput(u.ctx, txn, eventNID)
 		return err
 	})
 	return
@@ -548,7 +495,7 @@ func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (res
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
 	err := internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
-		return u.d.statements.updateEventSentToOutput(u.ctx, txn, eventNID)
+		return u.d.events.UpdateEventSentToOutput(u.ctx, txn, eventNID)
 	})
 	return err
 }
@@ -601,11 +548,11 @@ func (d *Database) LatestEventIDs(
 		if err != nil {
 			return err
 		}
-		references, err = d.statements.bulkSelectEventReference(ctx, txn, eventNIDs)
+		references, err = d.events.BulkSelectEventReference(ctx, txn, eventNIDs)
 		if err != nil {
 			return err
 		}
-		depth, err = d.statements.selectMaxEventDepth(ctx, txn, eventNIDs)
+		depth, err = d.events.SelectMaxEventDepth(ctx, txn, eventNIDs)
 		if err != nil {
 			return err
 		}
