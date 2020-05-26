@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal"
@@ -90,8 +91,8 @@ func (t *EDUServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
 }
 
 // SetupHTTP adds the EDUServerInputAPI handlers to the http.ServeMux.
-func (t *EDUServerInputAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(api.EDUServerInputTypingEventPath,
+func (t *EDUServerInputAPI) SetupHTTP(internalAPIMux *mux.Router) {
+	internalAPIMux.Handle(api.EDUServerInputTypingEventPath,
 		internal.MakeInternalAPI("inputTypingEvents", func(req *http.Request) util.JSONResponse {
 			var request api.InputTypingEventRequest
 			var response api.InputTypingEventResponse

@@ -289,3 +289,4 @@ Existing members see new members' join events
 Inbound federation can receive events
 Inbound federation can receive redacted events
 Can logout current device
+Guest users can accept invites to private rooms over federation

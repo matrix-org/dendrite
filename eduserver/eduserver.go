@@ -13,8 +13,6 @@
 package eduserver
 
 import (
-	"net/http"
-
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/eduserver/input"
@@ -35,9 +33,7 @@ func SetupEDUServerComponent(
 		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),
 	}
 
-	if base.EnableHTTPAPIs {
-		inputAPI.SetupHTTP(http.DefaultServeMux)
-	}
+	inputAPI.SetupHTTP(base.InternalAPIMux)
 
 	return inputAPI
 }
