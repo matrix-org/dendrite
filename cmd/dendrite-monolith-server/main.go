@@ -72,6 +72,9 @@ func main() {
 	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
 		base, federation,
 	)
+	if base.EnableHTTPAPIs {
+		serverKeyAPI = base.CreateHTTPServerKeyAPIs()
+	}
 	keyRing := serverKeyAPI.KeyRing()
 
 	rsComponent := roomserver.SetupRoomServerComponent(

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 
 	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/serverkeyapi/internal"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage/cache"
@@ -15,7 +16,7 @@ import (
 func SetupServerKeyAPIComponent(
 	base *basecomponent.BaseDendrite,
 	fedClient *gomatrixserverlib.FederationClient,
-) *internal.ServerKeyAPI {
+) api.ServerKeyInternalAPI {
 	innerDB, err := storage.NewDatabase(
 		string(base.Cfg.Database.ServerKey),
 		base.Cfg.DbProperties(),
