@@ -22,6 +22,7 @@ import (
 	"errors"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -71,12 +72,13 @@ type roomStatements struct {
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 }
 
-func (s *roomStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(roomsSchema)
+func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
+	s := &roomStatements{}
+	_, err := db.Exec(roomsSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
-	return statementList{
+	return s, statementList{
 		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
 		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
@@ -87,20 +89,20 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *roomStatements) insertRoomNID(
+func (s *roomStatements) InsertRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var err error
 	insertStmt := internal.TxStmt(txn, s.insertRoomNIDStmt)
 	if _, err = insertStmt.ExecContext(ctx, roomID, roomVersion); err == nil {
-		return s.selectRoomNID(ctx, txn, roomID)
+		return s.SelectRoomNID(ctx, txn, roomID)
 	} else {
 		return types.RoomNID(0), err
 	}
 }
 
-func (s *roomStatements) selectRoomNID(
+func (s *roomStatements) SelectRoomNID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (types.RoomNID, error) {
 	var roomNID int64
@@ -109,7 +111,7 @@ func (s *roomStatements) selectRoomNID(
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) selectLatestEventNIDs(
+func (s *roomStatements) SelectLatestEventNIDs(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.EventNID, types.StateSnapshotNID, error) {
 	var eventNIDs []types.EventNID
@@ -126,7 +128,7 @@ func (s *roomStatements) selectLatestEventNIDs(
 	return eventNIDs, types.StateSnapshotNID(stateSnapshotNID), nil
 }
 
-func (s *roomStatements) selectLatestEventsNIDsForUpdate(
+func (s *roomStatements) SelectLatestEventsNIDsForUpdate(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.EventNID, types.EventNID, types.StateSnapshotNID, error) {
 	var eventNIDs []types.EventNID
@@ -144,7 +146,7 @@ func (s *roomStatements) selectLatestEventsNIDsForUpdate(
 	return eventNIDs, types.EventNID(lastEventSentNID), types.StateSnapshotNID(stateSnapshotNID), nil
 }
 
-func (s *roomStatements) updateLatestEventNIDs(
+func (s *roomStatements) UpdateLatestEventNIDs(
 	ctx context.Context,
 	txn *sql.Tx,
 	roomNID types.RoomNID,
@@ -163,7 +165,7 @@ func (s *roomStatements) updateLatestEventNIDs(
 	return err
 }
 
-func (s *roomStatements) selectRoomVersionForRoomID(
+func (s *roomStatements) SelectRoomVersionForRoomID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
 	var roomVersion gomatrixserverlib.RoomVersion
@@ -175,7 +177,7 @@ func (s *roomStatements) selectRoomVersionForRoomID(
 	return roomVersion, err
 }
 
-func (s *roomStatements) selectRoomVersionForRoomNID(
+func (s *roomStatements) SelectRoomVersionForRoomNID(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) (gomatrixserverlib.RoomVersion, error) {
 	var roomVersion gomatrixserverlib.RoomVersion
