@@ -36,6 +36,7 @@ import (
 type Database struct {
 	shared.Database
 	statements     statements
+	eventTypes     tables.EventTypes
 	eventStateKeys tables.EventStateKeys
 	db             *sql.DB
 }
@@ -54,7 +55,12 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	if err != nil {
 		return nil, err
 	}
+	d.eventTypes, err = NewPostgresEventTypesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
+		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,
 	}
 	return &d, nil
@@ -191,17 +197,20 @@ func (d *Database) assignRoomNID(
 
 func (d *Database) assignEventTypeNID(
 	ctx context.Context, eventType string,
-) (types.EventTypeNID, error) {
-	// Check if we already have a numeric ID in the database.
-	eventTypeNID, err := d.statements.selectEventTypeNID(ctx, eventType)
-	if err == sql.ErrNoRows {
-		// We don't have a numeric ID so insert one into the database.
-		eventTypeNID, err = d.statements.insertEventTypeNID(ctx, eventType)
+) (eventTypeNID types.EventTypeNID, err error) {
+	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+		// Check if we already have a numeric ID in the database.
+		eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
 		if err == sql.ErrNoRows {
-			// We raced with another insert so run the select again.
-			eventTypeNID, err = d.statements.selectEventTypeNID(ctx, eventType)
+			// We don't have a numeric ID so insert one into the database.
+			eventTypeNID, err = d.eventTypes.InsertEventTypeNID(ctx, txn, eventType)
+			if err == sql.ErrNoRows {
+				// We raced with another insert so run the select again.
+				eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
+			}
 		}
-	}
+		return err
+	})
 	return eventTypeNID, err
 }
 
@@ -226,13 +235,6 @@ func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateEntry, error) {
 	return d.statements.bulkSelectStateEventByID(ctx, eventIDs)
-}
-
-// EventTypeNIDs implements state.RoomStateDatabase
-func (d *Database) EventTypeNIDs(
-	ctx context.Context, eventTypes []string,
-) (map[string]types.EventTypeNID, error) {
-	return d.statements.bulkSelectEventTypeNID(ctx, eventTypes)
 }
 
 // EventNIDs implements query.RoomserverQueryAPIDatabase

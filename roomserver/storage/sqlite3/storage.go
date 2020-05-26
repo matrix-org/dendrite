@@ -37,6 +37,7 @@ import (
 type Database struct {
 	shared.Database
 	statements     statements
+	eventTypes     tables.EventTypes
 	eventStateKeys tables.EventStateKeys
 	db             *sql.DB
 }
@@ -71,10 +72,18 @@ func Open(dataSourceName string) (*Database, error) {
 		return nil, err
 	}
 	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	d.eventTypes, err = NewSqliteEventTypesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
+		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,
 	}
-	return &d, err
+	return &d, nil
 }
 
 // StoreEvent implements input.EventDatabase
@@ -218,13 +227,13 @@ func (d *Database) assignEventTypeNID(
 	ctx context.Context, txn *sql.Tx, eventType string,
 ) (eventTypeNID types.EventTypeNID, err error) {
 	// Check if we already have a numeric ID in the database.
-	eventTypeNID, err = d.statements.selectEventTypeNID(ctx, txn, eventType)
+	eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventTypeNID, err = d.statements.insertEventTypeNID(ctx, txn, eventType)
+		eventTypeNID, err = d.eventTypes.InsertEventTypeNID(ctx, txn, eventType)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventTypeNID, err = d.statements.selectEventTypeNID(ctx, txn, eventType)
+			eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
 		}
 	}
 	return
@@ -252,17 +261,6 @@ func (d *Database) StateEntriesForEventIDs(
 ) (se []types.StateEntry, err error) {
 	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
 		se, err = d.statements.bulkSelectStateEventByID(ctx, txn, eventIDs)
-		return err
-	})
-	return
-}
-
-// EventTypeNIDs implements state.RoomStateDatabase
-func (d *Database) EventTypeNIDs(
-	ctx context.Context, eventTypes []string,
-) (etnids map[string]types.EventTypeNID, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		etnids, err = d.statements.bulkSelectEventTypeNID(ctx, txn, eventTypes)
 		return err
 	})
 	return

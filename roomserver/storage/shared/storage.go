@@ -8,7 +8,15 @@ import (
 )
 
 type Database struct {
+	EventTypesTable     tables.EventTypes
 	EventStateKeysTable tables.EventStateKeys
+}
+
+// EventTypeNIDs implements state.RoomStateDatabase
+func (d *Database) EventTypeNIDs(
+	ctx context.Context, eventTypes []string,
+) (map[string]types.EventTypeNID, error) {
+	return d.EventTypesTable.BulkSelectEventTypeNID(ctx, eventTypes)
 }
 
 // EventStateKeys implements query.RoomserverQueryAPIDatabase
