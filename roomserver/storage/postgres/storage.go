@@ -41,6 +41,7 @@ type Database struct {
 	eventStateKeys tables.EventStateKeys
 	eventJSON      tables.EventJSON
 	rooms          tables.Rooms
+	transactions   tables.Transactions
 	db             *sql.DB
 }
 
@@ -74,6 +75,10 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	if err != nil {
 		return nil, err
 	}
+	d.transactions, err = NewPostgresTransactionsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventTypesTable:     d.eventTypes,
@@ -81,6 +86,7 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 		EventJSONTable:      d.eventJSON,
 		EventsTable:         d.events,
 		RoomsTable:          d.rooms,
+		TransactionsTable:   d.transactions,
 	}
 	return &d, nil
 }
@@ -100,8 +106,8 @@ func (d *Database) StoreEvent(
 	)
 
 	if txnAndSessionID != nil {
-		if err = d.statements.insertTransaction(
-			ctx, txnAndSessionID.TransactionID,
+		if err = d.transactions.InsertTransaction(
+			ctx, nil, txnAndSessionID.TransactionID,
 			txnAndSessionID.SessionID, event.Sender(), event.EventID(),
 		); err != nil {
 			return 0, types.StateAtEvent{}, err
@@ -347,18 +353,6 @@ func (d *Database) GetLatestEventsForUpdate(
 	return &roomRecentEventsUpdater{
 		transaction{ctx, txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
 	}, nil
-}
-
-// GetTransactionEventID implements input.EventDatabase
-func (d *Database) GetTransactionEventID(
-	ctx context.Context, transactionID string,
-	sessionID int64, userID string,
-) (string, error) {
-	eventID, err := d.statements.selectTransactionEventID(ctx, transactionID, sessionID, userID)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return eventID, err
 }
 
 type roomRecentEventsUpdater struct {

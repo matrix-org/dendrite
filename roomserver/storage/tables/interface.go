@@ -65,3 +65,8 @@ type Rooms interface {
 	SelectRoomVersionForRoomID(ctx context.Context, txn *sql.Tx, roomID string) (gomatrixserverlib.RoomVersion, error)
 	SelectRoomVersionForRoomNID(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) (gomatrixserverlib.RoomVersion, error)
 }
+
+type Transactions interface {
+	InsertTransaction(ctx context.Context, txn *sql.Tx, transactionID string, sessionID int64, userID string, eventID string) error
+	SelectTransactionEventID(ctx context.Context, transactionID string, sessionID int64, userID string) (eventID string, err error)
+}

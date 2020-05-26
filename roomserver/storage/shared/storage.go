@@ -17,6 +17,7 @@ type Database struct {
 	EventTypesTable     tables.EventTypes
 	EventStateKeysTable tables.EventStateKeys
 	RoomsTable          tables.Rooms
+	TransactionsTable   tables.Transactions
 }
 
 // EventTypeNIDs implements state.RoomStateDatabase
@@ -146,4 +147,16 @@ func (d *Database) GetRoomVersionForRoomNID(
 	return d.RoomsTable.SelectRoomVersionForRoomNID(
 		ctx, nil, roomNID,
 	)
+}
+
+// GetTransactionEventID implements input.EventDatabase
+func (d *Database) GetTransactionEventID(
+	ctx context.Context, transactionID string,
+	sessionID int64, userID string,
+) (string, error) {
+	eventID, err := d.TransactionsTable.SelectTransactionEventID(ctx, transactionID, sessionID, userID)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return eventID, err
 }

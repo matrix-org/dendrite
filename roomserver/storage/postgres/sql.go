@@ -44,7 +44,6 @@ func (s *statements) prepare(db *sql.DB) error {
 		s.roomAliasesStatements.prepare,
 		s.inviteStatements.prepare,
 		s.membershipStatements.prepare,
-		s.transactionStatements.prepare,
 	} {
 		if err = prepare(db); err != nil {
 			return err
