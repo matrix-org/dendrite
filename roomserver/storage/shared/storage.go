@@ -8,6 +8,7 @@ import (
 )
 
 type Database struct {
+	EventJSON           tables.EventJSON
 	EventTypesTable     tables.EventTypes
 	EventStateKeysTable tables.EventStateKeys
 }

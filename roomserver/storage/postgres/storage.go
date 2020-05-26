@@ -38,6 +38,7 @@ type Database struct {
 	statements     statements
 	eventTypes     tables.EventTypes
 	eventStateKeys tables.EventStateKeys
+	eventJSON      tables.EventJSON
 	db             *sql.DB
 }
 
@@ -59,9 +60,14 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	if err != nil {
 		return nil, err
 	}
+	d.eventJSON, err = NewPostgresEventJSONTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,
+		EventJSON:           d.eventJSON,
 	}
 	return &d, nil
 }
@@ -139,7 +145,7 @@ func (d *Database) StoreEvent(
 		}
 	}
 
-	if err = d.statements.insertEventJSON(ctx, eventNID, event.JSON()); err != nil {
+	if err = d.eventJSON.InsertEventJSON(ctx, nil, eventNID, event.JSON()); err != nil {
 		return 0, types.StateAtEvent{}, err
 	}
 
@@ -248,7 +254,7 @@ func (d *Database) EventNIDs(
 func (d *Database) Events(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]types.Event, error) {
-	eventJSONs, err := d.statements.bulkSelectEventJSON(ctx, eventNIDs)
+	eventJSONs, err := d.eventJSON.BulkSelectEventJSON(ctx, eventNIDs)
 	if err != nil {
 		return nil, err
 	}

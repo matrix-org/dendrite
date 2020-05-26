@@ -37,6 +37,7 @@ import (
 type Database struct {
 	shared.Database
 	statements     statements
+	eventJSON      tables.EventJSON
 	eventTypes     tables.EventTypes
 	eventStateKeys tables.EventStateKeys
 	db             *sql.DB
@@ -79,9 +80,14 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.eventJSON, err = NewSqliteEventJSONTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,
+		EventJSON:           d.eventJSON,
 	}
 	return &d, nil
 }
@@ -161,7 +167,7 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		if err = d.statements.insertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
+		if err = d.eventJSON.InsertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
 			return err
 		}
 
@@ -281,14 +287,14 @@ func (d *Database) EventNIDs(
 func (d *Database) Events(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]types.Event, error) {
-	var eventJSONs []eventJSONPair
+	var eventJSONs []tables.EventJSONPair
 	var err error
 	var results []types.Event
+	eventJSONs, err = d.eventJSON.BulkSelectEventJSON(ctx, eventNIDs)
+	if err != nil || len(eventJSONs) == 0 {
+		return nil, nil
+	}
 	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		eventJSONs, err = d.statements.bulkSelectEventJSON(ctx, txn, eventNIDs)
-		if err != nil || len(eventJSONs) == 0 {
-			return nil
-		}
 		results = make([]types.Event, len(eventJSONs))
 		for i, eventJSON := range eventJSONs {
 			var roomNID types.RoomNID

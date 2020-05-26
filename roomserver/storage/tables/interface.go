@@ -7,6 +7,16 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
+type EventJSONPair struct {
+	EventNID  types.EventNID
+	EventJSON []byte
+}
+
+type EventJSON interface {
+	InsertEventJSON(ctx context.Context, tx *sql.Tx, eventNID types.EventNID, eventJSON []byte) error
+	BulkSelectEventJSON(ctx context.Context, eventNIDs []types.EventNID) ([]EventJSONPair, error)
+}
+
 type EventTypes interface {
 	InsertEventTypeNID(ctx context.Context, tx *sql.Tx, eventType string) (types.EventTypeNID, error)
 	SelectEventTypeNID(ctx context.Context, tx *sql.Tx, eventType string) (types.EventTypeNID, error)
