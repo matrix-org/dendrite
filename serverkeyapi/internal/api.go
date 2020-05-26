@@ -67,7 +67,7 @@ func (s *ServerKeyAPI) FetchKeys(
 	}
 	// If we failed to fetch any keys then we should report an error.
 	if len(requests) > 0 {
-		return nil, fmt.Errorf("server key API failed to fetch %d keys", len(requests))
+		return results, fmt.Errorf("server key API failed to fetch %d keys", len(requests))
 	}
 	// Return the keys.
 	return results, nil
