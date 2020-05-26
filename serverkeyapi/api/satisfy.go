@@ -14,7 +14,9 @@ func (s *httpServerKeyInternalAPI) StoreKeys(
 	ctx context.Context,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	request := InputPublicKeysRequest{}
+	request := InputPublicKeysRequest{
+		Keys: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
+	}
 	response := InputPublicKeysResponse{}
 	for req, res := range results {
 		request.Keys[req] = res
@@ -27,9 +29,13 @@ func (s *httpServerKeyInternalAPI) FetchKeys(
 	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
-	result := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
-	request := QueryPublicKeysRequest{}
-	response := QueryPublicKeysResponse{}
+	result := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
+	request := QueryPublicKeysRequest{
+		Requests: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp),
+	}
+	response := QueryPublicKeysResponse{
+		Results: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
+	}
 	for req, ts := range requests {
 		if res, ok := s.immutableCache.GetServerKey(req); ok {
 			result[req] = res
