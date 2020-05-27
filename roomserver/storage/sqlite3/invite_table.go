@@ -124,7 +124,7 @@ func (s *inviteStatements) UpdateInviteRetired(
 	}
 
 	// now retire the invites
-	stmt = txn.Stmt(s.updateInviteRetiredStmt)
+	stmt = internal.TxStmt(txn, s.updateInviteRetiredStmt)
 	_, err = stmt.ExecContext(ctx, roomNID, targetUserNID)
 	return
 }
