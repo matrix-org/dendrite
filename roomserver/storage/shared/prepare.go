@@ -43,10 +43,18 @@ type transaction struct {
 
 // Commit implements types.Transaction
 func (t *transaction) Commit() error {
+	if t.txn == nil {
+		// The Updater structs can operate in useTxns=false mode. The code will still call this though.
+		return nil
+	}
 	return t.txn.Commit()
 }
 
 // Rollback implements types.Transaction
 func (t *transaction) Rollback() error {
+	if t.txn == nil {
+		// The Updater structs can operate in useTxns=false mode. The code will still call this though.
+		return nil
+	}
 	return t.txn.Rollback()
 }
