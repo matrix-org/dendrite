@@ -223,6 +223,7 @@ type Dendrite struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
 		FederationAPI    Address `yaml:"federation_api"`
+		ServerKeyAPI     Address `yaml:"server_key_api"`
 		AppServiceAPI    Address `yaml:"appservice_api"`
 		SyncAPI          Address `yaml:"sync_api"`
 		RoomServer       Address `yaml:"room_server"`
@@ -237,6 +238,7 @@ type Dendrite struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
 		FederationAPI    Address `yaml:"federation_api"`
+		ServerKeyAPI     Address `yaml:"server_key_api"`
 		AppServiceAPI    Address `yaml:"appservice_api"`
 		SyncAPI          Address `yaml:"sync_api"`
 		RoomServer       Address `yaml:"room_server"`
@@ -620,6 +622,7 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "listen.sync_api", string(config.Listen.SyncAPI))
 	checkNotEmpty(configErrs, "listen.room_server", string(config.Listen.RoomServer))
 	checkNotEmpty(configErrs, "listen.edu_server", string(config.Listen.EDUServer))
+	checkNotEmpty(configErrs, "listen.server_key_api", string(config.Listen.EDUServer))
 }
 
 // checkLogging verifies the parameters logging.* are valid.
@@ -749,6 +752,15 @@ func (config *Dendrite) FederationSenderURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return "http://" + string(config.Listen.FederationSender)
+}
+
+// FederationSenderURL returns an HTTP URL for where the federation sender is listening.
+func (config *Dendrite) ServerKeyAPIURL() string {
+	// Hard code the server key API server to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.ServerKeyAPI)
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.

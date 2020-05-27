@@ -12,39 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !wasm
+// +build wasm
 
-package keydb
+package storage
 
 import (
+	"fmt"
 	"net/url"
 
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/keydb/postgres"
-	"github.com/matrix-org/dendrite/internal/keydb/sqlite3"
+	"github.com/matrix-org/dendrite/serverkeyapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewDatabase opens a database connection.
 func NewDatabase(
 	dataSourceName string,
-	dbProperties internal.DbProperties,
+	dbProperties internal.DbProperties, // nolint:unparam
 	serverName gomatrixserverlib.ServerName,
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName, serverKey, serverKeyID)
+		return nil, err
 	}
 	switch uri.Scheme {
 	case "postgres":
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName, serverKey, serverKeyID)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
 		return sqlite3.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
 	default:
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName, serverKey, serverKeyID)
+		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
 }

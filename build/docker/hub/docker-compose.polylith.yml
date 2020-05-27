@@ -131,7 +131,7 @@ services:
       - internal
       
   key_server:
-    hostname: key_serverde
+    hostname: key_server
     image: matrixdotorg/dendrite:keyserver
     command: [
       "--config=dendrite.yaml"
@@ -140,6 +140,17 @@ services:
       - ./config:/etc/dendrite
     networks:
         - internal
+
+  server_key_api:
+    hostname: server_key_api
+    image: matrixdotorg/dendrite:serverkeyapi
+    command: [
+      "--config=dendrite.yaml"
+    ]
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
 
 networks:
   internal:

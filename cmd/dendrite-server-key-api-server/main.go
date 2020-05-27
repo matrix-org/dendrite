@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,26 +15,18 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/serverkeyapi"
 )
 
 func main() {
 	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "FederationSender", true)
+	base := basecomponent.NewBaseDendrite(cfg, "ServerKeyAPI", true)
 	defer base.Close() // nolint: errcheck
 
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := base.CreateHTTPServerKeyAPIs()
-	keyRing := serverKeyAPI.KeyRing()
+	serverkeyapi.SetupServerKeyAPIComponent(base, federation)
 
-	rsAPI := base.CreateHTTPRoomserverAPIs()
-	fsAPI := federationsender.SetupFederationSenderComponent(
-		base, federation, rsAPI, keyRing,
-	)
-	rsAPI.SetFederationSenderAPI(fsAPI)
-
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender), string(base.Cfg.Listen.FederationSender))
-
+	base.SetupAndServeHTTP(string(base.Cfg.Bind.ServerKeyAPI), string(base.Cfg.Listen.ServerKeyAPI))
 }

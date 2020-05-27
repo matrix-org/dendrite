@@ -1,4 +1,4 @@
-package keydb
+package storage
 
 import (
 	"context"
