@@ -20,15 +20,8 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-)
-
-type membershipState int64
-
-const (
-	membershipStateLeaveOrBan membershipState = 1
-	membershipStateInvite     membershipState = 2
-	membershipStateJoin       membershipState = 3
 )
 
 const membershipSchema = `
@@ -91,13 +84,14 @@ type membershipStatements struct {
 	updateMembershipStmt                            *sql.Stmt
 }
 
-func (s *membershipStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(membershipSchema)
+func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
+	s := &membershipStatements{}
+	_, err := db.Exec(membershipSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, statementList{
 		{&s.insertMembershipStmt, insertMembershipSQL},
 		{&s.selectMembershipForUpdateStmt, selectMembershipForUpdateSQL},
 		{&s.selectMembershipFromRoomAndTargetStmt, selectMembershipFromRoomAndTargetSQL},
@@ -109,7 +103,7 @@ func (s *membershipStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *membershipStatements) insertMembership(
+func (s *membershipStatements) InsertMembership(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	localTarget bool,
@@ -119,10 +113,10 @@ func (s *membershipStatements) insertMembership(
 	return err
 }
 
-func (s *membershipStatements) selectMembershipForUpdate(
+func (s *membershipStatements) SelectMembershipForUpdate(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
-) (membership membershipState, err error) {
+) (membership tables.MembershipState, err error) {
 	stmt := internal.TxStmt(txn, s.selectMembershipForUpdateStmt)
 	err = stmt.QueryRowContext(
 		ctx, roomNID, targetUserNID,
@@ -130,26 +124,25 @@ func (s *membershipStatements) selectMembershipForUpdate(
 	return
 }
 
-func (s *membershipStatements) selectMembershipFromRoomAndTarget(
-	ctx context.Context, txn *sql.Tx,
+func (s *membershipStatements) SelectMembershipFromRoomAndTarget(
+	ctx context.Context,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
-) (eventNID types.EventNID, membership membershipState, err error) {
-	selectStmt := internal.TxStmt(txn, s.selectMembershipFromRoomAndTargetStmt)
-	err = selectStmt.QueryRowContext(
+) (eventNID types.EventNID, membership tables.MembershipState, err error) {
+	err = s.selectMembershipFromRoomAndTargetStmt.QueryRowContext(
 		ctx, roomNID, targetUserNID,
 	).Scan(&membership, &eventNID)
 	return
 }
 
-func (s *membershipStatements) selectMembershipsFromRoom(
-	ctx context.Context, txn *sql.Tx,
+func (s *membershipStatements) SelectMembershipsFromRoom(
+	ctx context.Context,
 	roomNID types.RoomNID, localOnly bool,
 ) (eventNIDs []types.EventNID, err error) {
 	var selectStmt *sql.Stmt
 	if localOnly {
-		selectStmt = internal.TxStmt(txn, s.selectLocalMembershipsFromRoomStmt)
+		selectStmt = s.selectLocalMembershipsFromRoomStmt
 	} else {
-		selectStmt = internal.TxStmt(txn, s.selectMembershipsFromRoomStmt)
+		selectStmt = s.selectMembershipsFromRoomStmt
 	}
 	rows, err := selectStmt.QueryContext(ctx, roomNID)
 	if err != nil {
@@ -167,15 +160,15 @@ func (s *membershipStatements) selectMembershipsFromRoom(
 	return
 }
 
-func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID, membership membershipState, localOnly bool,
+func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
+	ctx context.Context,
+	roomNID types.RoomNID, membership tables.MembershipState, localOnly bool,
 ) (eventNIDs []types.EventNID, err error) {
 	var stmt *sql.Stmt
 	if localOnly {
-		stmt = internal.TxStmt(txn, s.selectLocalMembershipsFromRoomAndMembershipStmt)
+		stmt = s.selectLocalMembershipsFromRoomAndMembershipStmt
 	} else {
-		stmt = internal.TxStmt(txn, s.selectMembershipsFromRoomAndMembershipStmt)
+		stmt = s.selectMembershipsFromRoomAndMembershipStmt
 	}
 	rows, err := stmt.QueryContext(ctx, roomNID, membership)
 	if err != nil {
@@ -193,10 +186,10 @@ func (s *membershipStatements) selectMembershipsFromRoomAndMembership(
 	return
 }
 
-func (s *membershipStatements) updateMembership(
+func (s *membershipStatements) UpdateMembership(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
-	senderUserNID types.EventStateKeyNID, membership membershipState,
+	senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
 	eventNID types.EventNID,
 ) error {
 	stmt := internal.TxStmt(txn, s.updateMembershipStmt)

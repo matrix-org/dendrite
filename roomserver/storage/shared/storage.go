@@ -25,6 +25,7 @@ type Database struct {
 	RoomAliasesTable    tables.RoomAliases
 	PrevEventsTable     tables.PreviousEvents
 	InvitesTable        tables.Invites
+	MembershipTable     tables.Membership
 }
 
 // EventTypeNIDs implements state.RoomStateDatabase

@@ -33,7 +33,6 @@ import (
 // A Database is used to store room events and stream offsets.
 type Database struct {
 	shared.Database
-	statements     statements
 	events         tables.Events
 	eventTypes     tables.EventTypes
 	eventStateKeys tables.EventStateKeys
@@ -42,6 +41,7 @@ type Database struct {
 	transactions   tables.Transactions
 	prevEvents     tables.PreviousEvents
 	invites        tables.Invites
+	membership     tables.Membership
 	db             *sql.DB
 }
 
@@ -51,9 +51,6 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	var d Database
 	var err error
 	if d.db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
-		return nil, err
-	}
-	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}
 	d.eventStateKeys, err = NewPostgresEventStateKeysTable(d.db)
@@ -100,6 +97,10 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	if err != nil {
 		return nil, err
 	}
+	d.membership, err = NewPostgresMembershipTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventTypesTable:     d.eventTypes,
@@ -113,6 +114,7 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 		PrevEventsTable:     d.prevEvents,
 		RoomAliasesTable:    roomAliases,
 		InvitesTable:        d.invites,
+		MembershipTable:     d.membership,
 	}
 	return &d, nil
 }
@@ -300,7 +302,7 @@ type membershipUpdater struct {
 	d             *Database
 	roomNID       types.RoomNID
 	targetUserNID types.EventStateKeyNID
-	membership    membershipState
+	membership    tables.MembershipState
 }
 
 func (d *Database) membershipUpdaterTxn(
@@ -311,11 +313,11 @@ func (d *Database) membershipUpdaterTxn(
 	targetLocal bool,
 ) (types.MembershipUpdater, error) {
 
-	if err := d.statements.insertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
+	if err := d.membership.InsertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
 		return nil, err
 	}
 
-	membership, err := d.statements.selectMembershipForUpdate(ctx, txn, roomNID, targetUserNID)
+	membership, err := d.membership.SelectMembershipForUpdate(ctx, txn, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
@@ -327,17 +329,17 @@ func (d *Database) membershipUpdaterTxn(
 
 // IsInvite implements types.MembershipUpdater
 func (u *membershipUpdater) IsInvite() bool {
-	return u.membership == membershipStateInvite
+	return u.membership == tables.MembershipStateInvite
 }
 
 // IsJoin implements types.MembershipUpdater
 func (u *membershipUpdater) IsJoin() bool {
-	return u.membership == membershipStateJoin
+	return u.membership == tables.MembershipStateJoin
 }
 
 // IsLeave implements types.MembershipUpdater
 func (u *membershipUpdater) IsLeave() bool {
-	return u.membership == membershipStateLeaveOrBan
+	return u.membership == tables.MembershipStateLeaveOrBan
 }
 
 // SetToInvite implements types.MembershipUpdater
@@ -352,9 +354,9 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, er
 	if err != nil {
 		return false, err
 	}
-	if u.membership != membershipStateInvite {
-		if err = u.d.statements.updateMembership(
-			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite, 0,
+	if u.membership != tables.MembershipStateInvite {
+		if err = u.d.membership.UpdateMembership(
+			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateInvite, 0,
 		); err != nil {
 			return false, err
 		}
@@ -387,10 +389,10 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 		return nil, err
 	}
 
-	if u.membership != membershipStateJoin || isUpdate {
-		if err = u.d.statements.updateMembership(
+	if u.membership != tables.MembershipStateJoin || isUpdate {
+		if err = u.d.membership.UpdateMembership(
 			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID,
-			membershipStateJoin, nIDs[eventID],
+			tables.MembershipStateJoin, nIDs[eventID],
 		); err != nil {
 			return nil, err
 		}
@@ -418,10 +420,10 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 		return nil, err
 	}
 
-	if u.membership != membershipStateLeaveOrBan {
-		if err = u.d.statements.updateMembership(
+	if u.membership != tables.MembershipStateLeaveOrBan {
+		if err = u.d.membership.UpdateMembership(
 			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID,
-			membershipStateLeaveOrBan, nIDs[eventID],
+			tables.MembershipStateLeaveOrBan, nIDs[eventID],
 		); err != nil {
 			return nil, err
 		}
@@ -439,7 +441,7 @@ func (d *Database) GetMembership(
 	}
 
 	senderMembershipEventNID, senderMembership, err :=
-		d.statements.selectMembershipFromRoomAndTarget(
+		d.membership.SelectMembershipFromRoomAndTarget(
 			ctx, roomNID, requestSenderUserNID,
 		)
 	if err == sql.ErrNoRows {
@@ -449,7 +451,7 @@ func (d *Database) GetMembership(
 		return
 	}
 
-	return senderMembershipEventNID, senderMembership == membershipStateJoin, nil
+	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, nil
 }
 
 // GetMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
@@ -457,12 +459,12 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
 ) ([]types.EventNID, error) {
 	if joinOnly {
-		return d.statements.selectMembershipsFromRoomAndMembership(
-			ctx, roomNID, membershipStateJoin, localOnly,
+		return d.membership.SelectMembershipsFromRoomAndMembership(
+			ctx, roomNID, tables.MembershipStateJoin, localOnly,
 		)
 	}
 
-	return d.statements.selectMembershipsFromRoom(ctx, roomNID, localOnly)
+	return d.membership.SelectMembershipsFromRoom(ctx, roomNID, localOnly)
 }
 
 type transaction struct {
