@@ -311,6 +311,73 @@ func (d *Database) GetTransactionEventID(
 	return eventID, err
 }
 
+// MembershipUpdater implements input.RoomEventDatabase
+func (d *Database) MembershipUpdater(
+	ctx context.Context, roomID, targetUserID string,
+	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
+) (types.MembershipUpdater, error) {
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			txn.Rollback() // nolint: errcheck
+		}
+	}()
+
+	roomNID, err := d.assignRoomNID(ctx, txn, roomID, roomVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	targetUserNID, err := d.assignStateKeyNID(ctx, txn, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	updater, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
+	if err != nil {
+		return nil, err
+	}
+
+	succeeded = true
+	return updater, nil
+}
+
+// GetLatestEventsForUpdate implements input.EventDatabase
+func (d *Database) GetLatestEventsForUpdate(
+	ctx context.Context, roomNID types.RoomNID,
+) (types.RoomRecentEventsUpdater, error) {
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
+		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
+	if err != nil {
+		txn.Rollback() // nolint: errcheck
+		return nil, err
+	}
+	stateAndRefs, err := d.EventsTable.BulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
+	if err != nil {
+		txn.Rollback() // nolint: errcheck
+		return nil, err
+	}
+	var lastEventIDSent string
+	if lastEventNIDSent != 0 {
+		lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, txn, lastEventNIDSent)
+		if err != nil {
+			txn.Rollback() // nolint: errcheck
+			return nil, err
+		}
+	}
+	return &roomRecentEventsUpdater{
+		transaction{ctx, txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
+	}, nil
+}
+
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,

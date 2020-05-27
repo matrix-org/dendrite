@@ -16,6 +16,7 @@
 package shared
 
 import (
+	"context"
 	"database/sql"
 )
 
@@ -33,4 +34,19 @@ func (s StatementList) Prepare(db *sql.DB) (err error) {
 		}
 	}
 	return
+}
+
+type transaction struct {
+	ctx context.Context
+	txn *sql.Tx
+}
+
+// Commit implements types.Transaction
+func (t *transaction) Commit() error {
+	return t.txn.Commit()
+}
+
+// Rollback implements types.Transaction
+func (t *transaction) Rollback() error {
+	return t.txn.Rollback()
 }
