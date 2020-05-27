@@ -109,7 +109,7 @@ func (s *inviteStatements) UpdateInviteRetired(
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventIDs []string, err error) {
 	// gather all the event IDs we will retire
-	stmt := txn.Stmt(s.selectInvitesAboutToRetireStmt)
+	stmt := internal.TxStmt(txn, s.selectInvitesAboutToRetireStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
