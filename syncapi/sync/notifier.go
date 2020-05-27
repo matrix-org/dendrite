@@ -37,8 +37,8 @@ type Notifier struct {
 	streamLock *sync.Mutex
 	// The latest sync position
 	currPos types.StreamingToken
-	// A map of user_id => UserStream which can be used to wake a given user's /sync request.
-	userStreams map[string]*UserStream
+	// A map of user_id => device_id => UserStream which can be used to wake a given user's /sync request.
+	userDeviceStreams map[string]map[string]*UserDeviceStream
 	// The last time we cleaned out stale entries from the userStreams map
 	lastCleanUpTime time.Time
 }
@@ -50,7 +50,7 @@ func NewNotifier(pos types.StreamingToken) *Notifier {
 	return &Notifier{
 		currPos:             pos,
 		roomIDToJoinedUsers: make(map[string]userIDSet),
-		userStreams:         make(map[string]*UserStream),
+		userDeviceStreams:   make(map[string]map[string]*UserDeviceStream),
 		streamLock:          &sync.Mutex{},
 		lastCleanUpTime:     time.Now(),
 	}
@@ -123,7 +123,7 @@ func (n *Notifier) OnNewEvent(
 // GetListener returns a UserStreamListener that can be used to wait for
 // updates for a user. Must be closed.
 // notify for anything before sincePos
-func (n *Notifier) GetListener(req syncRequest) UserStreamListener {
+func (n *Notifier) GetListener(req syncRequest) UserDeviceStreamListener {
 	// Do what synapse does: https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/notifier.py#L298
 	// - Bucket request into a lookup map keyed off a list of joined room IDs and separately a user ID
 	// - Incoming events wake requests for a matching room ID
@@ -137,7 +137,7 @@ func (n *Notifier) GetListener(req syncRequest) UserStreamListener {
 
 	n.removeEmptyUserStreams()
 
-	return n.fetchUserStream(req.device.UserID, true).GetListener(req.ctx)
+	return n.fetchUserDeviceStream(req.device.UserID, req.device.ID, true).GetListener(req.ctx)
 }
 
 // Load the membership states required to notify users correctly.
@@ -175,25 +175,54 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 
 func (n *Notifier) wakeupUsers(userIDs []string, newPos types.StreamingToken) {
 	for _, userID := range userIDs {
-		stream := n.fetchUserStream(userID, false)
-		if stream != nil {
+		for _, stream := range n.fetchUserStreams(userID, false) {
+			if stream != nil {
+				stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
+			}
+		}
+	}
+}
+
+func (n *Notifier) wakeupUserDevice(userDevices map[string]string, newPos types.StreamingToken) {
+	for userID, deviceID := range userDevices {
+		if stream := n.fetchUserDeviceStream(userID, deviceID, false); stream != nil {
 			stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 		}
 	}
 }
 
-// fetchUserStream retrieves a stream unique to the given user. If makeIfNotExists is true,
+// fetchUserDeviceStream retrieves a stream unique to the given user. If makeIfNotExists is true,
 // a stream will be made for this user if one doesn't exist and it will be returned. This
 // function does not wait for data to be available on the stream.
 // NB: Callers should have locked the mutex before calling this function.
-func (n *Notifier) fetchUserStream(userID string, makeIfNotExists bool) *UserStream {
-	stream, ok := n.userStreams[userID]
+func (n *Notifier) fetchUserDeviceStream(userID, deviceID string, makeIfNotExists bool) *UserDeviceStream {
+	user, ok := n.userDeviceStreams[userID]
+	if !ok && makeIfNotExists {
+		n.userDeviceStreams[userID] = map[string]*UserDeviceStream{}
+	}
+	stream, ok := user[deviceID]
 	if !ok && makeIfNotExists {
 		// TODO: Unbounded growth of streams (1 per user)
-		stream = NewUserStream(userID, n.currPos)
-		n.userStreams[userID] = stream
+		stream = NewUserDeviceStream(userID, deviceID, n.currPos)
+		n.userDeviceStreams[userID][deviceID] = stream
 	}
 	return stream
+}
+
+// fetchUserDeviceStreams retrieves all streams for the given user. If makeIfNotExists is true,
+// a stream will be made for this user if one doesn't exist and it will be returned. This
+// function does not wait for data to be available on the stream.
+// NB: Callers should have locked the mutex before calling this function.
+func (n *Notifier) fetchUserStreams(userID string, makeIfNotExists bool) []*UserDeviceStream {
+	user, ok := n.userDeviceStreams[userID]
+	if !ok && makeIfNotExists {
+		return []*UserDeviceStream{}
+	}
+	streams := []*UserDeviceStream{}
+	for _, stream := range user {
+		streams = append(streams, stream)
+	}
+	return streams
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
@@ -236,9 +265,14 @@ func (n *Notifier) removeEmptyUserStreams() {
 	n.lastCleanUpTime = now
 
 	deleteBefore := now.Add(-5 * time.Minute)
-	for key, value := range n.userStreams {
-		if value.TimeOfLastNonEmpty().Before(deleteBefore) {
-			delete(n.userStreams, key)
+	for user, byUser := range n.userDeviceStreams {
+		for device, value := range byUser {
+			if value.TimeOfLastNonEmpty().Before(deleteBefore) {
+				delete(n.userDeviceStreams[user], device)
+			}
+			if len(n.userDeviceStreams[user]) == 0 {
+				delete(n.userDeviceStreams, user)
+			}
 		}
 	}
 }
