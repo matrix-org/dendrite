@@ -41,9 +41,11 @@ var (
 )
 
 var (
-	roomID = "!test:localhost"
-	alice  = "@alice:localhost"
-	bob    = "@bob:localhost"
+	roomID   = "!test:localhost"
+	alice    = "@alice:localhost"
+	aliceDev = "alicedevice"
+	bob      = "@bob:localhost"
+	bobDev   = "bobdev"
 )
 
 func init() {
@@ -107,7 +109,7 @@ func mustEqualPositions(t *testing.T, got, want types.StreamingToken) {
 // Test that the current position is returned if a request is already behind.
 func TestImmediateNotification(t *testing.T) {
 	n := NewNotifier(syncPositionBefore)
-	pos, err := waitForEvents(n, newTestSyncRequest(alice, syncPositionVeryOld))
+	pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionVeryOld))
 	if err != nil {
 		t.Fatalf("TestImmediateNotification error: %s", err)
 	}
@@ -124,7 +126,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewEventAndJoinedToRoom error: %w", err)
 		}
@@ -132,7 +134,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, "", bob)
+	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter)
@@ -150,7 +152,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
@@ -158,7 +160,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, "", bob)
+	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionAfter)
@@ -176,7 +178,7 @@ func TestEDUWakeup(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionAfter))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err != nil {
 			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
@@ -184,7 +186,7 @@ func TestEDUWakeup(t *testing.T) {
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, "", bob)
+	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionNewEDU)
@@ -202,7 +204,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(3)
 	poll := func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestMultipleRequestWakeup error: %w", err)
 		}
@@ -213,7 +215,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	go poll()
 	go poll()
 
-	stream := lockedFetchUserStream(n, "", bob)
+	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 3)
 
 	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter)
@@ -240,24 +242,24 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	// Make bob leave the room
 	leaveWG.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		leaveWG.Done()
 	}()
-	bobStream := lockedFetchUserStream(n, "", bob)
+	bobStream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(bobStream, 1)
 	n.OnNewEvent(&bobLeaveEvent, "", nil, syncPositionAfter)
 	leaveWG.Wait()
 
 	// send an event into the room. Make sure alice gets it. Bob should not.
 	var aliceWG sync.WaitGroup
-	aliceStream := lockedFetchUserStream(n, "", alice)
+	aliceStream := lockedFetchUserStream(n, aliceDev, alice)
 	aliceWG.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(alice, syncPositionAfter))
+		pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionAfter))
 		if err != nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
@@ -267,7 +269,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 
 	go func() {
 		// this should timeout with an error (but the main goroutine won't wait for the timeout explicitly)
-		_, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionAfter))
+		_, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err == nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom expect error but got nil")
 		}
@@ -313,12 +315,15 @@ func lockedFetchUserStream(n *Notifier, userID, deviceID string) *UserDeviceStre
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
-	return n.fetchUserStream(userID, deviceID, true)
+	return n.fetchUserDeviceStream(userID, deviceID, true)
 }
 
-func newTestSyncRequest(userID string, since types.StreamingToken) syncRequest {
+func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) syncRequest {
 	return syncRequest{
-		device:        authtypes.Device{UserID: userID},
+		device: authtypes.Device{
+			UserID: userID,
+			ID:     deviceID,
+		},
 		timeout:       1 * time.Minute,
 		since:         &since,
 		wantFullState: false,
