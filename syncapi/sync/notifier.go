@@ -183,6 +183,7 @@ func (n *Notifier) wakeupUsers(userIDs []string, newPos types.StreamingToken) {
 	}
 }
 
+// nolint:unused
 func (n *Notifier) wakeupUserDevice(userDevices map[string]string, newPos types.StreamingToken) {
 	for userID, deviceID := range userDevices {
 		if stream := n.fetchUserDeviceStream(userID, deviceID, false); stream != nil {
