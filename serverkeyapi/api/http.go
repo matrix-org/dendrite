@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	// RoomserverPerformJoinPath is the HTTP path for the PerformJoin API.
+	// ServerKeyInputPublicKeyPath is the HTTP path for the InputPublicKeys API.
 	ServerKeyInputPublicKeyPath = "/serverkeyapi/inputPublicKey"
 
-	// RoomserverPerformLeavePath is the HTTP path for the PerformLeave API.
+	// ServerKeyQueryPublicKeyPath is the HTTP path for the QueryPublicKeys API.
 	ServerKeyQueryPublicKeyPath = "/serverkeyapi/queryPublicKey"
 )
 

@@ -622,6 +622,7 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "listen.sync_api", string(config.Listen.SyncAPI))
 	checkNotEmpty(configErrs, "listen.room_server", string(config.Listen.RoomServer))
 	checkNotEmpty(configErrs, "listen.edu_server", string(config.Listen.EDUServer))
+	checkNotEmpty(configErrs, "listen.server_key_api", string(config.Listen.EDUServer))
 }
 
 // checkLogging verifies the parameters logging.* are valid.

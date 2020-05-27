@@ -34,7 +34,6 @@ func SetupServerKeyAPIComponent(
 	}
 
 	internalAPI := internal.ServerKeyAPI{
-		Cfg:            base.Cfg,
 		ImmutableCache: base.ImmutableCache,
 		FedClient:      fedClient,
 		OurKeyRing: gomatrixserverlib.KeyRing{

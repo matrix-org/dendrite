@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -13,7 +12,6 @@ import (
 type ServerKeyAPI struct {
 	api.ServerKeyInternalAPI
 
-	Cfg            *config.Dendrite
 	ImmutableCache caching.ImmutableCache
 	OurKeyRing     gomatrixserverlib.KeyRing
 	FedClient      *gomatrixserverlib.FederationClient
