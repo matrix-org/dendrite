@@ -19,7 +19,6 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
-	"github.com/matrix-org/dendrite/internal/keydb"
 	"github.com/matrix-org/dendrite/internal/transactions"
 )
 
@@ -31,9 +30,10 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
+
+	serverKeyAPI := base.CreateHTTPServerKeyAPIs()
+	keyRing := serverKeyAPI.KeyRing()
 
 	asQuery := base.CreateHTTPAppServiceAPIs()
 	rsAPI := base.CreateHTTPRoomserverAPIs()
@@ -42,7 +42,7 @@ func main() {
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
 
 	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB, federation, &keyRing,
+		base, deviceDB, accountDB, federation, keyRing,
 		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI,
 	)
 

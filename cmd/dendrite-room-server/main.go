@@ -16,7 +16,6 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/internal/basecomponent"
-	"github.com/matrix-org/dendrite/internal/keydb"
 	"github.com/matrix-org/dendrite/roomserver"
 )
 
@@ -24,9 +23,10 @@ func main() {
 	cfg := basecomponent.ParseFlags()
 	base := basecomponent.NewBaseDendrite(cfg, "RoomServerAPI", true)
 	defer base.Close() // nolint: errcheck
-	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
+
+	serverKeyAPI := base.CreateHTTPServerKeyAPIs()
+	keyRing := serverKeyAPI.KeyRing()
 
 	fsAPI := base.CreateHTTPFederationSenderAPIs()
 	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)

@@ -37,11 +37,11 @@ import (
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/keydb"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -52,17 +52,8 @@ import (
 
 func createKeyDB(
 	base *P2PDendrite,
-) keydb.Database {
-	db, err := keydb.NewDatabase(
-		string(base.Base.Cfg.Database.ServerKey),
-		base.Base.Cfg.DbProperties(),
-		base.Base.Cfg.Matrix.ServerName,
-		base.Base.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
-		base.Base.Cfg.Matrix.KeyID,
-	)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to keys db")
-	}
+	db gomatrixserverlib.KeyDatabase,
+) {
 	mdns := mDNSListener{
 		host:  base.LibP2P,
 		keydb: db,
@@ -77,7 +68,6 @@ func createKeyDB(
 		panic(err)
 	}
 	serv.RegisterNotifee(&mdns)
-	return db
 }
 
 func createFederationClient(
@@ -144,9 +134,15 @@ func main() {
 
 	accountDB := base.Base.CreateAccountsDB()
 	deviceDB := base.Base.CreateDeviceDB()
-	keyDB := createKeyDB(base)
 	federation := createFederationClient(base)
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
+
+	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
+		&base.Base, federation,
+	)
+	keyRing := serverKeyAPI.KeyRing()
+	createKeyDB(
+		base, serverKeyAPI,
+	)
 
 	rsAPI := roomserver.SetupRoomServerComponent(
 		&base.Base, keyRing, federation,
@@ -158,17 +154,17 @@ func main() {
 		&base.Base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
 	)
 	fsAPI := federationsender.SetupFederationSenderComponent(
-		&base.Base, federation, rsAPI, &keyRing,
+		&base.Base, federation, rsAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	clientapi.SetupClientAPIComponent(
 		&base.Base, deviceDB, accountDB,
-		federation, &keyRing, rsAPI,
+		federation, keyRing, rsAPI,
 		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(&base.Base, accountDB, deviceDB, federation, &keyRing, rsAPI, asAPI, fsAPI, eduProducer)
+	federationapi.SetupFederationAPIComponent(&base.Base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(&base.Base, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub)
 	if err != nil {

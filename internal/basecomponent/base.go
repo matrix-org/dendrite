@@ -21,12 +21,8 @@ import (
 	"net/url"
 	"time"
 
-	"golang.org/x/crypto/ed25519"
-
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httpapis"
-	"github.com/matrix-org/dendrite/internal/keydb"
-	"github.com/matrix-org/dendrite/internal/keydb/cache"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
@@ -43,6 +39,7 @@ import (
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -157,6 +154,20 @@ func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.Fede
 	return f
 }
 
+// CreateHTTPServerKeyAPIs returns ServerKeyInternalAPI for hitting the server key
+// API over HTTP
+func (b *BaseDendrite) CreateHTTPServerKeyAPIs() serverKeyAPI.ServerKeyInternalAPI {
+	f, err := serverKeyAPI.NewServerKeyInternalAPIHTTP(
+		b.Cfg.ServerKeyAPIURL(),
+		b.httpClient,
+		b.ImmutableCache,
+	)
+	if err != nil {
+		logrus.WithError(err).Panic("NewServerKeyInternalAPIHTTP failed", b.httpClient)
+	}
+	return f
+}
+
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
 func (b *BaseDendrite) CreateDeviceDB() devices.Database {
@@ -177,27 +188,6 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 	}
 
 	return db
-}
-
-// CreateKeyDB creates a new instance of the key database. Should only be called
-// once per component.
-func (b *BaseDendrite) CreateKeyDB() keydb.Database {
-	db, err := keydb.NewDatabase(
-		string(b.Cfg.Database.ServerKey),
-		b.Cfg.DbProperties(),
-		b.Cfg.Matrix.ServerName,
-		b.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
-		b.Cfg.Matrix.KeyID,
-	)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to keys db")
-	}
-
-	cachedDB, err := cache.NewKeyDatabase(db, b.ImmutableCache)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to create key cache wrapper")
-	}
-	return cachedDB
 }
 
 // CreateFederationClient creates a new federation client. Should only be called
