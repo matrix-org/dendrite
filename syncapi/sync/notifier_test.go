@@ -180,6 +180,9 @@ func TestCorrectStreamWakeup(t *testing.T) {
 	if result := <-awoken; result != wake {
 		t.Fatalf("expected to wake %q, got %q", wake, result)
 	}
+
+	close(n.userDeviceStreams[alice]["one"].signalChannel)
+	close(n.userDeviceStreams[alice]["two"].signalChannel)
 }
 
 // Test that an invite unblocks the request
