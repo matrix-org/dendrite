@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
 const transactionsSchema = `
@@ -46,19 +47,20 @@ type transactionStatements struct {
 	selectTransactionEventIDStmt *sql.Stmt
 }
 
-func (s *transactionStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(transactionsSchema)
+func NewSqliteTransactionsTable(db *sql.DB) (tables.Transactions, error) {
+	s := &transactionStatements{}
+	_, err := db.Exec(transactionsSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, statementList{
 		{&s.insertTransactionStmt, insertTransactionSQL},
 		{&s.selectTransactionEventIDStmt, selectTransactionEventIDSQL},
 	}.prepare(db)
 }
 
-func (s *transactionStatements) insertTransaction(
+func (s *transactionStatements) InsertTransaction(
 	ctx context.Context, txn *sql.Tx,
 	transactionID string,
 	sessionID int64,
@@ -72,14 +74,13 @@ func (s *transactionStatements) insertTransaction(
 	return
 }
 
-func (s *transactionStatements) selectTransactionEventID(
-	ctx context.Context, txn *sql.Tx,
+func (s *transactionStatements) SelectTransactionEventID(
+	ctx context.Context,
 	transactionID string,
 	sessionID int64,
 	userID string,
 ) (eventID string, err error) {
-	stmt := internal.TxStmt(txn, s.selectTransactionEventIDStmt)
-	err = stmt.QueryRowContext(
+	err = s.selectTransactionEventIDStmt.QueryRowContext(
 		ctx, transactionID, sessionID, userID,
 	).Scan(&eventID)
 	return

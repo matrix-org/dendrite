@@ -18,14 +18,12 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -41,10 +39,14 @@ type Database struct {
 	eventJSON      tables.EventJSON
 	eventTypes     tables.EventTypes
 	eventStateKeys tables.EventStateKeys
+	rooms          tables.Rooms
+	transactions   tables.Transactions
+	prevEvents     tables.PreviousEvents
 	db             *sql.DB
 }
 
 // Open a sqlite database.
+// nolint: gocyclo
 func Open(dataSourceName string) (*Database, error) {
 	var d Database
 	uri, err := url.Parse(dataSourceName)
@@ -89,133 +91,44 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.rooms, err = NewSqliteRoomsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	d.transactions, err = NewSqliteTransactionsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	stateBlock, err := NewSqliteStateBlockTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	d.prevEvents, err = NewSqlitePrevEventsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	roomAliases, err := NewSqliteRoomAliasesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
+		DB:                  d.db,
 		EventsTable:         d.events,
 		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,
 		EventJSONTable:      d.eventJSON,
+		RoomsTable:          d.rooms,
+		TransactionsTable:   d.transactions,
+		StateBlockTable:     stateBlock,
+		StateSnapshotTable:  stateSnapshot,
+		PrevEventsTable:     d.prevEvents,
+		RoomAliasesTable:    roomAliases,
 	}
 	return &d, nil
-}
-
-// StoreEvent implements input.EventDatabase
-func (d *Database) StoreEvent(
-	ctx context.Context, event gomatrixserverlib.Event,
-	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
-) (types.RoomNID, types.StateAtEvent, error) {
-	var (
-		roomNID          types.RoomNID
-		eventTypeNID     types.EventTypeNID
-		eventStateKeyNID types.EventStateKeyNID
-		eventNID         types.EventNID
-		stateNID         types.StateSnapshotNID
-		err              error
-	)
-
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if txnAndSessionID != nil {
-			if err = d.statements.insertTransaction(
-				ctx, txn, txnAndSessionID.TransactionID,
-				txnAndSessionID.SessionID, event.Sender(), event.EventID(),
-			); err != nil {
-				return err
-			}
-		}
-
-		// TODO: Here we should aim to have two different code paths for new rooms
-		// vs existing ones.
-
-		// Get the default room version. If the client doesn't supply a room_version
-		// then we will use our configured default to create the room.
-		// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
-		// Note that the below logic depends on the m.room.create event being the
-		// first event that is persisted to the database when creating or joining a
-		// room.
-		var roomVersion gomatrixserverlib.RoomVersion
-		if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
-			return err
-		}
-
-		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
-			return err
-		}
-
-		if eventTypeNID, err = d.assignEventTypeNID(ctx, txn, event.Type()); err != nil {
-			return err
-		}
-
-		eventStateKey := event.StateKey()
-		// Assigned a numeric ID for the state_key if there is one present.
-		// Otherwise set the numeric ID for the state_key to 0.
-		if eventStateKey != nil {
-			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, txn, *eventStateKey); err != nil {
-				return err
-			}
-		}
-
-		if eventNID, stateNID, err = d.events.InsertEvent(
-			ctx,
-			txn,
-			roomNID,
-			eventTypeNID,
-			eventStateKeyNID,
-			event.EventID(),
-			event.EventReference().EventSHA256,
-			authEventNIDs,
-			event.Depth(),
-		); err != nil {
-			if err == sql.ErrNoRows {
-				// We've already inserted the event so select the numeric event ID
-				eventNID, stateNID, err = d.events.SelectEvent(ctx, txn, event.EventID())
-			}
-			if err != nil {
-				return err
-			}
-		}
-
-		if err = d.eventJSON.InsertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
-		return 0, types.StateAtEvent{}, err
-	}
-
-	return roomNID, types.StateAtEvent{
-		BeforeStateSnapshotNID: stateNID,
-		StateEntry: types.StateEntry{
-			StateKeyTuple: types.StateKeyTuple{
-				EventTypeNID:     eventTypeNID,
-				EventStateKeyNID: eventStateKeyNID,
-			},
-			EventNID: eventNID,
-		},
-	}, nil
-}
-
-func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
-	gomatrixserverlib.RoomVersion, error,
-) {
-	var err error
-	var roomVersion gomatrixserverlib.RoomVersion
-	// Look for m.room.create events.
-	if event.Type() != gomatrixserverlib.MRoomCreate {
-		return gomatrixserverlib.RoomVersion(""), nil
-	}
-	roomVersion = gomatrixserverlib.RoomVersionV1
-	var createContent gomatrixserverlib.CreateContent
-	// The m.room.create event contains an optional "room_version" key in
-	// the event content, so we need to unmarshal that first.
-	if err = json.Unmarshal(event.Content(), &createContent); err != nil {
-		return gomatrixserverlib.RoomVersion(""), err
-	}
-	// A room version was specified in the event content?
-	if createContent.RoomVersion != nil {
-		roomVersion = gomatrixserverlib.RoomVersion(*createContent.RoomVersion)
-	}
-	return roomVersion, err
 }
 
 func (d *Database) assignRoomNID(
@@ -223,29 +136,13 @@ func (d *Database) assignRoomNID(
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (roomNID types.RoomNID, err error) {
 	// Check if we already have a numeric ID in the database.
-	roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
+	roomNID, err = d.rooms.SelectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.statements.insertRoomNID(ctx, txn, roomID, roomVersion)
+		roomNID, err = d.rooms.InsertRoomNID(ctx, txn, roomID, roomVersion)
 		if err == nil {
 			// Now get the numeric ID back out of the database
-			roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
-		}
-	}
-	return
-}
-
-func (d *Database) assignEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventType string,
-) (eventTypeNID types.EventTypeNID, err error) {
-	// Check if we already have a numeric ID in the database.
-	eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
-	if err == sql.ErrNoRows {
-		// We don't have a numeric ID so insert one into the database.
-		eventTypeNID, err = d.eventTypes.InsertEventTypeNID(ctx, txn, eventType)
-		if err == sql.ErrNoRows {
-			// We raced with another insert so run the select again.
-			eventTypeNID, err = d.eventTypes.SelectEventTypeNID(ctx, txn, eventType)
+			roomNID, err = d.rooms.SelectRoomNID(ctx, txn, roomID)
 		}
 	}
 	return
@@ -267,94 +164,6 @@ func (d *Database) assignStateKeyNID(
 	return
 }
 
-// Events implements input.EventDatabase
-func (d *Database) Events(
-	ctx context.Context, eventNIDs []types.EventNID,
-) ([]types.Event, error) {
-	var eventJSONs []tables.EventJSONPair
-	var err error
-	var results []types.Event
-	eventJSONs, err = d.eventJSON.BulkSelectEventJSON(ctx, eventNIDs)
-	if err != nil || len(eventJSONs) == 0 {
-		return nil, nil
-	}
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		results = make([]types.Event, len(eventJSONs))
-		for i, eventJSON := range eventJSONs {
-			var roomNID types.RoomNID
-			var roomVersion gomatrixserverlib.RoomVersion
-			result := &results[i]
-			result.EventNID = eventJSON.EventNID
-			roomNID, err = d.events.SelectRoomNIDForEventNID(ctx, txn, eventJSON.EventNID)
-			if err != nil {
-				return err
-			}
-			roomVersion, err = d.statements.selectRoomVersionForRoomNID(ctx, txn, roomNID)
-			if err != nil {
-				return err
-			}
-			result.Event, err = gomatrixserverlib.NewEventFromTrustedJSON(
-				eventJSON.EventJSON, false, roomVersion,
-			)
-			if err != nil {
-				return nil
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return []types.Event{}, err
-	}
-	return results, nil
-}
-
-// AddState implements input.EventDatabase
-func (d *Database) AddState(
-	ctx context.Context,
-	roomNID types.RoomNID,
-	stateBlockNIDs []types.StateBlockNID,
-	state []types.StateEntry,
-) (stateNID types.StateSnapshotNID, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if len(state) > 0 {
-			var stateBlockNID types.StateBlockNID
-			stateBlockNID, err = d.statements.bulkInsertStateData(ctx, txn, state)
-			if err != nil {
-				return err
-			}
-			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
-		}
-		stateNID, err = d.statements.insertState(ctx, txn, roomNID, stateBlockNIDs)
-		return err
-	})
-	if err != nil {
-		return 0, err
-	}
-	return
-}
-
-// StateBlockNIDs implements state.RoomStateDatabase
-func (d *Database) StateBlockNIDs(
-	ctx context.Context, stateNIDs []types.StateSnapshotNID,
-) (sl []types.StateBlockNIDList, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		sl, err = d.statements.bulkSelectStateBlockNIDs(ctx, txn, stateNIDs)
-		return err
-	})
-	return
-}
-
-// StateEntries implements state.RoomStateDatabase
-func (d *Database) StateEntries(
-	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
-) (sel []types.StateEntryList, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		sel, err = d.statements.bulkSelectStateBlockEntries(ctx, txn, stateBlockNIDs)
-		return err
-	})
-	return
-}
-
 // GetLatestEventsForUpdate implements input.EventDatabase
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
@@ -364,7 +173,7 @@ func (d *Database) GetLatestEventsForUpdate(
 		return nil, err
 	}
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
-		d.statements.selectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
+		d.rooms.SelectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
 	if err != nil {
 		txn.Rollback() // nolint: errcheck
 		return nil, err
@@ -394,18 +203,6 @@ func (d *Database) GetLatestEventsForUpdate(
 	return &roomRecentEventsUpdater{
 		transaction{ctx, nil}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
 	}, nil
-}
-
-// GetTransactionEventID implements input.EventDatabase
-func (d *Database) GetTransactionEventID(
-	ctx context.Context, transactionID string,
-	sessionID int64, userID string,
-) (string, error) {
-	eventID, err := d.statements.selectTransactionEventID(ctx, nil, transactionID, sessionID, userID)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return eventID, err
 }
 
 type roomRecentEventsUpdater struct {
@@ -442,7 +239,7 @@ func (u *roomRecentEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotN
 func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
 	err := internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
 		for _, ref := range previousEventReferences {
-			if err := u.d.statements.insertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			if err := u.d.prevEvents.InsertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
 				return err
 			}
 		}
@@ -454,7 +251,7 @@ func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, p
 // IsReferenced implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (res bool, err error) {
 	err = internal.WithTransaction(u.d.db, func(txn *sql.Tx) error {
-		err := u.d.statements.selectPreviousEventExists(u.ctx, txn, eventReference.EventID, eventReference.EventSHA256)
+		err := u.d.prevEvents.SelectPreviousEventExists(u.ctx, txn, eventReference.EventID, eventReference.EventSHA256)
 		if err == nil {
 			res = true
 			err = nil
@@ -478,7 +275,7 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(
 		for i := range latest {
 			eventNIDs[i] = latest[i].EventNID
 		}
-		return u.d.statements.updateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID)
+		return u.d.rooms.UpdateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID)
 	})
 	return err
 }
@@ -508,59 +305,6 @@ func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventSta
 	return
 }
 
-// RoomNID implements query.RoomserverQueryAPIDB
-func (d *Database) RoomNID(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		roomNID, err = d.statements.selectRoomNID(ctx, txn, roomID)
-		if err == sql.ErrNoRows {
-			roomNID = 0
-			err = nil
-		}
-		return err
-	})
-	return
-}
-
-// RoomNIDExcludingStubs implements query.RoomserverQueryAPIDB
-func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
-	roomNID, err = d.RoomNID(ctx, roomID)
-	if err != nil {
-		return
-	}
-	latestEvents, _, err := d.statements.selectLatestEventNIDs(ctx, nil, roomNID)
-	if err != nil {
-		return
-	}
-	if len(latestEvents) == 0 {
-		roomNID = 0
-		return
-	}
-	return
-}
-
-// LatestEventIDs implements query.RoomserverQueryAPIDatabase
-func (d *Database) LatestEventIDs(
-	ctx context.Context, roomNID types.RoomNID,
-) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		var eventNIDs []types.EventNID
-		eventNIDs, currentStateSnapshotNID, err = d.statements.selectLatestEventNIDs(ctx, txn, roomNID)
-		if err != nil {
-			return err
-		}
-		references, err = d.events.BulkSelectEventReference(ctx, txn, eventNIDs)
-		if err != nil {
-			return err
-		}
-		depth, err = d.events.SelectMaxEventDepth(ctx, txn, eventNIDs)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	return
-}
-
 // GetInvitesForUser implements query.RoomserverQueryAPIDatabase
 func (d *Database) GetInvitesForUser(
 	ctx context.Context,
@@ -568,44 +312,6 @@ func (d *Database) GetInvitesForUser(
 	targetUserNID types.EventStateKeyNID,
 ) (senderUserIDs []types.EventStateKeyNID, err error) {
 	return d.statements.selectInviteActiveForUserInRoom(ctx, targetUserNID, roomNID)
-}
-
-// SetRoomAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
-	return d.statements.insertRoomAlias(ctx, nil, alias, roomID, creatorUserID)
-}
-
-// GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
-	return d.statements.selectRoomIDFromAlias(ctx, nil, alias)
-}
-
-// GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
-func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
-	return d.statements.selectAliasesFromRoomID(ctx, nil, roomID)
-}
-
-// GetCreatorIDForAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) GetCreatorIDForAlias(
-	ctx context.Context, alias string,
-) (string, error) {
-	return d.statements.selectCreatorIDFromAlias(ctx, nil, alias)
-}
-
-// RemoveRoomAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
-	return d.statements.deleteRoomAlias(ctx, nil, alias)
-}
-
-// StateEntriesForTuples implements state.RoomStateDatabase
-func (d *Database) StateEntriesForTuples(
-	ctx context.Context,
-	stateBlockNIDs []types.StateBlockNID,
-	stateKeyTuples []types.StateKeyTuple,
-) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectFilteredStateBlockEntries(
-		ctx, nil, stateBlockNIDs, stateKeyTuples,
-	)
 }
 
 // MembershipUpdater implements input.RoomEventDatabase
@@ -842,37 +548,6 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 		return nil
 	})
 	return
-}
-
-// EventsFromIDs implements query.RoomserverQueryAPIEventDB
-func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
-	nidMap, err := d.EventNIDs(ctx, eventIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	var nids []types.EventNID
-	for _, nid := range nidMap {
-		nids = append(nids, nid)
-	}
-
-	return d.Events(ctx, nids)
-}
-
-func (d *Database) GetRoomVersionForRoom(
-	ctx context.Context, roomID string,
-) (gomatrixserverlib.RoomVersion, error) {
-	return d.statements.selectRoomVersionForRoomID(
-		ctx, nil, roomID,
-	)
-}
-
-func (d *Database) GetRoomVersionForRoomNID(
-	ctx context.Context, roomNID types.RoomNID,
-) (gomatrixserverlib.RoomVersion, error) {
-	return d.statements.selectRoomVersionForRoomNID(
-		ctx, nil, roomNID,
-	)
 }
 
 type transaction struct {
