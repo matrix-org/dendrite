@@ -142,6 +142,17 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	wg.Wait()
 }
 
+func TestCorrectStream(t *testing.T) {
+	n := NewNotifier(syncPositionBefore)
+	stream := lockedFetchUserStream(n, bob, bobDev)
+	if stream.UserID != bob {
+		t.Fatalf("expected user %q, got %q", bob, stream.UserID)
+	}
+	if stream.DeviceID != bobDev {
+		t.Fatalf("expected device %q, got %q", bobDev, stream.DeviceID)
+	}
+}
+
 // Test that an invite unblocks the request
 func TestNewInviteEventForUser(t *testing.T) {
 	n := NewNotifier(syncPositionBefore)
@@ -256,7 +267,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 
 	// send an event into the room. Make sure alice gets it. Bob should not.
 	var aliceWG sync.WaitGroup
-	aliceStream := lockedFetchUserStream(n, aliceDev, alice)
+	aliceStream := lockedFetchUserStream(n, alice, aliceDev)
 	aliceWG.Add(1)
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionAfter))
