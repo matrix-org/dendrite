@@ -173,16 +173,21 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	}
 }
 
+// wakeupUsers will wake up the sync strems for all of the devices for all of the
+// specified user IDs.
 func (n *Notifier) wakeupUsers(userIDs []string, newPos types.StreamingToken) {
 	for _, userID := range userIDs {
 		for _, stream := range n.fetchUserStreams(userID) {
-			if stream != nil {
-				stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
+			if stream == nil {
+				continue
 			}
+			stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 		}
 	}
 }
 
+// wakeupUserDevice will wake up the sync stream for a specific user device. Other
+// device streams will be left alone.
 // nolint:unused
 func (n *Notifier) wakeupUserDevice(userDevices map[string]string, newPos types.StreamingToken) {
 	for userID, deviceID := range userDevices {
@@ -192,25 +197,32 @@ func (n *Notifier) wakeupUserDevice(userDevices map[string]string, newPos types.
 	}
 }
 
-// fetchUserDeviceStream retrieves a stream unique to the given user. If makeIfNotExists is true,
-// a stream will be made for this user if one doesn't exist and it will be returned. This
+// fetchUserDeviceStream retrieves a stream unique to the given device. If makeIfNotExists is true,
+// a stream will be made for this device if one doesn't exist and it will be returned. This
 // function does not wait for data to be available on the stream.
 // NB: Callers should have locked the mutex before calling this function.
 func (n *Notifier) fetchUserDeviceStream(userID, deviceID string, makeIfNotExists bool) *UserDeviceStream {
 	_, ok := n.userDeviceStreams[userID]
-	if !ok && makeIfNotExists {
+	if !ok {
+		if !makeIfNotExists {
+			return nil
+		}
 		n.userDeviceStreams[userID] = map[string]*UserDeviceStream{}
 	}
 	stream, ok := n.userDeviceStreams[userID][deviceID]
-	if !ok && makeIfNotExists {
+	if !ok {
+		if !makeIfNotExists {
+			return nil
+		}
 		// TODO: Unbounded growth of streams (1 per user)
-		stream = NewUserDeviceStream(userID, deviceID, n.currPos)
-		n.userDeviceStreams[userID][deviceID] = stream
+		if stream = NewUserDeviceStream(userID, deviceID, n.currPos); stream != nil {
+			n.userDeviceStreams[userID][deviceID] = stream
+		}
 	}
 	return stream
 }
 
-// fetchUserDeviceStreams retrieves all streams for the given user. If makeIfNotExists is true,
+// fetchUserStreams retrieves all streams for the given user. If makeIfNotExists is true,
 // a stream will be made for this user if one doesn't exist and it will be returned. This
 // function does not wait for data to be available on the stream.
 // NB: Callers should have locked the mutex before calling this function.

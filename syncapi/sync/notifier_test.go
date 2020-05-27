@@ -153,6 +153,35 @@ func TestCorrectStream(t *testing.T) {
 	}
 }
 
+func TestCorrectStreamWakeup(t *testing.T) {
+	n := NewNotifier(syncPositionBefore)
+	awoken := make(chan string)
+
+	streamone := lockedFetchUserStream(n, alice, "one")
+	streamtwo := lockedFetchUserStream(n, alice, "two")
+
+	go waitForBlocking(streamone, 1)
+	go waitForBlocking(streamtwo, 1)
+
+	go func() {
+		select {
+		case <-n.userDeviceStreams[alice]["one"].signalChannel:
+			awoken <- "one"
+		case <-n.userDeviceStreams[alice]["two"].signalChannel:
+			awoken <- "two"
+		}
+	}()
+
+	time.Sleep(1 * time.Microsecond)
+
+	wake := "two"
+	n.wakeupUserDevice(map[string]string{alice: wake}, syncPositionAfter)
+
+	if result := <-awoken; result != wake {
+		t.Fatalf("expected to wake %q, got %q", wake, result)
+	}
+}
+
 // Test that an invite unblocks the request
 func TestNewInviteEventForUser(t *testing.T) {
 	n := NewNotifier(syncPositionBefore)
@@ -316,7 +345,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.StreamingToken, error) {
 func waitForBlocking(s *UserDeviceStream, numBlocking uint) {
 	for numBlocking != s.NumWaiting() {
 		// This is horrible but I don't want to add a signalling mechanism JUST for testing.
-		time.Sleep(1 * time.Microsecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
