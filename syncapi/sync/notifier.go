@@ -175,7 +175,7 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 
 func (n *Notifier) wakeupUsers(userIDs []string, newPos types.StreamingToken) {
 	for _, userID := range userIDs {
-		for deviceID, stream := range n.fetchUserStreams(userID) {
+		for _, stream := range n.fetchUserStreams(userID) {
 			if stream != nil {
 				stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 			}
