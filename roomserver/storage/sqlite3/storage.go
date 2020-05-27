@@ -42,6 +42,7 @@ type Database struct {
 	rooms          tables.Rooms
 	transactions   tables.Transactions
 	prevEvents     tables.PreviousEvents
+	invites        tables.Invites
 	db             *sql.DB
 }
 
@@ -115,6 +116,10 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.invites, err = NewSqliteInvitesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventsTable:         d.events,
@@ -127,6 +132,7 @@ func Open(dataSourceName string) (*Database, error) {
 		StateSnapshotTable:  stateSnapshot,
 		PrevEventsTable:     d.prevEvents,
 		RoomAliasesTable:    roomAliases,
+		InvitesTable:        d.invites,
 	}
 	return &d, nil
 }
@@ -305,15 +311,6 @@ func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventSta
 	return
 }
 
-// GetInvitesForUser implements query.RoomserverQueryAPIDatabase
-func (d *Database) GetInvitesForUser(
-	ctx context.Context,
-	roomNID types.RoomNID,
-	targetUserNID types.EventStateKeyNID,
-) (senderUserIDs []types.EventStateKeyNID, err error) {
-	return d.statements.selectInviteActiveForUserInRoom(ctx, targetUserNID, roomNID)
-}
-
 // MembershipUpdater implements input.RoomEventDatabase
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
@@ -415,7 +412,7 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (inserted
 		if err != nil {
 			return err
 		}
-		inserted, err = u.d.statements.insertInviteEvent(
+		inserted, err = u.d.invites.InsertInviteEvent(
 			u.ctx, txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
 		)
 		if err != nil {
@@ -443,7 +440,7 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 
 		// If this is a join event update, there is no invite to update
 		if !isUpdate {
-			inviteEventIDs, err = u.d.statements.updateInviteRetired(
+			inviteEventIDs, err = u.d.invites.UpdateInviteRetired(
 				u.ctx, txn, u.roomNID, u.targetUserNID,
 			)
 			if err != nil {
@@ -478,7 +475,7 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) (inv
 		if err != nil {
 			return err
 		}
-		inviteEventIDs, err = u.d.statements.updateInviteRetired(
+		inviteEventIDs, err = u.d.invites.UpdateInviteRetired(
 			u.ctx, txn, u.roomNID, u.targetUserNID,
 		)
 		if err != nil {

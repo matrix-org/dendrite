@@ -24,6 +24,7 @@ type Database struct {
 	StateBlockTable     tables.StateBlock
 	RoomAliasesTable    tables.RoomAliases
 	PrevEventsTable     tables.PreviousEvents
+	InvitesTable        tables.Invites
 }
 
 // EventTypeNIDs implements state.RoomStateDatabase
@@ -245,6 +246,15 @@ func (d *Database) GetCreatorIDForAlias(
 // RemoveRoomAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
+}
+
+// GetInvitesForUser implements query.RoomserverQueryAPIDatabase
+func (d *Database) GetInvitesForUser(
+	ctx context.Context,
+	roomNID types.RoomNID,
+	targetUserNID types.EventStateKeyNID,
+) (senderUserIDs []types.EventStateKeyNID, err error) {
+	return d.InvitesTable.SelectInviteActiveForUserInRoom(ctx, targetUserNID, roomNID)
 }
 
 // Events implements input.EventDatabase
