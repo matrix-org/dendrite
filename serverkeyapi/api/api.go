@@ -107,6 +107,7 @@ func (s *httpServerKeyInternalAPI) FetchKeys(
 	}
 	for req, res := range response.Results {
 		result[req] = res
+		s.immutableCache.StoreServerKey(req, res)
 	}
 	return result, nil
 }
