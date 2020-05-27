@@ -152,6 +152,8 @@ type Dendrite struct {
 			OutputClientData Topic `yaml:"output_client_data"`
 			// Topic for eduserver/api.OutputTypingEvent events.
 			OutputTypingEvent Topic `yaml:"output_typing_event"`
+			// Topic for eduserver/api.OutputSendToDeviceEvent events.
+			OutputSendToDeviceEventTopic Topic `yaml:"output_send_to_device_event"`
 			// Topic for user updates (profile, presence)
 			UserUpdates Topic `yaml:"user_updates"`
 		}

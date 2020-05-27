@@ -77,6 +77,14 @@ func (p *testEDUProducer) InputTypingEvent(
 	return nil
 }
 
+func (p *testEDUProducer) InputSendToDeviceEvent(
+	ctx context.Context,
+	request *eduAPI.InputSendToDeviceEventRequest,
+	response *eduAPI.InputSendToDeviceEventResponse,
+) error {
+	return nil
+}
+
 type testRoomserverAPI struct {
 	inputRoomEvents           []api.InputRoomEvent
 	queryStateAfterEvents     func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse

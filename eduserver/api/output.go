@@ -12,7 +12,10 @@
 
 package api
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // OutputTypingEvent is an entry in typing server output kafka log.
 // This contains the event with extra fields used to create 'm.typing' event
@@ -31,4 +34,14 @@ type TypingEvent struct {
 	RoomID string `json:"room_id"`
 	UserID string `json:"user_id"`
 	Typing bool   `json:"typing"`
+}
+
+// OutputTypingEvent is an entry in typing server output kafka log.
+// This contains the event with extra fields used to create 'm.typing' event
+// in clientapi & federation.
+type OutputSendToDeviceEvent struct {
+	UserID    string          `json:"user_id"`
+	DeviceID  string          `json:"device_id"`
+	EventType string          `json:"event_type"`
+	Message   json.RawMessage `json:"message"`
 }

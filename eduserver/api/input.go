@@ -15,6 +15,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -37,6 +38,17 @@ type InputTypingEvent struct {
 	OriginServerTS gomatrixserverlib.Timestamp `json:"origin_server_ts"`
 }
 
+type InputSendToDeviceEvent struct {
+	// The user ID to send the update to.
+	UserID string `json:"user_id"`
+	// The device ID to send the update to.
+	DeviceID string `json:"device_id"`
+	// The type of the event.
+	EventType string `json:"event_type"`
+	// The contents of the message.
+	Message json.RawMessage `json:"message"`
+}
+
 // InputTypingEventRequest is a request to EDUServerInputAPI
 type InputTypingEventRequest struct {
 	InputTypingEvent InputTypingEvent `json:"input_typing_event"`
@@ -45,6 +57,14 @@ type InputTypingEventRequest struct {
 // InputTypingEventResponse is a response to InputTypingEvents
 type InputTypingEventResponse struct{}
 
+// InputSendToDeviceEventRequest is a request to EDUServerInputAPI
+type InputSendToDeviceEventRequest struct {
+	InputSendToDeviceEvent InputSendToDeviceEvent `json:"input_send_to_device_event"`
+}
+
+// InputSendToDeviceEventResponse is a response to InputSendToDeviceEventRequest
+type InputSendToDeviceEventResponse struct{}
+
 // EDUServerInputAPI is used to write events to the typing server.
 type EDUServerInputAPI interface {
 	InputTypingEvent(
@@ -52,10 +72,19 @@ type EDUServerInputAPI interface {
 		request *InputTypingEventRequest,
 		response *InputTypingEventResponse,
 	) error
+
+	InputSendToDeviceEvent(
+		ctx context.Context,
+		request *InputSendToDeviceEventRequest,
+		response *InputSendToDeviceEventResponse,
+	) error
 }
 
 // EDUServerInputTypingEventPath is the HTTP path for the InputTypingEvent API.
 const EDUServerInputTypingEventPath = "/eduserver/input"
+
+// EDUServerInputSendToDeviceEventPath is the HTTP path for the InputSendToDeviceEvent API.
+const EDUServerInputSendToDeviceEventPath = "/eduserver/sendToDevice"
 
 // NewEDUServerInputAPIHTTP creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
 func NewEDUServerInputAPIHTTP(eduServerURL string, httpClient *http.Client) (EDUServerInputAPI, error) {
@@ -70,7 +99,7 @@ type httpEDUServerInputAPI struct {
 	httpClient   *http.Client
 }
 
-// InputRoomEvents implements EDUServerInputAPI
+// InputTypingEvent implements EDUServerInputAPI
 func (h *httpEDUServerInputAPI) InputTypingEvent(
 	ctx context.Context,
 	request *InputTypingEventRequest,
@@ -80,5 +109,18 @@ func (h *httpEDUServerInputAPI) InputTypingEvent(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputTypingEventPath
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// InputSendToDeviceEvent implements EDUServerInputAPI
+func (h *httpEDUServerInputAPI) InputSendToDeviceEvent(
+	ctx context.Context,
+	request *InputSendToDeviceEventRequest,
+	response *InputSendToDeviceEventResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputSendToDeviceEvent")
+	defer span.Finish()
+
+	apiURL := h.eduServerURL + EDUServerInputSendToDeviceEventPath
 	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

@@ -28,9 +28,10 @@ func SetupEDUServerComponent(
 	eduCache *cache.EDUCache,
 ) api.EDUServerInputAPI {
 	inputAPI := &input.EDUServerInputAPI{
-		Cache:                  eduCache,
-		Producer:               base.KafkaProducer,
-		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),
+		Cache:                        eduCache,
+		Producer:                     base.KafkaProducer,
+		OutputTypingEventTopic:       string(base.Cfg.Kafka.Topics.OutputTypingEvent),
+		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEventTopic),
 	}
 
 	inputAPI.SetupHTTP(base.InternalAPIMux)

@@ -33,6 +33,8 @@ type EDUServerInputAPI struct {
 	Cache *cache.EDUCache
 	// The kafka topic to output new typing events to.
 	OutputTypingEventTopic string
+	// The kafka topic to output new send to device events to.
+	OutputSendToDeviceEventTopic string
 	// kafka producer
 	Producer sarama.SyncProducer
 }
@@ -54,10 +56,20 @@ func (t *EDUServerInputAPI) InputTypingEvent(
 		t.Cache.RemoveUser(ite.UserID, ite.RoomID)
 	}
 
-	return t.sendEvent(ite)
+	return t.sendTypingEvent(ite)
 }
 
-func (t *EDUServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
+// InputTypingEvent implements api.EDUServerInputAPI
+func (t *EDUServerInputAPI) InputSendToDeviceEvent(
+	ctx context.Context,
+	request *api.InputSendToDeviceEventRequest,
+	response *api.InputSendToDeviceEventResponse,
+) error {
+	ise := &request.InputSendToDeviceEvent
+	return t.sendToDeviceEvent(ise)
+}
+
+func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 	ev := &api.TypingEvent{
 		Type:   gomatrixserverlib.MTyping,
 		RoomID: ite.RoomID,
@@ -90,6 +102,29 @@ func (t *EDUServerInputAPI) sendEvent(ite *api.InputTypingEvent) error {
 	return err
 }
 
+func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) error {
+	ote := &api.OutputSendToDeviceEvent{
+		UserID:    ise.UserID,
+		DeviceID:  ise.DeviceID,
+		EventType: ise.EventType,
+		Message:   ise.Message,
+	}
+
+	eventJSON, err := json.Marshal(ote)
+	if err != nil {
+		return err
+	}
+
+	m := &sarama.ProducerMessage{
+		Topic: string(t.OutputSendToDeviceEventTopic),
+		Key:   sarama.StringEncoder(ote.UserID),
+		Value: sarama.ByteEncoder(eventJSON),
+	}
+
+	_, _, err = t.Producer.SendMessage(m)
+	return err
+}
+
 // SetupHTTP adds the EDUServerInputAPI handlers to the http.ServeMux.
 func (t *EDUServerInputAPI) SetupHTTP(internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(api.EDUServerInputTypingEventPath,
@@ -100,6 +135,19 @@ func (t *EDUServerInputAPI) SetupHTTP(internalAPIMux *mux.Router) {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := t.InputTypingEvent(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(api.EDUServerInputSendToDeviceEventPath,
+		internal.MakeInternalAPI("inputSendToDeviceEvents", func(req *http.Request) util.JSONResponse {
+			var request api.InputSendToDeviceEventRequest
+			var response api.InputSendToDeviceEventResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := t.InputSendToDeviceEvent(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
