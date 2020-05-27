@@ -24,37 +24,34 @@ type Database struct {
 	StateBlockTable     tables.StateBlock
 	RoomAliasesTable    tables.RoomAliases
 	PrevEventsTable     tables.PreviousEvents
+	InvitesTable        tables.Invites
+	MembershipTable     tables.Membership
 }
 
-// EventTypeNIDs implements state.RoomStateDatabase
 func (d *Database) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
 	return d.EventTypesTable.BulkSelectEventTypeNID(ctx, eventTypes)
 }
 
-// EventStateKeys implements query.RoomserverQueryAPIDatabase
 func (d *Database) EventStateKeys(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
 	return d.EventStateKeysTable.BulkSelectEventStateKey(ctx, eventStateKeyNIDs)
 }
 
-// EventStateKeyNIDs implements state.RoomStateDatabase
 func (d *Database) EventStateKeyNIDs(
 	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
 	return d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, eventStateKeys)
 }
 
-// StateEntriesForEventIDs implements input.EventDatabase
 func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateEntry, error) {
 	return d.EventsTable.BulkSelectStateEventByID(ctx, eventIDs)
 }
 
-// StateEntriesForTuples implements state.RoomStateDatabase
 func (d *Database) StateEntriesForTuples(
 	ctx context.Context,
 	stateBlockNIDs []types.StateBlockNID,
@@ -65,7 +62,6 @@ func (d *Database) StateEntriesForTuples(
 	)
 }
 
-// AddState implements input.EventDatabase
 func (d *Database) AddState(
 	ctx context.Context,
 	roomNID types.RoomNID,
@@ -90,28 +86,24 @@ func (d *Database) AddState(
 	return
 }
 
-// EventNIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) EventNIDs(
 	ctx context.Context, eventIDs []string,
 ) (map[string]types.EventNID, error) {
 	return d.EventsTable.BulkSelectEventNID(ctx, eventIDs)
 }
 
-// SetState implements input.EventDatabase
 func (d *Database) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
 	return d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
 }
 
-// StateAtEventIDs implements input.EventDatabase
 func (d *Database) StateAtEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateAtEvent, error) {
 	return d.EventsTable.BulkSelectStateAtEventByID(ctx, eventIDs)
 }
 
-// SnapshotNIDFromEventID implements state.RoomStateDatabase
 func (d *Database) SnapshotNIDFromEventID(
 	ctx context.Context, eventID string,
 ) (types.StateSnapshotNID, error) {
@@ -119,14 +111,12 @@ func (d *Database) SnapshotNIDFromEventID(
 	return stateNID, err
 }
 
-// EventIDs implements input.RoomEventDatabase
 func (d *Database) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) (map[types.EventNID]string, error) {
 	return d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
 }
 
-// EventsFromIDs implements query.RoomserverQueryAPIEventDB
 func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
 	nidMap, err := d.EventNIDs(ctx, eventIDs)
 	if err != nil {
@@ -141,7 +131,6 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 	return d.Events(ctx, nids)
 }
 
-// RoomNID implements query.RoomserverQueryAPIDB
 func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, error) {
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
 	if err == sql.ErrNoRows {
@@ -150,7 +139,6 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 	return roomNID, err
 }
 
-// RoomNIDExcludingStubs implements query.RoomserverQueryAPIDB
 func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
 	roomNID, err = d.RoomNID(ctx, roomID)
 	if err != nil {
@@ -167,7 +155,6 @@ func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (ro
 	return
 }
 
-// LatestEventIDs implements query.RoomserverQueryAPIDatabase
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
 ) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
@@ -190,14 +177,12 @@ func (d *Database) LatestEventIDs(
 	return
 }
 
-// StateBlockNIDs implements state.RoomStateDatabase
 func (d *Database) StateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
 	return d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, stateNIDs)
 }
 
-// StateEntries implements state.RoomStateDatabase
 func (d *Database) StateEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
@@ -220,34 +205,70 @@ func (d *Database) GetRoomVersionForRoomNID(
 	)
 }
 
-// SetRoomAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
 	return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
 }
 
-// GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
 	return d.RoomAliasesTable.SelectRoomIDFromAlias(ctx, alias)
 }
 
-// GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
 func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
 	return d.RoomAliasesTable.SelectAliasesFromRoomID(ctx, roomID)
 }
 
-// GetCreatorIDForAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) GetCreatorIDForAlias(
 	ctx context.Context, alias string,
 ) (string, error) {
 	return d.RoomAliasesTable.SelectCreatorIDFromAlias(ctx, alias)
 }
 
-// RemoveRoomAlias implements alias.RoomserverAliasAPIDB
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
 }
 
-// Events implements input.EventDatabase
+func (d *Database) GetMembership(
+	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
+) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
+	requestSenderUserNID, err := d.assignStateKeyNID(ctx, nil, requestSenderUserID)
+	if err != nil {
+		return
+	}
+
+	senderMembershipEventNID, senderMembership, err :=
+		d.MembershipTable.SelectMembershipFromRoomAndTarget(
+			ctx, roomNID, requestSenderUserNID,
+		)
+	if err == sql.ErrNoRows {
+		// The user has never been a member of that room
+		return 0, false, nil
+	} else if err != nil {
+		return
+	}
+
+	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, nil
+}
+
+func (d *Database) GetMembershipEventNIDsForRoom(
+	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
+) ([]types.EventNID, error) {
+	if joinOnly {
+		return d.MembershipTable.SelectMembershipsFromRoomAndMembership(
+			ctx, roomNID, tables.MembershipStateJoin, localOnly,
+		)
+	}
+
+	return d.MembershipTable.SelectMembershipsFromRoom(ctx, roomNID, localOnly)
+}
+
+func (d *Database) GetInvitesForUser(
+	ctx context.Context,
+	roomNID types.RoomNID,
+	targetUserNID types.EventStateKeyNID,
+) (senderUserIDs []types.EventStateKeyNID, err error) {
+	return d.InvitesTable.SelectInviteActiveForUserInRoom(ctx, targetUserNID, roomNID)
+}
+
 func (d *Database) Events(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]types.Event, error) {
@@ -279,7 +300,6 @@ func (d *Database) Events(
 	return results, nil
 }
 
-// GetTransactionEventID implements input.EventDatabase
 func (d *Database) GetTransactionEventID(
 	ctx context.Context, transactionID string,
 	sessionID int64, userID string,
@@ -291,7 +311,6 @@ func (d *Database) GetTransactionEventID(
 	return eventID, err
 }
 
-// StoreEvent implements input.EventDatabase
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,

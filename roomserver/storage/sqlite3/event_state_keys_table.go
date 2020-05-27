@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -75,12 +76,12 @@ func NewSqliteEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyStmt, bulkSelectEventStateKeySQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *eventStateKeyStatements) InsertEventStateKeyNID(
@@ -89,7 +90,7 @@ func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	var eventStateKeyNID int64
 	var err error
 	var res sql.Result
-	insertStmt := txn.Stmt(s.insertEventStateKeyNIDStmt)
+	insertStmt := internal.TxStmt(txn, s.insertEventStateKeyNIDStmt)
 	if res, err = insertStmt.ExecContext(ctx, eventStateKey); err == nil {
 		eventStateKeyNID, err = res.LastInsertId()
 	}
@@ -100,7 +101,7 @@ func (s *eventStateKeyStatements) SelectEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := txn.Stmt(s.selectEventStateKeyNIDStmt)
+	stmt := internal.TxStmt(txn, s.selectEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }

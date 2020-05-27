@@ -22,6 +22,7 @@ import (
 	"errors"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -78,7 +79,7 @@ func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
 		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
@@ -86,7 +87,7 @@ func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *roomStatements) InsertRoomNID(

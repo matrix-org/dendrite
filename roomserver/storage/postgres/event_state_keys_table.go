@@ -21,6 +21,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -81,12 +82,12 @@ func NewPostgresEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyStmt, bulkSelectEventStateKeySQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *eventStateKeyStatements) InsertEventStateKeyNID(

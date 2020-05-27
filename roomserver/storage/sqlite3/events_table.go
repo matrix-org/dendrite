@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -120,7 +121,7 @@ func NewSqliteEventsTable(db *sql.DB) (tables.Events, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
@@ -134,7 +135,7 @@ func NewSqliteEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *eventStatements) InsertEvent(

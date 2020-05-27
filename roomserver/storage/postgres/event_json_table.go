@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -65,10 +66,10 @@ func NewPostgresEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertEventJSONStmt, insertEventJSONSQL},
 		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *eventJSONStatements) InsertEventJSON(

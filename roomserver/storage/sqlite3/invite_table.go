@@ -20,6 +20,8 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -66,21 +68,22 @@ type inviteStatements struct {
 	selectInvitesAboutToRetireStmt      *sql.Stmt
 }
 
-func (s *inviteStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(inviteSchema)
+func NewSqliteInvitesTable(db *sql.DB) (tables.Invites, error) {
+	s := &inviteStatements{}
+	_, err := db.Exec(inviteSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
 		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
 		{&s.selectInvitesAboutToRetireStmt, selectInvitesAboutToRetireSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *inviteStatements) insertInviteEvent(
+func (s *inviteStatements) InsertInviteEvent(
 	ctx context.Context,
 	txn *sql.Tx, inviteEventID string, roomNID types.RoomNID,
 	targetUserNID, senderUserNID types.EventStateKeyNID,
@@ -101,7 +104,7 @@ func (s *inviteStatements) insertInviteEvent(
 	return count != 0, nil
 }
 
-func (s *inviteStatements) updateInviteRetired(
+func (s *inviteStatements) UpdateInviteRetired(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventIDs []string, err error) {
@@ -127,7 +130,7 @@ func (s *inviteStatements) updateInviteRetired(
 }
 
 // selectInviteActiveForUserInRoom returns a list of sender state key NIDs
-func (s *inviteStatements) selectInviteActiveForUserInRoom(
+func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 	ctx context.Context,
 	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
 ) ([]types.EventStateKeyNID, error) {

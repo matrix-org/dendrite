@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -106,11 +107,11 @@ func NewPostgresEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
 		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *eventTypeStatements) InsertEventTypeNID(

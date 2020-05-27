@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
@@ -95,12 +96,12 @@ func NewPostgresStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertStateDataStmt, insertStateDataSQL},
 		{&s.selectNextStateBlockNIDStmt, selectNextStateBlockNIDSQL},
 		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
 		{&s.bulkSelectFilteredStateBlockEntriesStmt, bulkSelectFilteredStateBlockEntriesSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *stateBlockStatements) BulkInsertStateData(

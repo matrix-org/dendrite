@@ -34,7 +34,6 @@ import (
 // A Database is used to store room events and stream offsets.
 type Database struct {
 	shared.Database
-	statements     statements
 	events         tables.Events
 	eventJSON      tables.EventJSON
 	eventTypes     tables.EventTypes
@@ -42,6 +41,8 @@ type Database struct {
 	rooms          tables.Rooms
 	transactions   tables.Transactions
 	prevEvents     tables.PreviousEvents
+	invites        tables.Invites
+	membership     tables.Membership
 	db             *sql.DB
 }
 
@@ -72,9 +73,7 @@ func Open(dataSourceName string) (*Database, error) {
 	// acquire the global mutex and never unlock it because it is waiting for a connection
 	// which it will never obtain.
 	d.db.SetMaxOpenConns(20)
-	if err = d.statements.prepare(d.db); err != nil {
-		return nil, err
-	}
+
 	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db)
 	if err != nil {
 		return nil, err
@@ -115,6 +114,14 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.invites, err = NewSqliteInvitesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	d.membership, err = NewSqliteMembershipTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventsTable:         d.events,
@@ -127,6 +134,8 @@ func Open(dataSourceName string) (*Database, error) {
 		StateSnapshotTable:  stateSnapshot,
 		PrevEventsTable:     d.prevEvents,
 		RoomAliasesTable:    roomAliases,
+		InvitesTable:        d.invites,
+		MembershipTable:     d.membership,
 	}
 	return &d, nil
 }
@@ -305,15 +314,6 @@ func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventSta
 	return
 }
 
-// GetInvitesForUser implements query.RoomserverQueryAPIDatabase
-func (d *Database) GetInvitesForUser(
-	ctx context.Context,
-	roomNID types.RoomNID,
-	targetUserNID types.EventStateKeyNID,
-) (senderUserIDs []types.EventStateKeyNID, err error) {
-	return d.statements.selectInviteActiveForUserInRoom(ctx, targetUserNID, roomNID)
-}
-
 // MembershipUpdater implements input.RoomEventDatabase
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
@@ -367,7 +367,7 @@ type membershipUpdater struct {
 	d             *Database
 	roomNID       types.RoomNID
 	targetUserNID types.EventStateKeyNID
-	membership    membershipState
+	membership    tables.MembershipState
 }
 
 func (d *Database) membershipUpdaterTxn(
@@ -378,11 +378,11 @@ func (d *Database) membershipUpdaterTxn(
 	targetLocal bool,
 ) (types.MembershipUpdater, error) {
 
-	if err := d.statements.insertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
+	if err := d.membership.InsertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
 		return nil, err
 	}
 
-	membership, err := d.statements.selectMembershipForUpdate(ctx, txn, roomNID, targetUserNID)
+	membership, err := d.membership.SelectMembershipForUpdate(ctx, txn, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
@@ -395,17 +395,17 @@ func (d *Database) membershipUpdaterTxn(
 
 // IsInvite implements types.MembershipUpdater
 func (u *membershipUpdater) IsInvite() bool {
-	return u.membership == membershipStateInvite
+	return u.membership == tables.MembershipStateInvite
 }
 
 // IsJoin implements types.MembershipUpdater
 func (u *membershipUpdater) IsJoin() bool {
-	return u.membership == membershipStateJoin
+	return u.membership == tables.MembershipStateJoin
 }
 
 // IsLeave implements types.MembershipUpdater
 func (u *membershipUpdater) IsLeave() bool {
-	return u.membership == membershipStateLeaveOrBan
+	return u.membership == tables.MembershipStateLeaveOrBan
 }
 
 // SetToInvite implements types.MembershipUpdater
@@ -415,15 +415,15 @@ func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (inserted
 		if err != nil {
 			return err
 		}
-		inserted, err = u.d.statements.insertInviteEvent(
+		inserted, err = u.d.invites.InsertInviteEvent(
 			u.ctx, txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
 		)
 		if err != nil {
 			return err
 		}
-		if u.membership != membershipStateInvite {
-			if err = u.d.statements.updateMembership(
-				u.ctx, txn, u.roomNID, u.targetUserNID, senderUserNID, membershipStateInvite, 0,
+		if u.membership != tables.MembershipStateInvite {
+			if err = u.d.membership.UpdateMembership(
+				u.ctx, txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateInvite, 0,
 			); err != nil {
 				return err
 			}
@@ -443,7 +443,7 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 
 		// If this is a join event update, there is no invite to update
 		if !isUpdate {
-			inviteEventIDs, err = u.d.statements.updateInviteRetired(
+			inviteEventIDs, err = u.d.invites.UpdateInviteRetired(
 				u.ctx, txn, u.roomNID, u.targetUserNID,
 			)
 			if err != nil {
@@ -457,10 +457,10 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 			return err
 		}
 
-		if u.membership != membershipStateJoin || isUpdate {
-			if err = u.d.statements.updateMembership(
+		if u.membership != tables.MembershipStateJoin || isUpdate {
+			if err = u.d.membership.UpdateMembership(
 				u.ctx, txn, u.roomNID, u.targetUserNID, senderUserNID,
-				membershipStateJoin, nIDs[eventID],
+				tables.MembershipStateJoin, nIDs[eventID],
 			); err != nil {
 				return err
 			}
@@ -478,7 +478,7 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) (inv
 		if err != nil {
 			return err
 		}
-		inviteEventIDs, err = u.d.statements.updateInviteRetired(
+		inviteEventIDs, err = u.d.invites.UpdateInviteRetired(
 			u.ctx, txn, u.roomNID, u.targetUserNID,
 		)
 		if err != nil {
@@ -491,60 +491,14 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) (inv
 			return err
 		}
 
-		if u.membership != membershipStateLeaveOrBan {
-			if err = u.d.statements.updateMembership(
+		if u.membership != tables.MembershipStateLeaveOrBan {
+			if err = u.d.membership.UpdateMembership(
 				u.ctx, txn, u.roomNID, u.targetUserNID, senderUserNID,
-				membershipStateLeaveOrBan, nIDs[eventID],
+				tables.MembershipStateLeaveOrBan, nIDs[eventID],
 			); err != nil {
 				return err
 			}
 		}
-		return nil
-	})
-	return
-}
-
-// GetMembership implements query.RoomserverQueryAPIDB
-func (d *Database) GetMembership(
-	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
-) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		requestSenderUserNID, err := d.assignStateKeyNID(ctx, txn, requestSenderUserID)
-		if err != nil {
-			return err
-		}
-
-		membershipEventNID, _, err =
-			d.statements.selectMembershipFromRoomAndTarget(
-				ctx, txn, roomNID, requestSenderUserNID,
-			)
-		if err == sql.ErrNoRows {
-			// The user has never been a member of that room
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		stillInRoom = true
-		return nil
-	})
-
-	return
-}
-
-// GetMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
-func (d *Database) GetMembershipEventNIDsForRoom(
-	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
-) (eventNIDs []types.EventNID, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if joinOnly {
-			eventNIDs, err = d.statements.selectMembershipsFromRoomAndMembership(
-				ctx, txn, roomNID, membershipStateJoin, localOnly,
-			)
-			return nil
-		}
-
-		eventNIDs, err = d.statements.selectMembershipsFromRoom(ctx, txn, roomNID, localOnly)
 		return nil
 	})
 	return

@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -66,13 +67,13 @@ func NewPostgresRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
 		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},
 		{&s.selectAliasesFromRoomIDStmt, selectAliasesFromRoomIDSQL},
 		{&s.selectCreatorIDFromAliasStmt, selectCreatorIDFromAliasSQL},
 		{&s.deleteRoomAliasStmt, deleteRoomAliasSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *roomAliasesStatements) InsertRoomAlias(
