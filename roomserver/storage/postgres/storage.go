@@ -431,42 +431,6 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 	return inviteEventIDs, nil
 }
 
-// GetMembership implements query.RoomserverQueryAPIDB
-func (d *Database) GetMembership(
-	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
-) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
-	requestSenderUserNID, err := d.assignStateKeyNID(ctx, nil, requestSenderUserID)
-	if err != nil {
-		return
-	}
-
-	senderMembershipEventNID, senderMembership, err :=
-		d.membership.SelectMembershipFromRoomAndTarget(
-			ctx, roomNID, requestSenderUserNID,
-		)
-	if err == sql.ErrNoRows {
-		// The user has never been a member of that room
-		return 0, false, nil
-	} else if err != nil {
-		return
-	}
-
-	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, nil
-}
-
-// GetMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
-func (d *Database) GetMembershipEventNIDsForRoom(
-	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
-) ([]types.EventNID, error) {
-	if joinOnly {
-		return d.membership.SelectMembershipsFromRoomAndMembership(
-			ctx, roomNID, tables.MembershipStateJoin, localOnly,
-		)
-	}
-
-	return d.membership.SelectMembershipsFromRoom(ctx, roomNID, localOnly)
-}
-
 type transaction struct {
 	ctx context.Context
 	txn *sql.Tx

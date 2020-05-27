@@ -22,6 +22,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -144,7 +145,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
@@ -159,7 +160,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 		{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *eventStatements) InsertEvent(

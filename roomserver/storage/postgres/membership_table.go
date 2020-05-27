@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -115,7 +116,7 @@ func NewPostgresMembershipTable(db *sql.DB) (tables.Membership, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertMembershipStmt, insertMembershipSQL},
 		{&s.selectMembershipForUpdateStmt, selectMembershipForUpdateSQL},
 		{&s.selectMembershipFromRoomAndTargetStmt, selectMembershipFromRoomAndTargetSQL},
@@ -124,7 +125,7 @@ func NewPostgresMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectMembershipsFromRoomStmt, selectMembershipsFromRoomSQL},
 		{&s.selectLocalMembershipsFromRoomStmt, selectLocalMembershipsFromRoomSQL},
 		{&s.updateMembershipStmt, updateMembershipSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *membershipStatements) InsertMembership(

@@ -249,6 +249,42 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
 }
 
+// GetMembership implements query.RoomserverQueryAPIDB
+func (d *Database) GetMembership(
+	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
+) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
+	requestSenderUserNID, err := d.assignStateKeyNID(ctx, nil, requestSenderUserID)
+	if err != nil {
+		return
+	}
+
+	senderMembershipEventNID, senderMembership, err :=
+		d.MembershipTable.SelectMembershipFromRoomAndTarget(
+			ctx, roomNID, requestSenderUserNID,
+		)
+	if err == sql.ErrNoRows {
+		// The user has never been a member of that room
+		return 0, false, nil
+	} else if err != nil {
+		return
+	}
+
+	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, nil
+}
+
+// GetMembershipEventNIDsForRoom implements query.RoomserverQueryAPIDB
+func (d *Database) GetMembershipEventNIDsForRoom(
+	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
+) ([]types.EventNID, error) {
+	if joinOnly {
+		return d.MembershipTable.SelectMembershipsFromRoomAndMembership(
+			ctx, roomNID, tables.MembershipStateJoin, localOnly,
+		)
+	}
+
+	return d.MembershipTable.SelectMembershipsFromRoom(ctx, roomNID, localOnly)
+}
+
 // GetInvitesForUser implements query.RoomserverQueryAPIDatabase
 func (d *Database) GetInvitesForUser(
 	ctx context.Context,

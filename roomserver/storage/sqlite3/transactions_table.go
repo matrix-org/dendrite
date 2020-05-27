@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -54,10 +55,10 @@ func NewSqliteTransactionsTable(db *sql.DB) (tables.Transactions, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertTransactionStmt, insertTransactionSQL},
 		{&s.selectTransactionEventIDStmt, selectTransactionEventIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *transactionStatements) InsertTransaction(

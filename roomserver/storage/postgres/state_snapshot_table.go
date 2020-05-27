@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -72,10 +73,10 @@ func NewPostgresStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertStateStmt, insertStateSQL},
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *stateSnapshotStatements) InsertState(

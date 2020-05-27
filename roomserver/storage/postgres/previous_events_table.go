@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -71,10 +72,10 @@ func NewPostgresPreviousEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
 		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *previousEventStatements) InsertPreviousEvent(

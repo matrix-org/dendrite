@@ -13,22 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sqlite3
+package shared
 
 import (
 	"database/sql"
 )
 
-// a statementList is a list of SQL statements to prepare and a pointer to where to store the resulting prepared statement.
-type statementList []struct {
-	statement **sql.Stmt
-	sql       string
+// StatementList is a list of SQL statements to prepare and a pointer to where to store the resulting prepared statement.
+type StatementList []struct {
+	Statement **sql.Stmt
+	SQL       string
 }
 
-// prepare the SQL for each statement in the list and assign the result to the prepared statement.
-func (s statementList) prepare(db *sql.DB) (err error) {
+// Prepare the SQL for each statement in the list and assign the result to the prepared statement.
+func (s StatementList) Prepare(db *sql.DB) (err error) {
 	for _, statement := range s {
-		if *statement.statement, err = db.Prepare(statement.sql); err != nil {
+		if *statement.Statement, err = db.Prepare(statement.SQL); err != nil {
 			return
 		}
 	}

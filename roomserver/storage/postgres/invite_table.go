@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -87,11 +88,11 @@ func NewPostgresInvitesTable(db *sql.DB) (tables.Invites, error) {
 		return nil, err
 	}
 
-	return s, statementList{
+	return s, shared.StatementList{
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
 		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
 func (s *inviteStatements) InsertInviteEvent(
