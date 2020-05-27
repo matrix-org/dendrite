@@ -43,17 +43,16 @@ func NewMembershipUpdater(
 		return nil, err
 	}
 
-	if !useTxns {
-		txn.Commit() // nolint: errcheck
-		txn = nil
-	}
-
 	updater, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
 	if err != nil {
 		return nil, err
 	}
 
 	succeeded = true
+	if !useTxns {
+		txn.Commit() // nolint: errcheck
+		updater.transaction.txn = nil
+	}
 	return updater, nil
 }
 
@@ -63,7 +62,7 @@ func (d *Database) membershipUpdaterTxn(
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
 	targetLocal bool,
-) (types.MembershipUpdater, error) {
+) (*membershipUpdater, error) {
 
 	if err := d.MembershipTable.InsertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
 		return nil, err
