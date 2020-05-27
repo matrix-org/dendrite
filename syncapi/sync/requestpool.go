@@ -47,7 +47,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	var syncData *types.Response
 
 	// Extract values from request
-	userID := device.UserID
 	syncReq, err := newSyncRequest(req, *device)
 	if err != nil {
 		return util.JSONResponse{
@@ -56,10 +55,11 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		}
 	}
 	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
-		"userID":  userID,
-		"since":   syncReq.since,
-		"timeout": syncReq.timeout,
-		"limit":   syncReq.limit,
+		"userID":   device.UserID,
+		"deviceID": device.ID,
+		"since":    syncReq.since,
+		"timeout":  syncReq.timeout,
+		"limit":    syncReq.limit,
 	})
 
 	currPos := rp.notifier.CurrentPosition()
@@ -136,7 +136,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
 	// TODO: handle ignored users
 	if req.since == nil {
-		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
+		res, err = rp.db.CompleteSync(req.ctx, req.device, req.limit)
 	} else {
 		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit, req.wantFullState)
 	}
