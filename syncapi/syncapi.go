@@ -81,7 +81,7 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
-	sendToDeviceConsumer := consumers.NewOutputClientDataConsumer(
+	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
 		base.Cfg, base.KafkaConsumer, notifier, syncDB,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
