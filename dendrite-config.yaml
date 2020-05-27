@@ -104,7 +104,8 @@ kafka:
     topics:
         output_room_event: roomserverOutput
         output_client_data: clientapiOutput
-        output_typing_event: eduServerOutput
+		output_typing_event: eduServerTypingOutput
+		output_send_to_device_event: eduServerSendToDeviceOutput
         user_updates: userUpdates
 
 # The postgres connection configs for connecting to the databases e.g a postgres:// URI
