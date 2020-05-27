@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -14,6 +15,39 @@ type roomRecentEventsUpdater struct {
 	latestEvents            []types.StateAtEventAndReference
 	lastEventIDSent         string
 	currentStateSnapshotNID types.StateSnapshotNID
+}
+
+func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.RoomNID, useTxns bool) (types.RoomRecentEventsUpdater, error) {
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
+		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
+	if err != nil {
+		txn.Rollback() // nolint: errcheck
+		return nil, err
+	}
+	stateAndRefs, err := d.EventsTable.BulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
+	if err != nil {
+		txn.Rollback() // nolint: errcheck
+		return nil, err
+	}
+	var lastEventIDSent string
+	if lastEventNIDSent != 0 {
+		lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, txn, lastEventNIDSent)
+		if err != nil {
+			txn.Rollback() // nolint: errcheck
+			return nil, err
+		}
+	}
+	if !useTxns {
+		txn.Commit() // nolint: errcheck
+		txn = nil
+	}
+	return &roomRecentEventsUpdater{
+		transaction{ctx, txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
+	}, nil
 }
 
 // RoomVersion implements types.RoomRecentEventsUpdater
