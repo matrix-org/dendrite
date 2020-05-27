@@ -160,14 +160,23 @@ func TestCorrectStreamWakeup(t *testing.T) {
 	streamone := lockedFetchUserStream(n, alice, "one")
 	streamtwo := lockedFetchUserStream(n, alice, "two")
 
-	go waitForBlocking(streamone, 1)
-	go waitForBlocking(streamtwo, 1)
+	wait := func(stream *UserDeviceStream) {
+		select {
+		case <-time.After(time.Second * 10):
+			return
+		default:
+			waitForBlocking(stream, 1)
+		}
+	}
+
+	go wait(streamone)
+	go wait(streamtwo)
 
 	go func() {
 		select {
-		case <-n.userDeviceStreams[alice]["one"].signalChannel:
+		case <-streamone.signalChannel:
 			awoken <- "one"
-		case <-n.userDeviceStreams[alice]["two"].signalChannel:
+		case <-streamtwo.signalChannel:
 			awoken <- "two"
 		}
 	}()
@@ -180,9 +189,6 @@ func TestCorrectStreamWakeup(t *testing.T) {
 	if result := <-awoken; result != wake {
 		t.Fatalf("expected to wake %q, got %q", wake, result)
 	}
-
-	close(n.userDeviceStreams[alice]["one"].signalChannel)
-	close(n.userDeviceStreams[alice]["two"].signalChannel)
 }
 
 // Test that an invite unblocks the request
