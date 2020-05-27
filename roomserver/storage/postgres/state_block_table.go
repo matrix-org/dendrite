@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 )
@@ -87,13 +88,14 @@ type stateBlockStatements struct {
 	bulkSelectFilteredStateBlockEntriesStmt *sql.Stmt
 }
 
-func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(stateDataSchema)
+func NewPostgresStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+	s := &stateBlockStatements{}
+	_, err := db.Exec(stateDataSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, statementList{
 		{&s.insertStateDataStmt, insertStateDataSQL},
 		{&s.selectNextStateBlockNIDStmt, selectNextStateBlockNIDSQL},
 		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
@@ -101,11 +103,15 @@ func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
 	}.prepare(db)
 }
 
-func (s *stateBlockStatements) bulkInsertStateData(
+func (s *stateBlockStatements) BulkInsertStateData(
 	ctx context.Context,
-	stateBlockNID types.StateBlockNID,
+	txn *sql.Tx,
 	entries []types.StateEntry,
-) error {
+) (types.StateBlockNID, error) {
+	stateBlockNID, err := s.selectNextStateBlockNID(ctx)
+	if err != nil {
+		return 0, err
+	}
 	for _, entry := range entries {
 		_, err := s.insertStateDataStmt.ExecContext(
 			ctx,
@@ -115,10 +121,10 @@ func (s *stateBlockStatements) bulkInsertStateData(
 			int64(entry.EventNID),
 		)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
-	return nil
+	return stateBlockNID, nil
 }
 
 func (s *stateBlockStatements) selectNextStateBlockNID(
@@ -129,7 +135,7 @@ func (s *stateBlockStatements) selectNextStateBlockNID(
 	return types.StateBlockNID(stateBlockNID), err
 }
 
-func (s *stateBlockStatements) bulkSelectStateBlockEntries(
+func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
 	nids := make([]int64, len(stateBlockNIDs))
@@ -180,7 +186,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	return results, err
 }
 
-func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
+func (s *stateBlockStatements) BulkSelectFilteredStateBlockEntries(
 	ctx context.Context,
 	stateBlockNIDs []types.StateBlockNID,
 	stateKeyTuples []types.StateKeyTuple,

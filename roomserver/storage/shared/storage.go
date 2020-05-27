@@ -20,6 +20,10 @@ type Database struct {
 	EventStateKeysTable tables.EventStateKeys
 	RoomsTable          tables.Rooms
 	TransactionsTable   tables.Transactions
+	StateSnapshotTable  tables.StateSnapshot
+	StateBlockTable     tables.StateBlock
+	RoomAliasesTable    tables.RoomAliases
+	PrevEventsTable     tables.PreviousEvents
 }
 
 // EventTypeNIDs implements state.RoomStateDatabase
@@ -48,6 +52,42 @@ func (d *Database) StateEntriesForEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateEntry, error) {
 	return d.EventsTable.BulkSelectStateEventByID(ctx, eventIDs)
+}
+
+// StateEntriesForTuples implements state.RoomStateDatabase
+func (d *Database) StateEntriesForTuples(
+	ctx context.Context,
+	stateBlockNIDs []types.StateBlockNID,
+	stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntryList, error) {
+	return d.StateBlockTable.BulkSelectFilteredStateBlockEntries(
+		ctx, stateBlockNIDs, stateKeyTuples,
+	)
+}
+
+// AddState implements input.EventDatabase
+func (d *Database) AddState(
+	ctx context.Context,
+	roomNID types.RoomNID,
+	stateBlockNIDs []types.StateBlockNID,
+	state []types.StateEntry,
+) (stateNID types.StateSnapshotNID, err error) {
+	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		if len(state) > 0 {
+			var stateBlockNID types.StateBlockNID
+			stateBlockNID, err = d.StateBlockTable.BulkInsertStateData(ctx, txn, state)
+			if err != nil {
+				return err
+			}
+			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
+		}
+		stateNID, err = d.StateSnapshotTable.InsertState(ctx, txn, roomNID, stateBlockNIDs)
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	return
 }
 
 // EventNIDs implements query.RoomserverQueryAPIDatabase
@@ -150,6 +190,20 @@ func (d *Database) LatestEventIDs(
 	return
 }
 
+// StateBlockNIDs implements state.RoomStateDatabase
+func (d *Database) StateBlockNIDs(
+	ctx context.Context, stateNIDs []types.StateSnapshotNID,
+) ([]types.StateBlockNIDList, error) {
+	return d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, stateNIDs)
+}
+
+// StateEntries implements state.RoomStateDatabase
+func (d *Database) StateEntries(
+	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
+) ([]types.StateEntryList, error) {
+	return d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs)
+}
+
 func (d *Database) GetRoomVersionForRoom(
 	ctx context.Context, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
@@ -164,6 +218,33 @@ func (d *Database) GetRoomVersionForRoomNID(
 	return d.RoomsTable.SelectRoomVersionForRoomNID(
 		ctx, roomNID,
 	)
+}
+
+// SetRoomAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
+	return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
+}
+
+// GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
+	return d.RoomAliasesTable.SelectRoomIDFromAlias(ctx, alias)
+}
+
+// GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
+func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
+	return d.RoomAliasesTable.SelectAliasesFromRoomID(ctx, roomID)
+}
+
+// GetCreatorIDForAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) GetCreatorIDForAlias(
+	ctx context.Context, alias string,
+) (string, error) {
+	return d.RoomAliasesTable.SelectCreatorIDFromAlias(ctx, alias)
+}
+
+// RemoveRoomAlias implements alias.RoomserverAliasAPIDB
+func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
+	return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
 }
 
 // Events implements input.EventDatabase

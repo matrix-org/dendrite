@@ -40,10 +40,12 @@ type Database struct {
 	eventJSON      tables.EventJSON
 	rooms          tables.Rooms
 	transactions   tables.Transactions
+	prevEvents     tables.PreviousEvents
 	db             *sql.DB
 }
 
 // Open a postgres database.
+// nolint: gocyclo
 func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database, error) {
 	var d Database
 	var err error
@@ -77,6 +79,22 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 	if err != nil {
 		return nil, err
 	}
+	stateBlock, err := NewPostgresStateBlockTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	stateSnapshot, err := NewPostgresStateSnapshotTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	roomAliases, err := NewPostgresRoomAliasesTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	d.prevEvents, err = NewPostgresPreviousEventsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		EventTypesTable:     d.eventTypes,
@@ -85,6 +103,10 @@ func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database,
 		EventsTable:         d.events,
 		RoomsTable:          d.rooms,
 		TransactionsTable:   d.transactions,
+		StateBlockTable:     stateBlock,
+		StateSnapshotTable:  stateSnapshot,
+		PrevEventsTable:     d.prevEvents,
+		RoomAliasesTable:    roomAliases,
 	}
 	return &d, nil
 }
@@ -120,41 +142,6 @@ func (d *Database) assignStateKeyNID(
 		}
 	}
 	return eventStateKeyNID, err
-}
-
-// AddState implements input.EventDatabase
-func (d *Database) AddState(
-	ctx context.Context,
-	roomNID types.RoomNID,
-	stateBlockNIDs []types.StateBlockNID,
-	state []types.StateEntry,
-) (types.StateSnapshotNID, error) {
-	if len(state) > 0 {
-		stateBlockNID, err := d.statements.selectNextStateBlockNID(ctx)
-		if err != nil {
-			return 0, err
-		}
-		if err = d.statements.bulkInsertStateData(ctx, stateBlockNID, state); err != nil {
-			return 0, err
-		}
-		stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
-	}
-
-	return d.statements.insertState(ctx, roomNID, stateBlockNIDs)
-}
-
-// StateBlockNIDs implements state.RoomStateDatabase
-func (d *Database) StateBlockNIDs(
-	ctx context.Context, stateNIDs []types.StateSnapshotNID,
-) ([]types.StateBlockNIDList, error) {
-	return d.statements.bulkSelectStateBlockNIDs(ctx, stateNIDs)
-}
-
-// StateEntries implements state.RoomStateDatabase
-func (d *Database) StateEntries(
-	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
-) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectStateBlockEntries(ctx, stateBlockNIDs)
 }
 
 // GetLatestEventsForUpdate implements input.EventDatabase
@@ -222,7 +209,7 @@ func (u *roomRecentEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotN
 // StorePreviousEvents implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
 	for _, ref := range previousEventReferences {
-		if err := u.d.statements.insertPreviousEvent(u.ctx, u.txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+		if err := u.d.prevEvents.InsertPreviousEvent(u.ctx, u.txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
 			return err
 		}
 	}
@@ -231,7 +218,7 @@ func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, p
 
 // IsReferenced implements types.RoomRecentEventsUpdater
 func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
-	err := u.d.statements.selectPreviousEventExists(u.ctx, u.txn, eventReference.EventID, eventReference.EventSHA256)
+	err := u.d.prevEvents.SelectPreviousEventExists(u.ctx, u.txn, eventReference.EventID, eventReference.EventSHA256)
 	if err == nil {
 		return true, nil
 	}
@@ -274,44 +261,6 @@ func (d *Database) GetInvitesForUser(
 	targetUserNID types.EventStateKeyNID,
 ) (senderUserIDs []types.EventStateKeyNID, err error) {
 	return d.statements.selectInviteActiveForUserInRoom(ctx, targetUserNID, roomNID)
-}
-
-// SetRoomAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
-	return d.statements.insertRoomAlias(ctx, alias, roomID, creatorUserID)
-}
-
-// GetRoomIDForAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
-	return d.statements.selectRoomIDFromAlias(ctx, alias)
-}
-
-// GetAliasesForRoomID implements alias.RoomserverAliasAPIDB
-func (d *Database) GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error) {
-	return d.statements.selectAliasesFromRoomID(ctx, roomID)
-}
-
-// GetCreatorIDForAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) GetCreatorIDForAlias(
-	ctx context.Context, alias string,
-) (string, error) {
-	return d.statements.selectCreatorIDFromAlias(ctx, alias)
-}
-
-// RemoveRoomAlias implements alias.RoomserverAliasAPIDB
-func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
-	return d.statements.deleteRoomAlias(ctx, alias)
-}
-
-// StateEntriesForTuples implements state.RoomStateDatabase
-func (d *Database) StateEntriesForTuples(
-	ctx context.Context,
-	stateBlockNIDs []types.StateBlockNID,
-	stateKeyTuples []types.StateKeyTuple,
-) ([]types.StateEntryList, error) {
-	return d.statements.bulkSelectFilteredStateBlockEntries(
-		ctx, stateBlockNIDs, stateKeyTuples,
-	)
 }
 
 // MembershipUpdater implements input.RoomEventDatabase
