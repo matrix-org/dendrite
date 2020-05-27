@@ -60,6 +60,7 @@ func main() {
 		cfg.Listen.EDUServer = addr
 		cfg.Listen.AppServiceAPI = addr
 		cfg.Listen.FederationSender = addr
+		cfg.Listen.ServerKeyAPI = addr
 	}
 
 	base := basecomponent.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
