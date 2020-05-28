@@ -247,7 +247,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		err = fmt.Errorf("token %s is not a streaming token", tok)
 		return
 	}
-	if len(t.Positions) != 3 {
+	if len(t.Positions) != 2 {
 		err = fmt.Errorf("token %s wrong number of values, got %d want 2", tok, len(t.Positions))
 		return
 	}
@@ -318,6 +318,7 @@ func NewResponse(token StreamingToken) *Response {
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
 	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.ToDevice.Events = make([]gomatrixserverlib.SendToDeviceEvent, 0)
 
 	return &res
 }
@@ -329,7 +330,8 @@ func (r *Response) IsEmpty() bool {
 		len(r.Rooms.Invite) == 0 &&
 		len(r.Rooms.Leave) == 0 &&
 		len(r.AccountData.Events) == 0 &&
-		len(r.Presence.Events) == 0
+		len(r.Presence.Events) == 0 &&
+		len(r.ToDevice.Events) == 0
 }
 
 // JoinResponse represents a /sync response for a room which is under the 'join' key.

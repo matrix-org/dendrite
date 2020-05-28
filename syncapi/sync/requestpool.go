@@ -257,7 +257,6 @@ func (rp *RequestPool) appendSendToDeviceMessages(
 	for _, event := range events {
 		data.ToDevice.Events = append(data.ToDevice.Events, event.SendToDeviceEvent)
 	}
-
 	return data, nil
 }
 
