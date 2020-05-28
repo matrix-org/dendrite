@@ -15,6 +15,7 @@
 package consumers
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
@@ -23,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -77,6 +79,18 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		"device_id":  output.DeviceID,
 		"event_type": output.EventType,
 	}).Debug("received send-to-device event from EDU server")
+
+	newPos, err := s.db.StoreNewSendForDeviceMessage(context.TODO(), output.SendToDeviceEvent)
+	if err != nil {
+		log.WithError(err).Errorf("failed to store send-to-device message")
+		return err
+	}
+
+	s.notifier.OnNewSendToDevice(
+		output.UserID,
+		[]string{output.DeviceID}, // TODO: support wildcard here as per spec
+		types.NewStreamToken(0, newPos),
+	)
 
 	return nil
 }

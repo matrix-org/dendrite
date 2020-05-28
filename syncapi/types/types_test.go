@@ -4,9 +4,9 @@ import "testing"
 
 func TestNewSyncTokenFromString(t *testing.T) {
 	shouldPass := map[string]syncToken{
-		"s4_0": NewStreamToken(4, 0).syncToken,
-		"s3_1": NewStreamToken(3, 1).syncToken,
-		"t3_1": NewTopologyToken(3, 1).syncToken,
+		"s4_0_0": NewStreamToken(4, 0).syncToken,
+		"s3_1_0": NewStreamToken(3, 1).syncToken,
+		"t3_1":   NewTopologyToken(3, 1).syncToken,
 	}
 
 	shouldFail := []string{

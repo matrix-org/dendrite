@@ -108,4 +108,6 @@ type Database interface {
 	// updates and deletions for previous events. The sync token should be supplied to this function so
 	// that we can clean up old events properly.
 	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, token types.StreamingToken) ([]types.SendToDeviceEvent, error)
+	// StoreNewSendForDeviceMessage stores a new send-to-device event for a user's device.
+	StoreNewSendForDeviceMessage(ctx context.Context, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
 }

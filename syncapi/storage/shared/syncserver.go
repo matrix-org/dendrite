@@ -1038,6 +1038,18 @@ func (d *Database) AddSendToDeviceEvent(
 	)
 }
 
+func (d *Database) StoreNewSendForDeviceMessage(
+	ctx context.Context, event gomatrixserverlib.SendToDeviceEvent,
+) (types.StreamPosition, error) {
+	err := d.AddSendToDeviceEvent(
+		ctx, nil, event.UserID, event.DeviceID, event.EventType, string(event.Message),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return types.StreamPosition(d.EDUCache.AddSendToDeviceMessage()), nil
+}
+
 func (d *Database) SendToDeviceUpdatesForSync(
 	ctx context.Context,
 	userID, deviceID string,

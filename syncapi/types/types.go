@@ -247,7 +247,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		err = fmt.Errorf("token %s is not a streaming token", tok)
 		return
 	}
-	if len(t.Positions) != 2 {
+	if len(t.Positions) != 3 {
 		err = fmt.Errorf("token %s wrong number of values, got %d want 2", tok, len(t.Positions))
 		return
 	}
