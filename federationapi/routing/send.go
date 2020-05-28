@@ -279,6 +279,7 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 			}
 			for userID, byUser := range directPayload.Messages {
 				for deviceID, message := range byUser {
+					// TODO: check that the user and the device actually exist here
 					if err := t.eduProducer.SendToDevice(t.context, userID, deviceID, directPayload.EventType, message); err != nil {
 						util.GetLogger(t.context).WithError(err).Error("Failed to send send-to-device event to edu server")
 					}

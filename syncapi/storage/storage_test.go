@@ -539,7 +539,8 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	}
 
 	// At this point we should get exactly one message. We're sending the sync position
-	// that we were given from the update.
+	// that we were given from the update and the send-to-device update will be updated
+	// in the database to reflect that this was the sync position we sent the message at.
 	second, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
 	if err != nil {
 		t.Fatal(err)
@@ -560,7 +561,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	}
 
 	// At this point we should now have no updates, because we've progressed the sync
-	// position. Therefore the update from before will be cleane
+	// position. Therefore the update from before will not be sent again.
 	fourth, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+1))
 	if err != nil {
 		t.Fatal(err)
@@ -569,6 +570,8 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 		t.Fatal("fourth call should have no updates")
 	}
 
+	// At this point we should still have no updates, because no new updates have been
+	// sent.
 	fifth, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+2))
 	if err != nil {
 		t.Fatal(err)
