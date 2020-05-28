@@ -512,6 +512,17 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 	}
 }
 
+func TestSendToDeviceBehaviour(t *testing.T) {
+	//t.Parallel()
+	db := MustCreateDatabase(t)
+
+	initial, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println("Initial:", initial)
+}
+
 func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []gomatrixserverlib.HeaderedEvent) {
 	if len(gots) != len(wants) {
 		t.Fatalf("%s response returned %d events, want %d", msg, len(gots), len(wants))

@@ -1057,7 +1057,7 @@ func (d *Database) SendToDeviceUpdatesForSync(
 ) (events []types.SendToDeviceEvent, err error) {
 	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		// First of all, get our send-to-device updates for this user.
-		events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, userID, deviceID)
+		events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, txn, userID, deviceID)
 		if err != nil {
 			return fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
 		}

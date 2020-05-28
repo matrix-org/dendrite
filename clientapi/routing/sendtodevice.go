@@ -43,7 +43,7 @@ func SendToDevice(
 	var httpReq struct {
 		Messages map[string]map[string]json.RawMessage `json:"messages"`
 	}
-	resErr := httputil.UnmarshalJSONRequest(req, &req)
+	resErr := httputil.UnmarshalJSONRequest(req, &httpReq)
 	if resErr != nil {
 		return *resErr
 	}

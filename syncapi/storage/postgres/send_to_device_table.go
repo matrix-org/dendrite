@@ -98,14 +98,14 @@ func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, eventType, content string,
 ) (err error) {
-	_, err = txn.Stmt(s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, eventType, content)
+	_, err = internal.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, eventType, content)
 	return
 }
 
 func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
-	ctx context.Context, userID, deviceID string,
+	ctx context.Context, txn *sql.Tx, userID, deviceID string,
 ) (events []types.SendToDeviceEvent, err error) {
-	rows, err := s.selectSendToDeviceMessagesStmt.QueryContext(ctx, userID, deviceID)
+	rows, err := internal.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID)
 	if err != nil {
 		return
 	}

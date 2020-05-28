@@ -117,7 +117,7 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 		"user_id":    ise.UserID,
 		"device_id":  ise.DeviceID,
 		"event_type": ise.EventType,
-	}).Error("sendToDevice")
+	}).Info("handling send-to-device message")
 
 	eventJSON, err := json.Marshal(ote)
 	if err != nil {
