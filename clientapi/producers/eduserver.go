@@ -64,10 +64,12 @@ func (p *EDUServerProducer) SendToDevice(
 		return err
 	}
 	requestData := api.InputSendToDeviceEvent{
-		UserID:    userID,
-		DeviceID:  deviceID,
-		EventType: eventType,
-		Message:   js,
+		SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
+			UserID:    userID,
+			DeviceID:  deviceID,
+			EventType: eventType,
+			Message:   js,
+		},
 	}
 	request := api.InputSendToDeviceEventRequest{
 		InputSendToDeviceEvent: requestData,

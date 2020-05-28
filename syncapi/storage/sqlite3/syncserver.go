@@ -95,6 +95,10 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err != nil {
 		return err
 	}
+	sendToDevice, err := NewSqliteSendToDeviceTable(d.db)
+	if err != nil {
+		return err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Invites:             invites,
@@ -103,6 +107,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		BackwardExtremities: bwExtrem,
 		CurrentRoomState:    roomState,
 		Topology:            topology,
+		SendToDevice:        sendToDevice,
 		EDUCache:            cache.New(),
 	}
 	return nil

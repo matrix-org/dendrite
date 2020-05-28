@@ -27,6 +27,7 @@ type Database struct {
 	Topology            tables.Topology
 	CurrentRoomState    tables.CurrentRoomState
 	BackwardExtremities tables.BackwardsExtremities
+	SendToDevice        tables.SendToDevice
 	EDUCache            *cache.EDUCache
 }
 

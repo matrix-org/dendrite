@@ -393,3 +393,10 @@ func NewLeaveResponse() *LeaveResponse {
 	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	return &res
 }
+
+type SendToDeviceNID int
+
+type SendToDeviceEvent struct {
+	gomatrixserverlib.SendToDeviceEvent
+	SentByToken *string
+}

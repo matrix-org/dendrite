@@ -94,3 +94,10 @@ type BackwardsExtremities interface {
 	// DeleteBackwardExtremity removes a backwards extremity for a room, if one existed.
 	DeleteBackwardExtremity(ctx context.Context, txn *sql.Tx, roomID, knownEventID string) (err error)
 }
+
+type SendToDevice interface {
+	InsertSendToDeviceMessage(ctx context.Context, txn *sql.Tx, userID, deviceID, eventType, content string) (err error)
+	SelectSendToDeviceMessages(ctx context.Context, userID, deviceID string) (events []types.SendToDeviceEvent, err error)
+	UpdateSentSendToDeviceMessages(ctx context.Context, txn *sql.Tx, token string, nids []types.SendToDeviceNID) (err error)
+	DeleteSendToDeviceMessages(ctx context.Context, txn *sql.Tx, nids []types.SendToDeviceNID) (err error)
+}

@@ -13,8 +13,9 @@
 package api
 
 import (
-	"encoding/json"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // OutputTypingEvent is an entry in typing server output kafka log.
@@ -40,8 +41,5 @@ type TypingEvent struct {
 // This contains the event with extra fields used to create 'm.typing' event
 // in clientapi & federation.
 type OutputSendToDeviceEvent struct {
-	UserID    string          `json:"user_id"`
-	DeviceID  string          `json:"device_id"`
-	EventType string          `json:"event_type"`
-	Message   json.RawMessage `json:"message"`
+	gomatrixserverlib.SendToDeviceEvent
 }

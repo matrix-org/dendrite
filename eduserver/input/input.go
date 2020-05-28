@@ -104,10 +104,12 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 
 func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) error {
 	ote := &api.OutputSendToDeviceEvent{
-		UserID:    ise.UserID,
-		DeviceID:  ise.DeviceID,
-		EventType: ise.EventType,
-		Message:   ise.Message,
+		SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
+			UserID:    ise.UserID,
+			DeviceID:  ise.DeviceID,
+			EventType: ise.EventType,
+			Message:   ise.Message,
+		},
 	}
 
 	eventJSON, err := json.Marshal(ote)
