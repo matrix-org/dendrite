@@ -1057,7 +1057,7 @@ func (d *Database) SendToDeviceUpdatesForSync(
 ) (events []types.SendToDeviceEvent, err error) {
 	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		// First of all, get our send-to-device updates for this user.
-		events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, txn, userID, deviceID)
+		events, err = d.SendToDevice.SelectSendToDeviceMessages(ctx, txn, userID, deviceID)
 		if err != nil {
 			return fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
 		}
@@ -1068,14 +1068,14 @@ func (d *Database) SendToDeviceUpdatesForSync(
 		toUpdate := []types.SendToDeviceNID{}
 		toDelete := []types.SendToDeviceNID{}
 		for pos, event := range events {
-			if event.SentByToken != nil && token.IsAfter(*event.SentByToken) {
-				// Mark the event for deletion and remove it from our list of return events.
-				toDelete = append(toDelete, event.ID)
-				events = append(events[:pos], events[pos+1:]...)
-			} else {
+			if event.SentByToken == nil {
 				// Mark the event for update and keep it in our list of return events.
 				toUpdate = append(toUpdate, event.ID)
 				event.SentByToken = &token
+			} else if token.IsAfter(*event.SentByToken) {
+				// Mark the event for deletion and remove it from our list of return events.
+				toDelete = append(toDelete, event.ID)
+				events = append(events[:pos], events[pos+1:]...)
 			}
 		}
 

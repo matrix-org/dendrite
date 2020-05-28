@@ -109,6 +109,7 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			return
 		}
 		event := types.SendToDeviceEvent{
+			ID: id,
 			SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
 				UserID:    userID,
 				DeviceID:  deviceID,
@@ -130,7 +131,7 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, token string, nids []types.SendToDeviceNID,
 ) (err error) {
-	query := strings.Replace(updateSentSendToDeviceMessagesSQL, "($2)", internal.QueryVariadic(len(nids)), 1)
+	query := strings.Replace(updateSentSendToDeviceMessagesSQL, "($2)", internal.QueryVariadic(1+len(nids)), 1)
 	params := make([]interface{}, 1+len(nids))
 	params[0] = token
 	for k, v := range nids {

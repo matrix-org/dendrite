@@ -3,6 +3,7 @@ package storage_test
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -516,11 +517,65 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	//t.Parallel()
 	db := MustCreateDatabase(t)
 
-	initial, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, 0))
+	// At this point there should be no messages. We haven't sent anything
+	// yet.
+	first, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Initial:", initial)
+	if len(first) != 0 {
+		t.Fatal("first call should have no updates")
+	}
+
+	// Try sending a message.
+	streamPos, err := db.StoreNewSendForDeviceMessage(ctx, gomatrixserverlib.SendToDeviceEvent{
+		UserID:    "alice",
+		DeviceID:  "one",
+		EventType: "m.type",
+		Message:   json.RawMessage("{}"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// At this point we should get exactly one message. We're sending the sync position
+	// that we were given from the update.
+	second, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second) != 1 {
+		t.Fatal("second call should have one update")
+	}
+
+	// At this point we should still have one message because we haven't progressed the
+	// sync position yet. This is equivalent to the client failing to /sync and retrying
+	// with the same position.
+	third, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(third) != 1 {
+		t.Fatal("third call should have one update still")
+	}
+
+	// At this point we should now have no updates, because we've progressed the sync
+	// position. Therefore the update from before will be cleane
+	fourth, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fourth) != 0 {
+		t.Fatal("fourth call should have no updates")
+	}
+
+	fifth, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fifth) != 0 {
+		t.Fatal("fifth call should have no updates")
+	}
 }
 
 func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []gomatrixserverlib.HeaderedEvent) {

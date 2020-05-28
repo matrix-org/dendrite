@@ -119,6 +119,7 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			return
 		}
 		event := types.SendToDeviceEvent{
+			ID: id,
 			SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
 				UserID:    userID,
 				DeviceID:  deviceID,
