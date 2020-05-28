@@ -90,7 +90,6 @@ func (s *inviteStatements) InsertInviteEvent(
 	inviteEventJSON []byte,
 ) (bool, error) {
 	stmt := internal.TxStmt(txn, s.insertInviteEventStmt)
-	defer stmt.Close() // nolint: errcheck
 	result, err := stmt.ExecContext(
 		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)
@@ -109,7 +108,7 @@ func (s *inviteStatements) UpdateInviteRetired(
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventIDs []string, err error) {
 	// gather all the event IDs we will retire
-	stmt := txn.Stmt(s.selectInvitesAboutToRetireStmt)
+	stmt := internal.TxStmt(txn, s.selectInvitesAboutToRetireStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
@@ -124,7 +123,7 @@ func (s *inviteStatements) UpdateInviteRetired(
 	}
 
 	// now retire the invites
-	stmt = txn.Stmt(s.updateInviteRetiredStmt)
+	stmt = internal.TxStmt(txn, s.updateInviteRetiredStmt)
 	_, err = stmt.ExecContext(ctx, roomNID, targetUserNID)
 	return
 }

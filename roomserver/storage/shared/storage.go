@@ -311,6 +311,19 @@ func (d *Database) GetTransactionEventID(
 	return eventID, err
 }
 
+func (d *Database) MembershipUpdater(
+	ctx context.Context, roomID, targetUserID string,
+	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
+) (types.MembershipUpdater, error) {
+	return NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion, true)
+}
+
+func (d *Database) GetLatestEventsForUpdate(
+	ctx context.Context, roomNID types.RoomNID,
+) (types.RoomRecentEventsUpdater, error) {
+	return NewRoomRecentEventsUpdater(d, ctx, roomNID, true)
+}
+
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
