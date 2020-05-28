@@ -160,18 +160,6 @@ func TestCorrectStreamWakeup(t *testing.T) {
 	streamone := lockedFetchUserStream(n, alice, "one")
 	streamtwo := lockedFetchUserStream(n, alice, "two")
 
-	wait := func(stream *UserDeviceStream) {
-		select {
-		case <-time.After(time.Second * 10):
-			return
-		default:
-			waitForBlocking(stream, 1)
-		}
-	}
-
-	go wait(streamone)
-	go wait(streamtwo)
-
 	go func() {
 		select {
 		case <-streamone.signalChannel:
@@ -181,7 +169,7 @@ func TestCorrectStreamWakeup(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(1 * time.Microsecond)
+	time.Sleep(1 * time.Second)
 
 	wake := "two"
 	n.wakeupUserDevice(map[string]string{alice: wake}, syncPositionAfter)
@@ -354,7 +342,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.StreamingToken, error) {
 func waitForBlocking(s *UserDeviceStream, numBlocking uint) {
 	for numBlocking != s.NumWaiting() {
 		// This is horrible but I don't want to add a signalling mechanism JUST for testing.
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Microsecond)
 	}
 }
 
