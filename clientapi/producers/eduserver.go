@@ -56,7 +56,7 @@ func (p *EDUServerProducer) SendTyping(
 
 // SendToDevice sends a typing event to EDU server
 func (p *EDUServerProducer) SendToDevice(
-	ctx context.Context, userID, deviceID, eventType string,
+	ctx context.Context, sender, userID, deviceID, eventType string,
 	message interface{},
 ) error {
 	js, err := json.Marshal(message)
@@ -64,11 +64,12 @@ func (p *EDUServerProducer) SendToDevice(
 		return err
 	}
 	requestData := api.InputSendToDeviceEvent{
+		UserID:   userID,
+		DeviceID: deviceID,
 		SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
-			UserID:    userID,
-			DeviceID:  deviceID,
-			EventType: eventType,
-			Message:   js,
+			Sender:  sender,
+			Type:    eventType,
+			Content: js,
 		},
 	}
 	request := api.InputSendToDeviceEventRequest{

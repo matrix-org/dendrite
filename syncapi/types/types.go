@@ -404,5 +404,7 @@ type SendToDeviceNID int
 type SendToDeviceEvent struct {
 	gomatrixserverlib.SendToDeviceEvent
 	ID          SendToDeviceNID
+	UserID      string
+	DeviceID    string
 	SentByToken *StreamingToken
 }

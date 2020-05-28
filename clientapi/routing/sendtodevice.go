@@ -51,7 +51,7 @@ func SendToDevice(
 	for userID, byUser := range httpReq.Messages {
 		for deviceID, message := range byUser {
 			if err := eduProducer.SendToDevice(
-				req.Context(), userID, deviceID, eventType, message,
+				req.Context(), device.UserID, userID, deviceID, eventType, message,
 			); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
 				return jsonerror.InternalServerError()

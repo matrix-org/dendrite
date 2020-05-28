@@ -528,11 +528,10 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	}
 
 	// Try sending a message.
-	streamPos, err := db.StoreNewSendForDeviceMessage(ctx, gomatrixserverlib.SendToDeviceEvent{
-		UserID:    "alice",
-		DeviceID:  "one",
-		EventType: "m.type",
-		Message:   json.RawMessage("{}"),
+	streamPos, err := db.StoreNewSendForDeviceMessage(ctx, "alice", "one", gomatrixserverlib.SendToDeviceEvent{
+		Sender:  "bob",
+		Type:    "m.type",
+		Content: json.RawMessage("{}"),
 	})
 	if err != nil {
 		t.Fatal(err)

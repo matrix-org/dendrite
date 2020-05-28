@@ -1031,18 +1031,18 @@ func (d *Database) currentStateStreamEventsForRoom(
 
 func (d *Database) AddSendToDeviceEvent(
 	ctx context.Context, txn *sql.Tx,
-	userID, deviceID, eventType, message string,
+	userID, deviceID, eventType, content string,
 ) error {
 	return d.SendToDevice.InsertSendToDeviceMessage(
-		ctx, txn, userID, deviceID, eventType, message,
+		ctx, txn, userID, deviceID, content,
 	)
 }
 
 func (d *Database) StoreNewSendForDeviceMessage(
-	ctx context.Context, event gomatrixserverlib.SendToDeviceEvent,
+	ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
 ) (types.StreamPosition, error) {
 	err := d.AddSendToDeviceEvent(
-		ctx, nil, event.UserID, event.DeviceID, event.EventType, string(event.Message),
+		ctx, nil, userID, deviceID, event.Type, string(event.Content),
 	)
 	if err != nil {
 		return 0, err

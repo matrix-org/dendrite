@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const sendToDeviceSchema = `
@@ -33,12 +32,12 @@ CREATE SEQUENCE IF NOT EXISTS syncapi_send_to_device_id;
 CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 	-- The ID that uniquely identifies this message.
 	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_send_to_device_id'),
+	-- The sender of the message.
+	sender TEXT NOT NULL,
 	-- The user ID to send the message to.
 	user_id TEXT NOT NULL,
 	-- The device ID to send the message to.
 	device_id TEXT NOT NULL,
-	-- The event type.
-	event_type TEXT NOT NULL,
 	-- The event content JSON.
 	content TEXT NOT NULL,
 	-- The sync token that was supplied when we tried to send the message,
@@ -48,12 +47,12 @@ CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 `
 
 const insertSendToDeviceMessageSQL = `
-	INSERT INTO syncapi_send_to_device (user_id, device_id, event_type, content)
-	  VALUES ($1, $2, $3, $4)
+	INSERT INTO syncapi_send_to_device (user_id, device_id, content)
+	  VALUES ($1, $2, $3)
 `
 
 const selectSendToDeviceMessagesSQL = `
-	SELECT id, user_id, device_id, event_type, content, sent_by_token
+	SELECT id, sender, user_id, device_id, content, sent_by_token
 	  FROM syncapi_send_to_device
 	  WHERE user_id = $1 AND device_id = $2
 `
@@ -96,9 +95,9 @@ func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 }
 
 func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
-	ctx context.Context, txn *sql.Tx, userID, deviceID, eventType, content string,
+	ctx context.Context, txn *sql.Tx, userID, deviceID, content string,
 ) (err error) {
-	_, err = internal.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, eventType, content)
+	_, err = internal.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
 	return
 }
 
@@ -113,19 +112,18 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 
 	for rows.Next() {
 		var id types.SendToDeviceNID
-		var userID, deviceID, eventType, message string
+		var userID, deviceID, content string
 		var sentByToken *string
-		if err = rows.Scan(&id, &userID, &deviceID, &eventType, &message, &sentByToken); err != nil {
+		if err = rows.Scan(&id, &userID, &deviceID, &content, &sentByToken); err != nil {
 			return
 		}
 		event := types.SendToDeviceEvent{
-			ID: id,
-			SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
-				UserID:    userID,
-				DeviceID:  deviceID,
-				EventType: eventType,
-				Message:   json.RawMessage(message),
-			},
+			ID:       id,
+			UserID:   userID,
+			DeviceID: deviceID,
+		}
+		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
+			return
 		}
 		if sentByToken != nil {
 			if token, err := types.NewStreamTokenFromString(*sentByToken); err == nil {

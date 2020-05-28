@@ -41,5 +41,7 @@ type TypingEvent struct {
 // This contains the event with extra fields used to create 'm.typing' event
 // in clientapi & federation.
 type OutputSendToDeviceEvent struct {
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
 	gomatrixserverlib.SendToDeviceEvent
 }

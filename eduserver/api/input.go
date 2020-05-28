@@ -38,6 +38,8 @@ type InputTypingEvent struct {
 }
 
 type InputSendToDeviceEvent struct {
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
 	gomatrixserverlib.SendToDeviceEvent
 }
 

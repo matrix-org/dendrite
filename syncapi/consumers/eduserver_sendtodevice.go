@@ -81,10 +81,12 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 	log.WithFields(log.Fields{
 		"user_id":    output.UserID,
 		"device_id":  output.DeviceID,
-		"event_type": output.EventType,
+		"event_type": output.Type,
 	}).Debug("received send-to-device event from EDU server")
 
-	newPos, err := s.db.StoreNewSendForDeviceMessage(context.TODO(), output.SendToDeviceEvent)
+	newPos, err := s.db.StoreNewSendForDeviceMessage(
+		context.TODO(), output.UserID, output.DeviceID, output.SendToDeviceEvent,
+	)
 	if err != nil {
 		log.WithError(err).Errorf("failed to store send-to-device message")
 		return err

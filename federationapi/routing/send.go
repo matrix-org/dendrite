@@ -267,12 +267,7 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 			}
 		case gomatrixserverlib.MDirectToDevice:
 			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
-			var directPayload struct {
-				Sender    string                                `json:"sender"`
-				EventType string                                `json:"type"`
-				MessageID string                                `json:"message_id"`
-				Messages  map[string]map[string]json.RawMessage `json:"message"`
-			}
+			var directPayload gomatrixserverlib.ToDeviceMessage
 			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
 				util.GetLogger(t.context).WithError(err).Error("Failed to unmarshal send-to-device events")
 				continue
@@ -280,7 +275,7 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 			for userID, byUser := range directPayload.Messages {
 				for deviceID, message := range byUser {
 					// TODO: check that the user and the device actually exist here
-					if err := t.eduProducer.SendToDevice(t.context, userID, deviceID, directPayload.EventType, message); err != nil {
+					if err := t.eduProducer.SendToDevice(t.context, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
 						util.GetLogger(t.context).WithError(err).Error("Failed to send send-to-device event to edu server")
 					}
 				}

@@ -105,18 +105,15 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 
 func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) error {
 	ote := &api.OutputSendToDeviceEvent{
-		SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
-			UserID:    ise.UserID,
-			DeviceID:  ise.DeviceID,
-			EventType: ise.EventType,
-			Message:   ise.Message,
-		},
+		UserID:            ise.UserID,
+		DeviceID:          ise.DeviceID,
+		SendToDeviceEvent: ise.SendToDeviceEvent,
 	}
 
 	logrus.WithFields(logrus.Fields{
 		"user_id":    ise.UserID,
 		"device_id":  ise.DeviceID,
-		"event_type": ise.EventType,
+		"event_type": ise.Type,
 	}).Info("handling send-to-device message")
 
 	eventJSON, err := json.Marshal(ote)
