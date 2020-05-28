@@ -104,4 +104,8 @@ type Database interface {
 	StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent
 	// SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 	SyncStreamPosition(ctx context.Context) (types.StreamPosition, error)
+	// SendToDeviceUpdatesForSync returns a list of send-to-device updates, after having completed
+	// updates and deletions for previous events. The sync token should be supplied to this function so
+	// that we can clean up old events properly.
+	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, token types.StreamingToken) ([]types.SendToDeviceEvent, error)
 }

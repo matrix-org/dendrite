@@ -108,15 +108,20 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 		if err = rows.Scan(&id, &userID, &deviceID, &eventType, &message, &sentByToken); err != nil {
 			return
 		}
-		events = append(events, types.SendToDeviceEvent{
+		event := types.SendToDeviceEvent{
 			SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
 				UserID:    userID,
 				DeviceID:  deviceID,
 				EventType: eventType,
 				Message:   json.RawMessage(message),
 			},
-			SentByToken: sentByToken,
-		})
+		}
+		if sentByToken != nil {
+			if token, err := types.NewStreamTokenFromString(*sentByToken); err == nil {
+				event.SentByToken = &token
+			}
+		}
+		events = append(events, event)
 	}
 
 	return events, rows.Err()

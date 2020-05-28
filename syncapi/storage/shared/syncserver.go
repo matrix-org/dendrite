@@ -1029,6 +1029,59 @@ func (d *Database) currentStateStreamEventsForRoom(
 	return s, nil
 }
 
+func (d *Database) AddSendToDeviceEvent(
+	ctx context.Context, txn *sql.Tx,
+	userID, deviceID, eventType, message string,
+) error {
+	return d.SendToDevice.InsertSendToDeviceMessage(
+		ctx, txn, userID, deviceID, eventType, message,
+	)
+}
+
+func (d *Database) SendToDeviceUpdatesForSync(
+	ctx context.Context,
+	userID, deviceID string,
+	token types.StreamingToken,
+) (events []types.SendToDeviceEvent, err error) {
+	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		// First of all, get our send-to-device updates for this user.
+		events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, userID, deviceID)
+		if err != nil {
+			return fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
+		}
+
+		// Start by cleaning up any send-to-device messages that have older sent-by-tokens.
+		// This means that they were sent in a previous /sync and the client has happily
+		// progressed onto newer sync tokens.
+		toUpdate := []types.SendToDeviceNID{}
+		toDelete := []types.SendToDeviceNID{}
+		for pos, event := range events {
+			if event.SentByToken != nil && token.IsAfter(*event.SentByToken) {
+				// Mark the event for deletion and remove it from our list of return events.
+				toDelete = append(toDelete, event.ID)
+				events = append(events[:pos], events[pos+1:]...)
+			} else {
+				// Mark the event for update and keep it in our list of return events.
+				toUpdate = append(toUpdate, event.ID)
+				event.SentByToken = &token
+			}
+		}
+
+		// Delete any send-to-device messages marked for deletion.
+		if err := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); err != nil {
+			return fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", err)
+		}
+
+		// Now update any outstanding send-to-device messages with the new sync token.
+		if err := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); err != nil {
+			return fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
+		}
+
+		return nil
+	})
+	return
+}
+
 // There may be some overlap where events in stateEvents are already in recentEvents, so filter
 // them out so we don't include them twice in the /sync response. They should be in recentEvents
 // only, so clients get to the correct state once they have rolled forward.

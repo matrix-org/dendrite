@@ -296,6 +296,9 @@ type Response struct {
 		Invite map[string]InviteResponse `json:"invite"`
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
+	ToDevice struct {
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
+	} `json:"to_device"`
 }
 
 // NewResponse creates an empty response with initialised maps.
@@ -398,5 +401,6 @@ type SendToDeviceNID int
 
 type SendToDeviceEvent struct {
 	gomatrixserverlib.SendToDeviceEvent
-	SentByToken *string
+	ID          SendToDeviceNID
+	SentByToken *StreamingToken
 }

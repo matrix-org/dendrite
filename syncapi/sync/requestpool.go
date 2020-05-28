@@ -15,6 +15,7 @@
 package sync
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -147,6 +148,11 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
 	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
+	if err != nil {
+		return
+	}
+
+	res, err = rp.appendSendToDeviceMessages(res, req.device.UserID, req, latestPos)
 	return
 }
 
@@ -230,6 +236,26 @@ func (rp *RequestPool) appendAccountData(
 		} else {
 			data.AccountData.Events = events
 		}
+	}
+
+	return data, nil
+}
+
+func (rp *RequestPool) appendSendToDeviceMessages(
+	data *types.Response, userID string, req syncRequest, currentPos types.StreamingToken,
+) (*types.Response, error) {
+	events, err := rp.db.SendToDeviceUpdatesForSync(
+		context.TODO(),
+		userID,
+		req.device.ID,
+		currentPos,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, event := range events {
+		data.ToDevice.Events = append(data.ToDevice.Events, event.SendToDeviceEvent)
 	}
 
 	return data, nil
