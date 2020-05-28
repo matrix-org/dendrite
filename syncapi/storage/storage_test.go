@@ -181,7 +181,7 @@ func TestSyncResponse(t *testing.T) {
 			Name: "CompleteSync limited",
 			DoSync: func() (*types.Response, error) {
 				// limit set to 5
-				return db.CompleteSync(ctx, testUserIDA, 5)
+				return db.CompleteSync(ctx, testUserDeviceA, 5)
 			},
 			// want the last 5 events
 			WantTimeline: events[len(events)-5:],
@@ -193,7 +193,7 @@ func TestSyncResponse(t *testing.T) {
 		{
 			Name: "CompleteSync",
 			DoSync: func() (*types.Response, error) {
-				return db.CompleteSync(ctx, testUserIDA, len(events)+1)
+				return db.CompleteSync(ctx, testUserDeviceA, len(events)+1)
 			},
 			WantTimeline: events,
 			// We want no state at all as that field in /sync is the delta between the token (beginning of time)

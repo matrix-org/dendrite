@@ -666,10 +666,10 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 }
 
 func (d *Database) CompleteSync(
-	ctx context.Context, userID string, numRecentEventsPerRoom int,
+	ctx context.Context, device authtypes.Device, numRecentEventsPerRoom int,
 ) (*types.Response, error) {
 	res, toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
-		ctx, userID, numRecentEventsPerRoom,
+		ctx, device.UserID, numRecentEventsPerRoom,
 	)
 	if err != nil {
 		return nil, err
