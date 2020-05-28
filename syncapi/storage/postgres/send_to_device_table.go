@@ -32,8 +32,6 @@ CREATE SEQUENCE IF NOT EXISTS syncapi_send_to_device_id;
 CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 	-- The ID that uniquely identifies this message.
 	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_send_to_device_id'),
-	-- The sender of the message.
-	sender TEXT NOT NULL,
 	-- The user ID to send the message to.
 	user_id TEXT NOT NULL,
 	-- The device ID to send the message to.

@@ -30,8 +30,6 @@ const sendToDeviceSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 	-- The ID that uniquely identifies this message.
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	-- The sender of the message.
-	sender TEXT NOT NULL,
 	-- The user ID to send the message to.
 	user_id TEXT NOT NULL,
 	-- The device ID to send the message to.
