@@ -58,7 +58,7 @@ type Database interface {
 	// ID.
 	IncrementalSync(ctx context.Context, device authtypes.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
 	// CompleteSync returns a complete /sync API response for the given user.
-	CompleteSync(ctx context.Context, userID string, numRecentEventsPerRoom int) (*types.Response, error)
+	CompleteSync(ctx context.Context, device authtypes.Device, numRecentEventsPerRoom int) (*types.Response, error)
 	// GetAccountDataInRange returns all account data for a given user inserted or
 	// updated between two given positions
 	// Returns a map following the format data[roomID] = []dataTypes

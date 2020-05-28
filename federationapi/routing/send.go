@@ -76,6 +76,7 @@ func Send(
 	resp, err := t.processTransaction()
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
+		return util.ErrorResponse(err)
 	}
 
 	// https://matrix.org/docs/spec/server_server/r0.1.3#put-matrix-federation-v1-send-txnid
@@ -117,7 +118,7 @@ type txnFederationClient interface {
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	results := make(map[string]gomatrixserverlib.PDUResult)
 
-	var pdus []gomatrixserverlib.HeaderedEvent
+	pdus := []gomatrixserverlib.HeaderedEvent{}
 	for _, pdu := range t.PDUs {
 		var header struct {
 			RoomID string `json:"room_id"`
