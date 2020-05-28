@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -139,13 +140,13 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, token string, nids []types.SendToDeviceNID,
 ) (err error) {
-	_, err = txn.Stmt(s.updateSentSendToDeviceMessagesStmt).ExecContext(ctx, token, nids)
+	_, err = txn.Stmt(s.updateSentSendToDeviceMessagesStmt).ExecContext(ctx, token, pq.Array(nids))
 	return
 }
 
 func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, nids []types.SendToDeviceNID,
 ) (err error) {
-	_, err = txn.Stmt(s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, nids)
+	_, err = txn.Stmt(s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, pq.Array(nids))
 	return
 }
