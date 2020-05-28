@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -63,15 +64,18 @@ func NewOutputSendToDeviceEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputSendToDeviceEventConsumer) Start() error {
+	logrus.Info("syncapi starting sendToDevice consumer")
 	return s.sendToDeviceConsumer.Start()
 }
 
 func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+	logrus.Info("syncapi received sendToDevice event")
+
 	var output api.OutputSendToDeviceEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
-		return nil
+		return err
 	}
 
 	log.WithFields(log.Fields{

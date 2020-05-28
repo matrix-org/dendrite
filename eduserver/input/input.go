@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // EDUServerInputAPI implements api.EDUServerInputAPI
@@ -112,8 +113,15 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 		},
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"user_id":    ise.UserID,
+		"device_id":  ise.DeviceID,
+		"event_type": ise.EventType,
+	}).Error("sendToDevice")
+
 	eventJSON, err := json.Marshal(ote)
 	if err != nil {
+		logrus.WithError(err).Error("sendToDevice failed json.Marshal")
 		return err
 	}
 
@@ -124,6 +132,9 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 	}
 
 	_, _, err = t.Producer.SendMessage(m)
+	if err != nil {
+		logrus.WithError(err).Error("sendToDevice failed t.Producer.SendMessage")
+	}
 	return err
 }
 
