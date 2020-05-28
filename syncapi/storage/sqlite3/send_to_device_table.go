@@ -100,9 +100,9 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 
 	for rows.Next() {
 		var id types.SendToDeviceNID
-		var sender, userID, deviceID, content string
+		var userID, deviceID, content string
 		var sentByToken *string
-		if err = rows.Scan(&id, &sender, &userID, &deviceID, &content, &sentByToken); err != nil {
+		if err = rows.Scan(&id, &userID, &deviceID, &content, &sentByToken); err != nil {
 			return
 		}
 		event := types.SendToDeviceEvent{

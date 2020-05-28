@@ -50,7 +50,7 @@ const insertSendToDeviceMessageSQL = `
 `
 
 const selectSendToDeviceMessagesSQL = `
-	SELECT id, sender, user_id, device_id, content, sent_by_token
+	SELECT id, user_id, device_id, content, sent_by_token
 	  FROM syncapi_send_to_device
 	  WHERE user_id = $1 AND device_id = $2
 `
