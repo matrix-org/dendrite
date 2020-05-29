@@ -137,28 +137,49 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
 	res = types.NewResponse()
+
+	// See if we have any new tasks to do for the send-to-device messaging.
 	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, latestPos)
 	if err != nil {
 		return nil, err
 	}
 
+	// Before we return the sync response, make sure that we take action on
+	// any send-to-device database updates or deletions that we need to do.
+	// Then add the updates into the sync response.
 	defer func() {
 		if len(updates) > 0 || len(deletions) > 0 {
+			// Handle the updates and deletions in the database.
 			err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, latestPos)
 			if err != nil {
 				return
 			}
 		}
 		if len(events) > 0 {
+			// Add the updates into the sync response.
 			for _, event := range events {
 				res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
 			}
+
+			// Get the next_batch from the sync response and increase the
+			// EDU counter.
 			if pos, perr := types.NewStreamTokenFromString(res.NextBatch); perr == nil {
 				pos.Positions[1]++
 				res.NextBatch = pos.String()
 			}
 		}
 	}()
+
+	if len(events) > 0 {
+		// This is a bit of a hack until we can do something better with the sync API
+		// than this mess. If we have pending send-to-device updates then we want to
+		// deliver them pretty quickly. We still want the next step to run so that the
+		// sync tokens are updated properly. Set a short timeout on the next step so
+		// that we return faster.
+		ctx, cancel := context.WithTimeout(req.ctx, time.Second)
+		defer cancel()
+		req.ctx = ctx
+	}
 
 	// TODO: handle ignored users
 	if req.since == nil {
