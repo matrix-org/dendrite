@@ -245,6 +245,11 @@ func (rp *RequestPool) appendAccountData(
 func (rp *RequestPool) appendSendToDeviceMessages(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamingToken,
 ) (*types.Response, error) {
+	nextPos, err := types.NewStreamTokenFromString(data.NextBatch)
+	if err != nil {
+		return nil, err
+	}
+
 	events, err := rp.db.SendToDeviceUpdatesForSync(
 		context.TODO(),
 		userID,
@@ -257,7 +262,9 @@ func (rp *RequestPool) appendSendToDeviceMessages(
 
 	for _, event := range events {
 		data.ToDevice.Events = append(data.ToDevice.Events, event.SendToDeviceEvent)
+		nextPos.Positions[1]++
 	}
+	data.NextBatch = nextPos.String()
 	return data, nil
 }
 
