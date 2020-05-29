@@ -158,7 +158,8 @@ func TestSyncResponse(t *testing.T) {
 				from := types.NewStreamToken( // pretend we are at the penultimate event
 					positions[len(positions)-2], types.StreamPosition(0),
 				)
-				return db.IncrementalSync(ctx, testUserDeviceA, from, latest, 5, false)
+				res := types.NewResponse()
+				return db.IncrementalSync(ctx, res, testUserDeviceA, from, latest, 5, false)
 			},
 			WantTimeline: events[len(events)-1:],
 		},
@@ -170,8 +171,9 @@ func TestSyncResponse(t *testing.T) {
 				from := types.NewStreamToken( // pretend we are 10 events behind
 					positions[len(positions)-11], types.StreamPosition(0),
 				)
+				res := types.NewResponse()
 				// limit is set to 5
-				return db.IncrementalSync(ctx, testUserDeviceA, from, latest, 5, false)
+				return db.IncrementalSync(ctx, res, testUserDeviceA, from, latest, 5, false)
 			},
 			// want the last 5 events, NOT the last 10.
 			WantTimeline: events[len(events)-5:],
@@ -181,8 +183,9 @@ func TestSyncResponse(t *testing.T) {
 		{
 			Name: "CompleteSync limited",
 			DoSync: func() (*types.Response, error) {
+				res := types.NewResponse()
 				// limit set to 5
-				return db.CompleteSync(ctx, testUserDeviceA, 5)
+				return db.CompleteSync(ctx, res, testUserDeviceA, 5)
 			},
 			// want the last 5 events
 			WantTimeline: events[len(events)-5:],
@@ -194,7 +197,8 @@ func TestSyncResponse(t *testing.T) {
 		{
 			Name: "CompleteSync",
 			DoSync: func() (*types.Response, error) {
-				return db.CompleteSync(ctx, testUserDeviceA, len(events)+1)
+				res := types.NewResponse()
+				return db.CompleteSync(ctx, res, testUserDeviceA, len(events)+1)
 			},
 			WantTimeline: events,
 			// We want no state at all as that field in /sync is the delta between the token (beginning of time)
@@ -235,7 +239,8 @@ func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
 		positions[len(positions)-2], types.StreamPosition(0),
 	)
 
-	res, err := db.IncrementalSync(ctx, testUserDeviceA, from, latest, 5, false)
+	res := types.NewResponse()
+	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, from, latest, 5, false)
 	if err != nil {
 		t.Fatalf("failed to IncrementalSync with latest token")
 	}
