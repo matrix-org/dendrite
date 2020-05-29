@@ -570,6 +570,7 @@ func (d *Database) IncrementalSync(
 
 // getResponseWithPDUsForCompleteSync creates a response and adds all PDUs needed
 // to it. It returns toPos and joinedRoomIDs for use of adding EDUs.
+// nolint:nakedret
 func (d *Database) getResponseWithPDUsForCompleteSync(
 	ctx context.Context, res *types.Response,
 	userID string,
