@@ -55,12 +55,13 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			JSON: jsonerror.Unknown(err.Error()),
 		}
 	}
+
 	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
-		"userID":   device.UserID,
-		"deviceID": device.ID,
-		"since":    syncReq.since,
-		"timeout":  syncReq.timeout,
-		"limit":    syncReq.limit,
+		"user_id":   device.UserID,
+		"device_id": device.ID,
+		"since":     syncReq.since,
+		"timeout":   syncReq.timeout,
+		"limit":     syncReq.limit,
 	})
 
 	currPos := rp.notifier.CurrentPosition()

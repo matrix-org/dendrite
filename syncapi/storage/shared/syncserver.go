@@ -1041,8 +1041,12 @@ func (d *Database) AddSendToDeviceEvent(
 func (d *Database) StoreNewSendForDeviceMessage(
 	ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
 ) (types.StreamPosition, error) {
-	err := d.AddSendToDeviceEvent(
-		ctx, nil, userID, deviceID, string(event.Content),
+	j, err := json.Marshal(event)
+	if err != nil {
+		return 0, err
+	}
+	err = d.AddSendToDeviceEvent(
+		ctx, nil, userID, deviceID, string(j),
 	)
 	if err != nil {
 		return 0, err

@@ -117,7 +117,7 @@ func (t *EDUCache) AddSendToDeviceMessage() int64 {
 	defer t.Unlock()
 
 	t.latestSyncPosition++
-	return t.latestSyncPosition
+	return t.latestSyncPosition - 1
 }
 
 // addUser with mutex lock & replace the previous timer.

@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/sirupsen/logrus"
+	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -64,13 +64,10 @@ func NewOutputSendToDeviceEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputSendToDeviceEventConsumer) Start() error {
-	logrus.Info("syncapi starting sendToDevice consumer")
 	return s.sendToDeviceConsumer.Start()
 }
 
 func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	logrus.Info("syncapi received sendToDevice event")
-
 	var output api.OutputSendToDeviceEvent
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
@@ -78,13 +75,12 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		return err
 	}
 
-	log.WithFields(log.Fields{
+	util.GetLogger(context.TODO()).WithFields(log.Fields{
 		"sender":     output.Sender,
 		"user_id":    output.UserID,
 		"device_id":  output.DeviceID,
 		"event_type": output.Type,
-		"content":    string(output.Content),
-	}).Debug("sync API received send-to-device event from EDU server")
+	}).Info("sync API received send-to-device event from EDU server")
 
 	newPos, err := s.db.StoreNewSendForDeviceMessage(
 		context.TODO(), output.UserID, output.DeviceID, output.SendToDeviceEvent,
