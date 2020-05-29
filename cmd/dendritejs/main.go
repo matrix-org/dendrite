@@ -37,7 +37,6 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/dendrite/syncapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -197,14 +196,12 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	federation := createFederationClient(cfg, node)
 
-	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
-		base, federation,
-	)
+	fetcher := &libp2pKeyFetcher{}
 	keyRing := gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			&libp2pKeyFetcher{},
+			fetcher,
 		},
-		KeyDatabase: serverKeyAPI,
+		KeyDatabase: fetcher,
 	}
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node)
 
