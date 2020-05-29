@@ -28,6 +28,7 @@ type Database struct {
 	CurrentRoomState    tables.CurrentRoomState
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
+	SendToDeviceWriter  internal.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
 
@@ -1045,9 +1046,13 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	if err != nil {
 		return 0, err
 	}
-	err = d.AddSendToDeviceEvent(
-		ctx, nil, userID, deviceID, string(j),
-	)
+	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
+	// that we don't lock the table for writes in more than one place.
+	d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) {
+		err = d.AddSendToDeviceEvent(
+			ctx, txn, userID, deviceID, string(j),
+		)
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -1059,42 +1064,48 @@ func (d *Database) SendToDeviceUpdatesForSync(
 	userID, deviceID string,
 	token types.StreamingToken,
 ) (events []types.SendToDeviceEvent, err error) {
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
-		// First of all, get our send-to-device updates for this user.
-		events, err = d.SendToDevice.SelectSendToDeviceMessages(ctx, txn, userID, deviceID)
-		if err != nil {
-			return fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
-		}
+	// First of all, get our send-to-device updates for this user.
+	events, err = d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
+	}
 
-		// Start by cleaning up any send-to-device messages that have older sent-by-tokens.
-		// This means that they were sent in a previous /sync and the client has happily
-		// progressed onto newer sync tokens.
-		toUpdate := []types.SendToDeviceNID{}
-		toDelete := []types.SendToDeviceNID{}
-		for pos, event := range events {
-			if event.SentByToken == nil {
-				// Mark the event for update and keep it in our list of return events.
-				toUpdate = append(toUpdate, event.ID)
-				event.SentByToken = &token
-			} else if token.IsAfter(*event.SentByToken) {
-				// Mark the event for deletion and remove it from our list of return events.
-				toDelete = append(toDelete, event.ID)
-				events = append(events[:pos], events[pos+1:]...)
+	// Start by cleaning up any send-to-device messages that have older sent-by-tokens.
+	// This means that they were sent in a previous /sync and the client has happily
+	// progressed onto newer sync tokens.
+	toUpdate := []types.SendToDeviceNID{}
+	toDelete := []types.SendToDeviceNID{}
+	for pos, event := range events {
+		if event.SentByToken == nil {
+			// Mark the event for update and keep it in our list of return events.
+			toUpdate = append(toUpdate, event.ID)
+			event.SentByToken = &token
+		} else if token.IsAfter(*event.SentByToken) {
+			// Mark the event for deletion and remove it from our list of return events.
+			toDelete = append(toDelete, event.ID)
+			events = append(events[:pos], events[pos+1:]...)
+		}
+	}
+
+	// If we need to write to the database then we'll ask the SendToDeviceWriter to
+	// do that for us. It'll guarantee that we don't lock the table for writes in
+	// more than one place.
+	if len(toUpdate) > 0 || len(toDelete) > 0 {
+		d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) {
+			// Delete any send-to-device messages marked for deletion.
+			if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
+				err = fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)
+				return
 			}
-		}
 
-		// Delete any send-to-device messages marked for deletion.
-		if err := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); err != nil {
-			return fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", err)
-		}
+			// Now update any outstanding send-to-device messages with the new sync token.
+			if e := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); e != nil {
+				err = fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
+				return
+			}
+		})
+	}
 
-		// Now update any outstanding send-to-device messages with the new sync token.
-		if err := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); err != nil {
-			return fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
-		}
-
-		return nil
-	})
 	return
 }
 

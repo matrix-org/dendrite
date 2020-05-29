@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"runtime"
 	"time"
+
+	"go.uber.org/atomic"
 )
 
 // A Transaction is something that can be committed or rolledback.
@@ -106,4 +108,45 @@ type DbProperties interface {
 	MaxIdleConns() int
 	MaxOpenConns() int
 	ConnMaxLifetime() time.Duration
+}
+
+type TransactionWriter struct {
+	running atomic.Bool
+	todo    chan transactionWriterTask
+}
+
+type transactionWriterTask struct {
+	db   *sql.DB
+	f    func(txn *sql.Tx)
+	wait chan struct{}
+}
+
+func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx)) {
+	if w.todo == nil {
+		w.todo = make(chan transactionWriterTask)
+	}
+	if !w.running.Load() {
+		go w.run()
+	}
+	task := transactionWriterTask{
+		db:   db,
+		f:    f,
+		wait: make(chan struct{}),
+	}
+	w.todo <- task
+	<-task.wait
+}
+
+func (w *TransactionWriter) run() {
+	if !w.running.CAS(false, true) {
+		return
+	}
+	defer w.running.Store(false)
+	for task := range w.todo {
+		_ = WithTransaction(task.db, func(txn *sql.Tx) error {
+			task.f(txn)
+			return nil
+		})
+		close(task.wait)
+	}
 }

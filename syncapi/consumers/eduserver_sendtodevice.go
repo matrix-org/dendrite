@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -33,6 +34,7 @@ import (
 type OutputSendToDeviceEventConsumer struct {
 	sendToDeviceConsumer *internal.ContinualConsumer
 	db                   storage.Database
+	serverName           gomatrixserverlib.ServerName // our server name
 	notifier             *sync.Notifier
 }
 
@@ -54,6 +56,7 @@ func NewOutputSendToDeviceEventConsumer(
 	s := &OutputSendToDeviceEventConsumer{
 		sendToDeviceConsumer: &consumer,
 		db:                   store,
+		serverName:           cfg.Matrix.ServerName,
 		notifier:             n,
 	}
 
@@ -73,6 +76,14 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
 		return err
+	}
+
+	_, domain, err := gomatrixserverlib.SplitID('@', output.UserID)
+	if err != nil {
+		return err
+	}
+	if domain != s.serverName {
+		return nil
 	}
 
 	util.GetLogger(context.TODO()).WithFields(log.Fields{
