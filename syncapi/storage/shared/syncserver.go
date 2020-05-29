@@ -1063,19 +1063,20 @@ func (d *Database) SendToDeviceUpdatesForSync(
 	ctx context.Context,
 	userID, deviceID string,
 	token types.StreamingToken,
-) (toReturn []types.SendToDeviceEvent, err error) {
+) ([]types.SendToDeviceEvent, []types.SendToDeviceNID, []types.SendToDeviceNID, error) {
 	// First of all, get our send-to-device updates for this user.
 	events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID)
 	if err != nil {
-		return nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
+		return nil, nil, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
 	}
 
 	// If there's nothing to do then stop here.
 	if len(events) == 0 {
-		return nil, nil
+		return nil, nil, nil, nil
 	}
 
 	// Work out whether we need to update any of the database entries.
+	toReturn := []types.SendToDeviceEvent{}
 	toUpdate := []types.SendToDeviceNID{}
 	toDelete := []types.SendToDeviceNID{}
 	for _, event := range events {
@@ -1098,25 +1099,33 @@ func (d *Database) SendToDeviceUpdatesForSync(
 		}
 	}
 
+	return toReturn, toUpdate, toDelete, nil
+}
+
+func (d *Database) CleanSendToDeviceUpdates(
+	ctx context.Context,
+	toUpdate, toDelete []types.SendToDeviceNID,
+	token types.StreamingToken,
+) (err error) {
+	if len(toUpdate) == 0 && len(toDelete) == 0 {
+		return nil
+	}
 	// If we need to write to the database then we'll ask the SendToDeviceWriter to
 	// do that for us. It'll guarantee that we don't lock the table for writes in
 	// more than one place.
-	if len(toUpdate) > 0 || len(toDelete) > 0 {
-		d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) {
-			// Delete any send-to-device messages marked for deletion.
-			if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
-				err = fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)
-				return
-			}
+	d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) {
+		// Delete any send-to-device messages marked for deletion.
+		if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
+			err = fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)
+			return
+		}
 
-			// Now update any outstanding send-to-device messages with the new sync token.
-			if e := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); e != nil {
-				err = fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
-				return
-			}
-		})
-	}
-
+		// Now update any outstanding send-to-device messages with the new sync token.
+		if e := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); e != nil {
+			err = fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
+			return
+		}
+	})
 	return
 }
 

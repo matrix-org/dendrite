@@ -524,12 +524,16 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 
 	// At this point there should be no messages. We haven't sent anything
 	// yet.
-	first, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, 0))
+	events, updates, deletions, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first) != 0 {
+	if len(events) != 0 || len(updates) != 0 || len(deletions) != 0 {
 		t.Fatal("first call should have no updates")
+	}
+	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, 0))
+	if err != nil {
+		return
 	}
 
 	// Try sending a message.
@@ -545,42 +549,54 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	// At this point we should get exactly one message. We're sending the sync position
 	// that we were given from the update and the send-to-device update will be updated
 	// in the database to reflect that this was the sync position we sent the message at.
-	second, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
+	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(second) != 1 {
+	if len(events) != 1 || len(updates) != 1 || len(deletions) != 0 {
 		t.Fatal("second call should have one update")
+	}
+	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos))
+	if err != nil {
+		return
 	}
 
 	// At this point we should still have one message because we haven't progressed the
 	// sync position yet. This is equivalent to the client failing to /sync and retrying
 	// with the same position.
-	third, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
+	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(third) != 1 {
+	if len(events) != 1 || len(updates) != 0 || len(deletions) != 0 {
 		t.Fatal("third call should have one update still")
+	}
+	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos))
+	if err != nil {
+		return
 	}
 
 	// At this point we should now have no updates, because we've progressed the sync
 	// position. Therefore the update from before will not be sent again.
-	fourth, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+1))
+	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+1))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(fourth) != 0 {
+	if len(events) != 0 || len(updates) != 0 || len(deletions) != 1 {
 		t.Fatal("fourth call should have no updates")
+	}
+	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos+1))
+	if err != nil {
+		return
 	}
 
 	// At this point we should still have no updates, because no new updates have been
 	// sent.
-	fifth, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+2))
+	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+2))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(fifth) != 0 {
+	if len(events) != 0 || len(updates) != 0 || len(deletions) != 0 {
 		t.Fatal("fifth call should have no updates")
 	}
 }

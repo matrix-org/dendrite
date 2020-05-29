@@ -137,14 +137,28 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
 	res = types.NewResponse()
-
-	res, err = rp.appendSendToDeviceMessages(res, req.device.UserID, req, latestPos)
+	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, latestPos)
 	if err != nil {
-		return
+		return nil, err
 	}
-	if len(res.ToDevice.Events) > 0 {
-		return
-	}
+
+	defer func() {
+		if len(updates) > 0 || len(deletions) > 0 {
+			err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, latestPos)
+			if err != nil {
+				return
+			}
+		}
+		if len(events) > 0 {
+			for _, event := range events {
+				res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
+			}
+			if pos, perr := types.NewStreamTokenFromString(res.NextBatch); perr == nil {
+				pos.Positions[1]++
+				res.NextBatch = pos.String()
+			}
+		}
+	}()
 
 	// TODO: handle ignored users
 	if req.since == nil {
@@ -152,7 +166,6 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	} else {
 		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, *req.since, latestPos, req.limit, req.wantFullState)
 	}
-
 	if err != nil {
 		return
 	}
@@ -242,31 +255,6 @@ func (rp *RequestPool) appendAccountData(
 		} else {
 			data.AccountData.Events = events
 		}
-	}
-
-	return data, nil
-}
-
-func (rp *RequestPool) appendSendToDeviceMessages(
-	data *types.Response, userID string, req syncRequest, currentPos types.StreamingToken,
-) (*types.Response, error) {
-	events, err := rp.db.SendToDeviceUpdatesForSync(
-		context.TODO(),
-		userID,
-		req.device.ID,
-		currentPos,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, event := range events {
-		data.ToDevice.Events = append(data.ToDevice.Events, event.SendToDeviceEvent)
-	}
-
-	if len(data.ToDevice.Events) > 0 {
-		currentPos.Positions[1]++
-		data.NextBatch = currentPos.String()
 	}
 
 	return data, nil
