@@ -295,3 +295,4 @@ Can send a to-device message to two users which both receive it using /sync
 Can recv device messages until they are acknowledged
 Device messages wake up /sync
 Device messages over federation wake up /sync
+Wildcard device messages wake up /sync
