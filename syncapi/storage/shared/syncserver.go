@@ -1031,7 +1031,7 @@ func (d *Database) currentStateStreamEventsForRoom(
 
 func (d *Database) AddSendToDeviceEvent(
 	ctx context.Context, txn *sql.Tx,
-	userID, deviceID, eventType, content string,
+	userID, deviceID, content string,
 ) error {
 	return d.SendToDevice.InsertSendToDeviceMessage(
 		ctx, txn, userID, deviceID, content,
@@ -1042,7 +1042,7 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
 ) (types.StreamPosition, error) {
 	err := d.AddSendToDeviceEvent(
-		ctx, nil, userID, deviceID, event.Type, string(event.Content),
+		ctx, nil, userID, deviceID, string(event.Content),
 	)
 	if err != nil {
 		return 0, err

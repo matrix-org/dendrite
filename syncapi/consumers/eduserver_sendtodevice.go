@@ -79,10 +79,12 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 	}
 
 	log.WithFields(log.Fields{
+		"sender":     output.Sender,
 		"user_id":    output.UserID,
 		"device_id":  output.DeviceID,
 		"event_type": output.Type,
-	}).Debug("received send-to-device event from EDU server")
+		"content":    string(output.Content),
+	}).Debug("sync API received send-to-device event from EDU server")
 
 	newPos, err := s.db.StoreNewSendForDeviceMessage(
 		context.TODO(), output.UserID, output.DeviceID, output.SendToDeviceEvent,

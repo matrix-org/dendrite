@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // SendToDevice handles PUT /_matrix/client/r0/sendToDevice/{eventType}/{txnId}
@@ -55,6 +56,14 @@ func SendToDevice(
 			); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
 				return jsonerror.InternalServerError()
+			} else {
+				util.GetLogger(req.Context()).WithFields(logrus.Fields{
+					"sender":     device.UserID,
+					"user_id":    userID,
+					"device_id":  deviceID,
+					"event_type": eventType,
+					"message":    string(message),
+				}).Info("client API processed send-to-device message")
 			}
 		}
 	}
