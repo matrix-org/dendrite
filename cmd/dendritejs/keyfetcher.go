@@ -82,3 +82,8 @@ func (f *libp2pKeyFetcher) FetchKeys(
 func (f *libp2pKeyFetcher) FetcherName() string {
 	return "libp2pKeyFetcher"
 }
+
+// no-op function for storing keys - we don't do any work to fetch them so don't bother storing.
+func (f *libp2pKeyFetcher) StoreKeys(ctx context.Context, results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult) error {
+	return nil
+}
