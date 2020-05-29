@@ -93,8 +93,10 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		"event_type": output.Type,
 	}).Info("sync API received send-to-device event from EDU server")
 
+	streamPos := s.db.AddSendToDevice()
+
 	_, err = s.db.StoreNewSendForDeviceMessage(
-		context.TODO(), output.UserID, output.DeviceID, output.SendToDeviceEvent,
+		context.TODO(), streamPos, output.UserID, output.DeviceID, output.SendToDeviceEvent,
 	)
 	if err != nil {
 		log.WithError(err).Errorf("failed to store send-to-device message")
@@ -104,7 +106,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 	s.notifier.OnNewSendToDevice(
 		output.UserID,
 		[]string{output.DeviceID}, // TODO: support wildcard here as per spec
-		types.NewStreamToken(0, 1),
+		types.NewStreamToken(0, streamPos),
 	)
 
 	return nil

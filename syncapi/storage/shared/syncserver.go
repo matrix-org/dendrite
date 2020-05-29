@@ -91,6 +91,10 @@ func (d *Database) RemoveTypingUser(
 	return types.StreamPosition(d.EDUCache.RemoveUser(userID, roomID))
 }
 
+func (d *Database) AddSendToDevice() types.StreamPosition {
+	return types.StreamPosition(d.EDUCache.AddSendToDeviceMessage())
+}
+
 func (d *Database) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
 	d.EDUCache.SetTimeoutCallback(fn)
 }
@@ -1041,11 +1045,11 @@ func (d *Database) AddSendToDeviceEvent(
 }
 
 func (d *Database) StoreNewSendForDeviceMessage(
-	ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
+	ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
 ) (types.StreamPosition, error) {
 	j, err := json.Marshal(event)
 	if err != nil {
-		return 0, err
+		return streamPos, err
 	}
 	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
 	// that we don't lock the table for writes in more than one place.
@@ -1055,9 +1059,9 @@ func (d *Database) StoreNewSendForDeviceMessage(
 		)
 	})
 	if err != nil {
-		return 0, err
+		return streamPos, err
 	}
-	return types.StreamPosition(d.EDUCache.AddSendToDeviceMessage()), nil
+	return streamPos, nil
 }
 
 func (d *Database) SendToDeviceUpdatesForSync(

@@ -51,6 +51,7 @@ const selectSendToDeviceMessagesSQL = `
 	SELECT id, user_id, device_id, content, sent_by_token
 	  FROM syncapi_send_to_device
 	  WHERE user_id = $1 AND device_id = $2
+	  ORDER BY id DESC
 `
 
 const updateSentSendToDeviceMessagesSQL = `
