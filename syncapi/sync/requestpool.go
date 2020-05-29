@@ -136,11 +136,21 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
+	res = types.NewResponse()
+
+	res, err = rp.appendSendToDeviceMessages(res, req.device.UserID, req, latestPos)
+	if err != nil {
+		return
+	}
+	if len(res.ToDevice.Events) > 0 {
+		return
+	}
+
 	// TODO: handle ignored users
 	if req.since == nil {
-		res, err = rp.db.CompleteSync(req.ctx, req.device, req.limit)
+		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit, req.wantFullState)
+		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, *req.since, latestPos, req.limit, req.wantFullState)
 	}
 
 	if err != nil {
@@ -149,11 +159,6 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
 	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
-	if err != nil {
-		return
-	}
-
-	res, err = rp.appendSendToDeviceMessages(res, req.device.UserID, req, latestPos)
 	return
 }
 
@@ -245,11 +250,6 @@ func (rp *RequestPool) appendAccountData(
 func (rp *RequestPool) appendSendToDeviceMessages(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamingToken,
 ) (*types.Response, error) {
-	nextPos, err := types.NewStreamTokenFromString(data.NextBatch)
-	if err != nil {
-		return nil, err
-	}
-
 	events, err := rp.db.SendToDeviceUpdatesForSync(
 		context.TODO(),
 		userID,
@@ -262,9 +262,13 @@ func (rp *RequestPool) appendSendToDeviceMessages(
 
 	for _, event := range events {
 		data.ToDevice.Events = append(data.ToDevice.Events, event.SendToDeviceEvent)
-		nextPos.Positions[1]++
 	}
-	data.NextBatch = nextPos.String()
+
+	if len(data.ToDevice.Events) > 0 {
+		currentPos.Positions[1]++
+		data.NextBatch = currentPos.String()
+	}
+
 	return data, nil
 }
 

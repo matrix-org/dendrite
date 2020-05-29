@@ -56,9 +56,9 @@ type Database interface {
 	// transaction IDs associated with the given device. These transaction IDs come
 	// from when the device sent the event via an API that included a transaction
 	// ID.
-	IncrementalSync(ctx context.Context, device authtypes.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
+	IncrementalSync(ctx context.Context, res *types.Response, device authtypes.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
 	// CompleteSync returns a complete /sync API response for the given user.
-	CompleteSync(ctx context.Context, device authtypes.Device, numRecentEventsPerRoom int) (*types.Response, error)
+	CompleteSync(ctx context.Context, res *types.Response, device authtypes.Device, numRecentEventsPerRoom int) (*types.Response, error)
 	// GetAccountDataInRange returns all account data for a given user inserted or
 	// updated between two given positions
 	// Returns a map following the format data[roomID] = []dataTypes

@@ -93,7 +93,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		"event_type": output.Type,
 	}).Info("sync API received send-to-device event from EDU server")
 
-	newPos, err := s.db.StoreNewSendForDeviceMessage(
+	_, err = s.db.StoreNewSendForDeviceMessage(
 		context.TODO(), output.UserID, output.DeviceID, output.SendToDeviceEvent,
 	)
 	if err != nil {
@@ -104,7 +104,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 	s.notifier.OnNewSendToDevice(
 		output.UserID,
 		[]string{output.DeviceID}, // TODO: support wildcard here as per spec
-		types.NewStreamToken(0, newPos),
+		types.NewStreamToken(0, 1),
 	)
 
 	return nil
