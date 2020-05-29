@@ -13,6 +13,7 @@
 package eduserver
 
 import (
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/eduserver/input"
@@ -26,12 +27,15 @@ import (
 func SetupEDUServerComponent(
 	base *basecomponent.BaseDendrite,
 	eduCache *cache.EDUCache,
+	deviceDB devices.Database,
 ) api.EDUServerInputAPI {
 	inputAPI := &input.EDUServerInputAPI{
 		Cache:                        eduCache,
+		DeviceDB:                     deviceDB,
 		Producer:                     base.KafkaProducer,
 		OutputTypingEventTopic:       string(base.Cfg.Kafka.Topics.OutputTypingEvent),
 		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEventTopic),
+		ServerName:                   base.Cfg.Matrix.ServerName,
 	}
 
 	inputAPI.SetupHTTP(base.InternalAPIMux)

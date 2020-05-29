@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -35,7 +34,6 @@ import (
 type OutputSendToDeviceEventConsumer struct {
 	sendToDeviceConsumer *internal.ContinualConsumer
 	db                   storage.Database
-	deviceDB             devices.Database
 	serverName           gomatrixserverlib.ServerName // our server name
 	notifier             *sync.Notifier
 }
@@ -47,7 +45,6 @@ func NewOutputSendToDeviceEventConsumer(
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
 	store storage.Database,
-	deviceDB devices.Database,
 ) *OutputSendToDeviceEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -59,7 +56,6 @@ func NewOutputSendToDeviceEventConsumer(
 	s := &OutputSendToDeviceEventConsumer{
 		sendToDeviceConsumer: &consumer,
 		db:                   store,
-		deviceDB:             deviceDB,
 		serverName:           cfg.Matrix.ServerName,
 		notifier:             n,
 	}
@@ -82,7 +78,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		return err
 	}
 
-	localpart, domain, err := gomatrixserverlib.SplitID('@', output.UserID)
+	_, domain, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
 		return err
 	}
@@ -107,22 +103,9 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		return err
 	}
 
-	devices := []string{}
-	if output.DeviceID == "*" {
-		devs, err := s.deviceDB.GetDevicesByLocalpart(context.TODO(), localpart)
-		if err != nil {
-			return err
-		}
-		for _, dev := range devs {
-			devices = append(devices, dev.ID)
-		}
-	} else {
-		devices = append(devices, output.DeviceID)
-	}
-
 	s.notifier.OnNewSendToDevice(
 		output.UserID,
-		devices,
+		[]string{output.DeviceID},
 		types.NewStreamToken(0, streamPos),
 	)
 

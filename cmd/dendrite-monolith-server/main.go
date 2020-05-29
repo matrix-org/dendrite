@@ -87,7 +87,7 @@ func main() {
 	}
 
 	eduInputAPI := eduserver.SetupEDUServerComponent(
-		base, cache.New(),
+		base, cache.New(), deviceDB,
 	)
 	if base.EnableHTTPAPIs {
 		eduInputAPI = base.CreateHTTPEDUServerAPIs()

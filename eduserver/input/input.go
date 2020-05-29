@@ -20,6 +20,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal"
@@ -38,6 +39,10 @@ type EDUServerInputAPI struct {
 	OutputSendToDeviceEventTopic string
 	// kafka producer
 	Producer sarama.SyncProducer
+	// device database
+	DeviceDB devices.Database
+	// our server name
+	ServerName gomatrixserverlib.ServerName
 }
 
 // InputTypingEvent implements api.EDUServerInputAPI
@@ -104,35 +109,57 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 }
 
 func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) error {
-	ote := &api.OutputSendToDeviceEvent{
-		UserID:            ise.UserID,
-		DeviceID:          ise.DeviceID,
-		SendToDeviceEvent: ise.SendToDeviceEvent,
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"user_id":    ise.UserID,
-		"device_id":  ise.DeviceID,
-		"event_type": ise.Type,
-	}).Info("handling send-to-device message")
-
-	eventJSON, err := json.Marshal(ote)
+	devices := []string{}
+	localpart, domain, err := gomatrixserverlib.SplitID('@', ise.UserID)
 	if err != nil {
-		logrus.WithError(err).Error("sendToDevice failed json.Marshal")
 		return err
 	}
 
-	m := &sarama.ProducerMessage{
-		Topic: string(t.OutputSendToDeviceEventTopic),
-		Key:   sarama.StringEncoder(ote.UserID),
-		Value: sarama.ByteEncoder(eventJSON),
+	if domain == t.ServerName && ise.DeviceID == "*" {
+		devs, err := t.DeviceDB.GetDevicesByLocalpart(context.TODO(), localpart)
+		if err != nil {
+			return err
+		}
+		for _, dev := range devs {
+			devices = append(devices, dev.ID)
+		}
+	} else {
+		devices = append(devices, ise.DeviceID)
 	}
 
-	_, _, err = t.Producer.SendMessage(m)
-	if err != nil {
-		logrus.WithError(err).Error("sendToDevice failed t.Producer.SendMessage")
+	for _, device := range devices {
+		ote := &api.OutputSendToDeviceEvent{
+			UserID:            ise.UserID,
+			DeviceID:          device,
+			SendToDeviceEvent: ise.SendToDeviceEvent,
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"user_id":    ise.UserID,
+			"device_id":  ise.DeviceID,
+			"event_type": ise.Type,
+		}).Info("handling send-to-device message")
+
+		eventJSON, err := json.Marshal(ote)
+		if err != nil {
+			logrus.WithError(err).Error("sendToDevice failed json.Marshal")
+			return err
+		}
+
+		m := &sarama.ProducerMessage{
+			Topic: string(t.OutputSendToDeviceEventTopic),
+			Key:   sarama.StringEncoder(ote.UserID),
+			Value: sarama.ByteEncoder(eventJSON),
+		}
+
+		_, _, err = t.Producer.SendMessage(m)
+		if err != nil {
+			logrus.WithError(err).Error("sendToDevice failed t.Producer.SendMessage")
+			return err
+		}
 	}
-	return err
+
+	return nil
 }
 
 // SetupHTTP adds the EDUServerInputAPI handlers to the http.ServeMux.

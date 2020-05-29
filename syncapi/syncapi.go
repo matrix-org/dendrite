@@ -82,7 +82,7 @@ func SetupSyncAPIComponent(
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB, deviceDB,
+		base.Cfg, base.KafkaConsumer, notifier, syncDB,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")

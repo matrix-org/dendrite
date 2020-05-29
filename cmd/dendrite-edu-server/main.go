@@ -29,8 +29,9 @@ func main() {
 			logrus.WithError(err).Warn("BaseDendrite close failed")
 		}
 	}()
+	deviceDB := base.CreateDeviceDB()
 
-	eduserver.SetupEDUServerComponent(base, cache.New())
+	eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.EDUServer), string(base.Cfg.Listen.EDUServer))
 
