@@ -29,6 +29,9 @@ type Database interface {
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
 	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
 	SetDisplayName(ctx context.Context, localpart string, displayName string) error
+	// CreateAccount makes a new account with the given login name and password, and creates an empty profile
+	// for this account. If no password is supplied, the account will be a passwordless account. If the
+	// account already exists, it will return nil, ErrUserExists.
 	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*authtypes.Account, error)
 	CreateGuestAccount(ctx context.Context) (*authtypes.Account, error)
 	UpdateMemberships(ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error

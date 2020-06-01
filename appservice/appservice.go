@@ -16,6 +16,7 @@ package appservice
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice/workers"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
@@ -117,12 +119,12 @@ func generateAppServiceAccount(
 	ctx := context.Background()
 
 	// Create an account for the application service
-	acc, err := accountsDB.CreateAccount(ctx, as.SenderLocalpart, "", as.ID)
+	_, err := accountsDB.CreateAccount(ctx, as.SenderLocalpart, "", as.ID)
 	if err != nil {
+		if errors.Is(err, internal.ErrUserExists) { // This account already exists
+			return nil
+		}
 		return err
-	} else if acc == nil {
-		// This account already exists
-		return nil
 	}
 
 	// Create a dummy device with a dummy token for the application service

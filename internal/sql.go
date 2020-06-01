@@ -26,6 +26,9 @@ import (
 	"go.uber.org/atomic"
 )
 
+// ErrUserExists is returned if a username already exists in the database.
+var ErrUserExists = errors.New("Username already exists")
+
 // A Transaction is something that can be committed or rolledback.
 type Transaction interface {
 	// Commit the transaction
