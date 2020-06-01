@@ -112,7 +112,7 @@ type Database interface {
 	// - "events": a list of send-to-device events that should be included in the sync
 	// - "changes": a list of send-to-device events that should be updated in the database by
 	//      CleanSendToDeviceUpdates
-	// - "defletions": a list of send-to-device events which have been confirmed as sent and
+	// - "deletions": a list of send-to-device events which have been confirmed as sent and
 	//      can be deleted altogether by CleanSendToDeviceUpdates
 	// The token supplied should be the current requested sync token, e.g. from the "since"
 	// parameter.
