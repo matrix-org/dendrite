@@ -274,6 +274,31 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
+	r0mux.Handle("/sendToDevice/{eventType}/{txnID}",
+		internal.MakeAuthAPI("send_to_device", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars, err := internal.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			txnID := vars["txnID"]
+			return SendToDevice(req, device, eduProducer, transactionsCache, vars["eventType"], &txnID)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
+
+	// This is only here because sytest refers to /unstable for this endpoint
+	// rather than r0. It's an exact duplicate of the above handler.
+	// TODO: Remove this if/when sytest is fixed!
+	unstableMux.Handle("/sendToDevice/{eventType}/{txnID}",
+		internal.MakeAuthAPI("send_to_device", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+			vars, err := internal.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			txnID := vars["txnID"]
+			return SendToDevice(req, device, eduProducer, transactionsCache, vars["eventType"], &txnID)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
+
 	r0mux.Handle("/account/whoami",
 		internal.MakeAuthAPI("whoami", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return Whoami(req, device)

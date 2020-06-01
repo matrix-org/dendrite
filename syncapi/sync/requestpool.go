@@ -1,4 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
+// Copyright 2017-2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +17,7 @@
 package sync
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -54,17 +57,18 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			JSON: jsonerror.Unknown(err.Error()),
 		}
 	}
+
 	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
-		"userID":   device.UserID,
-		"deviceID": device.ID,
-		"since":    syncReq.since,
-		"timeout":  syncReq.timeout,
-		"limit":    syncReq.limit,
+		"user_id":   device.UserID,
+		"device_id": device.ID,
+		"since":     syncReq.since,
+		"timeout":   syncReq.timeout,
+		"limit":     syncReq.limit,
 	})
 
 	currPos := rp.notifier.CurrentPosition()
 
-	if shouldReturnImmediately(syncReq) {
+	if rp.shouldReturnImmediately(syncReq) {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
@@ -116,7 +120,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// response. This ensures that we don't waste the hard work
 		// of calculating the sync only to get timed out before we
 		// can respond
-
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
@@ -134,19 +137,59 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 }
 
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
-	// TODO: handle ignored users
-	if req.since == nil {
-		res, err = rp.db.CompleteSync(req.ctx, req.device, req.limit)
-	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit, req.wantFullState)
+	res = types.NewResponse()
+
+	since := types.NewStreamToken(0, 0)
+	if req.since != nil {
+		since = *req.since
 	}
 
+	// See if we have any new tasks to do for the send-to-device messaging.
+	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, since)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: handle ignored users
+	if req.since == nil {
+		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
+	} else {
+		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, *req.since, latestPos, req.limit, req.wantFullState)
+	}
 	if err != nil {
 		return
 	}
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
 	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
+	if err != nil {
+		return
+	}
+
+	// Before we return the sync response, make sure that we take action on
+	// any send-to-device database updates or deletions that we need to do.
+	// Then add the updates into the sync response.
+	if len(updates) > 0 || len(deletions) > 0 {
+		// Handle the updates and deletions in the database.
+		err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, since)
+		if err != nil {
+			return
+		}
+	}
+	if len(events) > 0 {
+		// Add the updates into the sync response.
+		for _, event := range events {
+			res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
+		}
+
+		// Get the next_batch from the sync response and increase the
+		// EDU counter.
+		if pos, perr := types.NewStreamTokenFromString(res.NextBatch); perr == nil {
+			pos.Positions[1]++
+			res.NextBatch = pos.String()
+		}
+	}
+
 	return
 }
 
@@ -238,6 +281,10 @@ func (rp *RequestPool) appendAccountData(
 // shouldReturnImmediately returns whether the /sync request is an initial sync,
 // or timeout=0, or full_state=true, in any of the cases the request should
 // return immediately.
-func shouldReturnImmediately(syncReq *syncRequest) bool {
-	return syncReq.since == nil || syncReq.timeout == 0 || syncReq.wantFullState
+func (rp *RequestPool) shouldReturnImmediately(syncReq *syncRequest) bool {
+	if syncReq.since == nil || syncReq.timeout == 0 || syncReq.wantFullState {
+		return true
+	}
+	waiting, werr := rp.db.SendToDeviceUpdatesWaiting(context.TODO(), syncReq.device.UserID, syncReq.device.ID)
+	return werr == nil && waiting
 }

@@ -1,3 +1,7 @@
+// Copyright 2017 Vector Creations Ltd
+// Copyright 2017-2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -13,6 +17,7 @@
 package eduserver
 
 import (
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/eduserver/input"
@@ -26,11 +31,15 @@ import (
 func SetupEDUServerComponent(
 	base *basecomponent.BaseDendrite,
 	eduCache *cache.EDUCache,
+	deviceDB devices.Database,
 ) api.EDUServerInputAPI {
 	inputAPI := &input.EDUServerInputAPI{
-		Cache:                  eduCache,
-		Producer:               base.KafkaProducer,
-		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),
+		Cache:                        eduCache,
+		DeviceDB:                     deviceDB,
+		Producer:                     base.KafkaProducer,
+		OutputTypingEventTopic:       string(base.Cfg.Kafka.Topics.OutputTypingEvent),
+		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEvent),
+		ServerName:                   base.Cfg.Matrix.ServerName,
 	}
 
 	inputAPI.SetupHTTP(base.InternalAPIMux)

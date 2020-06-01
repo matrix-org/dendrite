@@ -104,7 +104,8 @@ kafka:
     topics:
         output_room_event: roomserverOutput
         output_client_data: clientapiOutput
-        output_typing_event: eduServerOutput
+        output_typing_event: eduServerTypingOutput
+        output_send_to_device_event: eduServerSendToDeviceOutput
         user_updates: userUpdates
 
 # The postgres connection configs for connecting to the databases e.g a postgres:// URI
@@ -137,8 +138,8 @@ listen:
     federation_sender: "localhost:7776"
     appservice_api: "localhost:7777"
     edu_server: "localhost:7778"
-	key_server: "localhost:7779"
-	server_key_api: "localhost:7780"
+    key_server: "localhost:7779"
+    server_key_api: "localhost:7780"
 
 # The configuration for tracing the dendrite components.
 tracing:
