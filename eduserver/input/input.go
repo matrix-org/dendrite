@@ -119,6 +119,11 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 		return err
 	}
 
+	// If the event is targeted locally then we want to expand the wildcard
+	// out into individual device IDs so that we can send them to each respective
+	// device. If the event isn't targeted locally then we can't expand the
+	// wildcard as we don't know about the remote devices, so instead we leave it
+	// as-is, so that the federation sender can send it on with the wildcard intact.
 	if domain == t.ServerName && ise.DeviceID == "*" {
 		devs, err := t.DeviceDB.GetDevicesByLocalpart(context.TODO(), localpart)
 		if err != nil {
