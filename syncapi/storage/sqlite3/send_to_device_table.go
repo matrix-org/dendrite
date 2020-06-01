@@ -47,6 +47,12 @@ const insertSendToDeviceMessageSQL = `
 	  VALUES ($1, $2, $3)
 `
 
+const countSendToDeviceMessagesSQL = `
+	SELECT COUNT(*)
+	  FROM syncapi_send_to_device
+	  WHERE user_id = $1 AND device_id = $2
+`
+
 const selectSendToDeviceMessagesSQL = `
 	SELECT id, user_id, device_id, content, sent_by_token
 	  FROM syncapi_send_to_device
@@ -66,12 +72,16 @@ const deleteSendToDeviceMessagesSQL = `
 type sendToDeviceStatements struct {
 	insertSendToDeviceMessageStmt  *sql.Stmt
 	selectSendToDeviceMessagesStmt *sql.Stmt
+	countSendToDeviceMessagesStmt  *sql.Stmt
 }
 
 func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 	s := &sendToDeviceStatements{}
 	_, err := db.Exec(sendToDeviceSchema)
 	if err != nil {
+		return nil, err
+	}
+	if s.countSendToDeviceMessagesStmt, err = db.Prepare(countSendToDeviceMessagesSQL); err != nil {
 		return nil, err
 	}
 	if s.insertSendToDeviceMessageStmt, err = db.Prepare(insertSendToDeviceMessageSQL); err != nil {
@@ -88,6 +98,16 @@ func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 ) (err error) {
 	_, err = internal.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
 	return
+}
+
+func (s *sendToDeviceStatements) CountSendToDeviceMessages(
+	ctx context.Context, txn *sql.Tx, userID, deviceID string,
+) (count int, err error) {
+	row := internal.TxStmt(txn, s.countSendToDeviceMessagesStmt).QueryRowContext(ctx, userID, deviceID)
+	if err = row.Scan(&count); err != nil {
+		return
+	}
+	return count, nil
 }
 
 func (s *sendToDeviceStatements) SelectSendToDeviceMessages(

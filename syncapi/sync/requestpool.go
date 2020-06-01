@@ -66,7 +66,16 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 	currPos := rp.notifier.CurrentPosition()
 
-	if shouldReturnImmediately(syncReq) {
+	returnImmediately := shouldReturnImmediately(syncReq)
+	if !returnImmediately {
+		if waiting, werr := rp.db.SendToDeviceUpdatesWaiting(
+			context.TODO(), nil, device.UserID, device.ID,
+		); werr == nil {
+			returnImmediately = waiting
+		}
+	}
+
+	if returnImmediately {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
@@ -118,7 +127,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// response. This ensures that we don't waste the hard work
 		// of calculating the sync only to get timed out before we
 		// can respond
-
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
@@ -139,7 +147,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	res = types.NewResponse()
 
 	// See if we have any new tasks to do for the send-to-device messaging.
-	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, latestPos)
+	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, *req.since)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +158,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	defer func() {
 		if len(updates) > 0 || len(deletions) > 0 {
 			// Handle the updates and deletions in the database.
-			err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, latestPos)
+			err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, *req.since)
 			if err != nil {
 				return
 			}
@@ -169,15 +177,6 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 			}
 		}
 	}()
-
-	if len(events) > 0 {
-		// This is a bit of a hack until we can do something better with the sync API
-		// than this mess. If we have pending send-to-device updates then we want to
-		// deliver them pretty quickly. We still want the next step to run so that the
-		// sync tokens are updated properly. Set a zero timeout on the next step so
-		// that we return immediately.
-		req.timeout = 0
-	}
 
 	// TODO: handle ignored users
 	if req.since == nil {

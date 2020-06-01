@@ -1035,6 +1035,17 @@ func (d *Database) currentStateStreamEventsForRoom(
 	return s, nil
 }
 
+func (d *Database) SendToDeviceUpdatesWaiting(
+	ctx context.Context, txn *sql.Tx,
+	userID, deviceID string,
+) (bool, error) {
+	count, err := d.SendToDevice.CountSendToDeviceMessages(ctx, txn, userID, deviceID)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (d *Database) AddSendToDeviceEvent(
 	ctx context.Context, txn *sql.Tx,
 	userID, deviceID, content string,

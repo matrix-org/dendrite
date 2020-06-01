@@ -115,8 +115,9 @@ func (t *EDUCache) AddTypingUser(
 func (t *EDUCache) AddSendToDeviceMessage() int64 {
 	t.Lock()
 	defer t.Unlock()
+	latestSyncPosition := t.latestSyncPosition
 	t.latestSyncPosition++
-	return t.latestSyncPosition
+	return latestSyncPosition
 }
 
 // addUser with mutex lock & replace the previous timer.

@@ -16,6 +16,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -114,4 +115,6 @@ type Database interface {
 	StoreNewSendForDeviceMessage(ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
 	// CleanSendToDeviceUpdates will update or remove any send-to-device updates based on the given sync.
 	CleanSendToDeviceUpdates(ctx context.Context, toUpdate, toDelete []types.SendToDeviceNID, token types.StreamingToken) (err error)
+	// SendToDeviceUpdatesWaiting returns true if there are send-to-device updates waiting to be sent.
+	SendToDeviceUpdatesWaiting(ctx context.Context, txn *sql.Tx, userID, deviceID string) (bool, error)
 }
