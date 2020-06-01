@@ -27,8 +27,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 
-	// Import the postgres database driver.
-	_ "github.com/mattn/go-sqlite3"
+	// Import the sqlite3 database driver.
+	"github.com/mattn/go-sqlite3"
 )
 
 // Database represents an account database
@@ -172,7 +172,7 @@ func (d *Database) createAccount(
 		}
 	}
 	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
-		if internal.IsUniqueConstraintViolationErr(err) {
+		if errors.Is(err, sqlite3.ErrConstraint) {
 			return nil, internal.ErrUserExists
 		}
 		return nil, err
