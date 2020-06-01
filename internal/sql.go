@@ -123,14 +123,14 @@ type TransactionWriter struct {
 // transactionWriterTask represents a specific task.
 type transactionWriterTask struct {
 	db   *sql.DB
-	f    func(txn *sql.Tx)
-	wait chan struct{}
+	f    func(txn *sql.Tx) error
+	wait chan error
 }
 
 // Do queues a task to be run by a TransactionWriter. The function
 // provided will be ran within a transaction as supplied by the
 // database parameter. This will block until the task is finished.
-func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx)) {
+func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx) error) error {
 	if w.todo == nil {
 		w.todo = make(chan transactionWriterTask)
 	}
@@ -140,10 +140,10 @@ func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx)) {
 	task := transactionWriterTask{
 		db:   db,
 		f:    f,
-		wait: make(chan struct{}),
+		wait: make(chan error, 1),
 	}
 	w.todo <- task
-	<-task.wait
+	return <-task.wait
 }
 
 // run processes the tasks for a given transaction writer. Only one
@@ -156,9 +156,8 @@ func (w *TransactionWriter) run() {
 	}
 	defer w.running.Store(false)
 	for task := range w.todo {
-		_ = WithTransaction(task.db, func(txn *sql.Tx) error {
-			task.f(txn)
-			return nil
+		task.wait <- WithTransaction(task.db, func(txn *sql.Tx) error {
+			return task.f(txn)
 		})
 		close(task.wait)
 	}

@@ -1078,8 +1078,8 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	}
 	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
 	// that we don't lock the table for writes in more than one place.
-	d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) {
-		err = d.AddSendToDeviceEvent(
+	err = d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) error {
+		return d.AddSendToDeviceEvent(
 			ctx, txn, userID, deviceID, string(j),
 		)
 	})
@@ -1143,18 +1143,18 @@ func (d *Database) CleanSendToDeviceUpdates(
 	// If we need to write to the database then we'll ask the SendToDeviceWriter to
 	// do that for us. It'll guarantee that we don't lock the table for writes in
 	// more than one place.
-	d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) {
+	err = d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) error {
 		// Delete any send-to-device messages marked for deletion.
 		if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
-			err = fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)
-			return
+			return fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)
 		}
 
 		// Now update any outstanding send-to-device messages with the new sync token.
 		if e := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); e != nil {
-			err = fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
-			return
+			return fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
 		}
+
+		return nil
 	})
 	return
 }
