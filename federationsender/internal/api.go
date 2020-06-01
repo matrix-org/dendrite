@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/producers"
+	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
@@ -24,6 +25,7 @@ type FederationSenderInternalAPI struct {
 	producer   *producers.RoomserverProducer
 	federation *gomatrixserverlib.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
+	queues     *queue.OutgoingQueues
 }
 
 func NewFederationSenderInternalAPI(
@@ -32,6 +34,7 @@ func NewFederationSenderInternalAPI(
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
 	statistics *types.Statistics,
+	queues *queue.OutgoingQueues,
 ) *FederationSenderInternalAPI {
 	return &FederationSenderInternalAPI{
 		db:         db,
@@ -40,6 +43,7 @@ func NewFederationSenderInternalAPI(
 		federation: federation,
 		keyRing:    keyRing,
 		statistics: statistics,
+		queues:     queues,
 	}
 }
 
@@ -107,6 +111,19 @@ func (f *FederationSenderInternalAPI) SetupHTTP(internalAPIMux *mux.Router) {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := f.PerformDirectoryLookup(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(api.FederationSenderPerformServersAlivePath,
+		internal.MakeInternalAPI("PerformServersAliveRequest", func(req *http.Request) util.JSONResponse {
+			var request api.PerformServersAliveRequest
+			var response api.PerformServersAliveResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := f.PerformServersAlive(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

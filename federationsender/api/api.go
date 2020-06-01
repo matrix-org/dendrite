@@ -42,6 +42,12 @@ type FederationSenderInternalAPI interface {
 		request *PerformLeaveRequest,
 		response *PerformLeaveResponse,
 	) error
+	// Notifies the federation sender that these servers may be online and to retry sending messages.
+	PerformServersAlive(
+		ctx context.Context,
+		request *PerformServersAliveRequest,
+		response *PerformServersAliveResponse,
+	) error
 }
 
 // NewFederationSenderInternalAPIHTTP creates a FederationSenderInternalAPI implemented by talking to a HTTP POST API.
