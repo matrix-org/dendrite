@@ -275,3 +275,16 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 		request.RoomID, len(request.ServerNames),
 	)
 }
+
+// PerformServersAlive implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) PerformServersAlive(
+	ctx context.Context,
+	request *api.PerformServersAliveRequest,
+	response *api.PerformServersAliveResponse,
+) (err error) {
+	for _, srv := range request.Servers {
+		r.queues.RetryServer(srv)
+	}
+
+	return nil
+}

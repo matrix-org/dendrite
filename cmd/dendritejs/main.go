@@ -39,6 +39,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
+
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
@@ -203,7 +204,6 @@ func main() {
 		},
 		KeyDatabase: fetcher,
 	}
-	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node)
 
 	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
@@ -212,6 +212,7 @@ func main() {
 	)
 	fedSenderAPI := federationsender.SetupFederationSenderComponent(base, federation, rsAPI, &keyRing)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
+	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,

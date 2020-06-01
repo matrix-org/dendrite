@@ -47,6 +47,23 @@ type destinationQueue struct {
 	pendingPDUs        []*gomatrixserverlib.HeaderedEvent      // owned by backgroundSend
 	pendingEDUs        []*gomatrixserverlib.EDU                // owned by backgroundSend
 	pendingInvites     []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
+	retryServerCh      chan bool                               // interrupts backoff
+}
+
+// retry will clear the blacklist state and attempt to send built up events to the server,
+// resetting and interrupting any backoff timers.
+func (oq *destinationQueue) retry() {
+	// TODO: We don't send all events in the case where the server has been blacklisted as we
+	// drop events instead then. This means we will send the oldest N events (chan size, currently 128)
+	// and then skip ahead a lot which feels non-ideal but equally we can't persist thousands of events
+	// in-memory to maybe-send it one day. Ideally we would just shove these pending events in a database
+	// so we can send a lot of events.
+	oq.statistics.Success()
+	oq.retryServerCh <- true
+	if !oq.running.Load() {
+		log.Infof("Restarting queue for %s", oq.destination)
+		go oq.backgroundSend()
+	}
 }
 
 // Send event adds the event to the pending queue for the destination.
@@ -155,9 +172,13 @@ func (oq *destinationQueue) backgroundSend() {
 		}
 
 		// If we are backing off this server then wait for the
-		// backoff duration to complete first.
+		// backoff duration to complete first, or until explicitly
+		// told to retry.
 		if backoff, duration := oq.statistics.BackoffDuration(); backoff {
-			<-time.After(duration)
+			select {
+			case <-time.After(duration):
+			case <-oq.retryServerCh:
+			}
 		}
 
 		// How many things do we have waiting?

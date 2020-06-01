@@ -18,6 +18,9 @@ const (
 
 	// FederationSenderPerformLeaveRequestPath is the HTTP path for the PerformLeaveRequest API.
 	FederationSenderPerformLeaveRequestPath = "/federationsender/performLeaveRequest"
+
+	// FederationSenderPerformServersAlivePath is the HTTP path for the PerformServersAlive API.
+	FederationSenderPerformServersAlivePath = "/federationsender/performServersAlive"
 )
 
 type PerformDirectoryLookupRequest struct {
@@ -86,5 +89,24 @@ func (h *httpFederationSenderInternalAPI) PerformLeave(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformLeaveRequestPath
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+type PerformServersAliveRequest struct {
+	Servers []gomatrixserverlib.ServerName
+}
+
+type PerformServersAliveResponse struct {
+}
+
+func (h *httpFederationSenderInternalAPI) PerformServersAlive(
+	ctx context.Context,
+	request *PerformServersAliveRequest,
+	response *PerformServersAliveResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformServersAlive")
+	defer span.Finish()
+
+	apiURL := h.federationSenderURL + FederationSenderPerformServersAlivePath
 	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

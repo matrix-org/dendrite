@@ -67,7 +67,7 @@ func SetupFederationSenderComponent(
 
 	queryAPI := internal.NewFederationSenderInternalAPI(
 		federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing,
-		statistics,
+		statistics, queues,
 	)
 
 	queryAPI.SetupHTTP(base.InternalAPIMux)
