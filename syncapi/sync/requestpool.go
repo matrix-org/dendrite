@@ -174,11 +174,9 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		// This is a bit of a hack until we can do something better with the sync API
 		// than this mess. If we have pending send-to-device updates then we want to
 		// deliver them pretty quickly. We still want the next step to run so that the
-		// sync tokens are updated properly. Set a short timeout on the next step so
-		// that we return faster.
-		ctx, cancel := context.WithTimeout(req.ctx, time.Second)
-		defer cancel()
-		req.ctx = ctx
+		// sync tokens are updated properly. Set a zero timeout on the next step so
+		// that we return immediately.
+		req.timeout = 0
 	}
 
 	// TODO: handle ignored users

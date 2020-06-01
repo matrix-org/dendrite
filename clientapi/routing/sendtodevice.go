@@ -33,13 +33,11 @@ func SendToDevice(
 	eventType string, txnID *string,
 ) util.JSONResponse {
 	if txnID != nil {
-		// Try to fetch response from transactionsCache
 		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
 			return *res
 		}
 	}
 
-	// parse the incoming http request
 	var httpReq struct {
 		Messages map[string]map[string]json.RawMessage `json:"messages"`
 	}
@@ -59,8 +57,14 @@ func SendToDevice(
 		}
 	}
 
-	return util.JSONResponse{
+	res := util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
+
+	if txnID != nil {
+		txnCache.AddTransaction(device.AccessToken, *txnID, &res)
+	}
+
+	return res
 }
