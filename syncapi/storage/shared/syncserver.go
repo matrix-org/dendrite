@@ -42,7 +42,7 @@ type Database struct {
 	CurrentRoomState    tables.CurrentRoomState
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
-	SendToDeviceWriter  internal.TransactionWriter
+	SendToDeviceWriter  *internal.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
 

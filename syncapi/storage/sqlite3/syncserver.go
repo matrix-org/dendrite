@@ -108,6 +108,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		CurrentRoomState:    roomState,
 		Topology:            topology,
 		SendToDevice:        sendToDevice,
+		SendToDeviceWriter:  internal.NewTransactionWriter(),
 		EDUCache:            cache.New(),
 	}
 	return nil

@@ -82,6 +82,7 @@ func NewDatabase(dbDataSourceName string, dbProperties internal.DbProperties) (*
 		CurrentRoomState:    currState,
 		BackwardExtremities: backwardExtremities,
 		SendToDevice:        sendToDevice,
+		SendToDeviceWriter:  internal.NewTransactionWriter(),
 		EDUCache:            cache.New(),
 	}
 	return &d, nil

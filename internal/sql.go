@@ -18,6 +18,7 @@ package internal
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"runtime"
 	"time"
@@ -120,6 +121,12 @@ type TransactionWriter struct {
 	todo    chan transactionWriterTask
 }
 
+func NewTransactionWriter() *TransactionWriter {
+	return &TransactionWriter{
+		todo: make(chan transactionWriterTask),
+	}
+}
+
 // transactionWriterTask represents a specific task.
 type transactionWriterTask struct {
 	db   *sql.DB
@@ -132,7 +139,7 @@ type transactionWriterTask struct {
 // database parameter. This will block until the task is finished.
 func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx) error) error {
 	if w.todo == nil {
-		w.todo = make(chan transactionWriterTask)
+		return errors.New("not initialised")
 	}
 	if !w.running.Load() {
 		go w.run()
