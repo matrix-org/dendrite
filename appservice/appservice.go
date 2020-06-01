@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice/workers"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
@@ -120,7 +121,7 @@ func generateAppServiceAccount(
 	// Create an account for the application service
 	_, err := accountsDB.CreateAccount(ctx, as.SenderLocalpart, "", as.ID)
 	if err != nil {
-		if errors.Is(err, accounts.ErrUserExists) { // This account already exists
+		if errors.Is(err, internal.ErrUserExists) { // This account already exists
 			return nil
 		}
 		return err

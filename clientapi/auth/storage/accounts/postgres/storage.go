@@ -21,7 +21,6 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -165,7 +164,7 @@ func (d *Database) createAccount(
 	}
 	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		if internal.IsUniqueConstraintViolationErr(err) {
-			return nil, accounts.ErrUserExists
+			return nil, internal.ErrUserExists
 		}
 		return nil, err
 	}
