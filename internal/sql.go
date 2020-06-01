@@ -1,4 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
+// Copyright 2017-2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -110,17 +112,24 @@ type DbProperties interface {
 	ConnMaxLifetime() time.Duration
 }
 
+// TransactionWriter allows queuing database writes so that you don't
+// contend on database locks in, e.g. SQLite. Only one task will run
+// at a time on a given TransactionWriter.
 type TransactionWriter struct {
 	running atomic.Bool
 	todo    chan transactionWriterTask
 }
 
+// transactionWriterTask represents a specific task.
 type transactionWriterTask struct {
 	db   *sql.DB
 	f    func(txn *sql.Tx)
 	wait chan struct{}
 }
 
+// Do queues a task to be run by a TransactionWriter. The function
+// provided will be ran within a transaction as supplied by the
+// database parameter. This will block until the task is finished.
 func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx)) {
 	if w.todo == nil {
 		w.todo = make(chan transactionWriterTask)
@@ -137,6 +146,10 @@ func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx)) {
 	<-task.wait
 }
 
+// run processes the tasks for a given transaction writer. Only one
+// of these goroutines will run at a time. A transaction will be
+// opened using the database object from the task and then this will
+// be passed as a parameter to the task function.
 func (w *TransactionWriter) run() {
 	if !w.running.CAS(false, true) {
 		return
