@@ -55,3 +55,6 @@ type Database interface {
 // Err3PIDInUse is the error returned when trying to save an association involving
 // a third-party identifier which is already associated to a local user.
 var Err3PIDInUse = errors.New("This third-party identifier is already in use")
+
+// ErrUserExists is returned if a username already exists in the database.
+var ErrUserExists = errors.New("Username already exists")

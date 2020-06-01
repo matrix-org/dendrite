@@ -830,7 +830,7 @@ func completeRegistration(
 
 	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
 	if err != nil {
-		if errors.Is(err, internal.ErrUserExists) { // user already exists
+		if errors.Is(err, accounts.ErrUserExists) { // user already exists
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
