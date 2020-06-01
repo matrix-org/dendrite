@@ -164,7 +164,7 @@ func (d *Database) createAccount(
 	}
 	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		if internal.IsUniqueConstraintViolationErr(err) {
-			return nil, nil
+			return nil, internal.ErrSQLUserExists
 		}
 		return nil, err
 	}

@@ -16,10 +16,14 @@ package internal
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"runtime"
 	"time"
 )
+
+// ErrUserExists is returned if a username already exists in the database.
+var ErrSQLUserExists = errors.New("Username already exists")
 
 // A Transaction is something that can be committed or rolledback.
 type Transaction interface {
