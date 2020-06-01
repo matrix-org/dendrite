@@ -172,7 +172,7 @@ func TestCorrectStreamWakeup(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	wake := "two"
-	n.wakeupUserDevice(map[string]string{alice: wake}, syncPositionAfter)
+	n.wakeupUserDevice(alice, []string{wake}, syncPositionAfter)
 
 	if result := <-awoken; result != wake {
 		t.Fatalf("expected to wake %q, got %q", wake, result)

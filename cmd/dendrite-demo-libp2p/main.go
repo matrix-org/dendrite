@@ -148,7 +148,7 @@ func main() {
 		&base.Base, keyRing, federation,
 	)
 	eduInputAPI := eduserver.SetupEDUServerComponent(
-		&base.Base, cache.New(),
+		&base.Base, cache.New(), deviceDB,
 	)
 	asAPI := appservice.SetupAppServiceAPIComponent(
 		&base.Base, accountDB, deviceDB, federation, rsAPI, transactions.New(),

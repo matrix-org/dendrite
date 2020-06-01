@@ -69,6 +69,10 @@ func NewDatabase(dbDataSourceName string, dbProperties internal.DbProperties) (*
 	if err != nil {
 		return nil, err
 	}
+	sendToDevice, err := NewPostgresSendToDeviceTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Invites:             invites,
@@ -77,6 +81,8 @@ func NewDatabase(dbDataSourceName string, dbProperties internal.DbProperties) (*
 		Topology:            topology,
 		CurrentRoomState:    currState,
 		BackwardExtremities: backwardExtremities,
+		SendToDevice:        sendToDevice,
+		SendToDeviceWriter:  internal.NewTransactionWriter(),
 		EDUCache:            cache.New(),
 	}
 	return &d, nil

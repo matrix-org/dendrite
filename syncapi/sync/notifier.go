@@ -120,6 +120,18 @@ func (n *Notifier) OnNewEvent(
 	}
 }
 
+func (n *Notifier) OnNewSendToDevice(
+	userID string, deviceIDs []string,
+	posUpdate types.StreamingToken,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+	latestPos := n.currPos.WithUpdates(posUpdate)
+	n.currPos = latestPos
+
+	n.wakeupUserDevice(userID, deviceIDs, latestPos)
+}
+
 // GetListener returns a UserStreamListener that can be used to wait for
 // updates for a user. Must be closed.
 // notify for anything before sincePos
@@ -189,8 +201,8 @@ func (n *Notifier) wakeupUsers(userIDs []string, newPos types.StreamingToken) {
 // wakeupUserDevice will wake up the sync stream for a specific user device. Other
 // device streams will be left alone.
 // nolint:unused
-func (n *Notifier) wakeupUserDevice(userDevices map[string]string, newPos types.StreamingToken) {
-	for userID, deviceID := range userDevices {
+func (n *Notifier) wakeupUserDevice(userID string, deviceIDs []string, newPos types.StreamingToken) {
+	for _, deviceID := range deviceIDs {
 		if stream := n.fetchUserDeviceStream(userID, deviceID, false); stream != nil {
 			stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 		}

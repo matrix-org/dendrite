@@ -55,10 +55,12 @@ type Database interface {
 	// sync response for the given user. Events returned will include any client
 	// transaction IDs associated with the given device. These transaction IDs come
 	// from when the device sent the event via an API that included a transaction
-	// ID.
-	IncrementalSync(ctx context.Context, device authtypes.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
-	// CompleteSync returns a complete /sync API response for the given user.
-	CompleteSync(ctx context.Context, device authtypes.Device, numRecentEventsPerRoom int) (*types.Response, error)
+	// ID. A response object must be provided for IncrementaSync to populate - it
+	// will not create one.
+	IncrementalSync(ctx context.Context, res *types.Response, device authtypes.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
+	// CompleteSync returns a complete /sync API response for the given user. A response object
+	// must be provided for CompleteSync to populate - it will not create one.
+	CompleteSync(ctx context.Context, res *types.Response, device authtypes.Device, numRecentEventsPerRoom int) (*types.Response, error)
 	// GetAccountDataInRange returns all account data for a given user inserted or
 	// updated between two given positions
 	// Returns a map following the format data[roomID] = []dataTypes
@@ -104,4 +106,26 @@ type Database interface {
 	StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent
 	// SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 	SyncStreamPosition(ctx context.Context) (types.StreamPosition, error)
+	// AddSendToDevice increases the EDU position in the cache and returns the stream position.
+	AddSendToDevice() types.StreamPosition
+	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns three lists:
+	// - "events": a list of send-to-device events that should be included in the sync
+	// - "changes": a list of send-to-device events that should be updated in the database by
+	//      CleanSendToDeviceUpdates
+	// - "deletions": a list of send-to-device events which have been confirmed as sent and
+	//      can be deleted altogether by CleanSendToDeviceUpdates
+	// The token supplied should be the current requested sync token, e.g. from the "since"
+	// parameter.
+	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, token types.StreamingToken) (events []types.SendToDeviceEvent, changes []types.SendToDeviceNID, deletions []types.SendToDeviceNID, err error)
+	// StoreNewSendForDeviceMessage stores a new send-to-device event for a user's device.
+	StoreNewSendForDeviceMessage(ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
+	// CleanSendToDeviceUpdates will update or remove any send-to-device updates based on the
+	// result to a previous call to SendDeviceUpdatesForSync. This is separate as it allows
+	// SendToDeviceUpdatesForSync to be called multiple times if needed (e.g. before and after
+	// starting to wait for an incremental sync with timeout).
+	// The token supplied should be the current requested sync token, e.g. from the "since"
+	// parameter.
+	CleanSendToDeviceUpdates(ctx context.Context, toUpdate, toDelete []types.SendToDeviceNID, token types.StreamingToken) (err error)
+	// SendToDeviceUpdatesWaiting returns true if there are send-to-device updates waiting to be sent.
+	SendToDeviceUpdatesWaiting(ctx context.Context, userID, deviceID string) (bool, error)
 }
