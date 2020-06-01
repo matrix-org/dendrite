@@ -41,9 +41,9 @@ type TypingEvent struct {
 	Typing bool   `json:"typing"`
 }
 
-// OutputTypingEvent is an entry in typing server output kafka log.
-// This contains the event with extra fields used to create 'm.typing' event
-// in clientapi & federation.
+// OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.
+// This contains the full event content, along with the user ID and device ID
+// to which it is destined.
 type OutputSendToDeviceEvent struct {
 	UserID   string `json:"user_id"`
 	DeviceID string `json:"device_id"`

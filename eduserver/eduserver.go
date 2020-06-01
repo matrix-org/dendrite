@@ -38,7 +38,7 @@ func SetupEDUServerComponent(
 		DeviceDB:                     deviceDB,
 		Producer:                     base.KafkaProducer,
 		OutputTypingEventTopic:       string(base.Cfg.Kafka.Topics.OutputTypingEvent),
-		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEventTopic),
+		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEvent),
 		ServerName:                   base.Cfg.Matrix.ServerName,
 	}
 

@@ -176,6 +176,7 @@ func main() {
 	cfg.Database.SyncAPI = "file:/idb/dendritejs_syncapi.db"
 	cfg.Kafka.Topics.UserUpdates = "user_updates"
 	cfg.Kafka.Topics.OutputTypingEvent = "output_typing_event"
+	cfg.Kafka.Topics.OutputSendToDeviceEvent = "output_send_to_device_event"
 	cfg.Kafka.Topics.OutputClientData = "output_client_data"
 	cfg.Kafka.Topics.OutputRoomEvent = "output_room_event"
 	cfg.Matrix.TrustedIDServers = []string{

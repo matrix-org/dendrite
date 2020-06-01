@@ -48,7 +48,7 @@ func NewOutputSendToDeviceEventConsumer(
 ) *OutputSendToDeviceEventConsumer {
 
 	consumer := internal.ContinualConsumer{
-		Topic:          string(cfg.Kafka.Topics.OutputSendToDeviceEventTopic),
+		Topic:          string(cfg.Kafka.Topics.OutputSendToDeviceEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

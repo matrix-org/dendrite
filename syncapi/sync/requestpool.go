@@ -68,16 +68,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 
 	currPos := rp.notifier.CurrentPosition()
 
-	returnImmediately := shouldReturnImmediately(syncReq)
-	if !returnImmediately {
-		if waiting, werr := rp.db.SendToDeviceUpdatesWaiting(
-			context.TODO(), nil, device.UserID, device.ID,
-		); werr == nil {
-			returnImmediately = waiting
-		}
-	}
-
-	if returnImmediately {
+	if rp.shouldReturnImmediately(syncReq) {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
@@ -159,32 +150,6 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		return nil, err
 	}
 
-	// Before we return the sync response, make sure that we take action on
-	// any send-to-device database updates or deletions that we need to do.
-	// Then add the updates into the sync response.
-	defer func() {
-		if len(updates) > 0 || len(deletions) > 0 {
-			// Handle the updates and deletions in the database.
-			err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, since)
-			if err != nil {
-				return
-			}
-		}
-		if len(events) > 0 {
-			// Add the updates into the sync response.
-			for _, event := range events {
-				res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
-			}
-
-			// Get the next_batch from the sync response and increase the
-			// EDU counter.
-			if pos, perr := types.NewStreamTokenFromString(res.NextBatch); perr == nil {
-				pos.Positions[1]++
-				res.NextBatch = pos.String()
-			}
-		}
-	}()
-
 	// TODO: handle ignored users
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
@@ -197,6 +162,34 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
 	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
+	if err != nil {
+		return
+	}
+
+	// Before we return the sync response, make sure that we take action on
+	// any send-to-device database updates or deletions that we need to do.
+	// Then add the updates into the sync response.
+	if len(updates) > 0 || len(deletions) > 0 {
+		// Handle the updates and deletions in the database.
+		err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, since)
+		if err != nil {
+			return
+		}
+	}
+	if len(events) > 0 {
+		// Add the updates into the sync response.
+		for _, event := range events {
+			res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
+		}
+
+		// Get the next_batch from the sync response and increase the
+		// EDU counter.
+		if pos, perr := types.NewStreamTokenFromString(res.NextBatch); perr == nil {
+			pos.Positions[1]++
+			res.NextBatch = pos.String()
+		}
+	}
+
 	return
 }
 
@@ -288,6 +281,10 @@ func (rp *RequestPool) appendAccountData(
 // shouldReturnImmediately returns whether the /sync request is an initial sync,
 // or timeout=0, or full_state=true, in any of the cases the request should
 // return immediately.
-func shouldReturnImmediately(syncReq *syncRequest) bool {
-	return syncReq.since == nil || syncReq.timeout == 0 || syncReq.wantFullState
+func (rp *RequestPool) shouldReturnImmediately(syncReq *syncRequest) bool {
+	if syncReq.since == nil || syncReq.timeout == 0 || syncReq.wantFullState {
+		return true
+	}
+	waiting, werr := rp.db.SendToDeviceUpdatesWaiting(context.TODO(), syncReq.device.UserID, syncReq.device.ID)
+	return werr == nil && waiting
 }

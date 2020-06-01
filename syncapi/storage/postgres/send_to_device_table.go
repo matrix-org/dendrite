@@ -38,8 +38,9 @@ CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 	device_id TEXT NOT NULL,
 	-- The event content JSON.
 	content TEXT NOT NULL,
-	-- The sync token that was supplied when we tried to send the message,
-	-- or NULL if we haven't tried to send it yet.
+	-- The token that was supplied to the /sync at the time that this
+	-- message was included in a sync response, or NULL if we haven't
+	-- included it in a /sync response yet.
 	sent_by_token TEXT
 );
 `
