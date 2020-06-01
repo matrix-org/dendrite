@@ -121,7 +121,7 @@ func generateAppServiceAccount(
 	// Create an account for the application service
 	_, err := accountsDB.CreateAccount(ctx, as.SenderLocalpart, "", as.ID)
 	if err != nil {
-		if errors.Is(err, internal.ErrSQLUserExists) { // This account already exists
+		if errors.Is(err, internal.ErrUserExists) { // This account already exists
 			return nil
 		}
 		return err
