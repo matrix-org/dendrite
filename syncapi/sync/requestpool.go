@@ -146,8 +146,13 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
 	res = types.NewResponse()
 
+	since := types.NewStreamToken(0, 0)
+	if req.since != nil {
+		since = *req.since
+	}
+
 	// See if we have any new tasks to do for the send-to-device messaging.
-	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, *req.since)
+	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, since)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +163,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	defer func() {
 		if len(updates) > 0 || len(deletions) > 0 {
 			// Handle the updates and deletions in the database.
-			err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, *req.since)
+			err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, since)
 			if err != nil {
 				return
 			}
