@@ -16,22 +16,10 @@
 
 package internal
 
-import (
-	"errors"
+import "github.com/lib/pq"
 
-	"github.com/lib/pq"
-	"github.com/mattn/go-sqlite3"
-)
-
-// IsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation or sqlite3.ErrConstraint
+// IsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation error
 func IsUniqueConstraintViolationErr(err error) bool {
 	pqErr, ok := err.(*pq.Error)
-	if ok {
-		return pqErr.Code == "23505"
-	}
-	sqliteErr, ok := err.(*sqlite3.Error)
-	if ok {
-		return errors.Is(sqliteErr, sqlite3.ErrConstraint)
-	}
-	return false
+	return ok && pqErr.Code == "23505"
 }
