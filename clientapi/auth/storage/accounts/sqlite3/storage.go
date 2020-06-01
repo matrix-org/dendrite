@@ -26,9 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
-
 	// Import the sqlite3 database driver.
-	"github.com/mattn/go-sqlite3"
 )
 
 // Database represents an account database
@@ -172,7 +170,7 @@ func (d *Database) createAccount(
 		}
 	}
 	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
-		if errors.Is(err, sqlite3.ErrConstraint) {
+		if isConstraintError(err) {
 			return nil, internal.ErrUserExists
 		}
 		return nil, err
