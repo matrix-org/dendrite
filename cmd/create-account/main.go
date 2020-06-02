@@ -69,12 +69,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	account, err := accountDB.CreateAccount(context.Background(), *username, *password, "")
+	_, err = accountDB.CreateAccount(context.Background(), *username, *password, "")
 	if err != nil {
 		fmt.Println(err.Error())
-		os.Exit(1)
-	} else if account == nil {
-		fmt.Println("Username already exists")
 		os.Exit(1)
 	}
 

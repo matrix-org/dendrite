@@ -22,6 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -98,36 +100,37 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
-func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(eventTypesSchema)
+func NewPostgresEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+	s := &eventTypeStatements{}
+	_, err := db.Exec(eventTypesSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
 		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *eventTypeStatements) insertEventTypeNID(
-	ctx context.Context, eventType string,
+func (s *eventTypeStatements) InsertEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.insertEventTypeNIDStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	err := txn.Stmt(s.insertEventTypeNIDStmt).QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) selectEventTypeNID(
-	ctx context.Context, eventType string,
+func (s *eventTypeStatements) SelectEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.selectEventTypeNIDStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	err := txn.Stmt(s.selectEventTypeNIDStmt).QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) bulkSelectEventTypeNID(
+func (s *eventTypeStatements) BulkSelectEventTypeNID(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
 	rows, err := s.bulkSelectEventTypeNIDStmt.QueryContext(ctx, pq.StringArray(eventTypes))

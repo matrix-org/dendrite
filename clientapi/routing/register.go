@@ -830,14 +830,15 @@ func completeRegistration(
 
 	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
 	if err != nil {
+		if errors.Is(err, internal.ErrUserExists) { // user already exists
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+			}
+		}
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
-		}
-	} else if acc == nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.UserInUse("Desired user ID is already taken."),
 		}
 	}
 

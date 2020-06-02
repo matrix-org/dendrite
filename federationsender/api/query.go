@@ -11,10 +11,10 @@ import (
 )
 
 // FederationSenderQueryJoinedHostsInRoomPath is the HTTP path for the QueryJoinedHostsInRoom API.
-const FederationSenderQueryJoinedHostsInRoomPath = "/api/federationsender/queryJoinedHostsInRoom"
+const FederationSenderQueryJoinedHostsInRoomPath = "/federationsender/queryJoinedHostsInRoom"
 
 // FederationSenderQueryJoinedHostServerNamesInRoomPath is the HTTP path for the QueryJoinedHostServerNamesInRoom API.
-const FederationSenderQueryJoinedHostServerNamesInRoomPath = "/api/federationsender/queryJoinedHostServerNamesInRoom"
+const FederationSenderQueryJoinedHostServerNamesInRoomPath = "/federationsender/queryJoinedHostServerNamesInRoom"
 
 // QueryJoinedHostsInRoomRequest is a request to QueryJoinedHostsInRoom
 type QueryJoinedHostsInRoomRequest struct {

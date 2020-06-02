@@ -33,7 +33,7 @@ func NewDatabase(
 	}
 	switch uri.Scheme {
 	case "file":
-		return sqlite3.NewDatabase(dataSourceName)
+		return sqlite3.NewDatabase(uri.Path)
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	default:

@@ -103,7 +103,7 @@ type InputRoomEventsResponse struct {
 }
 
 // RoomserverInputRoomEventsPath is the HTTP path for the InputRoomEvents API.
-const RoomserverInputRoomEventsPath = "/api/roomserver/inputRoomEvents"
+const RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 // InputRoomEvents implements RoomserverInputAPI
 func (h *httpRoomserverInternalAPI) InputRoomEvents(

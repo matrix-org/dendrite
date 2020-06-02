@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -64,30 +66,31 @@ type stateSnapshotStatements struct {
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 
-func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(stateSnapshotSchema)
+func NewPostgresStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
+	s := &stateSnapshotStatements{}
+	_, err := db.Exec(stateSnapshotSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertStateStmt, insertStateSQL},
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *stateSnapshotStatements) insertState(
-	ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
+func (s *stateSnapshotStatements) InsertState(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
 ) (stateNID types.StateSnapshotNID, err error) {
 	nids := make([]int64, len(stateBlockNIDs))
 	for i := range stateBlockNIDs {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
-	err = s.insertStateStmt.QueryRowContext(ctx, int64(roomNID), pq.Int64Array(nids)).Scan(&stateNID)
+	err = txn.Stmt(s.insertStateStmt).QueryRowContext(ctx, int64(roomNID), pq.Int64Array(nids)).Scan(&stateNID)
 	return
 }
 
-func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
+func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
 	nids := make([]int64, len(stateNIDs))

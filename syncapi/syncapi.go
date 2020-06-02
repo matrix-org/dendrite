@@ -78,8 +78,15 @@ func SetupSyncAPIComponent(
 		base.Cfg, base.KafkaConsumer, notifier, syncDB,
 	)
 	if err = typingConsumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start typing server consumer")
+		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
+	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
+		base.Cfg, base.KafkaConsumer, notifier, syncDB,
+	)
+	if err = sendToDeviceConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
+	}
+
+	routing.Setup(base.PublicAPIMux, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
 }

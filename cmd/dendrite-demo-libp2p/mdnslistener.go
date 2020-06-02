@@ -21,12 +21,11 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/matrix-org/dendrite/internal/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type mDNSListener struct {
-	keydb keydb.Database
+	keydb gomatrixserverlib.KeyDatabase
 	host  host.Host
 }
 

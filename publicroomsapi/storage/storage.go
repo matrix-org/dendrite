@@ -22,23 +22,24 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/postgres"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const schemePostgres = "postgres"
 const schemeFile = "file"
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties internal.DbProperties) (Database, error) {
+func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties internal.DbProperties, localServerName gomatrixserverlib.ServerName) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties)
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties, localServerName)
 	}
 	switch uri.Scheme {
 	case schemePostgres:
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties)
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties, localServerName)
 	case schemeFile:
-		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
+		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName, localServerName)
 	default:
-		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties)
+		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties, localServerName)
 	}
 }

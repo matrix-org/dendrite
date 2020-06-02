@@ -30,20 +30,22 @@ import (
 type PublicRoomsServerDatabase struct {
 	db *sql.DB
 	internal.PartitionOffsetStatements
-	statements publicRoomsStatements
+	statements      publicRoomsStatements
+	localServerName gomatrixserverlib.ServerName
 }
 
 type attributeValue interface{}
 
 // NewPublicRoomsServerDatabase creates a new public rooms server database.
-func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties internal.DbProperties) (*PublicRoomsServerDatabase, error) {
+func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties internal.DbProperties, localServerName gomatrixserverlib.ServerName) (*PublicRoomsServerDatabase, error) {
 	var db *sql.DB
 	var err error
 	if db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
 		return nil, err
 	}
 	storage := PublicRoomsServerDatabase{
-		db: db,
+		db:              db,
+		localServerName: localServerName,
 	}
 	if err = storage.PartitionOffsetStatements.Prepare(db, "publicroomsapi"); err != nil {
 		return nil, err
@@ -243,6 +245,9 @@ func (d *PublicRoomsServerDatabase) updateBooleanAttribute(
 func (d *PublicRoomsServerDatabase) updateRoomAliases(
 	ctx context.Context, aliasesEvent gomatrixserverlib.Event,
 ) error {
+	if aliasesEvent.StateKey() == nil || *aliasesEvent.StateKey() != string(d.localServerName) {
+		return nil // only store our own aliases
+	}
 	var content internal.AliasesContent
 	if err := json.Unmarshal(aliasesEvent.Content(), &content); err != nil {
 		return err

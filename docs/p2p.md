@@ -1,6 +1,6 @@
 ## Peer-to-peer Matrix
 
-These are the instructions for setting up P2P Dendrite, current as of March 2020. There's both Go stuff and JS stuff to do to set this up.
+These are the instructions for setting up P2P Dendrite, current as of May 2020. There's both Go stuff and JS stuff to do to set this up.
 
 
 ### Dendrite
@@ -28,14 +28,13 @@ Then use `/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/`.
 
 ### Riot-web
 
-You need to check out these repos:
+You need to check out this repo:
 
 ```
 $ git clone git@github.com:matrix-org/go-http-js-libp2p.git
-$ git clone git@github.com:matrix-org/go-sqlite3-js.git
 ```
 
-Make sure to `yarn install` in both of these repos. Then:
+Make sure to `yarn install` in the repo. Then:
 
 - `$ cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" ./src/vector/`
 - Comment out the lines in `wasm_exec.js` which contains:
@@ -49,7 +48,6 @@ if (!global.fs && global.require) {
 - Add the following symlinks: they HAVE to be symlinks as the diff in `webpack.config.js` references specific paths.
 ```
 $ cd node_modules
-$ ln -s ../../go-sqlite-js # NB: NOT go-sqlite3-js
 $ ln -s ../../go-http-js-libp2p
 ```
 
@@ -65,14 +63,7 @@ You need a Chrome and a Firefox running to test locally as service workers don't
 
 Assuming you've `yarn start`ed Riot-Web, go to `http://localhost:8080` and register with `http://localhost:8080` as your HS URL.
 
-You can join rooms by room alias e.g `/join #foo:bar`.
-
-### Known issues
-
-- When registering you may be unable to find the server, it'll seem flakey. This happens because the SW, particularly in Firefox,
-  gets killed after 30s of inactivity. When you are not registered, you aren't doing `/sync` calls to keep the SW alive, so if you
-  don't register for a while and idle on the page, the HS will disappear. To fix, unregister the SW, and then refresh the page.
-
-- The libp2p layer has rate limits, so frequent Federation traffic may cause the connection to drop and messages to not be transferred.
-  I guess in other words, don't send too much traffic?
-
+You can:
+ - join rooms by room alias e.g `/join #foo:bar`.
+ - invite specific users to a room.
+ - explore the published room list. All members of the room can re-publish aliases (unlike Synapse).

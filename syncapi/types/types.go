@@ -296,13 +296,14 @@ type Response struct {
 		Invite map[string]InviteResponse `json:"invite"`
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
+	ToDevice struct {
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
+	} `json:"to_device"`
 }
 
 // NewResponse creates an empty response with initialised maps.
-func NewResponse(token StreamingToken) *Response {
-	res := Response{
-		NextBatch: token.String(),
-	}
+func NewResponse() *Response {
+	res := Response{}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
 	res.Rooms.Join = make(map[string]JoinResponse)
@@ -315,6 +316,7 @@ func NewResponse(token StreamingToken) *Response {
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
 	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.ToDevice.Events = make([]gomatrixserverlib.SendToDeviceEvent, 0)
 
 	return &res
 }
@@ -326,7 +328,8 @@ func (r *Response) IsEmpty() bool {
 		len(r.Rooms.Invite) == 0 &&
 		len(r.Rooms.Leave) == 0 &&
 		len(r.AccountData.Events) == 0 &&
-		len(r.Presence.Events) == 0
+		len(r.Presence.Events) == 0 &&
+		len(r.ToDevice.Events) == 0
 }
 
 // JoinResponse represents a /sync response for a room which is under the 'join' key.
@@ -392,4 +395,14 @@ func NewLeaveResponse() *LeaveResponse {
 	res.State.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	return &res
+}
+
+type SendToDeviceNID int
+
+type SendToDeviceEvent struct {
+	gomatrixserverlib.SendToDeviceEvent
+	ID          SendToDeviceNID
+	UserID      string
+	DeviceID    string
+	SentByToken *StreamingToken
 }

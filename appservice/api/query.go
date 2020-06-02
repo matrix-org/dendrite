@@ -84,10 +84,10 @@ type AppServiceQueryAPI interface {
 }
 
 // AppServiceRoomAliasExistsPath is the HTTP path for the RoomAliasExists API
-const AppServiceRoomAliasExistsPath = "/api/appservice/RoomAliasExists"
+const AppServiceRoomAliasExistsPath = "/appservice/RoomAliasExists"
 
 // AppServiceUserIDExistsPath is the HTTP path for the UserIDExists API
-const AppServiceUserIDExistsPath = "/api/appservice/UserIDExists"
+const AppServiceUserIDExistsPath = "/appservice/UserIDExists"
 
 // httpAppServiceQueryAPI contains the URL to an appservice query API and a
 // reference to a httpClient used to reach it

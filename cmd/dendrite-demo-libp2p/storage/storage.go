@@ -23,39 +23,40 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-libp2p/storage/postgreswithpubsub"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const schemePostgres = "postgres"
 const schemeFile = "file"
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func NewPublicRoomsServerDatabaseWithDHT(dataSourceName string, dht *dht.IpfsDHT) (storage.Database, error) {
+func NewPublicRoomsServerDatabaseWithDHT(dataSourceName string, dht *dht.IpfsDHT, localServerName gomatrixserverlib.ServerName) (storage.Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgreswithdht.NewPublicRoomsServerDatabase(dataSourceName, dht)
+		return postgreswithdht.NewPublicRoomsServerDatabase(dataSourceName, dht, localServerName)
 	}
 	switch uri.Scheme {
 	case schemePostgres:
-		return postgreswithdht.NewPublicRoomsServerDatabase(dataSourceName, dht)
+		return postgreswithdht.NewPublicRoomsServerDatabase(dataSourceName, dht, localServerName)
 	case schemeFile:
-		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
+		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName, localServerName)
 	default:
-		return postgreswithdht.NewPublicRoomsServerDatabase(dataSourceName, dht)
+		return postgreswithdht.NewPublicRoomsServerDatabase(dataSourceName, dht, localServerName)
 	}
 }
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func NewPublicRoomsServerDatabaseWithPubSub(dataSourceName string, pubsub *pubsub.PubSub) (storage.Database, error) {
+func NewPublicRoomsServerDatabaseWithPubSub(dataSourceName string, pubsub *pubsub.PubSub, localServerName gomatrixserverlib.ServerName) (storage.Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgreswithpubsub.NewPublicRoomsServerDatabase(dataSourceName, pubsub)
+		return postgreswithpubsub.NewPublicRoomsServerDatabase(dataSourceName, pubsub, localServerName)
 	}
 	switch uri.Scheme {
 	case schemePostgres:
-		return postgreswithpubsub.NewPublicRoomsServerDatabase(dataSourceName, pubsub)
+		return postgreswithpubsub.NewPublicRoomsServerDatabase(dataSourceName, pubsub, localServerName)
 	case schemeFile:
-		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName)
+		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName, localServerName)
 	default:
-		return postgreswithpubsub.NewPublicRoomsServerDatabase(dataSourceName, pubsub)
+		return postgreswithpubsub.NewPublicRoomsServerDatabase(dataSourceName, pubsub, localServerName)
 	}
 }

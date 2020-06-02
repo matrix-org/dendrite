@@ -46,8 +46,19 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		supportedVersions = append(supportedVersions, version)
 	}
 
-	// Deduplicate the server names we were provided.
-	util.SortAndUnique(request.ServerNames)
+	// Deduplicate the server names we were provided but keep the ordering
+	// as this encodes useful information about which servers are most likely
+	// to respond.
+	seenSet := make(map[gomatrixserverlib.ServerName]bool)
+	var uniqueList []gomatrixserverlib.ServerName
+	for _, srv := range request.ServerNames {
+		if seenSet[srv] {
+			continue
+		}
+		seenSet[srv] = true
+		uniqueList = append(uniqueList, srv)
+	}
+	request.ServerNames = uniqueList
 
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-join send-join dance.
@@ -263,4 +274,17 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 		"Failed to leave room %q through %d server(s)",
 		request.RoomID, len(request.ServerNames),
 	)
+}
+
+// PerformServersAlive implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) PerformServersAlive(
+	ctx context.Context,
+	request *api.PerformServersAliveRequest,
+	response *api.PerformServersAliveResponse,
+) (err error) {
+	for _, srv := range request.Servers {
+		r.queues.RetryServer(srv)
+	}
+
+	return nil
 }

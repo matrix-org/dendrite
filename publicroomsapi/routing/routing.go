@@ -31,7 +31,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixR0 = "/_matrix/client/r0"
+const pathPrefixR0 = "/client/r0"
 
 // Setup configures the given mux with publicroomsapi server listeners
 //
@@ -39,10 +39,10 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, rsAPI api.RoomserverInternalAPI,
+	publicAPIMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, rsAPI api.RoomserverInternalAPI,
 	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	authData := auth.Data{
 		AccountDB:   nil,
@@ -79,7 +79,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	// Federation - TODO: should this live here or in federation API? It's sure easier if it's here so here it is.
-	apiMux.Handle("/_matrix/federation/v1/publicRooms",
+	publicAPIMux.Handle("/federation/v1/publicRooms",
 		internal.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
 			return directory.GetPostPublicRooms(req, publicRoomsDB)
 		}),

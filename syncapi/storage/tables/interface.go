@@ -1,3 +1,17 @@
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package tables
 
 import (
@@ -93,4 +107,29 @@ type BackwardsExtremities interface {
 	SelectBackwardExtremitiesForRoom(ctx context.Context, roomID string) (bwExtrems map[string][]string, err error)
 	// DeleteBackwardExtremity removes a backwards extremity for a room, if one existed.
 	DeleteBackwardExtremity(ctx context.Context, txn *sql.Tx, roomID, knownEventID string) (err error)
+}
+
+// SendToDevice tracks send-to-device messages which are sent to individual
+// clients. Each message gets inserted into this table at the point that we
+// receive it from the EDU server.
+//
+// We're supposed to try and do our best to deliver send-to-device messages
+// once, but the only way that we can really guarantee that they have been
+// delivered is if the client successfully requests the next sync as given
+// in the next_batch. Each time the device syncs, we will request all of the
+// updates that either haven't been sent yet, along with all updates that we
+// *have* sent but we haven't confirmed to have been received yet. If it's the
+// first time we're sending a given update then we update the table to say
+// what the "since" parameter was when we tried to send it.
+//
+// When the client syncs again, if their "since" parameter is *later* than
+// the recorded one, we drop the entry from the DB as it's "sent". If the
+// sync parameter isn't later then we will keep including the updates in the
+// sync response, as the client is seemingly trying to repeat the same /sync.
+type SendToDevice interface {
+	InsertSendToDeviceMessage(ctx context.Context, txn *sql.Tx, userID, deviceID, content string) (err error)
+	SelectSendToDeviceMessages(ctx context.Context, txn *sql.Tx, userID, deviceID string) (events []types.SendToDeviceEvent, err error)
+	UpdateSentSendToDeviceMessages(ctx context.Context, txn *sql.Tx, token string, nids []types.SendToDeviceNID) (err error)
+	DeleteSendToDeviceMessages(ctx context.Context, txn *sql.Tx, nids []types.SendToDeviceNID) (err error)
+	CountSendToDeviceMessages(ctx context.Context, txn *sql.Tx, userID, deviceID string) (count int, err error)
 }

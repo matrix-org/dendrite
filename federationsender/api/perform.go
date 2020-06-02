@@ -11,13 +11,16 @@ import (
 
 const (
 	// FederationSenderPerformJoinRequestPath is the HTTP path for the PerformJoinRequest API.
-	FederationSenderPerformDirectoryLookupRequestPath = "/api/federationsender/performDirectoryLookup"
+	FederationSenderPerformDirectoryLookupRequestPath = "/federationsender/performDirectoryLookup"
 
 	// FederationSenderPerformJoinRequestPath is the HTTP path for the PerformJoinRequest API.
-	FederationSenderPerformJoinRequestPath = "/api/federationsender/performJoinRequest"
+	FederationSenderPerformJoinRequestPath = "/federationsender/performJoinRequest"
 
 	// FederationSenderPerformLeaveRequestPath is the HTTP path for the PerformLeaveRequest API.
-	FederationSenderPerformLeaveRequestPath = "/api/federationsender/performLeaveRequest"
+	FederationSenderPerformLeaveRequestPath = "/federationsender/performLeaveRequest"
+
+	// FederationSenderPerformServersAlivePath is the HTTP path for the PerformServersAlive API.
+	FederationSenderPerformServersAlivePath = "/federationsender/performServersAlive"
 )
 
 type PerformDirectoryLookupRequest struct {
@@ -44,8 +47,9 @@ func (h *httpFederationSenderInternalAPI) PerformDirectoryLookup(
 }
 
 type PerformJoinRequest struct {
-	RoomID      string                 `json:"room_id"`
-	UserID      string                 `json:"user_id"`
+	RoomID string `json:"room_id"`
+	UserID string `json:"user_id"`
+	// The sorted list of servers to try. Servers will be tried sequentially, after de-duplication.
 	ServerNames types.ServerNames      `json:"server_names"`
 	Content     map[string]interface{} `json:"content"`
 }
@@ -85,5 +89,24 @@ func (h *httpFederationSenderInternalAPI) PerformLeave(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformLeaveRequestPath
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+type PerformServersAliveRequest struct {
+	Servers []gomatrixserverlib.ServerName
+}
+
+type PerformServersAliveResponse struct {
+}
+
+func (h *httpFederationSenderInternalAPI) PerformServersAlive(
+	ctx context.Context,
+	request *PerformServersAliveRequest,
+	response *PerformServersAliveResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformServersAlive")
+	defer span.Finish()
+
+	apiURL := h.federationSenderURL + FederationSenderPerformServersAlivePath
 	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
