@@ -120,7 +120,7 @@ func main() {
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties())
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
