@@ -1,17 +1,20 @@
 package internal
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httpapis"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -170,6 +173,7 @@ func MakeFedAPI(
 	metricsName string,
 	serverName gomatrixserverlib.ServerName,
 	keyRing gomatrixserverlib.KeyRing,
+	wakeup *FederationWakeups,
 	f func(*http.Request, *gomatrixserverlib.FederationRequest) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -179,9 +183,36 @@ func MakeFedAPI(
 		if fedReq == nil {
 			return errResp
 		}
+		go wakeup.Wakeup(req.Context(), fedReq.Origin())
 		return f(req, fedReq)
 	}
 	return MakeExternalAPI(metricsName, h)
+}
+
+type FederationWakeups struct {
+	FsAPI   federationsenderAPI.FederationSenderInternalAPI
+	origins sync.Map
+}
+
+func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib.ServerName) {
+	key, keyok := f.origins.Load(origin)
+	if keyok {
+		lastTime, ok := key.(time.Time)
+		if ok && time.Since(lastTime) < time.Minute {
+			return
+		}
+	}
+	aliveReq := federationsenderAPI.PerformServersAliveRequest{
+		Servers: []gomatrixserverlib.ServerName{origin},
+	}
+	aliveRes := federationsenderAPI.PerformServersAliveResponse{}
+	if err := f.FsAPI.PerformServersAlive(ctx, &aliveReq, &aliveRes); err != nil {
+		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+			"origin": origin,
+		}).Warn("incoming federation request failed to notify server alive")
+	} else {
+		f.origins.Store(origin, time.Now())
+	}
 }
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
