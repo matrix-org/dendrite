@@ -102,9 +102,9 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 			Host:   fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
 		})}
 	}
-  
+
 	httpmux := mux.NewRouter()
-  
+
 	return &BaseDendrite{
 		componentName:  componentName,
 		EnableHTTPAPIs: enableHTTPAPIs,

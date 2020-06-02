@@ -268,9 +268,13 @@ type Dendrite struct {
 	// The config for logging informations. Each hook will be added to logrus.
 	Logging []LogrusHook `yaml:"logging"`
 
+	// The config for setting a proxy to use for server->server requests
 	Proxy *struct {
+		// The protocol for the proxy (http / https / socks5)
 		Protocol string `yaml:"protocol"`
+		// The host where the proxy is listening
 		Host string `yaml:"host"`
+		// The port on which the proxy is listening
 		Port uint16 `yaml:"port"`
 	} `yaml:"proxy"`
 
