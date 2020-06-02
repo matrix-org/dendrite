@@ -1,12 +1,14 @@
 package internal
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -171,7 +173,7 @@ func MakeFedAPI(
 	metricsName string,
 	serverName gomatrixserverlib.ServerName,
 	keyRing gomatrixserverlib.KeyRing,
-	fsAPI federationsenderAPI.FederationSenderInternalAPI,
+	wakeup *FederationWakeups,
 	f func(*http.Request, *gomatrixserverlib.FederationRequest) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -181,24 +183,36 @@ func MakeFedAPI(
 		if fedReq == nil {
 			return errResp
 		}
-		// TODO: should we do this in a goroutine or something?
-		aliveReq := federationsenderAPI.PerformServersAliveRequest{
-			Servers: []gomatrixserverlib.ServerName{
-				fedReq.Origin(),
-			},
-		}
-		aliveRes := federationsenderAPI.PerformServersAliveResponse{}
-		if err := fsAPI.PerformServersAlive(req.Context(), &aliveReq, &aliveRes); err != nil {
-			util.GetLogger(req.Context()).WithError(err).WithFields(logrus.Fields{
-				"origin": fedReq.Origin(),
-			}).Warn("incoming federation request failed to notify server alive")
-		}
+		go wakeup.Wakeup(req.Context(), fedReq.Origin())
 		return f(req, fedReq)
 	}
 	return MakeExternalAPI(metricsName, h)
 }
 
-type IncomingFederationWakeupRequests struct {
+type FederationWakeups struct {
+	FsAPI   federationsenderAPI.FederationSenderInternalAPI
+	origins sync.Map
+}
+
+func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib.ServerName) {
+	key, keyok := f.origins.Load(origin)
+	if keyok {
+		lastTime, ok := key.(time.Time)
+		if ok && time.Since(lastTime) < time.Minute {
+			return
+		}
+	}
+	aliveReq := federationsenderAPI.PerformServersAliveRequest{
+		Servers: []gomatrixserverlib.ServerName{origin},
+	}
+	aliveRes := federationsenderAPI.PerformServersAliveResponse{}
+	if err := f.FsAPI.PerformServersAlive(ctx, &aliveReq, &aliveRes); err != nil {
+		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+			"origin": origin,
+		}).Warn("incoming federation request failed to notify server alive")
+	} else {
+		f.origins.Store(origin, time.Now())
+	}
 }
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
