@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httpapis"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -170,6 +171,7 @@ func MakeFedAPI(
 	metricsName string,
 	serverName gomatrixserverlib.ServerName,
 	keyRing gomatrixserverlib.KeyRing,
+	fsAPI federationsenderAPI.FederationSenderInternalAPI,
 	f func(*http.Request, *gomatrixserverlib.FederationRequest) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -179,9 +181,24 @@ func MakeFedAPI(
 		if fedReq == nil {
 			return errResp
 		}
+		// TODO: should we do this in a goroutine or something?
+		aliveReq := federationsenderAPI.PerformServersAliveRequest{
+			Servers: []gomatrixserverlib.ServerName{
+				fedReq.Origin(),
+			},
+		}
+		aliveRes := federationsenderAPI.PerformServersAliveResponse{}
+		if err := fsAPI.PerformServersAlive(req.Context(), &aliveReq, &aliveRes); err != nil {
+			util.GetLogger(req.Context()).WithError(err).WithFields(logrus.Fields{
+				"origin": fedReq.Origin(),
+			}).Warn("incoming federation request failed to notify server alive")
+		}
 		return f(req, fedReq)
 	}
 	return MakeExternalAPI(metricsName, h)
+}
+
+type IncomingFederationWakeupRequests struct {
 }
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
