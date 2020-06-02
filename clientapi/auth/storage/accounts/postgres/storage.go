@@ -138,7 +138,7 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Accou
 
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
 // for this account. If no password is supplied, the account will be a passwordless account. If the
-// account already exists, it will return nil, nil.
+// account already exists, it will return nil, ErrUserExists.
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
 ) (acc *authtypes.Account, err error) {
@@ -164,7 +164,7 @@ func (d *Database) createAccount(
 	}
 	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		if internal.IsUniqueConstraintViolationErr(err) {
-			return nil, nil
+			return nil, internal.ErrUserExists
 		}
 		return nil, err
 	}

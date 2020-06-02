@@ -39,6 +39,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/syncapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
+
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
@@ -163,18 +164,19 @@ func main() {
 	cfg := &config.Dendrite{}
 	cfg.SetDefaults()
 	cfg.Kafka.UseNaffka = true
-	cfg.Database.Account = "file:dendritejs_account.db"
-	cfg.Database.AppService = "file:dendritejs_appservice.db"
-	cfg.Database.Device = "file:dendritejs_device.db"
-	cfg.Database.FederationSender = "file:dendritejs_fedsender.db"
-	cfg.Database.MediaAPI = "file:dendritejs_mediaapi.db"
-	cfg.Database.Naffka = "file:dendritejs_naffka.db"
-	cfg.Database.PublicRoomsAPI = "file:dendritejs_publicrooms.db"
-	cfg.Database.RoomServer = "file:dendritejs_roomserver.db"
-	cfg.Database.ServerKey = "file:dendritejs_serverkey.db"
-	cfg.Database.SyncAPI = "file:dendritejs_syncapi.db"
+	cfg.Database.Account = "file:/idb/dendritejs_account.db"
+	cfg.Database.AppService = "file:/idb/dendritejs_appservice.db"
+	cfg.Database.Device = "file:/idb/dendritejs_device.db"
+	cfg.Database.FederationSender = "file:/idb/dendritejs_fedsender.db"
+	cfg.Database.MediaAPI = "file:/idb/dendritejs_mediaapi.db"
+	cfg.Database.Naffka = "file:/idb/dendritejs_naffka.db"
+	cfg.Database.PublicRoomsAPI = "file:/idb/dendritejs_publicrooms.db"
+	cfg.Database.RoomServer = "file:/idb/dendritejs_roomserver.db"
+	cfg.Database.ServerKey = "file:/idb/dendritejs_serverkey.db"
+	cfg.Database.SyncAPI = "file:/idb/dendritejs_syncapi.db"
 	cfg.Kafka.Topics.UserUpdates = "user_updates"
 	cfg.Kafka.Topics.OutputTypingEvent = "output_typing_event"
+	cfg.Kafka.Topics.OutputSendToDeviceEvent = "output_send_to_device_event"
 	cfg.Kafka.Topics.OutputClientData = "output_client_data"
 	cfg.Kafka.Topics.OutputRoomEvent = "output_room_event"
 	cfg.Matrix.TrustedIDServers = []string{
@@ -194,23 +196,24 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	keyDB := base.CreateKeyDB()
 	federation := createFederationClient(cfg, node)
+
+	fetcher := &libp2pKeyFetcher{}
 	keyRing := gomatrixserverlib.KeyRing{
 		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			&libp2pKeyFetcher{},
+			fetcher,
 		},
-		KeyDatabase: keyDB,
+		KeyDatabase: fetcher,
 	}
-	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node)
 
 	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
+	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
 	)
 	fedSenderAPI := federationsender.SetupFederationSenderComponent(base, federation, rsAPI, &keyRing)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
+	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI)
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB,
@@ -220,16 +223,20 @@ func main() {
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
 	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
 
-	httpHandler := internal.WrapHandlerInCORS(base.APIMux)
-
-	http.Handle("/", httpHandler)
+	internal.SetupHTTPAPI(
+		http.DefaultServeMux,
+		base.PublicAPIMux,
+		base.InternalAPIMux,
+		cfg,
+		base.EnableHTTPAPIs,
+	)
 
 	// Expose the matrix APIs via libp2p-js - for federation traffic
 	if node != nil {

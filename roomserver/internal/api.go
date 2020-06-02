@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/Shopify/sarama"
+	"github.com/gorilla/mux"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -32,8 +33,8 @@ type RoomserverInternalAPI struct {
 
 // SetupHTTP adds the RoomserverInternalAPI handlers to the http.ServeMux.
 // nolint: gocyclo
-func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(api.RoomserverInputRoomEventsPath,
+func (r *RoomserverInternalAPI) SetupHTTP(internalAPIMux *mux.Router) {
+	internalAPIMux.Handle(api.RoomserverInputRoomEventsPath,
 		internal.MakeInternalAPI("inputRoomEvents", func(req *http.Request) util.JSONResponse {
 			var request api.InputRoomEventsRequest
 			var response api.InputRoomEventsResponse
@@ -46,7 +47,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(api.RoomserverPerformJoinPath,
+	internalAPIMux.Handle(api.RoomserverPerformJoinPath,
 		internal.MakeInternalAPI("performJoin", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
@@ -59,7 +60,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(api.RoomserverPerformLeavePath,
+	internalAPIMux.Handle(api.RoomserverPerformLeavePath,
 		internal.MakeInternalAPI("performLeave", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse
@@ -72,7 +73,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryLatestEventsAndStatePath,
 		internal.MakeInternalAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
 			var request api.QueryLatestEventsAndStateRequest
@@ -86,7 +87,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryStateAfterEventsPath,
 		internal.MakeInternalAPI("queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAfterEventsRequest
@@ -100,7 +101,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryEventsByIDPath,
 		internal.MakeInternalAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
 			var request api.QueryEventsByIDRequest
@@ -114,7 +115,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryMembershipForUserPath,
 		internal.MakeInternalAPI("QueryMembershipForUser", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMembershipForUserRequest
@@ -128,7 +129,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryMembershipsForRoomPath,
 		internal.MakeInternalAPI("queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMembershipsForRoomRequest
@@ -142,7 +143,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryInvitesForUserPath,
 		internal.MakeInternalAPI("queryInvitesForUser", func(req *http.Request) util.JSONResponse {
 			var request api.QueryInvitesForUserRequest
@@ -156,7 +157,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryServerAllowedToSeeEventPath,
 		internal.MakeInternalAPI("queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
 			var request api.QueryServerAllowedToSeeEventRequest
@@ -170,7 +171,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryMissingEventsPath,
 		internal.MakeInternalAPI("queryMissingEvents", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMissingEventsRequest
@@ -184,7 +185,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryStateAndAuthChainPath,
 		internal.MakeInternalAPI("queryStateAndAuthChain", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAndAuthChainRequest
@@ -198,7 +199,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryBackfillPath,
 		internal.MakeInternalAPI("QueryBackfill", func(req *http.Request) util.JSONResponse {
 			var request api.QueryBackfillRequest
@@ -212,7 +213,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryRoomVersionCapabilitiesPath,
 		internal.MakeInternalAPI("QueryRoomVersionCapabilities", func(req *http.Request) util.JSONResponse {
 			var request api.QueryRoomVersionCapabilitiesRequest
@@ -226,7 +227,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverQueryRoomVersionForRoomPath,
 		internal.MakeInternalAPI("QueryRoomVersionForRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryRoomVersionForRoomRequest
@@ -240,7 +241,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverSetRoomAliasPath,
 		internal.MakeInternalAPI("setRoomAlias", func(req *http.Request) util.JSONResponse {
 			var request api.SetRoomAliasRequest
@@ -254,7 +255,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverGetRoomIDForAliasPath,
 		internal.MakeInternalAPI("GetRoomIDForAlias", func(req *http.Request) util.JSONResponse {
 			var request api.GetRoomIDForAliasRequest
@@ -268,7 +269,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverGetCreatorIDForAliasPath,
 		internal.MakeInternalAPI("GetCreatorIDForAlias", func(req *http.Request) util.JSONResponse {
 			var request api.GetCreatorIDForAliasRequest
@@ -282,7 +283,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverGetAliasesForRoomIDPath,
 		internal.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
 			var request api.GetAliasesForRoomIDRequest
@@ -296,7 +297,7 @@ func (r *RoomserverInternalAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.RoomserverRemoveRoomAliasPath,
 		internal.MakeInternalAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
 			var request api.RemoveRoomAliasRequest

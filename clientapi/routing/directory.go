@@ -77,7 +77,7 @@ func DirectoryRoom(
 			if fedErr != nil {
 				// TODO: Return 502 if the remote server errored.
 				// TODO: Return 504 if the remote server timed out.
-				util.GetLogger(req.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
+				util.GetLogger(req.Context()).WithError(fedErr).Error("federation.LookupRoomAlias failed")
 				return jsonerror.InternalServerError()
 			}
 			res.RoomID = fedRes.RoomID

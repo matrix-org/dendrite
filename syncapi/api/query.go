@@ -24,10 +24,10 @@ import (
 )
 
 const (
-	SyncAPIQuerySyncPath      = "/api/syncapi/querySync"
-	SyncAPIQueryStatePath     = "/api/syncapi/queryState"
-	SyncAPIQueryStateTypePath = "/api/syncapi/queryStateType"
-	SyncAPIQueryMessagesPath  = "/api/syncapi/queryMessages"
+	SyncAPIQuerySyncPath      = "/syncapi/querySync"
+	SyncAPIQueryStatePath     = "/syncapi/queryState"
+	SyncAPIQueryStateTypePath = "/syncapi/queryStateType"
+	SyncAPIQueryMessagesPath  = "/syncapi/queryMessages"
 )
 
 func NewSyncQueryAPIHTTP(syncapiURL string, httpClient *http.Client) SyncQueryAPI {

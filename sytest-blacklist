@@ -39,3 +39,8 @@ Ignore invite in incremental sync
 # Blacklisted because this test calls /r0/events which we don't implement
 New room members see their own join event
 Existing members see new members' join events
+
+# Blacklisted because the federation work for these hasn't been finished yet. 
+Can recv device messages over federation
+Device messages over federation wake up /sync
+Wildcard device messages over federation wake up /sync

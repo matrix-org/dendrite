@@ -85,19 +85,19 @@ type RemoveRoomAliasRequest struct {
 type RemoveRoomAliasResponse struct{}
 
 // RoomserverSetRoomAliasPath is the HTTP path for the SetRoomAlias API.
-const RoomserverSetRoomAliasPath = "/api/roomserver/setRoomAlias"
+const RoomserverSetRoomAliasPath = "/roomserver/setRoomAlias"
 
 // RoomserverGetRoomIDForAliasPath is the HTTP path for the GetRoomIDForAlias API.
-const RoomserverGetRoomIDForAliasPath = "/api/roomserver/GetRoomIDForAlias"
+const RoomserverGetRoomIDForAliasPath = "/roomserver/GetRoomIDForAlias"
 
 // RoomserverGetAliasesForRoomIDPath is the HTTP path for the GetAliasesForRoomID API.
-const RoomserverGetAliasesForRoomIDPath = "/api/roomserver/GetAliasesForRoomID"
+const RoomserverGetAliasesForRoomIDPath = "/roomserver/GetAliasesForRoomID"
 
 // RoomserverGetCreatorIDForAliasPath is the HTTP path for the GetCreatorIDForAlias API.
-const RoomserverGetCreatorIDForAliasPath = "/api/roomserver/GetCreatorIDForAlias"
+const RoomserverGetCreatorIDForAliasPath = "/roomserver/GetCreatorIDForAlias"
 
 // RoomserverRemoveRoomAliasPath is the HTTP path for the RemoveRoomAlias API.
-const RoomserverRemoveRoomAliasPath = "/api/roomserver/removeRoomAlias"
+const RoomserverRemoveRoomAliasPath = "/roomserver/removeRoomAlias"
 
 // SetRoomAlias implements RoomserverAliasAPI
 func (h *httpRoomserverInternalAPI) SetRoomAlias(

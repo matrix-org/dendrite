@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -182,8 +183,8 @@ func makeHTTPClient() *http.Client {
 
 // SetupHTTP adds the AppServiceQueryPAI handlers to the http.ServeMux. This
 // handles and muxes incoming api requests the to internal AppServiceQueryAPI.
-func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
-	servMux.Handle(
+func (a *AppServiceQueryAPI) SetupHTTP(internalAPIMux *mux.Router) {
+	internalAPIMux.Handle(
 		api.AppServiceRoomAliasExistsPath,
 		internal.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
 			var request api.RoomAliasExistsRequest
@@ -197,7 +198,7 @@ func (a *AppServiceQueryAPI) SetupHTTP(servMux *http.ServeMux) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	servMux.Handle(
+	internalAPIMux.Handle(
 		api.AppServiceUserIDExistsPath,
 		internal.MakeInternalAPI("appserviceUserIDExists", func(req *http.Request) util.JSONResponse {
 			var request api.UserIDExistsRequest

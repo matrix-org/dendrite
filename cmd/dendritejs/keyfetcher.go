@@ -23,7 +23,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 const libp2pMatrixKeyID = "ed25519:libp2p-dendrite"
@@ -63,8 +62,6 @@ func (f *libp2pKeyFetcher) FetchKeys(
 		if err != nil {
 			return nil, fmt.Errorf("Failed to extract raw bytes from public key: %w", err)
 		}
-		util.GetLogger(ctx).Info("libp2pKeyFetcher.FetchKeys: Using public key %v for server name %s", pubKeyBytes, req.ServerName)
-
 		b64Key := gomatrixserverlib.Base64String(pubKeyBytes)
 		res[req] = gomatrixserverlib.PublicKeyLookupResult{
 			VerifyKey: gomatrixserverlib.VerifyKey{
@@ -81,4 +78,9 @@ func (f *libp2pKeyFetcher) FetchKeys(
 // logging errors etc.
 func (f *libp2pKeyFetcher) FetcherName() string {
 	return "libp2pKeyFetcher"
+}
+
+// no-op function for storing keys - we don't do any work to fetch them so don't bother storing.
+func (f *libp2pKeyFetcher) StoreKeys(ctx context.Context, results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult) error {
+	return nil
 }

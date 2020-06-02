@@ -16,7 +16,9 @@ package directory
 
 import (
 	"context"
+	"math/rand"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -96,6 +98,28 @@ func GetPostPublicRoomsWithExternal(
 	// downcasting `limit` is safe as we know it isn't bigger than request.Limit which is int16
 	fedRooms := bulkFetchPublicRoomsFromServers(req.Context(), fedClient, extRoomsProvider.Homeservers(), int16(limit))
 	response.Chunk = append(response.Chunk, fedRooms...)
+
+	// de-duplicate rooms with the same room ID. We can join the room via any of these aliases as we know these servers
+	// are alive and well, so we arbitrarily pick one (purposefully shuffling them to spread the load a bit)
+	var publicRooms []gomatrixserverlib.PublicRoom
+	haveRoomIDs := make(map[string]bool)
+	rand.Shuffle(len(response.Chunk), func(i, j int) {
+		response.Chunk[i], response.Chunk[j] = response.Chunk[j], response.Chunk[i]
+	})
+	for _, r := range response.Chunk {
+		if haveRoomIDs[r.RoomID] {
+			continue
+		}
+		haveRoomIDs[r.RoomID] = true
+		publicRooms = append(publicRooms, r)
+	}
+	// sort by member count
+	sort.SliceStable(publicRooms, func(i, j int) bool {
+		return publicRooms[i].JoinedMembersCount > publicRooms[j].JoinedMembersCount
+	})
+
+	response.Chunk = publicRooms
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: response,

@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -51,20 +53,21 @@ type stateSnapshotStatements struct {
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 
-func (s *stateSnapshotStatements) prepare(db *sql.DB) (err error) {
+func NewSqliteStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
+	s := &stateSnapshotStatements{}
 	s.db = db
-	_, err = db.Exec(stateSnapshotSchema)
+	_, err := db.Exec(stateSnapshotSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertStateStmt, insertStateSQL},
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *stateSnapshotStatements) insertState(
+func (s *stateSnapshotStatements) InsertState(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
 ) (stateNID types.StateSnapshotNID, err error) {
 	stateBlockNIDsJSON, err := json.Marshal(stateBlockNIDs)
@@ -82,15 +85,15 @@ func (s *stateSnapshotStatements) insertState(
 	return
 }
 
-func (s *stateSnapshotStatements) bulkSelectStateBlockNIDs(
-	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
+func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
+	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
 	nids := make([]interface{}, len(stateNIDs))
 	for k, v := range stateNIDs {
 		nids[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", internal.QueryVariadic(len(nids)), 1)
-	selectStmt, err := txn.Prepare(selectOrig)
+	selectStmt, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}

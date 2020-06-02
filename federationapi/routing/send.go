@@ -76,6 +76,7 @@ func Send(
 	resp, err := t.processTransaction()
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
+		return util.ErrorResponse(err)
 	}
 
 	// https://matrix.org/docs/spec/server_server/r0.1.3#put-matrix-federation-v1-send-txnid
@@ -117,7 +118,7 @@ type txnFederationClient interface {
 func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 	results := make(map[string]gomatrixserverlib.PDUResult)
 
-	var pdus []gomatrixserverlib.HeaderedEvent
+	pdus := []gomatrixserverlib.HeaderedEvent{}
 	for _, pdu := range t.PDUs {
 		var header struct {
 			RoomID string `json:"room_id"`
@@ -263,6 +264,25 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 			}
 			if err := t.eduProducer.SendTyping(t.context, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
 				util.GetLogger(t.context).WithError(err).Error("Failed to send typing event to edu server")
+			}
+		case gomatrixserverlib.MDirectToDevice:
+			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
+			var directPayload gomatrixserverlib.ToDeviceMessage
+			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
+				util.GetLogger(t.context).WithError(err).Error("Failed to unmarshal send-to-device events")
+				continue
+			}
+			for userID, byUser := range directPayload.Messages {
+				for deviceID, message := range byUser {
+					// TODO: check that the user and the device actually exist here
+					if err := t.eduProducer.SendToDevice(t.context, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
+						util.GetLogger(t.context).WithError(err).WithFields(logrus.Fields{
+							"sender":    directPayload.Sender,
+							"user_id":   userID,
+							"device_id": deviceID,
+						}).Error("Failed to send send-to-device event to edu server")
+					}
+				}
 			}
 		default:
 			util.GetLogger(t.context).WithField("type", e.Type).Warn("unhandled edu")

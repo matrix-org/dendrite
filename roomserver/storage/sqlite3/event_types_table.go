@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -81,22 +83,23 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt   *sql.Stmt
 }
 
-func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
+func NewSqliteEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+	s := &eventTypeStatements{}
 	s.db = db
-	_, err = db.Exec(eventTypesSchema)
+	_, err := db.Exec(eventTypesSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.insertEventTypeNIDResultStmt, insertEventTypeNIDResultSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
 		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *eventTypeStatements) insertEventTypeNID(
+func (s *eventTypeStatements) InsertEventTypeNID(
 	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
@@ -109,7 +112,7 @@ func (s *eventTypeStatements) insertEventTypeNID(
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) selectEventTypeNID(
+func (s *eventTypeStatements) SelectEventTypeNID(
 	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
@@ -118,8 +121,8 @@ func (s *eventTypeStatements) selectEventTypeNID(
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) bulkSelectEventTypeNID(
-	ctx context.Context, tx *sql.Tx, eventTypes []string,
+func (s *eventTypeStatements) BulkSelectEventTypeNID(
+	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
 	///////////////
 	iEventTypes := make([]interface{}, len(eventTypes))
@@ -133,8 +136,7 @@ func (s *eventTypeStatements) bulkSelectEventTypeNID(
 	}
 	///////////////
 
-	selectStmt := internal.TxStmt(tx, selectPrep)
-	rows, err := selectStmt.QueryContext(ctx, iEventTypes...)
+	rows, err := selectPrep.QueryContext(ctx, iEventTypes...)
 	if err != nil {
 		return nil, err
 	}

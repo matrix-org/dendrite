@@ -20,6 +20,8 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -66,28 +68,28 @@ type inviteStatements struct {
 	selectInvitesAboutToRetireStmt      *sql.Stmt
 }
 
-func (s *inviteStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(inviteSchema)
+func NewSqliteInvitesTable(db *sql.DB) (tables.Invites, error) {
+	s := &inviteStatements{}
+	_, err := db.Exec(inviteSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
 		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
 		{&s.selectInvitesAboutToRetireStmt, selectInvitesAboutToRetireSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *inviteStatements) insertInviteEvent(
+func (s *inviteStatements) InsertInviteEvent(
 	ctx context.Context,
 	txn *sql.Tx, inviteEventID string, roomNID types.RoomNID,
 	targetUserNID, senderUserNID types.EventStateKeyNID,
 	inviteEventJSON []byte,
 ) (bool, error) {
 	stmt := internal.TxStmt(txn, s.insertInviteEventStmt)
-	defer stmt.Close() // nolint: errcheck
 	result, err := stmt.ExecContext(
 		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)
@@ -101,12 +103,12 @@ func (s *inviteStatements) insertInviteEvent(
 	return count != 0, nil
 }
 
-func (s *inviteStatements) updateInviteRetired(
+func (s *inviteStatements) UpdateInviteRetired(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventIDs []string, err error) {
 	// gather all the event IDs we will retire
-	stmt := txn.Stmt(s.selectInvitesAboutToRetireStmt)
+	stmt := internal.TxStmt(txn, s.selectInvitesAboutToRetireStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
@@ -121,13 +123,13 @@ func (s *inviteStatements) updateInviteRetired(
 	}
 
 	// now retire the invites
-	stmt = txn.Stmt(s.updateInviteRetiredStmt)
+	stmt = internal.TxStmt(txn, s.updateInviteRetiredStmt)
 	_, err = stmt.ExecContext(ctx, roomNID, targetUserNID)
 	return
 }
 
 // selectInviteActiveForUserInRoom returns a list of sender state key NIDs
-func (s *inviteStatements) selectInviteActiveForUserInRoom(
+func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 	ctx context.Context,
 	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
 ) ([]types.EventStateKeyNID, error) {

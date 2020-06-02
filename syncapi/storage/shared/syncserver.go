@@ -1,3 +1,17 @@
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package shared
 
 import (
@@ -27,6 +41,8 @@ type Database struct {
 	Topology            tables.Topology
 	CurrentRoomState    tables.CurrentRoomState
 	BackwardExtremities tables.BackwardsExtremities
+	SendToDevice        tables.SendToDevice
+	SendToDeviceWriter  *internal.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
 
@@ -87,6 +103,10 @@ func (d *Database) RemoveTypingUser(
 	userID, roomID string,
 ) types.StreamPosition {
 	return types.StreamPosition(d.EDUCache.RemoveUser(userID, roomID))
+}
+
+func (d *Database) AddSendToDevice() types.StreamPosition {
+	return types.StreamPosition(d.EDUCache.AddSendToDeviceMessage())
 }
 
 func (d *Database) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
@@ -528,14 +548,14 @@ func (d *Database) addEDUDeltaToResponse(
 }
 
 func (d *Database) IncrementalSync(
-	ctx context.Context,
+	ctx context.Context, res *types.Response,
 	device authtypes.Device,
 	fromPos, toPos types.StreamingToken,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
 ) (*types.Response, error) {
 	nextBatchPos := fromPos.WithUpdates(toPos)
-	res := types.NewResponse(nextBatchPos)
+	res.NextBatch = nextBatchPos.String()
 
 	var joinedRoomIDs []string
 	var err error
@@ -568,12 +588,12 @@ func (d *Database) IncrementalSync(
 
 // getResponseWithPDUsForCompleteSync creates a response and adds all PDUs needed
 // to it. It returns toPos and joinedRoomIDs for use of adding EDUs.
+// nolint:nakedret
 func (d *Database) getResponseWithPDUsForCompleteSync(
-	ctx context.Context,
+	ctx context.Context, res *types.Response,
 	userID string,
 	numRecentEventsPerRoom int,
 ) (
-	res *types.Response,
 	toPos types.StreamingToken,
 	joinedRoomIDs []string,
 	err error,
@@ -604,7 +624,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		To:   toPos.PDUPosition(),
 	}
 
-	res = types.NewResponse(toPos)
+	res.NextBatch = toPos.String()
 
 	// Extract room state and recent events for all rooms the user is joined to.
 	joinedRoomIDs, err = d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
@@ -662,14 +682,15 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 
 	succeeded = true
-	return res, toPos, joinedRoomIDs, err
+	return //res, toPos, joinedRoomIDs, err
 }
 
 func (d *Database) CompleteSync(
-	ctx context.Context, userID string, numRecentEventsPerRoom int,
+	ctx context.Context, res *types.Response,
+	device authtypes.Device, numRecentEventsPerRoom int,
 ) (*types.Response, error) {
-	res, toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
-		ctx, userID, numRecentEventsPerRoom,
+	toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
+		ctx, res, device.UserID, numRecentEventsPerRoom,
 	)
 	if err != nil {
 		return nil, err
@@ -1026,6 +1047,115 @@ func (d *Database) currentStateStreamEventsForRoom(
 		s[i] = types.StreamEvent{HeaderedEvent: allState[i], StreamPosition: 0}
 	}
 	return s, nil
+}
+
+func (d *Database) SendToDeviceUpdatesWaiting(
+	ctx context.Context, userID, deviceID string,
+) (bool, error) {
+	count, err := d.SendToDevice.CountSendToDeviceMessages(ctx, nil, userID, deviceID)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (d *Database) AddSendToDeviceEvent(
+	ctx context.Context, txn *sql.Tx,
+	userID, deviceID, content string,
+) error {
+	return d.SendToDevice.InsertSendToDeviceMessage(
+		ctx, txn, userID, deviceID, content,
+	)
+}
+
+func (d *Database) StoreNewSendForDeviceMessage(
+	ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
+) (types.StreamPosition, error) {
+	j, err := json.Marshal(event)
+	if err != nil {
+		return streamPos, err
+	}
+	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
+	// that we don't lock the table for writes in more than one place.
+	err = d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) error {
+		return d.AddSendToDeviceEvent(
+			ctx, txn, userID, deviceID, string(j),
+		)
+	})
+	if err != nil {
+		return streamPos, err
+	}
+	return streamPos, nil
+}
+
+func (d *Database) SendToDeviceUpdatesForSync(
+	ctx context.Context,
+	userID, deviceID string,
+	token types.StreamingToken,
+) ([]types.SendToDeviceEvent, []types.SendToDeviceNID, []types.SendToDeviceNID, error) {
+	// First of all, get our send-to-device updates for this user.
+	events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
+	}
+
+	// If there's nothing to do then stop here.
+	if len(events) == 0 {
+		return nil, nil, nil, nil
+	}
+
+	// Work out whether we need to update any of the database entries.
+	toReturn := []types.SendToDeviceEvent{}
+	toUpdate := []types.SendToDeviceNID{}
+	toDelete := []types.SendToDeviceNID{}
+	for _, event := range events {
+		if event.SentByToken == nil {
+			// If the event has no sent-by token yet then we haven't attempted to send
+			// it. Record the current requested sync token in the database.
+			toUpdate = append(toUpdate, event.ID)
+			toReturn = append(toReturn, event)
+			event.SentByToken = &token
+		} else if token.IsAfter(*event.SentByToken) {
+			// The event had a sync token, therefore we've sent it before. The current
+			// sync token is now after the stored one so we can assume that the client
+			// successfully completed the previous sync (it would re-request it otherwise)
+			// so we can remove the entry from the database.
+			toDelete = append(toDelete, event.ID)
+		} else {
+			// It looks like the sync is being re-requested, maybe it timed out or
+			// failed. Re-send any that should have been acknowledged by now.
+			toReturn = append(toReturn, event)
+		}
+	}
+
+	return toReturn, toUpdate, toDelete, nil
+}
+
+func (d *Database) CleanSendToDeviceUpdates(
+	ctx context.Context,
+	toUpdate, toDelete []types.SendToDeviceNID,
+	token types.StreamingToken,
+) (err error) {
+	if len(toUpdate) == 0 && len(toDelete) == 0 {
+		return nil
+	}
+	// If we need to write to the database then we'll ask the SendToDeviceWriter to
+	// do that for us. It'll guarantee that we don't lock the table for writes in
+	// more than one place.
+	err = d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) error {
+		// Delete any send-to-device messages marked for deletion.
+		if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
+			return fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)
+		}
+
+		// Now update any outstanding send-to-device messages with the new sync token.
+		if e := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); e != nil {
+			return fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
+		}
+
+		return nil
+	})
+	return
 }
 
 // There may be some overlap where events in stateEvents are already in recentEvents, so filter

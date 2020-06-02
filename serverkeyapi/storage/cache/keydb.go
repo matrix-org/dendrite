@@ -5,18 +5,17 @@ import (
 	"errors"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store
 // the public keys for other matrix servers.
 type KeyDatabase struct {
-	inner keydb.Database
+	inner gomatrixserverlib.KeyDatabase
 	cache caching.ImmutableCache
 }
 
-func NewKeyDatabase(inner keydb.Database, cache caching.ImmutableCache) (*KeyDatabase, error) {
+func NewKeyDatabase(inner gomatrixserverlib.KeyDatabase, cache caching.ImmutableCache) (*KeyDatabase, error) {
 	if inner == nil {
 		return nil, errors.New("inner database can't be nil")
 	}
