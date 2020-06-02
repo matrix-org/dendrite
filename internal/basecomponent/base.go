@@ -98,9 +98,9 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 
 	client := http.Client{Timeout: HTTPClientTimeout}
 	if cfg.Proxy != nil {
-		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL {
+		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
 			Scheme: cfg.Proxy.Protocol,
-			Host: fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
+			Host:   fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
 		})}
 	}
 
