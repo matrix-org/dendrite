@@ -3,11 +3,6 @@
 # as it pulls archives straight from github branches.
 FROM golang:1.13.7-alpine3.11 AS gobuild
 
-# TODO: This does nothing currently ;)
-# or /dns4/rendezvous.matrix.org/tcp/8443/wss/p2p-websocket-star/
-# or whatever you want!
-ENV RENDEZVOUS_SERVER=/ip4/127.0.0.1/tcp/9090/ws/p2p-websocket-star/
-
 # Download and build dendrite
 WORKDIR /build
 ADD https://github.com/matrix-org/dendrite/archive/master.tar.gz /build/master.tar.gz
