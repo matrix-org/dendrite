@@ -49,15 +49,11 @@ func (h *JSServer) OnRequestFromJS(this js.Value, args []js.Value) interface{} {
 		// we need to put this in an immediately invoked goroutine.
 		go func() {
 			resolve := pargs[0]
-			fmt.Println("Received request:")
-			fmt.Printf("%s\n", httpStr)
 			resStr, err := h.handle(httpStr)
 			errStr := ""
 			if err != nil {
 				errStr = err.Error()
 			}
-			fmt.Println("Sending response:")
-			fmt.Printf("%s\n", resStr)
 			resolve.Invoke(map[string]interface{}{
 				"result": resStr,
 				"error":  errStr,
