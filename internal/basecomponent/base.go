@@ -16,6 +16,7 @@ package basecomponent
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -94,7 +95,16 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
+	client := http.Client{Timeout: HTTPClientTimeout}
+	if cfg.Proxy != nil {
+		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
+			Scheme: cfg.Proxy.Protocol,
+			Host:   fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
+		})}
+	}
+
 	httpmux := mux.NewRouter()
+
 	return &BaseDendrite{
 		componentName:  componentName,
 		EnableHTTPAPIs: enableHTTPAPIs,
@@ -103,7 +113,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		ImmutableCache: cache,
 		PublicAPIMux:   httpmux.PathPrefix(httpapis.PublicPathPrefix).Subrouter().UseEncodedPath(),
 		InternalAPIMux: httpmux.PathPrefix(httpapis.InternalPathPrefix).Subrouter().UseEncodedPath(),
-		httpClient:     &http.Client{Timeout: HTTPClientTimeout},
+		httpClient:     &client,
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,
 	}
