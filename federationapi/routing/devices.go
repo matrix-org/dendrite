@@ -15,18 +15,12 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
-
-type userDevicesResponse struct {
-	UserID   string             `json:"user_id"`
-	StreamID int                `json:"stream_id"`
-	Devices  []authtypes.Device `json:"devices"`
-}
 
 // GetUserDevices for the given user id
 func GetUserDevices(
@@ -42,20 +36,30 @@ func GetUserDevices(
 		}
 	}
 
+	response := gomatrixserverlib.RespUserDevices{
+		UserID: userID,
+		// TODO: we should return an incrementing stream ID each time the device
+		// list changes for delta changes to be recognised
+		StreamID: 0,
+	}
+
 	devs, err := deviceDB.GetDevicesByLocalpart(req.Context(), localpart)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDevicesByLocalPart failed")
 		return jsonerror.InternalServerError()
 	}
 
+	for _, dev := range devs {
+		device := gomatrixserverlib.RespUserDevice{
+			DeviceID:    dev.ID,
+			DisplayName: dev.DisplayName,
+			Keys:        []gomatrixserverlib.RespUserDeviceKeys{},
+		}
+		response.Devices = append(response.Devices, device)
+	}
+
 	return util.JSONResponse{
 		Code: 200,
-		// TODO: we should return an incrementing stream ID each time the device
-		// list changes for delta changes to be recognised
-		JSON: userDevicesResponse{
-			UserID:   userID,
-			StreamID: 0,
-			Devices:  devs,
-		},
+		JSON: response,
 	}
 }
