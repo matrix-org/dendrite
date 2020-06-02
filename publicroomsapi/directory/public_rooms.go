@@ -18,6 +18,7 @@ import (
 	"context"
 	"math/rand"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -112,6 +113,11 @@ func GetPostPublicRoomsWithExternal(
 		haveRoomIDs[r.RoomID] = true
 		publicRooms = append(publicRooms, r)
 	}
+	// sort by member count
+	sort.SliceStable(publicRooms, func(i, j int) bool {
+		return publicRooms[i].JoinedMembersCount > publicRooms[j].JoinedMembersCount
+	})
+
 	response.Chunk = publicRooms
 
 	return util.JSONResponse{
