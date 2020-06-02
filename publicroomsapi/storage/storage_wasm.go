@@ -19,10 +19,11 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
+func NewPublicRoomsServerDatabase(dataSourceName string, localServerName gomatrixserverlib.ServerName) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return nil, err
@@ -31,7 +32,7 @@ func NewPublicRoomsServerDatabase(dataSourceName string) (Database, error) {
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
-		return sqlite3.NewPublicRoomsServerDatabase(uri.Path)
+		return sqlite3.NewPublicRoomsServerDatabase(uri.Path, localServerName)
 	default:
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
