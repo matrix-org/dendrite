@@ -1,6 +1,10 @@
 # This dockerfile will build dendritejs and hook it up to riot-web, build that then dump the
 # resulting HTML/JS onto an nginx container for hosting. It requires no specific build context
 # as it pulls archives straight from github branches.
+#
+# $ docker build -t dendritejs -f DendriteJS.Dockerfile .
+# $ docker run --rm -p 8888:80 dendritejs
+# Then visit http://localhost:8888
 FROM golang:1.13.7-alpine3.11 AS gobuild
 
 # Download and build dendrite
