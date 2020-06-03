@@ -91,6 +91,7 @@ func GetAvatarURL(
 }
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
+// nolint:gocyclo
 func SetAvatarURL(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
@@ -156,17 +157,16 @@ func SetAvatarURL(
 	events, err := buildMembershipEvents(
 		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
 	)
-	if err != nil {
-		switch e := err.(type) {
-		case gomatrixserverlib.BadJSONError:
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(e.Error()),
-			}
-		default:
-			util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
-			return jsonerror.InternalServerError()
+	switch e := err.(type) {
+	case nil:
+	case gomatrixserverlib.BadJSONError:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
 		}
+	default:
+		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
@@ -213,6 +213,7 @@ func GetDisplayName(
 }
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
+// nolint:gocyclo
 func SetDisplayName(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
@@ -278,17 +279,16 @@ func SetDisplayName(
 	events, err := buildMembershipEvents(
 		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
 	)
-	if err != nil {
-		switch e := err.(type) {
-		case gomatrixserverlib.BadJSONError:
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(e.Error()),
-			}
-		default:
-			util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
-			return jsonerror.InternalServerError()
+	switch e := err.(type) {
+	case nil:
+	case gomatrixserverlib.BadJSONError:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
 		}
+	default:
+		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
+		return jsonerror.InternalServerError()
 	}
 
 	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
