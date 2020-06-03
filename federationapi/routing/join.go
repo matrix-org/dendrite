@@ -102,6 +102,11 @@ func MakeJoin(
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
+	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
 	} else if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("internal.BuildEvent failed")
 		return jsonerror.InternalServerError()

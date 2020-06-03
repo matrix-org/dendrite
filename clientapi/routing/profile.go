@@ -157,8 +157,16 @@ func SetAvatarURL(
 		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
 	)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
-		return jsonerror.InternalServerError()
+		switch e := err.(type) {
+		case gomatrixserverlib.BadJSONError:
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON(e.Error()),
+			}
+		default:
+			util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
@@ -271,8 +279,16 @@ func SetDisplayName(
 		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
 	)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
-		return jsonerror.InternalServerError()
+		switch e := err.(type) {
+		case gomatrixserverlib.BadJSONError:
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON(e.Error()),
+			}
+		default:
+			util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
