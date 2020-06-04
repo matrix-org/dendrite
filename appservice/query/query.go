@@ -18,16 +18,12 @@ package query
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -179,37 +175,4 @@ func makeHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: time.Second * 30,
 	}
-}
-
-// SetupHTTP adds the AppServiceQueryPAI handlers to the http.ServeMux. This
-// handles and muxes incoming api requests the to internal AppServiceQueryAPI.
-func (a *AppServiceQueryAPI) SetupHTTP(internalAPIMux *mux.Router) {
-	internalAPIMux.Handle(
-		api.AppServiceRoomAliasExistsPath,
-		internal.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
-			var request api.RoomAliasExistsRequest
-			var response api.RoomAliasExistsResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := a.RoomAliasExists(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(
-		api.AppServiceUserIDExistsPath,
-		internal.MakeInternalAPI("appserviceUserIDExists", func(req *http.Request) util.JSONResponse {
-			var request api.UserIDExistsRequest
-			var response api.UserIDExistsResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := a.UserIDExists(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 }

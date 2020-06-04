@@ -36,11 +36,14 @@ import (
 	"github.com/gorilla/mux"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
+	eduinthttp "github.com/matrix-org/dendrite/eduserver/inthttp"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/federationsender/inthttp"
+	fsinthttp "github.com/matrix-org/dendrite/federationsender/inthttp"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/sirupsen/logrus"
 
@@ -136,32 +139,29 @@ func (b *BaseDendrite) Close() error {
 	return b.tracerCloser.Close()
 }
 
-// CreateHTTPAppServiceAPIs returns the QueryAPI for hitting the appservice
-// component over HTTP.
-func (b *BaseDendrite) CreateHTTPAppServiceAPIs() appserviceAPI.AppServiceQueryAPI {
-	a, err := appserviceAPI.NewAppServiceQueryAPIHTTP(b.Cfg.AppServiceURL(), b.httpClient)
+// AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
+func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
+	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")
 	}
 	return a
 }
 
-// CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI for hitting
-// the roomserver over HTTP.
-func (b *BaseDendrite) CreateHTTPRoomserverAPIs() roomserverAPI.RoomserverInternalAPI {
-	rsAPI, err := roomserverAPI.NewRoomserverInternalAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
+// RoomserverHTTPClient returns RoomserverInternalAPI for hitting the roomserver over HTTP.
+func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
+	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
 	if err != nil {
-		logrus.WithError(err).Panic("NewRoomserverInternalAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.httpClient)
 	}
 	return rsAPI
 }
 
-// CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
-// server over HTTP
-func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI {
-	e, err := eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), b.httpClient)
+// EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
+func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
+	e, err := eduinthttp.NewEDUServerClient(b.Cfg.EDUServerURL(), b.httpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("NewEDUServerInputAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("EDUServerClient failed", b.httpClient)
 	}
 	return e
 }
@@ -169,9 +169,9 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 // FederationSenderHTTPClient returns FederationSenderInternalAPI for hitting
 // the federation sender over HTTP
 func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationSenderInternalAPI {
-	f, err := inthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.httpClient)
+	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("NewFederationSenderInternalAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.httpClient)
 	}
 	return f
 }

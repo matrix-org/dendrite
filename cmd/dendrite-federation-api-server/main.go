@@ -36,8 +36,8 @@ func main() {
 
 	fsAPI := base.FederationSenderHTTPClient()
 
-	rsAPI := base.CreateHTTPRoomserverAPIs()
-	asAPI := base.CreateHTTPAppServiceAPIs()
+	rsAPI := base.RoomserverHTTPClient()
+	asAPI := base.AppserviceHTTPClient()
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)

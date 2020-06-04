@@ -19,17 +19,13 @@ package input
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -169,34 +165,4 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 	}
 
 	return nil
-}
-
-// SetupHTTP adds the EDUServerInputAPI handlers to the http.ServeMux.
-func (t *EDUServerInputAPI) SetupHTTP(internalAPIMux *mux.Router) {
-	internalAPIMux.Handle(api.EDUServerInputTypingEventPath,
-		internal.MakeInternalAPI("inputTypingEvents", func(req *http.Request) util.JSONResponse {
-			var request api.InputTypingEventRequest
-			var response api.InputTypingEventResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := t.InputTypingEvent(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(api.EDUServerInputSendToDeviceEventPath,
-		internal.MakeInternalAPI("inputSendToDeviceEvents", func(req *http.Request) util.JSONResponse {
-			var request api.InputSendToDeviceEventRequest
-			var response api.InputSendToDeviceEventResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := t.InputSendToDeviceEvent(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 }

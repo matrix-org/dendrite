@@ -83,21 +83,21 @@ func main() {
 	)
 	rsAPI := rsComponent
 	if base.UseHTTPAPIs {
-		rsAPI = base.CreateHTTPRoomserverAPIs()
+		rsAPI = base.RoomserverHTTPClient()
 	}
 
 	eduInputAPI := eduserver.SetupEDUServerComponent(
 		base, cache.New(), deviceDB,
 	)
 	if base.UseHTTPAPIs {
-		eduInputAPI = base.CreateHTTPEDUServerAPIs()
+		eduInputAPI = base.EDUServerClient()
 	}
 
 	asAPI := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
 	)
 	if base.UseHTTPAPIs {
-		asAPI = base.CreateHTTPAppServiceAPIs()
+		asAPI = base.AppserviceHTTPClient()
 	}
 
 	fsAPI := federationsender.SetupFederationSenderComponent(

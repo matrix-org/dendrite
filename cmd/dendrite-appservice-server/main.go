@@ -28,7 +28,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
-	rsAPI := base.CreateHTTPRoomserverAPIs()
+	rsAPI := base.RoomserverHTTPClient()
 	cache := transactions.New()
 
 	appservice.SetupAppServiceAPIComponent(
