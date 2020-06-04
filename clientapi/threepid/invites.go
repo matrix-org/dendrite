@@ -279,7 +279,7 @@ func queryIDServerPubKey(ctx context.Context, idServerName string, keyID string)
 	}
 
 	var pubKeyRes struct {
-		PublicKey gomatrixserverlib.Base64String `json:"public_key"`
+		PublicKey gomatrixserverlib.Base64Bytes `json:"public_key"`
 	}
 
 	if resp.StatusCode != http.StatusOK {

@@ -43,7 +43,7 @@ func (n *mDNSListener) HandlePeerFound(p peer.AddrInfo) {
 					KeyID:      "ed25519:p2pdemo",
 				}: {
 					VerifyKey: gomatrixserverlib.VerifyKey{
-						Key: gomatrixserverlib.Base64String(raw),
+						Key: gomatrixserverlib.Base64Bytes(raw),
 					},
 					ValidUntilTS: math.MaxUint64 >> 1,
 					ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,

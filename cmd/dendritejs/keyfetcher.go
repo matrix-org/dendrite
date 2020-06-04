@@ -62,7 +62,7 @@ func (f *libp2pKeyFetcher) FetchKeys(
 		if err != nil {
 			return nil, fmt.Errorf("Failed to extract raw bytes from public key: %w", err)
 		}
-		b64Key := gomatrixserverlib.Base64String(pubKeyBytes)
+		b64Key := gomatrixserverlib.Base64Bytes(pubKeyBytes)
 		res[req] = gomatrixserverlib.PublicKeyLookupResult{
 			VerifyKey: gomatrixserverlib.VerifyKey{
 				Key: b64Key,

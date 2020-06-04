@@ -65,7 +65,7 @@ func NewDatabase(
 	}
 	value := gomatrixserverlib.PublicKeyLookupResult{
 		VerifyKey: gomatrixserverlib.VerifyKey{
-			Key: gomatrixserverlib.Base64String(serverKey),
+			Key: gomatrixserverlib.Base64Bytes(serverKey),
 		},
 		ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(100 * 365 * 24 * time.Hour)),
 		ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
