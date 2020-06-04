@@ -23,7 +23,7 @@ import (
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
+	cfg := basecomponent.ParseFlags(false)
 	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI", true)
 	defer base.Close() // nolint: errcheck
 

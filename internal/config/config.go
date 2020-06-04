@@ -370,11 +370,9 @@ type LogrusHook struct {
 // It implements the error interface.
 type configErrors []string
 
-// Load a yaml config file for a server run as multiple processes.
+// Load a yaml config file for a server run as multiple processes or as a monolith.
 // Checks the config to ensure that it is valid.
-// The checks are different if the server is run as a monolithic process instead
-// of being split into multiple components
-func Load(configPath string) (*Dendrite, error) {
+func Load(configPath string, monolith bool) (*Dendrite, error) {
 	configData, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -385,27 +383,7 @@ func Load(configPath string) (*Dendrite, error) {
 	}
 	// Pass the current working directory and ioutil.ReadFile so that they can
 	// be mocked in the tests
-	monolithic := false
-	return loadConfig(basePath, configData, ioutil.ReadFile, monolithic)
-}
-
-// LoadMonolithic loads a yaml config file for a server run as a single monolith.
-// Checks the config to ensure that it is valid.
-// The checks are different if the server is run as a monolithic process instead
-// of being split into multiple components
-func LoadMonolithic(configPath string) (*Dendrite, error) {
-	configData, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-	basePath, err := filepath.Abs(".")
-	if err != nil {
-		return nil, err
-	}
-	// Pass the current working directory and ioutil.ReadFile so that they can
-	// be mocked in the tests
-	monolithic := true
-	return loadConfig(basePath, configData, ioutil.ReadFile, monolithic)
+	return loadConfig(basePath, configData, ioutil.ReadFile, monolith)
 }
 
 func loadConfig(

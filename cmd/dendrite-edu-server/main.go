@@ -22,7 +22,7 @@ import (
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
+	cfg := basecomponent.ParseFlags(false)
 	base := basecomponent.NewBaseDendrite(cfg, "EDUServerAPI", true)
 	defer func() {
 		if err := base.Close(); err != nil {
