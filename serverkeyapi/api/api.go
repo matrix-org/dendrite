@@ -2,11 +2,7 @@ package api
 
 import (
 	"context"
-	"errors"
-	"net/http"
-	"time"
 
-	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -28,97 +24,17 @@ type ServerKeyInternalAPI interface {
 	) error
 }
 
-// NewRoomserverInputAPIHTTP creates a RoomserverInputAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil an error is returned
-func NewServerKeyInternalAPIHTTP(
-	serverKeyAPIURL string,
-	httpClient *http.Client,
-	immutableCache caching.ImmutableCache,
-) (ServerKeyInternalAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewRoomserverInternalAPIHTTP: httpClient is <nil>")
-	}
-	return &httpServerKeyInternalAPI{
-		serverKeyAPIURL: serverKeyAPIURL,
-		httpClient:      httpClient,
-		immutableCache:  immutableCache,
-	}, nil
+type QueryPublicKeysRequest struct {
+	Requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp `json:"requests"`
 }
 
-type httpServerKeyInternalAPI struct {
-	ServerKeyInternalAPI
-
-	serverKeyAPIURL string
-	httpClient      *http.Client
-	immutableCache  caching.ImmutableCache
+type QueryPublicKeysResponse struct {
+	Results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult `json:"results"`
 }
 
-func (s *httpServerKeyInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
-	// This is a bit of a cheat - we tell gomatrixserverlib that this API is
-	// both the key database and the key fetcher. While this does have the
-	// rather unfortunate effect of preventing gomatrixserverlib from handling
-	// key fetchers directly, we can at least reimplement this behaviour on
-	// the other end of the API.
-	return &gomatrixserverlib.KeyRing{
-		KeyDatabase: s,
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{s},
-	}
+type InputPublicKeysRequest struct {
+	Keys map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult `json:"keys"`
 }
 
-func (s *httpServerKeyInternalAPI) FetcherName() string {
-	return "httpServerKeyInternalAPI"
-}
-
-func (s *httpServerKeyInternalAPI) StoreKeys(
-	_ context.Context,
-	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
-) error {
-	// Run in a background context - we don't want to stop this work just
-	// because the caller gives up waiting.
-	ctx := context.Background()
-	request := InputPublicKeysRequest{
-		Keys: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
-	}
-	response := InputPublicKeysResponse{}
-	for req, res := range results {
-		request.Keys[req] = res
-		s.immutableCache.StoreServerKey(req, res)
-	}
-	return s.InputPublicKeys(ctx, &request, &response)
-}
-
-func (s *httpServerKeyInternalAPI) FetchKeys(
-	_ context.Context,
-	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
-) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
-	// Run in a background context - we don't want to stop this work just
-	// because the caller gives up waiting.
-	ctx := context.Background()
-	result := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
-	request := QueryPublicKeysRequest{
-		Requests: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp),
-	}
-	response := QueryPublicKeysResponse{
-		Results: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
-	}
-	now := gomatrixserverlib.AsTimestamp(time.Now())
-	for req, ts := range requests {
-		if res, ok := s.immutableCache.GetServerKey(req); ok {
-			if now > res.ValidUntilTS && res.ExpiredTS == gomatrixserverlib.PublicKeyNotExpired {
-				continue
-			}
-			result[req] = res
-			continue
-		}
-		request.Requests[req] = ts
-	}
-	err := s.QueryPublicKeys(ctx, &request, &response)
-	if err != nil {
-		return nil, err
-	}
-	for req, res := range response.Results {
-		result[req] = res
-		s.immutableCache.StoreServerKey(req, res)
-	}
-	return result, nil
+type InputPublicKeysResponse struct {
 }

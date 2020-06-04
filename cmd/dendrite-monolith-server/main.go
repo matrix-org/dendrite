@@ -74,7 +74,7 @@ func main() {
 		base, federation,
 	)
 	if base.UseHTTPAPIs {
-		serverKeyAPI = base.CreateHTTPServerKeyAPIs()
+		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
 

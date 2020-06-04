@@ -7,6 +7,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/serverkeyapi/internal"
+	"github.com/matrix-org/dendrite/serverkeyapi/inthttp"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage/cache"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -34,8 +35,7 @@ func SetupServerKeyAPIComponent(
 	}
 
 	internalAPI := internal.ServerKeyAPI{
-		ImmutableCache: base.ImmutableCache,
-		FedClient:      fedClient,
+		FedClient: fedClient,
 		OurKeyRing: gomatrixserverlib.KeyRing{
 			KeyFetchers: []gomatrixserverlib.KeyFetcher{
 				&gomatrixserverlib.DirectKeyFetcher{
@@ -77,7 +77,7 @@ func SetupServerKeyAPIComponent(
 		}).Info("Enabled perspective key fetcher")
 	}
 
-	internalAPI.SetupHTTP(base.InternalAPIMux)
+	inthttp.AddRoutes(&internalAPI, base.InternalAPIMux, base.ImmutableCache)
 
 	return &internalAPI
 }

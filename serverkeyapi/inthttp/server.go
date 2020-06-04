@@ -1,4 +1,4 @@
-package internal
+package inthttp
 
 import (
 	"encoding/json"
@@ -6,13 +6,14 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-func (s *ServerKeyAPI) SetupHTTP(internalAPIMux *mux.Router) {
-	internalAPIMux.Handle(api.ServerKeyQueryPublicKeyPath,
+func AddRoutes(s api.ServerKeyInternalAPI, internalAPIMux *mux.Router, cache caching.ImmutableCache) {
+	internalAPIMux.Handle(ServerKeyQueryPublicKeyPath,
 		internal.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryPublicKeysRequest{}
 			response := api.QueryPublicKeysResponse{}
@@ -27,7 +28,7 @@ func (s *ServerKeyAPI) SetupHTTP(internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(api.ServerKeyInputPublicKeyPath,
+	internalAPIMux.Handle(ServerKeyInputPublicKeyPath,
 		internal.MakeInternalAPI("inputPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.InputPublicKeysRequest{}
 			response := api.InputPublicKeysResponse{}
@@ -37,7 +38,7 @@ func (s *ServerKeyAPI) SetupHTTP(internalAPIMux *mux.Router) {
 			store := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
 			for req, res := range request.Keys {
 				store[req] = res
-				s.ImmutableCache.StoreServerKey(req, res)
+				cache.StoreServerKey(req, res)
 			}
 			if err := s.StoreKeys(req.Context(), store); err != nil {
 				return util.ErrorResponse(err)

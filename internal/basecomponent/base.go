@@ -45,6 +45,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
+	skinthttp "github.com/matrix-org/dendrite/serverkeyapi/inthttp"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -176,10 +177,9 @@ func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.Federati
 	return f
 }
 
-// CreateHTTPServerKeyAPIs returns ServerKeyInternalAPI for hitting the server key
-// API over HTTP
-func (b *BaseDendrite) CreateHTTPServerKeyAPIs() serverKeyAPI.ServerKeyInternalAPI {
-	f, err := serverKeyAPI.NewServerKeyInternalAPIHTTP(
+// ServerKeyAPIClient returns ServerKeyInternalAPI for hitting the server key API over HTTP
+func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
+	f, err := skinthttp.NewServerKeyClient(
 		b.Cfg.ServerKeyAPIURL(),
 		b.httpClient,
 		b.ImmutableCache,
