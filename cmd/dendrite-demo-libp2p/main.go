@@ -178,7 +178,7 @@ func main() {
 		base.Base.PublicAPIMux,
 		base.Base.InternalAPIMux,
 		&cfg,
-		base.Base.EnableHTTPAPIs,
+		base.Base.UseHTTPAPIs,
 	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.

@@ -34,7 +34,7 @@ func main() {
 	serverKeyAPI := base.CreateHTTPServerKeyAPIs()
 	keyRing := serverKeyAPI.KeyRing()
 
-	fsAPI := base.CreateHTTPFederationSenderAPIs()
+	fsAPI := base.FederationSenderHTTPClient()
 
 	rsAPI := base.CreateHTTPRoomserverAPIs()
 	asAPI := base.CreateHTTPAppServiceAPIs()
