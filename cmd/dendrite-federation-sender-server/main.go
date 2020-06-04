@@ -30,10 +30,9 @@ func main() {
 	keyRing := serverKeyAPI.KeyRing()
 
 	rsAPI := base.RoomserverHTTPClient()
-	fsAPI := federationsender.SetupFederationSenderComponent(
+	federationsender.SetupFederationSenderComponent(
 		base, federation, rsAPI, keyRing,
 	)
-	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender), string(base.Cfg.Listen.FederationSender))
 
