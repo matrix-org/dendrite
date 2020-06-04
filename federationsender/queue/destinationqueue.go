@@ -59,7 +59,6 @@ func (oq *destinationQueue) retry() {
 	// and then skip ahead a lot which feels non-ideal but equally we can't persist thousands of events
 	// in-memory to maybe-send it one day. Ideally we would just shove these pending events in a database
 	// so we can send a lot of events.
-	oq.statistics.Success()
 	// if we were backing off, swap to not backing off and interrupt the select.
 	// We need to use an atomic bool here to prevent multiple calls to retry() blocking on the channel
 	// as it is unbuffered.
