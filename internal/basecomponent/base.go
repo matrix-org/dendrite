@@ -265,7 +265,8 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 	uri, err := url.Parse(string(cfg.Database.Naffka))
 	if err != nil || uri.Scheme == "file" {
-		cs, err := sqlutil.ParseFileURI(string(cfg.Database.Naffka))
+		var cs string
+		cs, err = sqlutil.ParseFileURI(string(cfg.Database.Naffka))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to parse naffka database file URI")
 		}
