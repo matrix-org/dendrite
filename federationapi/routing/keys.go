@@ -44,7 +44,7 @@ func localKeys(cfg *config.Dendrite, validUntil time.Time) (*gomatrixserverlib.S
 
 	keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
 		cfg.Matrix.KeyID: {
-			Key: gomatrixserverlib.Base64String(publicKey),
+			Key: gomatrixserverlib.Base64Bytes(publicKey),
 		},
 	}
 
