@@ -37,6 +37,7 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
+	eduinthttp "github.com/matrix-org/dendrite/eduserver/inthttp"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/inthttp"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -151,17 +152,16 @@ func (b *BaseDendrite) CreateHTTPAppServiceAPIs() appserviceAPI.AppServiceQueryA
 func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
 	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
 	if err != nil {
-		logrus.WithError(err).Panic("NewRoomserverInternalAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.httpClient)
 	}
 	return rsAPI
 }
 
-// CreateHTTPEDUServerAPIs returns eduInputAPI for hitting the EDU
-// server over HTTP
-func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI {
-	e, err := eduServerAPI.NewEDUServerInputAPIHTTP(b.Cfg.EDUServerURL(), b.httpClient)
+// EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
+func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
+	e, err := eduinthttp.NewEDUServerClient(b.Cfg.EDUServerURL(), b.httpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("NewEDUServerInputAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("EDUServerClient failed", b.httpClient)
 	}
 	return e
 }
@@ -171,7 +171,7 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationSenderInternalAPI {
 	f, err := inthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("NewFederationSenderInternalAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.httpClient)
 	}
 	return f
 }

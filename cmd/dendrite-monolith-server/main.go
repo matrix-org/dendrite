@@ -90,7 +90,7 @@ func main() {
 		base, cache.New(), deviceDB,
 	)
 	if base.UseHTTPAPIs {
-		eduInputAPI = base.CreateHTTPEDUServerAPIs()
+		eduInputAPI = base.EDUServerClient()
 	}
 
 	asAPI := appservice.SetupAppServiceAPIComponent(

@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/eduserver/input"
+	"github.com/matrix-org/dendrite/eduserver/inthttp"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 )
 
@@ -42,7 +43,7 @@ func SetupEDUServerComponent(
 		ServerName:                   base.Cfg.Matrix.ServerName,
 	}
 
-	inputAPI.SetupHTTP(base.InternalAPIMux)
+	inthttp.AddRoutes(inputAPI, base.InternalAPIMux)
 
 	return inputAPI
 }

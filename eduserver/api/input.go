@@ -19,12 +19,8 @@ package api
 
 import (
 	"context"
-	"errors"
-	"net/http"
 
-	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/gomatrixserverlib"
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // InputTypingEvent is an event for notifying the typing server about typing updates.
@@ -76,49 +72,4 @@ type EDUServerInputAPI interface {
 		request *InputSendToDeviceEventRequest,
 		response *InputSendToDeviceEventResponse,
 	) error
-}
-
-// EDUServerInputTypingEventPath is the HTTP path for the InputTypingEvent API.
-const EDUServerInputTypingEventPath = "/eduserver/input"
-
-// EDUServerInputSendToDeviceEventPath is the HTTP path for the InputSendToDeviceEvent API.
-const EDUServerInputSendToDeviceEventPath = "/eduserver/sendToDevice"
-
-// NewEDUServerInputAPIHTTP creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
-func NewEDUServerInputAPIHTTP(eduServerURL string, httpClient *http.Client) (EDUServerInputAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewTypingServerInputAPIHTTP: httpClient is <nil>")
-	}
-	return &httpEDUServerInputAPI{eduServerURL, httpClient}, nil
-}
-
-type httpEDUServerInputAPI struct {
-	eduServerURL string
-	httpClient   *http.Client
-}
-
-// InputTypingEvent implements EDUServerInputAPI
-func (h *httpEDUServerInputAPI) InputTypingEvent(
-	ctx context.Context,
-	request *InputTypingEventRequest,
-	response *InputTypingEventResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputTypingEvent")
-	defer span.Finish()
-
-	apiURL := h.eduServerURL + EDUServerInputTypingEventPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// InputSendToDeviceEvent implements EDUServerInputAPI
-func (h *httpEDUServerInputAPI) InputSendToDeviceEvent(
-	ctx context.Context,
-	request *InputSendToDeviceEventRequest,
-	response *InputSendToDeviceEventResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputSendToDeviceEvent")
-	defer span.Finish()
-
-	apiURL := h.eduServerURL + EDUServerInputSendToDeviceEventPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
