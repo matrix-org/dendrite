@@ -38,6 +38,7 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationsender/httpint"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
@@ -58,7 +59,7 @@ type BaseDendrite struct {
 	// PublicAPIMux should be used to register new public matrix api endpoints
 	PublicAPIMux   *mux.Router
 	InternalAPIMux *mux.Router
-	EnableHTTPAPIs bool
+	UseHTTPAPIs    bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
 	ImmutableCache caching.ImmutableCache
@@ -72,7 +73,7 @@ const HTTPClientTimeout = time.Second * 30
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
-func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs bool) *BaseDendrite {
+func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs bool) *BaseDendrite {
 	internal.SetupStdLogging()
 	internal.SetupHookLogging(cfg.Logging, componentName)
 	internal.SetupPprof()
@@ -118,7 +119,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 
 	return &BaseDendrite{
 		componentName:  componentName,
-		EnableHTTPAPIs: enableHTTPAPIs,
+		UseHTTPAPIs:    useHTTPAPIs,
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		ImmutableCache: cache,
@@ -165,10 +166,10 @@ func (b *BaseDendrite) CreateHTTPEDUServerAPIs() eduServerAPI.EDUServerInputAPI 
 	return e
 }
 
-// CreateHTTPFederationSenderAPIs returns FederationSenderInternalAPI for hitting
+// FederationSenderHTTPClient returns FederationSenderInternalAPI for hitting
 // the federation sender over HTTP
-func (b *BaseDendrite) CreateHTTPFederationSenderAPIs() federationSenderAPI.FederationSenderInternalAPI {
-	f, err := federationSenderAPI.NewFederationSenderInternalAPIHTTP(b.Cfg.FederationSenderURL(), b.httpClient)
+func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationSenderInternalAPI {
+	f, err := httpint.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("NewFederationSenderInternalAPIHTTP failed", b.httpClient)
 	}
@@ -241,7 +242,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		b.PublicAPIMux,
 		b.InternalAPIMux,
 		b.Cfg,
-		b.EnableHTTPAPIs,
+		b.UseHTTPAPIs,
 	)
 	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 

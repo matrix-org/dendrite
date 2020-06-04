@@ -73,7 +73,7 @@ func main() {
 	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
 		base, federation,
 	)
-	if base.EnableHTTPAPIs {
+	if base.UseHTTPAPIs {
 		serverKeyAPI = base.CreateHTTPServerKeyAPIs()
 	}
 	keyRing := serverKeyAPI.KeyRing()
@@ -82,29 +82,29 @@ func main() {
 		base, keyRing, federation,
 	)
 	rsAPI := rsComponent
-	if base.EnableHTTPAPIs {
+	if base.UseHTTPAPIs {
 		rsAPI = base.CreateHTTPRoomserverAPIs()
 	}
 
 	eduInputAPI := eduserver.SetupEDUServerComponent(
 		base, cache.New(), deviceDB,
 	)
-	if base.EnableHTTPAPIs {
+	if base.UseHTTPAPIs {
 		eduInputAPI = base.CreateHTTPEDUServerAPIs()
 	}
 
 	asAPI := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
 	)
-	if base.EnableHTTPAPIs {
+	if base.UseHTTPAPIs {
 		asAPI = base.CreateHTTPAppServiceAPIs()
 	}
 
 	fsAPI := federationsender.SetupFederationSenderComponent(
 		base, federation, rsAPI, keyRing,
 	)
-	if base.EnableHTTPAPIs {
-		fsAPI = base.CreateHTTPFederationSenderAPIs()
+	if base.UseHTTPAPIs {
+		fsAPI = base.FederationSenderHTTPClient()
 	}
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
@@ -132,7 +132,7 @@ func main() {
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
-		base.EnableHTTPAPIs,
+		base.UseHTTPAPIs,
 	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.

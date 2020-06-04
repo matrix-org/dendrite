@@ -2,8 +2,9 @@ package api
 
 import (
 	"context"
-	"errors"
-	"net/http"
+
+	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // FederationSenderInternalAPI is used to query information from the federation sender.
@@ -50,16 +51,59 @@ type FederationSenderInternalAPI interface {
 	) error
 }
 
-// NewFederationSenderInternalAPIHTTP creates a FederationSenderInternalAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil an error is returned
-func NewFederationSenderInternalAPIHTTP(federationSenderURL string, httpClient *http.Client) (FederationSenderInternalAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewFederationSenderInternalAPIHTTP: httpClient is <nil>")
-	}
-	return &httpFederationSenderInternalAPI{federationSenderURL, httpClient}, nil
+type PerformDirectoryLookupRequest struct {
+	RoomAlias  string                       `json:"room_alias"`
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
 }
 
-type httpFederationSenderInternalAPI struct {
-	federationSenderURL string
-	httpClient          *http.Client
+type PerformDirectoryLookupResponse struct {
+	RoomID      string                         `json:"room_id"`
+	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
+}
+
+type PerformJoinRequest struct {
+	RoomID string `json:"room_id"`
+	UserID string `json:"user_id"`
+	// The sorted list of servers to try. Servers will be tried sequentially, after de-duplication.
+	ServerNames types.ServerNames      `json:"server_names"`
+	Content     map[string]interface{} `json:"content"`
+}
+
+type PerformJoinResponse struct {
+}
+
+type PerformLeaveRequest struct {
+	RoomID      string            `json:"room_id"`
+	UserID      string            `json:"user_id"`
+	ServerNames types.ServerNames `json:"server_names"`
+}
+
+type PerformLeaveResponse struct {
+}
+
+type PerformServersAliveRequest struct {
+	Servers []gomatrixserverlib.ServerName
+}
+
+type PerformServersAliveResponse struct {
+}
+
+// QueryJoinedHostsInRoomRequest is a request to QueryJoinedHostsInRoom
+type QueryJoinedHostsInRoomRequest struct {
+	RoomID string `json:"room_id"`
+}
+
+// QueryJoinedHostsInRoomResponse is a response to QueryJoinedHostsInRoom
+type QueryJoinedHostsInRoomResponse struct {
+	JoinedHosts []types.JoinedHost `json:"joined_hosts"`
+}
+
+// QueryJoinedHostServerNamesRequest is a request to QueryJoinedHostServerNames
+type QueryJoinedHostServerNamesInRoomRequest struct {
+	RoomID string `json:"room_id"`
+}
+
+// QueryJoinedHostServerNamesResponse is a response to QueryJoinedHostServerNames
+type QueryJoinedHostServerNamesInRoomResponse struct {
+	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
 }
