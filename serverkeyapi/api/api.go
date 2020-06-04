@@ -70,10 +70,9 @@ func (s *httpServerKeyInternalAPI) FetcherName() string {
 }
 
 func (s *httpServerKeyInternalAPI) StoreKeys(
-	_ context.Context,
+	ctx context.Context,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	ctx := context.Background()
 	request := InputPublicKeysRequest{
 		Keys: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
 	}
@@ -86,10 +85,9 @@ func (s *httpServerKeyInternalAPI) StoreKeys(
 }
 
 func (s *httpServerKeyInternalAPI) FetchKeys(
-	_ context.Context,
+	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
-	ctx := context.Background()
 	result := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
 	request := QueryPublicKeysRequest{
 		Requests: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp),
