@@ -162,7 +162,7 @@ func SendJoin(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON: " + err.Error()),
 		}
 	}
 
