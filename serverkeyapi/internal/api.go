@@ -25,17 +25,23 @@ func (s *ServerKeyAPI) KeyRing() *gomatrixserverlib.KeyRing {
 }
 
 func (s *ServerKeyAPI) StoreKeys(
-	ctx context.Context,
+	_ context.Context,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
+	// Run in a background context - we don't want to stop this work just
+	// because the caller gives up waiting.
+	ctx := context.Background()
 	// Store any keys that we were given in our database.
 	return s.OurKeyRing.KeyDatabase.StoreKeys(ctx, results)
 }
 
 func (s *ServerKeyAPI) FetchKeys(
-	ctx context.Context,
+	_ context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
+	// Run in a background context - we don't want to stop this work just
+	// because the caller gives up waiting.
+	ctx := context.Background()
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	// First consult our local database and see if we have the requested
 	// keys. These might come from a cache, depending on the database
