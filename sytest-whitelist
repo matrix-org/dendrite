@@ -311,3 +311,5 @@ Inbound: send_join rejects invalid JSON for room version 6
 Outbound federation rejects backfill containing invalid JSON for events in room version 6
 Invalid JSON integers
 Invalid JSON special values
+Invalid JSON floats
+Outbound federation will ignore a missing event with bad JSON for room version 6
