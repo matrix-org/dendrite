@@ -59,7 +59,11 @@ func (oq *destinationQueue) retry() {
 	// and then skip ahead a lot which feels non-ideal but equally we can't persist thousands of events
 	// in-memory to maybe-send it one day. Ideally we would just shove these pending events in a database
 	// so we can send a lot of events.
-	// if we were backing off, swap to not backing off and interrupt the select.
+	//
+	// Interrupt the backoff. If the federation request that happens as a result of this is successful
+	// then the counters will be reset there and the backoff will cancel. If the federation request
+	// fails then we will retry at the current backoff interval, so as to prevent us from spamming
+	// homeservers which are behaving badly.
 	// We need to use an atomic bool here to prevent multiple calls to retry() blocking on the channel
 	// as it is unbuffered.
 	if oq.backingOff.CAS(true, false) {
