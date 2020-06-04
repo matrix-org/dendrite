@@ -301,3 +301,15 @@ Can send messages with a wildcard device id to two devices
 Wildcard device messages wake up /sync 
 # TODO: separate PR for: Wildcard device messages over federation wake up /sync 
 Can send a to-device message to two users which both receive it using /sync
+User can create and send/receive messages in a room with version 6
+local user can join room with version 6
+User can invite local user to room with version 6
+remote user can join room with version 6
+User can invite remote user to room with version 6
+Remote user can backfill in a room with version 6
+Inbound: send_join rejects invalid JSON for room version 6
+Outbound federation rejects backfill containing invalid JSON for events in room version 6
+Invalid JSON integers
+Invalid JSON special values
+Invalid JSON floats
+Outbound federation will ignore a missing event with bad JSON for room version 6

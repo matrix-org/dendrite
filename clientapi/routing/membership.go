@@ -276,7 +276,13 @@ func checkAndProcessThreepid(
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),
 		}
-	} else if err != nil {
+	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+		return inviteStored, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
+	}
+	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		er := jsonerror.InternalServerError()
 		return inviteStored, &er
