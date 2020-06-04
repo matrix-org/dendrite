@@ -235,7 +235,7 @@ func main() {
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
-		base.EnableHTTPAPIs,
+		base.UseHTTPAPIs,
 	)
 
 	// Expose the matrix APIs via libp2p-js - for federation traffic

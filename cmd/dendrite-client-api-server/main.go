@@ -37,7 +37,7 @@ func main() {
 
 	asQuery := base.CreateHTTPAppServiceAPIs()
 	rsAPI := base.CreateHTTPRoomserverAPIs()
-	fsAPI := base.CreateHTTPFederationSenderAPIs()
+	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
 

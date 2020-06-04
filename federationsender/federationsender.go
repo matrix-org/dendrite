@@ -18,6 +18,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/internal"
+	"github.com/matrix-org/dendrite/federationsender/inthttp"
 	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
@@ -65,12 +66,8 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	queryAPI := internal.NewFederationSenderInternalAPI(
-		federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing,
-		statistics, queues,
-	)
-
-	queryAPI.SetupHTTP(base.InternalAPIMux)
+	queryAPI := internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing, statistics, queues)
+	inthttp.AddRoutes(queryAPI, base.InternalAPIMux)
 
 	return queryAPI
 }

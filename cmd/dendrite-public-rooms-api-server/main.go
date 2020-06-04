@@ -28,7 +28,7 @@ func main() {
 
 	deviceDB := base.CreateDeviceDB()
 
-	fsAPI := base.CreateHTTPFederationSenderAPIs()
+	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI := base.CreateHTTPRoomserverAPIs()
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
