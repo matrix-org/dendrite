@@ -455,6 +455,19 @@ rmv User can invite remote user to room with version 5
 rmv Remote user can backfill in a room with version 5 
 rmv Can reject invites over federation for rooms with version 5 
 rmv Can receive redactions from regular users over federation in room version 5 
+rmv User can create and send/receive messages in a room with version 6 
+rmv User can create and send/receive messages in a room with version 6 (2 subtests)
+rmv local user can join room with version 6 
+rmv User can invite local user to room with version 6 
+rmv remote user can join room with version 6 
+rmv User can invite remote user to room with version 6 
+rmv Remote user can backfill in a room with version 6 
+rmv Can reject invites over federation for rooms with version 6 
+rmv Can receive redactions from regular users over federation in room version 6 
+rmv Inbound federation rejects invites which include invalid JSON for room version 6
+rmv Outbound federation rejects invite response which include invalid JSON for room version 6
+rmv Inbound federation rejects invite rejections which include invalid JSON for room version 6
+rmv Server rejects invalid JSON in a version 6 room
 pre Presence changes are reported to local room members 
 f,pre Presence changes are also reported to remote room members 
 pre Presence changes to UNAVAILABLE are reported to local room members 
@@ -536,11 +549,11 @@ std Can recv device messages until they are acknowledged
 std Device messages with the same txn_id are deduplicated 
 std Device messages wake up /sync 
 std Can recv device messages over federation 
-std Device messages over federation wake up /sync 
+fsd Device messages over federation wake up /sync 
 std Can send messages with a wildcard device id 
 std Can send messages with a wildcard device id to two devices 
 std Wildcard device messages wake up /sync 
-std Wildcard device messages over federation wake up /sync 
+fsd Wildcard device messages over federation wake up /sync 
 adm /whois 
 nsp /purge_history 
 nsp /purge_history by ts 
@@ -578,6 +591,7 @@ frv A pair of servers can establish a join in a v2 room
 fsj Outbound federation rejects send_join responses with no m.room.create event 
 frv Outbound federation rejects m.room.create events with an unknown room version 
 fsj Event with an invalid signature in the send_join response should not cause room join to fail 
+fsj Inbound: send_join rejects invalid JSON for room version 6
 fed Outbound federation can send events
 fed Inbound federation can receive events 
 fed Inbound federation can receive redacted events 
@@ -636,6 +650,7 @@ fst Name/topic keys are correct
 fau Remote servers cannot set power levels in rooms without existing powerlevels 
 fau Remote servers should reject attempts by non-creators to set the power levels 
 fau Inbound federation rejects typing notifications from wrong remote 
+fau Users cannot set notifications powerlevel higher than their own
 fed Forward extremities remain so even after the next events are populated as outliers 
 fau Banned servers cannot send events 
 fau Banned servers cannot /make_join 
@@ -834,3 +849,8 @@ gst Real user can call /events on another world_readable room (SYN-606)
 gst Events come down the correct room
 pub Asking for a remote rooms list, but supplying the local server's name, returns the local rooms list
 std Can send a to-device message to two users which both receive it using /sync
+fme Outbound federation will ignore a missing event with bad JSON for room version 6
+fbk Outbound federation rejects backfill containing invalid JSON for events in room version 6
+jso Invalid JSON integers
+jso Invalid JSON floats
+jso Invalid JSON special values

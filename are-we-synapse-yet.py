@@ -50,6 +50,7 @@ test_mappings = {
         "fpb": "Public Room API",
         "fdk": "Device Key APIs",
         "fed": "Federation API",
+		"fsd": "Send-to-Device APIs",
     },
 
     "client_apis": {
@@ -99,6 +100,7 @@ test_mappings = {
         "ign": "Ignore Users",
         "udr": "User Directory APIs",
         "app": "Application Services API",
+		"jso": "Enforced canonical JSON",
     },
 }
 

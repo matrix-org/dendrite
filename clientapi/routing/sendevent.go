@@ -154,6 +154,11 @@ func generateSendEvent(
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
+	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
 	} else if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("internal.BuildEvent failed")
 		resErr := jsonerror.InternalServerError()
