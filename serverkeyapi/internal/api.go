@@ -66,6 +66,9 @@ func (s *ServerKeyAPI) FetchKeys(
 				results[req] = res
 				delete(requests, req)
 			}
+			if err = s.OurKeyRing.KeyDatabase.StoreKeys(ctx, fetcherResults); err != nil {
+				return nil, fmt.Errorf("server key API failed to store retrieved keys: %w", err)
+			}
 		}
 	}
 	// If we failed to fetch any keys then we should report an error.
