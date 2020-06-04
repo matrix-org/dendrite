@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice/storage"
@@ -207,9 +208,15 @@ func send(
 	txnID int,
 	transaction []byte,
 ) error {
-	// POST a transaction to our AS
-	address := fmt.Sprintf("%s/transactions/%d", appservice.URL, txnID)
-	resp, err := client.Post(address, "application/json", bytes.NewBuffer(transaction))
+	// PUT a transaction to our AS
+	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
+	address := fmt.Sprintf("%s/transactions/%d?access_token=%s", appservice.URL, txnID, url.QueryEscape(appservice.HSToken))
+	req, err := http.NewRequest("PUT", address, bytes.NewBuffer(transaction))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}

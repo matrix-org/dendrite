@@ -174,7 +174,7 @@ func MakeFedAPI(
 	serverName gomatrixserverlib.ServerName,
 	keyRing gomatrixserverlib.KeyRing,
 	wakeup *FederationWakeups,
-	f func(*http.Request, *gomatrixserverlib.FederationRequest) util.JSONResponse,
+	f func(*http.Request, *gomatrixserverlib.FederationRequest, map[string]string) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
 		fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
@@ -184,7 +184,12 @@ func MakeFedAPI(
 			return errResp
 		}
 		go wakeup.Wakeup(req.Context(), fedReq.Origin())
-		return f(req, fedReq)
+		vars, err := URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+
+		return f(req, fedReq, vars)
 	}
 	return MakeExternalAPI(metricsName, h)
 }

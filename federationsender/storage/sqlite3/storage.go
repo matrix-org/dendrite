@@ -38,7 +38,11 @@ type Database struct {
 func NewDatabase(dataSourceName string) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sqlutil.Open(internal.SQLiteDriverName(), dataSourceName, nil); err != nil {
+	cs, err := sqlutil.ParseFileURI(dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+	if result.db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {

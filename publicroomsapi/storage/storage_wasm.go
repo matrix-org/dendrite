@@ -32,7 +32,7 @@ func NewPublicRoomsServerDatabase(dataSourceName string, localServerName gomatri
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
-		return sqlite3.NewPublicRoomsServerDatabase(uri.Path, localServerName)
+		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName, localServerName)
 	default:
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}
