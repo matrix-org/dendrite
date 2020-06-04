@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
@@ -39,10 +40,14 @@ func (s *ServerKeyAPI) FetchKeys(
 	// First consult our local database and see if we have the requested
 	// keys. These might come from a cache, depending on the database
 	// implementation used.
+	now := gomatrixserverlib.AsTimestamp(time.Now())
 	if dbResults, err := s.OurKeyRing.KeyDatabase.FetchKeys(ctx, requests); err == nil {
 		// We successfully got some keys. Add them to the results and
 		// remove them from the request list.
 		for req, res := range dbResults {
+			if now > res.ValidUntilTS && res.ExpiredTS == gomatrixserverlib.PublicKeyNotExpired {
+				continue
+			}
 			results[req] = res
 			delete(requests, req)
 		}

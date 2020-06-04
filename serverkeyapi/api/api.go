@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -94,8 +95,12 @@ func (s *httpServerKeyInternalAPI) FetchKeys(
 	response := QueryPublicKeysResponse{
 		Results: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
 	}
+	now := gomatrixserverlib.AsTimestamp(time.Now())
 	for req, ts := range requests {
 		if res, ok := s.immutableCache.GetServerKey(req); ok {
+			if now > res.ValidUntilTS && res.ExpiredTS == gomatrixserverlib.PublicKeyNotExpired {
+				continue
+			}
 			result[req] = res
 			continue
 		}
