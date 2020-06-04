@@ -103,7 +103,18 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, enableHTTPAPIs 
 		})}
 	}
 
-	httpmux := mux.NewRouter()
+	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
+	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.
+	// When used in conjunction with UseEncodedPath() we get the behaviour we want when parsing
+	// path parameters:
+	// /foo/bar%2Fbaz    == [foo, bar%2Fbaz]  (from UseEncodedPath)
+	// /foo/bar%2F%2Fbaz == [foo, bar%2F%2Fbaz] (from SkipClean)
+	// In particular, rooms v3 event IDs are not urlsafe and can include '/' and because they
+	// are randomly generated it results in flakey tests.
+	// We need to be careful with media APIs if they read from a filesystem to make sure they
+	// are not inadvertently reading paths without cleaning, else this could introduce a
+	// directory traversal attack e.g /../../../etc/passwd
+	httpmux := mux.NewRouter().SkipClean(true)
 
 	return &BaseDendrite{
 		componentName:  componentName,

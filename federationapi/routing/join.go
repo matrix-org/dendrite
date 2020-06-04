@@ -102,6 +102,11 @@ func MakeJoin(
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
+	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
 	} else if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("internal.BuildEvent failed")
 		return jsonerror.InternalServerError()
@@ -157,7 +162,7 @@ func SendJoin(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON: " + err.Error()),
 		}
 	}
 
