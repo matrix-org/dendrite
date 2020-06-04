@@ -17,8 +17,8 @@ package federationsender
 import (
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
-	"github.com/matrix-org/dendrite/federationsender/httpint"
 	"github.com/matrix-org/dendrite/federationsender/internal"
+	"github.com/matrix-org/dendrite/federationsender/inthttp"
 	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
@@ -67,7 +67,7 @@ func SetupFederationSenderComponent(
 	}
 
 	queryAPI := internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing, statistics, queues)
-	httpint.AddRoutes(queryAPI, base.InternalAPIMux)
+	inthttp.AddRoutes(queryAPI, base.InternalAPIMux)
 
 	return queryAPI
 }

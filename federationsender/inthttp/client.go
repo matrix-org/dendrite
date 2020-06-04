@@ -1,4 +1,4 @@
-package httpint
+package inthttp
 
 import (
 	"context"
