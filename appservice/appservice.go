@@ -23,6 +23,7 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
+	"github.com/matrix-org/dendrite/appservice/inthttp"
 	"github.com/matrix-org/dendrite/appservice/query"
 	"github.com/matrix-org/dendrite/appservice/routing"
 	"github.com/matrix-org/dendrite/appservice/storage"
@@ -77,14 +78,14 @@ func SetupAppServiceAPIComponent(
 
 	// Create appserivce query API with an HTTP client that will be used for all
 	// outbound and inbound requests (inbound only for the internal API)
-	appserviceQueryAPI := query.AppServiceQueryAPI{
+	appserviceQueryAPI := &query.AppServiceQueryAPI{
 		HTTPClient: &http.Client{
 			Timeout: time.Second * 30,
 		},
 		Cfg: base.Cfg,
 	}
 
-	appserviceQueryAPI.SetupHTTP(base.InternalAPIMux)
+	inthttp.AddRoutes(appserviceQueryAPI, base.InternalAPIMux)
 
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
@@ -105,7 +106,7 @@ func SetupAppServiceAPIComponent(
 		accountsDB, federation, transactionsCache,
 	)
 
-	return &appserviceQueryAPI
+	return appserviceQueryAPI
 }
 
 // generateAppServiceAccounts creates a dummy account based off the

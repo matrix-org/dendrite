@@ -97,7 +97,7 @@ func main() {
 		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
 	)
 	if base.UseHTTPAPIs {
-		asAPI = base.CreateHTTPAppServiceAPIs()
+		asAPI = base.AppserviceHTTPClient()
 	}
 
 	fsAPI := federationsender.SetupFederationSenderComponent(
