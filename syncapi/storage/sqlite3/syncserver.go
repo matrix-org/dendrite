@@ -17,8 +17,6 @@ package sqlite3
 
 import (
 	"database/sql"
-	"errors"
-	"net/url"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
@@ -43,17 +41,9 @@ type SyncServerDatasource struct {
 // nolint: gocyclo
 func NewDatabase(dataSourceName string) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
-	uri, err := url.Parse(dataSourceName)
+	cs, err := sqlutil.ParseFileURI(dataSourceName)
 	if err != nil {
 		return nil, err
-	}
-	var cs string
-	if uri.Opaque != "" { // file:filename.db
-		cs = uri.Opaque
-	} else if uri.Path != "" { // file:///path/to/filename.db
-		cs = uri.Path
-	} else {
-		return nil, errors.New("no filename or path in connect string")
 	}
 	if d.db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
