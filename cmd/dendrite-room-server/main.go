@@ -25,7 +25,7 @@ func main() {
 	defer base.Close() // nolint: errcheck
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := base.CreateHTTPServerKeyAPIs()
+	serverKeyAPI := base.ServerKeyAPIClient()
 	keyRing := serverKeyAPI.KeyRing()
 
 	fsAPI := base.FederationSenderHTTPClient()

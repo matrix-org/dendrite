@@ -31,7 +31,7 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := base.CreateHTTPServerKeyAPIs()
+	serverKeyAPI := base.ServerKeyAPIClient()
 	keyRing := serverKeyAPI.KeyRing()
 
 	fsAPI := base.FederationSenderHTTPClient()
