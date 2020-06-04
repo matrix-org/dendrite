@@ -16,6 +16,7 @@ package roomserver
 
 import (
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal/basecomponent"
@@ -38,7 +39,7 @@ func SetupRoomServerComponent(
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	internalAPI := internal.RoomserverInternalAPI{
+	internalAPI := &internal.RoomserverInternalAPI{
 		DB:                   roomserverDB,
 		Cfg:                  base.Cfg,
 		Producer:             base.KafkaProducer,
@@ -49,7 +50,7 @@ func SetupRoomServerComponent(
 		KeyRing:              keyRing,
 	}
 
-	internalAPI.SetupHTTP(base.InternalAPIMux)
+	inthttp.AddRoutes(internalAPI, base.InternalAPIMux)
 
-	return &internalAPI
+	return internalAPI
 }

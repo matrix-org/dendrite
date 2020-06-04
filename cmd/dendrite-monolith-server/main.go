@@ -83,7 +83,7 @@ func main() {
 	)
 	rsAPI := rsComponent
 	if base.UseHTTPAPIs {
-		rsAPI = base.CreateHTTPRoomserverAPIs()
+		rsAPI = base.RoomserverHTTPClient()
 	}
 
 	eduInputAPI := eduserver.SetupEDUServerComponent(

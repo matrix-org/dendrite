@@ -36,7 +36,7 @@ func main() {
 	keyRing := serverKeyAPI.KeyRing()
 
 	asQuery := base.CreateHTTPAppServiceAPIs()
-	rsAPI := base.CreateHTTPRoomserverAPIs()
+	rsAPI := base.RoomserverHTTPClient()
 	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)

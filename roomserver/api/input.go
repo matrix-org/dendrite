@@ -16,11 +16,7 @@
 package api
 
 import (
-	"context"
-
-	internalHTTP "github.com/matrix-org/dendrite/internal/http"
 	"github.com/matrix-org/gomatrixserverlib"
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 const (
@@ -100,20 +96,4 @@ type InputRoomEventsRequest struct {
 // InputRoomEventsResponse is a response to InputRoomEvents
 type InputRoomEventsResponse struct {
 	EventID string `json:"event_id"`
-}
-
-// RoomserverInputRoomEventsPath is the HTTP path for the InputRoomEvents API.
-const RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
-
-// InputRoomEvents implements RoomserverInputAPI
-func (h *httpRoomserverInternalAPI) InputRoomEvents(
-	ctx context.Context,
-	request *InputRoomEventsRequest,
-	response *InputRoomEventsResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputRoomEvents")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverInputRoomEventsPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

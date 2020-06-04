@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -209,7 +210,7 @@ func writeToRoomServer(input []string, roomserverURL string) error {
 			return err
 		}
 	}
-	x, err := api.NewRoomserverInternalAPIHTTP(roomserverURL, &http.Client{Timeout: timeoutHTTP}, nil)
+	x, err := inthttp.NewRoomserverClient(roomserverURL, &http.Client{Timeout: timeoutHTTP}, nil)
 	if err != nil {
 		return err
 	}
@@ -276,7 +277,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	cmd.Args = []string{"dendrite-room-server", "--config", filepath.Join(dir, test.ConfigFile)}
 
 	gotOutput, err := runAndReadFromTopic(cmd, cfg.RoomServerURL()+"/metrics", doInput, outputTopic, len(wantOutput), func() {
-		queryAPI, _ := api.NewRoomserverInternalAPIHTTP("http://"+string(cfg.Listen.RoomServer), &http.Client{Timeout: timeoutHTTP}, cache)
+		queryAPI, _ := inthttp.NewRoomserverClient("http://"+string(cfg.Listen.RoomServer), &http.Client{Timeout: timeoutHTTP}, cache)
 		checkQueries(queryAPI)
 	})
 	if err != nil {

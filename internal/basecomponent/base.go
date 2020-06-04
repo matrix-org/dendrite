@@ -41,6 +41,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/inthttp"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/sirupsen/logrus"
 
@@ -146,10 +147,9 @@ func (b *BaseDendrite) CreateHTTPAppServiceAPIs() appserviceAPI.AppServiceQueryA
 	return a
 }
 
-// CreateHTTPRoomserverAPIs returns the AliasAPI, InputAPI and QueryAPI for hitting
-// the roomserver over HTTP.
-func (b *BaseDendrite) CreateHTTPRoomserverAPIs() roomserverAPI.RoomserverInternalAPI {
-	rsAPI, err := roomserverAPI.NewRoomserverInternalAPIHTTP(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
+// RoomserverHTTPClient returns RoomserverInternalAPI for hitting the roomserver over HTTP.
+func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
+	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
 	if err != nil {
 		logrus.WithError(err).Panic("NewRoomserverInternalAPIHTTP failed", b.httpClient)
 	}

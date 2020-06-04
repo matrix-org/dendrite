@@ -14,13 +14,6 @@
 
 package api
 
-import (
-	"context"
-
-	internalHTTP "github.com/matrix-org/dendrite/internal/http"
-	opentracing "github.com/opentracing/opentracing-go"
-)
-
 // SetRoomAliasRequest is a request to SetRoomAlias
 type SetRoomAliasRequest struct {
 	// ID of the user setting the alias
@@ -83,83 +76,3 @@ type RemoveRoomAliasRequest struct {
 
 // RemoveRoomAliasResponse is a response to RemoveRoomAlias
 type RemoveRoomAliasResponse struct{}
-
-// RoomserverSetRoomAliasPath is the HTTP path for the SetRoomAlias API.
-const RoomserverSetRoomAliasPath = "/roomserver/setRoomAlias"
-
-// RoomserverGetRoomIDForAliasPath is the HTTP path for the GetRoomIDForAlias API.
-const RoomserverGetRoomIDForAliasPath = "/roomserver/GetRoomIDForAlias"
-
-// RoomserverGetAliasesForRoomIDPath is the HTTP path for the GetAliasesForRoomID API.
-const RoomserverGetAliasesForRoomIDPath = "/roomserver/GetAliasesForRoomID"
-
-// RoomserverGetCreatorIDForAliasPath is the HTTP path for the GetCreatorIDForAlias API.
-const RoomserverGetCreatorIDForAliasPath = "/roomserver/GetCreatorIDForAlias"
-
-// RoomserverRemoveRoomAliasPath is the HTTP path for the RemoveRoomAlias API.
-const RoomserverRemoveRoomAliasPath = "/roomserver/removeRoomAlias"
-
-// SetRoomAlias implements RoomserverAliasAPI
-func (h *httpRoomserverInternalAPI) SetRoomAlias(
-	ctx context.Context,
-	request *SetRoomAliasRequest,
-	response *SetRoomAliasResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "SetRoomAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// GetRoomIDForAlias implements RoomserverAliasAPI
-func (h *httpRoomserverInternalAPI) GetRoomIDForAlias(
-	ctx context.Context,
-	request *GetRoomIDForAliasRequest,
-	response *GetRoomIDForAliasResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetRoomIDForAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverGetRoomIDForAliasPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// GetAliasesForRoomID implements RoomserverAliasAPI
-func (h *httpRoomserverInternalAPI) GetAliasesForRoomID(
-	ctx context.Context,
-	request *GetAliasesForRoomIDRequest,
-	response *GetAliasesForRoomIDResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetAliasesForRoomID")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverGetAliasesForRoomIDPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// GetCreatorIDForAlias implements RoomserverAliasAPI
-func (h *httpRoomserverInternalAPI) GetCreatorIDForAlias(
-	ctx context.Context,
-	request *GetCreatorIDForAliasRequest,
-	response *GetCreatorIDForAliasResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetCreatorIDForAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverGetCreatorIDForAliasPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// RemoveRoomAlias implements RoomserverAliasAPI
-func (h *httpRoomserverInternalAPI) RemoveRoomAlias(
-	ctx context.Context,
-	request *RemoveRoomAliasRequest,
-	response *RemoveRoomAliasResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "RemoveRoomAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverRemoveRoomAliasPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}

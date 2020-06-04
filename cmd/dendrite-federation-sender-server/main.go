@@ -29,7 +29,7 @@ func main() {
 	serverKeyAPI := base.CreateHTTPServerKeyAPIs()
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsAPI := base.CreateHTTPRoomserverAPIs()
+	rsAPI := base.RoomserverHTTPClient()
 	fsAPI := federationsender.SetupFederationSenderComponent(
 		base, federation, rsAPI, keyRing,
 	)
