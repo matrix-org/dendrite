@@ -24,7 +24,7 @@ const (
 func NewServerKeyClient(
 	serverKeyAPIURL string,
 	httpClient *http.Client,
-	immutableCache caching.ImmutableCache,
+	cache caching.ServerKeyCache,
 ) (api.ServerKeyInternalAPI, error) {
 	if httpClient == nil {
 		return nil, errors.New("NewRoomserverInternalAPIHTTP: httpClient is <nil>")
@@ -32,14 +32,14 @@ func NewServerKeyClient(
 	return &httpServerKeyInternalAPI{
 		serverKeyAPIURL: serverKeyAPIURL,
 		httpClient:      httpClient,
-		immutableCache:  immutableCache,
+		cache:           cache,
 	}, nil
 }
 
 type httpServerKeyInternalAPI struct {
 	serverKeyAPIURL string
 	httpClient      *http.Client
-	immutableCache  caching.ImmutableCache
+	cache           caching.ServerKeyCache
 }
 
 func (s *httpServerKeyInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
@@ -71,7 +71,7 @@ func (s *httpServerKeyInternalAPI) StoreKeys(
 	response := api.InputPublicKeysResponse{}
 	for req, res := range results {
 		request.Keys[req] = res
-		s.immutableCache.StoreServerKey(req, res)
+		s.cache.StoreServerKey(req, res)
 	}
 	return s.InputPublicKeys(ctx, &request, &response)
 }
@@ -92,7 +92,7 @@ func (s *httpServerKeyInternalAPI) FetchKeys(
 	}
 	now := gomatrixserverlib.AsTimestamp(time.Now())
 	for req, ts := range requests {
-		if res, ok := s.immutableCache.GetServerKey(req); ok {
+		if res, ok := s.cache.GetServerKey(req); ok {
 			if now > res.ValidUntilTS && res.ExpiredTS == gomatrixserverlib.PublicKeyNotExpired {
 				continue
 			}
@@ -107,7 +107,7 @@ func (s *httpServerKeyInternalAPI) FetchKeys(
 	}
 	for req, res := range response.Results {
 		result[req] = res
-		s.immutableCache.StoreServerKey(req, res)
+		s.cache.StoreServerKey(req, res)
 	}
 	return result, nil
 }

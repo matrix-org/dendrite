@@ -29,7 +29,7 @@ func SetupServerKeyAPIComponent(
 		logrus.WithError(err).Panicf("failed to connect to server key database")
 	}
 
-	serverKeyDB, err := cache.NewKeyDatabase(innerDB, base.ImmutableCache)
+	serverKeyDB, err := cache.NewKeyDatabase(innerDB, base.Caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to set up caching wrapper for server key database")
 	}
@@ -77,7 +77,7 @@ func SetupServerKeyAPIComponent(
 		}).Info("Enabled perspective key fetcher")
 	}
 
-	inthttp.AddRoutes(&internalAPI, base.InternalAPIMux, base.ImmutableCache)
+	inthttp.AddRoutes(&internalAPI, base.InternalAPIMux, base.Caches)
 
 	return &internalAPI
 }
