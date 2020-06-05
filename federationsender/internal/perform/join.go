@@ -33,37 +33,49 @@ func (r joinContext) CheckSendJoinResponse(
 ) error {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
-	retries := map[string]*gomatrixserverlib.Event{}
+	retries := map[string][]gomatrixserverlib.Event{}
 
 	// Define a function which we can pass to Check to retrieve missing
 	// auth events inline. This greatly increases our chances of not having
 	// to repeat the entire set of checks just for a missing event or two.
-	missingAuth := func(eventID string, roomVersion gomatrixserverlib.RoomVersion) (*gomatrixserverlib.Event, error) {
-		if retry, ok := retries[eventID]; ok {
-			if retry == nil {
-				return nil, fmt.Errorf("missingAuth: not retrying failed event ID %q", eventID)
+	missingAuth := func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+		returning := []gomatrixserverlib.Event{}
+
+		// See if we have retry entries for each of the supplied event IDs.
+		for _, eventID := range eventIDs {
+			// If we've already satisfied a request for ths event ID before then
+			// just append the results.
+			if retry, ok := retries[eventID]; ok {
+				if retry == nil {
+					return nil, fmt.Errorf("missingAuth: not retrying failed event ID %q", eventID)
+				}
+				returning = append(returning, retry...)
+				continue
 			}
-			return retries[eventID], nil
-		}
-		// Make a note of the fact that we tried to do something with this
-		// event ID, even if we don't succeed.
-		retries[eventID] = nil
-		// Try to retrieve the event from the server that sent us the send
-		// join response.
-		tx, txerr := r.federation.GetEvent(ctx, server, eventID)
-		if txerr != nil {
-			return nil, fmt.Errorf("missingAuth r.federation.GetEvent: %w", txerr)
-		}
-		// For each event returned, add it to the auth events.
-		for _, pdu := range tx.PDUs {
-			ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
-			if everr != nil {
-				return nil, fmt.Errorf("missingAuth gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
+
+			// Make a note of the fact that we tried to do something with this
+			// event ID, even if we don't succeed.
+			retries[event.EventID()] = nil
+
+			// Try to retrieve the event from the server that sent us the send
+			// join response.
+			tx, txerr := r.federation.GetEvent(ctx, server, eventID)
+			if txerr != nil {
+				return nil, fmt.Errorf("missingAuth r.federation.GetEvent: %w", txerr)
 			}
-			respSendJoin.AuthEvents = append(respSendJoin.AuthEvents, ev)
-			retries[ev.EventID()] = &ev
+
+			// For each event returned, add it to the auth events.
+			for _, pdu := range tx.PDUs {
+				ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
+				if everr != nil {
+					return nil, fmt.Errorf("missingAuth gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
+				}
+				returning = append(returning, ev)
+				retries[event.EventID()] = append(retries[event.EventID()], ev)
+			}
 		}
-		return retries[eventID], nil
+
+		return returning, nil
 	}
 
 	// TODO: Can we expand Check here to return a list of missing auth
