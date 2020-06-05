@@ -33,38 +33,72 @@ func (r joinContext) CheckSendJoinResponse(
 ) error {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
-	retries := map[string]bool{}
+	retries := map[string][]gomatrixserverlib.Event{}
 
-retryCheck:
+	// Define a function which we can pass to Check to retrieve missing
+	// auth events inline. This greatly increases our chances of not having
+	// to repeat the entire set of checks just for a missing event or two.
+	missingAuth := func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+		returning := []gomatrixserverlib.Event{}
+
+		// See if we have retry entries for each of the supplied event IDs.
+		for _, eventID := range eventIDs {
+			// If we've already satisfied a request for this event ID before then
+			// just append the results. We won't retry the request.
+			if retry, ok := retries[eventID]; ok {
+				if retry == nil {
+					return nil, fmt.Errorf("missingAuth: not retrying failed event ID %q", eventID)
+				}
+				returning = append(returning, retry...)
+				continue
+			}
+
+			// Make a note of the fact that we tried to do something with this
+			// event ID, even if we don't succeed.
+			retries[event.EventID()] = nil
+
+			// Try to retrieve the event from the server that sent us the send
+			// join response.
+			tx, txerr := r.federation.GetEvent(ctx, server, eventID)
+			if txerr != nil {
+				return nil, fmt.Errorf("missingAuth r.federation.GetEvent: %w", txerr)
+			}
+
+			// For each event returned, add it to the set of return events. We
+			// also will populate the retries, in case someone asks for this
+			// event ID again.
+			for _, pdu := range tx.PDUs {
+				// Try to parse the event.
+				ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
+				if everr != nil {
+					return nil, fmt.Errorf("missingAuth gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
+				}
+
+				// Check the signatures of the event.
+				if res, err := gomatrixserverlib.VerifyEventSignatures(ctx, []gomatrixserverlib.Event{ev}, r.keyRing); err != nil {
+					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
+				} else {
+					for _, err := range res {
+						if err != nil {
+							return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
+						}
+					}
+				}
+
+				// If the event is OK then add it to the results and the retry map.
+				returning = append(returning, ev)
+				retries[event.EventID()] = append(retries[event.EventID()], ev)
+				retries[ev.EventID()] = append(retries[ev.EventID()], ev)
+			}
+		}
+
+		return returning, nil
+	}
+
 	// TODO: Can we expand Check here to return a list of missing auth
 	// events rather than failing one at a time?
-	if err := respSendJoin.Check(ctx, r.keyRing, event); err != nil {
-		switch e := err.(type) {
-		case gomatrixserverlib.MissingAuthEventError:
-			// Check that we haven't already retried for this event, prevents
-			// us from ending up in endless loops
-			if !retries[e.AuthEventID] {
-				// Ask the server that we're talking to right now for the event
-				tx, txerr := r.federation.GetEvent(ctx, server, e.AuthEventID)
-				if txerr != nil {
-					return fmt.Errorf("r.federation.GetEvent: %w", txerr)
-				}
-				// For each event returned, add it to the auth events.
-				for _, pdu := range tx.PDUs {
-					ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, respMakeJoin.RoomVersion)
-					if everr != nil {
-						return fmt.Errorf("gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
-					}
-					respSendJoin.AuthEvents = append(respSendJoin.AuthEvents, ev)
-				}
-				// Mark the event as retried and then give the check another go.
-				retries[e.AuthEventID] = true
-				goto retryCheck
-			}
-			return fmt.Errorf("respSendJoin (after retries): %w", e)
-		default:
-			return fmt.Errorf("respSendJoin: %w", err)
-		}
+	if err := respSendJoin.Check(ctx, r.keyRing, event, missingAuth); err != nil {
+		return fmt.Errorf("respSendJoin: %w", err)
 	}
 	return nil
 }

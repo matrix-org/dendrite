@@ -675,7 +675,7 @@ func (t *txnReq) lookupMissingStateViaState(roomID, eventID string, roomVersion 
 		return nil, err
 	}
 	// Check that the returned state is valid.
-	if err := state.Check(t.context, t.keys); err != nil {
+	if err := state.Check(t.context, t.keys, nil); err != nil {
 		return nil, err
 	}
 	return &state, nil
