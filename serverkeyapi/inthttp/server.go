@@ -12,7 +12,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-func AddRoutes(s api.ServerKeyInternalAPI, internalAPIMux *mux.Router, cache caching.ImmutableCache) {
+func AddRoutes(s api.ServerKeyInternalAPI, internalAPIMux *mux.Router, cache caching.ServerKeyCache) {
 	internalAPIMux.Handle(ServerKeyQueryPublicKeyPath,
 		internal.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryPublicKeysRequest{}

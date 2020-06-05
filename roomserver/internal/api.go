@@ -16,7 +16,7 @@ type RoomserverInternalAPI struct {
 	DB                   storage.Database
 	Cfg                  *config.Dendrite
 	Producer             sarama.SyncProducer
-	ImmutableCache       caching.ImmutableCache
+	Cache                caching.RoomVersionCache
 	ServerName           gomatrixserverlib.ServerName
 	KeyRing              gomatrixserverlib.JSONVerifier
 	FedClient            *gomatrixserverlib.FederationClient

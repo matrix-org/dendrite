@@ -12,10 +12,10 @@ import (
 // the public keys for other matrix servers.
 type KeyDatabase struct {
 	inner gomatrixserverlib.KeyDatabase
-	cache caching.ImmutableCache
+	cache caching.ServerKeyCache
 }
 
-func NewKeyDatabase(inner gomatrixserverlib.KeyDatabase, cache caching.ImmutableCache) (*KeyDatabase, error) {
+func NewKeyDatabase(inner gomatrixserverlib.KeyDatabase, cache caching.ServerKeyCache) (*KeyDatabase, error) {
 	if inner == nil {
 		return nil, errors.New("inner database can't be nil")
 	}

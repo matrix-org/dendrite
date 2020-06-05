@@ -951,7 +951,7 @@ func (r *RoomserverInternalAPI) QueryRoomVersionForRoom(
 	request *api.QueryRoomVersionForRoomRequest,
 	response *api.QueryRoomVersionForRoomResponse,
 ) error {
-	if roomVersion, ok := r.ImmutableCache.GetRoomVersion(request.RoomID); ok {
+	if roomVersion, ok := r.Cache.GetRoomVersion(request.RoomID); ok {
 		response.RoomVersion = roomVersion
 		return nil
 	}
@@ -961,6 +961,6 @@ func (r *RoomserverInternalAPI) QueryRoomVersionForRoom(
 		return err
 	}
 	response.RoomVersion = roomVersion
-	r.ImmutableCache.StoreRoomVersion(request.RoomID, response.RoomVersion)
+	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	return nil
 }
