@@ -68,10 +68,24 @@ func (r joinContext) CheckSendJoinResponse(
 			// also will populate the retries, in case someone asks for this
 			// event ID again.
 			for _, pdu := range tx.PDUs {
+				// Try to parse the event.
 				ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
 				if everr != nil {
 					return nil, fmt.Errorf("missingAuth gomatrixserverlib.NewEventFromUntrustedJSON: %w", everr)
 				}
+
+				// Check the signatures of the event.
+				if res, err := gomatrixserverlib.VerifyEventSignatures(ctx, []gomatrixserverlib.Event{ev}, r.keyRing); err != nil {
+					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
+				} else {
+					for _, err := range res {
+						if err != nil {
+							return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
+						}
+					}
+				}
+
+				// If the event is OK then add it to the results and the retry map.
 				returning = append(returning, ev)
 				retries[event.EventID()] = append(retries[event.EventID()], ev)
 				retries[ev.EventID()] = append(retries[ev.EventID()], ev)
