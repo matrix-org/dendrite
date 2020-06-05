@@ -4,6 +4,8 @@ cd $(git rev-parse --show-toplevel)
 
 docker build -f build/docker/hub/Dockerfile -t matrixdotorg/dendrite:latest .
 
+docker build -t matrixdotorg/dendrite:monolith          --build-arg component=dendrite-monolith-server          -f build/docker/hub/Dockerfile.component .
+
 docker build -t matrixdotorg/dendrite:clientapi         --build-arg component=dendrite-client-api-server        -f build/docker/hub/Dockerfile.component .
 docker build -t matrixdotorg/dendrite:clientproxy       --build-arg component=client-api-proxy                  -f build/docker/hub/Dockerfile.component .
 docker build -t matrixdotorg/dendrite:eduserver         --build-arg component=dendrite-edu-server               -f build/docker/hub/Dockerfile.component .
