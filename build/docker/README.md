@@ -1,13 +1,14 @@
-# Docker Hub images
+# Docker images
 
-These are Docker Hub-friendly images for Dendrite.
+These are Docker images for Dendrite!
 
 ## Dockerfiles
 
 The `Dockerfile` builds the base image which contains all of the Dendrite
-components. The `Dockerfile.*` files take components from the base image and
-produce smaller component-specific images, which are substantially smaller
-and do not contain the Go toolchain etc.
+components. The `Dockerfile.component` file takes the given component, as
+specified with `--buildarg component=` from the base image and produce
+smaller component-specific images, which are substantially smaller and do
+not contain the Go toolchain etc.
 
 ## Compose files
 
@@ -59,10 +60,11 @@ docker-compose -f docker-compose.polylith.yml up
 
 ## Building the images
 
-The `docker/images-build.sh` script will build all of the component images.
+The `docker/images-build.sh` script will build the base image, followed by
+all of the component images.
 
 The `docker/images-push.sh` script will push them to Docker Hub (subject
-to permissions). 
+to permissions).
 
 If you wish to build and push your own images, rename `matrixdotorg/dendrite` to
 the name of another Docker Hub repository in `images-build.sh` and `images-push.sh`.
