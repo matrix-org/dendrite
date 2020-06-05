@@ -16,31 +16,25 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
+	cfg := basecomponent.ParseFlags(false)
 	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI", true)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
-
 	serverKeyAPI := base.ServerKeyAPIClient()
 	keyRing := serverKeyAPI.KeyRing()
-
 	fsAPI := base.FederationSenderHTTPClient()
-
 	rsAPI := base.RoomserverHTTPClient()
 	asAPI := base.AppserviceHTTPClient()
-	rsAPI.SetFederationSenderAPI(fsAPI)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
+	// TODO: this isn't a producer
+	eduProducer := producers.NewEDUServerProducer(base.EDUServerClient())
 
 	federationapi.SetupFederationAPIComponent(
 		base, accountDB, deviceDB, federation, keyRing,

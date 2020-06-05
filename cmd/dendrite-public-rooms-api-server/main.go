@@ -22,15 +22,13 @@ import (
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
+	cfg := basecomponent.ParseFlags(false)
 	base := basecomponent.NewBaseDendrite(cfg, "PublicRoomsAPI", true)
 	defer base.Close() // nolint: errcheck
 
 	deviceDB := base.CreateDeviceDB()
 
-	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
-	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {

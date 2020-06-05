@@ -49,7 +49,7 @@ var (
 )
 
 func main() {
-	cfg := basecomponent.ParseMonolithFlags()
+	cfg := basecomponent.ParseFlags(true)
 	if *enableHTTPAPIs {
 		// If the HTTP APIs are enabled then we need to update the Listen
 		// statements in the configuration so that we know where to find

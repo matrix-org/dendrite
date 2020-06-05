@@ -25,33 +25,14 @@ import (
 var configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 
 // ParseFlags parses the commandline flags and uses them to create a config.
-// If running as a monolith use `ParseMonolithFlags` instead.
-func ParseFlags() *config.Dendrite {
+func ParseFlags(monolith bool) *config.Dendrite {
 	flag.Parse()
 
 	if *configPath == "" {
 		logrus.Fatal("--config must be supplied")
 	}
 
-	cfg, err := config.Load(*configPath)
-
-	if err != nil {
-		logrus.Fatalf("Invalid config file: %s", err)
-	}
-
-	return cfg
-}
-
-// ParseMonolithFlags parses the commandline flags and uses them to create a
-// config. Should only be used if running a monolith. See `ParseFlags`.
-func ParseMonolithFlags() *config.Dendrite {
-	flag.Parse()
-
-	if *configPath == "" {
-		logrus.Fatal("--config must be supplied")
-	}
-
-	cfg, err := config.LoadMonolithic(*configPath)
+	cfg, err := config.Load(*configPath, monolith)
 
 	if err != nil {
 		logrus.Fatalf("Invalid config file: %s", err)

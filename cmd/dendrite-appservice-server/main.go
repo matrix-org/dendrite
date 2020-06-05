@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
+	cfg := basecomponent.ParseFlags(false)
 	base := basecomponent.NewBaseDendrite(cfg, "AppServiceAPI", true)
 
 	defer base.Close() // nolint: errcheck

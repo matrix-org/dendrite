@@ -16,14 +16,12 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/clientapi"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/transactions"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
+	cfg := basecomponent.ParseFlags(false)
 
 	base := basecomponent.NewBaseDendrite(cfg, "ClientAPI", true)
 	defer base.Close() // nolint: errcheck
@@ -38,8 +36,7 @@ func main() {
 	asQuery := base.AppserviceHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
 	fsAPI := base.FederationSenderHTTPClient()
-	rsAPI.SetFederationSenderAPI(fsAPI)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
+	eduInputAPI := base.EDUServerClient()
 
 	clientapi.SetupClientAPIComponent(
 		base, deviceDB, accountDB, federation, keyRing,

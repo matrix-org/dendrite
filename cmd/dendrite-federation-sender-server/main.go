@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
+	cfg := basecomponent.ParseFlags(false)
 	base := basecomponent.NewBaseDendrite(cfg, "FederationSender", true)
 	defer base.Close() // nolint: errcheck
 
@@ -30,10 +30,9 @@ func main() {
 	keyRing := serverKeyAPI.KeyRing()
 
 	rsAPI := base.RoomserverHTTPClient()
-	fsAPI := federationsender.SetupFederationSenderComponent(
+	federationsender.SetupFederationSenderComponent(
 		base, federation, rsAPI, keyRing,
 	)
-	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender), string(base.Cfg.Listen.FederationSender))
 

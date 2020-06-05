@@ -45,7 +45,6 @@ const (
 type httpRoomserverInternalAPI struct {
 	roomserverURL  string
 	httpClient     *http.Client
-	fsAPI          fsInputAPI.FederationSenderInternalAPI
 	immutableCache caching.ImmutableCache
 }
 
@@ -66,11 +65,8 @@ func NewRoomserverClient(
 	}, nil
 }
 
-// SetFederationSenderInputAPI passes in a federation sender input API reference
-// so that we can avoid the chicken-and-egg problem of both the roomserver input API
-// and the federation sender input API being interdependent.
+// SetFederationSenderInputAPI no-ops in HTTP client mode as there is no chicken/egg scenario
 func (h *httpRoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsInputAPI.FederationSenderInternalAPI) {
-	h.fsAPI = fsAPI
 }
 
 // SetRoomAlias implements RoomserverAliasAPI
