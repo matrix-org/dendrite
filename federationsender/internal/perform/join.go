@@ -43,8 +43,8 @@ func (r joinContext) CheckSendJoinResponse(
 
 		// See if we have retry entries for each of the supplied event IDs.
 		for _, eventID := range eventIDs {
-			// If we've already satisfied a request for ths event ID before then
-			// just append the results.
+			// If we've already satisfied a request for this event ID before then
+			// just append the results. We won't retry the request.
 			if retry, ok := retries[eventID]; ok {
 				if retry == nil {
 					return nil, fmt.Errorf("missingAuth: not retrying failed event ID %q", eventID)
@@ -64,7 +64,9 @@ func (r joinContext) CheckSendJoinResponse(
 				return nil, fmt.Errorf("missingAuth r.federation.GetEvent: %w", txerr)
 			}
 
-			// For each event returned, add it to the auth events.
+			// For each event returned, add it to the set of return events. We
+			// also will populate the retries, in case someone asks for this
+			// event ID again.
 			for _, pdu := range tx.PDUs {
 				ev, everr := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
 				if everr != nil {
@@ -72,6 +74,7 @@ func (r joinContext) CheckSendJoinResponse(
 				}
 				returning = append(returning, ev)
 				retries[event.EventID()] = append(retries[event.EventID()], ev)
+				retries[ev.EventID()] = append(retries[ev.EventID()], ev)
 			}
 		}
 
