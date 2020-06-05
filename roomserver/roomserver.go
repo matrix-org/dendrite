@@ -44,7 +44,7 @@ func SetupRoomServerComponent(
 		Cfg:                  base.Cfg,
 		Producer:             base.KafkaProducer,
 		OutputRoomEventTopic: string(base.Cfg.Kafka.Topics.OutputRoomEvent),
-		ImmutableCache:       base.ImmutableCache,
+		Cache:                base.Caches,
 		ServerName:           base.Cfg.Matrix.ServerName,
 		FedClient:            fedClient,
 		KeyRing:              keyRing,

@@ -66,7 +66,7 @@ type BaseDendrite struct {
 	UseHTTPAPIs    bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
-	ImmutableCache caching.ImmutableCache
+	Caches         *caching.Caches
 	KafkaConsumer  sarama.Consumer
 	KafkaProducer  sarama.SyncProducer
 }
@@ -95,7 +95,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
-	cache, err := caching.NewImmutableInMemoryLRUCache()
+	cache, err := caching.NewInMemoryLRUCache()
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
@@ -126,7 +126,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		UseHTTPAPIs:    useHTTPAPIs,
 		tracerCloser:   closer,
 		Cfg:            cfg,
-		ImmutableCache: cache,
+		Caches:         cache,
 		PublicAPIMux:   httpmux.PathPrefix(httpapis.PublicPathPrefix).Subrouter().UseEncodedPath(),
 		InternalAPIMux: httpmux.PathPrefix(httpapis.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		httpClient:     &client,
@@ -151,7 +151,7 @@ func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
 
 // RoomserverHTTPClient returns RoomserverInternalAPI for hitting the roomserver over HTTP.
 func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
-	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
+	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.httpClient, b.Caches)
 	if err != nil {
 		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.httpClient)
 	}
@@ -182,7 +182,7 @@ func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
 	f, err := skinthttp.NewServerKeyClient(
 		b.Cfg.ServerKeyAPIURL(),
 		b.httpClient,
-		b.ImmutableCache,
+		b.Caches,
 	)
 	if err != nil {
 		logrus.WithError(err).Panic("NewServerKeyInternalAPIHTTP failed", b.httpClient)
