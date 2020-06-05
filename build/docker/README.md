@@ -23,7 +23,7 @@ The `docker-compose` files refer to the `/etc/dendrite` volume as where the
 runtime config should come from. The mounted folder must contain:
 
 - `dendrite.yaml` configuration file (based on the sample `dendrite-config.yaml`
-   in the `docker/hub/config` folder in the [Dendrite repository](https://github.com/matrix-org/dendrite)
+   in the `docker/config` folder in the [Dendrite repository](https://github.com/matrix-org/dendrite)
 - `matrix_key.pem` server key, as generated using `cmd/generate-keys`
 - `server.crt` certificate file
 - `server.key` private key file for the above certificate
@@ -59,9 +59,9 @@ docker-compose -f docker-compose.polylith.yml up
 
 ## Building the images
 
-The `docker/hub/images-build.sh` script will build all of the component images.
+The `docker/images-build.sh` script will build all of the component images.
 
-The `docker/hub/images-push.sh` script will push them to Docker Hub (subject
+The `docker/images-push.sh` script will push them to Docker Hub (subject
 to permissions). 
 
 If you wish to build and push your own images, rename `matrixdotorg/dendrite` to
