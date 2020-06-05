@@ -1,9 +1,10 @@
-FROM docker.io/golang:1.13.7-alpine3.11
+FROM docker.io/golang:1.13.7-alpine3.11 AS builder
 
-RUN mkdir /build
+RUN apk --update --no-cache add bash build-base
 
 WORKDIR /build
 
-RUN apk --update --no-cache add openssl bash git build-base
+COPY . /build
 
-CMD ["bash", "docker/build.sh"]
+RUN mkdir -p bin
+RUN sh ./build.sh
