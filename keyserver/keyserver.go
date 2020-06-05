@@ -15,18 +15,12 @@
 package keyserver
 
 import (
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver/routing"
 )
 
 // SetupFederationSenderComponent sets up and registers HTTP handlers for the
 // FederationSender component.
-func SetupKeyServerComponent(
-	base *basecomponent.BaseDendrite,
-	deviceDB devices.Database,
-	accountsDB accounts.Database,
-) {
-	routing.Setup(base.PublicAPIMux, base.Cfg, accountsDB, deviceDB)
+func SetupKeyServerComponent(base *setup.Base) {
+	routing.Setup(base.PublicAPIMux, base.Cfg, base.AccountDB, base.DeviceDB)
 }

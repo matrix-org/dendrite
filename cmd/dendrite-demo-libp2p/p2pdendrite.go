@@ -22,7 +22,7 @@ import (
 
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 	record "github.com/libp2p/go-libp2p-record"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
@@ -37,9 +37,9 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 )
 
-// P2PDendrite is a Peer-to-Peer variant of BaseDendrite.
+// P2PDendrite is a Peer-to-Peer variant of Base.
 type P2PDendrite struct {
-	Base basecomponent.BaseDendrite
+	Base setup.Base
 
 	// Store our libp2p object so that we can make outgoing connections from it
 	// later
@@ -54,7 +54,7 @@ type P2PDendrite struct {
 // The componentName is used for logging purposes, and should be a friendly name
 // of the component running, e.g. SyncAPI.
 func NewP2PDendrite(cfg *config.Dendrite, componentName string) *P2PDendrite {
-	baseDendrite := basecomponent.NewBaseDendrite(cfg, componentName, false)
+	baseDendrite := setup.NewBase(cfg, componentName, false)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

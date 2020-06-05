@@ -30,13 +30,14 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/transactions"
+	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
-	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/syncapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 
@@ -160,6 +161,19 @@ func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http
 	return
 }
 
+func serverKeyAPI() api.ServerKeyInternalAPI {
+	fetcher := &libp2pKeyFetcher{}
+	keyRing := gomatrixserverlib.KeyRing{
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{
+			fetcher,
+		},
+		KeyDatabase: fetcher,
+	}
+	return libp2pServerKeyAPI{
+		keyRing: keyRing,
+	}
+}
+
 func main() {
 	cfg := &config.Dendrite{}
 	cfg.SetDefaults()
@@ -191,44 +205,27 @@ func main() {
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith", false)
+	base := setup.NewBase(cfg, "Monolith", false)
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
-	federation := createFederationClient(cfg, node)
+	base.FederationClient = createFederationClient(cfg, node)
+	base.SetServerKeyAPI(serverKeyAPI())
 
-	fetcher := &libp2pKeyFetcher{}
-	keyRing := gomatrixserverlib.KeyRing{
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			fetcher,
-		},
-		KeyDatabase: fetcher,
-	}
+	base.SetRoomserverAPI(roomserver.SetupRoomServerComponent(base))
+	base.SetEDUServer(eduserver.SetupEDUServerComponent(base, cache.New()))
+	base.SetAppserviceAPI(appservice.SetupAppServiceAPIComponent(base, transactions.New()))
+	base.SetFederationSender(federationsender.SetupFederationSenderComponent(base))
+	rsAPI.SetFederationSenderAPI(base.FederationSender())
 
-	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
-	asQuery := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
-	)
-	fedSenderAPI := federationsender.SetupFederationSenderComponent(base, federation, rsAPI, &keyRing)
-	rsAPI.SetFederationSenderAPI(fedSenderAPI)
-	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI)
+	clientapi.SetupClientAPIComponent(base, transactions.New())
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
-		federation, &keyRing, rsAPI,
-		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
-	)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), cfg.Matrix.ServerName)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
-	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
+	keyserver.SetupKeyServerComponent(base)
+	eduProducer := producers.NewEDUServerProducer(base.EDUServer())
+	federationapi.SetupFederationAPIComponent(base, eduProducer)
+	mediaapi.SetupMediaAPIComponent(base)
+	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, base.FederationSender())
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, p2pPublicRoomProvider)
+	syncapi.SetupSyncAPIComponent(base)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,

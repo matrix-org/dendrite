@@ -15,8 +15,7 @@
 package mediaapi
 
 import (
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -25,16 +24,13 @@ import (
 
 // SetupMediaAPIComponent sets up and registers HTTP handlers for the MediaAPI
 // component.
-func SetupMediaAPIComponent(
-	base *basecomponent.BaseDendrite,
-	deviceDB devices.Database,
-) {
+func SetupMediaAPIComponent(base *setup.Base) {
 	mediaDB, err := storage.Open(string(base.Cfg.Database.MediaAPI), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to media db")
 	}
 
 	routing.Setup(
-		base.PublicAPIMux, base.Cfg, mediaDB, deviceDB, gomatrixserverlib.NewClient(),
+		base.PublicAPIMux, base.Cfg, mediaDB, base.DeviceDB, gomatrixserverlib.NewClient(),
 	)
 }

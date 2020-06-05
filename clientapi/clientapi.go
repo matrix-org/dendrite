@@ -15,37 +15,22 @@
 package clientapi
 
 import (
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
-	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/transactions"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
 // SetupClientAPIComponent sets up and registers HTTP handlers for the ClientAPI
 // component.
 func SetupClientAPIComponent(
-	base *basecomponent.BaseDendrite,
-	deviceDB devices.Database,
-	accountsDB accounts.Database,
-	federation *gomatrixserverlib.FederationClient,
-	keyRing *gomatrixserverlib.KeyRing,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	eduInputAPI eduServerAPI.EDUServerInputAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	base *setup.Base,
 	transactionsCache *transactions.Cache,
-	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(rsAPI)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
+	roomserverProducer := producers.NewRoomserverProducer(base.RoomserverAPI())
+	eduProducer := producers.NewEDUServerProducer(base.EDUServer())
 
 	userUpdateProducer := &producers.UserUpdateProducer{
 		Producer: base.KafkaProducer,
@@ -58,15 +43,16 @@ func SetupClientAPIComponent(
 	}
 
 	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, rsAPI,
+		base.Cfg, base.KafkaConsumer, base.AccountDB, base.RoomserverAPI(),
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
+	keyRing := base.ServerKeyAPI().KeyRing()
 	routing.Setup(
-		base.PublicAPIMux, base.Cfg, roomserverProducer, rsAPI, asAPI,
-		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
-		syncProducer, eduProducer, transactionsCache, fsAPI,
+		base.PublicAPIMux, base.Cfg, roomserverProducer, base.RoomserverAPI(), base.AppserviceAPI(),
+		base.AccountDB, base.DeviceDB, base.FederationClient, *keyRing, userUpdateProducer,
+		syncProducer, eduProducer, transactionsCache, base.FederationSender(),
 	)
 }

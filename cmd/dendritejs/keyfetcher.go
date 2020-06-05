@@ -84,3 +84,27 @@ func (f *libp2pKeyFetcher) FetcherName() string {
 func (f *libp2pKeyFetcher) StoreKeys(ctx context.Context, results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult) error {
 	return nil
 }
+
+type libp2pServerKeyAPI struct {
+	keyRing *gomatrixserverlib.KeyRing
+}
+
+func (a *libp2pServerKeyAPI) KeyRing() *gomatrixserverlib.KeyRing {
+	return a.keyRing
+}
+
+func (a *libp2pServerKeyAPI) InputPublicKeys(
+	ctx context.Context,
+	request *InputPublicKeysRequest,
+	response *InputPublicKeysResponse,
+) error {
+	return nil
+}
+
+func (a *libp2pServerKeyAPI) QueryPublicKeys(
+	ctx context.Context,
+	request *QueryPublicKeysRequest,
+	response *QueryPublicKeysResponse,
+) error {
+	return nil
+}

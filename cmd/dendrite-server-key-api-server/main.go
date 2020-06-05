@@ -15,18 +15,16 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/serverkeyapi"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "ServerKeyAPI", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBase(cfg, "ServerKeyAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	federation := base.CreateFederationClient()
-
-	serverkeyapi.SetupServerKeyAPIComponent(base, federation)
+	serverkeyapi.SetupServerKeyAPIComponent(base)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ServerKeyAPI), string(base.Cfg.Listen.ServerKeyAPI))
 }

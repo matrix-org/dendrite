@@ -23,37 +23,30 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/sirupsen/logrus"
 )
 
 // SetupFederationSenderComponent sets up and registers HTTP handlers for the
 // FederationSender component.
-func SetupFederationSenderComponent(
-	base *basecomponent.BaseDendrite,
-	federation *gomatrixserverlib.FederationClient,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	keyRing *gomatrixserverlib.KeyRing,
-) api.FederationSenderInternalAPI {
+func SetupFederationSenderComponent(base *setup.Base) api.FederationSenderInternalAPI {
 	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
 	roomserverProducer := producers.NewRoomserverProducer(
-		rsAPI, base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey,
+		base.RoomserverAPI(), base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey,
 	)
 
 	statistics := &types.Statistics{}
 	queues := queue.NewOutgoingQueues(
-		base.Cfg.Matrix.ServerName, federation, roomserverProducer, statistics,
+		base.Cfg.Matrix.ServerName, base.FederationClient, roomserverProducer, statistics,
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,
-		federationSenderDB, rsAPI,
+		federationSenderDB, base.RoomserverAPI(),
 	)
 	if err = rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
@@ -66,7 +59,9 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	queryAPI := internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing, statistics, queues)
+	queryAPI := internal.NewFederationSenderInternalAPI(
+		federationSenderDB, base.Cfg, roomserverProducer, base.FederationClient, base.ServerKeyAPI().KeyRing(), statistics, queues,
+	)
 	inthttp.AddRoutes(queryAPI, base.InternalAPIMux)
 
 	return queryAPI

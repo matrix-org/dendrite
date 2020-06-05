@@ -15,18 +15,15 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/mediaapi"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "MediaAPI", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBase(cfg, "MediaAPI", true)
 	defer base.Close() // nolint: errcheck
-
-	deviceDB := base.CreateDeviceDB()
-
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
+	mediaapi.SetupMediaAPIComponent(base)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.MediaAPI), string(base.Cfg.Listen.MediaAPI))
 

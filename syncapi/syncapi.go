@@ -19,13 +19,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/internal/setup"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -34,14 +29,7 @@ import (
 
 // SetupSyncAPIComponent sets up and registers HTTP handlers for the SyncAPI
 // component.
-func SetupSyncAPIComponent(
-	base *basecomponent.BaseDendrite,
-	deviceDB devices.Database,
-	accountsDB accounts.Database,
-	rsAPI api.RoomserverInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
-	cfg *config.Dendrite,
-) {
+func SetupSyncAPIComponent(base *setup.Base) {
 	syncDB, err := storage.NewSyncServerDatasource(string(base.Cfg.Database.SyncAPI), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
@@ -58,10 +46,10 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, accountsDB)
+	requestPool := sync.NewRequestPool(syncDB, notifier, base.AccountDB)
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB, rsAPI,
+		base.Cfg, base.KafkaConsumer, notifier, syncDB, base.RoomserverAPI(),
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -88,5 +76,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
-	routing.Setup(base.PublicAPIMux, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
+	routing.Setup(base.PublicAPIMux, requestPool, syncDB, base.DeviceDB, base.FederationClient, base.RoomserverAPI(), base.Cfg)
 }

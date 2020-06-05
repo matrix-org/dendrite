@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/serverkeyapi/internal"
 	"github.com/matrix-org/dendrite/serverkeyapi/inthttp"
@@ -14,10 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func SetupServerKeyAPIComponent(
-	base *basecomponent.BaseDendrite,
-	fedClient *gomatrixserverlib.FederationClient,
-) api.ServerKeyInternalAPI {
+func SetupServerKeyAPIComponent(base *setup.Base) api.ServerKeyInternalAPI {
 	innerDB, err := storage.NewDatabase(
 		string(base.Cfg.Database.ServerKey),
 		base.Cfg.DbProperties(),
@@ -35,11 +32,11 @@ func SetupServerKeyAPIComponent(
 	}
 
 	internalAPI := internal.ServerKeyAPI{
-		FedClient: fedClient,
+		FedClient: base.FederationClient,
 		OurKeyRing: gomatrixserverlib.KeyRing{
 			KeyFetchers: []gomatrixserverlib.KeyFetcher{
 				&gomatrixserverlib.DirectKeyFetcher{
-					Client: fedClient.Client,
+					Client: base.FederationClient.Client,
 				},
 			},
 			KeyDatabase: serverKeyDB,
@@ -51,7 +48,7 @@ func SetupServerKeyAPIComponent(
 		perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
 			PerspectiveServerName: ps.ServerName,
 			PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},
-			Client:                fedClient.Client,
+			Client:                base.FederationClient.Client,
 		}
 
 		for _, key := range ps.Keys {

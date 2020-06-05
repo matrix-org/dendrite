@@ -15,37 +15,24 @@
 package federationapi
 
 import (
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/internal/setup"
 
 	// TODO: Are we really wanting to pull in the producer from clientapi
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/routing"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // SetupFederationAPIComponent sets up and registers HTTP handlers for the
 // FederationAPI component.
 func SetupFederationAPIComponent(
-	base *basecomponent.BaseDendrite,
-	accountsDB accounts.Database,
-	deviceDB devices.Database,
-	federation *gomatrixserverlib.FederationClient,
-	keyRing *gomatrixserverlib.KeyRing,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
-	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
+	base *setup.Base,
 	eduProducer *producers.EDUServerProducer,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(rsAPI)
+	roomserverProducer := producers.NewRoomserverProducer(base.RoomserverAPI())
 
 	routing.Setup(
-		base.PublicAPIMux, base.Cfg, rsAPI, asAPI, roomserverProducer,
-		eduProducer, federationSenderAPI, *keyRing,
-		federation, accountsDB, deviceDB,
+		base.PublicAPIMux, base.Cfg, base.RoomserverAPI(), base.AppserviceAPI(), roomserverProducer,
+		eduProducer, base.FederationSender(), *base.ServerKeyAPI().KeyRing(),
+		base.FederationClient, base.AccountDB, base.DeviceDB,
 	)
 }

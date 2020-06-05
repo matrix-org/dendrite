@@ -26,13 +26,12 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/mediaapi"
 	"github.com/matrix-org/dendrite/publicroomsapi"
-	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/dendrite/syncapi"
@@ -49,7 +48,7 @@ var (
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(true)
+	cfg := setup.ParseFlags(true)
 	if *enableHTTPAPIs {
 		// If the HTTP APIs are enabled then we need to update the Listen
 		// statements in the configuration so that we know where to find
@@ -63,69 +62,43 @@ func main() {
 		cfg.Listen.ServerKeyAPI = addr
 	}
 
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
+	base := setup.NewBase(cfg, "Monolith", *enableHTTPAPIs)
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
-	federation := base.CreateFederationClient()
-
-	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
-		base, federation,
-	)
-	if base.UseHTTPAPIs {
-		serverKeyAPI = base.ServerKeyAPIClient()
-	}
-	keyRing := serverKeyAPI.KeyRing()
-
-	rsComponent := roomserver.SetupRoomServerComponent(
-		base, keyRing, federation,
-	)
-	rsAPI := rsComponent
-	if base.UseHTTPAPIs {
-		rsAPI = base.RoomserverHTTPClient()
+	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(base)
+	if !base.UseHTTPAPIs {
+		base.SetServerKeyAPI(serverKeyAPI)
 	}
 
-	eduInputAPI := eduserver.SetupEDUServerComponent(
-		base, cache.New(), deviceDB,
-	)
-	if base.UseHTTPAPIs {
-		eduInputAPI = base.EDUServerClient()
+	rsAPI := roomserver.SetupRoomServerComponent(base)
+	if !base.UseHTTPAPIs {
+		base.SetRoomserverAPI(rsAPI)
 	}
 
-	asAPI := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
-	)
-	if base.UseHTTPAPIs {
-		asAPI = base.AppserviceHTTPClient()
+	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
+	if !base.UseHTTPAPIs {
+		base.SetEDUServer(eduInputAPI)
 	}
 
-	fsAPI := federationsender.SetupFederationSenderComponent(
-		base, federation, rsAPI, keyRing,
-	)
-	if base.UseHTTPAPIs {
-		fsAPI = base.FederationSenderHTTPClient()
+	asAPI := appservice.SetupAppServiceAPIComponent(base, transactions.New())
+	if !base.UseHTTPAPIs {
+		base.SetAppserviceAPI(asAPI)
 	}
-	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
-		federation, keyRing, rsAPI,
-		eduInputAPI, asAPI, transactions.New(), fsAPI,
-	)
-
-	keyserver.SetupKeyServerComponent(
-		base, deviceDB, accountDB,
-	)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
+	fsAPI := federationsender.SetupFederationSenderComponent(base)
+	if !base.UseHTTPAPIs {
+		base.SetFederationSender(fsAPI)
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
+	rsAPI.SetFederationSenderAPI(fsAPI)
+
+	clientapi.SetupClientAPIComponent(base, transactions.New())
+
+	keyserver.SetupKeyServerComponent(base)
+	eduProducer := producers.NewEDUServerProducer(base.EDUServer())
+	federationapi.SetupFederationAPIComponent(base, eduProducer)
+	mediaapi.SetupMediaAPIComponent(base)
+	publicroomsapi.SetupPublicRoomsAPIComponent(base, nil)
+	syncapi.SetupSyncAPIComponent(base)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,
@@ -139,7 +112,7 @@ func main() {
 	go func() {
 		serv := http.Server{
 			Addr:         *httpBindAddr,
-			WriteTimeout: basecomponent.HTTPServerTimeout,
+			WriteTimeout: setup.HTTPServerTimeout,
 		}
 
 		logrus.Info("Listening on ", serv.Addr)
@@ -150,7 +123,7 @@ func main() {
 		go func() {
 			serv := http.Server{
 				Addr:         *httpsBindAddr,
-				WriteTimeout: basecomponent.HTTPServerTimeout,
+				WriteTimeout: setup.HTTPServerTimeout,
 			}
 
 			logrus.Info("Listening on ", serv.Addr)

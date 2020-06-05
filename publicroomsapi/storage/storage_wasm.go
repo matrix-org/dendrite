@@ -18,12 +18,13 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func NewPublicRoomsServerDatabase(dataSourceName string, localServerName gomatrixserverlib.ServerName) (Database, error) {
+func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties internal.DbProperties, localServerName gomatrixserverlib.ServerName) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return nil, err

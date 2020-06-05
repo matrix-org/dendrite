@@ -32,24 +32,19 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/transactions"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
 // SetupAppServiceAPIComponent sets up and registers HTTP handlers for the AppServices
 // component.
 func SetupAppServiceAPIComponent(
-	base *basecomponent.BaseDendrite,
-	accountsDB accounts.Database,
-	deviceDB devices.Database,
-	federation *gomatrixserverlib.FederationClient,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	base *setup.Base,
 	transactionsCache *transactions.Cache,
 ) appserviceAPI.AppServiceQueryAPI {
+
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(string(base.Cfg.Database.AppService), base.Cfg.DbProperties())
 	if err != nil {
@@ -69,7 +64,7 @@ func SetupAppServiceAPIComponent(
 		workerStates[i] = ws
 
 		// Create bot account for this AS if it doesn't already exist
-		if err = generateAppServiceAccount(accountsDB, deviceDB, appservice); err != nil {
+		if err = generateAppServiceAccount(base.AccountDB, base.DeviceDB, appservice); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"appservice": appservice.ID,
 			}).WithError(err).Panicf("failed to generate bot account for appservice")
@@ -88,8 +83,8 @@ func SetupAppServiceAPIComponent(
 	inthttp.AddRoutes(appserviceQueryAPI, base.InternalAPIMux)
 
 	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
-		rsAPI, workerStates,
+		base.Cfg, base.KafkaConsumer, base.AccountDB, appserviceDB,
+		base.RoomserverAPI(), workerStates,
 	)
 	if err := consumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
@@ -102,8 +97,8 @@ func SetupAppServiceAPIComponent(
 
 	// Set up HTTP Endpoints
 	routing.Setup(
-		base.PublicAPIMux, base.Cfg, rsAPI,
-		accountsDB, federation, transactionsCache,
+		base.PublicAPIMux, base.Cfg, base.RoomserverAPI(),
+		base.AccountDB, base.FederationClient, transactionsCache,
 	)
 
 	return appserviceQueryAPI

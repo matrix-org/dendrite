@@ -15,19 +15,15 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "KeyServer", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBase(cfg, "KeyServer", true)
 	defer base.Close() // nolint: errcheck
-
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
-
-	keyserver.SetupKeyServerComponent(base, deviceDB, accountDB)
+	keyserver.SetupKeyServerComponent(base)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.KeyServer), string(base.Cfg.Listen.KeyServer))
 

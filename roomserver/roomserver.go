@@ -17,9 +17,8 @@ package roomserver
 import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/inthttp"
-	"github.com/matrix-org/gomatrixserverlib"
 
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/sirupsen/logrus"
@@ -30,9 +29,7 @@ import (
 // allowing other components running in the same process to hit the query the
 // APIs directly instead of having to use HTTP.
 func SetupRoomServerComponent(
-	base *basecomponent.BaseDendrite,
-	keyRing gomatrixserverlib.JSONVerifier,
-	fedClient *gomatrixserverlib.FederationClient,
+	base *setup.Base,
 ) api.RoomserverInternalAPI {
 	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer), base.Cfg.DbProperties())
 	if err != nil {
@@ -46,8 +43,8 @@ func SetupRoomServerComponent(
 		OutputRoomEventTopic: string(base.Cfg.Kafka.Topics.OutputRoomEvent),
 		ImmutableCache:       base.ImmutableCache,
 		ServerName:           base.Cfg.Matrix.ServerName,
-		FedClient:            fedClient,
-		KeyRing:              keyRing,
+		FedClient:            base.FederationClient,
+		KeyRing:              base.ServerKeyAPI().KeyRing(),
 	}
 
 	inthttp.AddRoutes(internalAPI, base.InternalAPIMux)

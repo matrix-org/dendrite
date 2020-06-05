@@ -15,33 +15,28 @@
 package publicroomsapi
 
 import (
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/consumers"
 	"github.com/matrix-org/dendrite/publicroomsapi/routing"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
 // SetupPublicRoomsAPIComponent sets up and registers HTTP handlers for the PublicRoomsAPI
 // component.
-func SetupPublicRoomsAPIComponent(
-	base *basecomponent.BaseDendrite,
-	deviceDB devices.Database,
-	publicRoomsDB storage.Database,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	fedClient *gomatrixserverlib.FederationClient,
-	extRoomsProvider types.ExternalPublicRoomsProvider,
-) {
+func SetupPublicRoomsAPIComponent(base *setup.Base, extRoomsProvider types.ExternalPublicRoomsProvider) {
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), base.Cfg.Matrix.ServerName)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to public rooms db")
+	}
+
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, publicRoomsDB, rsAPI,
+		base.Cfg, base.KafkaConsumer, publicRoomsDB, base.RoomserverAPI(),
 	)
 	if err := rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start public rooms server consumer")
 	}
 
-	routing.Setup(base.PublicAPIMux, deviceDB, publicRoomsDB, rsAPI, fedClient, extRoomsProvider)
+	routing.Setup(base.PublicAPIMux, base.DeviceDB, publicRoomsDB, base.RoomserverAPI(), base.FederationClient, extRoomsProvider)
 }

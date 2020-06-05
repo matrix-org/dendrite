@@ -15,22 +15,16 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/syncapi"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "SyncAPI", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBase(cfg, "SyncAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	deviceDB := base.CreateDeviceDB()
-	accountDB := base.CreateAccountsDB()
-	federation := base.CreateFederationClient()
-
-	rsAPI := base.RoomserverHTTPClient()
-
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
+	syncapi.SetupSyncAPIComponent(base)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
 

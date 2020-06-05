@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package basecomponent
+package setup
 
 import (
 	"database/sql"
@@ -51,12 +51,12 @@ import (
 	_ "net/http/pprof"
 )
 
-// BaseDendrite is a base for creating new instances of dendrite. It parses
+// Base is a base for creating new instances of dendrite. It parses
 // command line flags and config, and exposes methods for creating various
 // resources. All errors are handled by logging then exiting, so all methods
 // should only be used during start up.
 // Must be closed when shutting down.
-type BaseDendrite struct {
+type Base struct {
 	componentName string
 	tracerCloser  io.Closer
 
@@ -69,15 +69,27 @@ type BaseDendrite struct {
 	ImmutableCache caching.ImmutableCache
 	KafkaConsumer  sarama.Consumer
 	KafkaProducer  sarama.SyncProducer
+
+	// internal APIs
+	appserviceAPI    appserviceAPI.AppServiceQueryAPI
+	roomserverAPI    roomserverAPI.RoomserverInternalAPI
+	eduServer        eduServerAPI.EDUServerInputAPI
+	federationSender federationSenderAPI.FederationSenderInternalAPI
+	serverKeyAPI     serverKeyAPI.ServerKeyInternalAPI
+
+	DeviceDB         devices.Database
+	AccountDB        accounts.Database
+	FederationClient *gomatrixserverlib.FederationClient
 }
 
 const HTTPServerTimeout = time.Minute * 5
 const HTTPClientTimeout = time.Second * 30
 
-// NewBaseDendrite creates a new instance to be used by a component.
+// NewBase creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
-func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs bool) *BaseDendrite {
+// If `useHTTPAPIs` is true, HTTP clients will be made for all internal APIs.
+func NewBase(cfg *config.Dendrite, componentName string, useHTTPAPIs bool) *Base {
 	internal.SetupStdLogging()
 	internal.SetupHookLogging(cfg.Logging, componentName)
 	internal.SetupPprof()
@@ -121,7 +133,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	// directory traversal attack e.g /../../../etc/passwd
 	httpmux := mux.NewRouter().SkipClean(true)
 
-	return &BaseDendrite{
+	b := &Base{
 		componentName:  componentName,
 		UseHTTPAPIs:    useHTTPAPIs,
 		tracerCloser:   closer,
@@ -133,15 +145,85 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,
 	}
+
+	if useHTTPAPIs {
+		b.appserviceAPI = b.createAppserviceHTTPClient()
+		b.roomserverAPI = b.createRoomserverHTTPClient()
+		b.eduServer = b.createEDUServerClient()
+		b.federationSender = b.createFederationSenderHTTPClient()
+		b.serverKeyAPI = b.createServerKeyAPIClient()
+	}
+
+	b.DeviceDB = b.createDeviceDB()
+	b.AccountDB = b.createAccountsDB()
+	b.FederationClient = b.createFederationClient()
+
+	return b
 }
 
 // Close implements io.Closer
-func (b *BaseDendrite) Close() error {
+func (b *Base) Close() error {
 	return b.tracerCloser.Close()
 }
 
-// AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
-func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
+// AppserviceAPI return the API or panics if one is not set.
+func (b *Base) AppserviceAPI() appserviceAPI.AppServiceQueryAPI {
+	if b.appserviceAPI == nil {
+		logrus.Panic("AppserviceAPI is unset")
+	}
+	return b.appserviceAPI
+}
+
+// RoomserverAPI return the API or panics if one is not set.
+func (b *Base) RoomserverAPI() roomserverAPI.RoomserverInternalAPI {
+	if b.roomserverAPI == nil {
+		logrus.Panic("RoomserverAPI is unset")
+	}
+	return b.roomserverAPI
+}
+
+// EDUServer return the API or panics if one is not set.
+func (b *Base) EDUServer() eduServerAPI.EDUServerInputAPI {
+	if b.eduServer == nil {
+		logrus.Panic("EDUServer is unset")
+	}
+	return b.eduServer
+}
+
+// FederationSender return the API or panics if one is not set.
+func (b *Base) FederationSender() federationSenderAPI.FederationSenderInternalAPI {
+	if b.federationSender == nil {
+		logrus.Panic("FederationSender is unset")
+	}
+	return b.federationSender
+}
+
+// ServerKeyAPI return the API or panics if one is not set.
+func (b *Base) ServerKeyAPI() serverKeyAPI.ServerKeyInternalAPI {
+	if b.serverKeyAPI == nil {
+		logrus.Panic("ServerKeyAPI is unset")
+	}
+	return b.serverKeyAPI
+}
+
+func (b *Base) SetServerKeyAPI(a serverKeyAPI.ServerKeyInternalAPI) {
+	b.serverKeyAPI = a
+}
+func (b *Base) SetFederationSender(a federationSenderAPI.FederationSenderInternalAPI) {
+	b.federationSender = a
+}
+func (b *Base) SetEDUServer(a eduServerAPI.EDUServerInputAPI) {
+	b.eduServer = a
+}
+func (b *Base) SetRoomserverAPI(a roomserverAPI.RoomserverInternalAPI) {
+	b.roomserverAPI = a
+}
+func (b *Base) SetAppserviceAPI(a appserviceAPI.AppServiceQueryAPI) {
+	b.appserviceAPI = a
+}
+
+// createAppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
+func (b *Base) createAppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
 	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")
@@ -149,8 +231,8 @@ func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
 	return a
 }
 
-// RoomserverHTTPClient returns RoomserverInternalAPI for hitting the roomserver over HTTP.
-func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
+// createRoomserverHTTPClient returns RoomserverInternalAPI for hitting the roomserver over HTTP.
+func (b *Base) createRoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
 	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.httpClient, b.ImmutableCache)
 	if err != nil {
 		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.httpClient)
@@ -158,8 +240,8 @@ func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAP
 	return rsAPI
 }
 
-// EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
-func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
+// createEDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
+func (b *Base) createEDUServerClient() eduServerAPI.EDUServerInputAPI {
 	e, err := eduinthttp.NewEDUServerClient(b.Cfg.EDUServerURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("EDUServerClient failed", b.httpClient)
@@ -167,9 +249,9 @@ func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
 	return e
 }
 
-// FederationSenderHTTPClient returns FederationSenderInternalAPI for hitting
+// createFederationSenderHTTPClient returns FederationSenderInternalAPI for hitting
 // the federation sender over HTTP
-func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationSenderInternalAPI {
+func (b *Base) createFederationSenderHTTPClient() federationSenderAPI.FederationSenderInternalAPI {
 	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.httpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.httpClient)
@@ -177,8 +259,8 @@ func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.Federati
 	return f
 }
 
-// ServerKeyAPIClient returns ServerKeyInternalAPI for hitting the server key API over HTTP
-func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
+// createServerKeyAPIClient returns ServerKeyInternalAPI for hitting the server key API over HTTP
+func (b *Base) createServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
 	f, err := skinthttp.NewServerKeyClient(
 		b.Cfg.ServerKeyAPIURL(),
 		b.httpClient,
@@ -190,9 +272,12 @@ func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
 	return f
 }
 
-// CreateDeviceDB creates a new instance of the device database. Should only be
+// createDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
-func (b *BaseDendrite) CreateDeviceDB() devices.Database {
+func (b *Base) createDeviceDB() devices.Database {
+	if b.Cfg.Database.Device == "" {
+		return nil
+	}
 	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to devices db")
@@ -201,9 +286,12 @@ func (b *BaseDendrite) CreateDeviceDB() devices.Database {
 	return db
 }
 
-// CreateAccountsDB creates a new instance of the accounts database. Should only
+// createAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
-func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
+func (b *Base) createAccountsDB() accounts.Database {
+	if b.Cfg.Database.Account == "" {
+		return nil
+	}
 	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
@@ -212,9 +300,9 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 	return db
 }
 
-// CreateFederationClient creates a new federation client. Should only be called
+// createFederationClient creates a new federation client. Should only be called
 // once per component.
-func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
+func (b *Base) createFederationClient() *gomatrixserverlib.FederationClient {
 	return gomatrixserverlib.NewFederationClient(
 		b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
 	)
@@ -222,7 +310,7 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
-func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
+func (b *Base) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 	// If a separate bind address is defined, listen on that. Otherwise use
 	// the listen address
 	var addr string

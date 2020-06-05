@@ -17,12 +17,11 @@
 package eduserver
 
 import (
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/eduserver/input"
 	"github.com/matrix-org/dendrite/eduserver/inthttp"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 )
 
 // SetupEDUServerComponent sets up and registers HTTP handlers for the
@@ -30,13 +29,12 @@ import (
 // allowing other components running in the same process to hit the query the
 // APIs directly instead of having to use HTTP.
 func SetupEDUServerComponent(
-	base *basecomponent.BaseDendrite,
+	base *setup.Base,
 	eduCache *cache.EDUCache,
-	deviceDB devices.Database,
 ) api.EDUServerInputAPI {
 	inputAPI := &input.EDUServerInputAPI{
 		Cache:                        eduCache,
-		DeviceDB:                     deviceDB,
+		DeviceDB:                     base.DeviceDB,
 		Producer:                     base.KafkaProducer,
 		OutputTypingEventTopic:       string(base.Cfg.Kafka.Topics.OutputTypingEvent),
 		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEvent),
