@@ -163,7 +163,7 @@ func (d *Database) createAccount(
 		}
 	}
 	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
-		if internal.IsUniqueConstraintViolationErr(err) {
+		if internal.PostgresIsUniqueConstraintViolationErr(err) {
 			return nil, internal.ErrUserExists
 		}
 		return nil, err

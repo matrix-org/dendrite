@@ -33,7 +33,7 @@ type Database struct {
 	db         *sql.DB
 }
 
-// Open opens a postgres database.
+// Open opens a postgres / mysql / mariadb database.
 func Open(dataSourceName string) (*Database, error) {
 	var d Database
 	var err error

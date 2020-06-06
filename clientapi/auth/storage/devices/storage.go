@@ -20,6 +20,7 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices/postgres"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices/mysql"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices/sqlite3"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -35,6 +36,8 @@ func NewDatabase(dataSourceName string, dbProperties internal.DbProperties, serv
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName, dbProperties, serverName)
+	case "mysql":
+		return mysql.NewDatabase(dataSourceName, dbProperties, serverName)
 	case "file":
 		return sqlite3.NewDatabase(dataSourceName, serverName)
 	default:

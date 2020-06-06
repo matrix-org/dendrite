@@ -19,6 +19,7 @@ package storage
 import (
 	"net/url"
 
+	"github.com/matrix-org/dendrite/federationsender/storage/mysql"
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
 	"github.com/matrix-org/dendrite/internal"
@@ -35,6 +36,8 @@ func NewDatabase(dataSourceName string, dbProperties internal.DbProperties) (Dat
 		return sqlite3.NewDatabase(dataSourceName)
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName, dbProperties)
+	case "mysql":
+		return mysql.NewDatabase(dataSourceName, dbProperties)
 	default:
 		return postgres.NewDatabase(dataSourceName, dbProperties)
 	}

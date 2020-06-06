@@ -34,6 +34,10 @@ var (
 	// This needs to be high enough to account for the time it takes to create
 	// the postgres database tables which can take a while on travis.
 	timeoutString = test.Defaulting(os.Getenv("TIMEOUT"), "10s")
+	// The type of the database
+	databaseType = "postgres"
+	// The name of the database user
+	databaseUser = test.Defaulting(os.Getenv("POSTGRES_USER"), "postgres")
 	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = test.Defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
 	// The name of the test database to create.
@@ -110,6 +114,8 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 	proxyCmd, _ := test.StartProxy(proxyAddr, cfg)
 
 	test.InitDatabase(
+		databaseType,
+		databaseUser,
 		postgresDatabase,
 		postgresContainerName,
 		databases,

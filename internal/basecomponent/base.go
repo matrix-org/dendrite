@@ -291,6 +291,16 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
+	} else if uri.Scheme == "mysql" {
+		db, err = sqlutil.Open("mysql", string(cfg.Database.Naffka), nil)
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to open naffka database")
+		}
+
+		naffkaDB, err = naffka.NewMysqlDatabase(db)
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to setup naffka database")
+		}
 	} else {
 		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka), nil)
 		if err != nil {

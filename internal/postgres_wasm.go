@@ -16,7 +16,7 @@
 
 package internal
 
-// IsUniqueConstraintViolationErr no-ops for this architecture
-func IsUniqueConstraintViolationErr(err error) bool {
+// PostgresIsUniqueConstraintViolationErr no-ops for this architecture
+func PostgresIsUniqueConstraintViolationErr(err error) bool {
 	return false
 }

@@ -20,6 +20,7 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/syncapi/storage/mysql"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 )
@@ -33,6 +34,8 @@ func NewSyncServerDatasource(dataSourceName string, dbProperties internal.DbProp
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName, dbProperties)
+	case "mysql":
+		return mysql.NewDatabase(dataSourceName, dbProperties)
 	case "file":
 		return sqlite3.NewDatabase(dataSourceName)
 	default:

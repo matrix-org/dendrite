@@ -20,12 +20,14 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/publicroomsapi/storage/mysql"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/postgres"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const schemePostgres = "postgres"
+const schemeMysql = "mysql"
 const schemeFile = "file"
 
 // NewPublicRoomsServerDatabase opens a database connection.
@@ -37,6 +39,8 @@ func NewPublicRoomsServerDatabase(dataSourceName string, dbProperties internal.D
 	switch uri.Scheme {
 	case schemePostgres:
 		return postgres.NewPublicRoomsServerDatabase(dataSourceName, dbProperties, localServerName)
+	case schemeMysql:
+		return mysql.NewPublicRoomsServerDatabase(dataSourceName, dbProperties, localServerName)
 	case schemeFile:
 		return sqlite3.NewPublicRoomsServerDatabase(dataSourceName, localServerName)
 	default:

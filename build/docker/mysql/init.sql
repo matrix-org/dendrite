@@ -1,0 +1,10 @@
+CREATE DATABASE 'account';
+CREATE DATABASE 'device';
+CREATE DATABASE 'mediaapi';
+CREATE DATABASE 'syncapi';
+CREATE DATABASE 'roomserver';
+CREATE DATABASE 'serverkey';
+CREATE DATABASE 'federationsender';
+CREATE DATABASE 'publicroomsapi';
+CREATE DATABASE 'appservice';
+CREATE DATABASE 'naffka';

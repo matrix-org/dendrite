@@ -709,10 +709,11 @@ func (d *Database) CompleteSync(
 
 var txReadOnlySnapshot = sql.TxOptions{
 	// Set the isolation level so that we see a snapshot of the database.
-	// In PostgreSQL repeatable read transactions will see a snapshot taken
+	// In PostgreSQL / MySQL / MariaDB repeatable read transactions will see a snapshot taken
 	// at the first query, and since the transaction is read-only it can't
 	// run into any serialisation errors.
 	// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
+	// https://postgresql.verite.pro/blog/2020/02/14/isolation-repeatable-read-postgresql-mysql.html
 	Isolation: sql.LevelRepeatableRead,
 	ReadOnly:  true,
 }

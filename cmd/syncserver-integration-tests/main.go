@@ -43,6 +43,10 @@ var (
 	// This needs to be high enough to account for the time it takes to create
 	// the postgres database tables which can take a while on travis.
 	timeoutString = test.Defaulting(os.Getenv("TIMEOUT"), "10s")
+	// The type of the database
+	databaseType = "postgres"
+	// The name of the database user
+	databaseUser = test.Defaulting(os.Getenv("POSTGRES_USER"), "postgres")
 	// The name of maintenance database to connect to in order to create the test database.
 	postgresDatabase = test.Defaulting(os.Getenv("POSTGRES_DATABASE"), "postgres")
 	// Postgres docker container name (for running psql). If not set, psql must be in PATH.
@@ -150,6 +154,8 @@ func startSyncServer() (*exec.Cmd, chan error) {
 	}
 
 	test.InitDatabase(
+		databaseType,
+		databaseUser,
 		postgresDatabase,
 		postgresContainerName,
 		databases,

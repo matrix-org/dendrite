@@ -36,6 +36,8 @@ func NewDatabase(
 		return sqlite3.NewDatabase(dataSourceName)
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
+	case "mysql":
+		return nil, fmt.Errorf("Cannot use mysql implementation")
 	default:
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}

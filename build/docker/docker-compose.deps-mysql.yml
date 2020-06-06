@@ -1,0 +1,36 @@
+version: "3.4"
+services:
+  mysql:
+    hostname: mysql
+    image: mysql
+    restart: always
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      MYSQL_PASSWORD: itsasecret
+      MYSQL_USER: dendrite
+    networks:
+      - internal
+
+  zookeeper:
+    hostname: zookeeper
+    image: zookeeper
+    networks:
+      - internal
+
+  kafka:
+    container_name: dendrite_kafka
+    hostname: kafka
+    image: wurstmeister/kafka
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: "kafka"
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+    depends_on:
+      - zookeeper
+    networks:
+      - internal
+
+networks:
+  internal:
+    attachable: true

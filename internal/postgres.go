@@ -18,8 +18,8 @@ package internal
 
 import "github.com/lib/pq"
 
-// IsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation error
-func IsUniqueConstraintViolationErr(err error) bool {
+// PostgresIsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation error
+func PostgresIsUniqueConstraintViolationErr(err error) bool {
 	pqErr, ok := err.(*pq.Error)
 	return ok && pqErr.Code == "23505"
 }

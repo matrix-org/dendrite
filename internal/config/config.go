@@ -159,7 +159,7 @@ type Dendrite struct {
 		}
 	} `yaml:"kafka"`
 
-	// Postgres Config
+	// Postgres / MySQL / MariaDB Config
 	Database struct {
 		// The Account database stores the login details and account information
 		// for local users. It is accessed by the ClientAPI.
@@ -328,7 +328,7 @@ type KeyPerspectives []struct {
 // A Path on the filesystem.
 type Path string
 
-// A DataSource for opening a postgresql database using lib/pq.
+// A DataSource for opening a sql database using database/sql.
 type DataSource string
 
 // A Topic in kafka.

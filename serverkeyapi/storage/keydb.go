@@ -22,6 +22,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/serverkeyapi/storage/mysql"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage/postgres"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -42,6 +43,8 @@ func NewDatabase(
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName, dbProperties, serverName, serverKey, serverKeyID)
+	case "mysql":
+		return mysql.NewDatabase(dataSourceName, dbProperties, serverName, serverKey, serverKeyID)
 	case "file":
 		return sqlite3.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
 	default:

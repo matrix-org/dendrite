@@ -123,6 +123,14 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	return stateBlockNID, nil
 }
 
+func (s *stateBlockStatements) selectNextStateBlockNID(
+	ctx context.Context,
+) (types.StateBlockNID, error) {
+	var stateBlockNID int64
+	err := s.selectNextStateBlockNIDStmt.QueryRowContext(ctx).Scan(&stateBlockNID)
+	return types.StateBlockNID(stateBlockNID), err
+}
+
 func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {

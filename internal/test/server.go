@@ -66,17 +66,23 @@ func CreateBackgroundCommand(command string, args []string) (*exec.Cmd, chan err
 }
 
 // InitDatabase creates the database and config file needed for the server to run
-func InitDatabase(postgresDatabase, postgresContainerName string, databases []string) {
+func InitDatabase(databaseType, databaseUser, postgresDatabase, postgresContainerName string, databases []string) {
 	if len(databases) > 0 {
 		var dbCmd string
 		var dbArgs []string
+
+		dbAppName := "psql"
+		if databaseType == "mysql" {
+			dbAppName = "mysql"
+		}
+
 		if postgresContainerName == "" {
-			dbCmd = "psql"
+			dbCmd = dbAppName
 			dbArgs = []string{postgresDatabase}
 		} else {
 			dbCmd = "docker"
 			dbArgs = []string{
-				"exec", "-i", postgresContainerName, "psql", "-U", "postgres", postgresDatabase,
+				"exec", "-i", postgresContainerName, dbAppName, "-U", databaseUser, postgresDatabase,
 			}
 		}
 		for _, database := range databases {
