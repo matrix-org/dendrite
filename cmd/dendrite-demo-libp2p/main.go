@@ -152,7 +152,7 @@ func main() {
 	)
 	asAPI := appservice.NewInternalAPI(&base.Base, accountDB, deviceDB, rsAPI)
 	appservice.AddPublicRoutes(base.Base.PublicAPIMux, &cfg, rsAPI, accountDB, federation, transactions.New())
-	fsAPI := federationsender.SetupFederationSenderComponent(
+	fsAPI := federationsender.NewInternalAPI(
 		&base.Base, federation, rsAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
@@ -163,8 +163,8 @@ func main() {
 		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.AddPublicRoutes(&base.Base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(&base.Base, deviceDB)
+	federationapi.AddPublicRoutes(base.Base.PublicAPIMux, base.Base.Cfg, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
+	mediaapi.AddPublicRoutes(base.Base.PublicAPIMux, base.Base.Cfg, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub, cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")

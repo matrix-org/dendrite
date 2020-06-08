@@ -15,6 +15,7 @@
 package federationsender
 
 import (
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/internal"
@@ -29,9 +30,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SetupFederationSenderComponent sets up and registers HTTP handlers for the
-// FederationSender component.
-func SetupFederationSenderComponent(
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(router *mux.Router, intAPI api.FederationSenderInternalAPI) {
+	inthttp.AddRoutes(intAPI, router)
+}
+
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI(
 	base *basecomponent.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
@@ -66,8 +73,5 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	queryAPI := internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing, statistics, queues)
-	inthttp.AddRoutes(queryAPI, base.InternalAPIMux)
-
-	return queryAPI
+	return internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing, statistics, queues)
 }

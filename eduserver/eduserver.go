@@ -33,7 +33,7 @@ func AddInternalRoutes(internalMux *mux.Router, inputAPI api.EDUServerInputAPI) 
 }
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
-// can call functions directly on the returned API or via an HTTP interface using AddRoutes.
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *basecomponent.BaseDendrite,
 	eduCache *cache.EDUCache,

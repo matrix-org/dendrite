@@ -37,7 +37,7 @@ func main() {
 	eduProducer := producers.NewEDUServerProducer(base.EDUServerClient())
 
 	federationapi.AddPublicRoutes(
-		base, accountDB, deviceDB, federation, keyRing,
+		base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, keyRing,
 		rsAPI, asAPI, fsAPI, eduProducer,
 	)
 
