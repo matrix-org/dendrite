@@ -3,6 +3,7 @@ module github.com/matrix-org/dendrite
 require (
 	github.com/Shopify/sarama v1.26.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
+	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/lib/pq v1.2.0
@@ -18,7 +19,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20200608125510-defe251235b1
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20200608165142-b4efca4dd957
 	github.com/matrix-org/naffka v0.0.0-20200422140631-181f1ee7401f
 	github.com/matrix-org/util v0.0.0-20190711121626-527ce5ddefc7
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible
@@ -32,6 +33,7 @@ require (
 	github.com/uber-go/atomic v1.3.0 // indirect
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0
+	github.com/yggdrasil-network/yggdrasil-go v0.3.14
 	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d
 	gopkg.in/h2non/bimg.v1 v1.0.18
