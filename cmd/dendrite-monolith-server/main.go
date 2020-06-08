@@ -86,10 +86,11 @@ func main() {
 		rsAPI = base.RoomserverHTTPClient()
 	}
 
-	eduInputAPI := eduserver.SetupEDUServerComponent(
+	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), deviceDB,
 	)
 	if base.UseHTTPAPIs {
+		eduserver.AddRoutes(base.InternalAPIMux, eduInputAPI)
 		eduInputAPI = base.EDUServerClient()
 	}
 
@@ -118,7 +119,7 @@ func main() {
 		base, deviceDB, accountDB,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
+	federationapi.AddRoutes(base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {

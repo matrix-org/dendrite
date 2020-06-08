@@ -28,9 +28,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// SetupFederationAPIComponent sets up and registers HTTP handlers for the
-// FederationAPI component.
-func SetupFederationAPIComponent(
+// AddRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
+func AddRoutes(
 	base *basecomponent.BaseDendrite,
 	accountsDB accounts.Database,
 	deviceDB devices.Database,

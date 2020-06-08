@@ -36,7 +36,7 @@ func main() {
 	// TODO: this isn't a producer
 	eduProducer := producers.NewEDUServerProducer(base.EDUServerClient())
 
-	federationapi.SetupFederationAPIComponent(
+	federationapi.AddRoutes(
 		base, accountDB, deviceDB, federation, keyRing,
 		rsAPI, asAPI, fsAPI, eduProducer,
 	)

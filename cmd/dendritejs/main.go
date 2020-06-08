@@ -207,7 +207,7 @@ func main() {
 	}
 
 	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
+	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
 	asQuery := appservice.SetupAppServiceAPIComponent(
 		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
 	)
@@ -221,7 +221,7 @@ func main() {
 		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
+	federationapi.AddRoutes(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), cfg.Matrix.ServerName)
 	if err != nil {

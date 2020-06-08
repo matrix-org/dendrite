@@ -31,7 +31,8 @@ func main() {
 	}()
 	deviceDB := base.CreateDeviceDB()
 
-	eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
+	intAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
+	eduserver.AddRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.EDUServer), string(base.Cfg.Listen.EDUServer))
 
