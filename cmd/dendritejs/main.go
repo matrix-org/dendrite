@@ -208,20 +208,20 @@ func main() {
 
 	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
 	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
-	asQuery := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
+	asQuery := appservice.NewInternalAPI(
+		base, accountDB, deviceDB, rsAPI,
 	)
 	fedSenderAPI := federationsender.SetupFederationSenderComponent(base, federation, rsAPI, &keyRing)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI)
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
+	clientapi.AddPublicRoutes(
+		base.PublicAPIMux, base, deviceDB, accountDB,
 		federation, &keyRing, rsAPI,
 		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.AddRoutes(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
+	federationapi.AddPublicRoutes(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), cfg.Matrix.ServerName)
 	if err != nil {

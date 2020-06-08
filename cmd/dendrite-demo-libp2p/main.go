@@ -150,21 +150,20 @@ func main() {
 	eduInputAPI := eduserver.NewInternalAPI(
 		&base.Base, cache.New(), deviceDB,
 	)
-	asAPI := appservice.SetupAppServiceAPIComponent(
-		&base.Base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
-	)
+	asAPI := appservice.NewInternalAPI(&base.Base, accountDB, deviceDB, rsAPI)
+	appservice.AddPublicRoutes(base.Base.PublicAPIMux, &cfg, rsAPI, accountDB, federation, transactions.New())
 	fsAPI := federationsender.SetupFederationSenderComponent(
 		&base.Base, federation, rsAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
-	clientapi.SetupClientAPIComponent(
-		&base.Base, deviceDB, accountDB,
+	clientapi.AddPublicRoutes(
+		base.Base.PublicAPIMux, &base.Base, deviceDB, accountDB,
 		federation, keyRing, rsAPI,
 		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.AddRoutes(&base.Base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
+	federationapi.AddPublicRoutes(&base.Base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(&base.Base, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub, cfg.Matrix.ServerName)
 	if err != nil {

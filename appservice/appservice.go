@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/appservice/inthttp"
@@ -40,15 +41,28 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SetupAppServiceAPIComponent sets up and registers HTTP handlers for the AppServices
-// component.
-func SetupAppServiceAPIComponent(
+// AddPublicRoutes registers HTTP handlers for CS API calls
+func AddPublicRoutes(router *mux.Router, cfg *config.Dendrite, rsAPI roomserverAPI.RoomserverInternalAPI,
+	accountsDB accounts.Database, federation *gomatrixserverlib.FederationClient, txnCache *transactions.Cache) {
+
+	routing.Setup(
+		router, cfg, rsAPI,
+		accountsDB, federation, txnCache,
+	)
+}
+
+// AddInternalRoutes registers HTTP handlers for internal API calls
+func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQueryAPI) {
+	inthttp.AddRoutes(queryAPI, router)
+}
+
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI(
 	base *basecomponent.BaseDendrite,
 	accountsDB accounts.Database,
 	deviceDB devices.Database,
-	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	transactionsCache *transactions.Cache,
 ) appserviceAPI.AppServiceQueryAPI {
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(string(base.Cfg.Database.AppService), base.Cfg.DbProperties())
@@ -85,8 +99,6 @@ func SetupAppServiceAPIComponent(
 		Cfg: base.Cfg,
 	}
 
-	inthttp.AddRoutes(appserviceQueryAPI, base.InternalAPIMux)
-
 	consumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
 		rsAPI, workerStates,
@@ -99,13 +111,6 @@ func SetupAppServiceAPIComponent(
 	if err := workers.SetupTransactionWorkers(appserviceDB, workerStates); err != nil {
 		logrus.WithError(err).Panicf("failed to start app service transaction workers")
 	}
-
-	// Set up HTTP Endpoints
-	routing.Setup(
-		base.PublicAPIMux, base.Cfg, rsAPI,
-		accountsDB, federation, transactionsCache,
-	)
-
 	return appserviceQueryAPI
 }
 

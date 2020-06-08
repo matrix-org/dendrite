@@ -26,9 +26,9 @@ import (
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 )
 
-// AddRoutes registers HTTP handlers for the internal API. Invokes functions
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddRoutes(internalMux *mux.Router, inputAPI api.EDUServerInputAPI) {
+func AddInternalRoutes(internalMux *mux.Router, inputAPI api.EDUServerInputAPI) {
 	inthttp.AddRoutes(inputAPI, internalMux)
 }
 

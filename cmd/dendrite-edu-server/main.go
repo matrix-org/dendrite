@@ -32,7 +32,7 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 
 	intAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
-	eduserver.AddRoutes(base.InternalAPIMux, intAPI)
+	eduserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.EDUServer), string(base.Cfg.Listen.EDUServer))
 

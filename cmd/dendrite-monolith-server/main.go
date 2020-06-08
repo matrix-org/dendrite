@@ -90,14 +90,14 @@ func main() {
 		base, cache.New(), deviceDB,
 	)
 	if base.UseHTTPAPIs {
-		eduserver.AddRoutes(base.InternalAPIMux, eduInputAPI)
+		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
 		eduInputAPI = base.EDUServerClient()
 	}
 
-	asAPI := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
-	)
+	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	appservice.AddPublicRoutes(base.PublicAPIMux, cfg, rsAPI, accountDB, federation, transactions.New())
 	if base.UseHTTPAPIs {
+		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
 	}
 
@@ -109,8 +109,8 @@ func main() {
 	}
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
+	clientapi.AddPublicRoutes(
+		base.PublicAPIMux, base, deviceDB, accountDB,
 		federation, keyRing, rsAPI,
 		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
@@ -119,7 +119,7 @@ func main() {
 		base, deviceDB, accountDB,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.AddRoutes(base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
+	federationapi.AddPublicRoutes(base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
 	mediaapi.SetupMediaAPIComponent(base, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
