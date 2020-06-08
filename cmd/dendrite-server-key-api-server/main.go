@@ -26,7 +26,8 @@ func main() {
 
 	federation := base.CreateFederationClient()
 
-	serverkeyapi.SetupServerKeyAPIComponent(base, federation)
+	intAPI := serverkeyapi.NewInternalAPI(base.Cfg, federation, base.Caches)
+	serverkeyapi.AddInternalRoutes(base.InternalAPIMux, intAPI, base.Caches)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ServerKeyAPI), string(base.Cfg.Listen.ServerKeyAPI))
 }

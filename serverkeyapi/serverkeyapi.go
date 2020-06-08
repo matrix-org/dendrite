@@ -4,7 +4,9 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/serverkeyapi/internal"
 	"github.com/matrix-org/dendrite/serverkeyapi/inthttp"
@@ -14,22 +16,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func SetupServerKeyAPIComponent(
-	base *basecomponent.BaseDendrite,
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(router *mux.Router, intAPI api.ServerKeyInternalAPI, caches *caching.Caches) {
+	inthttp.AddRoutes(intAPI, router, caches)
+}
+
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI(
+	cfg *config.Dendrite,
 	fedClient *gomatrixserverlib.FederationClient,
+	caches *caching.Caches,
 ) api.ServerKeyInternalAPI {
 	innerDB, err := storage.NewDatabase(
-		string(base.Cfg.Database.ServerKey),
-		base.Cfg.DbProperties(),
-		base.Cfg.Matrix.ServerName,
-		base.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
-		base.Cfg.Matrix.KeyID,
+		string(cfg.Database.ServerKey),
+		cfg.DbProperties(),
+		cfg.Matrix.ServerName,
+		cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
+		cfg.Matrix.KeyID,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to server key database")
 	}
 
-	serverKeyDB, err := cache.NewKeyDatabase(innerDB, base.Caches)
+	serverKeyDB, err := cache.NewKeyDatabase(innerDB, caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to set up caching wrapper for server key database")
 	}
@@ -47,7 +58,7 @@ func SetupServerKeyAPIComponent(
 	}
 
 	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
-	for _, ps := range base.Cfg.Matrix.KeyPerspectives {
+	for _, ps := range cfg.Matrix.KeyPerspectives {
 		perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
 			PerspectiveServerName: ps.ServerName,
 			PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},
@@ -76,8 +87,6 @@ func SetupServerKeyAPIComponent(
 			"num_public_keys": len(ps.Keys),
 		}).Info("Enabled perspective key fetcher")
 	}
-
-	inthttp.AddRoutes(&internalAPI, base.InternalAPIMux, base.Caches)
 
 	return &internalAPI
 }

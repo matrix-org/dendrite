@@ -206,7 +206,7 @@ func main() {
 		KeyDatabase: fetcher,
 	}
 
-	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
+	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
 	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
 	asQuery := appservice.NewInternalAPI(
 		base, accountDB, deviceDB, rsAPI,
@@ -227,8 +227,8 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
+	publicroomsapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
+	syncapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, accountDB, rsAPI, federation, cfg)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,

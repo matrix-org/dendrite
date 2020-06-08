@@ -70,19 +70,21 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
-		base, federation,
+	serverKeyAPI := serverkeyapi.NewInternalAPI(
+		base.Cfg, federation, base.Caches,
 	)
 	if base.UseHTTPAPIs {
+		serverkeyapi.AddInternalRoutes(base.InternalAPIMux, serverKeyAPI, base.Caches)
 		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsComponent := roomserver.SetupRoomServerComponent(
+	rsComponent := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
 	rsAPI := rsComponent
 	if base.UseHTTPAPIs {
+		roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 		rsAPI = base.RoomserverHTTPClient()
 	}
 
@@ -126,8 +128,8 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
+	publicroomsapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
+	syncapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, accountDB, rsAPI, federation, cfg)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,

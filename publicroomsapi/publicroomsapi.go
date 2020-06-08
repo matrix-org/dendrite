@@ -15,6 +15,7 @@
 package publicroomsapi
 
 import (
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/publicroomsapi/consumers"
@@ -26,9 +27,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SetupPublicRoomsAPIComponent sets up and registers HTTP handlers for the PublicRoomsAPI
+// AddPublicRoutes sets up and registers HTTP handlers for the PublicRoomsAPI
 // component.
-func SetupPublicRoomsAPIComponent(
+func AddPublicRoutes(
+	router *mux.Router,
 	base *basecomponent.BaseDendrite,
 	deviceDB devices.Database,
 	publicRoomsDB storage.Database,
@@ -43,5 +45,5 @@ func SetupPublicRoomsAPIComponent(
 		logrus.WithError(err).Panic("failed to start public rooms server consumer")
 	}
 
-	routing.Setup(base.PublicAPIMux, deviceDB, publicRoomsDB, rsAPI, fedClient, extRoomsProvider)
+	routing.Setup(router, deviceDB, publicRoomsDB, rsAPI, fedClient, extRoomsProvider)
 }
