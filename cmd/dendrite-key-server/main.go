@@ -27,7 +27,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 
-	keyserver.SetupKeyServerComponent(base, deviceDB, accountDB)
+	keyserver.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB, accountDB)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.KeyServer), string(base.Cfg.Listen.KeyServer))
 

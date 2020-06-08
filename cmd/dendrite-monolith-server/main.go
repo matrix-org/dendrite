@@ -70,62 +70,66 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
-		base, federation,
+	serverKeyAPI := serverkeyapi.NewInternalAPI(
+		base.Cfg, federation, base.Caches,
 	)
 	if base.UseHTTPAPIs {
+		serverkeyapi.AddInternalRoutes(base.InternalAPIMux, serverKeyAPI, base.Caches)
 		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsComponent := roomserver.SetupRoomServerComponent(
+	rsComponent := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
 	rsAPI := rsComponent
 	if base.UseHTTPAPIs {
+		roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 		rsAPI = base.RoomserverHTTPClient()
 	}
 
-	eduInputAPI := eduserver.SetupEDUServerComponent(
+	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), deviceDB,
 	)
 	if base.UseHTTPAPIs {
+		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
 		eduInputAPI = base.EDUServerClient()
 	}
 
-	asAPI := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
-	)
+	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	appservice.AddPublicRoutes(base.PublicAPIMux, cfg, rsAPI, accountDB, federation, transactions.New())
 	if base.UseHTTPAPIs {
+		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
 	}
 
-	fsAPI := federationsender.SetupFederationSenderComponent(
+	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, keyRing,
 	)
 	if base.UseHTTPAPIs {
+		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationSenderHTTPClient()
 	}
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
+	clientapi.AddPublicRoutes(
+		base.PublicAPIMux, base, deviceDB, accountDB,
 		federation, keyRing, rsAPI,
 		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
 
-	keyserver.SetupKeyServerComponent(
-		base, deviceDB, accountDB,
+	keyserver.AddPublicRoutes(
+		base.PublicAPIMux, base.Cfg, deviceDB, accountDB,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
+	federationapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
+	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
+	publicroomsapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
+	syncapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, accountDB, rsAPI, federation, cfg)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,

@@ -38,8 +38,8 @@ func main() {
 	fsAPI := base.FederationSenderHTTPClient()
 	eduInputAPI := base.EDUServerClient()
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB, federation, keyRing,
+	clientapi.AddPublicRoutes(
+		base.PublicAPIMux, base, deviceDB, accountDB, federation, keyRing,
 		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI,
 	)
 

@@ -206,29 +206,29 @@ func main() {
 		KeyDatabase: fetcher,
 	}
 
-	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New(), deviceDB)
-	asQuery := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
+	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
+	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
+	asQuery := appservice.NewInternalAPI(
+		base, accountDB, deviceDB, rsAPI,
 	)
-	fedSenderAPI := federationsender.SetupFederationSenderComponent(base, federation, rsAPI, &keyRing)
+	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, &keyRing)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI)
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
+	clientapi.AddPublicRoutes(
+		base.PublicAPIMux, base, deviceDB, accountDB,
 		federation, &keyRing, rsAPI,
 		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
+	federationapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
+	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, rsAPI, federation, cfg)
+	publicroomsapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
+	syncapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, accountDB, rsAPI, federation, cfg)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,

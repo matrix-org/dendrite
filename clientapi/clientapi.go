@@ -15,6 +15,7 @@
 package clientapi
 
 import (
+	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
@@ -30,9 +31,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SetupClientAPIComponent sets up and registers HTTP handlers for the ClientAPI
-// component.
-func SetupClientAPIComponent(
+// AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
+func AddPublicRoutes(
+	router *mux.Router,
 	base *basecomponent.BaseDendrite,
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
@@ -65,7 +66,7 @@ func SetupClientAPIComponent(
 	}
 
 	routing.Setup(
-		base.PublicAPIMux, base.Cfg, roomserverProducer, rsAPI, asAPI,
+		router, base.Cfg, roomserverProducer, rsAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
 		syncProducer, eduProducer, transactionsCache, fsAPI,
 	)

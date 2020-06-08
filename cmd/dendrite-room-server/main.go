@@ -29,8 +29,9 @@ func main() {
 	keyRing := serverKeyAPI.KeyRing()
 
 	fsAPI := base.FederationSenderHTTPClient()
-	rsAPI := roomserver.SetupRoomServerComponent(base, keyRing, federation)
+	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
 	rsAPI.SetFederationSenderAPI(fsAPI)
+	roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer), string(base.Cfg.Listen.RoomServer))
 

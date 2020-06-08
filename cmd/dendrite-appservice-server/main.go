@@ -31,9 +31,9 @@ func main() {
 	rsAPI := base.RoomserverHTTPClient()
 	cache := transactions.New()
 
-	appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, rsAPI, cache,
-	)
+	intAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI)
+	appservice.AddPublicRoutes(base.PublicAPIMux, base.Cfg, rsAPI, accountDB, federation, cache)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.AppServiceAPI), string(base.Cfg.Listen.AppServiceAPI))
 

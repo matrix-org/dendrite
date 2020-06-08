@@ -17,6 +17,7 @@
 package eduserver
 
 import (
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -25,16 +26,20 @@ import (
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 )
 
-// SetupEDUServerComponent sets up and registers HTTP handlers for the
-// EDUServer component. Returns instances of the various roomserver APIs,
-// allowing other components running in the same process to hit the query the
-// APIs directly instead of having to use HTTP.
-func SetupEDUServerComponent(
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(internalMux *mux.Router, inputAPI api.EDUServerInputAPI) {
+	inthttp.AddRoutes(inputAPI, internalMux)
+}
+
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI(
 	base *basecomponent.BaseDendrite,
 	eduCache *cache.EDUCache,
 	deviceDB devices.Database,
 ) api.EDUServerInputAPI {
-	inputAPI := &input.EDUServerInputAPI{
+	return &input.EDUServerInputAPI{
 		Cache:                        eduCache,
 		DeviceDB:                     deviceDB,
 		Producer:                     base.KafkaProducer,
@@ -42,8 +47,4 @@ func SetupEDUServerComponent(
 		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEvent),
 		ServerName:                   base.Cfg.Matrix.ServerName,
 	}
-
-	inthttp.AddRoutes(inputAPI, base.InternalAPIMux)
-
-	return inputAPI
 }

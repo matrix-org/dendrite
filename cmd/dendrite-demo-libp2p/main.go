@@ -136,42 +136,41 @@ func main() {
 	deviceDB := base.Base.CreateDeviceDB()
 	federation := createFederationClient(base)
 
-	serverKeyAPI := serverkeyapi.SetupServerKeyAPIComponent(
-		&base.Base, federation,
+	serverKeyAPI := serverkeyapi.NewInternalAPI(
+		base.Base.Cfg, federation, base.Base.Caches,
 	)
 	keyRing := serverKeyAPI.KeyRing()
 	createKeyDB(
 		base, serverKeyAPI,
 	)
 
-	rsAPI := roomserver.SetupRoomServerComponent(
+	rsAPI := roomserver.NewInternalAPI(
 		&base.Base, keyRing, federation,
 	)
-	eduInputAPI := eduserver.SetupEDUServerComponent(
+	eduInputAPI := eduserver.NewInternalAPI(
 		&base.Base, cache.New(), deviceDB,
 	)
-	asAPI := appservice.SetupAppServiceAPIComponent(
-		&base.Base, accountDB, deviceDB, federation, rsAPI, transactions.New(),
-	)
-	fsAPI := federationsender.SetupFederationSenderComponent(
+	asAPI := appservice.NewInternalAPI(&base.Base, accountDB, deviceDB, rsAPI)
+	appservice.AddPublicRoutes(base.Base.PublicAPIMux, &cfg, rsAPI, accountDB, federation, transactions.New())
+	fsAPI := federationsender.NewInternalAPI(
 		&base.Base, federation, rsAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
-	clientapi.SetupClientAPIComponent(
-		&base.Base, deviceDB, accountDB,
+	clientapi.AddPublicRoutes(
+		base.Base.PublicAPIMux, &base.Base, deviceDB, accountDB,
 		federation, keyRing, rsAPI,
 		eduInputAPI, asAPI, transactions.New(), fsAPI,
 	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(&base.Base, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(&base.Base, deviceDB)
+	federationapi.AddPublicRoutes(base.Base.PublicAPIMux, base.Base.Cfg, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
+	mediaapi.AddPublicRoutes(base.Base.PublicAPIMux, base.Base.Cfg, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub, cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(&base.Base, deviceDB, publicRoomsDB, rsAPI, federation, nil) // Check this later
-	syncapi.SetupSyncAPIComponent(&base.Base, deviceDB, accountDB, rsAPI, federation, &cfg)
+	publicroomsapi.AddPublicRoutes(base.Base.PublicAPIMux, &base.Base, deviceDB, publicRoomsDB, rsAPI, federation, nil) // Check this later
+	syncapi.AddPublicRoutes(base.Base.PublicAPIMux, &base.Base, deviceDB, accountDB, rsAPI, federation, &cfg)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,

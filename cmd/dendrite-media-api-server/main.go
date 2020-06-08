@@ -26,7 +26,7 @@ func main() {
 
 	deviceDB := base.CreateDeviceDB()
 
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
+	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.MediaAPI), string(base.Cfg.Listen.MediaAPI))
 

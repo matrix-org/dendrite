@@ -15,11 +15,12 @@
 package federationapi
 
 import (
+	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
 	// TODO: Are we really wanting to pull in the producer from clientapi
@@ -28,10 +29,10 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// SetupFederationAPIComponent sets up and registers HTTP handlers for the
-// FederationAPI component.
-func SetupFederationAPIComponent(
-	base *basecomponent.BaseDendrite,
+// AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
+func AddPublicRoutes(
+	router *mux.Router,
+	cfg *config.Dendrite,
 	accountsDB accounts.Database,
 	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
@@ -44,7 +45,7 @@ func SetupFederationAPIComponent(
 	roomserverProducer := producers.NewRoomserverProducer(rsAPI)
 
 	routing.Setup(
-		base.PublicAPIMux, base.Cfg, rsAPI, asAPI, roomserverProducer,
+		router, cfg, rsAPI, asAPI, roomserverProducer,
 		eduProducer, federationSenderAPI, *keyRing,
 		federation, accountsDB, deviceDB,
 	)

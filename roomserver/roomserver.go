@@ -15,6 +15,7 @@
 package roomserver
 
 import (
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -25,11 +26,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SetupRoomServerComponent sets up and registers HTTP handlers for the
-// RoomServer component. Returns instances of the various roomserver APIs,
-// allowing other components running in the same process to hit the query the
-// APIs directly instead of having to use HTTP.
-func SetupRoomServerComponent(
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(router *mux.Router, intAPI api.RoomserverInternalAPI) {
+	inthttp.AddRoutes(intAPI, router)
+}
+
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI(
 	base *basecomponent.BaseDendrite,
 	keyRing gomatrixserverlib.JSONVerifier,
 	fedClient *gomatrixserverlib.FederationClient,
@@ -39,7 +44,7 @@ func SetupRoomServerComponent(
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	internalAPI := &internal.RoomserverInternalAPI{
+	return &internal.RoomserverInternalAPI{
 		DB:                   roomserverDB,
 		Cfg:                  base.Cfg,
 		Producer:             base.KafkaProducer,
@@ -49,8 +54,4 @@ func SetupRoomServerComponent(
 		FedClient:            fedClient,
 		KeyRing:              keyRing,
 	}
-
-	inthttp.AddRoutes(internalAPI, base.InternalAPIMux)
-
-	return internalAPI
 }

@@ -17,6 +17,7 @@ package syncapi
 import (
 	"context"
 
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -32,9 +33,10 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/sync"
 )
 
-// SetupSyncAPIComponent sets up and registers HTTP handlers for the SyncAPI
+// AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI
 // component.
-func SetupSyncAPIComponent(
+func AddPublicRoutes(
+	router *mux.Router,
 	base *basecomponent.BaseDendrite,
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
@@ -88,5 +90,5 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
-	routing.Setup(base.PublicAPIMux, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
+	routing.Setup(router, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
 }
