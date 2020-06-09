@@ -54,7 +54,7 @@ func Setup(instanceName string) (*Node, error) {
 			panic(err)
 		}
 	} else {
-		j, err := json.Marshal(n.config)
+		j, err := json.MarshalIndent(n.config, "", "  ")
 		if err != nil {
 			panic(err)
 		}
