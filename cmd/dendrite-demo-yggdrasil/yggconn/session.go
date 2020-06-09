@@ -2,35 +2,47 @@ package yggconn
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"net"
+	"time"
 
 	"github.com/libp2p/go-yamux"
 )
+
+func (n *Node) yamuxConfig() *yamux.Config {
+	cfg := yamux.DefaultConfig()
+	cfg.EnableKeepAlive = true
+	cfg.KeepAliveInterval = time.Second
+	return cfg
+}
 
 func (n *Node) listenFromYgg() {
 	for {
 		conn, err := n.listener.Accept()
 		if err != nil {
+			fmt.Println("n.listener.Accept:", err)
 			return
 		}
-		session, err := yamux.Server(conn, nil)
+		session, err := yamux.Server(conn, n.yamuxConfig())
 		if err != nil {
+			fmt.Println("yamux.Server:", err)
 			return
 		}
-		n.conns.Store(conn.RemoteAddr(), conn)
-		n.sessions.Store(conn.RemoteAddr(), session)
-		go n.listenFromYggConn(session, conn)
+		go n.listenFromYggConn(session)
 	}
 }
 
-func (n *Node) listenFromYggConn(session *yamux.Session, conn net.Conn) {
+func (n *Node) listenFromYggConn(session *yamux.Session) {
+	n.sessions.Store(session.RemoteAddr().String(), session)
+	defer n.sessions.Delete(session.RemoteAddr())
+
 	for {
 		st, err := session.AcceptStream()
 		if err != nil {
+			fmt.Println("session.AcceptStream:", err)
 			return
 		}
-		n.incoming <- &stream{st, conn}
+		n.incoming <- st
 	}
 }
 
@@ -51,34 +63,24 @@ func (n *Node) Dial(network, address string) (net.Conn, error) {
 }
 
 func (n *Node) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	conn, err := n.dialer.DialContext(ctx, network, address)
-	if err != nil {
-		c, ok := n.conns.Load(address)
-		if !ok {
-			return nil, errors.New("conn not found")
+	s, ok1 := n.sessions.Load(address)
+	session, ok2 := s.(*yamux.Session)
+	if !ok1 || !ok2 {
+		conn, err := n.dialer.DialContext(ctx, network, address)
+		if err != nil {
+			fmt.Println("n.dialer.DialContext:", err)
+			return nil, err
 		}
-		conn, ok = c.(net.Conn)
-		if !ok {
-			return nil, errors.New("conn type assertion error")
+		session, err = yamux.Client(conn, n.yamuxConfig())
+		if err != nil {
+			fmt.Println("yamux.Client.AcceptStream:", err)
+			return nil, err
 		}
-	} else {
-		client, cerr := yamux.Client(conn, nil)
-		if cerr != nil {
-			return nil, cerr
-		}
-		n.sessions.Store(address, client)
+		go n.listenFromYggConn(session)
 	}
-	s, ok := n.sessions.Load(address)
-	if !ok {
-		return nil, errors.New("session not found")
-	}
-	session, ok := s.(*yamux.Session)
-	if !ok {
-		return nil, errors.New("session type assertion error")
-	}
-	ch, err := session.OpenStream()
+	st, err := session.OpenStream()
 	if err != nil {
 		return nil, err
 	}
-	return &stream{ch, conn}, nil
+	return st, nil
 }

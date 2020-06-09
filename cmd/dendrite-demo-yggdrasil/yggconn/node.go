@@ -10,6 +10,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/libp2p/go-yamux"
 	yggdrasiladmin "github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
@@ -27,9 +28,8 @@ type Node struct {
 	log       *gologme.Logger
 	listener  *yggdrasil.Listener
 	dialer    *yggdrasil.Dialer
-	conns     sync.Map // string -> yggdrasil.Conn
 	sessions  sync.Map // string -> yamux.Session
-	incoming  chan *stream
+	incoming  chan *yamux.Stream
 }
 
 func Setup(instanceName string) (*Node, error) {
@@ -38,7 +38,7 @@ func Setup(instanceName string) (*Node, error) {
 		admin:     &yggdrasiladmin.AdminSocket{},
 		multicast: &yggdrasilmulticast.Multicast{},
 		log:       gologme.New(os.Stdout, "YGG ", log.Flags()),
-		incoming:  make(chan *stream),
+		incoming:  make(chan *yamux.Stream),
 	}
 	n.config.AdminListen = fmt.Sprintf("unix://./%s-yggdrasil.sock", instanceName)
 

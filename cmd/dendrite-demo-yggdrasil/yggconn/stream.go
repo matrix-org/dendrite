@@ -1,19 +1,17 @@
 package yggconn
 
 import (
-	"net"
-	"time"
-
 	"github.com/libp2p/go-yamux"
 )
 
 type stream struct {
 	*yamux.Stream
-	conn net.Conn
+	//conn net.Conn
 }
 
+/*
 func (c *stream) LocalAddr() net.Addr {
-	return c.conn.LocalAddr()
+	return c.LocalAddr()
 }
 
 func (c *stream) RemoteAddr() net.Addr {
@@ -31,3 +29,4 @@ func (c *stream) SetReadDeadline(t time.Time) error {
 func (c *stream) SetWriteDeadline(t time.Time) error {
 	return c.conn.SetWriteDeadline(t)
 }
+*/
