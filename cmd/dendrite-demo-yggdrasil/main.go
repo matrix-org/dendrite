@@ -72,15 +72,11 @@ func createFederationClient(
 	yggdialerctx := func(ctx context.Context, network, address string) (net.Conn, error) {
 		return yggdialer(network, address)
 	}
-
-	tr := &http.Transport{
-		MaxConnsPerHost: 1,
-	}
+	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{
 			inner: &http.Transport{
-				DialContext:     yggdialerctx,
-				MaxConnsPerHost: 1,
+				DialContext: yggdialerctx,
 			},
 		},
 	)
