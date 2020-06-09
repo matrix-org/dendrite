@@ -20,7 +20,7 @@ import (
 )
 
 type Node struct {
-	core      yggdrasil.Core
+	core      *yggdrasil.Core
 	config    *yggdrasilconfig.NodeConfig
 	state     *yggdrasilconfig.NodeState
 	admin     *yggdrasiladmin.AdminSocket
@@ -33,7 +33,8 @@ type Node struct {
 }
 
 func Setup(instanceName string) (*Node, error) {
-	n := Node{
+	n := &Node{
+		core:      &yggdrasil.Core{},
 		config:    yggdrasilconfig.GenerateConfig(),
 		admin:     &yggdrasiladmin.AdminSocket{},
 		multicast: &yggdrasilmulticast.Multicast{},
@@ -41,6 +42,7 @@ func Setup(instanceName string) (*Node, error) {
 		incoming:  make(chan *yamux.Stream),
 	}
 	n.config.AdminListen = fmt.Sprintf("unix://./%s-yggdrasil.sock", instanceName)
+	n.config.MulticastInterfaces = []string{".*"}
 
 	yggfile := fmt.Sprintf("%s-yggdrasil.conf", instanceName)
 	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
@@ -69,14 +71,13 @@ func Setup(instanceName string) (*Node, error) {
 	if err != nil {
 		panic(err)
 	}
-	n.core.UpdateConfig(n.config)
-	if err = n.admin.Init(&n.core, n.state, n.log, nil); err != nil {
+	if err = n.admin.Init(n.core, n.state, n.log, nil); err != nil {
 		panic(err)
 	}
 	if err = n.admin.Start(); err != nil {
 		panic(err)
 	}
-	if err = n.multicast.Init(&n.core, n.state, n.log, nil); err != nil {
+	if err = n.multicast.Init(n.core, n.state, n.log, nil); err != nil {
 		panic(err)
 	}
 	if err = n.multicast.Start(); err != nil {
@@ -95,7 +96,7 @@ func Setup(instanceName string) (*Node, error) {
 
 	go n.listenFromYgg()
 
-	return &n, nil
+	return n, nil
 }
 
 func (n *Node) EncryptionPublicKey() string {
