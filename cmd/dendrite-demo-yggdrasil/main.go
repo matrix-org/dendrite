@@ -25,24 +25,18 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/transactions"
-	"github.com/matrix-org/dendrite/keyserver"
-	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/dendrite/publicroomsapi"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/serverkeyapi"
-	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
@@ -163,7 +157,6 @@ func main() {
 	}
 
 	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
-	appservice.AddPublicRoutes(base.PublicAPIMux, cfg, rsAPI, accountDB, federation, transactions.New())
 	if base.UseHTTPAPIs {
 		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
@@ -178,24 +171,31 @@ func main() {
 	}
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	clientapi.AddPublicRoutes(
-		base.PublicAPIMux, base, deviceDB, accountDB,
-		federation, keyRing, rsAPI,
-		eduInputAPI, asAPI, transactions.New(), fsAPI,
-	)
-
-	keyserver.AddPublicRoutes(
-		base.PublicAPIMux, base.Cfg, deviceDB, accountDB,
-	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, keyRing, rsAPI, asAPI, fsAPI, eduProducer)
-	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, publicRoomsDB, rsAPI, federation, nil)
-	syncapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, accountDB, rsAPI, federation, cfg)
+
+	monolith := setup.Monolith{
+		Config:        base.Cfg,
+		AccountDB:     accountDB,
+		DeviceDB:      deviceDB,
+		FedClient:     federation,
+		KeyRing:       keyRing,
+		KafkaConsumer: base.KafkaConsumer,
+		KafkaProducer: base.KafkaProducer,
+
+		AppserviceAPI:       asAPI,
+		EDUInternalAPI:      eduInputAPI,
+		EDUProducer:         eduProducer,
+		FederationSenderAPI: fsAPI,
+		RoomserverAPI:       rsAPI,
+		ServerKeyAPI:        serverKeyAPI,
+
+		PublicRoomsDB: publicRoomsDB,
+	}
+	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,
