@@ -16,23 +16,18 @@ package main
 
 import (
 	"context"
-	"crypto/ed25519"
 	"crypto/tls"
-	"encoding/hex"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
@@ -50,12 +45,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	yggdrasiladmin "github.com/yggdrasil-network/yggdrasil-go/src/admin"
-	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
-	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
-	"github.com/yggdrasil-network/yggdrasil-go/src/yggdrasil"
-
-	gologme "github.com/gologme/log"
 	"github.com/sirupsen/logrus"
 )
 
@@ -63,17 +52,6 @@ var (
 	instanceName = flag.String("name", "dendrite-p2p", "the name of this P2P demo instance")
 	instancePort = flag.Int("port", 8080, "the port that the client API will listen on")
 )
-
-type node struct {
-	core      yggdrasil.Core
-	config    *yggdrasilconfig.NodeConfig
-	state     *yggdrasilconfig.NodeState
-	admin     *yggdrasiladmin.AdminSocket
-	multicast *yggdrasilmulticast.Multicast
-	log       *gologme.Logger
-	listener  *yggdrasil.Listener
-	dialer    *yggdrasil.Dialer
-}
 
 type yggroundtripper struct {
 	inner *http.Transport
@@ -84,73 +62,36 @@ func (y *yggroundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return y.inner.RoundTrip(req)
 }
 
-// nolint:gocyclo
-func main() {
-	flag.Parse()
-
-	// Build an Yggdrasil node.
-	n := node{
-		config: yggdrasilconfig.GenerateConfig(),
-		log:    gologme.New(os.Stdout, "YGG ", log.Flags()),
-	}
-	//n.config.AdminListen = fmt.Sprintf("unix:%s-yggdrasil.sock", *instanceName)
-
-	yggfile := fmt.Sprintf("%s-yggdrasil.conf", *instanceName)
-	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
-		yggconf, e := ioutil.ReadFile(yggfile)
-		if e != nil {
-			panic(err)
-		}
-		if err := json.Unmarshal([]byte(yggconf), &n.config); err != nil {
-			panic(err)
-		}
-	} else {
-		j, err := json.Marshal(n.config)
-		if err != nil {
-			panic(err)
-		}
-		if e := ioutil.WriteFile(yggfile, j, 0600); e != nil {
-			fmt.Printf("Couldn't write private key to file '%s': %s\n", yggfile, e)
-		}
-	}
-
-	var err error
-	n.log.EnableLevel("error")
-	n.log.EnableLevel("warn")
-	n.log.EnableLevel("info")
-	n.log.EnableLevel("debug")
-	n.state, err = n.core.Start(n.config, n.log)
-	if err != nil {
-		panic(err)
-	}
-	_ = n.admin.Init(&n.core, n.state, n.log, nil)
-	if err = n.admin.Start(); err != nil {
-		panic(err)
-	}
-	n.admin.SetupAdminHandlers(n.admin)
-	n.multicast = &yggdrasilmulticast.Multicast{}
-	if err = n.multicast.Init(&n.core, n.state, n.log, nil); err != nil {
-		panic(err)
-	}
-	n.multicast.SetupAdminHandlers(n.admin)
-	if err = n.multicast.Start(); err != nil {
-		panic(err)
-	}
-	n.listener, err = n.core.ConnListen()
-	if err != nil {
-		panic(err)
-	}
-	n.dialer, err = n.core.ConnDialer()
-	if err != nil {
-		panic(err)
-	}
+func createFederationClient(
+	base *basecomponent.BaseDendrite, n *yggconn.Node,
+) *gomatrixserverlib.FederationClient {
 	yggdialer := func(_, address string) (net.Conn, error) {
 		tokens := strings.Split(address, ":")
-		return n.dialer.Dial("curve25519", tokens[0])
+		return n.Dial("curve25519", tokens[0])
 	}
 	yggdialerctx := func(ctx context.Context, network, address string) (net.Conn, error) {
 		return yggdialer(network, address)
 	}
+
+	tr := &http.Transport{
+		MaxConnsPerHost: 1,
+	}
+	tr.RegisterProtocol(
+		"matrix", &yggroundtripper{
+			inner: &http.Transport{
+				DialContext:     yggdialerctx,
+				MaxConnsPerHost: 1,
+			},
+		},
+	)
+	return gomatrixserverlib.NewFederationClientWithTransport(
+		base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey, tr,
+	)
+}
+
+// nolint:gocyclo
+func main() {
+	flag.Parse()
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
@@ -159,22 +100,19 @@ func main() {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  15 * time.Second,
-	}
-	httpClient := &http.Client{
-		Transport: &yggroundtripper{
-			inner: &http.Transport{
-				DialContext:     yggdialerctx,
-				MaxConnsPerHost: 1,
-			},
+		BaseContext: func(_ net.Listener) context.Context {
+			return context.Background()
 		},
 	}
 
-	privBytes, _ := hex.DecodeString(n.config.SigningPrivateKey)
-	privKey := ed25519.PrivateKey(privBytes)
+	ygg, err := yggconn.Setup(*instanceName)
+	if err != nil {
+		panic(err)
+	}
 
 	cfg := &config.Dendrite{}
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(n.core.EncryptionPublicKey())
-	cfg.Matrix.PrivateKey = privKey
+	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.EncryptionPublicKey())
+	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
 	cfg.Kafka.UseNaffka = true
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
@@ -200,12 +138,7 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	federation := gomatrixserverlib.NewFederationClientWithHTTPClient(
-		cfg.Matrix.ServerName,
-		cfg.Matrix.KeyID,
-		cfg.Matrix.PrivateKey,
-		httpClient,
-	)
+	federation := createFederationClient(base, ygg)
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
 		base.Cfg, federation, base.Caches,
@@ -276,10 +209,9 @@ func main() {
 		base.UseHTTPAPIs,
 	)
 
-	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		logrus.Info("Listening on ", n.core.EncryptionPublicKey())
-		logrus.Fatal(httpServer.ListenAndServe())
+		logrus.Info("Listening on ", ygg.EncryptionPublicKey())
+		logrus.Fatal(httpServer.Serve(ygg))
 	}()
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
@@ -287,6 +219,5 @@ func main() {
 		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
 	}()
 
-	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
 	select {}
 }

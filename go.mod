@@ -2,6 +2,7 @@ module github.com/matrix-org/dendrite
 
 require (
 	github.com/Shopify/sarama v1.26.1
+	github.com/alecthomas/multiplex v0.0.0-20140815001232-e565e6fcbcd0
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.7.3
