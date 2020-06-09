@@ -2,7 +2,6 @@ package yggconn
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"time"
 
@@ -12,7 +11,9 @@ import (
 func (n *Node) yamuxConfig() *yamux.Config {
 	cfg := yamux.DefaultConfig()
 	cfg.EnableKeepAlive = true
-	cfg.KeepAliveInterval = time.Second * 5
+	cfg.KeepAliveInterval = time.Second * 30
+	cfg.MaxMessageSize = 65535
+	cfg.ReadBufSize = 655350
 	return cfg
 }
 
@@ -20,12 +21,12 @@ func (n *Node) listenFromYgg() {
 	for {
 		conn, err := n.listener.Accept()
 		if err != nil {
-			fmt.Println("n.listener.Accept:", err)
+			n.log.Println("n.listener.Accept:", err)
 			return
 		}
 		session, err := yamux.Server(conn, n.yamuxConfig())
 		if err != nil {
-			fmt.Println("yamux.Server:", err)
+			n.log.Println("yamux.Server:", err)
 			return
 		}
 		go n.listenFromYggConn(session)
@@ -39,7 +40,7 @@ func (n *Node) listenFromYggConn(session *yamux.Session) {
 	for {
 		st, err := session.AcceptStream()
 		if err != nil {
-			fmt.Println("session.AcceptStream:", err)
+			n.log.Println("session.AcceptStream:", err)
 			return
 		}
 		n.incoming <- st
@@ -73,12 +74,12 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 	if !ok1 || !ok2 {
 		conn, err := n.dialer.DialContext(ctx, network, address)
 		if err != nil {
-			fmt.Println("n.dialer.DialContext:", err)
+			n.log.Println("n.dialer.DialContext:", err)
 			return nil, err
 		}
 		session, err = yamux.Client(conn, n.yamuxConfig())
 		if err != nil {
-			fmt.Println("yamux.Client.AcceptStream:", err)
+			n.log.Println("yamux.Client.AcceptStream:", err)
 			return nil, err
 		}
 		go n.listenFromYggConn(session)

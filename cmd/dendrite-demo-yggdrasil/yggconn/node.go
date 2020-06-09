@@ -57,7 +57,7 @@ func Setup(instanceName string) (*Node, error) {
 			panic(err)
 		}
 		if e := ioutil.WriteFile(yggfile, j, 0600); e != nil {
-			fmt.Printf("Couldn't write private key to file '%s': %s\n", yggfile, e)
+			n.log.Printf("Couldn't write private key to file '%s': %s\n", yggfile, e)
 		}
 	}
 
