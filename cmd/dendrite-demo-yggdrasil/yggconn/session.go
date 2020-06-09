@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/alecthomas/multiplex"
+	"github.com/libp2p/go-yamux"
 )
 
 func (n *Node) listenFromYgg() {
@@ -14,20 +14,23 @@ func (n *Node) listenFromYgg() {
 		if err != nil {
 			return
 		}
-		stream := multiplex.MultiplexedServer(conn)
-		n.conns.Store(conn.RemoteAddr(), conn)
-		n.streams.Store(conn.RemoteAddr(), stream)
-		go n.listenFromYggConn(stream, conn)
-	}
-}
-
-func (n *Node) listenFromYggConn(stream *multiplex.MultiplexedStream, conn net.Conn) {
-	for {
-		ch, err := stream.Accept()
+		session, err := yamux.Server(conn, nil)
 		if err != nil {
 			return
 		}
-		n.incoming <- &channel{ch, conn}
+		n.conns.Store(conn.RemoteAddr(), conn)
+		n.sessions.Store(conn.RemoteAddr(), session)
+		go n.listenFromYggConn(session, conn)
+	}
+}
+
+func (n *Node) listenFromYggConn(session *yamux.Session, conn net.Conn) {
+	for {
+		st, err := session.AcceptStream()
+		if err != nil {
+			return
+		}
+		n.incoming <- &stream{st, conn}
 	}
 }
 
@@ -59,19 +62,23 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 			return nil, errors.New("conn type assertion error")
 		}
 	} else {
-		n.streams.Store(address, multiplex.MultiplexedClient(conn))
+		client, cerr := yamux.Client(conn, nil)
+		if cerr != nil {
+			return nil, cerr
+		}
+		n.sessions.Store(address, client)
 	}
-	s, ok := n.streams.Load(address)
+	s, ok := n.sessions.Load(address)
 	if !ok {
-		return nil, errors.New("stream not found")
+		return nil, errors.New("session not found")
 	}
-	stream, ok := s.(*multiplex.MultiplexedStream)
+	session, ok := s.(*yamux.Session)
 	if !ok {
-		return nil, errors.New("stream type assertion error")
+		return nil, errors.New("session type assertion error")
 	}
-	ch, err := stream.Dial()
+	ch, err := session.OpenStream()
 	if err != nil {
 		return nil, err
 	}
-	return &channel{ch, conn}, nil
+	return &stream{ch, conn}, nil
 }

@@ -28,8 +28,8 @@ type Node struct {
 	listener  *yggdrasil.Listener
 	dialer    *yggdrasil.Dialer
 	conns     sync.Map // string -> yggdrasil.Conn
-	streams   sync.Map // string -> multiplex.MultiplexedStream
-	incoming  chan *channel
+	sessions  sync.Map // string -> yamux.Session
+	incoming  chan *stream
 }
 
 func Setup(instanceName string) (*Node, error) {
@@ -38,7 +38,7 @@ func Setup(instanceName string) (*Node, error) {
 		admin:     &yggdrasiladmin.AdminSocket{},
 		multicast: &yggdrasilmulticast.Multicast{},
 		log:       gologme.New(os.Stdout, "YGG ", log.Flags()),
-		incoming:  make(chan *channel),
+		incoming:  make(chan *stream),
 	}
 	n.config.AdminListen = fmt.Sprintf("unix://./%s-yggdrasil.sock", instanceName)
 
