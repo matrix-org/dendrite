@@ -15,6 +15,7 @@
 package clientapi
 
 import (
+	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
@@ -24,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -34,7 +35,9 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
 	router *mux.Router,
-	base *basecomponent.BaseDendrite,
+	cfg *config.Dendrite,
+	consumer sarama.Consumer,
+	producer sarama.SyncProducer,
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
@@ -49,24 +52,24 @@ func AddPublicRoutes(
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 
 	userUpdateProducer := &producers.UserUpdateProducer{
-		Producer: base.KafkaProducer,
-		Topic:    string(base.Cfg.Kafka.Topics.UserUpdates),
+		Producer: producer,
+		Topic:    string(cfg.Kafka.Topics.UserUpdates),
 	}
 
 	syncProducer := &producers.SyncAPIProducer{
-		Producer: base.KafkaProducer,
-		Topic:    string(base.Cfg.Kafka.Topics.OutputClientData),
+		Producer: producer,
+		Topic:    string(cfg.Kafka.Topics.OutputClientData),
 	}
 
-	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, rsAPI,
+	roomEventConsumer := consumers.NewOutputRoomEventConsumer(
+		cfg, consumer, accountsDB, rsAPI,
 	)
-	if err := consumer.Start(); err != nil {
+	if err := roomEventConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	routing.Setup(
-		router, base.Cfg, roomserverProducer, rsAPI, asAPI,
+		router, cfg, roomserverProducer, rsAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
 		syncProducer, eduProducer, transactionsCache, fsAPI,
 	)
