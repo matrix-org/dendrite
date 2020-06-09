@@ -12,7 +12,7 @@ import (
 func (n *Node) yamuxConfig() *yamux.Config {
 	cfg := yamux.DefaultConfig()
 	cfg.EnableKeepAlive = true
-	cfg.KeepAliveInterval = time.Second
+	cfg.KeepAliveInterval = time.Second * 5
 	return cfg
 }
 
@@ -46,22 +46,27 @@ func (n *Node) listenFromYggConn(session *yamux.Session) {
 	}
 }
 
+// Implements net.Listener
 func (n *Node) Accept() (net.Conn, error) {
 	return <-n.incoming, nil
 }
 
+// Implements net.Listener
 func (n *Node) Close() error {
 	return n.listener.Close()
 }
 
+// Implements net.Listener
 func (n *Node) Addr() net.Addr {
 	return n.listener.Addr()
 }
 
+// Implements http.Transport.Dial
 func (n *Node) Dial(network, address string) (net.Conn, error) {
 	return n.DialContext(context.TODO(), network, address)
 }
 
+// Implements http.Transport.DialContext
 func (n *Node) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	s, ok1 := n.sessions.Load(address)
 	session, ok2 := s.(*yamux.Session)
