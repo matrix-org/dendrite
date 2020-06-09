@@ -23,21 +23,16 @@ import (
 	"syscall/js"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/transactions"
-	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/dendrite/publicroomsapi"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/syncapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -215,20 +210,32 @@ func main() {
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI)
 
-	clientapi.AddPublicRoutes(
-		base.PublicAPIMux, base, deviceDB, accountDB,
-		federation, &keyRing, rsAPI,
-		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
-	)
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, &keyRing, rsAPI, asQuery, fedSenderAPI, eduProducer)
-	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, publicRoomsDB, rsAPI, federation, p2pPublicRoomProvider)
-	syncapi.AddPublicRoutes(base.PublicAPIMux, base, deviceDB, accountDB, rsAPI, federation, cfg)
+
+	monolith := setup.Monolith{
+		Config:        base.Cfg,
+		AccountDB:     accountDB,
+		DeviceDB:      deviceDB,
+		FedClient:     federation,
+		KeyRing:       &keyRing,
+		KafkaConsumer: base.KafkaConsumer,
+		KafkaProducer: base.KafkaProducer,
+
+		AppserviceAPI:       asQuery,
+		EDUInternalAPI:      eduInputAPI,
+		EDUProducer:         eduProducer,
+		FederationSenderAPI: fedSenderAPI,
+		RoomserverAPI:       rsAPI,
+		//ServerKeyAPI:        serverKeyAPI,
+
+		PublicRoomsDB:          publicRoomsDB,
+		ExtPublicRoomsProvider: p2pPublicRoomProvider,
+	}
+	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	internal.SetupHTTPAPI(
 		http.DefaultServeMux,

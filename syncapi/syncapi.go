@@ -17,11 +17,11 @@ package syncapi
 import (
 	"context"
 
+	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -37,14 +37,14 @@ import (
 // component.
 func AddPublicRoutes(
 	router *mux.Router,
-	base *basecomponent.BaseDendrite,
+	consumer sarama.Consumer,
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
 	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 ) {
-	syncDB, err := storage.NewSyncServerDatasource(string(base.Cfg.Database.SyncAPI), base.Cfg.DbProperties())
+	syncDB, err := storage.NewSyncServerDatasource(string(cfg.Database.SyncAPI), cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
@@ -63,28 +63,28 @@ func AddPublicRoutes(
 	requestPool := sync.NewRequestPool(syncDB, notifier, accountsDB)
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB, rsAPI,
+		cfg, consumer, notifier, syncDB, rsAPI,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB,
+		cfg, consumer, notifier, syncDB,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB,
+		cfg, consumer, notifier, syncDB,
 	)
 	if err = typingConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB,
+		cfg, consumer, notifier, syncDB,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
