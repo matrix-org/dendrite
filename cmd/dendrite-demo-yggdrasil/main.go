@@ -101,6 +101,7 @@ func main() {
 	}
 
 	cfg := &config.Dendrite{}
+	cfg.SetDefaults()
 	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.EncryptionPublicKey())
 	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
