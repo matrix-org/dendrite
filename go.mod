@@ -34,7 +34,7 @@ require (
 	github.com/uber-go/atomic v1.3.0 // indirect
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0
-	github.com/yggdrasil-network/yggdrasil-go v0.3.14
+	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200530233943-aec82d7a391b
 	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d
 	gopkg.in/h2non/bimg.v1 v1.0.18
