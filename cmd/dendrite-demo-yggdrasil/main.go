@@ -43,8 +43,8 @@ import (
 )
 
 var (
-	instanceName = flag.String("name", "dendrite-p2p", "the name of this P2P demo instance")
-	instancePort = flag.Int("port", 8080, "the port that the client API will listen on")
+	instanceName = flag.String("name", "dendrite-p2p-ygg", "the name of this P2P demo instance")
+	instancePort = flag.Int("port", 8008, "the port that the client API will listen on")
 )
 
 type yggroundtripper struct {
