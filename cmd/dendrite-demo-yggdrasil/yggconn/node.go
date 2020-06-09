@@ -32,7 +32,7 @@ type Node struct {
 	incoming  chan *yamux.Stream
 }
 
-func Setup(instanceName string) (*Node, error) {
+func Setup(instanceName, instancePeer string) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasil.Core{},
 		config:    yggdrasilconfig.GenerateConfig(),
@@ -70,6 +70,11 @@ func Setup(instanceName string) (*Node, error) {
 	n.state, err = n.core.Start(n.config, n.log)
 	if err != nil {
 		panic(err)
+	}
+	if instancePeer != "" {
+		if err = n.core.AddPeer(instancePeer, ""); err != nil {
+			panic(err)
+		}
 	}
 	if err = n.admin.Init(n.core, n.state, n.log, nil); err != nil {
 		panic(err)

@@ -45,6 +45,7 @@ import (
 var (
 	instanceName = flag.String("name", "dendrite-p2p-ygg", "the name of this P2P demo instance")
 	instancePort = flag.Int("port", 8008, "the port that the client API will listen on")
+	instancePeer = flag.String("peer", "", "an internet Yggdrasil peer to connect to")
 )
 
 type yggroundtripper struct {
@@ -95,7 +96,7 @@ func main() {
 		},
 	}
 
-	ygg, err := yggconn.Setup(*instanceName)
+	ygg, err := yggconn.Setup(*instanceName, *instancePeer)
 	if err != nil {
 		panic(err)
 	}
