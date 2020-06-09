@@ -15,9 +15,10 @@
 package publicroomsapi
 
 import (
+	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/publicroomsapi/consumers"
 	"github.com/matrix-org/dendrite/publicroomsapi/routing"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
@@ -31,7 +32,8 @@ import (
 // component.
 func AddPublicRoutes(
 	router *mux.Router,
-	base *basecomponent.BaseDendrite,
+	cfg *config.Dendrite,
+	consumer sarama.Consumer,
 	deviceDB devices.Database,
 	publicRoomsDB storage.Database,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
@@ -39,7 +41,7 @@ func AddPublicRoutes(
 	extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, publicRoomsDB, rsAPI,
+		cfg, consumer, publicRoomsDB, rsAPI,
 	)
 	if err := rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start public rooms server consumer")

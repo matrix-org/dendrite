@@ -39,7 +39,7 @@ func main() {
 	eduInputAPI := base.EDUServerClient()
 
 	clientapi.AddPublicRoutes(
-		base.PublicAPIMux, base, deviceDB, accountDB, federation, keyRing,
+		base.PublicAPIMux, base.Cfg, base.KafkaConsumer, base.KafkaProducer, deviceDB, accountDB, federation, keyRing,
 		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI,
 	)
 
