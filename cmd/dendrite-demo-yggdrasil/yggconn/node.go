@@ -32,6 +32,7 @@ type Node struct {
 	incoming  chan *yamux.Stream
 }
 
+// nolint:gocyclo
 func Setup(instanceName, instancePeer string) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasil.Core{},
