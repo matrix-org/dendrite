@@ -24,8 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
-	// TODO: Are we really wanting to pull in the producer from clientapi
-
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/gomatrixserverlib"
 )
