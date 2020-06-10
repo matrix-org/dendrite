@@ -17,9 +17,13 @@ type ServerKeyAPI struct {
 }
 
 func (s *ServerKeyAPI) KeyRing() *gomatrixserverlib.KeyRing {
-	// Return a real keyring - one that has the real database and real
-	// fetchers.
-	return &s.OurKeyRing
+	// Return a keyring that forces requests to be proxied through the
+	// below functions. That way we can enforce things like validity
+	// and keeping the cache up-to-date.
+	return &gomatrixserverlib.KeyRing{
+		KeyDatabase: s,
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{s},
+	}
 }
 
 func (s *ServerKeyAPI) StoreKeys(
@@ -84,5 +88,5 @@ func (s *ServerKeyAPI) FetchKeys(
 }
 
 func (s *ServerKeyAPI) FetcherName() string {
-	return s.OurKeyRing.KeyDatabase.FetcherName()
+	return fmt.Sprintf("ServerKeyAPI (wrapping %q)", s.OurKeyRing.KeyDatabase.FetcherName())
 }
