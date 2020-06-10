@@ -49,3 +49,6 @@ dendrite.yaml
 
 # Log files
 *.log* 
+
+# Generated code
+internal/embed/fs*.go

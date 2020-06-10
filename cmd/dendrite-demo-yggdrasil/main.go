@@ -26,7 +26,6 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -34,11 +33,14 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/embed"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	_ "github.com/matrix-org/dendrite/internal/embed"
 
 	"github.com/sirupsen/logrus"
 )
@@ -160,10 +162,7 @@ func main() {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
-	// To replace the embedded content, navigate into the `embed` subfolder and:
-	// go run github.com/mjibson/esc -o embed.go -pkg embed /path/to/riot-web/
-	embeddedFS := http.FileServer(embed.FS(false))
-	http.DefaultServeMux.Handle("/", embeddedFS)
+	embed.Embed(*instancePort, "Yggdrasil Demo")
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
