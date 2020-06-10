@@ -88,5 +88,5 @@ func (s *ServerKeyAPI) FetchKeys(
 }
 
 func (s *ServerKeyAPI) FetcherName() string {
-	return s.OurKeyRing.KeyDatabase.FetcherName()
+	return fmt.Sprintf("ServerKeyAPI (wrapping %q)", s.OurKeyRing.KeyDatabase.FetcherName())
 }
