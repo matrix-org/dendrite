@@ -15,11 +15,12 @@
 package queue
 
 import (
+	"crypto/ed25519"
 	"fmt"
 	"sync"
 
-	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -28,10 +29,11 @@ import (
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
-	rsProducer  *producers.RoomserverProducer
+	rsAPI       api.RoomserverInternalAPI
 	origin      gomatrixserverlib.ServerName
 	client      *gomatrixserverlib.FederationClient
 	statistics  *types.Statistics
+	signing     *SigningInfo
 	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
@@ -40,16 +42,26 @@ type OutgoingQueues struct {
 func NewOutgoingQueues(
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
-	rsProducer *producers.RoomserverProducer,
+	rsAPI api.RoomserverInternalAPI,
 	statistics *types.Statistics,
+	signing *SigningInfo,
 ) *OutgoingQueues {
 	return &OutgoingQueues{
-		rsProducer: rsProducer,
+		rsAPI:      rsAPI,
 		origin:     origin,
 		client:     client,
 		statistics: statistics,
+		signing:    signing,
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
+}
+
+// TODO: Move this somewhere useful for other components as we often need to ferry these 3 variables
+// around together
+type SigningInfo struct {
+	ServerName gomatrixserverlib.ServerName
+	KeyID      gomatrixserverlib.KeyID
+	PrivateKey ed25519.PrivateKey
 }
 
 func (oqs *OutgoingQueues) getQueueIfExists(destination gomatrixserverlib.ServerName) *destinationQueue {
@@ -64,7 +76,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	oq := oqs.queues[destination]
 	if oq == nil {
 		oq = &destinationQueue{
-			rsProducer:      oqs.rsProducer,
+			rsAPI:           oqs.rsAPI,
 			origin:          oqs.origin,
 			destination:     destination,
 			client:          oqs.client,
@@ -73,6 +85,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
 			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
 			retryServerCh:   make(chan bool),
+			signing:         oqs.signing,
 		}
 		oqs.queues[destination] = oq
 	}
