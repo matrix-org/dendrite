@@ -24,6 +24,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
+
 	"github.com/libp2p/go-yamux"
 	yggdrasiladmin "github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
@@ -56,8 +58,6 @@ func Setup(instanceName, instancePeer string) (*Node, error) {
 		log:       gologme.New(os.Stdout, "YGG ", log.Flags()),
 		incoming:  make(chan *yamux.Stream),
 	}
-	n.config.AdminListen = fmt.Sprintf("unix://./%s-yggdrasil.sock", instanceName)
-	n.config.MulticastInterfaces = []string{".*"}
 
 	yggfile := fmt.Sprintf("%s-yggdrasil.conf", instanceName)
 	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
@@ -69,6 +69,11 @@ func Setup(instanceName, instancePeer string) (*Node, error) {
 			panic(err)
 		}
 	} else {
+		n.config.AdminListen = fmt.Sprintf("unix://./%s-yggdrasil.sock", instanceName)
+		n.config.MulticastInterfaces = []string{".*"}
+		n.config.EncryptionPrivateKey = hex.EncodeToString(n.EncryptionPrivateKey())
+		n.config.EncryptionPublicKey = hex.EncodeToString(n.EncryptionPublicKey())
+
 		j, err := json.MarshalIndent(n.config, "", "  ")
 		if err != nil {
 			panic(err)
@@ -119,8 +124,23 @@ func Setup(instanceName, instancePeer string) (*Node, error) {
 	return n, nil
 }
 
-func (n *Node) EncryptionPublicKey() string {
-	return n.core.EncryptionPublicKey()
+func (n *Node) DerivedServerName() string {
+	return hex.EncodeToString(n.SigningPublicKey())
+}
+
+func (n *Node) EncryptionPublicKey() []byte {
+	edkey := n.SigningPublicKey()
+	return convert.Ed25519PublicKeyToCurve25519(edkey)
+}
+
+func (n *Node) EncryptionPrivateKey() []byte {
+	edkey := n.SigningPrivateKey()
+	return convert.Ed25519PrivateKeyToCurve25519(edkey)
+}
+
+func (n *Node) SigningPublicKey() ed25519.PublicKey {
+	pubBytes, _ := hex.DecodeString(n.config.SigningPublicKey)
+	return ed25519.PublicKey(pubBytes)
 }
 
 func (n *Node) SigningPrivateKey() ed25519.PrivateKey {
