@@ -40,10 +40,10 @@ func (n *Node) listenFromYgg() {
 			return
 		}
 		var session *yamux.Session
-		if strings.Compare(n.EncryptionPublicKey(), conn.RemoteAddr().String()) < 0 {
-			session, err = yamux.Client(conn, n.yamuxConfig())
-		} else {
+		if strings.Compare(conn.RemoteAddr().String(), n.DerivedServerName()) < 0 {
 			session, err = yamux.Server(conn, n.yamuxConfig())
+		} else {
+			session, err = yamux.Client(conn, n.yamuxConfig())
 		}
 		if err != nil {
 			return
@@ -96,7 +96,7 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 			n.log.Println("n.dialer.DialContext:", err)
 			return nil, err
 		}
-		if strings.Compare(n.EncryptionPublicKey(), address) < 0 {
+		if strings.Compare(address, n.DerivedServerName()) > 0 {
 			session, err = yamux.Client(conn, n.yamuxConfig())
 		} else {
 			session, err = yamux.Server(conn, n.yamuxConfig())

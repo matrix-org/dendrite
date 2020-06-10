@@ -16,7 +16,9 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/tls"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
@@ -25,6 +27,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -35,7 +39,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
@@ -61,7 +64,13 @@ func createFederationClient(
 ) *gomatrixserverlib.FederationClient {
 	yggdialer := func(_, address string) (net.Conn, error) {
 		tokens := strings.Split(address, ":")
-		return n.Dial("curve25519", tokens[0])
+		raw, err := hex.DecodeString(tokens[0])
+		if err != nil {
+			return nil, fmt.Errorf("hex.DecodeString: %w", err)
+		}
+		converted := convert.Ed25519PublicKeyToCurve25519(ed25519.PublicKey(raw))
+		convhex := hex.EncodeToString(converted)
+		return n.Dial("curve25519", convhex)
 	}
 	yggdialerctx := func(ctx context.Context, network, address string) (net.Conn, error) {
 		return yggdialer(network, address)
@@ -102,9 +111,9 @@ func main() {
 
 	cfg := &config.Dendrite{}
 	cfg.SetDefaults()
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.EncryptionPublicKey())
+	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
-	cfg.Matrix.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
+	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Kafka.UseNaffka = true
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
@@ -130,9 +139,7 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	federation := createFederationClient(base, ygg)
 
-	serverKeyAPI := serverkeyapi.NewInternalAPI(
-		base.Cfg, federation, base.Caches,
-	)
+	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
 	rsComponent := roomserver.NewInternalAPI(
@@ -170,7 +177,7 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
-		ServerKeyAPI:        serverKeyAPI,
+		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB: publicRoomsDB,
 	}
@@ -185,7 +192,7 @@ func main() {
 	)
 
 	go func() {
-		logrus.Info("Listening on ", ygg.EncryptionPublicKey())
+		logrus.Info("Listening on ", ygg.DerivedServerName())
 		logrus.Fatal(httpServer.Serve(ygg))
 	}()
 	go func() {
