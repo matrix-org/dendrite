@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -60,7 +59,7 @@ var (
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
-	producer *producers.RoomserverProducer, federation *gomatrixserverlib.FederationClient,
+	federation *gomatrixserverlib.FederationClient,
 	accountDB accounts.Database,
 ) util.JSONResponse {
 	var body invites
@@ -92,8 +91,8 @@ func CreateInvitesFrom3PIDInvites(
 	}
 
 	// Send all the events
-	if _, err := producer.SendEvents(req.Context(), evs, cfg.Matrix.ServerName, nil); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+	if _, err := api.SendEvents(req.Context(), rsAPI, evs, cfg.Matrix.ServerName, nil); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -111,7 +110,6 @@ func ExchangeThirdPartyInvite(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
-	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
 	var builder gomatrixserverlib.EventBuilder
 	if err := json.Unmarshal(request.Content(), &builder); err != nil {
@@ -176,15 +174,15 @@ func ExchangeThirdPartyInvite(
 	}
 
 	// Send the event to the roomserver
-	if _, err = producer.SendEvents(
-		httpReq.Context(),
+	if _, err = api.SendEvents(
+		httpReq.Context(), rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			signedEvent.Event.Headered(verRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,
 		nil,
 	); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 

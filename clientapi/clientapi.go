@@ -48,9 +48,6 @@ func AddPublicRoutes(
 	transactionsCache *transactions.Cache,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(rsAPI)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,
 		Topic:    string(cfg.Kafka.Topics.OutputClientData),
@@ -64,8 +61,8 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		router, cfg, roomserverProducer, rsAPI, asAPI,
+		router, cfg, eduInputAPI, rsAPI, asAPI,
 		accountsDB, deviceDB, federation, *keyRing,
-		syncProducer, eduProducer, transactionsCache, fsAPI,
+		syncProducer, transactionsCache, fsAPI,
 	)
 }

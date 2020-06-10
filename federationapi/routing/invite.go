@@ -20,8 +20,8 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -34,7 +34,7 @@ func Invite(
 	roomID string,
 	eventID string,
 	cfg *config.Dendrite,
-	producer *producers.RoomserverProducer,
+	rsAPI api.RoomserverInternalAPI,
 	keys gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
 	inviteReq := gomatrixserverlib.InviteV2Request{}
@@ -98,8 +98,8 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = producer.SendInvite(
-		httpReq.Context(),
+	if err = api.SendInvite(
+		httpReq.Context(), rsAPI,
 		signedEvent.Headered(inviteReq.RoomVersion()),
 		inviteReq.InviteRoomState(),
 		event.Origin(),

@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -144,7 +143,6 @@ func SendJoin(
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
-	producer *producers.RoomserverProducer,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
@@ -267,8 +265,8 @@ func SendJoin(
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if !alreadyJoined {
-		_, err = producer.SendEvents(
-			httpReq.Context(),
+		_, err = api.SendEvents(
+			httpReq.Context(), rsAPI,
 			[]gomatrixserverlib.HeaderedEvent{
 				event.Headered(stateAndAuthChainResponse.RoomVersion),
 			},
@@ -276,7 +274,7 @@ func SendJoin(
 			nil,
 		)
 		if err != nil {
-			util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+			util.GetLogger(httpReq.Context()).WithError(err).Error("SendEvents failed")
 			return jsonerror.InternalServerError()
 		}
 	}

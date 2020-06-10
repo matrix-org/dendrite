@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -105,7 +104,6 @@ func main() {
 	}
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
@@ -122,7 +120,6 @@ func main() {
 
 		AppserviceAPI:       asAPI,
 		EDUInternalAPI:      eduInputAPI,
-		EDUProducer:         eduProducer,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		ServerKeyAPI:        serverKeyAPI,

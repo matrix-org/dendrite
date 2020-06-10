@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -46,7 +45,6 @@ func SendMembership(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
 	roomID string, membership string, cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
-	producer *producers.RoomserverProducer,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
@@ -71,7 +69,7 @@ func SendMembership(
 	}
 
 	inviteStored, jsonErrResp := checkAndProcessThreepid(
-		req, device, &body, cfg, rsAPI, accountDB, producer,
+		req, device, &body, cfg, rsAPI, accountDB,
 		membership, roomID, evTime,
 	)
 	if jsonErrResp != nil {
@@ -112,8 +110,8 @@ func SendMembership(
 	switch membership {
 	case gomatrixserverlib.Invite:
 		// Invites need to be handled specially
-		err = producer.SendInvite(
-			req.Context(),
+		err = roomserverAPI.SendInvite(
+			req.Context(), rsAPI,
 			event.Headered(verRes.RoomVersion),
 			nil, // ask the roomserver to draw up invite room state for us
 			cfg.Matrix.ServerName,
@@ -130,14 +128,14 @@ func SendMembership(
 		}{roomID}
 		fallthrough
 	default:
-		_, err = producer.SendEvents(
-			req.Context(),
+		_, err = roomserverAPI.SendEvents(
+			req.Context(), rsAPI,
 			[]gomatrixserverlib.HeaderedEvent{event.Headered(verRes.RoomVersion)},
 			cfg.Matrix.ServerName,
 			nil,
 		)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+			util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 			return jsonerror.InternalServerError()
 		}
 	}
@@ -252,13 +250,12 @@ func checkAndProcessThreepid(
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	accountDB accounts.Database,
-	producer *producers.RoomserverProducer,
 	membership, roomID string,
 	evTime time.Time,
 ) (inviteStored bool, errRes *util.JSONResponse) {
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req.Context(), device, body, cfg, rsAPI, accountDB, producer,
+		req.Context(), device, body, cfg, rsAPI, accountDB,
 		membership, roomID, evTime,
 	)
 	if err == threepid.ErrMissingParameter {

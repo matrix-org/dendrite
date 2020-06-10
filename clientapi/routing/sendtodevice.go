@@ -19,7 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/util"
 )
@@ -28,7 +28,7 @@ import (
 // sends the device events to the EDU Server
 func SendToDevice(
 	req *http.Request, device *authtypes.Device,
-	eduProducer *producers.EDUServerProducer,
+	eduAPI api.EDUServerInputAPI,
 	txnCache *transactions.Cache,
 	eventType string, txnID *string,
 ) util.JSONResponse {
@@ -48,8 +48,8 @@ func SendToDevice(
 
 	for userID, byUser := range httpReq.Messages {
 		for deviceID, message := range byUser {
-			if err := eduProducer.SendToDevice(
-				req.Context(), device.UserID, userID, deviceID, eventType, message,
+			if err := api.SendToDevice(
+				req.Context(), eduAPI, device.UserID, userID, deviceID, eventType, message,
 			); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
 				return jsonerror.InternalServerError()

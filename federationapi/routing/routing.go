@@ -21,7 +21,7 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/producers"
+	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -49,8 +49,7 @@ func Setup(
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
-	producer *producers.RoomserverProducer,
-	eduProducer *producers.EDUServerProducer,
+	eduAPI eduserverAPI.EDUServerInputAPI,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
@@ -82,7 +81,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, rsAPI, producer, eduProducer, keys, federation,
+				cfg, rsAPI, eduAPI, keys, federation,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
@@ -92,14 +91,14 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Invite(
 				httpReq, request, vars["roomID"], vars["eventID"],
-				cfg, producer, keys,
+				cfg, rsAPI, keys,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
 	v1fedmux.Handle("/3pid/onbind", internal.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
-			return CreateInvitesFrom3PIDInvites(req, rsAPI, asAPI, cfg, producer, federation, accountDB)
+			return CreateInvitesFrom3PIDInvites(req, rsAPI, asAPI, cfg, federation, accountDB)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
@@ -107,7 +106,7 @@ func Setup(
 		"exchange_third_party_invite", cfg.Matrix.ServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return ExchangeThirdPartyInvite(
-				httpReq, request, vars["roomID"], rsAPI, cfg, federation, producer,
+				httpReq, request, vars["roomID"], rsAPI, cfg, federation,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
@@ -206,7 +205,7 @@ func Setup(
 			roomID := vars["roomID"]
 			eventID := vars["eventID"]
 			res := SendJoin(
-				httpReq, request, cfg, rsAPI, producer, keys, roomID, eventID,
+				httpReq, request, cfg, rsAPI, keys, roomID, eventID,
 			)
 			return util.JSONResponse{
 				Headers: res.Headers,
@@ -224,7 +223,7 @@ func Setup(
 			roomID := vars["roomID"]
 			eventID := vars["eventID"]
 			return SendJoin(
-				httpReq, request, cfg, rsAPI, producer, keys, roomID, eventID,
+				httpReq, request, cfg, rsAPI, keys, roomID, eventID,
 			)
 		},
 	)).Methods(http.MethodPut)
@@ -246,7 +245,7 @@ func Setup(
 			roomID := vars["roomID"]
 			eventID := vars["eventID"]
 			return SendLeave(
-				httpReq, request, cfg, producer, keys, roomID, eventID,
+				httpReq, request, cfg, rsAPI, keys, roomID, eventID,
 			)
 		},
 	)).Methods(http.MethodPut)
