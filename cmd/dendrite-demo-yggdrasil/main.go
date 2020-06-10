@@ -110,7 +110,6 @@ func main() {
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
 	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Kafka.Topics.UserUpdates = "userUpdates"
 	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
@@ -135,42 +134,23 @@ func main() {
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
 		base.Cfg, federation, base.Caches,
 	)
-	if base.UseHTTPAPIs {
-		serverkeyapi.AddInternalRoutes(base.InternalAPIMux, serverKeyAPI, base.Caches)
-		serverKeyAPI = base.ServerKeyAPIClient()
-	}
 	keyRing := serverKeyAPI.KeyRing()
 
 	rsComponent := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
 	rsAPI := rsComponent
-	if base.UseHTTPAPIs {
-		roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
-		rsAPI = base.RoomserverHTTPClient()
-	}
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), deviceDB,
 	)
-	if base.UseHTTPAPIs {
-		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
-		eduInputAPI = base.EDUServerClient()
-	}
 
 	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
-	if base.UseHTTPAPIs {
-		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
-		asAPI = base.AppserviceHTTPClient()
-	}
 
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, keyRing,
 	)
-	if base.UseHTTPAPIs {
-		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
-		fsAPI = base.FederationSenderHTTPClient()
-	}
+
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
 	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
