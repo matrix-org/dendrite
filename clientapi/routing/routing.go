@@ -55,7 +55,6 @@ func Setup(
 	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.KeyRing,
-	userUpdateProducer *producers.UserUpdateProducer,
 	syncProducer *producers.SyncAPIProducer,
 	eduProducer *producers.EDUServerProducer,
 	transactionsCache *transactions.Cache,
@@ -387,7 +386,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetAvatarURL(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, rsAPI)
+			return SetAvatarURL(req, accountDB, device, vars["userID"], cfg, producer, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -409,7 +408,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetDisplayName(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, rsAPI)
+			return SetDisplayName(req, accountDB, device, vars["userID"], cfg, producer, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows

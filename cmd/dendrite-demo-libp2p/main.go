@@ -109,7 +109,6 @@ func main() {
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
 	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Kafka.Topics.UserUpdates = "userUpdates"
 	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))

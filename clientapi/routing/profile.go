@@ -94,7 +94,7 @@ func GetAvatarURL(
 // nolint:gocyclo
 func SetAvatarURL(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
-	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
+	userID string, cfg *config.Dendrite,
 	rsProducer *producers.RoomserverProducer, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -103,8 +103,6 @@ func SetAvatarURL(
 			JSON: jsonerror.Forbidden("userID does not match the current user"),
 		}
 	}
-
-	changedKey := "avatar_url"
 
 	var r internal.AvatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
@@ -174,11 +172,6 @@ func SetAvatarURL(
 		return jsonerror.InternalServerError()
 	}
 
-	if err := producer.SendUpdate(userID, changedKey, oldProfile.AvatarURL, r.AvatarURL); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendUpdate failed")
-		return jsonerror.InternalServerError()
-	}
-
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
@@ -216,7 +209,7 @@ func GetDisplayName(
 // nolint:gocyclo
 func SetDisplayName(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
-	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
+	userID string, cfg *config.Dendrite,
 	rsProducer *producers.RoomserverProducer, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -225,8 +218,6 @@ func SetDisplayName(
 			JSON: jsonerror.Forbidden("userID does not match the current user"),
 		}
 	}
-
-	changedKey := "displayname"
 
 	var r internal.DisplayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
@@ -293,11 +284,6 @@ func SetDisplayName(
 
 	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsProducer.SendEvents failed")
-		return jsonerror.InternalServerError()
-	}
-
-	if err := producer.SendUpdate(userID, changedKey, oldProfile.DisplayName, r.DisplayName); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendUpdate failed")
 		return jsonerror.InternalServerError()
 	}
 
