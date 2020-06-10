@@ -7,6 +7,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/internal/perform"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -175,10 +176,11 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// If we successfully performed a send_join above then the other
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
-	if err = r.producer.SendEventWithState(
-		ctx,
-		respSendJoin.ToRespState(),
-		event.Headered(respMakeJoin.RoomVersion),
+	respState := respSendJoin.ToRespState()
+	if err = roomserverAPI.SendEventWithState(
+		ctx, r.rsAPI,
+		&respState,
+		event.Headered(respMakeJoin.RoomVersion), nil,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}

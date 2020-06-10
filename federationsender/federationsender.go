@@ -20,7 +20,6 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/internal"
 	"github.com/matrix-org/dendrite/federationsender/inthttp"
-	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
@@ -49,13 +48,13 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
-	roomserverProducer := producers.NewRoomserverProducer(
-		rsAPI, base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey,
-	)
-
 	statistics := &types.Statistics{}
 	queues := queue.NewOutgoingQueues(
-		base.Cfg.Matrix.ServerName, federation, roomserverProducer, statistics,
+		base.Cfg.Matrix.ServerName, federation, rsAPI, statistics, &queue.SigningInfo{
+			KeyID:      base.Cfg.Matrix.KeyID,
+			PrivateKey: base.Cfg.Matrix.PrivateKey,
+			ServerName: base.Cfg.Matrix.ServerName,
+		},
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
@@ -73,5 +72,5 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	return internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, roomserverProducer, federation, keyRing, statistics, queues)
+	return internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, rsAPI, federation, keyRing, statistics, queues)
 }
