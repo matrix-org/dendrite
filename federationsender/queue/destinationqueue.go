@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationsender/producers"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -34,7 +34,8 @@ import (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
-	rsProducer         *producers.RoomserverProducer           // roomserver producer
+	signing            *SigningInfo
+	rsAPI              api.RoomserverInternalAPI
 	client             *gomatrixserverlib.FederationClient     // federation client
 	origin             gomatrixserverlib.ServerName            // origin of requests
 	destination        gomatrixserverlib.ServerName            // destination of requests
@@ -370,11 +371,9 @@ func (oq *destinationQueue) nextInvites(
 			return done, err
 		}
 
-		if _, err = oq.rsProducer.SendInviteResponse(
-			context.TODO(),
-			inviteRes,
-			roomVersion,
-		); err != nil {
+		invEv := inviteRes.Event.Sign(string(oq.signing.ServerName), oq.signing.KeyID, oq.signing.PrivateKey).Headered(roomVersion)
+		_, err = api.SendEvents(context.TODO(), oq.rsAPI, []gomatrixserverlib.HeaderedEvent{invEv}, oq.signing.ServerName, nil)
+		if err != nil {
 			log.WithFields(log.Fields{
 				"event_id":    ev.EventID(),
 				"state_key":   ev.StateKey(),
