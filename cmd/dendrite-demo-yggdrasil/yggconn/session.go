@@ -40,7 +40,7 @@ func (n *Node) listenFromYgg() {
 			return
 		}
 		var session *yamux.Session
-		if strings.Compare(n.DerivedServerName(), conn.RemoteAddr().String()) > 0 {
+		if strings.Compare(conn.RemoteAddr().String(), n.DerivedServerName()) < 0 {
 			session, err = yamux.Server(conn, n.yamuxConfig())
 		} else {
 			session, err = yamux.Client(conn, n.yamuxConfig())
