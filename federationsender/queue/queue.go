@@ -85,6 +85,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
 			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
 			retryServerCh:   make(chan bool),
+			signing:         oqs.signing,
 		}
 		oqs.queues[destination] = oq
 	}
