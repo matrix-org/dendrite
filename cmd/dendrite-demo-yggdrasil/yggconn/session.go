@@ -25,8 +25,8 @@ import (
 
 func (n *Node) yamuxConfig() *yamux.Config {
 	cfg := yamux.DefaultConfig()
-	cfg.EnableKeepAlive = true
-	cfg.KeepAliveInterval = time.Second * 30
+	cfg.EnableKeepAlive = false
+	cfg.ConnectionWriteTimeout = time.Second * 5
 	cfg.MaxMessageSize = 65535
 	cfg.ReadBufSize = 655350
 	return cfg
@@ -40,6 +40,8 @@ func (n *Node) listenFromYgg() {
 			return
 		}
 		var session *yamux.Session
+		// If the remote address is lower than ours then we'll be the
+		// server. Otherwse we'll be the client.
 		if strings.Compare(conn.RemoteAddr().String(), n.DerivedServerName()) < 0 {
 			session, err = yamux.Server(conn, n.yamuxConfig())
 		} else {
@@ -55,6 +57,11 @@ func (n *Node) listenFromYgg() {
 func (n *Node) listenFromYggConn(session *yamux.Session) {
 	n.sessions.Store(session.RemoteAddr().String(), session)
 	defer n.sessions.Delete(session.RemoteAddr())
+	defer func() {
+		if err := session.Close(); err != nil {
+			n.log.Println("session.Close:", err)
+		}
+	}()
 
 	for {
 		st, err := session.AcceptStream()
@@ -90,16 +97,18 @@ func (n *Node) Dial(network, address string) (net.Conn, error) {
 func (n *Node) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	s, ok1 := n.sessions.Load(address)
 	session, ok2 := s.(*yamux.Session)
-	if !ok1 || !ok2 {
+	if !ok1 || !ok2 || (ok1 && ok2 && session.IsClosed()) {
 		conn, err := n.dialer.DialContext(ctx, network, address)
 		if err != nil {
 			n.log.Println("n.dialer.DialContext:", err)
 			return nil, err
 		}
-		if strings.Compare(address, n.DerivedServerName()) > 0 {
-			session, err = yamux.Client(conn, n.yamuxConfig())
-		} else {
+		// If the remote address is lower than ours then we will be the
+		// server. Otherwise we'll be the client.
+		if strings.Compare(conn.RemoteAddr().String(), n.DerivedServerName()) < 0 {
 			session, err = yamux.Server(conn, n.yamuxConfig())
+		} else {
+			session, err = yamux.Client(conn, n.yamuxConfig())
 		}
 		if err != nil {
 			return nil, err
