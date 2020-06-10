@@ -23,7 +23,6 @@ import (
 	"syscall/js"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -209,7 +208,6 @@ func main() {
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI)
 
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
@@ -226,7 +224,6 @@ func main() {
 
 		AppserviceAPI:       asQuery,
 		EDUInternalAPI:      eduInputAPI,
-		EDUProducer:         eduProducer,
 		FederationSenderAPI: fedSenderAPI,
 		RoomserverAPI:       rsAPI,
 		//ServerKeyAPI:        serverKeyAPI,

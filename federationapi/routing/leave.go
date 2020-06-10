@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -113,13 +112,13 @@ func SendLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
-	producer *producers.RoomserverProducer,
+	rsAPI api.RoomserverInternalAPI,
 	keys gomatrixserverlib.KeyRing,
 	roomID, eventID string,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := producer.RsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -194,8 +193,8 @@ func SendLeave(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(
-		httpReq.Context(),
+	_, err = api.SendEvents(
+		httpReq.Context(), rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			event.Headered(verRes.RoomVersion),
 		},

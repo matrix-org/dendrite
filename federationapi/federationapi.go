@@ -19,12 +19,11 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
-	// TODO: Are we really wanting to pull in the producer from clientapi
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -40,13 +39,12 @@ func AddPublicRoutes(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
-	eduProducer *producers.EDUServerProducer,
+	eduAPI eduserverAPI.EDUServerInputAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(rsAPI)
 
 	routing.Setup(
-		router, cfg, rsAPI, asAPI, roomserverProducer,
-		eduProducer, federationSenderAPI, *keyRing,
+		router, cfg, rsAPI, asAPI,
+		eduAPI, federationSenderAPI, *keyRing,
 		federation, accountsDB, deviceDB,
 	)
 }

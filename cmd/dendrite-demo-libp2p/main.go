@@ -29,7 +29,6 @@ import (
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-libp2p/storage"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -149,7 +148,6 @@ func main() {
 		&base.Base, federation, rsAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub, cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
@@ -166,7 +164,6 @@ func main() {
 
 		AppserviceAPI:       asAPI,
 		EDUInternalAPI:      eduInputAPI,
-		EDUProducer:         eduProducer,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		ServerKeyAPI:        serverKeyAPI,

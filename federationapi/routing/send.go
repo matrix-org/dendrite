@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
+	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -36,20 +36,18 @@ func Send(
 	txnID gomatrixserverlib.TransactionID,
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
-	producer *producers.RoomserverProducer,
-	eduProducer *producers.EDUServerProducer,
+	eduAPI eduserverAPI.EDUServerInputAPI,
 	keys gomatrixserverlib.KeyRing,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	t := txnReq{
-		context:     httpReq.Context(),
-		rsAPI:       rsAPI,
-		producer:    producer,
-		eduProducer: eduProducer,
-		keys:        keys,
-		federation:  federation,
-		haveEvents:  make(map[string]*gomatrixserverlib.HeaderedEvent),
-		newEvents:   make(map[string]bool),
+		context:    httpReq.Context(),
+		rsAPI:      rsAPI,
+		eduAPI:     eduAPI,
+		keys:       keys,
+		federation: federation,
+		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
+		newEvents:  make(map[string]bool),
 	}
 
 	var txnEvents struct {
@@ -91,12 +89,11 @@ func Send(
 
 type txnReq struct {
 	gomatrixserverlib.Transaction
-	context     context.Context
-	rsAPI       api.RoomserverInternalAPI
-	producer    *producers.RoomserverProducer
-	eduProducer *producers.EDUServerProducer
-	keys        gomatrixserverlib.JSONVerifier
-	federation  txnFederationClient
+	context    context.Context
+	rsAPI      api.RoomserverInternalAPI
+	eduAPI     eduserverAPI.EDUServerInputAPI
+	keys       gomatrixserverlib.JSONVerifier
+	federation txnFederationClient
 	// local cache of events for auth checks, etc - this may include events
 	// which the roomserver is unaware of.
 	haveEvents map[string]*gomatrixserverlib.HeaderedEvent
@@ -262,7 +259,7 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 				util.GetLogger(t.context).WithError(err).Error("Failed to unmarshal typing event")
 				continue
 			}
-			if err := t.eduProducer.SendTyping(t.context, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
+			if err := eduserverAPI.SendTyping(t.context, t.eduAPI, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
 				util.GetLogger(t.context).WithError(err).Error("Failed to send typing event to edu server")
 			}
 		case gomatrixserverlib.MDirectToDevice:
@@ -275,7 +272,7 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 			for userID, byUser := range directPayload.Messages {
 				for deviceID, message := range byUser {
 					// TODO: check that the user and the device actually exist here
-					if err := t.eduProducer.SendToDevice(t.context, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
+					if err := eduserverAPI.SendToDevice(t.context, t.eduAPI, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
 						util.GetLogger(t.context).WithError(err).WithFields(logrus.Fields{
 							"sender":    directPayload.Sender,
 							"user_id":   userID,
@@ -325,8 +322,8 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event, isInboundTxn bool) erro
 	}
 
 	// pass the event to the roomserver
-	_, err := t.producer.SendEvents(
-		t.context,
+	_, err := api.SendEvents(
+		t.context, t.rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			e.Headered(stateResp.RoomVersion),
 		},
@@ -408,7 +405,7 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 
 	// pass the event along with the state to the roomserver using a background context so we don't
 	// needlessly expire
-	return t.producer.SendEventWithState(context.Background(), resolvedState, e.Headered(roomVersion), t.haveEventIDs())
+	return api.SendEventWithState(context.Background(), t.rsAPI, resolvedState, e.Headered(roomVersion), t.haveEventIDs())
 }
 
 // lookupStateAfterEvent returns the room state after `eventID`, which is the state before eventID with the state of `eventID` (if it's a state event)

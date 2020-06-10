@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -339,14 +338,13 @@ func (c *txnFedClient) LookupMissingEvents(ctx context.Context, s gomatrixserver
 
 func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
 	t := &txnReq{
-		context:     context.Background(),
-		rsAPI:       rsAPI,
-		producer:    producers.NewRoomserverProducer(rsAPI),
-		eduProducer: producers.NewEDUServerProducer(&testEDUProducer{}),
-		keys:        &testNopJSONVerifier{},
-		federation:  fedClient,
-		haveEvents:  make(map[string]*gomatrixserverlib.HeaderedEvent),
-		newEvents:   make(map[string]bool),
+		context:    context.Background(),
+		rsAPI:      rsAPI,
+		eduAPI:     &testEDUProducer{},
+		keys:       &testNopJSONVerifier{},
+		federation: fedClient,
+		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
+		newEvents:  make(map[string]bool),
 	}
 	t.PDUs = pdus
 	t.Origin = testOrigin

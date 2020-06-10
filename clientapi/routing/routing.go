@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -48,7 +49,7 @@ const pathPrefixUnstable = "/client/unstable"
 // nolint: gocyclo
 func Setup(
 	publicAPIMux *mux.Router, cfg *config.Dendrite,
-	producer *producers.RoomserverProducer,
+	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	accountDB accounts.Database,
@@ -56,7 +57,6 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.KeyRing,
 	syncProducer *producers.SyncAPIProducer,
-	eduProducer *producers.EDUServerProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
 ) {
@@ -89,7 +89,7 @@ func Setup(
 
 	r0mux.Handle("/createRoom",
 		internal.MakeAuthAPI("createRoom", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return CreateRoom(req, device, cfg, producer, accountDB, rsAPI, asAPI)
+			return CreateRoom(req, device, cfg, accountDB, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/join/{roomIDOrAlias}",
@@ -125,7 +125,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, rsAPI, asAPI, producer)
+			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
@@ -134,7 +134,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, rsAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
@@ -145,7 +145,7 @@ func Setup(
 			}
 			txnID := vars["txnID"]
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID,
-				nil, cfg, rsAPI, producer, transactionsCache)
+				nil, cfg, rsAPI, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/event/{eventID}",
@@ -194,7 +194,7 @@ func Setup(
 			if strings.HasSuffix(eventType, "/") {
 				eventType = eventType[:len(eventType)-1]
 			}
-			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -205,7 +205,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			stateKey := vars["stateKey"]
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -269,7 +269,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduProducer)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -280,7 +280,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
-			return SendToDevice(req, device, eduProducer, transactionsCache, vars["eventType"], &txnID)
+			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -294,7 +294,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
-			return SendToDevice(req, device, eduProducer, transactionsCache, vars["eventType"], &txnID)
+			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -386,7 +386,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetAvatarURL(req, accountDB, device, vars["userID"], cfg, producer, rsAPI)
+			return SetAvatarURL(req, accountDB, device, vars["userID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -408,7 +408,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetDisplayName(req, accountDB, device, vars["userID"], cfg, producer, rsAPI)
+			return SetDisplayName(req, accountDB, device, vars["userID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows

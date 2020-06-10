@@ -26,7 +26,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -88,7 +87,7 @@ func CheckAndProcessInvite(
 	ctx context.Context,
 	device *authtypes.Device, body *MembershipRequest, cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI, db accounts.Database,
-	producer *producers.RoomserverProducer, membership string, roomID string,
+	membership string, roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
 	if membership != gomatrixserverlib.Invite || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
@@ -112,7 +111,7 @@ func CheckAndProcessInvite(
 		// "m.room.third_party_invite" have to be emitted from the data in
 		// storeInviteRes.
 		err = emit3PIDInviteEvent(
-			ctx, body, storeInviteRes, device, roomID, cfg, rsAPI, producer, evTime,
+			ctx, body, storeInviteRes, device, roomID, cfg, rsAPI, evTime,
 		)
 		inviteStoredOnIDServer = err == nil
 
@@ -331,7 +330,7 @@ func emit3PIDInviteEvent(
 	ctx context.Context,
 	body *MembershipRequest, res *idServerStoreInviteResponse,
 	device *authtypes.Device, roomID string, cfg *config.Dendrite,
-	rsAPI api.RoomserverInternalAPI, producer *producers.RoomserverProducer,
+	rsAPI api.RoomserverInternalAPI,
 	evTime time.Time,
 ) error {
 	builder := &gomatrixserverlib.EventBuilder{
@@ -359,8 +358,8 @@ func emit3PIDInviteEvent(
 		return err
 	}
 
-	_, err = producer.SendEvents(
-		ctx,
+	_, err = api.SendEvents(
+		ctx, rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			(*event).Headered(queryRes.RoomVersion),
 		},

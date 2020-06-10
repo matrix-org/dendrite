@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/appservice/inthttp"
 	"github.com/matrix-org/dendrite/appservice/query"
-	"github.com/matrix-org/dendrite/appservice/routing"
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/appservice/workers"
@@ -35,21 +34,9 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
-
-// AddPublicRoutes registers HTTP handlers for CS API calls
-func AddPublicRoutes(router *mux.Router, cfg *config.Dendrite, rsAPI roomserverAPI.RoomserverInternalAPI,
-	accountsDB accounts.Database, federation *gomatrixserverlib.FederationClient, txnCache *transactions.Cache) {
-
-	routing.Setup(
-		router, cfg, rsAPI,
-		accountsDB, federation, txnCache,
-	)
-}
 
 // AddInternalRoutes registers HTTP handlers for internal API calls
 func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQueryAPI) {
