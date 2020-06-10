@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -137,21 +136,21 @@ type fledglingEvent struct {
 // CreateRoom implements /createRoom
 func CreateRoom(
 	req *http.Request, device *authtypes.Device,
-	cfg *config.Dendrite, producer *producers.RoomserverProducer,
+	cfg *config.Dendrite,
 	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	return createRoom(req, device, cfg, roomID, producer, accountDB, rsAPI, asAPI)
+	return createRoom(req, device, cfg, roomID, accountDB, rsAPI, asAPI)
 }
 
 // createRoom implements /createRoom
 // nolint: gocyclo
 func createRoom(
 	req *http.Request, device *authtypes.Device,
-	cfg *config.Dendrite, roomID string, producer *producers.RoomserverProducer,
+	cfg *config.Dendrite, roomID string,
 	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -344,9 +343,9 @@ func createRoom(
 	}
 
 	// send events to the room server
-	_, err = producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName, nil)
+	_, err = roomserverAPI.SendEvents(req.Context(), rsAPI, builtEvents, cfg.Matrix.ServerName, nil)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -404,14 +403,14 @@ func createRoom(
 			}
 		}
 		// Send the invite event to the roomserver.
-		if err = producer.SendInvite(
-			req.Context(),
+		if err = roomserverAPI.SendInvite(
+			req.Context(), rsAPI,
 			inviteEvent.Headered(roomVersion),
 			strippedState,         // invite room state
 			cfg.Matrix.ServerName, // send as server
 			nil,                   // transaction ID
 		); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+			util.GetLogger(req.Context()).WithError(err).Error("SendInvite failed")
 			return jsonerror.InternalServerError()
 		}
 	}

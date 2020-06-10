@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -94,8 +93,7 @@ func GetAvatarURL(
 // nolint:gocyclo
 func SetAvatarURL(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
-	userID string, cfg *config.Dendrite,
-	rsProducer *producers.RoomserverProducer, rsAPI api.RoomserverInternalAPI,
+	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -167,8 +165,8 @@ func SetAvatarURL(
 		return jsonerror.InternalServerError()
 	}
 
-	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("rsProducer.SendEvents failed")
+	if _, err := api.SendEvents(req.Context(), rsAPI, events, cfg.Matrix.ServerName, nil); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -209,8 +207,7 @@ func GetDisplayName(
 // nolint:gocyclo
 func SetDisplayName(
 	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
-	userID string, cfg *config.Dendrite,
-	rsProducer *producers.RoomserverProducer, rsAPI api.RoomserverInternalAPI,
+	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -282,8 +279,8 @@ func SetDisplayName(
 		return jsonerror.InternalServerError()
 	}
 
-	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("rsProducer.SendEvents failed")
+	if _, err := api.SendEvents(req.Context(), rsAPI, events, cfg.Matrix.ServerName, nil); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 

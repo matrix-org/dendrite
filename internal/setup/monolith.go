@@ -7,7 +7,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -41,8 +40,6 @@ type Monolith struct {
 	RoomserverAPI       roomserverAPI.RoomserverInternalAPI
 	ServerKeyAPI        serverKeyAPI.ServerKeyInternalAPI
 
-	// TODO: remove, this isn't even a producer
-	EDUProducer *producers.EDUServerProducer
 	// TODO: can we remove this? It's weird that we are required the database
 	// yet every other component can do that on its own. libp2p-demo uses a custom
 	// database though annoyingly.
@@ -65,7 +62,7 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 	federationapi.AddPublicRoutes(
 		publicMux, m.Config, m.AccountDB, m.DeviceDB, m.FedClient,
 		m.KeyRing, m.RoomserverAPI, m.AppserviceAPI, m.FederationSenderAPI,
-		m.EDUProducer,
+		m.EDUInternalAPI,
 	)
 	mediaapi.AddPublicRoutes(publicMux, m.Config, m.DeviceDB)
 	publicroomsapi.AddPublicRoutes(

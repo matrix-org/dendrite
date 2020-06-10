@@ -1,3 +1,5 @@
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -10,35 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package producers
+package api
 
 import (
 	"context"
 	"encoding/json"
 	"time"
 
-	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// EDUServerProducer produces events for the EDU server to consume
-type EDUServerProducer struct {
-	InputAPI api.EDUServerInputAPI
-}
-
-// NewEDUServerProducer creates a new EDUServerProducer
-func NewEDUServerProducer(inputAPI api.EDUServerInputAPI) *EDUServerProducer {
-	return &EDUServerProducer{
-		InputAPI: inputAPI,
-	}
-}
-
 // SendTyping sends a typing event to EDU server
-func (p *EDUServerProducer) SendTyping(
-	ctx context.Context, userID, roomID string,
+func SendTyping(
+	ctx context.Context, eduAPI EDUServerInputAPI, userID, roomID string,
 	typing bool, timeoutMS int64,
 ) error {
-	requestData := api.InputTypingEvent{
+	requestData := InputTypingEvent{
 		UserID:         userID,
 		RoomID:         roomID,
 		Typing:         typing,
@@ -46,24 +35,24 @@ func (p *EDUServerProducer) SendTyping(
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
 
-	var response api.InputTypingEventResponse
-	err := p.InputAPI.InputTypingEvent(
-		ctx, &api.InputTypingEventRequest{InputTypingEvent: requestData}, &response,
+	var response InputTypingEventResponse
+	err := eduAPI.InputTypingEvent(
+		ctx, &InputTypingEventRequest{InputTypingEvent: requestData}, &response,
 	)
 
 	return err
 }
 
 // SendToDevice sends a typing event to EDU server
-func (p *EDUServerProducer) SendToDevice(
-	ctx context.Context, sender, userID, deviceID, eventType string,
+func SendToDevice(
+	ctx context.Context, eduAPI EDUServerInputAPI, sender, userID, deviceID, eventType string,
 	message interface{},
 ) error {
 	js, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
-	requestData := api.InputSendToDeviceEvent{
+	requestData := InputSendToDeviceEvent{
 		UserID:   userID,
 		DeviceID: deviceID,
 		SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
@@ -72,9 +61,9 @@ func (p *EDUServerProducer) SendToDevice(
 			Content: js,
 		},
 	}
-	request := api.InputSendToDeviceEventRequest{
+	request := InputSendToDeviceEventRequest{
 		InputSendToDeviceEvent: requestData,
 	}
-	response := api.InputSendToDeviceEventResponse{}
-	return p.InputAPI.InputSendToDeviceEvent(ctx, &request, &response)
+	response := InputSendToDeviceEventResponse{}
+	return eduAPI.InputSendToDeviceEvent(ctx, &request, &response)
 }

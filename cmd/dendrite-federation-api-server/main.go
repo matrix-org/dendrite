@@ -15,7 +15,6 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/basecomponent"
 )
@@ -33,12 +32,10 @@ func main() {
 	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
 	asAPI := base.AppserviceHTTPClient()
-	// TODO: this isn't a producer
-	eduProducer := producers.NewEDUServerProducer(base.EDUServerClient())
 
 	federationapi.AddPublicRoutes(
 		base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, keyRing,
-		rsAPI, asAPI, fsAPI, eduProducer,
+		rsAPI, asAPI, fsAPI, base.EDUServerClient(),
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

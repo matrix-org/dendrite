@@ -20,7 +20,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
@@ -46,7 +45,6 @@ func SendEvent(
 	roomID, eventType string, txnID, stateKey *string,
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
-	producer *producers.RoomserverProducer,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
@@ -80,8 +78,8 @@ func SendEvent(
 
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
-	eventID, err := producer.SendEvents(
-		req.Context(),
+	eventID, err := api.SendEvents(
+		req.Context(), rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			e.Headered(verRes.RoomVersion),
 		},
@@ -89,7 +87,7 @@ func SendEvent(
 		txnAndSessionID,
 	)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
