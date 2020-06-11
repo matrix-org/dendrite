@@ -84,63 +84,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	ev := output.NewRoomEvent.Event
-	log.WithFields(log.Fields{
-		"event_id": ev.EventID(),
-		"room_id":  ev.RoomID(),
-		"type":     ev.Type(),
-	}).Info("received event from roomserver")
-
-	events, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev.Event)
-	if err != nil {
-		return err
-	}
-
-	return s.db.UpdateMemberships(context.TODO(), events, output.NewRoomEvent.RemovesStateEventIDs)
-}
-
-// lookupStateEvents looks up the state events that are added by a new event.
-func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.Event,
-) ([]gomatrixserverlib.Event, error) {
-	// Fast path if there aren't any new state events.
-	if len(addsStateEventIDs) == 0 {
-		// If the event is a membership update (e.g. for a profile update), it won't
-		// show up in AddsStateEventIDs, so we need to add it manually
-		if event.Type() == "m.room.member" {
-			return []gomatrixserverlib.Event{event}, nil
-		}
-		return nil, nil
-	}
-
-	// Fast path if the only state event added is the event itself.
-	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.Event{event}, nil
-	}
-
-	result := []gomatrixserverlib.Event{}
-	missing := []string{}
-	for _, id := range addsStateEventIDs {
-		// Append the current event in the results if its ID is in the events list
-		if id == event.EventID() {
-			result = append(result, event)
-		} else {
-			// If the event isn't the current one, add it to the list of events
-			// to retrieve from the roomserver
-			missing = append(missing, id)
-		}
-	}
-
-	// Request the missing events from the roomserver
-	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
-	var eventResp api.QueryEventsByIDResponse
-	if err := s.rsAPI.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
-		return nil, err
-	}
-
-	for _, headeredEvent := range eventResp.Events {
-		result = append(result, headeredEvent.Event)
-	}
-
-	return result, nil
+	return s.db.UpdateMemberships(
+		context.TODO(),
+		gomatrixserverlib.UnwrapEventHeaders(output.NewRoomEvent.AddsState()),
+		output.NewRoomEvent.RemovesStateEventIDs,
+	)
 }

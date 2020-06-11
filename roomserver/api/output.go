@@ -63,6 +63,13 @@ type OutputNewRoomEvent struct {
 	// Together with RemovesStateEventIDs this allows the receiver to keep an up to date
 	// view of the current state of the room.
 	AddsStateEventIDs []string `json:"adds_state_event_ids"`
+	// All extra newly added state events. This is only set if there are *extra* events
+	// other than `Event`. This can happen when forks get merged because state resolution
+	// may decide a bunch of state events on one branch are now valid, so they will be
+	// present in this list. This is useful when trying to maintain the current state of a room
+	// as to do so you need to include both these events and `Event`.
+	AddStateEvents []gomatrixserverlib.HeaderedEvent `json:"adds_state_events"`
+
 	// The state event IDs that were removed from the state of the room by this event.
 	RemovesStateEventIDs []string `json:"removes_state_event_ids"`
 	// The ID of the event that was output before this event.
@@ -110,6 +117,26 @@ type OutputNewRoomEvent struct {
 	// The transaction ID of the send request if sent by a local user and one
 	// was specified
 	TransactionID *TransactionID `json:"transaction_id"`
+}
+
+// AddsState returns all added state events from this event.
+//
+// This function is needed because `AddStateEvents` will not include a copy of
+// the original event to save space, so you cannot use that slice alone.
+// Instead, use this function which will add the original event if it is present
+// in `AddsStateEventIDs`.
+func (ore *OutputNewRoomEvent) AddsState() []gomatrixserverlib.HeaderedEvent {
+	includeOutputEvent := false
+	for _, id := range ore.AddsStateEventIDs {
+		if id == ore.Event.EventID() {
+			includeOutputEvent = true
+			break
+		}
+	}
+	if !includeOutputEvent {
+		return ore.AddStateEvents
+	}
+	return append(ore.AddStateEvents, ore.Event)
 }
 
 // An OutputNewInviteEvent is written whenever an invite becomes active.

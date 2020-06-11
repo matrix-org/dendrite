@@ -19,6 +19,7 @@ package internal
 import (
 	"bytes"
 	"context"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -310,24 +311,11 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		TransactionID:   u.transactionID,
 	}
 
-	var stateEventNIDs []types.EventNID
-	for _, entry := range u.added {
-		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
-	}
-	for _, entry := range u.removed {
-		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
-	}
-	for _, entry := range u.stateBeforeEventRemoves {
-		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
-	}
-	for _, entry := range u.stateBeforeEventAdds {
-		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
-	}
-	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
-	eventIDMap, err := u.api.DB.EventIDs(u.ctx, stateEventNIDs)
+	eventIDMap, err := u.stateEventMap()
 	if err != nil {
 		return nil, err
 	}
+
 	for _, entry := range u.added {
 		ore.AddsStateEventIDs = append(ore.AddsStateEventIDs, eventIDMap[entry.EventNID])
 	}
@@ -342,10 +330,58 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 	ore.SendAsServer = u.sendAsServer
 
+	// include extra state events if they were added as nearly every downstream component will care about it
+	// and we'd rather not have them all hit QueryEventsByID at the same time!
+	if len(ore.AddsStateEventIDs) > 0 {
+		ore.AddStateEvents, err = u.extraEventsForIDs(roomVersion, ore.AddsStateEventIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load add_state_events from db: %w", err)
+		}
+	}
+
 	return &api.OutputEvent{
 		Type:         api.OutputTypeNewRoomEvent,
 		NewRoomEvent: &ore,
 	}, nil
+}
+
+// extraEventsForIDs returns the full events for the event IDs given, but does not include the current event being
+// updated.
+func (u *latestEventsUpdater) extraEventsForIDs(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.HeaderedEvent, error) {
+	var extraEventIDs []string
+	for _, e := range eventIDs {
+		if e == u.event.EventID() {
+			continue
+		}
+		extraEventIDs = append(extraEventIDs, e)
+	}
+	if len(extraEventIDs) == 0 {
+		return nil, nil
+	}
+	extraEvents, err := u.api.DB.EventsFromIDs(u.ctx, extraEventIDs)
+	if err != nil {
+		return nil, err
+	}
+	var h []gomatrixserverlib.HeaderedEvent
+	for _, e := range extraEvents {
+		h = append(h, e.Headered(roomVersion))
+	}
+	return h, nil
+}
+
+// retrieve an event nid -> event ID map for all events that need updating
+func (u *latestEventsUpdater) stateEventMap() (map[types.EventNID]string, error) {
+	var stateEventNIDs []types.EventNID
+	var allStateEntries []types.StateEntry
+	allStateEntries = append(allStateEntries, u.added...)
+	allStateEntries = append(allStateEntries, u.removed...)
+	allStateEntries = append(allStateEntries, u.stateBeforeEventRemoves...)
+	allStateEntries = append(allStateEntries, u.stateBeforeEventAdds...)
+	for _, entry := range allStateEntries {
+		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
+	}
+	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
+	return u.api.DB.EventIDs(u.ctx, stateEventNIDs)
 }
 
 type eventNIDSorter []types.EventNID

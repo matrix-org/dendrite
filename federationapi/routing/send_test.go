@@ -211,10 +211,10 @@ func (t *testRoomserverAPI) QueryStateAndAuthChain(
 }
 
 // Query a given amount (or less) of events prior to a given set of events.
-func (t *testRoomserverAPI) QueryBackfill(
+func (t *testRoomserverAPI) PerformBackfill(
 	ctx context.Context,
-	request *api.QueryBackfillRequest,
-	response *api.QueryBackfillResponse,
+	request *api.PerformBackfillRequest,
+	response *api.PerformBackfillResponse,
 ) error {
 	return fmt.Errorf("not implemented")
 }

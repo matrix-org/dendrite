@@ -165,14 +165,14 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		RoomserverQueryBackfillPath,
-		internal.MakeInternalAPI("QueryBackfill", func(req *http.Request) util.JSONResponse {
-			var request api.QueryBackfillRequest
-			var response api.QueryBackfillResponse
+		RoomserverPerformBackfillPath,
+		internal.MakeInternalAPI("PerformBackfill", func(req *http.Request) util.JSONResponse {
+			var request api.PerformBackfillRequest
+			var response api.PerformBackfillResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
-			if err := r.QueryBackfill(req.Context(), &request, &response); err != nil {
+			if err := r.PerformBackfill(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
