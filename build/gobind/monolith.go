@@ -1,30 +1,14 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package main
+package gobind
 
 import (
 	"context"
 	"crypto/tls"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/eduserver"
@@ -37,19 +21,28 @@ import (
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	instanceName = flag.String("name", "dendrite-p2p-ygg", "the name of this P2P demo instance")
-	instancePort = flag.Int("port", 8008, "the port that the client API will listen on")
-	instancePeer = flag.String("peer", "", "an internet Yggdrasil peer to connect to")
-)
+type DendriteMonolith struct {
+	StorageDirectory string
+	listener         net.Listener
+}
 
-// nolint:gocyclo
-func main() {
-	flag.Parse()
+func (m *DendriteMonolith) BaseURL() string {
+	return fmt.Sprintf("http://%s", m.listener.Addr().String())
+}
+
+func (m *DendriteMonolith) Start() {
+	logger := logrus.Logger{
+		Out: BindLogger{},
+	}
+
+	var err error
+	m.listener, err = net.Listen("tcp", "localhost:0")
+	if err != nil {
+		panic(err)
+	}
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
@@ -63,7 +56,7 @@ func main() {
 		},
 	}
 
-	ygg, err := yggconn.Setup(*instanceName, *instancePeer, ".")
+	ygg, err := yggconn.Setup("dendrite", "", m.StorageDirectory)
 	if err != nil {
 		panic(err)
 	}
@@ -77,16 +70,16 @@ func main() {
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
 	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
-	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
-	cfg.Database.SyncAPI = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
-	cfg.Database.RoomServer = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
-	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
-	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.Database.PublicRoomsAPI = config.DataSource(fmt.Sprintf("file:%s-publicroomsa.db", *instanceName))
-	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
+	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s/dendrite-account.db", m.StorageDirectory))
+	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s/dendrite-device.db", m.StorageDirectory))
+	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s/dendrite-mediaapi.db", m.StorageDirectory))
+	cfg.Database.SyncAPI = config.DataSource(fmt.Sprintf("file:%s/dendrite-syncapi.db", m.StorageDirectory))
+	cfg.Database.RoomServer = config.DataSource(fmt.Sprintf("file:%s/dendrite-roomserver.db", m.StorageDirectory))
+	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s/dendrite-serverkey.db", m.StorageDirectory))
+	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s/dendrite-federationsender.db", m.StorageDirectory))
+	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s/dendrite-appservice.db", m.StorageDirectory))
+	cfg.Database.PublicRoomsAPI = config.DataSource(fmt.Sprintf("file:%s/dendrite-publicroomsa.db", m.StorageDirectory))
+	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s/dendrite-naffka.db", m.StorageDirectory))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -120,10 +113,8 @@ func main() {
 
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
+		logger.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-
-	embed.Embed(*instancePort, "Yggdrasil Demo")
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -138,7 +129,6 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
-		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB: publicRoomsDB,
 	}
@@ -153,14 +143,11 @@ func main() {
 	)
 
 	go func() {
-		logrus.Info("Listening on ", ygg.DerivedServerName())
-		logrus.Fatal(httpServer.Serve(ygg))
+		logger.Info("Listening on ", ygg.DerivedServerName())
+		logger.Fatal(httpServer.Serve(ygg))
 	}()
 	go func() {
-		httpBindAddr := fmt.Sprintf("localhost:%d", *instancePort)
-		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
+		logger.Info("Listening on ", m.BaseURL())
+		logger.Fatal(http.Serve(m.listener, nil))
 	}()
-
-	select {}
 }
