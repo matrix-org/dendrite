@@ -104,8 +104,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		"room_version": ev.RoomVersion,
 	}).Info("received event from roomserver")
 
-	addsStateEvents := []gomatrixserverlib.HeaderedEvent{ev}
-	addsStateEvents = append(addsStateEvents, msg.AddStateEvents...)
+	addsStateEvents := msg.AddsState()
 
 	ev, err := s.updateStateEvent(ev)
 	if err != nil {

@@ -84,8 +84,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	events := []gomatrixserverlib.HeaderedEvent{output.NewRoomEvent.Event}
-	events = append(events, output.NewRoomEvent.AddStateEvents...)
-
-	return s.db.UpdateMemberships(context.TODO(), gomatrixserverlib.UnwrapEventHeaders(events), output.NewRoomEvent.RemovesStateEventIDs)
+	return s.db.UpdateMemberships(
+		context.TODO(),
+		gomatrixserverlib.UnwrapEventHeaders(output.NewRoomEvent.AddsState()),
+		output.NewRoomEvent.RemovesStateEventIDs,
+	)
 }

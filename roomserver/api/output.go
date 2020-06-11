@@ -119,6 +119,26 @@ type OutputNewRoomEvent struct {
 	TransactionID *TransactionID `json:"transaction_id"`
 }
 
+// AddsState returns all added state events from this event.
+//
+// This function is needed because `AddStateEvents` will not include a copy of
+// the original event to save space, so you cannot use that slice alone.
+// Instead, use this function which will add the original event if it is present
+// in `AddsStateEventIDs`.
+func (ore *OutputNewRoomEvent) AddsState() []gomatrixserverlib.HeaderedEvent {
+	includeOutputEvent := false
+	for _, id := range ore.AddsStateEventIDs {
+		if id == ore.Event.EventID() {
+			includeOutputEvent = true
+			break
+		}
+	}
+	if !includeOutputEvent {
+		return ore.AddStateEvents
+	}
+	return append(ore.AddStateEvents, ore.Event)
+}
+
 // An OutputNewInviteEvent is written whenever an invite becomes active.
 // Invite events can be received outside of an existing room so have to be
 // tracked separately from the room events themselves.

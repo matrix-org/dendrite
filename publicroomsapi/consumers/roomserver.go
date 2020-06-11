@@ -86,7 +86,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	var addQueryEvents, remQueryEvents []gomatrixserverlib.Event
-	for _, headeredEvent := range output.NewRoomEvent.AddStateEvents {
+	for _, headeredEvent := range output.NewRoomEvent.AddsState() {
 		addQueryEvents = append(addQueryEvents, headeredEvent.Event)
 	}
 	addQueryEvents = append(addQueryEvents, output.NewRoomEvent.Event.Unwrap())
