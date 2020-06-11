@@ -89,10 +89,10 @@ type RoomserverInternalAPI interface {
 	) error
 
 	// Query a given amount (or less) of events prior to a given set of events.
-	QueryBackfill(
+	PerformBackfill(
 		ctx context.Context,
-		request *QueryBackfillRequest,
-		response *QueryBackfillResponse,
+		request *PerformBackfillRequest,
+		response *PerformBackfillResponse,
 	) error
 
 	// Asks for the default room version as preferred by the server.

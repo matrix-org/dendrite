@@ -375,15 +375,15 @@ func (e eventsByDepth) Less(i, j int) bool {
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
 func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
-	var res api.QueryBackfillResponse
-	err := r.rsAPI.QueryBackfill(context.Background(), &api.QueryBackfillRequest{
+	var res api.PerformBackfillResponse
+	err := r.rsAPI.PerformBackfill(context.Background(), &api.PerformBackfillRequest{
 		RoomID:               roomID,
 		BackwardsExtremities: backwardsExtremities,
 		Limit:                limit,
 		ServerName:           r.cfg.Matrix.ServerName,
 	}, &res)
 	if err != nil {
-		return nil, fmt.Errorf("QueryBackfill failed: %w", err)
+		return nil, fmt.Errorf("PerformBackfill failed: %w", err)
 	}
 	util.GetLogger(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
 

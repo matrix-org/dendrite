@@ -18,7 +18,6 @@ package api
 
 import (
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -202,34 +201,6 @@ type QueryStateAndAuthChainResponse struct {
 	// The lists will be in an arbitrary order.
 	StateEvents     []gomatrixserverlib.HeaderedEvent `json:"state_events"`
 	AuthChainEvents []gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
-}
-
-// QueryBackfillRequest is a request to QueryBackfill.
-type QueryBackfillRequest struct {
-	// The room to backfill
-	RoomID string `json:"room_id"`
-	// A map of backwards extremity event ID to a list of its prev_event IDs.
-	BackwardsExtremities map[string][]string `json:"backwards_extremities"`
-	// The maximum number of events to retrieve.
-	Limit int `json:"limit"`
-	// The server interested in the events.
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
-}
-
-// PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.
-func (r *QueryBackfillRequest) PrevEventIDs() []string {
-	var prevEventIDs []string
-	for _, pes := range r.BackwardsExtremities {
-		prevEventIDs = append(prevEventIDs, pes...)
-	}
-	prevEventIDs = util.UniqueStrings(prevEventIDs)
-	return prevEventIDs
-}
-
-// QueryBackfillResponse is a response to QueryBackfill.
-type QueryBackfillResponse struct {
-	// Missing events, arbritrary order.
-	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
 // QueryRoomVersionCapabilitiesRequest asks for the default room version

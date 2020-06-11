@@ -24,8 +24,9 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformJoinPath  = "/roomserver/performJoin"
-	RoomserverPerformLeavePath = "/roomserver/performLeave"
+	RoomserverPerformJoinPath     = "/roomserver/performJoin"
+	RoomserverPerformLeavePath    = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -36,7 +37,6 @@ const (
 	RoomserverQueryServerAllowedToSeeEventPath = "/roomserver/queryServerAllowedToSeeEvent"
 	RoomserverQueryMissingEventsPath           = "/roomserver/queryMissingEvents"
 	RoomserverQueryStateAndAuthChainPath       = "/roomserver/queryStateAndAuthChain"
-	RoomserverQueryBackfillPath                = "/roomserver/queryBackfill"
 	RoomserverQueryRoomVersionCapabilitiesPath = "/roomserver/queryRoomVersionCapabilities"
 	RoomserverQueryRoomVersionForRoomPath      = "/roomserver/queryRoomVersionForRoom"
 )
@@ -274,16 +274,16 @@ func (h *httpRoomserverInternalAPI) QueryStateAndAuthChain(
 	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// QueryBackfill implements RoomServerQueryAPI
-func (h *httpRoomserverInternalAPI) QueryBackfill(
+// PerformBackfill implements RoomServerQueryAPI
+func (h *httpRoomserverInternalAPI) PerformBackfill(
 	ctx context.Context,
-	request *api.QueryBackfillRequest,
-	response *api.QueryBackfillResponse,
+	request *api.PerformBackfillRequest,
+	response *api.PerformBackfillResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBackfill")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformBackfill")
 	defer span.Finish()
 
-	apiURL := h.roomserverURL + RoomserverQueryBackfillPath
+	apiURL := h.roomserverURL + RoomserverPerformBackfillPath
 	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
