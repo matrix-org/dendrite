@@ -17,7 +17,6 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
@@ -105,17 +104,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		"room_version": ev.RoomVersion,
 	}).Info("received event from roomserver")
 
-	addsStateEvents, err := s.lookupStateEvents(msg.AddsStateEventIDs, ev)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"event":      string(ev.JSON()),
-			log.ErrorKey: err,
-			"add":        msg.AddsStateEventIDs,
-			"del":        msg.RemovesStateEventIDs,
-		}).Panicf("roomserver output log: state event lookup failure")
-	}
+	addsStateEvents := []gomatrixserverlib.HeaderedEvent{ev}
+	addsStateEvents = append(addsStateEvents, msg.AddStateEvents...)
 
-	ev, err = s.updateStateEvent(ev)
+	ev, err := s.updateStateEvent(ev)
 	if err != nil {
 		return err
 	}
@@ -185,63 +177,6 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	return nil
 }
 
-// lookupStateEvents looks up the state events that are added by a new event.
-func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.HeaderedEvent,
-) ([]gomatrixserverlib.HeaderedEvent, error) {
-	// Fast path if there aren't any new state events.
-	if len(addsStateEventIDs) == 0 {
-		return nil, nil
-	}
-
-	// Fast path if the only state event added is the event itself.
-	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.HeaderedEvent{event}, nil
-	}
-
-	// Check if this is re-adding a state events that we previously processed
-	// If we have previously received a state event it may still be in
-	// our event database.
-	result, err := s.db.Events(context.TODO(), addsStateEventIDs)
-	if err != nil {
-		return nil, err
-	}
-	missing := missingEventsFrom(result, addsStateEventIDs)
-
-	// Check if event itself is being added.
-	for _, eventID := range missing {
-		if eventID == event.EventID() {
-			result = append(result, event)
-			break
-		}
-	}
-	missing = missingEventsFrom(result, addsStateEventIDs)
-
-	if len(missing) == 0 {
-		return result, nil
-	}
-
-	// At this point the missing events are neither the event itself nor are
-	// they present in our local database. Our only option is to fetch them
-	// from the roomserver using the query API.
-	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
-	var eventResp api.QueryEventsByIDResponse
-	if err := s.rsAPI.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
-		return nil, err
-	}
-
-	result = append(result, eventResp.Events...)
-	missing = missingEventsFrom(result, addsStateEventIDs)
-
-	if len(missing) != 0 {
-		return nil, fmt.Errorf(
-			"missing %d state events IDs at event %q", len(missing), event.EventID(),
-		)
-	}
-
-	return result, nil
-}
-
 func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.HeaderedEvent) (gomatrixserverlib.HeaderedEvent, error) {
 	var stateKey string
 	if event.StateKey() == nil {
@@ -269,18 +204,4 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.Heade
 
 	event.Event, err = event.SetUnsigned(prev)
 	return event, err
-}
-
-func missingEventsFrom(events []gomatrixserverlib.HeaderedEvent, required []string) []string {
-	have := map[string]bool{}
-	for _, event := range events {
-		have[event.EventID()] = true
-	}
-	var missing []string
-	for _, eventID := range required {
-		if !have[eventID] {
-			missing = append(missing, eventID)
-		}
-	}
-	return missing
 }

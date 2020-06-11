@@ -63,6 +63,13 @@ type OutputNewRoomEvent struct {
 	// Together with RemovesStateEventIDs this allows the receiver to keep an up to date
 	// view of the current state of the room.
 	AddsStateEventIDs []string `json:"adds_state_event_ids"`
+	// All extra newly added state events. This is only set if there are *extra* events
+	// other than `Event`. This can happen when forks get merged because state resolution
+	// may decide a bunch of state events on one branch are now valid, so they will be
+	// present in this list. This is useful when trying to maintain the current state of a room
+	// as to do so you need to include both these events and `Event`.
+	AddStateEvents []gomatrixserverlib.HeaderedEvent `json:"adds_state_events"`
+
 	// The state event IDs that were removed from the state of the room by this event.
 	RemovesStateEventIDs []string `json:"removes_state_event_ids"`
 	// The ID of the event that was output before this event.
