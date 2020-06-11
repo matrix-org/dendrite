@@ -42,7 +42,7 @@ func (n *Node) listenFromYgg() {
 		var session *yamux.Session
 		// If the remote address is lower than ours then we'll be the
 		// server. Otherwse we'll be the client.
-		if strings.Compare(conn.RemoteAddr().String(), n.DerivedServerName()) < 0 {
+		if strings.Compare(conn.RemoteAddr().String(), n.DerivedSessionName()) < 0 {
 			session, err = yamux.Server(conn, n.yamuxConfig())
 		} else {
 			session, err = yamux.Client(conn, n.yamuxConfig())
@@ -105,7 +105,7 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 		}
 		// If the remote address is lower than ours then we will be the
 		// server. Otherwise we'll be the client.
-		if strings.Compare(conn.RemoteAddr().String(), n.DerivedServerName()) < 0 {
+		if strings.Compare(conn.RemoteAddr().String(), n.DerivedSessionName()) < 0 {
 			session, err = yamux.Server(conn, n.yamuxConfig())
 		} else {
 			session, err = yamux.Client(conn, n.yamuxConfig())
