@@ -65,13 +65,6 @@ type RoomserverInternalAPI interface {
 		response *QueryMembershipsForRoomResponse,
 	) error
 
-	// Query a list of invite event senders for a user in a room.
-	QueryInvitesForUser(
-		ctx context.Context,
-		request *QueryInvitesForUserRequest,
-		response *QueryInvitesForUserResponse,
-	) error
-
 	// Query whether a server is allowed to see an event
 	QueryServerAllowedToSeeEvent(
 		ctx context.Context,

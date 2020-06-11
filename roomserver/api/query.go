@@ -140,23 +140,6 @@ type QueryMembershipsForRoomResponse struct {
 	HasBeenInRoom bool `json:"has_been_in_room"`
 }
 
-// QueryInvitesForUserRequest is a request to QueryInvitesForUser
-type QueryInvitesForUserRequest struct {
-	// The room ID to look up invites in.
-	RoomID string `json:"room_id"`
-	// The User ID to look up invites for.
-	TargetUserID string `json:"target_user_id"`
-}
-
-// QueryInvitesForUserResponse is a response to QueryInvitesForUser
-// This is used when accepting an invite or rejecting a invite to tell which
-// remote matrix servers to contact.
-type QueryInvitesForUserResponse struct {
-	// A list of matrix user IDs for each sender of an active invite targeting
-	// the requested user ID.
-	InviteSenderUserIDs []string `json:"invite_sender_user_ids"`
-}
-
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent
 type QueryServerAllowedToSeeEventRequest struct {
 	// The event ID to look up invites in.

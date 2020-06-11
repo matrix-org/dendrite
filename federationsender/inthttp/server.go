@@ -13,20 +13,6 @@ import (
 // AddRoutes adds the FederationSenderInternalAPI handlers to the http.ServeMux.
 func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(
-		FederationSenderQueryJoinedHostsInRoomPath,
-		internal.MakeInternalAPI("QueryJoinedHostsInRoom", func(req *http.Request) util.JSONResponse {
-			var request api.QueryJoinedHostsInRoomRequest
-			var response api.QueryJoinedHostsInRoomResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := intAPI.QueryJoinedHostsInRoom(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(
 		FederationSenderQueryJoinedHostServerNamesInRoomPath,
 		internal.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryJoinedHostServerNamesInRoomRequest

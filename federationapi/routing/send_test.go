@@ -181,15 +181,6 @@ func (t *testRoomserverAPI) QueryMembershipsForRoom(
 	return fmt.Errorf("not implemented")
 }
 
-// Query a list of invite event senders for a user in a room.
-func (t *testRoomserverAPI) QueryInvitesForUser(
-	ctx context.Context,
-	request *api.QueryInvitesForUserRequest,
-	response *api.QueryInvitesForUserResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
 // Query whether a server is allowed to see an event
 func (t *testRoomserverAPI) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
