@@ -28,6 +28,7 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/eduserver"
@@ -166,6 +167,8 @@ func main() {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
+	embed.Embed(*instancePort, "Yggdrasil Demo")
+
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
@@ -198,7 +201,7 @@ func main() {
 		logrus.Fatal(httpServer.Serve(ygg))
 	}()
 	go func() {
-		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
+		httpBindAddr := fmt.Sprintf("localhost:%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
 		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
 	}()
