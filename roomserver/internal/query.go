@@ -353,40 +353,6 @@ func getMembershipsAtState(
 	return events, nil
 }
 
-// QueryInvitesForUser implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryInvitesForUser(
-	ctx context.Context,
-	request *api.QueryInvitesForUserRequest,
-	response *api.QueryInvitesForUserResponse,
-) error {
-	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
-	if err != nil {
-		return err
-	}
-
-	targetUserNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{request.TargetUserID})
-	if err != nil {
-		return err
-	}
-	targetUserNID := targetUserNIDs[request.TargetUserID]
-
-	senderUserNIDs, err := r.DB.GetInvitesForUser(ctx, roomNID, targetUserNID)
-	if err != nil {
-		return err
-	}
-
-	senderUserIDs, err := r.DB.EventStateKeys(ctx, senderUserNIDs)
-	if err != nil {
-		return err
-	}
-
-	for _, senderUserID := range senderUserIDs {
-		response.InviteSenderUserIDs = append(response.InviteSenderUserIDs, senderUserID)
-	}
-
-	return nil
-}
-
 // QueryServerAllowedToSeeEvent implements api.RoomserverInternalAPI
 func (r *RoomserverInternalAPI) QueryServerAllowedToSeeEvent(
 	ctx context.Context,

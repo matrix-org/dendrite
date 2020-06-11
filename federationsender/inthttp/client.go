@@ -12,7 +12,6 @@ import (
 
 // HTTP paths for the internal HTTP API
 const (
-	FederationSenderQueryJoinedHostsInRoomPath           = "/federationsender/queryJoinedHostsInRoom"
 	FederationSenderQueryJoinedHostServerNamesInRoomPath = "/federationsender/queryJoinedHostServerNamesInRoom"
 
 	FederationSenderPerformDirectoryLookupRequestPath = "/federationsender/performDirectoryLookup"
@@ -70,19 +69,6 @@ func (h *httpFederationSenderInternalAPI) QueryJoinedHostServerNamesInRoom(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderQueryJoinedHostServerNamesInRoomPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryJoinedHostsInRoom implements FederationSenderInternalAPI
-func (h *httpFederationSenderInternalAPI) QueryJoinedHostsInRoom(
-	ctx context.Context,
-	request *api.QueryJoinedHostsInRoomRequest,
-	response *api.QueryJoinedHostsInRoomResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryJoinedHostsInRoom")
-	defer span.Finish()
-
-	apiURL := h.federationSenderURL + FederationSenderQueryJoinedHostsInRoomPath
 	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

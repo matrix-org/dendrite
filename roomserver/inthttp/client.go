@@ -33,7 +33,6 @@ const (
 	RoomserverQueryEventsByIDPath              = "/roomserver/queryEventsByID"
 	RoomserverQueryMembershipForUserPath       = "/roomserver/queryMembershipForUser"
 	RoomserverQueryMembershipsForRoomPath      = "/roomserver/queryMembershipsForRoom"
-	RoomserverQueryInvitesForUserPath          = "/roomserver/queryInvitesForUser"
 	RoomserverQueryServerAllowedToSeeEventPath = "/roomserver/queryServerAllowedToSeeEvent"
 	RoomserverQueryMissingEventsPath           = "/roomserver/queryMissingEvents"
 	RoomserverQueryStateAndAuthChainPath       = "/roomserver/queryStateAndAuthChain"
@@ -233,19 +232,6 @@ func (h *httpRoomserverInternalAPI) QueryMembershipsForRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryInvitesForUser implements RoomserverQueryAPI
-func (h *httpRoomserverInternalAPI) QueryInvitesForUser(
-	ctx context.Context,
-	request *api.QueryInvitesForUserRequest,
-	response *api.QueryInvitesForUserResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryInvitesForUser")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryInvitesForUserPath
 	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
