@@ -82,7 +82,9 @@ func createFederationClient(
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{
 			inner: &http.Transport{
-				DialContext: yggdialerctx,
+				ResponseHeaderTimeout: 15 * time.Second,
+				IdleConnTimeout:       60 * time.Second,
+				DialContext:           yggdialerctx,
 			},
 		},
 	)
@@ -99,9 +101,9 @@ func main() {
 	httpServer := &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-		IdleTimeout:  15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 45 * time.Second,
+		IdleTimeout:  60 * time.Second,
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},

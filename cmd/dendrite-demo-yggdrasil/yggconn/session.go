@@ -26,7 +26,7 @@ import (
 func (n *Node) yamuxConfig() *yamux.Config {
 	cfg := yamux.DefaultConfig()
 	cfg.EnableKeepAlive = false
-	cfg.ConnectionWriteTimeout = time.Second * 5
+	cfg.ConnectionWriteTimeout = time.Second * 15
 	cfg.MaxMessageSize = 65535
 	cfg.ReadBufSize = 655350
 	return cfg
