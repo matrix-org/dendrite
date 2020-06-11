@@ -2,6 +2,7 @@ package caching
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -23,9 +24,17 @@ func (c Caches) GetServerKey(
 	request gomatrixserverlib.PublicKeyLookupRequest,
 ) (gomatrixserverlib.PublicKeyLookupResult, bool) {
 	key := fmt.Sprintf("%s/%s", request.ServerName, request.KeyID)
+	now := gomatrixserverlib.AsTimestamp(time.Now())
 	val, found := c.ServerKeys.Get(key)
 	if found && val != nil {
 		if keyLookupResult, ok := val.(gomatrixserverlib.PublicKeyLookupResult); ok {
+			if !keyLookupResult.WasValidAt(now, true) {
+				// We appear to be past the key validity so don't return this
+				// with the results. This ensures that the cache doesn't return
+				// values that are not useful to us.
+				c.ServerKeys.Unset(key)
+				return gomatrixserverlib.PublicKeyLookupResult{}, false
+			}
 			return keyLookupResult, true
 		}
 	}
