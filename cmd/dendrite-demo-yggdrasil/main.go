@@ -157,7 +157,7 @@ func main() {
 		logrus.Fatal(httpServer.Serve(ygg))
 	}()
 	go func() {
-		httpBindAddr := fmt.Sprintf("localhost:%d", *instancePort)
+		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
 		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
 	}()

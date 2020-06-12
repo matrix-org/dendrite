@@ -27,8 +27,10 @@ import (
 )
 
 type deviceJSON struct {
-	DeviceID string `json:"device_id"`
-	UserID   string `json:"user_id"`
+	DeviceID    string `json:"device_id"`
+	DisplayName string `json:"display_name"`
+	LastSeenIP  string `json:"last_seen_ip"`
+	LastSeenTS  uint64 `json:"last_seen_ts"`
 }
 
 type devicesJSON struct {
@@ -70,7 +72,6 @@ func GetDeviceByID(
 		Code: http.StatusOK,
 		JSON: deviceJSON{
 			DeviceID: dev.ID,
-			UserID:   dev.UserID,
 		},
 	}
 }
@@ -98,7 +99,6 @@ func GetDevicesByLocalpart(
 	for _, dev := range deviceList {
 		res.Devices = append(res.Devices, deviceJSON{
 			DeviceID: dev.ID,
-			UserID:   dev.UserID,
 		})
 	}
 

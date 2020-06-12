@@ -506,7 +506,11 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
+	resp := handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
+	j, _ := json.MarshalIndent(resp, "", "  ")
+	fmt.Println("ERROR!")
+	fmt.Println(string(j))
+	return resp
 }
 
 func handleGuestRegistration(

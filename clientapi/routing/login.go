@@ -15,6 +15,8 @@
 package routing
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"context"
@@ -45,13 +47,20 @@ type loginIdentifier struct {
 	User string `json:"user"`
 }
 
-type passwordRequest struct {
+type loginWithPasswordRequest struct {
 	Identifier loginIdentifier `json:"identifier"`
-	Password   string          `json:"password"`
+	Medium     string          `json:"medium"`   // third-party only
+	Password   string          `json:"password"` // m.login.password only
+	Token      string          `json:"token"`    // m.login.token only
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
 	DeviceID           *string `json:"device_id"`
+}
+
+type loginRequest struct {
+	Type string `json:"type"`
+	loginWithPasswordRequest
 }
 
 type loginResponse struct {
@@ -79,44 +88,68 @@ func Login(
 			JSON: passwordLogin(),
 		}
 	} else if req.Method == http.MethodPost {
-		var r passwordRequest
+		var temp interface{}
 		var acc *authtypes.Account
-		resErr := httputil.UnmarshalJSONRequest(req, &r)
+		resErr := httputil.UnmarshalJSONRequest(req, &temp)
 		if resErr != nil {
 			return *resErr
 		}
-		switch r.Identifier.Type {
-		case "m.id.user":
-			if r.Identifier.User == "" {
+
+		j, _ := json.MarshalIndent(temp, "", "  ")
+		fmt.Println(string(j))
+
+		var r loginRequest
+		json.Unmarshal(j, &r)
+
+		switch r.Type {
+		case "m.login.password":
+			j, _ := json.MarshalIndent(r, "", "  ")
+			fmt.Printf("LOGIN REQUEST: %+v\n", string(j))
+			switch r.Identifier.Type {
+			case "m.id.user":
+				if r.Identifier.User == "" {
+					return util.JSONResponse{
+						Code: http.StatusBadRequest,
+						JSON: jsonerror.BadJSON("'user' must be supplied."),
+					}
+				}
+
+				util.GetLogger(req.Context()).WithField("user", r.Identifier.User).Info("Processing login request")
+
+				localpart, err := userutil.ParseUsernameParam(r.Identifier.User, &cfg.Matrix.ServerName)
+				if err != nil {
+					return util.JSONResponse{
+						Code: http.StatusBadRequest,
+						JSON: jsonerror.InvalidUsername(err.Error()),
+					}
+				}
+
+				acc, err = accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
+				if err != nil {
+					// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+					// but that would leak the existence of the user.
+					return util.JSONResponse{
+						Code: http.StatusForbidden,
+						JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+					}
+				}
+
+			case "m.login.token":
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.BadJSON("'user' must be supplied."),
+					JSON: jsonerror.Unknown("Token login is not supported"),
 				}
-			}
 
-			util.GetLogger(req.Context()).WithField("user", r.Identifier.User).Info("Processing login request")
-
-			localpart, err := userutil.ParseUsernameParam(r.Identifier.User, &cfg.Matrix.ServerName)
-			if err != nil {
+			default:
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername(err.Error()),
-				}
-			}
-
-			acc, err = accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
-			if err != nil {
-				// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
-				// but that would leak the existence of the user.
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+					JSON: jsonerror.Unknown("login identifier '" + r.Identifier.Type + "' not supported"),
 				}
 			}
 		default:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("login identifier '" + r.Identifier.Type + "' not supported"),
+				JSON: jsonerror.Unknown(fmt.Sprintf("Login type %q not supported", r.Type)),
 			}
 		}
 
@@ -126,7 +159,7 @@ func Login(
 			return jsonerror.InternalServerError()
 		}
 
-		dev, err := getDevice(req.Context(), r, deviceDB, acc, token)
+		dev, err := getDevice(req.Context(), r.loginWithPasswordRequest, deviceDB, acc, token)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -153,7 +186,7 @@ func Login(
 // getDevice returns a new or existing device
 func getDevice(
 	ctx context.Context,
-	r passwordRequest,
+	r loginWithPasswordRequest,
 	deviceDB devices.Database,
 	acc *authtypes.Account,
 	token string,
