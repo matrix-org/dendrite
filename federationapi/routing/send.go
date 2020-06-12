@@ -377,8 +377,7 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 	// at this point we know we're going to have a gap: we need to work out the room state at the new backwards extremity.
 	// security: we have to do state resolution on the new backwards extremity (TODO: WHY)
 	// Therefore, we cannot just query /state_ids with this event to get the state before. Instead, we need to query
-	// the state AFTER all the prev_events for this event, then mix in our current room state and apply state resolution
-	// to that to get the state before the event.
+	// the state AFTER all the prev_events for this event, then apply state resolution to that to get the state before the event.
 	var states []*gomatrixserverlib.RespState
 	needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{*backwardsExtremity}).Tuples()
 	for _, prevEventID := range backwardsExtremity.PrevEventIDs() {
@@ -390,13 +389,6 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 		}
 		states = append(states, prevState)
 	}
-	// mix in the current room state
-	currState, err := t.lookupCurrentState(backwardsExtremity)
-	if err != nil {
-		util.GetLogger(t.context).WithError(err).Errorf("Failed to lookup current room state")
-		return err
-	}
-	states = append(states, currState)
 	resolvedState, err := t.resolveStatesAndCheck(roomVersion, states, backwardsExtremity)
 	if err != nil {
 		util.GetLogger(t.context).WithError(err).Errorf("Failed to resolve state conflicts for event %s", backwardsExtremity.EventID())
