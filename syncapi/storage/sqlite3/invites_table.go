@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -123,7 +124,7 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
 ) (map[string]gomatrixserverlib.HeaderedEvent, error) {
-	stmt := internal.TxStmt(txn, s.selectInviteEventsInRangeStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
 	if err != nil {
 		return nil, err
@@ -153,7 +154,7 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := internal.TxStmt(txn, s.selectMaxInviteIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectMaxInviteIDStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64

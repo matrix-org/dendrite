@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/util"
 )
 
@@ -14,7 +14,7 @@ import (
 func AddRoutes(a api.AppServiceQueryAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(
 		AppServiceRoomAliasExistsPath,
-		internal.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
 			var request api.RoomAliasExistsRequest
 			var response api.RoomAliasExistsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -28,7 +28,7 @@ func AddRoutes(a api.AppServiceQueryAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		AppServiceUserIDExistsPath,
-		internal.MakeInternalAPI("appserviceUserIDExists", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("appserviceUserIDExists", func(req *http.Request) util.JSONResponse {
 			var request api.UserIDExistsRequest
 			var response api.UserIDExistsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

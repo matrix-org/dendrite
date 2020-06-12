@@ -21,7 +21,7 @@ import (
 	"errors"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -106,7 +106,7 @@ func (s *roomStatements) InsertRoomNID(
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var roomNID int64
-	stmt := internal.TxStmt(txn, s.insertRoomNIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID, roomVersion).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
@@ -115,7 +115,7 @@ func (s *roomStatements) SelectRoomNID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (types.RoomNID, error) {
 	var roomNID int64
-	stmt := internal.TxStmt(txn, s.selectRoomNIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
@@ -143,7 +143,7 @@ func (s *roomStatements) SelectLatestEventsNIDsForUpdate(
 	var nids pq.Int64Array
 	var lastEventSentNID int64
 	var stateSnapshotNID int64
-	stmt := internal.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
 	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, 0, err
@@ -163,7 +163,7 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 	lastEventSentNID types.EventNID,
 	stateSnapshotNID types.StateSnapshotNID,
 ) error {
-	stmt := internal.TxStmt(txn, s.updateLatestEventNIDsStmt)
+	stmt := sqlutil.TxStmt(txn, s.updateLatestEventNIDsStmt)
 	_, err := stmt.ExecContext(
 		ctx,
 		roomNID,
@@ -178,7 +178,7 @@ func (s *roomStatements) SelectRoomVersionForRoomID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
 	var roomVersion gomatrixserverlib.RoomVersion
-	stmt := internal.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
 	if err == sql.ErrNoRows {
 		return roomVersion, errors.New("room not found")

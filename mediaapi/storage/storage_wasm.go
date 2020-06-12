@@ -18,14 +18,14 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/storage/sqlite3"
 )
 
 // Open opens a postgres database.
 func Open(
 	dataSourceName string,
-	dbProperties internal.DbProperties, // nolint:unparam
+	dbProperties sqlutil.DbProperties, // nolint:unparam
 ) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {

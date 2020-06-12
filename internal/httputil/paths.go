@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !wasm
+package httputil
 
-package internal
-
-import "github.com/lib/pq"
-
-// IsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation error
-func IsUniqueConstraintViolationErr(err error) bool {
-	pqErr, ok := err.(*pq.Error)
-	return ok && pqErr.Code == "23505"
-}
+const (
+	PublicPathPrefix   = "/_matrix/"
+	InternalPathPrefix = "/api/"
+)

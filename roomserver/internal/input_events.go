@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -177,7 +177,7 @@ func (r *RoomserverInternalAPI) processInviteEvent(
 	}
 	succeeded := false
 	defer func() {
-		txerr := internal.EndTransaction(updater, &succeeded)
+		txerr := sqlutil.EndTransaction(updater, &succeeded)
 		if err == nil && txerr != nil {
 			err = txerr
 		}

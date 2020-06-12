@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -95,7 +95,7 @@ func (s *roomStatements) InsertRoomNID(
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var err error
-	insertStmt := internal.TxStmt(txn, s.insertRoomNIDStmt)
+	insertStmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
 	if _, err = insertStmt.ExecContext(ctx, roomID, roomVersion); err == nil {
 		return s.SelectRoomNID(ctx, txn, roomID)
 	} else {
@@ -107,7 +107,7 @@ func (s *roomStatements) SelectRoomNID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (types.RoomNID, error) {
 	var roomNID int64
-	stmt := internal.TxStmt(txn, s.selectRoomNIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
@@ -118,7 +118,7 @@ func (s *roomStatements) SelectLatestEventNIDs(
 	var eventNIDs []types.EventNID
 	var nidsJSON string
 	var stateSnapshotNID int64
-	stmt := internal.TxStmt(txn, s.selectLatestEventNIDsStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectLatestEventNIDsStmt)
 	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nidsJSON, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, err
@@ -136,7 +136,7 @@ func (s *roomStatements) SelectLatestEventsNIDsForUpdate(
 	var nidsJSON string
 	var lastEventSentNID int64
 	var stateSnapshotNID int64
-	stmt := internal.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
 	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nidsJSON, &lastEventSentNID, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, 0, err
@@ -155,7 +155,7 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 	lastEventSentNID types.EventNID,
 	stateSnapshotNID types.StateSnapshotNID,
 ) error {
-	stmt := internal.TxStmt(txn, s.updateLatestEventNIDsStmt)
+	stmt := sqlutil.TxStmt(txn, s.updateLatestEventNIDsStmt)
 	_, err := stmt.ExecContext(
 		ctx,
 		eventNIDsAsArray(eventNIDs),
@@ -170,7 +170,7 @@ func (s *roomStatements) SelectRoomVersionForRoomID(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
 	var roomVersion gomatrixserverlib.RoomVersion
-	stmt := internal.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
 	if err == sql.ErrNoRows {
 		return roomVersion, errors.New("room not found")

@@ -17,13 +17,13 @@ import (
 
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "EDUServerAPI", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "EDUServerAPI", true)
 	defer func() {
 		if err := base.Close(); err != nil {
 			logrus.WithError(err).Warn("BaseDendrite close failed")

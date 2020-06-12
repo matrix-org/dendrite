@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,7 +32,7 @@ type SyncAPIProducer struct {
 func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string) error {
 	var m sarama.ProducerMessage
 
-	data := internal.AccountData{
+	data := eventutil.AccountData{
 		RoomID: roomID,
 		Type:   dataType,
 	}

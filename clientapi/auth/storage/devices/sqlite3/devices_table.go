@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -128,8 +128,8 @@ func (s *devicesStatements) insertDevice(
 ) (*authtypes.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
-	countStmt := internal.TxStmt(txn, s.selectDevicesCountStmt)
-	insertStmt := internal.TxStmt(txn, s.insertDeviceStmt)
+	countStmt := sqlutil.TxStmt(txn, s.selectDevicesCountStmt)
+	insertStmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
 	if err := countStmt.QueryRowContext(ctx).Scan(&sessionID); err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (s *devicesStatements) insertDevice(
 func (s *devicesStatements) deleteDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart string,
 ) error {
-	stmt := internal.TxStmt(txn, s.deleteDeviceStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteDeviceStmt)
 	_, err := stmt.ExecContext(ctx, id, localpart)
 	return err
 }
@@ -156,12 +156,12 @@ func (s *devicesStatements) deleteDevice(
 func (s *devicesStatements) deleteDevices(
 	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
 ) error {
-	orig := strings.Replace(deleteDevicesSQL, "($1)", internal.QueryVariadic(len(devices)), 1)
+	orig := strings.Replace(deleteDevicesSQL, "($1)", sqlutil.QueryVariadic(len(devices)), 1)
 	prep, err := s.db.Prepare(orig)
 	if err != nil {
 		return err
 	}
-	stmt := internal.TxStmt(txn, prep)
+	stmt := sqlutil.TxStmt(txn, prep)
 	params := make([]interface{}, len(devices)+1)
 	params[0] = localpart
 	for i, v := range devices {
@@ -175,7 +175,7 @@ func (s *devicesStatements) deleteDevices(
 func (s *devicesStatements) deleteDevicesByLocalpart(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) error {
-	stmt := internal.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
 	_, err := stmt.ExecContext(ctx, localpart)
 	return err
 }
@@ -183,7 +183,7 @@ func (s *devicesStatements) deleteDevicesByLocalpart(
 func (s *devicesStatements) updateDeviceName(
 	ctx context.Context, txn *sql.Tx, localpart, deviceID string, displayName *string,
 ) error {
-	stmt := internal.TxStmt(txn, s.updateDeviceNameStmt)
+	stmt := sqlutil.TxStmt(txn, s.updateDeviceNameStmt)
 	_, err := stmt.ExecContext(ctx, displayName, localpart, deviceID)
 	return err
 }

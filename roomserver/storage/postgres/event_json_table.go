@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
-
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"

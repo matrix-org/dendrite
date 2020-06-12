@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/appservice/api"
-	internalHTTP "github.com/matrix-org/dendrite/internal/http"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -46,7 +46,7 @@ func (h *httpAppServiceQueryAPI) RoomAliasExists(
 	defer span.Finish()
 
 	apiURL := h.appserviceURL + AppServiceRoomAliasExistsPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // UserIDExists implements AppServiceQueryAPI
@@ -59,5 +59,5 @@ func (h *httpAppServiceQueryAPI) UserIDExists(
 	defer span.Finish()
 
 	apiURL := h.appserviceURL + AppServiceUserIDExistsPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

@@ -21,11 +21,11 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string, dbProperties internal.DbProperties) (Database, error) {
+func NewDatabase(dataSourceName string, dbProperties sqlutil.DbProperties) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return postgres.NewDatabase(dataSourceName, dbProperties)

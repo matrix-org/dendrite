@@ -22,6 +22,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -85,7 +86,7 @@ func (s *joinedHostsStatements) insertJoinedHosts(
 	roomID, eventID string,
 	serverName gomatrixserverlib.ServerName,
 ) error {
-	stmt := internal.TxStmt(txn, s.insertJoinedHostsStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
 	_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
 	return err
 }
@@ -93,7 +94,7 @@ func (s *joinedHostsStatements) insertJoinedHosts(
 func (s *joinedHostsStatements) deleteJoinedHosts(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) error {
-	stmt := internal.TxStmt(txn, s.deleteJoinedHostsStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsStmt)
 	_, err := stmt.ExecContext(ctx, pq.StringArray(eventIDs))
 	return err
 }
@@ -101,7 +102,7 @@ func (s *joinedHostsStatements) deleteJoinedHosts(
 func (s *joinedHostsStatements) selectJoinedHostsWithTx(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) ([]types.JoinedHost, error) {
-	stmt := internal.TxStmt(txn, s.selectJoinedHostsStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectJoinedHostsStmt)
 	return joinedHostsFromStmt(ctx, stmt, roomID)
 }
 

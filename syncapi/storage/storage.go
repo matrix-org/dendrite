@@ -19,13 +19,13 @@ package storage
 import (
 	"net/url"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 )
 
 // NewSyncServerDatasource opens a database connection.
-func NewSyncServerDatasource(dataSourceName string, dbProperties internal.DbProperties) (Database, error) {
+func NewSyncServerDatasource(dataSourceName string, dbProperties sqlutil.DbProperties) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return postgres.NewDatabase(dataSourceName, dbProperties)
