@@ -127,7 +127,7 @@ func listenAndServe(t *testing.T, router *mux.Router) (apiURL string, cancel fun
 		srv.Handler = router
 		err := srv.Serve(listener)
 		if err != nil && err != http.ErrServerClosed {
-			t.Fatalf("Listen failed: %s", err)
+			t.Logf("Listen failed: %s", err)
 		}
 	}()
 

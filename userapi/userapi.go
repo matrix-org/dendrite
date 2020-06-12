@@ -16,11 +16,11 @@ package userapi
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -34,8 +34,8 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(accountDB accounts.Database, deviceDB devices.Database, serverName gomatrixserverlib.ServerName) api.UserInternalAPI {
 	return &internal.UserInternalAPI{
-		AccountDB: accountDB,
-		DeviceDB: deviceDB,
+		AccountDB:  accountDB,
+		DeviceDB:   deviceDB,
 		ServerName: serverName,
 	}
 }
